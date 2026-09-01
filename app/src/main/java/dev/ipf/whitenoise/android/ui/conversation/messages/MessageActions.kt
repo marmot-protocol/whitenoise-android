@@ -114,6 +114,7 @@ import kotlinx.coroutines.flow.map
 import java.util.Locale
 import java.util.UUID
 
+/** Anchored long-press action menu for one message. */
 @Composable
 internal fun MessageActionMenu(
     expanded: Boolean,
@@ -564,8 +565,11 @@ internal fun forwardTargetDisplayTitle(
             )
     }
 
-// No rows at all only when there are no chat rows to show AND no folder rows
-// matched — a query hitting only a folder name must still render that folder.
+/**
+ * True only when neither chat rows nor folder rows would render — no rows at
+ * all only when there are no chat rows to show AND no folder rows matched,
+ * because a query hitting only a folder name must still render that folder.
+ */
 internal fun forwardPickerHasNoRows(
     targetsEmpty: Boolean,
     filteredEmpty: Boolean,
@@ -883,6 +887,7 @@ internal fun RestoredForwardRequestHost(
     }
 }
 
+/** One circular quick-reaction emoji button. */
 @Composable
 private fun EmojiActionButton(
     emoji: String,

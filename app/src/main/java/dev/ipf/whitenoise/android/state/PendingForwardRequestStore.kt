@@ -41,12 +41,16 @@ internal data class PendingForwardRequest(
  * plaintext message text never reaches backups or the saved-state Bundle.
  */
 internal interface PendingForwardRequestStore {
+    /** Persists [request] as the single unresolved entry; false when it cannot be retained. */
     fun save(request: PendingForwardRequest): Boolean
 
+    /** Returns the single unresolved request, if a decodable one exists. */
     fun load(): PendingForwardRequest?
 
+    /** Removes the entry only when its id matches [requestId]. */
     fun remove(requestId: String)
 
+    /** Drops the unresolved entry unconditionally. */
     fun clear()
 }
 
@@ -59,6 +63,7 @@ internal class SerializedPendingForwardRequestStore(
     private val delegate: PendingForwardRequestStore,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
+    /** Serializes one save behind the process mutex on the IO dispatcher. */
     suspend fun save(request: PendingForwardRequest): Boolean =
         processMutex.withLock {
             withContext(ioDispatcher) {
@@ -68,15 +73,18 @@ internal class SerializedPendingForwardRequestStore(
             }
         }
 
+    /** Serializes one load behind the process mutex on the IO dispatcher. */
     suspend fun load(): PendingForwardRequest? =
         processMutex.withLock {
             withContext(ioDispatcher) { delegate.load() }
         }
 
+    /** Serializes one id-matched removal behind the process mutex. */
     suspend fun remove(requestId: String) {
         processMutex.withLock { withContext(ioDispatcher) { delegate.remove(requestId) } }
     }
 
+    /** Serializes an unconditional clear behind the process mutex. */
     suspend fun clear() {
         processMutex.withLock { withContext(ioDispatcher) { delegate.clear() } }
     }
@@ -90,6 +98,7 @@ internal class SerializedPendingForwardRequestStore(
 internal class EncryptedPendingForwardRequestStore(
     private val cache: DiskByteCache,
 ) : PendingForwardRequestStore {
+    /** Encrypts and stores [request], replacing any previous entry. */
     override fun save(request: PendingForwardRequest): Boolean {
         val valid =
             request.requestId.isNotBlank() &&
@@ -102,6 +111,7 @@ internal class EncryptedPendingForwardRequestStore(
         return cache.containsAfterHydration(ENTRY_KEY)
     }
 
+    /** Decrypts and decodes the single entry, or null when absent or malformed. */
     override fun load(): PendingForwardRequest? = cache.get(ENTRY_KEY)?.let(::decodePendingForwardRequest)
 
     /** Removes only the matching entry so a stale dismisser cannot delete a newer request. */
@@ -109,6 +119,7 @@ internal class EncryptedPendingForwardRequestStore(
         if (requestId.isNotBlank() && load()?.requestId == requestId) cache.remove(ENTRY_KEY)
     }
 
+    /** Deletes the encrypted entry unconditionally. */
     override fun clear() = cache.clear()
 
     companion object {
@@ -128,6 +139,7 @@ internal class EncryptedPendingForwardRequestStore(
                     .also { processInstance = it }
             }
 
+        /** Builds the keystore-encrypted store rooted in no-backup storage. */
         fun create(context: Context): EncryptedPendingForwardRequestStore {
             val app = context.applicationContext
             return EncryptedPendingForwardRequestStore(
@@ -174,6 +186,7 @@ private const val KIND_TEXT = "text"
 private const val KIND_MEDIA = "media"
 private const val FORMAT_VERSION = 1
 
+/** Encodes one pending request as versioned JSON bytes. */
 internal fun encodePendingForwardRequest(request: PendingForwardRequest): ByteArray =
     JSONObject()
         .put(KEY_VERSION, FORMAT_VERSION)
@@ -186,6 +199,7 @@ internal fun encodePendingForwardRequest(request: PendingForwardRequest): ByteAr
         .toString()
         .encodeToByteArray()
 
+/** Decodes versioned JSON bytes, returning null for malformed or skewed input. */
 @Suppress("SwallowedException", "TooGenericExceptionCaught")
 internal fun decodePendingForwardRequest(encoded: ByteArray): PendingForwardRequest? =
     try {
@@ -218,6 +232,7 @@ internal fun decodePendingForwardRequest(encoded: ByteArray): PendingForwardRequ
         null
     }
 
+/** Encodes one payload, preserving its kind, source identity, and order. */
 private fun encodePayload(payload: ForwardMessagePayload): JSONObject =
     when (payload) {
         is ForwardMessagePayload.Text ->
@@ -245,6 +260,7 @@ private fun encodePayload(payload: ForwardMessagePayload): JSONObject =
                 )
     }
 
+/** Decodes one payload back into its typed form. */
 private fun decodePayload(json: JSONObject): ForwardMessagePayload =
     when (val kind = json.getString(KEY_KIND)) {
         KIND_TEXT ->
@@ -274,6 +290,7 @@ private fun decodePayload(json: JSONObject): ForwardMessagePayload =
         else -> throw IllegalArgumentException("unknown forward payload kind: $kind")
     }
 
+/** Encodes every field of one media attachment reference. */
 private fun encodeReference(reference: MediaAttachmentReferenceFfi): JSONObject =
     JSONObject()
         .put(
@@ -295,6 +312,7 @@ private fun encodeReference(reference: MediaAttachmentReferenceFfi): JSONObject 
         .put(KEY_DIM, reference.dim ?: JSONObject.NULL)
         .put(KEY_THUMBHASH, reference.thumbhash ?: JSONObject.NULL)
 
+/** Decodes one media attachment reference field-for-field. */
 private fun decodeReference(json: JSONObject): MediaAttachmentReferenceFfi {
     val locators = json.getJSONArray(KEY_LOCATORS)
     return MediaAttachmentReferenceFfi(

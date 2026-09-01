@@ -131,6 +131,7 @@ internal fun ChatPickerSendingAccountRow(
     }
 }
 
+/** Name and short identity block for one sending account. */
 @Composable
 internal fun ShareChatPickerAccountIdentity(
     appState: WhiteNoiseAppState,

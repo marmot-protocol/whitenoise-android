@@ -13,6 +13,7 @@ import org.junit.Test
  * crosses the account boundary.
  */
 class CrossAccountForwardRequestTest {
+    /** A reply forwards as body-only text with no quote reference. */
     @Test
     fun forwardedReplyBecomesAnIndependentTextPayloadWithoutTheSourceReplyReference() {
         val quotedMessageId = "fe".repeat(32)
@@ -42,6 +43,7 @@ class CrossAccountForwardRequestTest {
         )
     }
 
+    /** An edited reply forwards its accepted edited text verbatim. */
     @Test
     fun editedReplyForwardsItsAcceptedEditedTextVerbatim() {
         val reply =
@@ -63,6 +65,7 @@ class CrossAccountForwardRequestTest {
         assertEquals("edited body", payload.text)
     }
 
+    /** Builds one chat message record with the given tags. */
     private fun message(
         id: String,
         sender: String = "alice",

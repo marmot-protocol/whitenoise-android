@@ -82,6 +82,7 @@ class ForwardMessageSheetCoverageTest {
         assertTrue("Modifier.semantics { this.selected = selected }" in targetRow)
     }
 
+    /** Member previews resolve through the owner-scoped nickname cache. */
     @Test
     fun groupMemberPreviewsUsePrivateContactNicknames() {
         val body = forwardPickerSource().readText().functionBody("ForwardTargetRow")

@@ -36,21 +36,25 @@ class CrossAccountForwardProcessRecreationTest {
             SecretKeySpec(ByteArray(32) { index -> (index + 1).toByte() }, "AES")
         }
 
+    /** Creates a fresh temp directory for the encrypted store. */
     @Before
     fun setUp() {
         dir = Files.createTempDirectory("pending-forward-store-test").toFile()
     }
 
+    /** Deletes the temp store directory. */
     @After
     fun tearDown() {
         dir.deleteRecursively()
     }
 
+    /** Builds the encrypted store over the temp directory with a fixed key. */
     private fun store(): EncryptedPendingForwardRequestStore =
         EncryptedPendingForwardRequestStore(
             DiskByteCache(dir, maxBytes = 512 * 1024, keyProvider = keyProvider),
         )
 
+    /** Builds one complete media attachment reference. */
     private fun reference(fileName: String) =
         MediaAttachmentReferenceFfi(
             locators = listOf(MediaLocatorFfi(kind = "blossom-v1", value = "https://media.example/$fileName")),
@@ -65,6 +69,7 @@ class CrossAccountForwardProcessRecreationTest {
             thumbhash = "hash",
         )
 
+    /** Builds one pending request with ordered text and media payloads. */
     private fun request(
         requestId: String = "request-1",
         destination: String? = "account-b",
@@ -96,6 +101,7 @@ class CrossAccountForwardProcessRecreationTest {
         selectedGroupIds = selected,
     )
 
+    /** A request round-trips across store recreation with identity and order intact. */
     @Test
     fun requestRoundTripsAcrossStoreRecreationPreservingIdentityAndOrder() {
         val request = request()
@@ -113,6 +119,7 @@ class CrossAccountForwardProcessRecreationTest {
         assertEquals(listOf("first.png", "second.png"), media.attachments.map { it.reference.fileName })
     }
 
+    /** No message text, caption, or account ref appears unencrypted on disk. */
     @Test
     fun plaintextNeverReachesDiskUnencrypted() {
         assertTrue(store().save(request()))
@@ -128,6 +135,7 @@ class CrossAccountForwardProcessRecreationTest {
         assertFalse("account-a" in onDisk)
     }
 
+    /** Saving a second request replaces the first entirely. */
     @Test
     fun storeHoldsOnlyTheNewestUnresolvedRequest() {
         val store = store()
@@ -141,6 +149,7 @@ class CrossAccountForwardProcessRecreationTest {
         assertTrue(restored!!.selectedGroupIds.isEmpty())
     }
 
+    /** Removal only deletes the entry whose id matches. */
     @Test
     fun removalIsIdMatchedSoAStaleDismisserCannotDeleteANewerRequest() {
         val store = store()
@@ -153,6 +162,7 @@ class CrossAccountForwardProcessRecreationTest {
         assertNull(store.load())
     }
 
+    /** Malformed decodes return null and invalid saves are refused. */
     @Test
     fun malformedAndBlankRequestsAreRejectedOrIgnored() {
         assertNull(decodePendingForwardRequest("not json".encodeToByteArray()))

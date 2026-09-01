@@ -80,6 +80,7 @@ class CrossAccountForwardOwnershipTest {
             }
         } as MarmotInterface
 
+    /** Builds one signed-in signing-account summary. */
     private fun account(
         label: String,
         hexSeed: String,
@@ -92,6 +93,7 @@ class CrossAccountForwardOwnershipTest {
         running = true,
     )
 
+    /** Builds an app state wired to the scripted engine proxy. */
     private fun appState(
         accounts: List<AccountSummaryFfi>,
         activeAccountRef: String,
@@ -109,6 +111,7 @@ class CrossAccountForwardOwnershipTest {
                 .set(state, AppMarmotRuntime(rootPath = "test", marmot = marmot))
         }
 
+    /** Builds one text payload rooted in the source group. */
     private fun textPayload(text: String = "forwarded body") =
         ForwardMessagePayload.Text(
             sourceGroupIdHex = SOURCE_GROUP,
@@ -116,6 +119,7 @@ class CrossAccountForwardOwnershipTest {
             text = text,
         )
 
+    /** Pumps the main looper until the operation leaves its active phases. */
     private fun awaitTerminal(
         appState: WhiteNoiseAppState,
         timeoutMillis: Long = 20_000,
@@ -130,6 +134,7 @@ class CrossAccountForwardOwnershipTest {
         error("forward operation did not reach a terminal state")
     }
 
+    /** Pumps the main looper until the proxy records the named call. */
     private fun awaitCall(
         method: String,
         timeoutMillis: Long = 20_000,
@@ -143,6 +148,7 @@ class CrossAccountForwardOwnershipTest {
         error("never observed a $method call")
     }
 
+    /** All publish traffic runs under the destination while a third account is active. */
     @Test
     fun destinationPublishesRunOnlyUnderTheSelectedAccountRegardlessOfTheActiveAccount() {
         val appState =
@@ -169,6 +175,7 @@ class CrossAccountForwardOwnershipTest {
         assertEquals(4, calls.count { it.method == "sendText" })
     }
 
+    /** Start returns false when either bound owner is signed out. */
     @Test
     fun startIsRejectedWhenEitherBoundOwnerIsNotASignedInSigningAccount() {
         val appState =
@@ -196,6 +203,7 @@ class CrossAccountForwardOwnershipTest {
         assertTrue(calls.isEmpty())
     }
 
+    /** Mid-flight destination sign-out fails closed with zero sends and no retry. */
     @Test
     fun destinationSignOutMidFlightStopsBeforePublishWithoutAFallbackAccount() {
         val appState =
@@ -225,6 +233,7 @@ class CrossAccountForwardOwnershipTest {
         assertTrue(calls.none { it.method == "sendText" })
     }
 
+    /** Replaces the live account list through the snapshot-state delegate. */
     @Suppress("UNCHECKED_CAST")
     private fun setAccounts(
         appState: WhiteNoiseAppState,

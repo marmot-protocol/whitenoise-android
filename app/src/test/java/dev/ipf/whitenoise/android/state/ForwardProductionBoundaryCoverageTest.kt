@@ -23,6 +23,7 @@ class ForwardProductionBoundaryCoverageTest {
         )
     }
 
+    /** The transport declares both owner guards and batch serialization. */
     @Test
     fun productionTransportGuardsBothOwnersAndSerializesEachDestinationBatch() {
         val body = appStateSource().readText().functionBody("startForwardMessages")

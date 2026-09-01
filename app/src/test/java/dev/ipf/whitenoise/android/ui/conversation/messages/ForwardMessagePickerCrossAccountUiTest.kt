@@ -49,17 +49,21 @@ class ForwardMessagePickerCrossAccountUiTest {
     private class InMemoryPendingForwardStore : PendingForwardRequestStore {
         var entry: PendingForwardRequest? = null
 
+        /** Records the saved request in memory. */
         override fun save(request: PendingForwardRequest): Boolean {
             entry = request
             return true
         }
 
+        /** Returns the in-memory entry. */
         override fun load(): PendingForwardRequest? = entry
 
+        /** Clears the entry only when its id matches. */
         override fun remove(requestId: String) {
             if (entry?.requestId == requestId) entry = null
         }
 
+        /** Drops the in-memory entry. */
         override fun clear() {
             entry = null
         }
@@ -67,6 +71,7 @@ class ForwardMessagePickerCrossAccountUiTest {
 
     private val accountB = testAccount(ACCOUNT_B_REF, ACCOUNT_B_HEX)
 
+    /** Builds an app state with two signing accounts and one active-account chat. */
     private fun twoAccountAppState(): WhiteNoiseAppState =
         appStateWithDirectChats(
             GROUP_UNDER_A to PEER_A_ID,
@@ -78,6 +83,7 @@ class ForwardMessagePickerCrossAccountUiTest {
             accounts = listOf(testAccount(ACCOUNT_REF, ACCOUNT_HEX), accountB),
         )
 
+    /** Provides a controller factory pre-bound to the second account. */
     private fun accountBControllerFactory(): Pair<(WhiteNoiseAppState) -> ChatsController, MutableList<String>> {
         val boundAccounts = mutableListOf<String>()
         val factory: (WhiteNoiseAppState) -> ChatsController = { state ->
@@ -86,6 +92,7 @@ class ForwardMessagePickerCrossAccountUiTest {
         return factory to boundAccounts
     }
 
+    /** Hosts the picker content with seeded controller and binder seams. */
     @Suppress("TestFunctionName")
     @androidx.compose.runtime.Composable
     private fun Picker(
@@ -116,6 +123,7 @@ class ForwardMessagePickerCrossAccountUiTest {
         }
     }
 
+    /** The picker defaults to the source account and swaps in the chosen account's chats. */
     @Test
     fun pickerDefaultsToTheSourceAccountAndSwitchingLoadsDestinationScopedChats() {
         val appState = twoAccountAppState()
@@ -135,6 +143,7 @@ class ForwardMessagePickerCrossAccountUiTest {
         composeRule.onNodeWithText("Person A").assertDoesNotExist()
     }
 
+    /** Account changes clear selections and confirm carries the explicit destination. */
     @Test
     fun chatSelectionsAreClearedByADestinationAccountChangeAndConfirmCarriesTheDestination() {
         val appState = twoAccountAppState()
@@ -173,6 +182,7 @@ class ForwardMessagePickerCrossAccountUiTest {
         assertEquals(listOf(ACCOUNT_B_REF to listOf(GROUP_UNDER_B)), forwards)
     }
 
+    /** The sheet mirrors live selection into the store and discards it on dismiss. */
     @Test
     fun sheetMirrorsSelectionIntoTheStoreAndDiscardsItOnDismiss() {
         val appState = twoAccountAppState()
@@ -209,6 +219,7 @@ class ForwardMessagePickerCrossAccountUiTest {
         assertNull(store.entry)
     }
 
+    /** A restored request preselects its destination and chat selection. */
     @Test
     fun restoredRequestPreselectsItsDestinationAndChats() {
         val appState = twoAccountAppState()
@@ -243,6 +254,7 @@ class ForwardMessagePickerCrossAccountUiTest {
         composeRule.onNodeWithText("Forward to 1 chat").assertIsDisplayed()
     }
 
+    /** Builds one text payload rooted in the origin group. */
     private fun textPayload() =
         ForwardMessagePayload.Text(
             sourceGroupIdHex = ORIGIN_GROUP,

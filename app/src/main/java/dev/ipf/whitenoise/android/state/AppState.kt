@@ -3011,10 +3011,13 @@ class WhiteNoiseAppState private constructor(
     /** Loads the unresolved forward request, if any, for process-recreation restore. */
     internal suspend fun loadPendingForwardRequest(): PendingForwardRequest? = forwardRequestPersistence.load()
 
+    /** Cancels the visible forward operation while it is still cancellable. */
     internal fun cancelActiveForwardOperation(): Boolean = forwardOperationOwner.cancel()
 
+    /** Retries the visible forward operation's incomplete destinations. */
     internal fun retryActiveForwardOperation(): Boolean = forwardOperationOwner.retry()
 
+    /** Dismisses the terminal forward operation and clears its presentation state. */
     internal fun dismissActiveForwardOperation(): Boolean =
         forwardOperationOwner.dismiss().also { dismissed ->
             if (dismissed) {
@@ -3165,10 +3168,12 @@ class WhiteNoiseAppState private constructor(
                     }
                 }.distinct()
 
+        /** Fails the session when the source owner is no longer signed in. */
         fun requireSourceAccount() {
             if (!isForwardOwnerSignedIn(sourceAccount)) throw ForwardSessionInvalidatedException()
         }
 
+        /** Fails the session when the destination owner is no longer signed in. */
         fun requireDestinationAccount() {
             if (!isForwardOwnerSignedIn(account)) throw ForwardSessionInvalidatedException()
         }
@@ -3266,6 +3271,7 @@ class WhiteNoiseAppState private constructor(
                     }.also { requireDestinationAccount() }
                 }
 
+                /** Indexes sent timeline records matching one prepared message's content. */
                 private fun forwardProjectionRecords(
                     timeline: List<TimelineMessageRecordFfi>,
                     message: PreparedForwardMessage,

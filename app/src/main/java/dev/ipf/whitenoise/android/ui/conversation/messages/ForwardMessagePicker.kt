@@ -174,6 +174,7 @@ private fun rememberForwardDestinationState(
 ): Pair<ForwardDestinationState, androidx.compose.runtime.MutableState<String?>> {
     val accounts = appState.accounts.filter(AccountSummaryFfi::isSignedInSigningAccount)
 
+    /** Keeps a candidate only while it names a signed-in signing account. */
     fun valid(candidate: String?): String? = candidate?.takeIf { ref -> accounts.any { it.label == ref } }
     val defaultAccountRef =
         valid(sourceAccountRef) ?: valid(appState.activeAccountRef) ?: accounts.firstOrNull()?.label
@@ -545,6 +546,7 @@ private fun ForwardTargetList(
     }
 }
 
+/** One selectable destination chat row resolved through the owning account. */
 @Composable
 @Suppress("LongParameterList")
 private fun ForwardTargetRow(

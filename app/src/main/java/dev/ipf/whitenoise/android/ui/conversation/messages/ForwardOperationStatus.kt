@@ -160,6 +160,7 @@ internal fun ForwardOperationStatus(
     }
 }
 
+/** Status surface: summary row, optional account label, and live progress. */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList")
 private fun ForwardOperationStatusBar(
@@ -192,6 +193,7 @@ private fun ForwardOperationStatusBar(
     }
 }
 
+/** Summary line with destination-account label, retry, and dismiss affordances. */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList")
 private fun ForwardOperationStatusRow(
