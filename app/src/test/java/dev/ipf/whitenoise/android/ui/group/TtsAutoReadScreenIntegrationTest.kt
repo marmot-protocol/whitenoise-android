@@ -6,8 +6,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -53,6 +53,7 @@ class TtsAutoReadScreenIntegrationTest {
             .commit()
     }
 
+    /** Verifies the uniquely tagged global toggle persists through app state. */
     @Test
     fun textToSpeechScreenTogglePersistsGlobalDefaultThroughAppState() {
         val appState = appState(activeAccountRef = accountA)
