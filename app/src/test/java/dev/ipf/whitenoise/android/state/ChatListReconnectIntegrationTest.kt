@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
@@ -9,16 +10,20 @@ import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.time.Duration
 
 /** End-to-end JVM coverage for recovery attribution through the chat-list projection. */
 @RunWith(RobolectricTestRunner::class)
@@ -26,57 +31,58 @@ import org.robolectric.annotation.Config
 class ChatListReconnectIntegrationTest {
     /** A recovered subscription row reaches the authoritative list under one generation. */
     @Test
-    fun recoveryGenerationReachesTheAuthoritativeChatListRow() =
-        runBlocking {
-            val diagnostics = testRecoveryDiagnostics()
-            val initialRow = notificationChatListRow().copy(lastMessage = null, unreadCount = 0uL, hasUnread = false)
-            val subscription = ScriptedChatListSubscription(initialRow)
-            val groupSubscription = ScriptedChatsSubscription()
-            val appState = chatListTestAppState(diagnostics, subscription, groupSubscription)
-            val controller =
-                ChatsController(
-                    appState = appState,
-                    initialAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,
-                    memberSnapshotRetryDelay = { Long.MAX_VALUE },
-                    memberSnapshotLoader = { _, _ -> conversationTimelineMemberSnapshot().members },
-                )
-            val bindJob = launch(Dispatchers.Main) { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
-            try {
-                awaitConversationCondition { subscription.nextUpdateStarted.isCompleted }
-                diagnostics.networkRestored(7L)
-                diagnostics.attemptStarted(7L, 1)
-                diagnostics.catchUpSucceeded(7L, 1)
-                subscription.emit(
-                    ChatListSubscriptionUpdateFfi.Row(
-                        row = notificationChatListRow(),
-                        trigger = ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
-                    ),
-                )
+    fun recoveryGenerationReachesTheAuthoritativeChatListRow() {
+        val diagnostics = testRecoveryDiagnostics()
+        val initialRow = notificationChatListRow().copy(lastMessage = null, unreadCount = 0uL, hasUnread = false)
+        val subscription = ScriptedChatListSubscription(initialRow)
+        val groupSubscription = ScriptedChatsSubscription()
+        val appState = chatListTestAppState(diagnostics, subscription, groupSubscription)
+        val controller =
+            ChatsController(
+                appState = appState,
+                initialAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,
+                memberSnapshotRetryDelay = { Long.MAX_VALUE },
+                memberSnapshotLoader = { _, _ -> conversationTimelineMemberSnapshot().members },
+            )
+        val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
+        try {
+            awaitChatListCondition { subscription.nextUpdateStarted.isCompleted }
+            diagnostics.networkRestored(7L)
+            diagnostics.attemptStarted(7L, 1)
+            diagnostics.catchUpSucceeded(7L, 1)
+            subscription.emit(
+                ChatListSubscriptionUpdateFfi.Row(
+                    row = notificationChatListRow(),
+                    trigger = ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+                ),
+            )
 
-                awaitConversationCondition {
-                    controller.items
-                        .singleOrNull()
-                        ?.latest
-                        ?.messageIdHex == ConversationTimelineTestIds.MESSAGE_B &&
-                        controller.recoveryProjectionGeneration == 7L
-                }
-                val phases = diagnostics.samples().filter { it.generation == 7L }.map { it.phase }
-                assertEquals(1uL, controller.items.single().unreadCount)
-                assertTrue(
-                    phases.indexOf(PerformancePhase.CURRENT_REPLAY_COMPLETE) <
-                        phases.indexOf(PerformancePhase.CHAT_LIST_SUBSCRIPTION_RECEIVED),
-                )
-                assertTrue(
-                    phases.indexOf(PerformancePhase.CHAT_LIST_SUBSCRIPTION_RECEIVED) <
-                        phases.indexOf(PerformancePhase.CHAT_LIST_PROJECTION_PUBLISHED),
-                )
-            } finally {
-                controller.onCleared()
-                bindJob.cancel()
-                subscription.close()
-                groupSubscription.close()
+            awaitChatListCondition {
+                controller.items
+                    .singleOrNull()
+                    ?.latest
+                    ?.messageIdHex == ConversationTimelineTestIds.MESSAGE_B &&
+                    controller.recoveryProjectionGeneration == 7L
             }
+            val phases = diagnostics.samples().filter { it.generation == 7L }.map { it.phase }
+            assertEquals(1uL, controller.items.single().unreadCount)
+            assertTrue(
+                phases.indexOf(PerformancePhase.CURRENT_REPLAY_COMPLETE) <
+                    phases.indexOf(PerformancePhase.CHAT_LIST_SUBSCRIPTION_RECEIVED),
+            )
+            assertTrue(
+                phases.indexOf(PerformancePhase.CHAT_LIST_SUBSCRIPTION_RECEIVED) <
+                    phases.indexOf(PerformancePhase.CHAT_LIST_PROJECTION_PUBLISHED),
+            )
+        } finally {
+            controller.onCleared()
+            subscription.close()
+            groupSubscription.close()
+            bindScope.cancel()
+            shadowOf(Looper.getMainLooper()).idle()
         }
+    }
 
     /** Builds a numeric-only diagnostics collector without enabling logcat output. */
     private fun testRecoveryDiagnostics(): NotificationNetworkRecoveryDiagnostics =
@@ -115,6 +121,16 @@ class ChatListReconnectIntegrationTest {
                     openChats = { _, _ -> chats },
                 )
         }
+}
+
+/** Advances Robolectric frames and coroutine delays while waiting for a chat-list projection. */
+private fun awaitChatListCondition(condition: () -> Boolean) {
+    repeat(250) {
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
+        if (condition()) return
+        Thread.sleep(10)
+    }
+    throw AssertionError("Chat-list condition not met within 5 simulated seconds")
 }
 
 /** Controllable chat-list subscription used by the recovery integration test. */
