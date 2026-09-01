@@ -8,14 +8,26 @@ import org.junit.Test
 class GroupArchiveMenuLabelTest {
     @Test
     fun settledStatesOfferTheOppositeAction() {
-        assertEquals(R.string.archive_chat, archiveMenuLabel(archiveMutationInFlight = false, presentedArchived = false))
-        assertEquals(R.string.unarchive_chat, archiveMenuLabel(archiveMutationInFlight = false, presentedArchived = true))
+        assertEquals(
+            R.string.archive_chat,
+            archiveMenuLabel(archiveMutationInFlight = false, presentedArchived = false),
+        )
+        assertEquals(
+            R.string.unarchive_chat,
+            archiveMenuLabel(archiveMutationInFlight = false, presentedArchived = true),
+        )
     }
 
     @Test
     fun inFlightStatesDescribeTheAcceptedTarget() {
-        assertEquals(R.string.archiving_chat, archiveMenuLabel(archiveMutationInFlight = true, presentedArchived = true))
-        assertEquals(R.string.restoring_chat, archiveMenuLabel(archiveMutationInFlight = true, presentedArchived = false))
+        assertEquals(
+            R.string.archiving_chat,
+            archiveMenuLabel(archiveMutationInFlight = true, presentedArchived = true),
+        )
+        assertEquals(
+            R.string.restoring_chat,
+            archiveMenuLabel(archiveMutationInFlight = true, presentedArchived = false),
+        )
     }
 
     /**

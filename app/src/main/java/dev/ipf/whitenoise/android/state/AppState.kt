@@ -2932,6 +2932,17 @@ class WhiteNoiseAppState private constructor(
             ?.commitOptimisticSentPreview(groupIdHex, optimisticMessageIdHex, confirmedMessageIdHex)
     }
 
+    internal fun hydrateOptimisticSentPreviewTokens(
+        accountRef: String?,
+        groupIdHex: String,
+        messageIdHex: String,
+        tokens: MarkdownDocumentFfi,
+    ) {
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.hydrateOptimisticSentPreviewTokens(groupIdHex, messageIdHex, tokens)
+    }
+
     internal fun failOptimisticSentPreview(
         accountRef: String?,
         groupIdHex: String,

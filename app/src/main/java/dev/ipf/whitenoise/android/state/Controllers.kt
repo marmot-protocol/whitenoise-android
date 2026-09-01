@@ -4290,6 +4290,26 @@ class ChatsController private constructor(
         return true
     }
 
+    /**
+     * Rebind a pending optimistic preview's parsed Markdown once the async
+     * hydration lands, keeping the preview's tokens equal to what a projected
+     * echo of the same message will carry. Deliberately narrower than
+     * [applyOptimisticSentPreview]: no activity bump, and an entry already
+     * confirmed or retired keeps its authoritative state.
+     */
+    internal fun hydrateOptimisticSentPreviewTokens(
+        groupIdHex: String,
+        messageIdHex: String,
+        tokens: MarkdownDocumentFfi,
+    ) {
+        val rowKey = chatRowKey(groupIdHex)
+        val state = optimisticChatListPreviewByGroup[rowKey].takeIf { accountRef != null } ?: return
+        val entry = state.entries[messageIdHex]?.takeIf { it.confirmedMessageIdHex == null } ?: return
+        state.entries[messageIdHex] = entry.copy(preview = entry.preview.copy(contentTokens = tokens))
+        materializeOptimisticChatListPreview(rowKey, state)
+        scheduleRecompute()
+    }
+
     internal fun commitOptimisticSentPreview(
         groupIdHex: String,
         optimisticMessageIdHex: String,
@@ -7827,6 +7847,37 @@ class ConversationController(
     }
 
     /**
+     * Parse the sent text into the same Markdown AST projected records carry
+     * and rebind it onto the already-published optimistic bubble and chat-list
+     * preview. Only the bubble's first paint is decoupled from this FFI hop —
+     * an accepted Send must paint on the next frame even when the IO lane is
+     * congested — while the network publish still runs after the parse, so the
+     * send's total latency matches the previous parse-first ordering.
+     * A parse failure keeps the plain-text presentation, and
+     * a bubble already reconciled or rolled back is left alone. Returns the
+     * record now backing the bubble so later reconciliation and failure
+     * retention keep the styled document instead of the pre-parse snapshot.
+     */
+    private suspend fun hydrateOptimisticSendMarkdown(
+        optimisticKey: String,
+        tempId: String,
+        text: String,
+    ): AppMessageRecordFfi? {
+        val tokens =
+            runCatchingCancellable { markdownParser(text) }
+                .getOrNull()
+                ?.takeIf { it.blocks.isNotEmpty() }
+        val pending = optimisticMessages[optimisticKey]
+        if (tokens == null || pending == null || pending.record.messageIdHex != tempId) return null
+        val hydrated = pending.record.copy(contentTokens = tokens)
+        optimisticMessages[optimisticKey] = pending.copy(record = hydrated)
+        messageById[tempId] = hydrated
+        publishTimelineFromIndexes()
+        appState.hydrateOptimisticSentPreviewTokens(conversationAccountRef, group.groupIdHex, tempId, tokens)
+        return hydrated
+    }
+
+    /**
      * Send a text message. [onAccepted] runs once the optimistic bubble has
      * been committed to the projection and published — i.e. the send has
      * visibly started. [onDurablyAccepted] runs only after MDK returns a typed
@@ -7902,10 +7953,13 @@ class ConversationController(
                 groupIdHex = group.groupIdHex,
                 sender = conversationAccountIdHex ?: "",
                 plaintext = trimmed,
-                // Parse locally so the optimistic bubble renders the same
-                // markdown the projected record will carry once the send
-                // round-trips — no plain→styled flash on confirm.
-                contentTokens = appState.parseMarkdownOrEmpty(trimmed),
+                // Publish with an empty AST so the bubble reaches the very next
+                // frame without first suspending on the parse FFI's IO hop — a
+                // congested IO lane used to hold the whole bubble hostage. An
+                // empty document renders the plaintext unstyled;
+                // hydrateOptimisticSendMarkdown below rebinds the styled
+                // document the projected record will carry.
+                contentTokens = EMPTY_MARKDOWN_DOCUMENT,
                 kind = 9uL,
                 tags =
                     replyTarget
@@ -7970,7 +8024,12 @@ class ConversationController(
         // clock is on screen. Everything after this is the "clock lingers"
         // window the issue is about.
         sendTrace(trace, PerformancePhase.OPTIMISTIC_SHOWN, result = PerformanceResult.PENDING)
+        // Starts as the plain-rendered record so every failure path below has a
+        // valid record even if hydration is cut short; the styled rebind lands
+        // inside the same try region as the publish it precedes.
+        var publishedRecord = optimistic
         try {
+            publishedRecord = hydrateOptimisticSendMarkdown(optimisticKey, tempId, trimmed) ?: optimistic
             // Publish with a retry sweep so a *transient* relay-pool gap
             // (socket teardown mid-reconnect, doze wake, network change) doesn't
             // surface as a user-visible "send failed" the instant the pool looks
@@ -7989,7 +8048,7 @@ class ConversationController(
                     acceptDisposition = summary.acceptDisposition,
                     optimisticKey = optimisticKey,
                     tempId = tempId,
-                    optimisticRecord = optimistic,
+                    optimisticRecord = publishedRecord,
                     optimisticMessages = optimisticMessages,
                     messageById = messageById,
                     projectedMessageIds = projectedMessageIds,
@@ -8068,13 +8127,13 @@ class ConversationController(
                 optimisticMessages = optimisticMessages,
                 messageById = messageById,
                 key = optimisticKey,
-                optimistic = optimistic,
+                optimistic = publishedRecord,
                 timelineOrder = optimisticOrder,
             )
             suppressProjectedTimelineItems(
                 unpublishedProjectionIdsMatchingMessage(
                     timelineRecords = timelineRecords,
-                    message = optimistic,
+                    message = publishedRecord,
                     activeAccountIdHex = conversationAccountIdHex,
                 ),
             )
