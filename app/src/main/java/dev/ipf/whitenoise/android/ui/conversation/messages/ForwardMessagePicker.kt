@@ -37,7 +37,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +67,7 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.isForwardOwnerSignedIn
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
 import dev.ipf.whitenoise.android.ui.chats.chatFolderTriState
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
@@ -178,8 +178,11 @@ private fun rememberForwardDestinationState(
     fun valid(candidate: String?): String? = candidate?.takeIf { ref -> accounts.any { it.label == ref } }
     val defaultAccountRef =
         valid(sourceAccountRef) ?: valid(appState.activeAccountRef) ?: accounts.firstOrNull()?.label
+    // Plain remember on purpose: process recreation restores through the
+    // encrypted pending-request store, and account identifiers must never be
+    // serialized into the plain saved-state Bundle.
     val selectedAccountRefState =
-        rememberSaveable(originGroupIdHex) {
+        remember(originGroupIdHex) {
             mutableStateOf(valid(initialDestinationAccountRef) ?: defaultAccountRef)
         }
     val selectedAccountRef = valid(selectedAccountRefState.value) ?: defaultAccountRef
@@ -224,11 +227,20 @@ internal fun ForwardMessagePickerContent(
     },
 ) {
     val titleCopy = rememberGroupTitleCopy()
-    var query by rememberSaveable(originGroupIdHex) { mutableStateOf("") }
+    // Plain remember throughout: the encrypted pending-request store owns
+    // recreation, so chat and account identifiers stay out of the plain
+    // saved-state Bundle. Selections restored for a destination that is no
+    // longer signed in are dropped rather than re-owned by the fallback.
+    var query by remember(originGroupIdHex) { mutableStateOf("") }
     val selectedState =
-        rememberSaveable(originGroupIdHex) { mutableStateOf(ArrayList(initialSelectedGroupIds)) }
+        remember(originGroupIdHex) {
+            val seedIsSafe =
+                initialDestinationAccountRef == null ||
+                    appState.isForwardOwnerSignedIn(initialDestinationAccountRef)
+            mutableStateOf(ArrayList(if (seedIsSafe) initialSelectedGroupIds else emptyList()))
+        }
     var selected by selectedState
-    var startFailed by rememberSaveable(originGroupIdHex) { mutableStateOf(false) }
+    var startFailed by remember(originGroupIdHex) { mutableStateOf(false) }
     var accountSelectorOpen by remember(originGroupIdHex) { mutableStateOf(false) }
     val (destination, selectedAccountRefState) =
         rememberForwardDestinationState(
@@ -327,7 +339,7 @@ internal fun ForwardMessagePickerContent(
                 Button(
                     onClick = {
                         val destinationAccountRef =
-                            destination.selectedAccountRef?.takeIf(appState::isForwardOwnerSignedIn)
+                            destination.selectedAccountRef?.takeIf { appState.isForwardOwnerSignedIn(it) }
                         val recipients = forwardRecipientGroupIds(selected, originGroupIdHex)
                         startFailed =
                             destinationAccountRef == null ||

@@ -60,7 +60,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
@@ -103,6 +102,7 @@ import dev.ipf.whitenoise.android.state.ForwardTargetPhase
 import dev.ipf.whitenoise.android.state.ForwardTargetProgress
 import dev.ipf.whitenoise.android.state.PendingForwardRequest
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.isForwardOwnerSignedIn
 import dev.ipf.whitenoise.android.ui.chats.chatFolderTriState
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.AppDivider
@@ -798,13 +798,15 @@ internal fun ForwardMessageSheet(
     onDismiss: () -> Unit,
     restoredRequest: PendingForwardRequest? = null,
 ) {
+    // Plain remember on purpose: the encrypted store owns recreation, and the
+    // saved-state Bundle must not carry forward-request identifiers.
     val requestId =
-        rememberSaveable(originGroupIdHex) {
+        remember(originGroupIdHex) {
             restoredRequest?.requestId ?: UUID.randomUUID().toString()
         }
     var pickerTitles by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     val dismissAndDiscard = {
-        appState.discardPendingForwardRequest(requestId)
+        appState.forwardRequestPersistence.discard(requestId)
         onDismiss()
     }
     ForwardMessagePickerFullScreen(
@@ -827,7 +829,7 @@ internal fun ForwardMessageSheet(
                         destinationAccountRef = destinationAccountRef,
                         targetTitles = pickerTitles,
                     )
-            if (started) appState.discardPendingForwardRequest(requestId)
+            if (started) appState.forwardRequestPersistence.discard(requestId)
             started
         },
         initialDestinationAccountRef = restoredRequest?.destinationAccountRef,
@@ -835,7 +837,7 @@ internal fun ForwardMessageSheet(
         onPickerStateChanged = { destinationAccountRef, selectedGroupIds, titles ->
             pickerTitles = titles
             if (sourceAccountRef != null) {
-                appState.persistPendingForwardRequest(
+                appState.forwardRequestPersistence.persist(
                     PendingForwardRequest(
                         requestId = requestId,
                         sourceAccountRef = sourceAccountRef,
@@ -850,12 +852,43 @@ internal fun ForwardMessageSheet(
     )
 }
 
+/** Outcome of validating one persisted forward request against a conversation. */
+internal enum class RestoredForwardDisposition {
+    Restore,
+    Ignore,
+    Discard,
+}
+
+/**
+ * Decides whether a persisted forward request may be restored here. A request
+ * belonging to another conversation or another source owner is ignored, and a
+ * request whose source owner or previously chosen destination owner is no
+ * longer a signed-in signing account is discarded — restoration must never
+ * silently substitute another account for either bound owner.
+ */
+internal fun restoredForwardRequestDisposition(
+    request: PendingForwardRequest,
+    boundGroupIdHex: String,
+    boundAccountRef: String?,
+    isOwnerSignedIn: (String) -> Boolean,
+): RestoredForwardDisposition =
+    when {
+        !request.originGroupIdHex.equals(boundGroupIdHex, ignoreCase = true) ->
+            RestoredForwardDisposition.Ignore
+        request.sourceAccountRef != boundAccountRef -> RestoredForwardDisposition.Ignore
+        !isOwnerSignedIn(request.sourceAccountRef) -> RestoredForwardDisposition.Discard
+        request.destinationAccountRef?.let { !isOwnerSignedIn(it) } == true ->
+            RestoredForwardDisposition.Discard
+        else -> RestoredForwardDisposition.Restore
+    }
+
 /**
  * Restores the single unresolved forward request after process recreation.
  * Restoration stays bound to the request's recorded source conversation and
- * source account and never substitutes the currently active account. A
- * request whose source owner is no longer a signed-in signing account is
- * discarded with an explanation instead of being restored.
+ * source account and never substitutes another account for either bound
+ * owner: a request whose source owner or previously chosen destination owner
+ * is no longer a signed-in signing account is discarded with an explanation
+ * instead of being restored.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -865,15 +898,22 @@ internal fun RestoredForwardRequestHost(
 ) {
     var restored by remember { mutableStateOf<PendingForwardRequest?>(null) }
     LaunchedEffect(controller.group.groupIdHex, controller.boundAccountRef) {
-        val request = appState.loadPendingForwardRequest() ?: return@LaunchedEffect
-        if (!request.originGroupIdHex.equals(controller.group.groupIdHex, ignoreCase = true)) return@LaunchedEffect
-        if (request.sourceAccountRef != controller.boundAccountRef) return@LaunchedEffect
-        if (!appState.isForwardOwnerSignedIn(request.sourceAccountRef)) {
-            appState.discardPendingForwardRequest(request.requestId)
-            appState.presentTransient(R.string.forward_restore_discarded)
-            return@LaunchedEffect
+        val request = appState.forwardRequestPersistence.load() ?: return@LaunchedEffect
+        when (
+            restoredForwardRequestDisposition(
+                request = request,
+                boundGroupIdHex = controller.group.groupIdHex,
+                boundAccountRef = controller.boundAccountRef,
+                isOwnerSignedIn = { appState.isForwardOwnerSignedIn(it) },
+            )
+        ) {
+            RestoredForwardDisposition.Ignore -> Unit
+            RestoredForwardDisposition.Discard -> {
+                appState.forwardRequestPersistence.discard(request.requestId)
+                appState.presentTransient(R.string.forward_restore_discarded)
+            }
+            RestoredForwardDisposition.Restore -> restored = request
         }
-        restored = request
     }
     restored?.let { request ->
         ForwardMessageSheet(

@@ -4,11 +4,18 @@ import android.content.Context
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaDownloadResultFfi
+import dev.ipf.marmotkit.MediaLocatorFfi
+import dev.ipf.marmotkit.MediaUploadAttachmentResultFfi
+import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -44,6 +51,7 @@ class CrossAccountForwardOwnershipTest {
     private val messageIdCounter = AtomicInteger(0)
     private var timelineGate: CountDownLatch? = null
     private var onTimelineEntered: (() -> Unit)? = null
+    private var onUploadEntered: (() -> Unit)? = null
 
     @Suppress("UNCHECKED_CAST")
     private val marmot =
@@ -66,6 +74,38 @@ class CrossAccountForwardOwnershipTest {
                     onTimelineEntered?.invoke()
                     timelineGate?.await()
                     TimelinePageFfi(messages = emptyList(), hasMoreBefore = false, hasMoreAfter = false)
+                }
+                "downloadMedia" -> {
+                    calls += RecordedCall("downloadMedia", arguments!![0] as String)
+                    MediaDownloadResultFfi(
+                        plaintext = byteArrayOf(1, 2, 3, 4),
+                        fileName = "photo.png",
+                        mediaType = "image/png",
+                        sizeBytes = 4uL,
+                    )
+                }
+                "uploadMedia" -> {
+                    calls += RecordedCall("uploadMedia", arguments!![0] as String)
+                    onUploadEntered?.invoke()
+                    MediaUploadResultFfi(
+                        attachments =
+                            listOf(
+                                MediaUploadAttachmentResultFfi(
+                                    reference = mediaReference("destination.png"),
+                                    encryptedSizeBytes = 4uL,
+                                ),
+                            ),
+                        sent = null,
+                    )
+                }
+                "sendMediaAttachments" -> {
+                    calls += RecordedCall("sendMediaAttachments", arguments!![0] as String)
+                    SendSummaryFfi(
+                        published = 1u,
+                        messageIds = listOf("media-id-${messageIdCounter.incrementAndGet()}"),
+                        acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+                        maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                    )
                 }
                 "accountUnreadSummary", "chatList" -> emptyList<Any>()
                 "toString" -> "CrossAccountForwardMarmotFake"
@@ -231,6 +271,85 @@ class CrossAccountForwardOwnershipTest {
         assertEquals(ForwardFailureStage.SessionChanged, terminal.targets.single().failureStage)
         assertFalse(terminal.canRetry)
         assertTrue(calls.none { it.method == "sendText" })
+    }
+
+    /** Builds one complete media attachment reference owned by the source group. */
+    private fun mediaReference(fileName: String) =
+        MediaAttachmentReferenceFfi(
+            locators = listOf(MediaLocatorFfi(kind = "blossom-v1", value = "https://media.example/$fileName")),
+            ciphertextSha256 = "a".repeat(64),
+            plaintextSha256 = "b".repeat(64),
+            nonceHex = "c".repeat(24),
+            fileName = fileName,
+            mediaType = "image/png",
+            version = EncryptedMediaVersionFfi.V1,
+            sourceEpoch = 4uL,
+            dim = null,
+            thumbhash = null,
+        )
+
+    /** Builds one media payload whose attachment resolves through the source group. */
+    private fun mediaPayload() =
+        ForwardMessagePayload.Media(
+            sourceGroupIdHex = SOURCE_GROUP,
+            sourceMessageIdHex = "02".repeat(32),
+            caption = "caption",
+            attachments = listOf(ForwardAttachmentSource(0, mediaReference("source.png"))),
+        )
+
+    /** Media materializes only under the source account; upload and publish run only under the destination. */
+    @Test
+    fun mediaForwardMaterializesUnderTheSourceAndUploadsAndPublishesUnderTheDestination() {
+        val appState =
+            appState(
+                accounts = listOf(account(ACCOUNT_A, "aa"), account(ACCOUNT_B, "bb"), account(ACCOUNT_C, "cc")),
+                activeAccountRef = ACCOUNT_C,
+            )
+
+        val started =
+            appState.startForwardMessages(
+                targetGroupIds = listOf(TARGET_ONE),
+                messages = listOf(mediaPayload()),
+                sourceAccountRef = ACCOUNT_A,
+                destinationAccountRef = ACCOUNT_B,
+            )
+
+        assertTrue(started)
+        val terminal = awaitTerminal(appState)
+        assertEquals(ForwardOperationPhase.Completed, terminal.phase)
+        val byMethod = calls.groupBy(RecordedCall::method) { it.accountRef }
+        assertEquals(listOf(ACCOUNT_A), byMethod.getValue("downloadMedia").distinct())
+        assertEquals(listOf(ACCOUNT_B), byMethod.getValue("uploadMedia").distinct())
+        assertEquals(listOf(ACCOUNT_B), byMethod.getValue("sendMediaAttachments").distinct())
+        assertEquals(listOf(ACCOUNT_B), byMethod.getValue("timelineMessages").distinct())
+        assertTrue(calls.none { it.accountRef == ACCOUNT_C })
+        assertTrue(calls.none { it.method == "sendText" })
+    }
+
+    /** Destination sign-out between upload and publish fails closed with no media send under any account. */
+    @Test
+    fun destinationSignOutDuringMediaUploadStopsBeforePublishWithoutAFallbackAccount() {
+        val appState =
+            appState(
+                accounts = listOf(account(ACCOUNT_A, "aa"), account(ACCOUNT_B, "bb")),
+                activeAccountRef = ACCOUNT_A,
+            )
+        onUploadEntered = { setAccounts(appState, listOf(account(ACCOUNT_A, "aa"))) }
+
+        val started =
+            appState.startForwardMessages(
+                targetGroupIds = listOf(TARGET_ONE),
+                messages = listOf(mediaPayload()),
+                sourceAccountRef = ACCOUNT_A,
+                destinationAccountRef = ACCOUNT_B,
+            )
+
+        assertTrue(started)
+        val terminal = awaitTerminal(appState)
+        assertEquals(ForwardOperationPhase.Failed, terminal.phase)
+        assertEquals(ForwardFailureStage.SessionChanged, terminal.targets.single().failureStage)
+        assertEquals(listOf(ACCOUNT_A), calls.filter { it.method == "downloadMedia" }.map { it.accountRef })
+        assertTrue(calls.none { it.method == "sendMediaAttachments" })
     }
 
     /** Replaces the live account list through the snapshot-state delegate. */

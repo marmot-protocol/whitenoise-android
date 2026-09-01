@@ -9,7 +9,9 @@ import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -93,6 +95,43 @@ internal class SerializedPendingForwardRequestStore(
         /** Shared across Activity recreation because old cancelled I/O can outlive its wrapper. */
         val processMutex = Mutex()
     }
+}
+
+/**
+ * App-state facade over the encrypted pending-forward store. Writes and
+ * discards are fire-and-forget on the app scope so UI callers never block;
+ * loads run inline for the restore path. The store itself is created lazily
+ * on first use and can be replaced by tests through [override].
+ */
+internal class ForwardRequestPersistence(
+    private val scope: CoroutineScope,
+    private val storeProvider: () -> SerializedPendingForwardRequestStore,
+) {
+    private var overrideStore: SerializedPendingForwardRequestStore? = null
+
+    private val store: SerializedPendingForwardRequestStore
+        get() = overrideStore ?: storeProvider()
+
+    /** Test seam replacing the encrypted on-disk pending-forward store. */
+    fun override(store: SerializedPendingForwardRequestStore) {
+        overrideStore = store
+    }
+
+    /** Mirrors one unresolved forward request into encrypted no-backup storage. */
+    fun persist(request: PendingForwardRequest) {
+        scope.launch { store.save(request) }
+    }
+
+    /** Discards an unresolved forward request after explicit dismissal or acceptance. */
+    fun discard(requestId: String) {
+        scope.launch { store.remove(requestId) }
+    }
+
+    /** Loads the unresolved forward request, if any, for process-recreation restore. */
+    suspend fun load(): PendingForwardRequest? = store.load()
+
+    /** Drops any unresolved request, used by destructive account wipes. */
+    suspend fun clear() = store.clear()
 }
 
 internal class EncryptedPendingForwardRequestStore(
@@ -335,3 +374,9 @@ private fun decodeReference(json: JSONObject): MediaAttachmentReferenceFfi {
         thumbhash = if (json.isNull(KEY_THUMBHASH)) null else json.getString(KEY_THUMBHASH),
     )
 }
+
+/** True while [accountRef] can still own one side of a forwarding operation. */
+internal fun WhiteNoiseAppState.isForwardOwnerSignedIn(accountRef: String): Boolean =
+    accounts.any { account ->
+        account.label == accountRef && account.isSignedInSigningAccount()
+    }

@@ -2204,13 +2204,19 @@ class WhiteNoiseAppState private constructor(
                 )
             },
         )
-    private var forwardTerminalDismissGeneration = 0L
+    private val forwardTerminalDismiss =
+        ForwardTerminalDismissPolicy(
+            scope = mutationsScope,
+            displayDurationMillis = FORWARD_TERMINAL_STATUS_DURATION_MS,
+            currentSnapshot = { activeForwardOperation.value },
+            dismiss = { dismissActiveForwardOperation() },
+        )
     private val forwardOperationOwner =
         ForwardOperationOwner(
             scope = mutationsScope,
             automaticRetryAttempts = FORWARD_BACKGROUND_RETRY_ATTEMPTS,
             retryDelayMillis = { attempt -> FORWARD_BACKGROUND_RETRY_DELAY_MS shl attempt },
-            onTerminal = ::scheduleForwardTerminalDismiss,
+            onTerminal = { snapshot -> forwardTerminalDismiss.onTerminal(snapshot) },
         )
     internal val activeForwardOperation: StateFlow<ForwardOperationSnapshot?> = forwardOperationOwner.state
 
@@ -2982,34 +2988,11 @@ class WhiteNoiseAppState private constructor(
         chatsController?.retryLoad()
     }
 
-    /** True while [accountRef] can still own one side of a forwarding operation. */
-    internal fun isForwardOwnerSignedIn(accountRef: String): Boolean =
-        accounts.any { account ->
-            account.label == accountRef && account.isSignedInSigningAccount()
+    /** Encrypted no-backup persistence for the single unresolved forward request. */
+    internal val forwardRequestPersistence =
+        ForwardRequestPersistence(mutationsScope) {
+            EncryptedPendingForwardRequestStore.forContext(appContext)
         }
-
-    private var forwardRequestPersistenceOverride: SerializedPendingForwardRequestStore? = null
-
-    private val forwardRequestPersistence: SerializedPendingForwardRequestStore
-        get() = forwardRequestPersistenceOverride ?: EncryptedPendingForwardRequestStore.forContext(appContext)
-
-    /** Test seam replacing the encrypted on-disk pending-forward store. */
-    internal fun overrideForwardRequestPersistence(store: SerializedPendingForwardRequestStore) {
-        forwardRequestPersistenceOverride = store
-    }
-
-    /** Mirrors one unresolved forward request into encrypted no-backup storage. */
-    internal fun persistPendingForwardRequest(request: PendingForwardRequest) {
-        mutationsScope.launch { forwardRequestPersistence.save(request) }
-    }
-
-    /** Discards an unresolved forward request after explicit dismissal or acceptance. */
-    internal fun discardPendingForwardRequest(requestId: String) {
-        mutationsScope.launch { forwardRequestPersistence.remove(requestId) }
-    }
-
-    /** Loads the unresolved forward request, if any, for process-recreation restore. */
-    internal suspend fun loadPendingForwardRequest(): PendingForwardRequest? = forwardRequestPersistence.load()
 
     /** Cancels the visible forward operation while it is still cancellable. */
     internal fun cancelActiveForwardOperation(): Boolean = forwardOperationOwner.cancel()
@@ -3149,8 +3132,8 @@ class WhiteNoiseAppState private constructor(
             MessageProjector
                 .normalizeForwardTargets(targetGroupIds)
                 .filterNot { target -> sourceGroupIds.any { it.equals(target, ignoreCase = true) } }
-        val sourceAccount = sourceAccountRef?.takeIf(String::isNotBlank)?.takeIf(::isForwardOwnerSignedIn)
-        val account = destinationAccountRef?.takeIf(String::isNotBlank)?.takeIf(::isForwardOwnerSignedIn)
+        val sourceAccount = sourceAccountRef?.takeIf(String::isNotBlank)?.takeIf { isForwardOwnerSignedIn(it) }
+        val account = destinationAccountRef?.takeIf(String::isNotBlank)?.takeIf { isForwardOwnerSignedIn(it) }
         val startable =
             sourceAccount != null && account != null && messages.isNotEmpty() && targets.isNotEmpty()
         if (!startable || sourceAccount == null || account == null) return false
@@ -3270,27 +3253,6 @@ class WhiteNoiseAppState private constructor(
                         ).messages
                     }.also { requireDestinationAccount() }
                 }
-
-                /** Indexes sent timeline records matching one prepared message's content. */
-                private fun forwardProjectionRecords(
-                    timeline: List<TimelineMessageRecordFfi>,
-                    message: PreparedForwardMessage,
-                    references: List<MediaAttachmentReferenceFfi>,
-                ): Map<String, TimelineMessageRecordFfi> =
-                    timeline
-                        .asSequence()
-                        .filter { record ->
-                            record.direction == "sent" &&
-                                record.kind == 9uL &&
-                                when (message) {
-                                    is PreparedForwardMessage.Text ->
-                                        record.plaintext == message.text && record.media.isEmpty()
-                                    is PreparedForwardMessage.Media ->
-                                        record.plaintext == message.caption.orEmpty() &&
-                                            record.media.map { it.ciphertextSha256 } ==
-                                            references.map { it.ciphertextSha256 }
-                                }
-                        }.associateBy(TimelineMessageRecordFfi::messageIdHex)
 
                 @Suppress("LongMethod", "ThrowsCount", "TooGenericExceptionCaught")
                 override suspend fun publishBatch(
@@ -3461,25 +3423,6 @@ class WhiteNoiseAppState private constructor(
             activeForwardTargetTitles = targetTitles
         }
         return started
-    }
-
-    private fun scheduleForwardTerminalDismiss(snapshot: ForwardOperationSnapshot) {
-        if (
-            snapshot.phase != ForwardOperationPhase.Completed &&
-            snapshot.phase != ForwardOperationPhase.Cancelled
-        ) {
-            return
-        }
-        val dismissGeneration = ++forwardTerminalDismissGeneration
-        mutationsScope.launch {
-            delay(FORWARD_TERMINAL_STATUS_DURATION_MS)
-            if (
-                forwardTerminalDismissGeneration == dismissGeneration &&
-                activeForwardOperation.value == snapshot
-            ) {
-                dismissActiveForwardOperation()
-            }
-        }
     }
 
     /**

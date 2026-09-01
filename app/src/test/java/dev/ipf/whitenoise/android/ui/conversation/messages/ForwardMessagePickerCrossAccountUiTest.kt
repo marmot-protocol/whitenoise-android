@@ -187,7 +187,7 @@ class ForwardMessagePickerCrossAccountUiTest {
     fun sheetMirrorsSelectionIntoTheStoreAndDiscardsItOnDismiss() {
         val appState = twoAccountAppState()
         val store = InMemoryPendingForwardStore()
-        appState.overrideForwardRequestPersistence(
+        appState.forwardRequestPersistence.override(
             SerializedPendingForwardRequestStore(store, ioDispatcher = Dispatchers.Main.immediate),
         )
         var dismissed = false
@@ -224,7 +224,7 @@ class ForwardMessagePickerCrossAccountUiTest {
     fun restoredRequestPreselectsItsDestinationAndChats() {
         val appState = twoAccountAppState()
         val store = InMemoryPendingForwardStore()
-        appState.overrideForwardRequestPersistence(
+        appState.forwardRequestPersistence.override(
             SerializedPendingForwardRequestStore(store, ioDispatcher = Dispatchers.Main.immediate),
         )
         val restored =
@@ -252,6 +252,34 @@ class ForwardMessagePickerCrossAccountUiTest {
         }
 
         composeRule.onNodeWithText("Forward to 1 chat").assertIsDisplayed()
+    }
+
+    /** Selections restored for a signed-out destination are dropped, never re-owned. */
+    @Test
+    fun restoredSelectionsForASignedOutDestinationAreDropped() {
+        val appState = twoAccountAppState()
+        val (factory, _) = accountBControllerFactory()
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface {
+                    ForwardMessagePickerContent(
+                        appState = appState,
+                        messageCount = 1,
+                        attachmentCount = 0,
+                        originGroupIdHex = ORIGIN_GROUP,
+                        sourceAccountRef = ACCOUNT_REF,
+                        onDismiss = {},
+                        onForward = { _, _ -> true },
+                        initialDestinationAccountRef = "signed-out-account",
+                        initialSelectedGroupIds = listOf(GROUP_UNDER_A),
+                        controllerFactory = factory,
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Forward").assertIsDisplayed()
+        composeRule.onNodeWithText("Forward to 1 chat").assertDoesNotExist()
     }
 
     /** Builds one text payload rooted in the origin group. */

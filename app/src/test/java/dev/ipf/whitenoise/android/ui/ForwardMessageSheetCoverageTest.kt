@@ -82,6 +82,14 @@ class ForwardMessageSheetCoverageTest {
         assertTrue("Modifier.semantics { this.selected = selected }" in targetRow)
     }
 
+    /** Account and chat identifiers must never enter the plain saved-state Bundle. */
+    @Test
+    fun forwardPickerStateStaysOutOfTheSavedStateBundle() {
+        assertFalse("rememberSaveable" in forwardPickerSource().readText())
+        val sheet = messageActionsSource().readText().functionBody("ForwardMessageSheet")
+        assertFalse("rememberSaveable" in sheet)
+    }
+
     /** Member previews resolve through the owner-scoped nickname cache. */
     @Test
     fun groupMemberPreviewsUsePrivateContactNicknames() {
