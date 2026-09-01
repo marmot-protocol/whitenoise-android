@@ -9,12 +9,15 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.conversation.messages.SWIPE_TEST_HOST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.SwipeTestBubbleHost
 import dev.ipf.whitenoise.android.ui.conversation.messages.swipeTestSurface
+import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.TimeZone
 
 /**
  * Deterministic mid-swipe captures for a reacted message: the held drag must
@@ -30,6 +33,20 @@ class MessageBubbleSwipeScreenshotTest {
     val composeRule = createComposeRule()
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+    private val originalTimeZone = TimeZone.getDefault()
+
+    /** Bubble timestamps render in the default zone; pin UTC so baselines match CI. */
+    @Before
+    fun pinTimeZone() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
+    /** Restores the machine's zone after each capture. */
+    @After
+    fun restoreTimeZone() {
+        TimeZone.setDefault(originalTimeZone)
+    }
 
     /** Incoming reacted text held mid-swipe in the dark theme. */
     @Test

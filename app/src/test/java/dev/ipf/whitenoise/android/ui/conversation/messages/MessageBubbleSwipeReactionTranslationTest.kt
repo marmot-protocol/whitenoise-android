@@ -7,13 +7,16 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.TimeZone
 import kotlin.math.abs
 
 /**
@@ -30,6 +33,20 @@ class MessageBubbleSwipeReactionTranslationTest {
     val composeRule = createComposeRule()
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+    private val originalTimeZone = TimeZone.getDefault()
+
+    /** Deterministic timestamp layout regardless of the machine's zone. */
+    @Before
+    fun pinTimeZone() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
+    /** Restores the machine's zone after each test. */
+    @After
+    fun restoreTimeZone() {
+        TimeZone.setDefault(originalTimeZone)
+    }
 
     /** During a held drag the bubble text and the reaction chip share one translation. */
     @Test
@@ -53,6 +70,31 @@ class MessageBubbleSwipeReactionTranslationTest {
     @Test
     fun rtlReactedTextTranslatesBubbleAndChipTogether() {
         assertSharedSwipeTranslation(mine = false, rtl = true)
+    }
+
+    /** A sub-threshold release drives onDragEnd and settles bubble and chip together. */
+    @Test
+    fun subThresholdReleaseReturnsBubbleAndChipToRestTogether() {
+        renderBubble(reacted = true, mine = false, media = false, rtl = false)
+        val host = composeRule.onNodeWithTag(SWIPE_TEST_HOST_TAG)
+        val visual = composeRule.onNode(hasText(SWIPE_TEST_MESSAGE_BODY, substring = true), useUnmergedTree = true)
+        val chip = composeRule.onNode(hasText(SWIPE_TEST_REACTION_EMOJI, substring = true), useUnmergedTree = true)
+        val visualAtRest = visual.left()
+        val chipAtRest = chip.left()
+
+        host.performTouchInput {
+            down(centerLeft)
+            moveBy(Offset(RELEASE_DRAG_PX, 0f))
+        }
+        composeRule.waitForIdle()
+        val visualDelta = visual.left() - visualAtRest
+        assertTrue("swipe should translate the bubble", abs(visualDelta) > MIN_TRANSLATION_PX)
+        assertEquals("chip shares the drag", visualDelta, chip.left() - chipAtRest, POSITION_TOLERANCE_PX)
+
+        host.performTouchInput { up() }
+        composeRule.waitForIdle()
+        assertEquals("bubble settles after release", visualAtRest, visual.left(), POSITION_TOLERANCE_PX)
+        assertEquals("chip settles with the bubble", chipAtRest, chip.left(), POSITION_TOLERANCE_PX)
     }
 
     /** A non-reacted control: the host row never translates while the bubble does. */
@@ -130,6 +172,7 @@ class MessageBubbleSwipeReactionTranslationTest {
 
     private companion object {
         const val DRAG_PX = 90f
+        const val RELEASE_DRAG_PX = 48f
         const val MIN_TRANSLATION_PX = 8f
         const val POSITION_TOLERANCE_PX = 1.5f
     }
