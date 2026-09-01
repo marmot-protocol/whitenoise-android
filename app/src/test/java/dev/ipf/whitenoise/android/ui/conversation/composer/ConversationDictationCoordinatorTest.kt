@@ -136,7 +136,11 @@ class ConversationDictationCoordinatorTest {
             listener.onError(failure)
             listener.onResult("late")
 
-            assertEquals(failure, (fixture.controller.state as ConversationDictationState.Failed).reason)
+            if (failure == ConversationDictationFailure.PermissionDenied) {
+                assertTrue(fixture.controller.state is ConversationDictationState.ProviderActivityRequired)
+            } else {
+                assertEquals(failure, (fixture.controller.state as ConversationDictationState.Failed).reason)
+            }
             assertEquals("Keep", fixture.draft.text)
             assertEquals(0, fixture.writes)
             assertEquals(1, fixture.releases)
