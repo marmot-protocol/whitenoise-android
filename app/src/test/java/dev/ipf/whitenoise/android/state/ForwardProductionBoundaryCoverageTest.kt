@@ -9,7 +9,7 @@ import java.io.File
 class ForwardProductionBoundaryCoverageTest {
     @Test
     fun productionTransportMaterializesFromSourceAndPublishesOnlyDestinationReferences() {
-        val body = appStateSource().readText().functionBody("startForwardMessages")
+        val body = transportSource().readText().functionBody("WhiteNoiseAppState.forwardTransport")
 
         assertTrue("resolveAttachmentReference(request)" in body)
         assertTrue("priority = AttachmentDownloadPriority.Interactive" in body)
@@ -26,7 +26,10 @@ class ForwardProductionBoundaryCoverageTest {
     /** The transport declares both owner guards and batch serialization. */
     @Test
     fun productionTransportGuardsBothOwnersAndSerializesEachDestinationBatch() {
-        val body = appStateSource().readText().functionBody("startForwardMessages")
+        val body = transportSource().readText().functionBody("WhiteNoiseAppState.forwardTransport")
+        val start = appStateSource().readText().functionBody("startForwardMessages")
+
+        assertTrue("forwardTransport(sourceAccount, account, materializationRequests, messages.size)" in start)
 
         assertTrue("fun requireSourceAccount()" in body)
         assertTrue("fun requireDestinationAccount()" in body)
@@ -40,7 +43,7 @@ class ForwardProductionBoundaryCoverageTest {
     /** Materialization stays bound to the source owner; upload/publish stay bound to the destination owner. */
     @Test
     fun productionTransportSplitsSourceAndDestinationOwnership() {
-        val body = appStateSource().readText().functionBody("startForwardMessages")
+        val body = transportSource().readText().functionBody("WhiteNoiseAppState.forwardTransport")
 
         assertTrue("accountRef = sourceAccount" in body)
         val materializeBlock =
@@ -64,12 +67,13 @@ class ForwardProductionBoundaryCoverageTest {
     @Test
     fun productionTransportReleasesTimedOutMaterializationForFreshRetry() {
         val source = appStateSource().readText()
+        val transport = transportSource().readText().functionBody("WhiteNoiseAppState.forwardTransport")
         val body = source.functionBody("startForwardMessages")
         val cleanup = source.functionBody("cancelMemoizedAttachmentDownload")
 
         assertTrue("val materializationRequests =" in body)
-        assertTrue("override fun cancelStalledMaterialization()" in body)
-        assertTrue("materializationRequests.forEach(::cancelMemoizedAttachmentDownload)" in body)
+        assertTrue("override fun cancelStalledMaterialization()" in transport)
+        assertTrue("materializationRequests.forEach(::cancelMemoizedAttachmentDownload)" in transport)
         assertTrue("request.accountRef" in cleanup)
         assertTrue("inFlightDownloads[cacheKey]?.takeIf { it.isActive }" in cleanup)
         assertTrue("active?.cancel(" in cleanup)
@@ -87,7 +91,8 @@ class ForwardProductionBoundaryCoverageTest {
 
     @Test
     fun uncertainPublishUsesConvergenceAndTheAppScopeOwnsCompletion() {
-        val body = appStateSource().readText().functionBody("startForwardMessages")
+        val body = transportSource().readText().functionBody("WhiteNoiseAppState.forwardTransport")
+        val start = appStateSource().readText().functionBody("startForwardMessages")
         val ownerSource = messageForwardingSource().readText()
         val owner = ownerSource.functionBody("monitor")
         val retry = ownerSource.functionBody("retryAutomatically")
@@ -102,8 +107,8 @@ class ForwardProductionBoundaryCoverageTest {
         assertTrue("retryGroupConvergence(account, targetGroupIdHex)" in body)
         assertTrue("it.messageIdHex == candidate.messageIdHex" in body)
         assertTrue("delivered?.sourceMessageIdHex != null" in body)
-        assertTrue("forwardOperationOwner.start(session)" in body)
-        assertTrue("session.release()" in body)
+        assertTrue("forwardOperationOwner.start(session)" in start)
+        assertTrue("session.release()" in start)
         assertTrue("scope.launch" in owner)
         assertTrue("candidate.state.first { !it.isActive }" in owner)
         assertTrue("candidate.retryFailed()" in retry)
@@ -114,6 +119,12 @@ class ForwardProductionBoundaryCoverageTest {
             File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull(File::exists) ?: error("Missing AppState.kt source file")
+
+    private fun transportSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTransport.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTransport.kt"),
+        ).firstOrNull(File::exists) ?: error("Missing AppStateForwardTransport.kt source file")
 
     private fun messageForwardingSource(): File =
         listOf(
