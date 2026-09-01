@@ -176,6 +176,7 @@ class TtsHistorySession internal constructor(
         navigate(TtsWindowSentenceTarget.Last) { defer -> controller.skipPreviousSentence(defer) }
     }
 
+    /** Applies an in-window navigation immediately or starts the matching bounded edge walk. */
     private fun navigate(
         targetSentence: TtsWindowSentenceTarget,
         skip: (Boolean) -> TtsNavigationOutcome,
@@ -280,6 +281,7 @@ class TtsHistorySession internal constructor(
             }
     }
 
+    /** Extends the queue with a current edge-walk projection and updates live-tail ownership. */
     private fun applyProjection(
         pager: TtsHistoryPager,
         direction: TtsHistoryDirection,

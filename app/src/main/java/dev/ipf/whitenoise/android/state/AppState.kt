@@ -1439,7 +1439,6 @@ class WhiteNoiseAppState private constructor(
     private var bootstrapCompleted = false
     private val nativePushSyncMutex = Mutex()
     private val ttsRefreshMutex = Mutex()
-    private val relayTelemetrySettingsMutex = Mutex()
     private val auditLogSettingsMutex = Mutex()
     private val conversationVibrationChannelMutex = Mutex()
 
@@ -5753,38 +5752,32 @@ class WhiteNoiseAppState private constructor(
         AppLockPreferences.writeLastUnlockedAtMillis(appContext, normalizedNow)
     }
 
-    /** Refreshes privacy settings through the same mutexes used by their setters. */
     suspend fun refreshSecurityPrivacySettings() {
-        relayTelemetrySettingsMutex.withLock {
-            relayTelemetrySettings = runCatchingCancellable { marmotIo { relayTelemetrySettings() } }.getOrNull()
-        }
+        relayTelemetrySettings = runCatchingCancellable { marmotIo { relayTelemetrySettings() } }.getOrNull()
         auditLogSettingsMutex.withLock {
             auditLogSettings = runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()
         }
     }
 
-    /** Serializes telemetry mutation with refresh so an older read cannot undo the toggle. */
     suspend fun setTelemetryEnabled(enabled: Boolean): Boolean =
-        relayTelemetrySettingsMutex.withLock {
-            runCatching {
-                val current = relayTelemetrySettings ?: marmotIo { relayTelemetrySettings() }
-                val updated =
-                    marmotIo {
-                        setRelayTelemetrySettings(
-                            RelayTelemetrySettingsFfi(
-                                exportEnabled = enabled,
-                                exportIntervalSeconds = current.exportIntervalSeconds,
-                            ),
-                        )
-                    }
-                relayTelemetrySettings = updated
-                presentTransient(R.string.toast_security_privacy_updated)
-                true
-            }.getOrElse {
-                if (it is CancellationException) throw it
-                presentFailure(R.string.toast_couldnt_update_security_privacy, "SECURITY_PRIVACY_UPDATE", it)
-                false
-            }
+        runCatching {
+            val current = relayTelemetrySettings ?: marmotIo { relayTelemetrySettings() }
+            val updated =
+                marmotIo {
+                    setRelayTelemetrySettings(
+                        RelayTelemetrySettingsFfi(
+                            exportEnabled = enabled,
+                            exportIntervalSeconds = current.exportIntervalSeconds,
+                        ),
+                    )
+                }
+            relayTelemetrySettings = updated
+            presentTransient(R.string.toast_security_privacy_updated)
+            true
+        }.getOrElse {
+            if (it is CancellationException) throw it
+            presentFailure(R.string.toast_couldnt_update_security_privacy, "SECURITY_PRIVACY_UPDATE", it)
+            false
         }
 
     suspend fun setAuditLogsEnabled(enabled: Boolean): Boolean =

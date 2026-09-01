@@ -151,6 +151,7 @@ internal object ConversationCardPostSynchronizer {
         }
     }
 
+    /** Serializes one conversation-card mutation on its deterministic key stripe. */
     inline fun <T> withLock(
         notificationTag: String,
         notificationId: Int,

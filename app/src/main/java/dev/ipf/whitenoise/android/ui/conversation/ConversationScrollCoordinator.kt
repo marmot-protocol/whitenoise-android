@@ -293,6 +293,7 @@ internal class ConversationScrollCoordinator(
         }
     }
 
+    /** Restores either tail-following or the durable reading anchor captured before backgrounding. */
     private suspend fun correctForegroundPresentation(
         snapshot: ConversationForegroundSnapshot,
         resolveAnchorIndex: (ConversationScrollAnchor) -> Int?,
@@ -355,6 +356,7 @@ internal class ConversationScrollCoordinator(
         foregroundRestoreInProgress = false
     }
 
+    /** Makes a user drag the newest scroll intent and cancels deferred lifecycle correction. */
     fun onUserGestureStarted(anchor: ConversationScrollAnchor) {
         cancelForegroundRestore()
         invalidateActiveCommand()
@@ -510,6 +512,7 @@ internal class ConversationScrollCoordinator(
         }
     }
 
+    /** Runs an explicit jump under the shared latest-wins scroll-command fence. */
     suspend fun programmaticJump(
         targetMessageId: String?,
         reason: ConversationScrollReason,

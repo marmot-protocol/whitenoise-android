@@ -761,6 +761,7 @@ internal class TtsPlaybackQueue(
         }
     }
 
+    /** Stops the engine before publishing terminal completion caused by user navigation. */
     private fun completeThroughNavigation() {
         stopEngine()
         finishPlayback()
@@ -853,6 +854,7 @@ internal class TtsPlaybackQueue(
         enqueueFromCurrentIndex()
     }
 
+    /** Submits the current callback generation from the selected chunk through the queue tail. */
     private fun enqueueFromCurrentIndex() {
         if (chunks.isEmpty()) {
             _state.value = TtsState.Idle(sessionId = playbackSessionId)

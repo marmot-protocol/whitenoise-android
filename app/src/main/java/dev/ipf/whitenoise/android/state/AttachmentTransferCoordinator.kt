@@ -285,6 +285,7 @@ internal class AttachmentTransferCoordinator(
         }
     }
 
+    /** Converts a non-cancellation cache probe failure into an unavailable result. */
     private suspend fun probeAvailability(probe: suspend () -> Boolean): Boolean =
         try {
             probe()
@@ -309,6 +310,7 @@ internal class AttachmentTransferCoordinator(
         }
     }
 
+    /** Returns the retained per-key state, seeding cache availability only on first access. */
     private fun stateFlow(
         key: String,
         initiallyAvailable: Boolean = false,

@@ -128,10 +128,10 @@ class StalenessGuardCoverageTest {
                 "AppState.kt:signOutActiveAccount" to "authoritative destructive command result",
                 // The wipe owns a cancellation-safe lifecycle bracket and serialized native-push teardown.
                 "AppState.kt:signOutAndWipeActiveAccount" to "serialized destructive lifecycle",
-                // Both settings reads publish under their dedicated mutexes.
-                "AppState.kt:refreshSecurityPrivacySettings" to "settings mutexes serialize reads and writes",
-                // The telemetry setter shares relayTelemetrySettingsMutex with refresh.
-                "AppState.kt:setTelemetryEnabled" to "telemetry settings mutex",
+                // Existing settings snapshot refresh is outside the audited stale-counter migration inventory.
+                "AppState.kt:refreshSecurityPrivacySettings" to "pre-existing settings snapshot path",
+                // Telemetry toggle completion is an authoritative engine command, not a replaceable cache read.
+                "AppState.kt:setTelemetryEnabled" to "authoritative settings command result",
                 // Setter completions are authoritative engine commands; every accepted toggle must apply.
                 "AppState.kt:setLocalNotificationsEnabled" to "authoritative settings command result",
                 // Foreground-service and preference side effects belong to every accepted toggle.

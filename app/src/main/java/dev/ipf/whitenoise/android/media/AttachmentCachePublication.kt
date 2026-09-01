@@ -162,6 +162,7 @@ internal object AttachmentCachePublication {
                         }
                         accepted = true
                     }
+                    if (!accepted) runCatching { tmp.delete() }
                     accepted
                 }
             if (published) AttachmentPlaintextCache.onPublished(finalFile)
@@ -230,6 +231,7 @@ internal object AttachmentCachePublication {
         evictionError?.let { throw it }
     }
 
+    /** Creates the temp-file parent only while both captured publication lifetimes remain current. */
     private fun prepareParentForTempWrite(
         attachmentKey: String,
         finalFile: File,
@@ -244,6 +246,7 @@ internal object AttachmentCachePublication {
         }
     }
 
+    /** Removes a final plaintext file or reports an IO failure without an exists/delete race. */
     @Throws(IOException::class)
     private fun deleteFinalFile(finalFile: File) {
         // delete() first, then treat an already-gone file as success — avoids the
