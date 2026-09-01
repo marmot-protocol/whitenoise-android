@@ -1,10 +1,15 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.speech.tts.TextToSpeech
+import android.util.Log
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
@@ -13,12 +18,15 @@ import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
@@ -30,6 +38,7 @@ import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.audio.tts.TtsSeekResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -50,6 +59,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
 import java.util.Locale
 
 /**
@@ -62,9 +72,10 @@ import java.util.Locale
  * spoken characters, that the sentence band stops at the sentence being spoken,
  * and that each word's marker occupies its own place under real font metrics.
  */
+@RunWith(AndroidJUnit4::class)
 class TtsHighlightPlacementAndroidTest {
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val engine = ReplayEngine()
@@ -120,6 +131,117 @@ class TtsHighlightPlacementAndroidTest {
             renderedSentenceBand(),
         )
     }
+
+    /** Exact sentence paint must begin on the wrapped line that owns its first character. */
+    @Test
+    fun sentenceBandExcludesAdjacentTextAtAWrappedLineBoundary() {
+        assertExactSecondSentenceBand(SentenceStartPlacement.WrappedLineStart)
+    }
+
+    /** Exact sentence paint must retain its in-line start instead of expanding to the line edge. */
+    @Test
+    fun sentenceBandExcludesAdjacentTextWhenTheSentenceStartsMidLine() {
+        assertExactSecondSentenceBand(SentenceStartPlacement.MidLine)
+    }
+
+    /**
+     * Finds a real production-row width with the requested layout shape, then
+     * compares every changed pixel with the selected sentence's character
+     * cells. The expectation intentionally comes straight from glyph boxes,
+     * independently of the production rectangle-merging implementation.
+     */
+    private fun assertExactSecondSentenceBand(placement: SentenceStartPlacement) {
+        val wrapWidth = mutableStateOf(MIN_WRAP_WIDTH.dp)
+        val record = speakableRecord(THREE_SENTENCES)
+        composeRule.setContent {
+            val item = timelineMessage(record)
+            WhiteNoiseTheme {
+                Box(Modifier.width(wrapWidth.value)) {
+                    key(item.record.messageIdHex) { row(item) }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        val selectedWidth = selectProductionWidth(wrapWidth, placement)
+        Log.i(TEST_LOG_TAG, "sentenceBand placement=$placement wrapWidthDp=$selectedWidth")
+
+        val idle = captureFrame()
+        speakSecondSentence(record)
+
+        val highlightedLeaf = checkNotNull(leafCarryingHighlight())
+        val sentenceRange = checkNotNull(highlightedLeaf.config.getOrNull(TtsReadAloudSentenceHighlightRangeKey))
+        assertEquals(SECOND_SENTENCE, highlightedLeaf.text().substring(sentenceRange.first, sentenceRange.last + 1))
+        val layout = textLayout(highlightedLeaf)
+        val leafBounds = highlightedLeaf.boundsInRoot
+        val expectedCells =
+            (sentenceRange.first..sentenceRange.last).map { offset ->
+                layout.getBoundingBox(offset).translate(leafBounds.left, leafBounds.top)
+            }
+        val adjacentCells =
+            ((0 until sentenceRange.first) + ((sentenceRange.last + 1) until THREE_SENTENCES.length)).map { offset ->
+                layout.getBoundingBox(offset).translate(leafBounds.left, leafBounds.top)
+            }
+        val active = captureFrame()
+        val changed = idle.changedPixels(active)
+        assertTrue("the selected sentence painted no pixels at width $selectedWidth", changed.isNotEmpty())
+        assertTrue(
+            "sentence paint escaped its exact glyph cells at width $selectedWidth: " +
+                changed.filterNot { pixel -> expectedCells.any { cell -> cell.contains(pixel.x, pixel.y) } }.take(12),
+            changed.all { pixel -> expectedCells.any { cell -> cell.contains(pixel.x, pixel.y) } },
+        )
+        assertTrue(
+            "paint entered the interior of the previous or next sentence at width $selectedWidth: " +
+                changed
+                    .filter { pixel ->
+                        adjacentCells.any { cell -> cell.contains(pixel.x, pixel.y, tolerance = -RASTER_SEAM_PX) }
+                    }.take(12),
+            changed.none { pixel ->
+                adjacentCells.any { cell -> cell.contains(pixel.x, pixel.y, tolerance = -RASTER_SEAM_PX) }
+            },
+        )
+    }
+
+    /** Starts playback and seeks the production controller to the second sentence. */
+    private fun speakSecondSentence(record: AppMessageRecordFfi) {
+        val entry =
+            runBlocking {
+                projectTtsSpeakableEntry(
+                    message = record,
+                    editedText = null,
+                    senderDisplayName = SENDER_NAME,
+                    parseMarkdown = { plainTextDocument(THREE_SENTENCES) },
+                )!!
+            }
+        check(appState.ttsController.speak(listOf(entry), Locale.US))
+        assertEquals(
+            TtsSeekResult.Repositioned,
+            appState.ttsController.seekToSentence(MESSAGE_ID, sentenceIndex = 1),
+        )
+        composeRule.waitForIdle()
+    }
+
+    /** Searches actual device font metrics for the sentence-start layout under test. */
+    private fun selectProductionWidth(
+        wrapWidth: MutableState<Dp>,
+        placement: SentenceStartPlacement,
+    ): Int =
+        checkNotNull(
+            (MIN_WRAP_WIDTH..MAX_WRAP_WIDTH).firstOrNull { candidate ->
+                composeRule.runOnIdle { wrapWidth.value = candidate.dp }
+                composeRule.waitForIdle()
+                val layout = textLayout(bodyLeaf())
+                val startBox = layout.getBoundingBox(SECOND_SENTENCE_START)
+                val visualLine = layout.getLineForVerticalPosition(startBox.center.y)
+                when (placement) {
+                    SentenceStartPlacement.WrappedLineStart ->
+                        visualLine > 0 && layout.getLineStart(visualLine) == SECOND_SENTENCE_START
+
+                    SentenceStartPlacement.MidLine ->
+                        layout.getLineStart(visualLine) < SECOND_SENTENCE_START
+                }
+            },
+        ) { "no production-row width produced $placement" }
 
     /** Reports [word] at its offset inside the exact payload of [chunkIndex]. */
     private fun rangeWithin(
@@ -210,13 +332,7 @@ class TtsHighlightPlacementAndroidTest {
     private fun expectedWordBounds(word: String): androidx.compose.ui.geometry.Rect {
         val leaf = checkNotNull(leafCarryingHighlight()) { "no highlighted leaf for '$word'" }
         val range = checkNotNull(leaf.config.getOrNull(TtsReadAloudHighlightRangeKey))
-        val layouts = mutableListOf<TextLayoutResult>()
-        val getLayout =
-            checkNotNull(leaf.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action) {
-                "highlighted leaf for '$word' exposes no text layout"
-            }
-        assertTrue("text layout action failed for '$word'", getLayout(layouts))
-        val layout = layouts.single()
+        val layout = textLayout(leaf)
         val localBounds =
             range
                 .map(layout::getBoundingBox)
@@ -257,12 +373,82 @@ class TtsHighlightPlacementAndroidTest {
         )
     }
 
-    private fun renderedPixels(): IntArray {
+    /** Captures the current frame as an array used by the existing word-marker checks. */
+    private fun renderedPixels(): IntArray = captureFrame().pixels
+
+    /** Returns the production text leaf before or after the highlight modifier is active. */
+    private fun bodyLeaf(): SemanticsNode =
+        checkNotNull(
+            composeRule
+                .onRoot(useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .descendants()
+                .firstOrNull { it.text() == THREE_SENTENCES },
+        ) { "production row exposed no body leaf" }
+
+    /** Reads the exact TextLayoutResult exposed by the production text leaf. */
+    private fun textLayout(leaf: SemanticsNode): TextLayoutResult {
+        val layouts = mutableListOf<TextLayoutResult>()
+        val getLayout =
+            checkNotNull(leaf.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action) {
+                "body leaf exposes no text layout"
+            }
+        assertTrue("text layout action failed", getLayout(layouts))
+        return layouts.single()
+    }
+
+    /** Captures a root-sized frame so exact changed-pixel coordinates remain comparable. */
+    private fun captureFrame(): RenderedFrame {
         val pixelMap = composeRule.onRoot(useUnmergedTree = true).captureToImage().toPixelMap()
-        return IntArray(pixelMap.width * pixelMap.height) { index ->
-            pixelMap[index % pixelMap.width, index / pixelMap.width].toArgb()
+        return RenderedFrame(
+            width = pixelMap.width,
+            height = pixelMap.height,
+            pixels =
+                IntArray(pixelMap.width * pixelMap.height) { index ->
+                    pixelMap[index % pixelMap.width, index / pixelMap.width].toArgb()
+                },
+        )
+    }
+
+    private data class PixelPoint(
+        val x: Float,
+        val y: Float,
+    )
+
+    private data class RenderedFrame(
+        val width: Int,
+        val height: Int,
+        val pixels: IntArray,
+    ) {
+        /** Lists centers of pixels changed between equal-sized frames. */
+        fun changedPixels(other: RenderedFrame): List<PixelPoint> {
+            assertEquals(width, other.width)
+            assertEquals(height, other.height)
+            return pixels.indices
+                .filter { pixels[it] != other.pixels[it] }
+                .map { index -> PixelPoint(index % width + 0.5f, index / width + 0.5f) }
         }
     }
+
+    private enum class SentenceStartPlacement {
+        WrappedLineStart,
+        MidLine,
+    }
+
+    /** Places a local character cell into root coordinates. */
+    private fun androidx.compose.ui.geometry.Rect.translate(
+        x: Float,
+        y: Float,
+    ): androidx.compose.ui.geometry.Rect =
+        androidx.compose.ui.geometry
+            .Rect(left + x, top + y, right + x, bottom + y)
+
+    /** Pixel-center containment with one-pixel rasterization tolerance by default. */
+    private fun androidx.compose.ui.geometry.Rect.contains(
+        x: Float,
+        y: Float,
+        tolerance: Float = 1f,
+    ): Boolean = x >= left - tolerance && x <= right + tolerance && y >= top - tolerance && y <= bottom + tolerance
 
     private fun renderedSentenceBand(): String {
         val leaf = leafCarryingHighlight()
@@ -536,5 +722,12 @@ class TtsHighlightPlacementAndroidTest {
         const val FIRST_SENTENCE = "The first sentence sits here."
         const val SECOND_SENTENCE = "The second one follows it."
         const val TWO_SENTENCES = "$FIRST_SENTENCE $SECOND_SENTENCE"
+        const val THIRD_SENTENCE = "The third sentence stays clear."
+        const val THREE_SENTENCES = "$FIRST_SENTENCE $SECOND_SENTENCE $THIRD_SENTENCE"
+        val SECOND_SENTENCE_START = THREE_SENTENCES.indexOf(SECOND_SENTENCE)
+        const val MIN_WRAP_WIDTH = 120
+        const val MAX_WRAP_WIDTH = 480
+        const val TEST_LOG_TAG = "WnTtsPlacement"
+        const val RASTER_SEAM_PX = 1f
     }
 }

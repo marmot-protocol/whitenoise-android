@@ -666,8 +666,8 @@
     <string name="tts_playback_action_play">播放</string>
     <string name="tts_playback_action_pause">暫停</string>
     <string name="tts_playback_action_stop">停止</string>
-    <string name="tts_playback_action_previous_message">上一則訊息</string>
-    <string name="tts_playback_action_next_message">下一則訊息</string>
+    <string name="tts_playback_action_previous_sentence">上一句</string>
+    <string name="tts_playback_action_next_sentence">下一句</string>
     <string name="toast_restarting">正在重啟</string>
     <string name="toast_identity_created">身分已建立</string>
     <string name="toast_couldnt_create_identity">無法建立身分</string>
