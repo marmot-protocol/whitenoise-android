@@ -1195,6 +1195,7 @@ internal fun MessageBubble(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .testTag(messageBubbleRowTestTag(record.messageIdHex))
                     .messageBubbleSelectionRow(
                         selectionMode = selectionMode,
                         selected = selected,
@@ -1419,6 +1420,14 @@ internal fun MessageBubble(
                 )
             }
             Column(
+                // Swipe-to-reply translates this whole visual column — bubble or
+                // media surface plus its attached reaction summary — as one unit,
+                // while the stationary parent Row keeps gesture and hitbox
+                // ownership (#204). Applying the offset here, and only here,
+                // keeps every bubble variant from double-applying it and keeps
+                // the sender avatar and selection gutter at rest. The placement
+                // lambda shifts drawing without invalidating measurement, so
+                // row alignment and width strategy are unaffected mid-drag.
                 modifier =
                     Modifier
                         .widthIn(min = bubbleColumnMinWidth, max = bubbleColumnMaxWidth)
@@ -1429,7 +1438,7 @@ internal fun MessageBubble(
                             } else {
                                 Modifier
                             },
-                        ),
+                        ).offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) },
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
             ) {
                 // Resolved before the content column so its presence can pick
@@ -1817,7 +1826,9 @@ internal fun MessageBubble(
                     // a caption is present; the shared frame owns the continuous
                     // outer shape, color, border, and single footer.
                     Column(
-                        modifier = Modifier.offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) },
+                        // The swipe translation lives on the enclosing bubble
+                        // column so the reaction summary moves too; applying it
+                        // here as well would double-shift media messages.
                         horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
@@ -1968,12 +1979,13 @@ internal fun MessageBubble(
                     }
                 } else {
                     MessageBubbleFrame(
-                        // Swipe-to-reply and long-press now live on the parent Row
-                        // (see #204) so the whole message row is the hitbox. The
-                        // Surface keeps only the visual slide driven by swipeDrag.
+                        // Swipe-to-reply and long-press live on the parent Row
+                        // (see #204) so the whole message row is the hitbox, and
+                        // the visual slide driven by swipeDrag lives on the
+                        // enclosing bubble column so the reaction summary
+                        // translates with this surface.
                         modifier =
                             Modifier
-                                .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) }
                                 .then(textSelectionBoundsModifier)
                                 .then(actionAnchorBoundsModifier),
                         presentation = bubblePresentation,
