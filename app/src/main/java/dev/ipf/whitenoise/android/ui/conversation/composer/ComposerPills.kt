@@ -374,6 +374,11 @@ internal fun ComposerPill(
     inputContentVisible: Boolean = true,
     inputFocusEnabled: Boolean = true,
     onMultilineControlsChanged: (Boolean) -> Unit = {},
+    // Compact-height viewports cannot afford the expanded control layout, whose
+    // fixed header and action-row overhead consumes the whole compact composer
+    // ceiling and squeezes the editor viewport to zero, so they pin the inline
+    // single-row controls regardless of the measured line count.
+    multilineControlsSuppressed: Boolean = false,
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -591,13 +596,17 @@ internal fun ComposerPill(
             }
         }
     val visualMultilineControls =
-        compactLineCount?.let { lineCount ->
-            when {
-                multilineControls && lineCount <= 1 -> false
-                !multilineControls && lineCount >= 3 -> true
-                else -> multilineControls
-            }
-        } ?: multilineControls
+        when {
+            multilineControlsSuppressed -> false
+            else ->
+                compactLineCount?.let { lineCount ->
+                    when {
+                        multilineControls && lineCount <= 1 -> false
+                        !multilineControls && lineCount >= 3 -> true
+                        else -> multilineControls
+                    }
+                } ?: multilineControls
+        }
     val expandedLayout = visualMultilineControls || expansionMode != ComposerExpansionMode.Automatic
     // One progress value owns the moving editor and action edges. The handle's
     // 24dp border reservation is installed atomically when expansion starts;
@@ -632,6 +641,7 @@ internal fun ComposerPill(
     fun updateMultilineControls(lineCount: Int) {
         val nextMultilineControls =
             when {
+                multilineControlsSuppressed -> false
                 multilineControls && lineCount <= 1 -> false
                 !multilineControls && lineCount >= 3 -> true
                 else -> multilineControls
@@ -643,7 +653,7 @@ internal fun ComposerPill(
     }
 
     SideEffect {
-        if (compactLineCount != null && visualMultilineControls != multilineControls) {
+        if ((compactLineCount != null || multilineControlsSuppressed) && visualMultilineControls != multilineControls) {
             multilineControls = visualMultilineControls
             onMultilineControlsChanged(visualMultilineControls)
         }

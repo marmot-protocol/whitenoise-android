@@ -1251,6 +1251,7 @@ internal fun ConversationScreen(
     val imeIsOpen by remember(imeInsets, density) {
         derivedStateOf { imeInsets.getBottom(density) > 0 }
     }
+    val compactHeightConversation by rememberConversationCompactHeight()
     // #589: composer focus is hoisted here so the resume lifecycle observer
     // below can drive it. `composerFocus` is the requester wired into the
     // composer's BasicTextField, `composerFocused` mirrors the live focus edge
@@ -2980,10 +2981,12 @@ internal fun ConversationScreen(
                     }
                 },
                 onTtsTransportBodyClick = onTtsTransportBodyClick,
+                compactHeight = compactHeightConversation,
             )
         },
         bottomBar = {
             ConversationBottomBar(
+                compactHeight = compactHeightConversation,
                 selectionMode = selectionMode,
                 selectionActionAvailability =
                     batchSelectionUi.actionAvailability.let { availability ->
