@@ -797,6 +797,7 @@ internal class ConversationDictationController internal constructor(
         val generationId = ++nextRecognitionGenerationId
         activeRecognitionGenerationId = generationId
         generationHasSpeech = false
+        lastCommittedSegment = ""
         state = ConversationDictationState.Starting(sessionId, target)
         armGenerationTimeout(sessionId, generationId, STARTING_TIMEOUT_MILLIS) {
             failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
@@ -818,7 +819,6 @@ internal class ConversationDictationController internal constructor(
                 override fun onBeginningOfSpeech() {
                     if (!owns(sessionId, generationId)) return
                     generationHasSpeech = true
-                    lastCommittedSegment = ""
                     silenceTimeoutHandle?.cancel()
                     silenceTimeoutHandle = null
                 }

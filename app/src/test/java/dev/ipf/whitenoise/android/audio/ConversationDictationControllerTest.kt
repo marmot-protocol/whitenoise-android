@@ -628,9 +628,9 @@ class ConversationDictationControllerTest {
         }
     }
 
-    /** Verifies segment spacing, punctuation attachment, and duplicate-final suppression. */
+    /** Verifies segment spacing, punctuation attachment, and repeated speech across generations. */
     @Test
-    fun segmentAccumulatorPreservesPunctuationAndDropsConsecutiveDuplicates() {
+    fun segmentAccumulatorPreservesPunctuationAndRepeatedSpeechAcrossGenerations() {
         assertEquals("Hello world", appendConversationDictationSegment("Hello ", "world"))
         assertEquals("你好。世界", appendConversationDictationSegment("你好", "。世界"))
         assertEquals("مرحبا؟", appendConversationDictationSegment("مرحبا", "؟"))
@@ -639,15 +639,31 @@ class ConversationDictationControllerTest {
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
 
         fixture.platform.listener.onResult("Hello")
+        assertEquals(2, fixture.platform.sessions.size)
         fixture.platform.listener.onResult("Hello")
+        assertEquals(3, fixture.platform.sessions.size)
         fixture.platform.listener.onResult(",")
         fixture.platform.listener.onResult("world")
-        fixture.platform.listener.onBeginningOfSpeech()
         fixture.platform.listener.onResult("world")
         fixture.controller.stop()
 
-        assertEquals("Hello, world world", fixture.drafts.getValue(key()).text)
+        assertEquals("Hello Hello, world world", fixture.drafts.getValue(key()).text)
         assertEquals(1, fixture.writes)
+    }
+
+    /** A duplicate callback from a completed generation is stale and must not append twice. */
+    @Test
+    fun staleDuplicateFinalFromCompletedGenerationIsIgnored() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val firstGeneration = fixture.platform.listener
+
+        firstGeneration.onResult("Hello")
+        assertEquals(2, fixture.platform.sessions.size)
+        firstGeneration.onResult("Hello")
+        fixture.controller.stop()
+
+        assertEquals("Hello", fixture.drafts.getValue(key()).text)
     }
 
     /** Verifies that recognizer churn retains one microphone lease and releases it only at logical teardown. */
