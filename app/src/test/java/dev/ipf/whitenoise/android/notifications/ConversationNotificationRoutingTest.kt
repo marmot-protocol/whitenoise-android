@@ -255,6 +255,23 @@ class ConversationNotificationRoutingTest {
         assertTrue(groupRoute.settingsTarget.channelId.contains(ConversationVibrationPattern.LONG.channelToken))
     }
 
+    /** Reading settings predicts the required child id without creating it before shortcut publication. */
+    @Test
+    fun settingsModelDoesNotCreateTheRequiredMessageChild() {
+        val conversation = descriptor("conversation-read-only", vibration = ConversationVibrationPattern.DOUBLE)
+        val expectedId =
+            ConversationNotificationChannels.conversationChannelId(
+                parentChannelId = NotificationChannelSpec.GROUP_MESSAGES.id,
+                conversationShortcutId = conversation.shortcutId,
+                vibrationPattern = ConversationVibrationPattern.DOUBLE,
+            )
+
+        val route = routing.settings(conversation).first()
+
+        assertEquals(expectedId, route.settingsTarget.channelId)
+        assertNull(manager.getNotificationChannel(expectedId))
+    }
+
     @Test
     fun explicitChoicesAreScopedToOneConversation() {
         val first = descriptor("conversation-first")

@@ -230,6 +230,7 @@ internal fun visibleDirectDetailsSharedGroups(
     expanded: Boolean,
 ): List<ChatListItem> = if (expanded) groups else groups.take(SHARED_GROUPS_PREVIEW_COUNT)
 
+/** Renders group identity, membership, behavior, and notification configuration. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun GroupDetailsScreen(
@@ -1108,6 +1109,7 @@ internal fun GroupDetailsScreen(
                     icon = Icons.Default.Notifications,
                     title = stringResource(R.string.sounds_and_notifications),
                     value = notificationModeLabel(conversationNotifyMode),
+                    modifier = Modifier.performanceTestTag(PerformanceTestTags.GROUP_NOTIFICATION_SETTINGS),
                     onClick = { showNotificationSettings = true },
                 )
                 if (isDm && dmPeerCandidate != null) {
