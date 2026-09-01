@@ -97,6 +97,7 @@ class NotificationNetworkReconnectCoverageTest {
             assertFalse("catch-up must not run without a confirmed receiver", catchUpRan)
         }
 
+    /** Pins validated-edge ordering across the Android bridge and isolated coordinator. */
     @Suppress("CyclomaticComplexMethod", "LongMethod") // One source-ordering contract is clearer together.
     @Test
     fun offlineToOnlineTransitionReconnectsNotificationRuntimeWithoutPushWakeMarker() {
@@ -105,11 +106,15 @@ class NotificationNetworkReconnectCoverageTest {
         val networkSnapshot = appState.functionBody("noteActiveNetworkSnapshot")
         val validatedListener = appState.functionBody("registerValidatedInternetListener")
         val usableRecovery = appState.functionBody("noteUsableValidatedInternetSnapshot")
-        val reconnect = appState.functionBody("scheduleNotificationReconnectOnNetworkRestore")
-        val attempt = appState.functionBody("runNotificationNetworkRecoveryAttempt")
-        val outboundWake = appState.functionBody("wakeDurableOutboundForNetworkRecovery")
-        val receiverRecovery = appState.functionBody("ensureNotificationReceiverForNetworkRecovery")
-        val accountCatchUp = appState.functionBody("catchUpAccountsForNetworkRecovery")
+        val recovery = notificationNetworkRecoverySource().readText()
+        val noteRecovery = recovery.functionBody("noteNetworkRestored")
+        val reconnect = recovery.functionBody("schedule")
+        val resume = recovery.functionBody("resumeIfPending")
+        val attempt = recovery.functionBody("runAttempt")
+        val bridge =
+            appState
+                .substringAfter("private val notificationNetworkRecovery =")
+                .substringBefore("private val connectivitySignalOwner")
         val receiver = appState.functionBody("ensureNotificationReceiverForNetworkReconnect")
         val listenerLoop = appState.functionBody("runNotificationListenerLoop")
 
@@ -126,8 +131,7 @@ class NotificationNetworkReconnectCoverageTest {
             "only validated aggregate recovery may wake pending sends and schedule reconnect",
             "if (!recovery.restored) return" in usableRecovery &&
                 "validatedConnectivityRecoveryGenerationMutable.update" in usableRecovery &&
-                "beginNotificationNetworkRecoveryTrace" in usableRecovery &&
-                "scheduleNotificationReconnectOnNetworkRestore()" in usableRecovery,
+                "notificationNetworkRecovery.noteNetworkRestored" in usableRecovery,
         )
         assertTrue(
             "notification reconnect must reuse the current listener and await its shared receiver state",
@@ -142,15 +146,15 @@ class NotificationNetworkReconnectCoverageTest {
         )
         assertTrue(
             "notification reconnect must wake durable outbound work before catch-up",
-            "wakeDurableOutboundForNetworkRecovery" in attempt &&
-                "ensureNotificationReceiverForNetworkRecovery" in attempt &&
-                "catchUpAccountsForNetworkRecovery" in attempt &&
-                "notifyConnectivityRestored()" in outboundWake &&
-                "ensureNotificationReceiverForNetworkReconnect" in receiverRecovery &&
-                "PerformancePhase.NOTIFICATION_RECEIVER_RETRY" in receiverRecovery &&
-                "catchUpAccountsBestEffort()" in accountCatchUp &&
-                "PerformancePhase.ACCOUNT_CATCH_UP_RETRY" in accountCatchUp &&
-                "pushWakeCatchUpPending()" !in accountCatchUp,
+            "wakeDurableOutbound =" in attempt &&
+                "ensureNotificationReceiverActive =" in attempt &&
+                "catchUpAccounts =" in attempt &&
+                "notifyConnectivityRestored()" in bridge &&
+                "ensureNotificationReceiverForNetworkReconnect" in bridge &&
+                "catchUpAccountsBestEffort()" in bridge &&
+                "PerformancePhase.NOTIFICATION_RECEIVER_RETRY" in attempt &&
+                "PerformancePhase.ACCOUNT_CATCH_UP_RETRY" in attempt &&
+                "pushWakeCatchUpPending()" !in bridge,
         )
         assertTrue(
             "bootstrap failure must not imply a receiver is ready for reconnect catch-up",
@@ -159,15 +163,15 @@ class NotificationNetworkReconnectCoverageTest {
         )
         assertTrue(
             "reconnect requests must be coalesced while in flight",
-            "notificationReconnectRequestedGeneration.accumulateAndGet" in reconnect &&
-                "notificationReconnectJob.startIfInactive" in reconnect &&
+            "requestedGeneration.accumulateAndGet" in noteRecovery &&
+                "job.startIfInactive" in reconnect &&
                 "drainNotificationNetworkRecovery" in reconnect,
         )
         assertTrue(
             "a receiver timeout or catch-up failure must remain queued after the current job settles",
-            "notificationReconnectRequestedGeneration.get()" in reconnect &&
-                "notificationReconnectCompletedGeneration.get()" in reconnect &&
-                "scheduleNotificationReconnectOnNetworkRestore()" in reconnect.substringAfter("invokeOnCompletion"),
+            "requestedGeneration.get()" in resume &&
+                "completedGeneration.get()" in resume &&
+                "resumeIfPending()" in reconnect.substringAfter("invokeOnCompletion"),
         )
     }
 
@@ -183,6 +187,7 @@ class NotificationNetworkReconnectCoverageTest {
         )
     }
 
+    /** Pins teardown ordering so recovery cannot reinstall work across a wipe. */
     @Suppress("LongMethod") // One source-ordering scenario is clearer as a single regression contract.
     @Test
     fun accountTeardownCancelsReconnectOwnersBeforeTheListener() {
@@ -191,19 +196,24 @@ class NotificationNetworkReconnectCoverageTest {
         val restore = appState.functionBody("restoreAfterFailedDestructiveAccountWipe")
         val teardown = appState.functionBody("stopNotificationListenerForAccountTeardown")
         val wipe = appState.functionBody("signOutAndWipeActiveAccount")
-        val reconnect = appState.functionBody("scheduleNotificationReconnectOnNetworkRestore")
+        val recovery = notificationNetworkRecoverySource().readText()
+        val reconnect = recovery.functionBody("schedule")
+        val bridge =
+            appState
+                .substringAfter("private val notificationNetworkRecovery =")
+                .substringBefore("private val connectivitySignalOwner")
         val pendingPushDrain = appState.functionBody("schedulePendingPushWakeCatchUpDrain")
 
         assertTrue(
             "failed-wipe recovery must remember every notification runtime owner",
             "backgroundConnectionEnabled" in prepare &&
                 "notificationJob.isActive()" in prepare &&
-                "notificationReconnectJob.isActive()" in prepare &&
+                "notificationNetworkRecovery.isActive()" in prepare &&
                 "pushWakeCatchUpDrainJob.isActive()" in prepare,
         )
         assertTrue(
             "teardown must cancel producers before they can reinstall the notification listener",
-            teardown.indexOf("notificationReconnectJob.cancelAndJoin()") in 0 until
+            teardown.indexOf("notificationNetworkRecovery.cancelAndJoin()") in 0 until
                 teardown.indexOf("pushWakeCatchUpDrainJob.cancelAndJoin()") &&
                 teardown.indexOf("pushWakeCatchUpDrainJob.cancelAndJoin()") <
                 teardown.indexOf("notificationJob.cancelAndJoin()"),
@@ -228,8 +238,9 @@ class NotificationNetworkReconnectCoverageTest {
         )
         assertTrue(
             "connectivity callbacks must not reinstall notification work during account teardown",
-            "if (networkNotificationRecoverySuppressed) return" in reconnect &&
-                "if (networkNotificationRecoverySuppressed) return@launch" in reconnect &&
+            "!networkNotificationRecoverySuppressed && hasValidatedInternet()" in bridge &&
+                "if (!shouldContinue()) return" in reconnect &&
+                "if (!shouldContinue()) return@launch" in reconnect &&
                 "if (networkNotificationRecoverySuppressed ||" in pendingPushDrain,
         )
         assertTrue(
@@ -264,6 +275,14 @@ class NotificationNetworkReconnectCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing AppState.kt source file")
+
+    /** Locates the isolated reconnect coordinator source for structural contracts. */
+    private fun notificationNetworkRecoverySource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/NotificationNetworkRecovery.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/NotificationNetworkRecovery.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing NotificationNetworkRecovery.kt source file")
 
     /**
      * Models [subscribeNotifications] at the pinned MDK revision: passive broadcast
