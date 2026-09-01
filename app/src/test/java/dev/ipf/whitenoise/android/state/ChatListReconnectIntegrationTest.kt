@@ -56,7 +56,7 @@ class ChatListReconnectIntegrationTest {
                 awaitConversationCondition {
                     controller.items
                         .singleOrNull()
-                        ?.lastMessage
+                        ?.latest
                         ?.messageIdHex == ConversationTimelineTestIds.MESSAGE_B &&
                         controller.recoveryProjectionGeneration == 7L
                 }

@@ -253,7 +253,7 @@ class NotificationRouteTimelinePresentationTest {
                         marmot = notificationRouteMarmot(routeGate),
                     ),
                 )
-            state.conversationLiveSubscriptionsOverride = scriptedSubscriptions.subscriptions
+            state.liveSubscriptionOverrides.conversation = scriptedSubscriptions.subscriptions
         }
     }
 
