@@ -44,6 +44,9 @@ jobs:
       - name: Test GitHub triage reconciliation
         run: python3 -m unittest scripts/test_check_github_triage.py
 
+      - name: Test stale-result recurrence classifier
+        run: python3 -m unittest scripts/test_stale_result_recurrence.py
+
       - name: Test package-replacement startup reporter
         run: bash .github/scripts/test-package-replacement-startup-report.sh
 
