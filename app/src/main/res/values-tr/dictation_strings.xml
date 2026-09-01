@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dictation_done">Bitti</string>
+    <string name="dictation_notification_title">Dikte etkin</string>
+    <string name="dictation_notification_text">Bitirmek için Bitti’ye, silmek için İptal’e dokunun</string>
+    <string name="notification_channel_dictation">Dikte</string>
+    <string name="notification_channel_dictation_description">Mesaj düzenleyicideki etkin dikte oturumunu denetler</string>
+    <string name="dictation_settings_title">Dikte</string>
+    <string name="dictation_settings_subtitle">Diktenin ne zaman biteceğini ve metne ne olacağını seçin</string>
+    <string name="dictation_settings_explainer">White Noise, Android’de seçilen tam konuşma tanıma hizmetini kullanır. Sesi bu hizmet işler; White Noise yalnızca döndürülen metni yapıştırılana veya gönderilene kadar bellekte tutar.</string>
+    <string name="dictation_finish_title">Dikteyi bitir</string>
+    <string name="dictation_finish_manual">Bitti’ye dokunduğumda</string>
+    <string name="dictation_finish_after_silence">%1$d saniye sessizlikten sonra</string>
+    <string name="dictation_result_title">Bittiğinde</string>
+    <string name="dictation_result_paste">Taslağa yapıştır</string>
+    <string name="dictation_result_paste_description">Göndermeden önce metni gözden geçirin veya düzenleyin</string>
+    <string name="dictation_result_send">Mesaj gönder</string>
+    <string name="dictation_result_send_description">Yalnızca özgün sohbet ve taslak değişmediyse gönder</string>
+    <string name="dictation_send_safety_note">Gönderme güvenli biçimde başarısız olur: özgün taslak, üyelik veya oturum değişirse White Noise metni göndermek yerine incelemeniz için saklar.</string>
+</resources>

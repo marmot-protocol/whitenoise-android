@@ -1633,6 +1633,6 @@
     <string name="discard">Elimina</string>
     <string name="open_app_settings">Apri le impostazioni dell’app</string>
     <string name="dictation_disclosure_title">Riconoscimento vocale esterno</string>
-    <string name="dictation_disclosure_message">Il servizio vocale installato elabora l’audio dettato e può inviarlo al proprio fornitore. White Noise inserisce il testo restituito in questa bozza per consentirti di controllarlo e non lo invia mai automaticamente.</string>
+    <string name="dictation_disclosure_message">Il servizio vocale installato elabora l’audio dettato e può inviarlo al proprio fornitore. Per impostazione predefinita, White Noise incolla il testo restituito nella bozza; l’invio automatico è disponibile solo quando lo abiliti esplicitamente nelle impostazioni di Dettatura.</string>
     <string name="dictation_continue">Continua</string>
 </resources>

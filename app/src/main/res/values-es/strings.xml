@@ -1633,6 +1633,6 @@
     <string name="discard">Descartar</string>
     <string name="open_app_settings">Abrir ajustes de la aplicación</string>
     <string name="dictation_disclosure_title">Reconocimiento de voz externo</string>
-    <string name="dictation_disclosure_message">El servicio de voz instalado procesa el audio dictado y puede enviarlo a su proveedor. White Noise inserta el texto devuelto en este borrador para que lo revises y nunca lo envía automáticamente.</string>
+    <string name="dictation_disclosure_message">El servicio de voz instalado procesa el audio dictado y puede enviarlo a su proveedor. De forma predeterminada, White Noise pega el texto devuelto en el borrador; el envío automático solo está disponible si lo activas expresamente en los ajustes de Dictado.</string>
     <string name="dictation_continue">Continuar</string>
 </resources>

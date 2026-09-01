@@ -320,6 +320,30 @@ class ConversationDictationControllerTest {
     }
 
     @Test
+    fun grantedPermissionRejectedByRecognitionServiceFallsBackToProviderActivity() {
+        var microphoneReleases = 0
+        var durableStops = 0
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Keep", TextRange(4)),
+                releaseMicrophone = { microphoneReleases += 1 },
+                stopDurableSession = { durableStops += 1 },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val rejectedSession = fixture.platform.session
+
+        fixture.platform.listener.onError(ConversationDictationFailure.PermissionDenied)
+
+        assertTrue(fixture.controller.state is ConversationDictationState.ProviderActivityRequired)
+        assertEquals(1L, fixture.controller.providerActivityRequestId)
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertFalse(fixture.controller.hasDurableSession)
+        assertTrue(rejectedSession.destroyed)
+        assertEquals(1, microphoneReleases)
+        assertEquals(1, durableStops)
+    }
+
+    @Test
     fun providerActivityAlsoWaitsForTheSharedFirstUseDisclosure() {
         var accepted = false
         val controller =

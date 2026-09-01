@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dictation_done">完成</string>
+    <string name="dictation_notification_title">聽寫進行中</string>
+    <string name="dictation_notification_text">點選「完成」以結束，或點選「取消」以捨棄</string>
+    <string name="notification_channel_dictation">聽寫</string>
+    <string name="notification_channel_dictation_description">控制訊息輸入框中的進行中聽寫工作階段</string>
+    <string name="dictation_settings_title">聽寫</string>
+    <string name="dictation_settings_subtitle">選擇聽寫何時結束，以及如何處理文字</string>
+    <string name="dictation_settings_explainer">White Noise 會使用 Android 中所選的確切語音辨識服務。該服務負責處理音訊；White Noise 只會將傳回的文字保留在記憶體中，直到貼上或傳送為止。</string>
+    <string name="dictation_finish_title">結束聽寫</string>
+    <string name="dictation_finish_manual">當我點選「完成」時</string>
+    <string name="dictation_finish_after_silence">靜音 %1$d 秒後</string>
+    <string name="dictation_result_title">完成時</string>
+    <string name="dictation_result_paste">貼到草稿</string>
+    <string name="dictation_result_paste_description">傳送前檢閱或編輯文字</string>
+    <string name="dictation_result_send">傳送訊息</string>
+    <string name="dictation_result_send_description">僅在原始聊天和草稿未變更時傳送</string>
+    <string name="dictation_send_safety_note">傳送會安全地中止：如果原始草稿、成員或工作階段有所變更，White Noise 會保留逐字稿供檢閱，而不會傳送。</string>
+</resources>

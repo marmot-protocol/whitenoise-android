@@ -12,7 +12,6 @@ import android.os.SystemClock
 import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.RecognitionService
-import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -868,6 +867,16 @@ internal class ConversationDictationController internal constructor(
                             finalizeAccumulatedTranscript(sessionId, target)
                         !finishRequested && error == ConversationDictationFailure.NoSpeech ->
                             restartAfterNoSpeech(sessionId, target)
+                        !finishRequested &&
+                            error == ConversationDictationFailure.PermissionDenied &&
+                            accumulatedTranscript.isBlank() -> {
+                            // Android's RecognitionService can reject an otherwise granted caller at the
+                            // AppOps/attribution boundary. Release app-owned capture before delegating to
+                            // the provider's exported Activity so compatible offline providers still work.
+                            clearRecognitionSession(cancel = false)
+                            resetTranscriptSession()
+                            prepareProviderActivity(sessionId, target)
+                        }
                         accumulatedTranscript.isNotBlank() -> retainAccumulatedTranscriptForReview(sessionId, target)
                         else -> fail(sessionId, target, error)
                     }
@@ -1571,12 +1580,7 @@ private class AndroidConversationDictationRecognitionSession(
 
     /** Starts listening for one final free-form result without requesting partial hypotheses. */
     override fun start() {
-        recognizer.startListening(
-            Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-                .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1),
-        )
+        recognizer.startListening(conversationDictationRecognitionIntent())
     }
 
     /** Requests the provider to finish the current utterance and return its final result. */

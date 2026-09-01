@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dictation_done">Concluído</string>
+    <string name="dictation_notification_title">Ditado ativo</string>
+    <string name="dictation_notification_text">Use Concluído para terminar ou Cancelar para descartar</string>
+    <string name="notification_channel_dictation">Ditado</string>
+    <string name="notification_channel_dictation_description">Controla uma sessão de ditado ativa no compositor</string>
+    <string name="dictation_settings_title">Ditado</string>
+    <string name="dictation_settings_subtitle">Escolha quando o ditado termina e o que acontece ao texto</string>
+    <string name="dictation_settings_explainer">O White Noise usa exatamente o serviço de reconhecimento de voz selecionado no Android. Esse serviço processa o áudio; o White Noise mantém na memória apenas o texto devolvido até que seja colado ou enviado.</string>
+    <string name="dictation_finish_title">Terminar ditado</string>
+    <string name="dictation_finish_manual">Quando tocar em Concluído</string>
+    <string name="dictation_finish_after_silence">Após %1$d segundos de silêncio</string>
+    <string name="dictation_result_title">Quando terminar</string>
+    <string name="dictation_result_paste">Colar no rascunho</string>
+    <string name="dictation_result_paste_description">Rever ou editar o texto antes de enviar</string>
+    <string name="dictation_result_send">Enviar mensagem</string>
+    <string name="dictation_result_send_description">Enviar apenas se a conversa e o rascunho originais não tiverem mudado</string>
+    <string name="dictation_send_safety_note">O envio falha de forma segura: se o rascunho original, os membros ou a sessão mudarem, o White Noise mantém a transcrição para revisão em vez de a enviar.</string>
+</resources>
