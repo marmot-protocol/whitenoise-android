@@ -31,8 +31,6 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
-import dev.ipf.marmotkit.AuditLogTrackerConfigFfi
-import dev.ipf.marmotkit.AuditLogUploadSourceFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscription
@@ -4248,6 +4246,7 @@ class WhiteNoiseAppState private constructor(
             "notification listener unavailable before Marmot startup"
         }
         runtimeStartResult.await().getOrThrow()
+        runtime.marmot.emitAuditRuntimeReadinessAfterStart()
     }
 
     private suspend fun resumeCompletedBootstrap(): Boolean {
@@ -8989,18 +8988,7 @@ class WhiteNoiseAppState private constructor(
                     ),
             ),
         )
-        setAuditLogTrackerConfig(
-            AuditLogTrackerConfigFfi(
-                endpoint = BuildConfig.WHITENOISE_AUDIT_LOG_ENDPOINT.nonBlankOrNull(),
-                authorizationBearerToken = BuildConfig.WHITENOISE_AUDIT_LOG_AUTH_TOKEN.nonBlankOrNull(),
-                source =
-                    AuditLogUploadSourceFfi(
-                        deviceLabel = Build.MODEL.nonBlankOrNull(),
-                        platform = "android",
-                        appVersion = BuildConfig.VERSION_NAME,
-                    ),
-            ),
-        )
+        configureAuditRuntime()
     }
 
     private fun warmProfile(accountIdHex: String) {
