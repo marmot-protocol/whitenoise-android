@@ -138,27 +138,31 @@ internal object AttachmentCachePublication {
             val stripe = stripeFor(attachmentKey)
             val published =
                 synchronized(stripe) {
-                    if (!permitStillValid(stripe, permit)) {
-                        runCatching { tmp.delete() }
-                        return@synchronized false
-                    }
-                    val renamed =
-                        try {
-                            renameFileForTests?.invoke(tmp, finalFile) ?: tmp.renameTo(finalFile)
-                        } catch (throwable: Throwable) {
+                    var accepted = false
+                    wipeLifetime.runIfCurrent(permit.wipeGeneration) {
+                        if (!permitStillValid(stripe, permit)) {
                             runCatching { tmp.delete() }
-                            throw IOException("failed to publish attachment cache ${finalFile.name}", throwable)
+                            return@runIfCurrent
                         }
-                    if (!renamed) {
-                        runCatching { tmp.delete() }
-                        if (!permitStillValid(stripe, permit)) return@synchronized false
-                        throw IOException("failed to publish attachment cache ${finalFile.name}")
+                        val renamed =
+                            try {
+                                renameFileForTests?.invoke(tmp, finalFile) ?: tmp.renameTo(finalFile)
+                            } catch (throwable: Throwable) {
+                                runCatching { tmp.delete() }
+                                throw IOException("failed to publish attachment cache ${finalFile.name}", throwable)
+                            }
+                        if (!renamed) {
+                            runCatching { tmp.delete() }
+                            if (!permitStillValid(stripe, permit)) return@runIfCurrent
+                            throw IOException("failed to publish attachment cache ${finalFile.name}")
+                        }
+                        if (!permitStillValid(stripe, permit)) {
+                            deleteFinalFile(finalFile)
+                            return@runIfCurrent
+                        }
+                        accepted = true
                     }
-                    if (!permitStillValid(stripe, permit)) {
-                        deleteFinalFile(finalFile)
-                        return@synchronized false
-                    }
-                    true
+                    accepted
                 }
             if (published) AttachmentPlaintextCache.onPublished(finalFile)
             published

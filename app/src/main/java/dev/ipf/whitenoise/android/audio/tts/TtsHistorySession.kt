@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.audio.tts
 
+import androidx.annotation.VisibleForTesting
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.CancellationException
@@ -74,6 +75,10 @@ class TtsHistorySession internal constructor(
     private val historyRequests = StalenessGuard()
     private var pendingLoad: Job? = null
     private var liveTailAttached = true
+
+    /** Optional barrier used by concurrency tests at the guarded settlement boundary. */
+    @VisibleForTesting
+    internal var settlementAwaiterForTests: (() -> Unit)? = null
 
     // The live conversation tail as last verified against the timeline. A
     // genuine arrival keeps this id in the loaded window, a window trim drops
@@ -229,45 +234,48 @@ class TtsHistorySession internal constructor(
                     } catch (_: Exception) {
                         TtsHistoryEdgeWalk.Result.Failed
                     }
-                if (!historyRequests.isCurrent(startedGeneration) || conversation != convo) return@launch
-                // Every reachable branch settles the queue's edge deferral: a
-                // final chunk that finished mid-request parked instead of ending
-                // playback, and only these outcomes can say how it resolves.
-                when (result) {
-                    is TtsHistoryEdgeWalk.Result.Found ->
-                        try {
-                            // Found is only reachable through a resolved pager.
-                            pager?.let { applyProjection(it, direction, targetSentence, result) }
-                        } finally {
-                            // An extension that landed already repositioned the
-                            // parked terminal, one that was refused has nothing
-                            // left to play. A throw must not strand either.
+                historyRequests.runIfCurrent(startedGeneration) {
+                    settlementAwaiterForTests?.invoke()
+                    if (conversation != convo) return@runIfCurrent
+                    // Every reachable branch settles the queue's edge deferral: a
+                    // final chunk that finished mid-request parked instead of ending
+                    // playback, and only these outcomes can say how it resolves.
+                    when (result) {
+                        is TtsHistoryEdgeWalk.Result.Found ->
+                            try {
+                                // Found is only reachable through a resolved pager.
+                                pager?.let { applyProjection(it, direction, targetSentence, result) }
+                            } finally {
+                                // An extension that landed already repositioned the
+                                // parked terminal, one that was refused has nothing
+                                // left to play. A throw must not strand either.
+                                controller.settleEdgeRequest(TtsEdgeSettlement.Resolved)
+                                _edgeState.value = null
+                            }
+
+                        TtsHistoryEdgeWalk.Result.EndOfHistory -> {
+                            _edgeState.value = null
+                            // Replaying the navigation call here instead would read
+                            // a cursor the parked terminal has already moved.
+                            controller.settleEdgeRequest(direction.endOfHistorySettlement())
+                        }
+
+                        TtsHistoryEdgeWalk.Result.Failed -> {
+                            // Retry-by-re-tap needs the window and cursor intact.
+                            controller.settleEdgeRequest(TtsEdgeSettlement.Retained)
+                            _edgeState.value = TtsHistoryEdgeState.Failed(direction)
+                        }
+
+                        TtsHistoryEdgeWalk.Result.PageBound -> {
                             controller.settleEdgeRequest(TtsEdgeSettlement.Resolved)
                             _edgeState.value = null
                         }
 
-                    TtsHistoryEdgeWalk.Result.EndOfHistory -> {
-                        _edgeState.value = null
-                        // Replaying the navigation call here instead would read
-                        // a cursor the parked terminal has already moved.
-                        controller.settleEdgeRequest(direction.endOfHistorySettlement())
+                        // Unreachable: a stale walk means the generation already
+                        // advanced, which the guard above rejected. Settling here
+                        // would clobber whichever request re-armed since.
+                        TtsHistoryEdgeWalk.Result.Stale -> Unit
                     }
-
-                    TtsHistoryEdgeWalk.Result.Failed -> {
-                        // Retry-by-re-tap needs the window and cursor intact.
-                        controller.settleEdgeRequest(TtsEdgeSettlement.Retained)
-                        _edgeState.value = TtsHistoryEdgeState.Failed(direction)
-                    }
-
-                    TtsHistoryEdgeWalk.Result.PageBound -> {
-                        controller.settleEdgeRequest(TtsEdgeSettlement.Resolved)
-                        _edgeState.value = null
-                    }
-
-                    // Unreachable: a stale walk means the generation already
-                    // advanced, which the guard above returned on. Settling
-                    // here would clobber whichever request re-armed since.
-                    TtsHistoryEdgeWalk.Result.Stale -> Unit
                 }
             }
     }
