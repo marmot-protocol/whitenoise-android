@@ -1191,6 +1191,7 @@ class WhiteNoiseAppState private constructor(
     private val notificationDispatcher: CoroutineDispatcher,
     private val notificationCardCancellationDispatcher: CoroutineDispatcher,
     private val notificationReceiverTimeoutMillis: () -> Long,
+    private val notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics,
     private val inboundShareTextStager: ((String, String, String) -> Unit)?,
     preferencesOverride: SharedPreferences?,
     initialAccounts: List<AccountSummaryFfi>,
@@ -1212,6 +1213,7 @@ class WhiteNoiseAppState private constructor(
             notificationDispatcher = Dispatchers.IO,
             notificationCardCancellationDispatcher = processNotificationCardCancellationDispatcher,
             notificationReceiverTimeoutMillis = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
+            notificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
             inboundShareTextStager = null,
             preferencesOverride = null,
             initialAccounts = emptyList(),
@@ -1235,6 +1237,7 @@ class WhiteNoiseAppState private constructor(
         notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
         notificationCardCancellationDispatcher: CoroutineDispatcher = processNotificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis: () -> Long = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
+        notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
         inboundShareTextStager: ((String, String, String) -> Unit)? = null,
         preferences: SharedPreferences? = null,
     ) : this(
@@ -1252,6 +1255,7 @@ class WhiteNoiseAppState private constructor(
         notificationDispatcher = notificationDispatcher,
         notificationCardCancellationDispatcher = notificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis = notificationReceiverTimeoutMillis,
+        notificationNetworkRecoveryDiagnostics = notificationNetworkRecoveryDiagnostics,
         inboundShareTextStager = inboundShareTextStager,
         preferencesOverride = preferences,
         initialAccounts = accounts,
@@ -2792,7 +2796,7 @@ class WhiteNoiseAppState private constructor(
         synchronized(conversationControllerLock) { conversationControllers.remove(controller) }
     }
 
-    internal var conversationLiveSubscriptionsOverride: ConversationLiveSubscriptions? = null
+    internal val liveSubscriptionOverrides = LiveSubscriptionOverrides()
 
     internal fun deliverConfirmedMediaHandoff(
         accountRef: String?,
@@ -6609,6 +6613,9 @@ class WhiteNoiseAppState private constructor(
             scope = notificationScope,
             shouldContinue = { !networkNotificationRecoverySuppressed && hasValidatedInternet() },
             wakeDurableOutbound = {
+                // A retained generation deliberately reissues this wake after
+                // a retry; MDK coalesces connectivity-restored commands so it
+                // interrupts stale backoff without duplicating account workers.
                 val wake = runCatchingCancellable { marmotIo { notifyConnectivityRestored() } }
                 wake.onFailure { throwable ->
                     appStateDebug(throwable) {
@@ -6633,7 +6640,12 @@ class WhiteNoiseAppState private constructor(
                 )
             },
             onDrainCompleted = ::schedulePendingPushWakeCatchUpDrain,
+            diagnostics = notificationNetworkRecoveryDiagnostics,
         )
+
+    /** Process-owned recovery attribution shared by projections and Compose. */
+    internal val recoveryDiagnostics: NotificationNetworkRecoveryCoordinator
+        get() = notificationNetworkRecovery
 
     /**
      * Reactive Android-validated internet and aggregate relay fallback inputs

@@ -24,6 +24,25 @@ internal fun String.functionBody(functionName: String): String {
     )
 }
 
+/** Returns the balanced argument list of a named Kotlin property's initializer call. */
+internal fun String.propertyInitializerCall(propertyName: String): String {
+    val declaration =
+        Regex("""\bval\s+${Regex.escape(propertyName)}\b""")
+            .find(this)
+            ?.range
+            ?: error("Missing property $propertyName")
+    val assignment = indexOf('=', declaration.last + 1)
+    require(assignment >= 0) { "Missing initializer for property $propertyName" }
+    val callStart = indexOf('(', assignment + 1)
+    require(callStart >= 0) { "Missing initializer call for property $propertyName" }
+    return kotlinBlockFrom(
+        openDelimiter = callStart,
+        description = "initializer call for property $propertyName",
+        opening = '(',
+        closing = ')',
+    )
+}
+
 internal fun String.kotlinBlockFrom(
     openDelimiter: Int,
     description: String,

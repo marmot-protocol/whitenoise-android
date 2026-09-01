@@ -26,11 +26,9 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
-import dev.ipf.marmotkit.ChatListSubscription
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
-import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
@@ -2920,6 +2918,8 @@ class ChatsController private constructor(
     initialLocalSnapshot: AccountSwitchLocalSnapshot?,
     private val initialConnectionAttemptClaim: () -> Boolean,
 ) {
+    private val liveSubscriptions = appState.chatListLiveSubscriptions()
+
     /** Creates a standalone controller whose initial subscription validation stays silent. */
     constructor(appState: WhiteNoiseAppState) :
         this(appState = appState, initialConnectionAttemptClaim = { false })
@@ -3030,6 +3030,11 @@ class ChatsController private constructor(
     var retryGeneration by mutableLongStateOf(0L)
         private set
     private var terminalLoadFailure = false
+
+    /** Recovery generation represented by the latest published row snapshot. */
+    var recoveryProjectionGeneration by mutableLongStateOf(0L)
+        private set
+    private var pendingRecoveryProjectionGeneration = 0L
 
     fun retryLoad() {
         if (terminalLoadFailure) {
@@ -3511,8 +3516,8 @@ class ChatsController private constructor(
     private var isCleared = false
 
     private val liveSubscriptionLock = Any()
-    private var activeChatListSubscription: ChatListSubscription? = null
-    private var activeChatsSubscription: ChatsSubscription? = null
+    private var activeChatListSubscription: ChatListSubscriptionHandle? = null
+    private var activeChatsSubscription: ChatsSubscriptionHandle? = null
     private var bindJob: Job? = null
     private val connectionOwner =
         ChatListConnectionOwner(appState) {
@@ -3621,8 +3626,8 @@ class ChatsController private constructor(
                 }
             }
             while (coroutineContext.isActive && shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
-                var chatListSubscription: ChatListSubscription? = null
-                var chatsSubscription: ChatsSubscription? = null
+                var chatListSubscription: ChatListSubscriptionHandle? = null
+                var chatsSubscription: ChatsSubscriptionHandle? = null
                 var receivedLiveUpdate = false
                 val connectionAttempt =
                     if (initialSubscriptionProjection) {
@@ -3636,11 +3641,9 @@ class ChatsController private constructor(
                         connectionOwner.beginSessionAttempt(accountRef, bindEpoch)
                     }
                 try {
-                    val chatListStream =
-                        appState.marmotIo { subscribeChatList(accountRef, includeArchived = true) }
+                    val chatListStream = liveSubscriptions.openChatList(accountRef, true)
                     chatListSubscription = chatListStream
-                    val chatStream =
-                        appState.marmotIo { subscribeChats(accountRef, includeArchived = true) }
+                    val chatStream = liveSubscriptions.openChats(accountRef, true)
                     chatsSubscription = chatStream
                     if (!shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) break
                     synchronized(liveSubscriptionLock) {
@@ -3692,6 +3695,12 @@ class ChatsController private constructor(
                                         withContext(Dispatchers.IO) {
                                             chatListStream.nextUpdate()
                                         } ?: break
+                                    appState.recoveryDiagnostics
+                                        .recordChatListSubscriptionReceived()
+                                        ?.let { generation ->
+                                            pendingRecoveryProjectionGeneration =
+                                                maxOf(pendingRecoveryProjectionGeneration, generation)
+                                        }
                                     receivedLiveUpdate = true
                                     connectionOwner.noteLiveUpdate(connectionAttempt)
                                     when (update) {
@@ -5643,6 +5652,8 @@ class ChatsController private constructor(
         error = null
         pendingRecompute = false
         recomputeScheduled = false
+        pendingRecoveryProjectionGeneration = 0L
+        recoveryProjectionGeneration = 0L
         recomputeScope.cancel()
     }
 
@@ -5721,6 +5732,18 @@ class ChatsController private constructor(
         val avatarWarmTargets = visible.take(CHAT_LIST_AVATAR_WARM_ROWS)
         items = visible
         archivedItems = archived
+        val recoveryGeneration = pendingRecoveryProjectionGeneration
+        if (recoveryGeneration > 0L) {
+            pendingRecoveryProjectionGeneration = 0L
+            if (
+                appState.recoveryDiagnostics.recordChatListProjectionPublished(
+                    generation = recoveryGeneration,
+                    count = visible.size + archived.size,
+                )
+            ) {
+                recoveryProjectionGeneration = recoveryGeneration
+            }
+        }
         // Limit speculative network work to the recent visible conversations the
         // user is likely to receive from next. The app-state notification stream
         // independently warms each ingested sender/conversation on cold UI-less
@@ -6411,6 +6434,11 @@ internal typealias MediaPublisher =
 
 internal typealias InviteAcceptor = suspend (String, String) -> AppGroupRecordFfi
 
+private data class RecoveryStampedTimelineUpdate(
+    val update: TimelineSubscriptionUpdateFfi,
+    val recoveryGeneration: Long?,
+)
+
 class ConversationController(
     internal val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
@@ -6761,6 +6789,10 @@ class ConversationController(
         private set
 
     var timeline by mutableStateOf(initialTimeline)
+        private set
+
+    /** Recovery generation represented by the latest authoritative timeline. */
+    var recoveryProjectionGeneration by mutableLongStateOf(0L)
         private set
 
     var hasPublishedAuthoritativeTimeline by mutableStateOf(false)
@@ -7332,8 +7364,13 @@ class ConversationController(
         timelineStream: ConversationTimelineSubscriptionHandle,
     ): List<String> {
         val snapshot = initialTimelineSnapshotRead.await { timelineStream.snapshot() }
+        val recoveryGeneration =
+            appState.recoveryDiagnostics.recordTimelineSubscriptionReceived(
+                count = snapshot?.messages?.size ?: 0,
+            )
         return if (snapshot == null) {
             if (timelineRecords.isEmpty()) publishAuthoritativeEmptyInitialTimeline()
+            publishRecoveryTimelineProjection(recoveryGeneration)
             emptyList()
         } else {
             hasLoadedOlderPages = false
@@ -7345,7 +7382,18 @@ class ConversationController(
                     updatePagination = true,
                 )
             initializeReadState(account)
+            publishRecoveryTimelineProjection(recoveryGeneration)
             streamIds
+        }
+    }
+
+    /** Publishes a captured recovery generation only after timeline state changed. */
+    private fun publishRecoveryTimelineProjection(generation: Long?) {
+        if (
+            generation != null &&
+            appState.recoveryDiagnostics.recordTimelineProjectionPublished(generation, timeline.size)
+        ) {
+            recoveryProjectionGeneration = generation
         }
     }
 
@@ -7635,7 +7683,7 @@ class ConversationController(
         account: String,
         timelineStream: ConversationTimelineSubscriptionHandle,
     ) {
-        val timelineUpdates = Channel<TimelineSubscriptionUpdateFfi>(capacity = Channel.BUFFERED)
+        val timelineUpdates = Channel<RecoveryStampedTimelineUpdate>(capacity = Channel.BUFFERED)
         val pump =
             async {
                 try {
@@ -7644,7 +7692,12 @@ class ConversationController(
                             withContext(Dispatchers.IO) {
                                 timelineStream.nextUpdate()
                             } ?: break
-                        timelineUpdates.send(update)
+                        timelineUpdates.send(
+                            RecoveryStampedTimelineUpdate(
+                                update = update,
+                                recoveryGeneration = appState.recoveryDiagnostics.recordTimelineSubscriptionReceived(),
+                            ),
+                        )
                     }
                 } finally {
                     timelineUpdates.close()
@@ -7678,7 +7731,8 @@ class ConversationController(
                 }
                 val streamIdsLaunched = mutableListOf<String>()
                 coalesceTimelinePublishes {
-                    for (update in batch) {
+                    for (stamped in batch) {
+                        val update = stamped.update
                         val streamIds =
                             when (update) {
                                 is TimelineSubscriptionUpdateFfi.Page -> {
@@ -7705,6 +7759,7 @@ class ConversationController(
                         streamIdsLaunched += streamIds
                     }
                 }
+                publishRecoveryTimelineProjection(batch.mapNotNull { it.recoveryGeneration }.maxOrNull())
                 // Scroll-driven mark-read in the UI layer handles
                 // the user-visible read pointer.
                 streamIdsLaunched.forEach { streamId ->

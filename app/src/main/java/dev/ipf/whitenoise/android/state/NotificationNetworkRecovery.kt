@@ -6,6 +6,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
+import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -19,11 +20,317 @@ private const val NETWORK_RECOVERY_INITIAL_RETRY_DELAY_MS = 500L
 private const val NETWORK_RECOVERY_MAX_RETRY_DELAY_MS = 8_000L
 private const val NETWORK_RECOVERY_MAX_RETRY_DOUBLINGS = 63
 
-/** Associates one opaque diagnostic operation with one Android recovery edge. */
-internal data class NotificationNetworkRecoveryPerformanceTrace(
+/**
+ * Retains the active diagnostic trace and only the newest coalesced successor.
+ * A stale edge can never replace a newer trace, while phases from the attempt
+ * already in flight remain attributable until that attempt settles.
+ */
+internal class NotificationNetworkRecoveryPerformanceTraces {
+    private val lock = Any()
+    private val traces = mutableMapOf<Long, PerformanceTrace?>()
+    private val recordedPhases = mutableMapOf<Long, MutableSet<PerformancePhase>>()
+    private val catchUpReadyGenerations = mutableSetOf<Long>()
+    private val firstVisibleGenerations = mutableSetOf<Long>()
+    private var activeGeneration: Long? = null
+    private var newestGeneration = 0L
+
+    /** Starts a generation only when it is newer than every observed edge. */
+    fun begin(
+        generation: Long,
+        create: () -> PerformanceTrace?,
+    ): Boolean =
+        synchronized(lock) {
+            if (generation <= newestGeneration) return@synchronized false
+            newestGeneration = generation
+            val active = activeGeneration
+            traces.keys.removeAll { existing -> existing != active }
+            recordedPhases.keys.removeAll { existing -> existing != active }
+            catchUpReadyGenerations.removeAll { existing -> existing != active }
+            firstVisibleGenerations.removeAll { existing -> existing != active }
+            traces[generation] = create()
+            true
+        }
+
+    /** Makes [generation] active and discards traces for superseded attempts. */
+    fun activate(generation: Long) {
+        synchronized(lock) {
+            if (!traces.containsKey(generation)) return
+            activeGeneration = generation
+            traces.keys.removeAll { existing -> existing < generation }
+            recordedPhases.keys.removeAll { existing -> existing < generation }
+            catchUpReadyGenerations.removeAll { existing -> existing < generation }
+            firstVisibleGenerations.removeAll { existing -> existing < generation }
+        }
+    }
+
+    /** Returns the trace owned by [generation], if diagnostics were active at its edge. */
+    fun forGeneration(generation: Long): PerformanceTrace? = synchronized(lock) { traces[generation] }
+
+    /** Returns the generation whose recovery attempt currently owns downstream attribution. */
+    fun activeGeneration(): Long? = synchronized(lock) { activeGeneration }
+
+    /** Claims a one-shot downstream phase for [generation]. */
+    fun claimPhase(
+        generation: Long,
+        phase: PerformancePhase,
+    ): Boolean =
+        synchronized(lock) {
+            if (activeGeneration != generation || !traces.containsKey(generation)) return@synchronized false
+            recordedPhases.getOrPut(generation) { mutableSetOf() }.add(phase)
+        }
+
+    /** Marks the native catch-up boundary and releases a generation already rendered. */
+    fun markCatchUpReady(generation: Long) {
+        synchronized(lock) {
+            if (!traces.containsKey(generation)) return
+            catchUpReadyGenerations += generation
+            completeIfFinished(generation)
+        }
+    }
+
+    /** Marks the first rendered frame and releases a generation already caught up. */
+    fun markFirstVisible(generation: Long) {
+        synchronized(lock) {
+            if (!traces.containsKey(generation)) return
+            firstVisibleGenerations += generation
+            completeIfFinished(generation)
+        }
+    }
+
+    private fun completeIfFinished(generation: Long) {
+        if (generation in catchUpReadyGenerations && generation in firstVisibleGenerations) {
+            release(generation)
+        }
+    }
+
+    private fun release(generation: Long) {
+        traces.remove(generation)
+        recordedPhases.remove(generation)
+        catchUpReadyGenerations.remove(generation)
+        firstVisibleGenerations.remove(generation)
+        if (activeGeneration == generation) activeGeneration = null
+    }
+}
+
+/** One privacy-safe in-memory recovery marker used by device acceptance tests. */
+internal data class NotificationNetworkRecoverySample(
     val generation: Long,
-    val trace: dev.ipf.whitenoise.android.diagnostics.PerformanceTrace,
+    val phase: PerformancePhase,
+    val elapsedMillis: Long,
+    val result: PerformanceResult,
+    val layer: PerformanceLayer,
+    val attempt: Int?,
+    val count: Int?,
 )
+
+/**
+ * Joins Android, MDK-return, projection, and Compose markers under one opaque
+ * generation. The bounded samples contain only enum values and numbers.
+ */
+internal class NotificationNetworkRecoveryDiagnostics(
+    private val nowMillis: () -> Long = SystemClock::elapsedRealtime,
+    private val traceFactory: () -> PerformanceTrace? = {
+        PerformanceDiagnostics.begin(PerformanceOperation.SYNC_CATCH_UP)
+    },
+    private val traceRecorder: (
+        PerformanceTrace?,
+        PerformancePhase,
+        Long,
+        PerformanceResult,
+        PerformanceLayer,
+        Int?,
+        Int?,
+    ) -> Unit = { trace, phase, elapsed, result, layer, attempt, count ->
+        PerformanceDiagnostics.record(
+            trace = trace,
+            phase = phase,
+            elapsedMs = elapsed,
+            result = result,
+            layer = layer,
+            attempt = attempt,
+            count = count,
+        )
+    },
+) {
+    private val traces = NotificationNetworkRecoveryPerformanceTraces()
+    private val sampleLock = Any()
+    private val recentSamples = ArrayDeque<NotificationNetworkRecoverySample>()
+
+    /** Starts a trace for a fresh validated offline-to-online edge. */
+    fun networkRestored(generation: Long) {
+        if (!traces.begin(generation, traceFactory)) return
+        record(
+            generation = generation,
+            phase = PerformancePhase.NETWORK_RESTORED,
+            result = PerformanceResult.PENDING,
+            layer = PerformanceLayer.ANDROID,
+        )
+    }
+
+    /** Makes [generation] the owner before its next retry attempt begins. */
+    fun attemptStarted(
+        generation: Long,
+        attempt: Int,
+    ) {
+        traces.activate(generation)
+        record(
+            generation = generation,
+            phase = PerformancePhase.RECOVERY_ATTEMPT,
+            result = PerformanceResult.PENDING,
+            layer = PerformanceLayer.ANDROID,
+            attempt = attempt,
+        )
+    }
+
+    /** Records a repeatable attempt phase such as receiver readiness or retry. */
+    fun attemptPhase(
+        generation: Long,
+        phase: PerformancePhase,
+        result: PerformanceResult,
+        layer: PerformanceLayer,
+        attempt: Int,
+    ) {
+        record(generation, phase, result, layer, attempt)
+    }
+
+    /**
+     * Records the ordered guarantees established by a successful MDK return.
+     * Catch-up cannot return before activation, current replay drain, durable
+     * checkpoint, and projection publication have completed in MDK.
+     */
+    fun catchUpSucceeded(
+        generation: Long,
+        attempt: Int,
+    ) {
+        record(
+            generation,
+            PerformancePhase.ACCOUNT_SUBSCRIPTION_ACTIVATED,
+            PerformanceResult.SUCCESS,
+            PerformanceLayer.TRANSPORT,
+            attempt,
+        )
+        record(
+            generation,
+            PerformancePhase.CURRENT_REPLAY_COMPLETE,
+            PerformanceResult.SUCCESS,
+            PerformanceLayer.TRANSPORT,
+            attempt,
+        )
+        record(
+            generation,
+            PerformancePhase.DURABLE_INGEST_READY,
+            PerformanceResult.SUCCESS,
+            PerformanceLayer.STORAGE,
+            attempt,
+        )
+        record(
+            generation,
+            PerformancePhase.ACCOUNT_CATCH_UP_READY,
+            PerformanceResult.SUCCESS,
+            PerformanceLayer.MDK,
+            attempt,
+        )
+        traces.markCatchUpReady(generation)
+    }
+
+    /** Attributes the first chat-list subscription update after recovery. */
+    fun chatListSubscriptionReceived(count: Int = 1): Long? =
+        recordCurrentOnce(
+            phase = PerformancePhase.CHAT_LIST_SUBSCRIPTION_RECEIVED,
+            layer = PerformanceLayer.ANDROID,
+            count = count,
+        )
+
+    /** Attributes the first timeline subscription update after recovery. */
+    fun timelineSubscriptionReceived(count: Int = 1): Long? =
+        recordCurrentOnce(
+            phase = PerformancePhase.TIMELINE_SUBSCRIPTION_RECEIVED,
+            layer = PerformanceLayer.ANDROID,
+            count = count,
+        )
+
+    /** Records publication of the authoritative chat-list projection. */
+    fun chatListProjectionPublished(
+        generation: Long,
+        count: Int,
+    ): Boolean =
+        recordOnce(
+            generation = generation,
+            phase = PerformancePhase.CHAT_LIST_PROJECTION_PUBLISHED,
+            layer = PerformanceLayer.ANDROID,
+            count = count,
+        )
+
+    /** Records publication of the authoritative timeline projection. */
+    fun timelineProjectionPublished(
+        generation: Long,
+        count: Int,
+    ): Boolean =
+        recordOnce(
+            generation = generation,
+            phase = PerformancePhase.TIMELINE_PROJECTION_PUBLISHED,
+            layer = PerformanceLayer.ANDROID,
+            count = count,
+        )
+
+    /** Records the first Compose frame containing a recovered projection. */
+    fun firstVisibleFrame(generation: Long): Boolean {
+        val recorded =
+            recordOnce(
+                generation = generation,
+                phase = PerformancePhase.RECOVERY_FIRST_VISIBLE_FRAME,
+                layer = PerformanceLayer.ANDROID,
+            )
+        if (recorded) traces.markFirstVisible(generation)
+        return recorded
+    }
+
+    /** Returns a bounded numeric-only snapshot for an instrumented report. */
+    fun samples(): List<NotificationNetworkRecoverySample> = synchronized(sampleLock) { recentSamples.toList() }
+
+    private fun recordCurrentOnce(
+        phase: PerformancePhase,
+        layer: PerformanceLayer,
+        count: Int,
+    ): Long? {
+        val generation = traces.activeGeneration() ?: return null
+        return generation.takeIf { recordOnce(it, phase, layer, count) }
+    }
+
+    private fun recordOnce(
+        generation: Long,
+        phase: PerformancePhase,
+        layer: PerformanceLayer,
+        count: Int? = null,
+    ): Boolean {
+        if (!traces.claimPhase(generation, phase)) return false
+        record(generation, phase, PerformanceResult.SUCCESS, layer, count = count)
+        return true
+    }
+
+    private fun record(
+        generation: Long,
+        phase: PerformancePhase,
+        result: PerformanceResult,
+        layer: PerformanceLayer,
+        attempt: Int? = null,
+        count: Int? = null,
+    ) {
+        val trace = traces.forGeneration(generation)
+        val startedAt = trace?.startedAtMs ?: nowMillis()
+        val elapsed = (nowMillis() - startedAt).coerceAtLeast(0L)
+        val sample = NotificationNetworkRecoverySample(generation, phase, elapsed, result, layer, attempt, count)
+        synchronized(sampleLock) {
+            recentSamples.addLast(sample)
+            while (recentSamples.size > RECOVERY_SAMPLE_LIMIT) recentSamples.removeFirst()
+        }
+        traceRecorder(trace, phase, elapsed, result, layer, attempt, count)
+    }
+
+    private companion object {
+        const val RECOVERY_SAMPLE_LIMIT = 512
+    }
+}
 
 /** Result of one validated-network recovery attempt. */
 internal enum class NotificationNetworkRecoveryOutcome {
@@ -44,16 +351,15 @@ internal class NotificationNetworkRecoveryCoordinator(
     private val catchUpAccounts: suspend () -> Boolean,
     private val awaitRetry: suspend (generation: Long, attempt: Int) -> Unit,
     private val onDrainCompleted: () -> Unit,
+    private val diagnostics: NotificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
 ) {
     private val job = NotificationJobSlot()
     private val requestedGeneration = AtomicLong(0L)
     private val completedGeneration = AtomicLong(0L)
-    private val traceLock = Any()
-    private var performanceTrace: NotificationNetworkRecoveryPerformanceTrace? = null
 
     /** Retains and schedules the newest validated offline-to-online edge. */
     fun noteNetworkRestored(generation: Long) {
-        beginTrace(generation)
+        diagnostics.networkRestored(generation)
         requestedGeneration.accumulateAndGet(generation, ::maxOf)
         schedule()
     }
@@ -68,6 +374,30 @@ internal class NotificationNetworkRecoveryCoordinator(
 
     /** Cancels and joins the active drain while retaining its requested generation. */
     suspend fun cancelAndJoin() = job.cancelAndJoin()
+
+    /** Attributes the first Android chat-list update to the active recovery. */
+    fun recordChatListSubscriptionReceived(count: Int = 1): Long? = diagnostics.chatListSubscriptionReceived(count)
+
+    /** Attributes the first Android timeline update to the active recovery. */
+    fun recordTimelineSubscriptionReceived(count: Int = 1): Long? = diagnostics.timelineSubscriptionReceived(count)
+
+    /** Records the chat-list projection publication for a captured generation. */
+    fun recordChatListProjectionPublished(
+        generation: Long,
+        count: Int,
+    ): Boolean = diagnostics.chatListProjectionPublished(generation, count)
+
+    /** Records the timeline projection publication for a captured generation. */
+    fun recordTimelineProjectionPublished(
+        generation: Long,
+        count: Int,
+    ): Boolean = diagnostics.timelineProjectionPublished(generation, count)
+
+    /** Records a recovered projection's first committed Compose frame. */
+    fun recordFirstVisibleFrame(generation: Long): Boolean = diagnostics.firstVisibleFrame(generation)
+
+    /** Returns numeric-only recovery samples for the instrumented latency report. */
+    fun performanceSamples(): List<NotificationNetworkRecoverySample> = diagnostics.samples()
 
     /** Starts one drain and guarantees a follow-up for any newer retained edge. */
     private fun schedule() {
@@ -102,17 +432,11 @@ internal class NotificationNetworkRecoveryCoordinator(
         generation: Long,
         attempt: Int,
     ): NotificationNetworkRecoveryOutcome {
-        recordPhase(
-            generation = generation,
-            phase = PerformancePhase.RECOVERY_ATTEMPT,
-            result = PerformanceResult.PENDING,
-            layer = PerformanceLayer.ANDROID,
-            attempt = attempt,
-        )
+        recordAttemptStart(generation, attempt)
         return runNotificationReconnectOnNetworkRestore(
             wakeDurableOutbound = {
                 val succeeded = wakeDurableOutbound()
-                recordPhase(
+                diagnostics.attemptPhase(
                     generation = generation,
                     phase = PerformancePhase.CONNECTIVITY_WAKE_READY,
                     result = if (succeeded) PerformanceResult.SUCCESS else PerformanceResult.FAILURE,
@@ -122,7 +446,7 @@ internal class NotificationNetworkRecoveryCoordinator(
             },
             ensureNotificationReceiverActive = {
                 val ready = ensureNotificationReceiverActive()
-                recordPhase(
+                diagnostics.attemptPhase(
                     generation = generation,
                     phase =
                         if (ready) {
@@ -137,7 +461,7 @@ internal class NotificationNetworkRecoveryCoordinator(
                 ready
             },
             catchUpAccounts = {
-                recordPhase(
+                diagnostics.attemptPhase(
                     generation = generation,
                     phase = PerformancePhase.ACCOUNT_CATCH_UP_START,
                     result = PerformanceResult.PENDING,
@@ -145,59 +469,28 @@ internal class NotificationNetworkRecoveryCoordinator(
                     attempt = attempt,
                 )
                 val succeeded = catchUpAccounts()
-                recordPhase(
-                    generation = generation,
-                    phase =
-                        if (succeeded) {
-                            PerformancePhase.ACCOUNT_CATCH_UP_READY
-                        } else {
-                            PerformancePhase.ACCOUNT_CATCH_UP_RETRY
-                        },
-                    result = if (succeeded) PerformanceResult.SUCCESS else PerformanceResult.PENDING,
-                    layer = PerformanceLayer.MDK,
-                    attempt = attempt,
-                )
+                if (succeeded) {
+                    diagnostics.catchUpSucceeded(generation, attempt)
+                } else {
+                    diagnostics.attemptPhase(
+                        generation = generation,
+                        phase = PerformancePhase.ACCOUNT_CATCH_UP_RETRY,
+                        result = PerformanceResult.PENDING,
+                        layer = PerformanceLayer.MDK,
+                        attempt = attempt,
+                    )
+                }
                 succeeded
             },
         )
     }
 
-    /** Starts a fresh process-local diagnostic trace for the supplied edge. */
-    private fun beginTrace(generation: Long) {
-        val trace = PerformanceDiagnostics.begin(PerformanceOperation.SYNC_CATCH_UP)
-        synchronized(traceLock) {
-            performanceTrace = trace?.let { NotificationNetworkRecoveryPerformanceTrace(generation, it) }
-        }
-        trace?.let {
-            PerformanceDiagnostics.record(
-                trace = it,
-                phase = PerformancePhase.NETWORK_RESTORED,
-                elapsedMs = 0L,
-                result = PerformanceResult.PENDING,
-            )
-        }
-    }
-
-    /** Records a phase only while its trace still represents the same edge. */
-    private fun recordPhase(
+    /** Activates the generation trace before recording its next retry attempt. */
+    private fun recordAttemptStart(
         generation: Long,
-        phase: PerformancePhase,
-        result: PerformanceResult,
-        layer: PerformanceLayer,
         attempt: Int,
     ) {
-        val state =
-            synchronized(traceLock) {
-                performanceTrace?.takeIf { it.generation == generation }
-            } ?: return
-        PerformanceDiagnostics.record(
-            trace = state.trace,
-            phase = phase,
-            elapsedMs = (SystemClock.elapsedRealtime() - state.trace.startedAtMs).coerceAtLeast(0L),
-            result = result,
-            layer = layer,
-            attempt = attempt,
-        )
+        diagnostics.attemptStarted(generation, attempt)
     }
 }
 

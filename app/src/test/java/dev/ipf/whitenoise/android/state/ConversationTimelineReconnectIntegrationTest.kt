@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import android.os.Looper
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
+import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,6 +23,61 @@ import java.time.Duration
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationTimelineReconnectIntegrationTest {
+    /** A recovered replacement snapshot publishes the durable target under one generation. */
+    @Test
+    fun recoveryGenerationReachesTheAuthoritativeReplacementRow() =
+        runBlocking {
+            val diagnostics =
+                NotificationNetworkRecoveryDiagnostics(
+                    traceFactory = { null },
+                    traceRecorder = { _, _, _, _, _, _, _ -> },
+                )
+            val fixtures = conversationTimelineReconnectFixtures()
+            val appState = conversationTimelineTestAppState(fixtures.scriptedSubscriptions.subscriptions, diagnostics)
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = conversationTimelineTestGroup(),
+                    initialMemberSnapshot = conversationTimelineMemberSnapshot(),
+                    groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
+                    startOnConstruction = true,
+                )
+            try {
+                awaitConversationCondition {
+                    ConversationTimelineTestIds.MESSAGE_A in timelineMessageIds(controller)
+                }
+                awaitConversationCondition { fixtures.firstSubscription.nextUpdateCallCount == 1 }
+                fixtures.firstSubscription.endUpdates()
+                awaitConversationCondition { fixtures.firstSubscription.closeCallCount == 1 }
+
+                diagnostics.networkRestored(9L)
+                diagnostics.attemptStarted(9L, 1)
+                diagnostics.catchUpSucceeded(9L, 1)
+                controller.retryLoadFailure()
+
+                awaitConversationCondition {
+                    ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(controller) &&
+                        controller.recoveryProjectionGeneration == 9L
+                }
+                assertEquals(
+                    listOf(ConversationTimelineTestIds.MESSAGE_A, ConversationTimelineTestIds.MESSAGE_B),
+                    timelineMessageIds(controller),
+                )
+                val phases = diagnostics.samples().filter { it.generation == 9L }.map { it.phase }
+                assertTrue(
+                    phases.indexOf(PerformancePhase.CURRENT_REPLAY_COMPLETE) <
+                        phases.indexOf(PerformancePhase.TIMELINE_SUBSCRIPTION_RECEIVED),
+                )
+                assertTrue(
+                    phases.indexOf(PerformancePhase.TIMELINE_SUBSCRIPTION_RECEIVED) <
+                        phases.indexOf(PerformancePhase.TIMELINE_PROJECTION_PUBLISHED),
+                )
+            } finally {
+                controller.onCleared()
+                awaitOpenedTimelineSubscriptionsClosed(fixtures.scriptedSubscriptions)
+            }
+        }
+
     @Test
     fun replacementSubscriptionSnapshotReconcilesGapMessageWithoutLaterDelta() =
         runBlocking {

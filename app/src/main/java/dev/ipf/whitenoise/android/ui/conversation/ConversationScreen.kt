@@ -833,6 +833,13 @@ internal fun ConversationScreen(
         remember(controller.timeline) {
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         }
+    LaunchedEffect(controller, controller.recoveryProjectionGeneration, renderedTimeline) {
+        val generation = controller.recoveryProjectionGeneration
+        if (generation > 0L) {
+            withFrameNanos { }
+            appState.recoveryDiagnostics.recordFirstVisibleFrame(generation)
+        }
+    }
     val conversationMedia =
         rememberSharedMediaTiles(
             controller = controller,

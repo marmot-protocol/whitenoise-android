@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.propertyInitializerCall
 import dev.ipf.whitenoise.android.state.NotificationJobSlot
 import dev.ipf.whitenoise.android.state.awaitActiveNotificationReceiver
 import dev.ipf.whitenoise.android.state.runNotificationReconnectOnNetworkRestore
@@ -111,10 +112,7 @@ class NotificationNetworkReconnectCoverageTest {
         val reconnect = recovery.functionBody("schedule")
         val resume = recovery.functionBody("resumeIfPending")
         val attempt = recovery.functionBody("runAttempt")
-        val bridge =
-            appState
-                .substringAfter("private val notificationNetworkRecovery =")
-                .substringBefore("private val connectivitySignalOwner")
+        val bridge = appState.propertyInitializerCall("notificationNetworkRecovery")
         val receiver = appState.functionBody("ensureNotificationReceiverForNetworkReconnect")
         val listenerLoop = appState.functionBody("runNotificationListenerLoop")
 
@@ -175,6 +173,32 @@ class NotificationNetworkReconnectCoverageTest {
         )
     }
 
+    /** Pins the shorter reconnect wait without weakening normal startup readiness. */
+    @Test
+    fun reconnectReceiverBudgetIsThreeSecondsWhileStartupRemainsFiveSeconds() {
+        val appState = appStateSource().readText()
+        val reconnect = appState.functionBody("ensureNotificationReceiverForNetworkReconnect")
+        val startup = appState.functionBody("completeReceiverGatedStartup")
+        val resumedStartup = appState.functionBody("resumeCompletedBootstrap")
+        val runtimeStart = appState.functionBody("ensureNotificationRuntimeStarted")
+
+        assertTrue(
+            "the reconnect receiver wait must be capped at three seconds",
+            "NOTIFICATION_NETWORK_RECOVERY_RECEIVER_TIMEOUT_MILLIS = 3_000L" in appState &&
+                "minOf(" in reconnect &&
+                "notificationReceiverTimeoutMillis()" in reconnect &&
+                "NOTIFICATION_NETWORK_RECOVERY_RECEIVER_TIMEOUT_MILLIS" in reconnect,
+        )
+        assertTrue(
+            "ordinary startup paths must retain the injected five-second budget",
+            "NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS = 5_000L" in appState &&
+                listOf(startup, resumedStartup, runtimeStart).all { body ->
+                    "notificationReceiverTimeoutMillis()" in body &&
+                        "NOTIFICATION_NETWORK_RECOVERY_RECEIVER_TIMEOUT_MILLIS" !in body
+                },
+        )
+    }
+
     @Test
     fun foregroundCatchUpWakesDurableOutboundBeforeAccountCatchUp() {
         val body = appStateSource().readText().functionBody("catchUpAfterForegroundActivation")
@@ -198,10 +222,7 @@ class NotificationNetworkReconnectCoverageTest {
         val wipe = appState.functionBody("signOutAndWipeActiveAccount")
         val recovery = notificationNetworkRecoverySource().readText()
         val reconnect = recovery.functionBody("schedule")
-        val bridge =
-            appState
-                .substringAfter("private val notificationNetworkRecovery =")
-                .substringBefore("private val connectivitySignalOwner")
+        val bridge = appState.propertyInitializerCall("notificationNetworkRecovery")
         val pendingPushDrain = appState.functionBody("schedulePendingPushWakeCatchUpDrain")
 
         assertTrue(

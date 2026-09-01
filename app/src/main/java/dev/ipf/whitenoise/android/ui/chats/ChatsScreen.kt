@@ -374,6 +374,13 @@ internal fun ChatsScreen(
         }
 
     val sourceList = if (showArchived) controller.archivedItems else controller.items
+    LaunchedEffect(controller, controller.recoveryProjectionGeneration, sourceList) {
+        val generation = controller.recoveryProjectionGeneration
+        if (generation > 0L) {
+            withFrameNanos { }
+            appState.recoveryDiagnostics.recordFirstVisibleFrame(generation)
+        }
+    }
     val loadFailurePlacement = loadFailurePlacement(controller.error != null, sourceList.isNotEmpty())
     // Subscribing read of the profile-cache revision so the filter
     // re-runs when a DM peer's display name resolves — the title
