@@ -6,8 +6,10 @@ import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 
 /**
  * Builds the production [ForwardTransport] for one forwarding operation with
@@ -23,7 +25,6 @@ import kotlinx.coroutines.ensureActive
 internal fun WhiteNoiseAppState.forwardTransport(
     sourceAccount: String,
     account: String,
-    materializationRequests: List<AttachmentTransferRequest>,
     batchMessageCount: Int,
 ): ForwardTransport {
     /** Rejects source reads after their explicitly bound signing account leaves the runtime. */
@@ -59,21 +60,10 @@ internal fun WhiteNoiseAppState.forwardTransport(
                 },
                 downloadPlaintext = { reference ->
                     requireSourceAccount()
-                    // Forwarding owns its operation lifecycle: retain user-level queue priority
-                    // without creating a durable attachment-open intent that no Worker will clear.
-                    downloadAttachmentPlaintext(
-                        request = request,
-                        reference = reference,
-                        priority = AttachmentDownloadPriority.Interactive,
-                        persistInteractiveIntent = false,
-                    ).also { requireSourceAccount() }
+                    materializeAttachmentPlaintextIsolated(request, reference)
+                        .also { requireSourceAccount() }
                 },
             )
-        }
-
-        /** Stops stale shared source attempts so an explicit retry creates fresh work. */
-        override fun cancelStalledMaterialization() {
-            materializationRequests.forEach(::cancelMemoizedAttachmentDownload)
         }
 
         /** Uploads already-materialized bytes strictly through the destination account. */
@@ -279,4 +269,31 @@ internal fun WhiteNoiseAppState.forwardTransport(
             return recovered
         }
     }
+}
+
+/**
+ * Downloads one attachment's plaintext for forwarding without joining the
+ * shared memoized download pool and without writing any cache. An unrelated
+ * active-account switch cancels and clears that shared pool for UI hygiene;
+ * a forwarding operation binds its accounts explicitly and must survive such
+ * invalidation, so it reads the existing caches opportunistically and
+ * otherwise downloads within its own session scope. The forwarding session
+ * retains and later zeroes its own private copy of the bytes, so skipping
+ * cache writes leaks nothing and keeps switch-time cache policy intact.
+ */
+internal suspend fun WhiteNoiseAppState.materializeAttachmentPlaintextIsolated(
+    request: AttachmentTransferRequest,
+    reference: MediaAttachmentReferenceFfi,
+): ByteArray {
+    val cacheKey =
+        mediaCacheKey(
+            request.accountRef,
+            request.groupIdHex,
+            request.messageIdHex,
+            request.attachmentIndex,
+        )
+    val cached =
+        withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) }
+            ?: withContext(Dispatchers.IO) { diskMediaCache.get(cacheKey) }
+    return cached ?: marmotIo { downloadMedia(request.accountRef, request.groupIdHex, reference) }.plaintext
 }

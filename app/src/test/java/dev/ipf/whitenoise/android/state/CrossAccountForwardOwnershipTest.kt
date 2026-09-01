@@ -52,6 +52,8 @@ class CrossAccountForwardOwnershipTest {
     private var timelineGate: CountDownLatch? = null
     private var onTimelineEntered: (() -> Unit)? = null
     private var onUploadEntered: (() -> Unit)? = null
+    private var downloadGate: CountDownLatch? = null
+    private var onDownloadEntered: (() -> Unit)? = null
 
     @Suppress("UNCHECKED_CAST")
     private val marmot =
@@ -77,6 +79,8 @@ class CrossAccountForwardOwnershipTest {
                 }
                 "downloadMedia" -> {
                     calls += RecordedCall("downloadMedia", arguments!![0] as String)
+                    onDownloadEntered?.invoke()
+                    downloadGate?.await()
                     MediaDownloadResultFfi(
                         plaintext = byteArrayOf(1, 2, 3, 4),
                         fileName = "photo.png",
@@ -324,6 +328,55 @@ class CrossAccountForwardOwnershipTest {
         assertEquals(listOf(ACCOUNT_B), byMethod.getValue("timelineMessages").distinct())
         assertTrue(calls.none { it.accountRef == ACCOUNT_C })
         assertTrue(calls.none { it.method == "sendText" })
+    }
+
+    /**
+     * The exact regression an unrelated active-account switch used to cause:
+     * switching cancels and clears the shared in-flight download pool, which
+     * previously killed an uncached media forward mid-materialization. The
+     * isolated path must survive that invalidation and complete under the
+     * explicitly bound owners.
+     */
+    @Test
+    fun sharedDownloadPoolInvalidationDuringMaterializationDoesNotCancelTheForward() {
+        val appState =
+            appState(
+                accounts = listOf(account(ACCOUNT_A, "aa"), account(ACCOUNT_B, "bb"), account(ACCOUNT_C, "cc")),
+                activeAccountRef = ACCOUNT_C,
+            )
+        val gate = CountDownLatch(1)
+        downloadGate = gate
+        onDownloadEntered = { cancelSharedDownloads(appState) }
+
+        val started =
+            appState.startForwardMessages(
+                targetGroupIds = listOf(TARGET_ONE),
+                messages = listOf(mediaPayload()),
+                sourceAccountRef = ACCOUNT_A,
+                destinationAccountRef = ACCOUNT_B,
+            )
+        assertTrue(started)
+        awaitCall("downloadMedia")
+        gate.countDown()
+
+        val terminal = awaitTerminal(appState)
+        assertEquals(ForwardOperationPhase.Completed, terminal.phase)
+        assertEquals(listOf(ACCOUNT_A), calls.filter { it.method == "downloadMedia" }.map { it.accountRef })
+        assertEquals(listOf(ACCOUNT_B), calls.filter { it.method == "sendMediaAttachments" }.map { it.accountRef })
+    }
+
+    /** Replays the account-switch teardown against the shared download pool. */
+    @Suppress("UNCHECKED_CAST")
+    private fun cancelSharedDownloads(appState: WhiteNoiseAppState) {
+        val map =
+            WhiteNoiseAppState::class.java
+                .getDeclaredField("inFlightDownloads")
+                .apply { isAccessible = true }
+                .get(appState) as MutableMap<String, kotlinx.coroutines.Deferred<ByteArray>>
+        synchronized(map) {
+            map.values.forEach { it.cancel() }
+            map.clear()
+        }
     }
 
     /** Destination sign-out between upload and publish fails closed with no media send under any account. */

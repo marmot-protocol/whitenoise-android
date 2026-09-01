@@ -3135,22 +3135,7 @@ class WhiteNoiseAppState private constructor(
         val startable =
             sourceAccount != null && account != null && messages.isNotEmpty() && targets.isNotEmpty()
         if (!startable || sourceAccount == null || account == null) return false
-        val materializationRequests =
-            messages
-                .filterIsInstance<ForwardMessagePayload.Media>()
-                .flatMap { message ->
-                    message.attachments.map { source ->
-                        AttachmentTransferRequest(
-                            accountRef = sourceAccount,
-                            groupIdHex = message.sourceGroupIdHex,
-                            messageIdHex = message.sourceMessageIdHex,
-                            attachmentIndex = source.attachmentIndex,
-                        )
-                    }
-                }.distinct()
-
-        /** Fails the session when the source owner is no longer signed in. */
-        val transport = forwardTransport(sourceAccount, account, materializationRequests, messages.size)
+        val transport = forwardTransport(sourceAccount, account, messages.size)
         val session =
             ForwardSession(
                 scope = mutationsScope,

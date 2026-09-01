@@ -12,8 +12,7 @@ class ForwardProductionBoundaryCoverageTest {
         val body = transportSource().readText().functionBody("WhiteNoiseAppState.forwardTransport")
 
         assertTrue("resolveAttachmentReference(request)" in body)
-        assertTrue("priority = AttachmentDownloadPriority.Interactive" in body)
-        assertTrue("persistInteractiveIntent = false" in body)
+        assertTrue("materializeAttachmentPlaintextIsolated(request, reference)" in body)
         assertTrue("uploadMedia(" in body)
         assertTrue("send = false" in body)
         assertTrue("uploadedReferences[messageIndex]" in body)
@@ -29,7 +28,7 @@ class ForwardProductionBoundaryCoverageTest {
         val body = transportSource().readText().functionBody("WhiteNoiseAppState.forwardTransport")
         val start = appStateSource().readText().functionBody("startForwardMessages")
 
-        assertTrue("forwardTransport(sourceAccount, account, materializationRequests, messages.size)" in start)
+        assertTrue("forwardTransport(sourceAccount, account, messages.size)" in start)
 
         assertTrue("fun requireSourceAccount()" in body)
         assertTrue("fun requireDestinationAccount()" in body)
@@ -49,7 +48,7 @@ class ForwardProductionBoundaryCoverageTest {
         val materializeBlock =
             body
                 .substringAfter("override suspend fun materialize(")
-                .substringBefore("override fun cancelStalledMaterialization")
+                .substringBefore("override suspend fun upload(")
         assertTrue("requireSourceAccount()" in materializeBlock)
         assertFalse("requireDestinationAccount()" in materializeBlock)
         val uploadBlock =
@@ -63,20 +62,26 @@ class ForwardProductionBoundaryCoverageTest {
         assertFalse("activeAccountRef" in transport)
     }
 
-    /** Production timeout cleanup cancels only account-scoped memoized source requests for this batch. */
+    /**
+     * Forward materialization stays isolated from the shared download pool:
+     * account switching cancels and clears that pool, so a forward that joined
+     * it would be killed by an unrelated switch. The isolated path reads the
+     * caches opportunistically, never writes them, and downloads inside the
+     * forwarding session's own scope.
+     */
     @Test
-    fun productionTransportReleasesTimedOutMaterializationForFreshRetry() {
-        val source = appStateSource().readText()
-        val transport = transportSource().readText().functionBody("WhiteNoiseAppState.forwardTransport")
-        val body = source.functionBody("startForwardMessages")
-        val cleanup = source.functionBody("cancelMemoizedAttachmentDownload")
+    fun productionMaterializationStaysOutOfTheSharedCancellableDownloadPool() {
+        val transportFile = transportSource().readText()
+        val transport = transportFile.functionBody("WhiteNoiseAppState.forwardTransport")
+        val isolated = transportFile.functionBody("WhiteNoiseAppState.materializeAttachmentPlaintextIsolated")
 
-        assertTrue("val materializationRequests =" in body)
-        assertTrue("override fun cancelStalledMaterialization()" in transport)
-        assertTrue("materializationRequests.forEach(::cancelMemoizedAttachmentDownload)" in transport)
-        assertTrue("request.accountRef" in cleanup)
-        assertTrue("inFlightDownloads[cacheKey]?.takeIf { it.isActive }" in cleanup)
-        assertTrue("active?.cancel(" in cleanup)
+        assertFalse("downloadAttachmentPlaintext(" in transport)
+        assertFalse("memoizedDownload(" in transportFile)
+        assertTrue("cachedMediaPlaintext(cacheKey)" in isolated)
+        assertTrue("diskMediaCache.get(cacheKey)" in isolated)
+        assertFalse("cacheMediaPlaintext(" in isolated)
+        assertFalse("diskMediaCache.put" in isolated)
+        assertTrue("downloadMedia(request.accountRef, request.groupIdHex, reference)" in isolated)
     }
 
     /** Session policy bounds preparation and deliberately excludes timeout from automatic retry loops. */
