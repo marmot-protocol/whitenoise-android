@@ -207,9 +207,12 @@ class TtsHighlightPlacementAndroidTest {
         val layout = textLayout(highlightedLeaf)
         val leafBounds = highlightedLeaf.boundsInRoot
         val expectedCells =
-            (sentenceRange.first..sentenceRange.last).map { offset ->
-                layout.getBoundingBox(offset).translate(leafBounds.left, leafBounds.top)
-            }
+            (sentenceRange.first..sentenceRange.last)
+                .map { offset ->
+                    layout.getBoundingBox(offset).translate(leafBounds.left, leafBounds.top)
+                }.filter { cell ->
+                    cell.width > 0f && cell.height > 0f
+                }
         val expectedPaintBoxes =
             expectedCells
                 .groupBy { cell -> cell.top to cell.bottom }
