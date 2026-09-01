@@ -196,14 +196,17 @@ read:
   defects recurring after a named earlier fix; denominator and every
   exclusion; exact policy-live dates; confidence limitations.
 - **Decision thresholds** (on the stale-result share of eligible defects,
-  baseline 3.1%, and the stale+named count, baseline 1):
+  baseline 3.1%, and the stale+named count, baseline 0):
   - **Retain** if the stale share is at most 1.6% (half the baseline) and
-    stale+named recurrences number at most 1.
+    stale+named recurrences stay at zero — the baseline is zero, so any
+    recurrence of a named fix is a regression, not a tolerable rate.
   - **Remove** (or fundamentally rethink) if the stale share is at least
     3.1% (no improvement on baseline) — the policy's cost is not paying for
     measurable association with fewer stale-result defects.
-  - **Revise** for any result between those bounds, or whenever the eligible
-    denominator differs from the baseline by more than a factor of two,
+  - **Revise** for any result between those bounds, for any non-zero
+    stale+named count with an otherwise low stale share, or whenever the
+    eligible denominator differs from the baseline by more than a factor of
+    two,
     which would make the shares incomparable without adjustment.
 
 The final review must state that a rate change is correlational only.
