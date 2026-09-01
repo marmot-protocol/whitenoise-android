@@ -263,18 +263,6 @@ internal suspend fun resolveNotificationPreviewText(
     ).text.takeIf { it.isNotBlank() }
 }
 
-internal fun accountSummariesWithCreatedIdentity(
-    current: List<AccountSummaryFfi>,
-    created: AccountSummaryFfi,
-): List<AccountSummaryFfi> {
-    val existingIndex =
-        current.indexOfFirst {
-            it.label == created.label || it.accountIdHex.equals(created.accountIdHex, ignoreCase = true)
-        }
-    if (existingIndex < 0) return current + created
-    return current.toMutableList().also { it[existingIndex] = created }
-}
-
 internal data class ProfileGroupInviteOutcome(
     val attempted: Int,
     val failures: Int,
@@ -483,17 +471,6 @@ private data class NotificationSystemText(
     val title: String?,
     val body: String,
 )
-
-/** Accepts an upload result only for the account session that launched it. */
-internal fun shouldAcceptMediaUploadForAccount(
-    conversationAccountRef: String?,
-    capturedMediaUploadSessionEpoch: Long,
-    activeAccountRef: String?,
-    currentMediaUploadSessionEpoch: Long,
-): Boolean =
-    conversationAccountRef != null &&
-        conversationAccountRef == activeAccountRef &&
-        capturedMediaUploadSessionEpoch == currentMediaUploadSessionEpoch
 
 internal data class ConversationNotificationTarget(
     val accountRef: String,
