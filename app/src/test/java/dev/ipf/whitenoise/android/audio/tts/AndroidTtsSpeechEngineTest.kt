@@ -17,6 +17,7 @@ import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 class AndroidTtsSpeechEngineTest {
+    /** Verifies the framework listener forwards every callback with its payload intact. */
     @Test
     fun progressListenerForwardsRangesStopsCompletionAndDetailedErrors() {
         val calls = mutableListOf<String>()
@@ -41,6 +42,7 @@ class AndroidTtsSpeechEngineTest {
         )
     }
 
+    /** Preserves completion when an engine omits optional range callbacks. */
     @Test
     fun completionWithoutARangeStillForwardsDone() {
         val calls = mutableListOf<String>()
@@ -51,6 +53,7 @@ class AndroidTtsSpeechEngineTest {
         assertEquals(listOf("done:u1"), calls)
     }
 
+    /** Keeps an interrupted stop distinct from successful completion. */
     @Test
     fun stopWithoutDoneDoesNotSynthesizeCompletion() {
         val calls = mutableListOf<String>()
@@ -61,6 +64,7 @@ class AndroidTtsSpeechEngineTest {
         assertEquals(listOf("stop:u1:true"), calls)
     }
 
+    /** Carries the framework frame index through the adapter callback. */
     @Test
     fun adapterForwardsRangeFrame() {
         val tts = CapturingTextToSpeech(RuntimeEnvironment.getApplication())
@@ -79,6 +83,7 @@ class AndroidTtsSpeechEngineTest {
         assertEquals("whitenoise.tts.1.0:4:9:12", received)
     }
 
+    /** Removes the framework listener when controller ownership ends. */
     @Test
     fun clearCallbacksRemovesTheUtteranceListener() {
         val tts = CapturingTextToSpeech(RuntimeEnvironment.getApplication())
@@ -175,6 +180,7 @@ class AndroidTtsSpeechEngineTest {
         assertNull(resolution?.effectiveKey)
     }
 
+    /** Builds a listener that records each lifecycle callback in order. */
     private fun listener(calls: MutableList<String>) =
         androidTtsProgressListener(
             onStart = { calls += "start:$it" },

@@ -41,10 +41,12 @@ internal class AndroidTtsSpeechEngine(
         return if (voices.isNotEmpty() && resolution.effectiveKey == null) TextToSpeech.LANG_NOT_SUPPORTED else status
     }
 
+    /** Applies the controller's bounded speech-rate preference to the framework engine. */
     override fun setSpeechRate(rate: Float) {
         textToSpeech.setSpeechRate(rate)
     }
 
+    /** Installs one listener that forwards every queue lifecycle callback. */
     override fun setCallbacks(
         onStart: (String?) -> Unit,
         onDone: (String?) -> Unit,
@@ -57,11 +59,12 @@ internal class AndroidTtsSpeechEngine(
         )
     }
 
+    /** Detaches the queue listener before an engine is replaced or released. */
     override fun clearCallbacks() {
         textToSpeech.setOnUtteranceProgressListener(null)
     }
 
-    /** Sends Android's per-utterance volume only for explicit media mixing. */
+    /** Enqueues ordinary speech without an explicit per-utterance volume. */
     override fun speak(
         text: String,
         utteranceId: String,
@@ -73,6 +76,7 @@ internal class AndroidTtsSpeechEngine(
             utteranceId,
         )
 
+    /** Sends Android's per-utterance volume only for explicit media mixing. */
     override fun speak(
         text: String,
         utteranceId: String,
@@ -87,6 +91,7 @@ internal class AndroidTtsSpeechEngine(
             utteranceId,
         )
 
+    /** Stops framework synthesis for the active queue. */
     override fun stop() {
         textToSpeech.stop()
     }

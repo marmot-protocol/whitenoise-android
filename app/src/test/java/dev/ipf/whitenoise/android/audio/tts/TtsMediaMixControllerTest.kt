@@ -39,9 +39,9 @@ class TtsMediaMixControllerTest {
         assertEquals(TtsStartFailure.MediaNotActive, controller.lastStartFailure)
     }
 
-    /** Proves focus denial cannot leak speech after the duckable request. */
+    /** Defensively prevents speech when the injected session-focus policy refuses. */
     @Test
-    fun mediaMixRequestsOnlyTransientMayDuckPolicyAndHonorsFocusDenial() {
+    fun mediaMixPolicyFailureDoesNotLeakSpeech() {
         val engine = RecordingEngine()
         val focus = RecordingFocus(granted = false)
         val controller = controller(focus, mixEnabled = { true }, mediaActive = { true })
@@ -54,9 +54,9 @@ class TtsMediaMixControllerTest {
         assertEquals(TtsStartFailure.AudioFocusDenied, controller.lastStartFailure)
     }
 
-    /** Exercises media ending while duckable focus is acquired, before session mutation. */
+    /** Keeps accepted mixed speech alive when media ends at the final start boundary. */
     @Test
-    fun mediaEndingDuringPreparationReleasesFocusWithoutCreatingQueueState() {
+    fun mediaEndingAfterInitialEligibilityDoesNotVetoSpeech() {
         val activeChecks = ArrayDeque(listOf(true, false))
         val engine = RecordingEngine()
         val focus = RecordingFocus()
@@ -68,13 +68,13 @@ class TtsMediaMixControllerTest {
             )
         controller.attachEngine(engine)
 
-        assertFalse(controller.speak("Race-safe speech.", Locale.US))
+        assertTrue(controller.speak("Race-safe speech.", Locale.US))
 
-        assertEquals(0, engine.languageCalls)
-        assertTrue(engine.spoken.isEmpty())
-        assertEquals(1, focus.releases)
-        assertTrue(controller.state.value is TtsState.Idle)
-        assertEquals(TtsStartFailure.MediaNotActive, controller.lastStartFailure)
+        assertEquals(1, engine.languageCalls)
+        assertEquals(listOf("Race-safe speech."), engine.spoken.map { it.text })
+        assertEquals(0, focus.releases)
+        assertTrue(controller.state.value is TtsState.Speaking)
+        assertEquals(TtsStartFailure.None, controller.lastStartFailure)
     }
 
     /** Verifies bounded enqueue parameters and next-boundary preference updates. */
@@ -120,18 +120,17 @@ class TtsMediaMixControllerTest {
         assertEquals(listOf(TtsAudioFocusMode.MediaMix, TtsAudioFocusMode.MediaMix), focus.modes)
     }
 
-    /** A refused replacement restores focus to an already-speaking ordinary queue. */
+    /** Initial media ineligibility leaves an already-speaking ordinary queue untouched. */
     @Test
-    fun finalMediaRaceDoesNotStrandTheExistingQueueWithoutFocus() {
+    fun initialMediaIneligibilityDoesNotStrandTheExistingQueueWithoutFocus() {
         var mixEnabled = false
-        val activeChecks = ArrayDeque(listOf(true, false))
         val engine = RecordingEngine()
         val focus = RecordingFocus()
         val controller =
             controller(
                 focus,
                 mixEnabled = { mixEnabled },
-                mediaActive = { activeChecks.removeFirst() },
+                mediaActive = { false },
             )
         controller.attachEngine(engine)
         assertTrue(controller.speak("Existing queue.", Locale.US))
@@ -141,15 +140,15 @@ class TtsMediaMixControllerTest {
         assertFalse(controller.speak("Refused replacement.", Locale.FRANCE))
 
         assertEquals(existingState, controller.state.value)
-        assertEquals(listOf(TtsAudioFocusMode.Full, TtsAudioFocusMode.MediaMix, TtsAudioFocusMode.Full), focus.modes)
+        assertEquals(listOf(TtsAudioFocusMode.Full), focus.modes)
         assertEquals(listOf(Locale.US), engine.locales)
         assertEquals(listOf("Existing queue."), engine.spoken.map { it.text })
     }
 
-    /** A denied mode switch also restores focus to the untouched old queue. */
+    /** A denied switch to Full focus restores the untouched mixed queue policy. */
     @Test
-    fun focusDenialDoesNotStrandTheExistingQueueWithoutFocus() {
-        var mixEnabled = false
+    fun fullFocusDenialDoesNotStrandTheExistingMediaMixQueue() {
+        var mixEnabled = true
         val engine = RecordingEngine()
         val focus = RecordingFocus(acquireResults = ArrayDeque(listOf(true, false, true)))
         val controller =
@@ -162,11 +161,12 @@ class TtsMediaMixControllerTest {
         assertTrue(controller.speak("Existing queue.", Locale.US))
         val existingState = controller.state.value
 
-        mixEnabled = true
+        mixEnabled = false
         assertFalse(controller.speak("Denied replacement.", Locale.US))
 
         assertEquals(existingState, controller.state.value)
-        assertEquals(listOf(TtsAudioFocusMode.Full, TtsAudioFocusMode.MediaMix, TtsAudioFocusMode.Full), focus.modes)
+        val expectedModes = listOf(TtsAudioFocusMode.MediaMix, TtsAudioFocusMode.Full, TtsAudioFocusMode.MediaMix)
+        assertEquals(expectedModes, focus.modes)
         assertEquals(listOf("Existing queue."), engine.spoken.map { it.text })
     }
 

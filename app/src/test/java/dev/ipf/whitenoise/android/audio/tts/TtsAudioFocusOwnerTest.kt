@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.audio.tts
 
 import android.media.AudioManager
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,20 +30,18 @@ class TtsAudioFocusOwnerTest {
         owner.release()
     }
 
-    /** Pins media mixing to Android's transient may-duck focus gain. */
+    /** Keeps MediaMix from pausing peer players through Android audio focus. */
     @Test
-    fun mediaMixModeRequestsOnlyTransientMayDuck() {
+    fun mediaMixModeDoesNotRequestOrAbandonAudioFocus() {
         val context = RuntimeEnvironment.getApplication()
         val manager = context.getSystemService(AudioManager::class.java)
         val owner = TtsAudioFocusOwner(context)
 
         assertTrue(owner.acquire(TtsAudioFocusMode.MediaMix, {}, {}))
 
-        assertEquals(
-            AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
-            shadowOf(manager).lastAudioFocusRequest.audioFocusRequest.focusGain,
-        )
+        assertNull(shadowOf(manager).lastAudioFocusRequest)
         owner.release()
+        assertNull(shadowOf(manager).lastAbandonedAudioFocusRequest)
     }
 
     /** Makes every callback after permanent focus surrender inert. */
@@ -55,7 +54,7 @@ class TtsAudioFocusOwnerTest {
         var permanentLosses = 0
         assertTrue(
             owner.acquire(
-                TtsAudioFocusMode.MediaMix,
+                TtsAudioFocusMode.Full,
                 onFocusLoss = { transientLosses += 1 },
                 onOwnerSurrender = { permanentLosses += 1 },
             ),
