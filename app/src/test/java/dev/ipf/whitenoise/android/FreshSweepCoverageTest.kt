@@ -124,7 +124,7 @@ class FreshSweepCoverageTest {
         val body = source("state/Controllers.kt").kotlinFunctionBody("acceptInvite")
         val optimisticProjection = body.indexOf("group = optimisticGroup")
         val optimisticLocalUpdate = body.indexOf("applyLocalGroupUpdate(optimisticGroup)")
-        val accept = body.indexOf("acceptGroupInvite")
+        val accept = body.indexOf("inviteAcceptor(")
         val confirmedProjection = body.indexOf("group = acceptedGroup")
         val confirmedLocalUpdate = body.indexOf("applyLocalGroupUpdate(group)", confirmedProjection)
         val dismiss = body.indexOf("dismissConversationNotifications")

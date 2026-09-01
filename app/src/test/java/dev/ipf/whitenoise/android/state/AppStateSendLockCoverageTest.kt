@@ -256,19 +256,37 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
-    fun manualFailedSendRetryUsesTheSharedBoundedConnectivityPolicy() {
+    fun manualFailedSendRetryUsesTheSharedConnectivityPolicyWithoutAnOuterCommitLock() {
         val body = controllerFunctionBody("retryFailedSend")
-        val lock = body.indexOf("appState.withGroupCommitLock(account, group.groupIdHex)")
-        val sharedRetry = body.indexOf("publishTextWithRetry(replyTarget, account, text", startIndex = lock)
+        val retryStart =
+            body.indexOf("retryTrace = PerformanceDiagnostics.begin(PerformanceOperation.TEXT_SEND)")
+        val sharedRetry = body.indexOf("publishTextWithRetry(replyTarget, account, text", startIndex = retryStart)
+        val retryEnd = body.indexOf("completeDurableAcceptance(key)", startIndex = sharedRetry)
 
         assertTrue(
-            "manual text/reply retry must reuse the bounded connect-phase policy inside the group commit lock",
-            lock >= 0 && sharedRetry > lock,
+            "manual text/reply retry must reuse the shared connect-phase policy",
+            retryStart >= 0 && sharedRetry > retryStart && retryEnd > sharedRetry,
+        )
+        val retryWindow = body.substring(retryStart, retryEnd)
+        assertFalse(
+            "manual retry must not hold the group commit lock around the shared retry loop",
+            "withGroupCommitLock" in retryWindow,
         )
         assertFalse(
             "manual text/reply retry must not bypass the shared policy with direct FFI publish calls",
             "replyToMessage(account, group.groupIdHex, replyTarget, text)" in body ||
                 "sendText(account, group.groupIdHex, text)" in body,
+        )
+    }
+
+    @Test
+    fun foregroundTextRetryListensForValidatedConnectivityRecovery() {
+        val body = controllerFunctionBody("publishTextWithRetry")
+
+        assertTrue(
+            "the foreground retry loop must wake when Android validates restored internet",
+            "retryPendingConversationSend(" in body &&
+                "connectivityRecoveryGeneration = appState.validatedConnectivityRecoveryGeneration" in body,
         )
     }
 

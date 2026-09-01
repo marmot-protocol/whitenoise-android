@@ -27,9 +27,13 @@ import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -38,7 +42,64 @@ import org.robolectric.annotation.Config
 /** Integration boundary for optimistic send state plus the shared relay retry policy (#2016). */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
+@Suppress("LargeClass") // Send, retry, projection, preview, and durable-draft scenarios share one controller fixture.
 class ConversationSendRetryIntegrationTest {
+    @Test
+    fun acceptInviteRetriesAClosedRuntimeWorkerWithoutRollingBackOrReportingAnError() =
+        runTest {
+            val appState = appState()
+            var attempts = 0
+            lateinit var controller: ConversationController
+            controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(pendingConfirmation = true),
+                    initialMemberSnapshot = memberSnapshot(),
+                    inviteAcceptor = { account, groupIdHex ->
+                        attempts += 1
+                        assertEquals(ACCOUNT_REF, account)
+                        assertEquals(GROUP_ID, groupIdHex)
+                        assertFalse(controller.group.pendingConfirmation)
+                        if (attempts == 1) throw MarmotKitException.TransportClosed()
+                        group(pendingConfirmation = false)
+                    },
+                )
+
+            assertTrue(controller.acceptInvite(notify = false))
+
+            assertEquals(2, attempts)
+            assertFalse(controller.group.pendingConfirmation)
+            assertEquals(null, appState.toast)
+        }
+
+    @Test
+    fun acceptInviteRetriesAConnectGapWithoutRollingBackOrReportingAnError() =
+        runTest {
+            val appState = appState()
+            var attempts = 0
+            lateinit var controller: ConversationController
+            controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(pendingConfirmation = true),
+                    initialMemberSnapshot = memberSnapshot(),
+                    inviteAcceptor = { _, _ ->
+                        attempts += 1
+                        assertFalse(controller.group.pendingConfirmation)
+                        if (attempts == 1) {
+                            throw MarmotKitException.Publish("connect relay failed")
+                        }
+                        group(pendingConfirmation = false)
+                    },
+                )
+
+            assertTrue(controller.acceptInvite(notify = false))
+
+            assertEquals(2, attempts)
+            assertFalse(controller.group.pendingConfirmation)
+            assertEquals(null, appState.toast)
+        }
+
     @Test
     fun durableAcceptanceClearsTheCapturedComposerDraft() {
         val appState = appState()
@@ -115,6 +176,64 @@ class ConversationSendRetryIntegrationTest {
 
             assertEquals(null, appState.draftFor(GROUP_ID))
             assertEquals(MessageStatus.Sent, controller.timeline.single().status)
+        }
+
+    @Test
+    fun ambiguousManualRetryStaysPendingAndCannotMintAnotherEvent() =
+        runTest {
+            val appState = appState()
+            var attempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        when (attempts) {
+                            1 -> throw MarmotKitException.Publish("relay rejected event")
+                            else -> throw MarmotKitException.Publish("send event timed out")
+                        }
+                    },
+                )
+
+            appState.sendConversationText(controller, "retry once")
+            controller.retryFailedSend(controller.timeline.single())
+
+            assertEquals(2, attempts)
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+
+            controller.retryFailedSend(controller.timeline.single())
+
+            assertEquals("a pending ambiguous retry must not publish again", 2, attempts)
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+        }
+
+    @Test
+    fun evictionDuringManualRetryRemovesTheBubbleAndMembership() =
+        runTest {
+            val appState = appState()
+            var attempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        if (attempts == 1) {
+                            throw MarmotKitException.Publish("relay rejected event")
+                        }
+                        throw IllegalStateException("GroupStateError::UseAfterEviction")
+                    },
+                )
+
+            appState.sendConversationText(controller, "cannot retry")
+            controller.retryFailedSend(controller.timeline.single())
+
+            assertEquals(2, attempts)
+            assertTrue(controller.timeline.isEmpty())
+            assertFalse(controller.isSelfMember)
         }
 
     @Test
@@ -462,6 +581,197 @@ class ConversationSendRetryIntegrationTest {
         }
 
     @Test
+    fun ambiguousTimeoutAfterLocalProjectionCompletesDurableAcceptanceWithoutRepublishing() =
+        runTest {
+            val appState = appState()
+            val callbacks = mutableListOf<String>()
+            var attempts = 0
+            lateinit var controller: ConversationController
+            controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        val optimisticRecordedAt =
+                            controller.timeline
+                                .single()
+                                .record.recordedAt
+                        applyProjection(
+                            controller,
+                            projectedMessage(
+                                recordedAt = optimisticRecordedAt,
+                                retentionSeconds = null,
+                                retentionExpiresAt = null,
+                                sourceMessageIdHex = null,
+                            ),
+                        )
+                        throw MarmotKitException.Publish("send event timed out")
+                    },
+                )
+
+            controller.send(
+                text = "hello",
+                onAccepted = { callbacks += "optimistic" },
+                onDurablyAccepted = { callbacks += "durable" },
+            )
+
+            assertEquals(1, attempts)
+            assertEquals(listOf("optimistic", "durable"), callbacks)
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+            assertEquals(null, appState.toast)
+        }
+
+    @Test
+    fun ambiguousSendTimeoutStaysPendingAndSilentWithoutResending() =
+        runTest {
+            val appState = appState()
+            var attempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        throw MarmotKitException.Publish("send event timed out")
+                    },
+                )
+
+            controller.send("hello")
+
+            assertEquals(1, attempts)
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+            assertEquals(null, appState.toast)
+        }
+
+    @Test
+    fun sendKeepsRetryingPastTheShortConnectWindowAndStaysPendingUntilAccepted() =
+        runTest {
+            val appState = appState()
+            var attempts = 0
+            lateinit var controller: ConversationController
+            controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+                        if (attempts <= SEND_RETRY_ATTEMPTS) {
+                            throw MarmotKitException.Publish("connect relay failed")
+                        }
+                        SendSummaryFfi(
+                            published = 1u,
+                            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            controller.send("hello")
+
+            assertEquals(SEND_RETRY_ATTEMPTS + 1, attempts)
+            assertEquals(MessageStatus.Sent, controller.timeline.single().status)
+            assertEquals(null, appState.toast)
+        }
+
+    @Test
+    fun pendingConnectRetryReleasesTheConversationCommitLockDuringBackoff() =
+        runTest {
+            val appState = appState()
+            val firstAttemptStarted = CompletableDeferred<Unit>()
+            val allowRetryToSucceed = CompletableDeferred<Unit>()
+            var attempts = 0
+            lateinit var controller: ConversationController
+            controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        if (attempts == 1) {
+                            firstAttemptStarted.complete(Unit)
+                            throw MarmotKitException.Publish("connect relay failed")
+                        }
+                        allowRetryToSucceed.await()
+                        successfulSendSummary()
+                    },
+                )
+
+            val send = async { controller.send("hello") }
+            firstAttemptStarted.await()
+            val otherCommitCompleted = CompletableDeferred<Unit>()
+            val otherCommit =
+                async {
+                    appState.withGroupCommitLock(ACCOUNT_REF, GROUP_ID) {
+                        otherCommitCompleted.complete(Unit)
+                    }
+                }
+            yield()
+
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+            assertTrue(
+                "an offline send must release the group commit lock before retry backoff",
+                otherCommitCompleted.isCompleted,
+            )
+
+            allowRetryToSucceed.complete(Unit)
+            otherCommit.await()
+            send.await()
+            assertEquals(MessageStatus.Sent, controller.timeline.single().status)
+        }
+
+    @Test
+    fun pendingConnectRetryKeepsALaterTextSendBehindTheEarlierMessage() =
+        runBlocking {
+            val attempts = mutableListOf<String>()
+            val firstAttemptStarted = CompletableDeferred<Unit>()
+            var firstAttempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, text ->
+                        attempts += text
+                        if (text == "first") {
+                            firstAttempts += 1
+                            if (firstAttempts == 1) {
+                                firstAttemptStarted.complete(Unit)
+                                throw MarmotKitException.Publish("connect relay failed")
+                            }
+                        }
+                        SendSummaryFfi(
+                            published = 1u,
+                            messageIds = listOf(if (text == "first") "11".repeat(32) else "22".repeat(32)),
+                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+
+            val first = async { controller.send("first") }
+            firstAttemptStarted.await()
+            val second = async { controller.send("second") }
+            delay(SEND_RETRY_BACKOFF_MS / 4)
+
+            assertEquals(
+                "a later text must not publish while the earlier text is backing off",
+                listOf("first"),
+                attempts,
+            )
+
+            first.await()
+            second.await()
+            assertEquals(listOf("first", "first", "second"), attempts)
+        }
+
+    @Test
     fun sendRetriesConnectFailureThenCommitsOneSentTimelineRow() =
         runTest {
             var attempts = 0
@@ -508,6 +818,14 @@ class ConversationSendRetryIntegrationTest {
             )
         }
 
+    private fun successfulSendSummary() =
+        SendSummaryFfi(
+            published = 1u,
+            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+        )
+
     private fun appState() =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
@@ -538,50 +856,52 @@ class ConversationSendRetryIntegrationTest {
             ),
         )
 
-    private fun group(disappearingMessageSecs: ULong = 0uL) =
-        AppGroupRecordFfi(
-            groupIdHex = GROUP_ID,
-            protocolProfile = AppProtocolProfileFfi.LEGACY,
-            endpoint = "wss://relay.example",
-            profilePresent = true,
-            name = "Retry group",
-            description = "",
-            admins = listOf(ACCOUNT_ID),
-            relays = listOf("wss://relay.example"),
-            nostrGroupIdHex = "04".repeat(32),
-            avatarUrl = null,
-            avatarDim = null,
-            avatarThumbhash = null,
-            imageHashHex = null,
-            encryptedMedia =
-                AppGroupEncryptedMediaComponentFfi(
-                    componentId = 0x8008u,
-                    component = "marmot.group.encrypted-media.v1",
-                    required = true,
-                    version = EncryptedMediaVersionFfi.V1,
-                    mediaFormat = "encrypted-media-v1",
-                    allowedLocatorKinds = listOf("blossom-v1"),
-                    defaultBlobEndpoints =
-                        listOf(
-                            AppBlobEndpointFfi(
-                                locatorKind = "blossom-v1",
-                                baseUrl = "https://blossom.example",
-                            ),
+    private fun group(
+        disappearingMessageSecs: ULong = 0uL,
+        pendingConfirmation: Boolean = false,
+    ) = AppGroupRecordFfi(
+        groupIdHex = GROUP_ID,
+        protocolProfile = AppProtocolProfileFfi.LEGACY,
+        endpoint = "wss://relay.example",
+        profilePresent = true,
+        name = "Retry group",
+        description = "",
+        admins = listOf(ACCOUNT_ID),
+        relays = listOf("wss://relay.example"),
+        nostrGroupIdHex = "04".repeat(32),
+        avatarUrl = null,
+        avatarDim = null,
+        avatarThumbhash = null,
+        imageHashHex = null,
+        encryptedMedia =
+            AppGroupEncryptedMediaComponentFfi(
+                componentId = 0x8008u,
+                component = "marmot.group.encrypted-media.v1",
+                required = true,
+                version = EncryptedMediaVersionFfi.V1,
+                mediaFormat = "encrypted-media-v1",
+                allowedLocatorKinds = listOf("blossom-v1"),
+                defaultBlobEndpoints =
+                    listOf(
+                        AppBlobEndpointFfi(
+                            locatorKind = "blossom-v1",
+                            baseUrl = "https://blossom.example",
                         ),
-                ),
-            disappearingMessageSecs = disappearingMessageSecs,
-            archived = false,
-            pendingConfirmation = false,
-            unrecoverable = false,
-            selfMembership = SelfMembershipFfi.MEMBER,
-            leaveRequestPending = false,
-            leaveRequestedAtMs = null,
-            disbanding = false,
-            disbandRequest = null,
-            disbanded = false,
-            welcomerAccountIdHex = null,
-            viaWelcomeMessageIdHex = null,
-        )
+                    ),
+            ),
+        disappearingMessageSecs = disappearingMessageSecs,
+        archived = false,
+        pendingConfirmation = pendingConfirmation,
+        unrecoverable = false,
+        selfMembership = SelfMembershipFfi.MEMBER,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        disbanding = false,
+        disbandRequest = null,
+        disbanded = false,
+        welcomerAccountIdHex = null,
+        viaWelcomeMessageIdHex = null,
+    )
 
     private fun chatListRow() =
         ChatListRowFfi(
@@ -639,9 +959,10 @@ class ConversationSendRetryIntegrationTest {
         recordedAt: ULong,
         retentionSeconds: ULong?,
         retentionExpiresAt: ULong?,
+        sourceMessageIdHex: String? = "d4".repeat(32),
     ) = TimelineMessageRecordFfi(
         messageIdHex = CONFIRMED_MESSAGE_ID,
-        sourceMessageIdHex = "d4".repeat(32),
+        sourceMessageIdHex = sourceMessageIdHex,
         direction = "sent",
         groupIdHex = GROUP_ID,
         sender = ACCOUNT_ID,

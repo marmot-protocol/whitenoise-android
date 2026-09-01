@@ -7,6 +7,39 @@ import org.junit.Test
 
 class ValidatedInternetNetworkTrackerTest {
     @Test
+    fun usableRecoveryWakesOnlyAfterBothRouteAndValidatedUpstreamRecover() {
+        val tracker = UsableValidatedInternetRecoveryTracker()
+        tracker.seed(
+            hasActiveDefaultNetwork = false,
+            hasValidatedPhysicalNetwork = false,
+        )
+
+        val routeOnly =
+            tracker.update(
+                hasActiveDefaultNetwork = true,
+                hasValidatedPhysicalNetwork = false,
+            )
+        assertFalse(routeOnly.hasUsableInternet)
+        assertFalse(routeOnly.restored)
+
+        val validated =
+            tracker.update(
+                hasActiveDefaultNetwork = true,
+                hasValidatedPhysicalNetwork = true,
+            )
+        assertTrue(validated.hasUsableInternet)
+        assertTrue(validated.restored)
+
+        val duplicateCallback =
+            tracker.update(
+                hasActiveDefaultNetwork = true,
+                hasValidatedPhysicalNetwork = true,
+            )
+        assertTrue(duplicateCallback.hasUsableInternet)
+        assertFalse(duplicateCallback.restored)
+    }
+
+    @Test
     fun connectivitySignalGenerationChangesOnlyAtValidatedInternetEdges() {
         val owner = ConnectivitySignalOwner()
 

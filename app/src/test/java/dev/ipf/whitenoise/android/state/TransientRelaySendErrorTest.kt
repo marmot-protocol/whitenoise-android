@@ -4,6 +4,11 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.notifications.NotificationReactionSendOutcome
 import dev.ipf.whitenoise.android.notifications.NotificationReplySendOutcome
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.currentTime
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,8 +27,9 @@ import org.junit.Test
  * surfaced that first failure as a hard, user-visible "send failed" instead of
  * giving the pool a brief window to (re)connect and retrying.
  *
- * The fix retries the send across a bounded budget ([SEND_RETRY_ATTEMPTS]) but
- * ONLY for failures [isTransientRelaySendError] classifies as *connect-phase*
+ * Foreground conversation sends stay pending and retry with capped backoff;
+ * bounded background operations use [SEND_RETRY_ATTEMPTS]. Both policies apply
+ * ONLY to failures [isTransientRelaySendError] classifies as *connect-phase*
  * connectivity — the cases that prove the event never reached a relay.
  *
  * IDEMPOTENCY CONTRACT (adversarial review of PR #299): the retry re-enters the
@@ -122,15 +128,18 @@ class TransientRelaySendErrorTest {
             "relay rejected event (blocked); connect relay failed",
             "connect relay failed; publish timed out after 30s: accepted 0 of required 2",
             "connect relay failed; insufficient publish acknowledgements: accepted 0 of required 2",
+            "connect relay failed; connection reset by peer",
         ).forEach { reason ->
             assertFalse(reason, isTransientRelaySendError(MarmotKitException.Publish(reason)))
         }
     }
 
     @Test
-    fun connectionRefusedAndResetAreTransient() {
+    fun connectionRefusedIsTransientButUnqualifiedResetIsAmbiguous() {
         assertTrue(isTransientRelaySendError(RuntimeException("Connection refused")))
-        assertTrue(isTransientRelaySendError(RuntimeException("connection reset by peer")))
+        val reset = RuntimeException("connection reset by peer")
+        assertFalse(isTransientRelaySendError(reset))
+        assertTrue(isAmbiguousRelayDeliveryError(reset))
     }
 
     @Test
@@ -205,6 +214,22 @@ class TransientRelaySendErrorTest {
         assertFalse(isTransientRelaySendError(TransportClosed()))
     }
 
+    @Test
+    fun postPublishFailuresAreAmbiguousButExplicitRejectionIsTerminal() {
+        listOf(
+            MarmotKitException.Publish("send event failed"),
+            MarmotKitException.Publish("send event timed out"),
+            MarmotKitException.Publish("relay did not acknowledge event"),
+            MarmotKitException.Publish("publish timed out after 30s: accepted 1 of required 2"),
+            MarmotKitException.Publish("insufficient publish acknowledgements: accepted 0 of required 1"),
+            MarmotKitException.Publish("connection reset by peer"),
+            MarmotKitException.TransportClosed(),
+        ).forEach { throwable -> assertTrue(isAmbiguousRelayDeliveryError(throwable)) }
+
+        assertFalse(isAmbiguousRelayDeliveryError(MarmotKitException.Publish("relay rejected event")))
+        assertFalse(isAmbiguousRelayDeliveryError(MarmotKitException.Publish("connect relay failed")))
+    }
+
     // ---- NOT retryable: terminal / shutdown ------------------------------
 
     @Test
@@ -260,4 +285,39 @@ class TransientRelaySendErrorTest {
         assertTrue(SEND_RETRY_ATTEMPTS in 2..6)
         assertTrue(SEND_RETRY_BACKOFF_MS in 100L..3_000L)
     }
+
+    @Test
+    fun pendingSendBackoffGrowsAndCaps() {
+        assertEquals(SEND_RETRY_BACKOFF_MS, pendingSendRetryBackoffMs(1))
+        assertEquals(SEND_RETRY_BACKOFF_MS * 2, pendingSendRetryBackoffMs(2))
+        assertEquals(PENDING_SEND_RETRY_MAX_BACKOFF_MS, pendingSendRetryBackoffMs(100))
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun pendingSendRetryWakesImmediatelyOnValidatedConnectivityRecovery() =
+        runTest {
+            val recoveryGeneration = MutableStateFlow(0L)
+            var attempts = 0
+            val send =
+                async {
+                    retryPendingConversationSend(
+                        connectivityRecoveryGeneration = recoveryGeneration,
+                    ) {
+                        attempts += 1
+                        if (attempts == 1) throw MarmotKitException.Publish("connect relay failed")
+                        "sent"
+                    }
+                }
+
+            runCurrent()
+            assertEquals(1, attempts)
+
+            recoveryGeneration.value += 1
+            runCurrent()
+
+            assertEquals("sent", send.await())
+            assertEquals(2, attempts)
+            assertEquals("the retry timer must not advance virtual time", 0L, currentTime)
+        }
 }
