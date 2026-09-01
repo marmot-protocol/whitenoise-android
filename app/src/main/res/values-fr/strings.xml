@@ -1633,6 +1633,6 @@
     <string name="discard">Supprimer</string>
     <string name="open_app_settings">Ouvrir les paramètres de l’application</string>
     <string name="dictation_disclosure_title">Reconnaissance vocale externe</string>
-    <string name="dictation_disclosure_message">Votre service vocal installé traite l’audio dicté et peut l’envoyer à son fournisseur. White Noise insère le texte renvoyé dans ce brouillon pour que vous puissiez le vérifier et ne l’envoie jamais automatiquement.</string>
+    <string name="dictation_disclosure_message">Votre service vocal installé traite l’audio dicté et peut l’envoyer à son fournisseur. Par défaut, White Noise colle le texte renvoyé dans votre brouillon ; l’envoi automatique n’est disponible que si vous l’activez explicitement dans les paramètres de Dictée.</string>
     <string name="dictation_continue">Continuer</string>
 </resources>

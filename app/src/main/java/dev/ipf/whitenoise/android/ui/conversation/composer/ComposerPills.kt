@@ -7,6 +7,7 @@ import android.window.OnBackInvokedDispatcher
 import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -307,6 +308,7 @@ internal fun ComposerPill(
     onPickDocument: (() -> Unit)?,
     modifier: Modifier = Modifier,
     onDictation: (() -> Unit)? = null,
+    dictationControls: (@Composable RowScope.() -> Unit)? = null,
     // Gate inputs only: the sheet these open lives in ComposerBar, but the
     // attach button must appear whenever ANY attachment action is wired, not
     // just gallery/document.
@@ -478,14 +480,26 @@ internal fun ComposerPill(
             hasUserShare ||
             hasContactShare
     var multilineControls by remember { mutableStateOf(false) }
+    val targetDictationControlWidth =
+        when {
+            dictationControls != null -> 96.dp
+            onDictation != null -> 48.dp
+            else -> 0.dp
+        }
+    val dictationControlWidth by
+        animateDpAsState(
+            targetValue = targetDictationControlWidth,
+            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+            label = "composer dictation control morph",
+        )
     val compactTrailingReserve =
         4.dp +
-            (if (onDictation != null) 48.dp else 0.dp) +
+            dictationControlWidth +
             (if (hasAttachmentAction) 36.dp else 0.dp) +
             (if (trailingAction != null) 44.dp else 0.dp)
     val compactMeasurementTrailingReserve =
         4.dp +
-            (if (onDictation != null) 48.dp else 0.dp) +
+            dictationControlWidth +
             (if (hasAttachmentAction) 36.dp else 0.dp) +
             (if (compactMeasurementReservesTrailingAction) 44.dp else 0.dp)
     val composerTextStyle =
@@ -788,9 +802,11 @@ internal fun ComposerPill(
                     modifier =
                         Modifier
                             .align(Alignment.BottomEnd)
-                            .height(if (onDictation != null) 48.dp else 44.dp),
+                            .height(if (onDictation != null || dictationControls != null) 48.dp else 44.dp),
                 ) {
-                    if (onDictation != null) {
+                    if (dictationControls != null) {
+                        dictationControls()
+                    } else if (onDictation != null) {
                         IconButton(
                             onClick = onDictation,
                             enabled = inputContentVisible,

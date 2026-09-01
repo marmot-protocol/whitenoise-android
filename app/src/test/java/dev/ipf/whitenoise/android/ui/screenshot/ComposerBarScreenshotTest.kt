@@ -38,7 +38,6 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
-import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_DICTATION_ELSEWHERE_ACTION_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.RecordingStripLeading
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -59,7 +58,7 @@ import org.robolectric.annotation.GraphicsMode
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
 class ComposerBarScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -257,6 +256,7 @@ class ComposerBarScreenshotTest {
         }
     }
 
+    /** Captures the app-owned listening controls in the compact large-font composer. */
     @Test
     fun composerDictationListeningCompactLargeFont() {
         render(
@@ -271,6 +271,7 @@ class ComposerBarScreenshotTest {
             .captureRoboImage("src/test/snapshots/composer_dictation_listening_compact_large_font.png")
     }
 
+    /** Captures processing controls in the compact large-font RTL composer. */
     @Test
     fun composerDictationProcessingCompactLargeFontRtl() {
         render(
@@ -286,6 +287,7 @@ class ComposerBarScreenshotTest {
             .captureRoboImage("src/test/snapshots/composer_dictation_processing_compact_large_font_rtl.png")
     }
 
+    /** Captures idle dictation availability alongside an active reply preview. */
     @Test
     fun composerDictationIdleWithReplyCompactLargeFont() {
         render(
@@ -301,6 +303,7 @@ class ComposerBarScreenshotTest {
             .captureRoboImage("src/test/snapshots/composer_dictation_idle_reply_compact_large_font.png")
     }
 
+    /** Captures that dictation remains unavailable while editing an existing message. */
     @Test
     fun composerDictationEditConstraintCompactRtl() {
         render(
@@ -316,8 +319,9 @@ class ComposerBarScreenshotTest {
             .captureRoboImage("src/test/snapshots/composer_dictation_edit_compact_rtl.png")
     }
 
+    /** Verifies another chat's app-owned controls are not duplicated in this composer. */
     @Test
-    fun composerKeepsOtherChatDictationVisibleBesideDraft() {
+    fun composerDefersOtherChatDictationControlToTheAppRoot() {
         render(
             darkTheme = false,
             draft = "Draft message text",
@@ -325,10 +329,12 @@ class ComposerBarScreenshotTest {
             dictationPreview = DictationPreview.ElsewhereListening,
         )
 
-        composeRule.onNodeWithTag(COMPOSER_DICTATION_ELSEWHERE_ACTION_TAG).assertIsDisplayed()
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.dictation_cancel)).assertDoesNotExist()
         composeRule.onNodeWithText("Draft message text").assertIsDisplayed()
     }
 
+    /** Verifies cross-chat dictation suppresses a voice-note control that cannot acquire the microphone. */
     @Test
     fun crossChatDictationReplacesVoiceNoteWithoutADeadMicControl() {
         val voiceRecording = previewVoiceRecordingController()
@@ -342,7 +348,7 @@ class ComposerBarScreenshotTest {
             )
 
             val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-            composeRule.onNodeWithTag(COMPOSER_DICTATION_ELSEWHERE_ACTION_TAG).assertIsDisplayed()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.dictation_cancel)).assertDoesNotExist()
             composeRule
                 .onNodeWithContentDescription(context.getString(R.string.voice_message_record))
                 .assertDoesNotExist()

@@ -1695,6 +1695,6 @@
     <string name="discard">Удалить</string>
     <string name="open_app_settings">Открыть настройки приложения</string>
     <string name="dictation_disclosure_title">Внешнее распознавание речи</string>
-    <string name="dictation_disclosure_message">Установленная служба распознавания обрабатывает надиктованный звук и может отправлять его своему поставщику. White Noise вставляет возвращённый текст в этот черновик для проверки и никогда не отправляет его автоматически.</string>
+    <string name="dictation_disclosure_message">Установленная служба распознавания обрабатывает надиктованный звук и может отправлять его своему поставщику. По умолчанию White Noise вставляет полученный текст в черновик; автоматическую отправку можно использовать только после явного включения в настройках диктовки.</string>
     <string name="dictation_continue">Продолжить</string>
 </resources>

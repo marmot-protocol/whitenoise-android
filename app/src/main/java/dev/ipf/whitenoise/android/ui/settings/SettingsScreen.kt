@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.KeyboardVoice
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
@@ -111,6 +112,7 @@ internal enum class SettingsHomeRow {
     DataAndStorage,
     Notifications,
     TextToSpeech,
+    Dictation,
     DevicePrivacy,
     AiAgents,
     Help,
@@ -152,6 +154,7 @@ internal fun settingsHomeState(
                 SettingsHomeRow.DataAndStorage,
                 SettingsHomeRow.Notifications,
                 SettingsHomeRow.TextToSpeech,
+                SettingsHomeRow.Dictation,
                 SettingsHomeRow.DevicePrivacy,
                 SettingsHomeRow.AiAgents,
                 SettingsHomeRow.Help,
@@ -230,6 +233,7 @@ internal fun SettingsScreen(
         SettingsDetail.AiAgents -> AiAgentsScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Donate -> DonateScreen(onBack = { onDetailChange(null) })
         SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Dictation -> DictationSettingsScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.ChatFolders -> ChatFoldersScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Help ->
             HelpScreen(
@@ -517,6 +521,7 @@ private fun SettingsGroupScope.settingsHomeRows(
                 SettingsHomeRow.DataAndStorage -> SettingsDetail.Data
                 SettingsHomeRow.Notifications -> SettingsDetail.Notifications
                 SettingsHomeRow.TextToSpeech -> SettingsDetail.TextToSpeech
+                SettingsHomeRow.Dictation -> SettingsDetail.Dictation
                 SettingsHomeRow.DevicePrivacy -> SettingsDetail.DevicePrivacy
                 SettingsHomeRow.AiAgents -> SettingsDetail.AiAgents
                 SettingsHomeRow.Help -> SettingsDetail.Help
@@ -534,6 +539,7 @@ private fun SettingsGroupScope.settingsHomeRows(
                         SettingsHomeRow.DataAndStorage -> stringResource(R.string.data_and_storage)
                         SettingsHomeRow.Notifications -> stringResource(R.string.notifications)
                         SettingsHomeRow.TextToSpeech -> stringResource(R.string.tts_settings_title)
+                        SettingsHomeRow.Dictation -> stringResource(R.string.dictation_settings_title)
                         SettingsHomeRow.DevicePrivacy -> stringResource(R.string.device_privacy)
                         SettingsHomeRow.AiAgents -> stringResource(R.string.ai_agents)
                         SettingsHomeRow.Help -> stringResource(R.string.help)
@@ -549,6 +555,7 @@ private fun SettingsGroupScope.settingsHomeRows(
                         SettingsHomeRow.DataAndStorage -> stringResource(R.string.data_and_storage_settings_subtitle)
                         SettingsHomeRow.Notifications -> stringResource(R.string.notifications_settings_subtitle)
                         SettingsHomeRow.TextToSpeech -> stringResource(R.string.tts_settings_subtitle)
+                        SettingsHomeRow.Dictation -> stringResource(R.string.dictation_settings_subtitle)
                         SettingsHomeRow.DevicePrivacy -> stringResource(R.string.device_privacy_settings_subtitle)
                         SettingsHomeRow.AiAgents -> stringResource(R.string.ai_agents_settings_subtitle)
                         SettingsHomeRow.Help -> stringResource(R.string.help_settings_subtitle)
@@ -564,6 +571,7 @@ private fun SettingsGroupScope.settingsHomeRows(
                         SettingsHomeRow.DataAndStorage -> Icons.Filled.Storage
                         SettingsHomeRow.Notifications -> Icons.Filled.Notifications
                         SettingsHomeRow.TextToSpeech -> Icons.Filled.RecordVoiceOver
+                        SettingsHomeRow.Dictation -> Icons.Filled.KeyboardVoice
                         SettingsHomeRow.DevicePrivacy -> Icons.Filled.Shield
                         SettingsHomeRow.AiAgents -> Icons.Filled.SmartToy
                         SettingsHomeRow.Help -> Icons.Filled.Help

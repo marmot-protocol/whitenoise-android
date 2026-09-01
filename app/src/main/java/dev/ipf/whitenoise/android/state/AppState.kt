@@ -62,6 +62,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.RuntimePolicyHooks
 import dev.ipf.whitenoise.android.amber.AmberSignerController
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
@@ -510,6 +511,21 @@ internal fun visibleConversationDismissalTarget(
     if (!appInForeground || appLockScreenVisible) return null
     return conversationOpenDismissalTarget(activeAccountRef, groupIdHex)
 }
+
+internal fun conversationDictationOriginVisible(
+    appInForeground: Boolean,
+    appLockScreenVisible: Boolean,
+    pendingProfileNpub: String?,
+    activeAccountRef: String?,
+    activeGroupIdHex: String?,
+    accountRef: String,
+    groupIdHex: String,
+): Boolean =
+    appInForeground &&
+        !appLockScreenVisible &&
+        pendingProfileNpub == null &&
+        activeAccountRef.equals(accountRef, ignoreCase = true) &&
+        activeGroupIdHex.equals(groupIdHex, ignoreCase = true)
 
 internal suspend fun dismissConversationNotificationsOnOpen(
     activeAccountRef: String?,
@@ -1260,6 +1276,7 @@ class WhiteNoiseAppState private constructor(
 
     private val appContext = context.applicationContext
     private val preferences = preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+    internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
     private val dictationMicrophoneOwner = Any()
     internal val conversationDictation: ConversationDictationController by lazy {
@@ -1289,8 +1306,44 @@ class WhiteNoiseAppState private constructor(
             },
             tryAcquireMicrophone = { microphoneCaptureCoordinator.tryAcquire(dictationMicrophoneOwner) },
             releaseMicrophone = { microphoneCaptureCoordinator.release(dictationMicrophoneOwner) },
+            finishAfterSilenceMillis = {
+                conversationDictationPreferences.current().finishAfterSilenceMillis
+            },
+            deliveryMode = {
+                conversationDictationPreferences.current().deliveryMode
+            },
+            sendTranscriptIfOriginUnchanged = { request ->
+                withGroupCommitLock(request.accountRef, request.groupIdHex) {
+                    val current =
+                        conversationDictationDraftSnapshot(
+                            request.accountRef,
+                            request.groupIdHex,
+                        )
+                    if (
+                        current.revision != request.expectedDraftRevision ||
+                        current.value.text != request.expectedDraftText
+                    ) {
+                        false
+                    } else {
+                        marmotIo {
+                            sendText(request.accountRef, request.groupIdHex, request.payload)
+                        }.messageIds.isNotEmpty()
+                    }
+                }
+            },
         )
     }
+
+    /** Updates the endpointing policy captured by future dictation sessions. */
+    internal fun setConversationDictationFinishAfterSilence(value: Long?) {
+        conversationDictationPreferences.setFinishAfterSilenceMillis(value)
+    }
+
+    /** Updates the terminal delivery policy captured by future dictation sessions. */
+    internal fun setConversationDictationDeliveryMode(value: ConversationDictationDeliveryMode) {
+        conversationDictationPreferences.setDeliveryMode(value)
+    }
+
     private val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }
     internal val editorSourceStore: EditorSourceStore = EditorSourceStore.create(appContext)
     internal val editorSessionStore: EditorSessionStore = EditorSessionStore.create(appContext)
@@ -2295,6 +2348,22 @@ class WhiteNoiseAppState private constructor(
         get() = suppression.activeConversationGroupIdHex
     private val activeConversationAccountRef: String?
         get() = suppression.activeConversationAccountRef
+
+    /** Whether the exact dictation origin is the unobscured foreground conversation. */
+    internal fun isConversationDictationOriginVisible(
+        accountRef: String,
+        groupIdHex: String,
+    ): Boolean =
+        conversationDictationOriginVisible(
+            appInForeground = appInForeground,
+            appLockScreenVisible = appLockScreenVisible,
+            pendingProfileNpub = pendingProfileNpub,
+            activeAccountRef = activeConversationAccountRef,
+            activeGroupIdHex = activeConversationGroupIdHex,
+            accountRef = accountRef,
+            groupIdHex = groupIdHex,
+        )
+
     private val profileRefreshGate = ProfileRefreshGate(PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS)
     private var chatsController: ChatsController? = null
     private val conversationControllerLock = Any()
@@ -6940,7 +7009,7 @@ class WhiteNoiseAppState private constructor(
      */
     fun onTaskRemoved() {
         updateNotificationSuppression(suppression.onTaskRemoved())
-        conversationDictation.cancel()
+        conversationDictation.onTaskRemoved()
         // The app-state lifecycle is authoritative even if the TTS foreground
         // service has not started yet or its start was rejected.
         stopSpeaking()
