@@ -250,6 +250,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "false")
+        buildConfigField("boolean", "WHITENOISE_AUDIT_RUNTIME_REQUIRED", "false")
+        buildConfigField("String", "WHITENOISE_AUDIT_DATA_MODE", "".asBuildConfigString())
         // Production release must resolve the local WNPerf facility to a
         // compile-time false constant. Non-production flavors and debug builds
         // override this below; runtime collection still requires explicit opt-in.
@@ -502,6 +504,16 @@ android {
                 "String",
                 "WHITENOISE_AUDIT_LOG_AUTH_TOKEN",
                 environmentRuntimeConfigProperty("staging", "AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
+            )
+            buildConfigField(
+                "boolean",
+                "WHITENOISE_AUDIT_RUNTIME_REQUIRED",
+                (runtimeConfigProperty("WHITENOISE_AUDIT_RUNTIME_REQUIRED") == "true").toString(),
+            )
+            buildConfigField(
+                "String",
+                "WHITENOISE_AUDIT_DATA_MODE",
+                runtimeConfigProperty("WHITENOISE_AUDIT_DATA_MODE").asBuildConfigString(),
             )
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "staging".asBuildConfigString())
             buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "true")
