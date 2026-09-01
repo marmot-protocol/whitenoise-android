@@ -80,7 +80,7 @@ classifier refuses to finalize any unadjudicated ambiguity.
 
 ### Adjudication policy applied
 
-The 161 reviewed adjudications follow these written rules, applied from the
+The 164 reviewed adjudications follow these written rules, applied from the
 full issue text:
 
 - `stale_result` is **true** only when the reported defect itself is a stale
