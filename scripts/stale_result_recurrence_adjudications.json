@@ -1,0 +1,672 @@
+{
+  "1006": {
+    "reason": "concurrency_or_refresh_defect_not_stale_result_application",
+    "stale_result": false
+  },
+  "1010": {
+    "reason": "performance_defect_not_stale_result_application",
+    "stale_result": false
+  },
+  "1016": {
+    "reason": "concurrency_or_refresh_defect_not_stale_result_application",
+    "stale_result": false
+  },
+  "1040": {
+    "reason": "concurrency_or_refresh_defect_not_stale_result_application",
+    "stale_result": false
+  },
+  "1063": {
+    "reason": "concurrency_or_refresh_defect_not_stale_result_application",
+    "stale_result": false
+  },
+  "1064": {
+    "reason": "concurrency_or_refresh_defect_not_stale_result_application",
+    "stale_result": false
+  },
+  "1088": {
+    "reason": "concurrency_or_refresh_defect_not_stale_result_application",
+    "stale_result": false
+  },
+  "109": {
+    "reason": "defect_is_stale_or_superseded_result_applied_after_invalidation",
+    "stale_result": true
+  },
+  "1198": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1222": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1230": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1251": {
+    "named_recurrence": false,
+    "reason": "prior_work_named_only_as_suspected_lead_not_an_asserted_failed_fix"
+  },
+  "1253": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1266": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1292": {
+    "reason": "defect_is_stale_or_superseded_result_applied_after_invalidation",
+    "stale_result": true
+  },
+  "1298": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1313": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1314": {
+    "reason": "concurrency_or_refresh_defect_not_stale_result_application",
+    "stale_result": false
+  },
+  "1316": {
+    "reason": "defect_is_stale_or_superseded_result_applied_after_invalidation",
+    "stale_result": true
+  },
+  "1331": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1340": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1342": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1366": {
+    "named_recurrence": false,
+    "reason": "concurrency_or_refresh_defect_not_stale_result_application; named_fix_path_traced_sound_defect_attributed_to_a_different_remaining_path",
+    "stale_result": false
+  },
+  "1373": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1381": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1383": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1396": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1398": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "14": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1404": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1431": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1438": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1441": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1499": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1534": {
+    "named_recurrence": true,
+    "reason": "report_names_prior_fix_of_this_behavior_and_asserts_recurrence_or_incomplete_fix"
+  },
+  "154": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1545": {
+    "reason": "concurrency_or_refresh_defect_not_stale_result_application",
+    "stale_result": false
+  },
+  "1565": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1579": {
+    "named_recurrence": true,
+    "reason": "report_names_prior_fix_of_this_behavior_and_asserts_recurrence_or_incomplete_fix"
+  },
+  "1589": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1638": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1639": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1646": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1651": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1655": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1663": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1666": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1668": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1670": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1676": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1678": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1680": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1685": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1690": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1696": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1698": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1714": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1718": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1750": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1751": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1767": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1771": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1783": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1797": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1800": {
+    "named_recurrence": false,
+    "reason": "prior_work_named_only_as_suspected_lead_not_an_asserted_failed_fix"
+  },
+  "1804": {
+    "named_recurrence": false,
+    "reason": "prior_work_named_only_as_suspected_lead_not_an_asserted_failed_fix"
+  },
+  "1816": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1817": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1818": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1820": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1821": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1828": {
+    "named_recurrence": true,
+    "reason": "report_names_prior_fix_of_this_behavior_and_asserts_recurrence_or_incomplete_fix"
+  },
+  "1830": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1831": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1835": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1836": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1839": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1840": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1841": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1842": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1844": {
+    "named_recurrence": false,
+    "reason": "late_completion_surfaces_prior_screens_result_after_navigation; prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect",
+    "stale_result": true
+  },
+  "1849": {
+    "named_recurrence": false,
+    "reason": "defect_is_stale_or_superseded_result_applied_after_invalidation; prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect",
+    "stale_result": true
+  },
+  "1850": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1863": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1868": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1886": {
+    "named_recurrence": false,
+    "reason": "stale_keyword_in_criteria_boilerplate_not_the_reported_defect; prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect",
+    "stale_result": false
+  },
+  "1888": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1893": {
+    "reason": "stale_keyword_in_criteria_boilerplate_not_the_reported_defect",
+    "stale_result": false
+  },
+  "1895": {
+    "reason": "stale_keyword_in_criteria_boilerplate_not_the_reported_defect",
+    "stale_result": false
+  },
+  "1905": {
+    "named_recurrence": true,
+    "reason": "report_names_prior_fix_of_this_behavior_and_asserts_recurrence_or_incomplete_fix"
+  },
+  "1912": {
+    "named_recurrence": false,
+    "reason": "stale_keyword_in_criteria_boilerplate_not_the_reported_defect; prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect",
+    "stale_result": false
+  },
+  "1925": {
+    "reason": "stale_keyword_in_criteria_boilerplate_not_the_reported_defect",
+    "stale_result": false
+  },
+  "1926": {
+    "named_recurrence": false,
+    "reason": "stale_keyword_in_criteria_boilerplate_not_the_reported_defect; prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect",
+    "stale_result": false
+  },
+  "1953": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1954": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1955": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "1965": {
+    "named_recurrence": false,
+    "reason": "stale_keyword_in_criteria_boilerplate_not_the_reported_defect; prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect",
+    "stale_result": false
+  },
+  "1973": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2010": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2016": {
+    "named_recurrence": true,
+    "reason": "report_names_prior_fix_of_this_behavior_and_asserts_recurrence_or_incomplete_fix"
+  },
+  "2017": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2027": {
+    "named_recurrence": false,
+    "reason": "stale_keyword_in_criteria_boilerplate_not_the_reported_defect; prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect",
+    "stale_result": false
+  },
+  "2035": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2046": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2047": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2054": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2056": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2058": {
+    "reason": "stale_keyword_in_criteria_boilerplate_not_the_reported_defect",
+    "stale_result": false
+  },
+  "2059": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2060": {
+    "named_recurrence": false,
+    "reason": "captured_account_context_applied_without_recheck_after_ownership_change; prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect",
+    "stale_result": true
+  },
+  "2062": {
+    "reason": "stale_keyword_in_criteria_boilerplate_not_the_reported_defect",
+    "stale_result": false
+  },
+  "2063": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2064": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2065": {
+    "named_recurrence": false,
+    "reason": "late_async_post_applies_outdated_read_state; prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect",
+    "stale_result": true
+  },
+  "2090": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2091": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2094": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2100": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2103": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2130": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2131": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2132": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2149": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2155": {
+    "named_recurrence": false,
+    "reason": "stale_keyword_in_criteria_boilerplate_not_the_reported_defect; prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect",
+    "stale_result": false
+  },
+  "2157": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2162": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2178": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2179": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2180": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "2182": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "221": {
+    "reason": "concurrency_or_refresh_defect_not_stale_result_application",
+    "stale_result": false
+  },
+  "225": {
+    "reason": "defect_is_stale_or_superseded_result_applied_after_invalidation",
+    "stale_result": true
+  },
+  "233": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "323": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "325": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "415": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "427": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "441": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "442": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "446": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "447": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "454": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "471": {
+    "reason": "defect_is_stale_or_superseded_result_applied_after_invalidation",
+    "stale_result": true
+  },
+  "547": {
+    "reason": "retained_or_unrefreshed_display_not_stale_result_application",
+    "stale_result": false
+  },
+  "586": {
+    "reason": "performance_defect_not_stale_result_application",
+    "stale_result": false
+  },
+  "609": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "624": {
+    "reason": "retained_or_unrefreshed_display_not_stale_result_application",
+    "stale_result": false
+  },
+  "634": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "680": {
+    "reason": "defect_is_stale_or_superseded_result_applied_after_invalidation",
+    "stale_result": true
+  },
+  "755": {
+    "reason": "retained_or_unrefreshed_display_not_stale_result_application",
+    "stale_result": false
+  },
+  "793": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "796": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "803": {
+    "named_recurrence": false,
+    "reason": "concurrency_or_refresh_defect_not_stale_result_application; prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect",
+    "stale_result": false
+  },
+  "809": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "810": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "811": {
+    "named_recurrence": false,
+    "reason": "speculative_mechanism_defect_is_action_gating; prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect",
+    "stale_result": false
+  },
+  "812": {
+    "named_recurrence": true,
+    "reason": "stale_keyword_in_criteria_boilerplate_not_the_reported_defect; report_names_prior_fix_of_this_behavior_and_asserts_recurrence_or_incomplete_fix",
+    "stale_result": false
+  },
+  "835": {
+    "reason": "cache_key_collision_mechanism_not_stale_result_application",
+    "stale_result": false
+  },
+  "849": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "856": {
+    "reason": "defect_is_stale_or_superseded_result_applied_after_invalidation",
+    "stale_result": true
+  },
+  "857": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "900": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "913": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  },
+  "942": {
+    "named_recurrence": false,
+    "reason": "prior_work_references_are_context_or_constraints_not_an_attempted_fix_of_this_defect"
+  }
+}
