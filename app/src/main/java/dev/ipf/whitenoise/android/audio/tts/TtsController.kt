@@ -257,6 +257,14 @@ class TtsController internal constructor(
             restorePreviousFocusIfNeeded(hadSpeakingQueue, previousFocusMode)
             return false
         }
+        // Media can stop while duckable focus is being acquired. Refuse before
+        // changing the shared engine locale or any state owned by an existing queue.
+        if (requestedFocusMode == TtsAudioFocusMode.MediaMix && !isMediaPlaybackActive()) {
+            lastStartFailure = TtsStartFailure.MediaNotActive
+            audioFocus.release()
+            restorePreviousFocusIfNeeded(hadSpeakingQueue, previousFocusMode)
+            return false
+        }
         queueLocale = locale
 
         val languageStatus = activeEngine.setLanguage(locale)
@@ -282,14 +290,6 @@ class TtsController internal constructor(
             rangeProbe.restore(scopedVerdict ?: legacyVerdict)
         }
         capabilityLocale = locale
-        // Media can stop while the engine resolves its language. Revalidate at
-        // the final synchronous boundary before queue state or speech exists.
-        if (requestedFocusMode == TtsAudioFocusMode.MediaMix && !isMediaPlaybackActive()) {
-            lastStartFailure = TtsStartFailure.MediaNotActive
-            audioFocus.release()
-            restorePreviousFocusIfNeeded(hadSpeakingQueue, previousFocusMode)
-            return false
-        }
         activeFocusMode = requestedFocusMode
         queue.start(messages, startSentenceIndex = startSentenceIndex.coerceAtLeast(0))
         return state.value !is TtsState.Error

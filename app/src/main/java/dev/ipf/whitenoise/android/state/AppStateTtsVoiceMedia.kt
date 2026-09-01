@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsVoiceKey
 import kotlinx.coroutines.launch
 
 /** Returns the resolved platform engine list and default used by the settings surface. */
+@Suppress("MaxLineLength")
 internal fun WhiteNoiseAppState.ttsEngineChoice(): TtsEngineChoice = ttsResolution?.engineChoice() ?: TtsEngineChoice(null, emptyList())
 
 /** Resolves the package currently selected by the user/default-engine policy. */

@@ -320,18 +320,7 @@ class TtsEngineResolver(
         val configuredLocales = appContext.resources.configuration.locales
         val locale = if (configuredLocales.isEmpty) Locale.getDefault() else configuredLocales[0]
         val voices = tts.voices.orEmpty().toList()
-        val resolution = resolveVoiceSelection(enginePackage, locale, voices, requestedVoice)
-        val preferred = resolution.preferredVoice
-        val appliedVoice =
-            preferred?.takeIf { tts.setVoice(it) == TextToSpeech.SUCCESS }
-                ?: offlineVoiceCandidates(locale, voices)
-                    .asSequence()
-                    .filterNot { it == preferred }
-                    .firstOrNull { tts.setVoice(it) == TextToSpeech.SUCCESS }
-        val effective =
-            (appliedVoice ?: tts.voice?.takeIf { it.isOfflineInstalledFor(locale) })
-                ?.toVoiceKey(enginePackage)
-        return resolution.copy(effectiveKey = effective)
+        return applyResolvedVoice(tts, enginePackage, locale, voices, requestedVoice)
     }
 
     private fun List<TextToSpeech.EngineInfo>.toTtsEngineInfos(): List<TtsEngineInfo> =
@@ -433,6 +422,28 @@ class TtsEngineResolver(
                 effectiveKey = null,
                 preferredVoice = preferred,
             )
+        }
+
+        /** Resolves, applies, and reports one deterministic installed offline voice. */
+        internal fun applyResolvedVoice(
+            tts: TextToSpeech,
+            enginePackage: String,
+            locale: Locale,
+            voices: Collection<Voice>,
+            requestedKey: TtsVoiceKey?,
+        ): TtsVoiceResolution {
+            val resolution = resolveVoiceSelection(enginePackage, locale, voices, requestedKey)
+            val preferred = resolution.preferredVoice
+            val appliedVoice =
+                preferred?.takeIf { tts.setVoice(it) == TextToSpeech.SUCCESS }
+                    ?: offlineVoiceCandidates(locale, voices)
+                        .asSequence()
+                        .filterNot { it == preferred }
+                        .firstOrNull { tts.setVoice(it) == TextToSpeech.SUCCESS }
+            val effective =
+                (appliedVoice ?: tts.voice?.takeIf { it.isOfflineInstalledFor(locale) })
+                    ?.toVoiceKey(enginePackage)
+            return resolution.copy(effectiveKey = effective)
         }
 
         /** Converts framework identity into the exact persisted three-part key. */

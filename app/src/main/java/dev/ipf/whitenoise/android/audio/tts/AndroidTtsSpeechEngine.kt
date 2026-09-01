@@ -17,40 +17,28 @@ internal class AndroidTtsSpeechEngine(
         val status = textToSpeech.setLanguage(locale)
         if (status < TextToSpeech.LANG_AVAILABLE || enginePackage.isEmpty()) return status
         val voices = textToSpeech.voices.orEmpty().toList()
-        // Some otherwise usable engines synthesize through their default language
-        // without exposing a Voice catalog. Preserve the framework's accepted
-        // language status instead of treating the missing optional catalog as a
-        // hard language failure.
-        if (voices.isEmpty()) return status
         val resolution =
-            TtsEngineResolver.resolveVoiceSelection(
-                enginePackage = enginePackage,
-                locale = locale,
-                voices = voices,
-                requestedKey = selectedVoice(),
-            )
-        val preferred = resolution.preferredVoice
-        val effective =
-            if (preferred != null && textToSpeech.setVoice(preferred) == TextToSpeech.SUCCESS) {
-                preferred
+            if (voices.isEmpty()) {
+                // Some otherwise usable engines synthesize through their default
+                // language without exposing a Voice catalog. Clear any prior
+                // catalog-derived UI state while preserving the accepted status.
+                TtsEngineResolver.resolveVoiceSelection(
+                    enginePackage = enginePackage,
+                    locale = locale,
+                    voices = emptyList(),
+                    requestedKey = selectedVoice(),
+                )
             } else {
-                val candidates = TtsEngineResolver.offlineVoiceCandidates(locale, voices)
-                candidates
-                    .asSequence()
-                    .filterNot { it == preferred }
-                    .firstOrNull { candidate ->
-                        textToSpeech.setVoice(candidate) == TextToSpeech.SUCCESS
-                    }
+                TtsEngineResolver.applyResolvedVoice(
+                    tts = textToSpeech,
+                    enginePackage = enginePackage,
+                    locale = locale,
+                    voices = voices,
+                    requestedKey = selectedVoice(),
+                )
             }
-        onVoiceResolved(
-            resolution.copy(
-                effectiveKey =
-                    effective?.let { voice ->
-                        TtsVoiceKey(enginePackage, voice.name, voice.locale.toLanguageTag())
-                    },
-            ),
-        )
-        return if (effective == null) TextToSpeech.LANG_NOT_SUPPORTED else status
+        onVoiceResolved(resolution)
+        return if (voices.isNotEmpty() && resolution.effectiveKey == null) TextToSpeech.LANG_NOT_SUPPORTED else status
     }
 
     override fun setSpeechRate(rate: Float) {

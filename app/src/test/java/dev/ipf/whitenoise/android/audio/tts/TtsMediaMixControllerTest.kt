@@ -54,7 +54,7 @@ class TtsMediaMixControllerTest {
         assertEquals(TtsStartFailure.AudioFocusDenied, controller.lastStartFailure)
     }
 
-    /** Exercises media ending between the initial and final activity checks. */
+    /** Exercises media ending while duckable focus is acquired, before session mutation. */
     @Test
     fun mediaEndingDuringPreparationReleasesFocusWithoutCreatingQueueState() {
         val activeChecks = ArrayDeque(listOf(true, false))
@@ -70,7 +70,7 @@ class TtsMediaMixControllerTest {
 
         assertFalse(controller.speak("Race-safe speech.", Locale.US))
 
-        assertEquals(1, engine.languageCalls)
+        assertEquals(0, engine.languageCalls)
         assertTrue(engine.spoken.isEmpty())
         assertEquals(1, focus.releases)
         assertTrue(controller.state.value is TtsState.Idle)
@@ -138,10 +138,11 @@ class TtsMediaMixControllerTest {
         val existingState = controller.state.value
 
         mixEnabled = true
-        assertFalse(controller.speak("Refused replacement.", Locale.US))
+        assertFalse(controller.speak("Refused replacement.", Locale.FRANCE))
 
         assertEquals(existingState, controller.state.value)
         assertEquals(listOf(TtsAudioFocusMode.Full, TtsAudioFocusMode.MediaMix, TtsAudioFocusMode.Full), focus.modes)
+        assertEquals(listOf(Locale.US), engine.locales)
         assertEquals(listOf("Existing queue."), engine.spoken.map { it.text })
     }
 
@@ -191,12 +192,14 @@ class TtsMediaMixControllerTest {
 
     private class RecordingEngine : TtsSpeechEngine {
         val spoken = mutableListOf<Spoken>()
-        var languageCalls = 0
+        val locales = mutableListOf<Locale>()
+        val languageCalls: Int
+            get() = locales.size
         private var onDone: ((String?) -> Unit)? = null
 
         /** Records that language work happened after both initial gates. */
         override fun setLanguage(locale: Locale): Int {
-            languageCalls += 1
+            locales += locale
             return TextToSpeech.LANG_AVAILABLE
         }
 

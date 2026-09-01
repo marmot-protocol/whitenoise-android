@@ -170,7 +170,9 @@ class AndroidTtsSpeechEngineTest {
             )
 
         assertEquals(TextToSpeech.LANG_COUNTRY_AVAILABLE, engine.setLanguage(Locale.US))
-        assertNull(resolution)
+        assertEquals(Locale.US.toLanguageTag(), resolution?.localeTag)
+        assertTrue(resolution?.options?.isEmpty() == true)
+        assertNull(resolution?.effectiveKey)
     }
 
     private fun listener(calls: MutableList<String>) =
