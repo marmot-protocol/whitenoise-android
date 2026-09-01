@@ -69,8 +69,6 @@ class StalenessGuardCoverageTest {
         val controllers = productionSource("Controllers.kt")
         val guardedPaths =
             mapOf(
-                "AppState.kt:startForwardMessages" to
-                    listOf("mediaUploadSessionLifetime.isCurrent"),
                 "AppState.kt:refreshAccountUnreadCounts" to
                     listOf("accountListLifetime.capture", "accountListLifetime.isCurrent"),
                 "AppState.kt:refreshAccountSnapshot" to
