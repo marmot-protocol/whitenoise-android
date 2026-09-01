@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -70,7 +71,7 @@ class TtsHistorySession internal constructor(
     internal val conversationSource: StateFlow<TtsConversationSource?> = mutableConversationSource.asStateFlow()
 
     private var conversation: TtsConversationSource? = null
-    private var generation = 0L
+    private val historyRequests = StalenessGuard()
     private var pendingLoad: Job? = null
     private var liveTailAttached = true
 
@@ -194,13 +195,13 @@ class TtsHistorySession internal constructor(
         }
     }
 
+    /** Starts one edge walk and rejects its settlement after a newer history request. */
     private fun startEdgeLoad(
         convo: TtsConversationSource,
         direction: TtsHistoryDirection,
         targetSentence: TtsWindowSentenceTarget,
     ) {
-        generation += 1
-        val startedGeneration = generation
+        val startedGeneration = historyRequests.advance()
         _edgeState.value = TtsHistoryEdgeState.Loading(direction)
         pendingLoad =
             scope.launch {
@@ -219,15 +220,16 @@ class TtsHistorySession internal constructor(
                         if (resolvedPager == null || anchor == null) {
                             TtsHistoryEdgeWalk.Result.Failed
                         } else {
-                            TtsHistoryEdgeWalk(resolvedPager, direction) { startedGeneration != generation }
-                                .run(anchor.messageIdHex, anchor.timelineAt)
+                            TtsHistoryEdgeWalk(resolvedPager, direction) {
+                                !historyRequests.isCurrent(startedGeneration)
+                            }.run(anchor.messageIdHex, anchor.timelineAt)
                         }
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {
                         TtsHistoryEdgeWalk.Result.Failed
                     }
-                if (startedGeneration != generation || conversation != convo) return@launch
+                if (!historyRequests.isCurrent(startedGeneration) || conversation != convo) return@launch
                 // Every reachable branch settles the queue's edge deferral: a
                 // final chunk that finished mid-request parked instead of ending
                 // playback, and only these outcomes can say how it resolves.
@@ -302,8 +304,9 @@ class TtsHistorySession internal constructor(
             }
     }
 
+    /** Cancels the current edge walk and invalidates any completion already queued. */
     private fun invalidatePending() {
-        generation += 1
+        historyRequests.advance()
         pendingLoad?.cancel()
         pendingLoad = null
         _edgeState.value = null

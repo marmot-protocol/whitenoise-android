@@ -395,12 +395,13 @@ internal class CoalescingDraftWriter(
 ) {
     private val lock = Any()
     private var values = initial.toMap()
-    private var generation = 0L
+    private val writes = StalenessGuard()
     private var workerScheduled = false
     private var workerDone = CountDownLatch(0)
 
     fun read(): Map<String, String> = synchronized(lock) { values.toMap() }
 
+    /** Updates the in-memory draft map and coalesces its encrypted persistence. */
     fun write(
         key: String,
         value: String?,
@@ -409,7 +410,7 @@ internal class CoalescingDraftWriter(
             val updated = if (value == null) values - key else values + (key to value)
             if (updated == values) return
             values = updated
-            generation += 1
+            writes.advance()
             scheduleWorkerLocked()
         }
     }
@@ -425,15 +426,16 @@ internal class CoalescingDraftWriter(
         }
     }
 
+    /** Persists snapshots until disk catches the latest accepted in-memory write. */
     private fun drain(completion: CountDownLatch) {
         try {
             while (true) {
                 val (snapshot, snapshotGeneration) =
-                    synchronized(lock) { values.toMap() to generation }
+                    synchronized(lock) { values.toMap() to writes.capture() }
                 persist(snapshot)
                 val caughtUp =
                     synchronized(lock) {
-                        if (generation == snapshotGeneration) {
+                        if (writes.isCurrent(snapshotGeneration)) {
                             workerScheduled = false
                             true
                         } else {

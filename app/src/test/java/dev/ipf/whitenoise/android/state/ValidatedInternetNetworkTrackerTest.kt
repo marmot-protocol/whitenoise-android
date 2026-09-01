@@ -6,6 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ValidatedInternetNetworkTrackerTest {
+    /** Advances the probe fence only when validated-internet identity changes. */
     @Test
     fun usableRecoveryWakesOnlyAfterBothRouteAndValidatedUpstreamRecover() {
         val tracker = UsableValidatedInternetRecoveryTracker()
@@ -44,16 +45,17 @@ class ValidatedInternetNetworkTrackerTest {
         val owner = ConnectivitySignalOwner()
 
         owner.update(hasValidatedInternet = false)
-        assertEquals(0L, owner.networkGeneration.get())
+        assertEquals(0L, owner.captureNetworkGeneration())
         owner.update(hasValidatedInternet = true)
-        assertEquals(1L, owner.networkGeneration.get())
+        assertEquals(1L, owner.captureNetworkGeneration())
         owner.update(relaysConnected = false)
-        assertEquals(1L, owner.networkGeneration.get())
+        assertEquals(1L, owner.captureNetworkGeneration())
         owner.update(hasValidatedInternet = false, relaysConnected = true)
-        assertEquals(2L, owner.networkGeneration.get())
+        assertEquals(2L, owner.captureNetworkGeneration())
         assertFalse(owner.signals.value.relaysConnected)
     }
 
+    /** Invalidates an in-flight probe when Android reports a replacement default network. */
     @Test
     fun defaultNetworkIdentityChangeAdvancesTheStaleCompletionFence() {
         val owner = ConnectivitySignalOwner()
@@ -61,7 +63,7 @@ class ValidatedInternetNetworkTrackerTest {
         owner.update(hasValidatedInternet = true)
         owner.noteNetworkIdentityChange()
 
-        assertEquals(2L, owner.networkGeneration.get())
+        assertEquals(2L, owner.captureNetworkGeneration())
         assertTrue(owner.signals.value.hasValidatedInternet)
     }
 

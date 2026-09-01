@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import androidx.annotation.VisibleForTesting
+import dev.ipf.whitenoise.android.state.StalenessGuard
 
 internal enum class ConversationCardOp {
     SHOW_NOTIFY,
@@ -69,6 +70,7 @@ internal object ConversationCardPostSynchronizer {
     @Volatile
     var testHook: ConversationCardTestHook? = null
 
+    /** Registers one card post under the current dismissal and newest-show lifetimes. */
     suspend fun <T> withRegisteredShow(
         notificationTag: String,
         notificationId: Int,
@@ -79,12 +81,11 @@ internal object ConversationCardPostSynchronizer {
             synchronized(inFlightShowsLock) {
                 val state = inFlightShows.getOrPut(key) { InFlightShowState() }
                 state.activeShows += 1
-                state.latestShowGeneration += 1
                 ConversationCardShowToken(
                     notificationTag = notificationTag,
                     notificationId = notificationId,
-                    dismissalGeneration = state.dismissalGeneration,
-                    showGeneration = state.latestShowGeneration,
+                    dismissalGeneration = state.dismissals.capture(),
+                    showGeneration = state.shows.advance(),
                 )
             }
         return try {
@@ -100,8 +101,8 @@ internal object ConversationCardPostSynchronizer {
             val state = inFlightShows[ConversationCardKey(token.notificationTag, token.notificationId)]
             if (
                 state == null ||
-                state.dismissalGeneration != token.dismissalGeneration ||
-                state.latestShowGeneration != token.showGeneration
+                !state.dismissals.isCurrent(token.dismissalGeneration) ||
+                !state.shows.isCurrent(token.showGeneration)
             ) {
                 false
             } else {
@@ -110,6 +111,7 @@ internal object ConversationCardPostSynchronizer {
             }
         }
 
+    /** Releases one registered post and retires its key after all detached work completes. */
     fun releaseShow(token: ConversationCardShowToken) {
         val key = ConversationCardKey(token.notificationTag, token.notificationId)
         synchronized(inFlightShowsLock) {
@@ -119,12 +121,13 @@ internal object ConversationCardPostSynchronizer {
         }
     }
 
+    /** Checks both dismissal and newest-show ownership for rich-card publication. */
     fun isShowCurrent(token: ConversationCardShowToken): Boolean =
         synchronized(inFlightShowsLock) {
             inFlightShows[ConversationCardKey(token.notificationTag, token.notificationId)]
                 ?.let { state ->
-                    state.dismissalGeneration == token.dismissalGeneration &&
-                        state.latestShowGeneration == token.showGeneration
+                    state.dismissals.isCurrent(token.dismissalGeneration) &&
+                        state.shows.isCurrent(token.showGeneration)
                 } == true
         }
 
@@ -132,16 +135,19 @@ internal object ConversationCardPostSynchronizer {
     fun isShowNotDismissed(token: ConversationCardShowToken): Boolean =
         synchronized(inFlightShowsLock) {
             inFlightShows[ConversationCardKey(token.notificationTag, token.notificationId)]
-                ?.dismissalGeneration == token.dismissalGeneration
+                ?.dismissals
+                ?.isCurrent(token.dismissalGeneration) == true
         }
 
+    /** Invalidates every registered post that predates a conversation-card dismissal. */
     fun markDismissed(
         notificationTag: String,
         notificationId: Int,
     ) {
         synchronized(inFlightShowsLock) {
             inFlightShows[ConversationCardKey(notificationTag, notificationId)]
-                ?.let { state -> state.dismissalGeneration += 1 }
+                ?.dismissals
+                ?.advance()
         }
     }
 
@@ -187,7 +193,7 @@ internal object ConversationCardPostSynchronizer {
 
     private data class InFlightShowState(
         var activeShows: Int = 0,
-        var dismissalGeneration: Long = 0,
-        var latestShowGeneration: Long = 0,
+        val dismissals: StalenessGuard = StalenessGuard(),
+        val shows: StalenessGuard = StalenessGuard(),
     )
 }

@@ -190,6 +190,7 @@ class AttachmentTransferCoordinatorTest {
             }
         }
 
+    /** Rejects an old probe even when a reopened key reaches the same numeric tokens. */
     @Test
     fun retiredColdProbeCannotMutateAReopenedAttachmentState() =
         runBlocking {
@@ -211,7 +212,9 @@ class AttachmentTransferCoordinatorTest {
                     oldProbeStarted.await()
 
                     coordinator.releaseState("file")
-                    val reopened = coordinator.acquireState("file", initiallyAvailable = true)
+                    val reopened = coordinator.acquireState("file", initiallyAvailable = false)
+                    coordinator.refresh("file") { true }
+                    assertEquals(AttachmentTransferState.Available, reopened.value)
                     releaseOldProbe.complete(Unit)
                     oldProbe.await()
 

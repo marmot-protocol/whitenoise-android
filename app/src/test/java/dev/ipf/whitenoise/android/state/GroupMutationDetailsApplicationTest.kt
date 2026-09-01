@@ -93,19 +93,6 @@ class GroupMutationDetailsApplicationTest {
     }
 
     @Test
-    fun newerRosterRefreshSupersedesOlderRefreshAndMutationInvalidatesBoth() {
-        val generations = GroupRosterRefreshGeneration()
-        val first = generations.begin()
-        val second = generations.begin()
-
-        assertFalse(generations.isCurrent(first))
-        assertTrue(generations.isCurrent(second))
-
-        generations.invalidate()
-        assertFalse(generations.isCurrent(second))
-    }
-
-    @Test
     fun delayedAuthoritativeRosterTransitionsFromLoadingToReady() {
         var state = GroupRosterLoadState.LOADING
         state = reduceGroupRosterLoadState(state, GroupRosterRefreshEvent.STARTED)

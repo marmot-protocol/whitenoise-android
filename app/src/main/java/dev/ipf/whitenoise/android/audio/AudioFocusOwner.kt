@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import dev.ipf.whitenoise.android.state.StalenessGuard
 
 /**
  * Process-wide audio-focus arbiter shared by voice-note playback (#1479) and
@@ -29,8 +30,7 @@ object AudioFocusOwner {
     private var onFocusChange: ((Int) -> Unit)? = null
     private var onSurrender: (() -> Unit)? = null
     private var focusListener: AudioManager.OnAudioFocusChangeListener? = null
-    private var nextGeneration = 0L
-    private var currentGeneration = 0L
+    private val focusCallbacks = StalenessGuard()
     private var activeCallbacks = 0
     private val focusLock = Any()
 
@@ -93,6 +93,7 @@ object AudioFocusOwner {
         return result.acquired
     }
 
+    /** Acquires focus and stamps the callbacks that belong to the accepted owner. */
     private fun acquireLocked(
         owner: Owner,
         audioAttributes: AudioAttributes,
@@ -110,6 +111,7 @@ object AudioFocusOwner {
                 activeCallbacks += 1
             }
             currentOwner = owner
+            focusCallbacks.advance()
             this.onFocusChange = onFocusChange
             onSurrender = onOwnerSurrender
             return AcquisitionResult(acquired = true, previousOwnerSurrender = previousSurrender)
@@ -119,12 +121,12 @@ object AudioFocusOwner {
             onSurrender = onOwnerSurrender
             return AcquisitionResult(acquired = true)
         }
-        val generation = ++nextGeneration
+        var generation: Long? = null
         val listener =
             AudioManager.OnAudioFocusChangeListener { change ->
                 val focusChangeCallback =
                     synchronized(focusLock) {
-                        if (generation != currentGeneration || currentOwner != owner) {
+                        if (generation?.let(focusCallbacks::isCurrent) != true || currentOwner != owner) {
                             null
                         } else {
                             when (change) {
@@ -155,6 +157,7 @@ object AudioFocusOwner {
         if (!granted) {
             return AcquisitionResult(acquired = false)
         }
+        generation = focusCallbacks.advance()
 
         val previousRequest = focusRequest
         val previousSurrender = onSurrender.takeIf { currentOwner != null && currentOwner != owner }
@@ -166,7 +169,6 @@ object AudioFocusOwner {
         this.onFocusChange = onFocusChange
         onSurrender = onOwnerSurrender
         focusListener = listener
-        currentGeneration = generation
         previousRequest?.let(am::abandonAudioFocusRequest)
         return AcquisitionResult(acquired = true, previousOwnerSurrender = previousSurrender)
     }
@@ -206,6 +208,7 @@ object AudioFocusOwner {
         release(Owner.Tts)
     }
 
+    /** Releases platform focus and invalidates every callback from the former owner. */
     private fun abandonFocusInternal() {
         val request = focusRequest
         audioManager?.let { am ->
@@ -216,6 +219,6 @@ object AudioFocusOwner {
         onFocusChange = null
         onSurrender = null
         focusListener = null
-        currentGeneration = 0L
+        focusCallbacks.advance()
     }
 }

@@ -7,7 +7,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.util.concurrent.atomic.AtomicLong
 
 data class ConnectivitySignals(
     val hasValidatedInternet: Boolean = false,
@@ -17,9 +16,16 @@ data class ConnectivitySignals(
 internal class ConnectivitySignalOwner {
     private val mutableSignals = MutableStateFlow(ConnectivitySignals())
     val signals: StateFlow<ConnectivitySignals> = mutableSignals.asStateFlow()
-    val networkGeneration = AtomicLong(0)
+    private val networkLifetime = StalenessGuard()
     private val lock = Any()
 
+    /** Captures the network identity that an asynchronous probe is validating. */
+    fun captureNetworkGeneration(): Long = networkLifetime.capture()
+
+    /** Reports whether a captured probe still belongs to the active network identity. */
+    fun isNetworkGenerationCurrent(captured: Long): Boolean = networkLifetime.isCurrent(captured)
+
+    /** Publishes connectivity changes and invalidates probes when validation identity changes. */
     fun update(
         hasValidatedInternet: Boolean? = null,
         relaysConnected: Boolean? = null,
@@ -27,7 +33,7 @@ internal class ConnectivitySignalOwner {
         synchronized(lock) {
             val current = mutableSignals.value
             val nextHasValidatedInternet = hasValidatedInternet ?: current.hasValidatedInternet
-            if (nextHasValidatedInternet != current.hasValidatedInternet) networkGeneration.incrementAndGet()
+            if (nextHasValidatedInternet != current.hasValidatedInternet) networkLifetime.advance()
             mutableSignals.value =
                 current.copy(
                     hasValidatedInternet = nextHasValidatedInternet,
@@ -40,8 +46,9 @@ internal class ConnectivitySignalOwner {
         }
     }
 
+    /** Invalidates probes after a network callback reports a different network identity. */
     fun noteNetworkIdentityChange() {
-        networkGeneration.incrementAndGet()
+        networkLifetime.advance()
     }
 }
 

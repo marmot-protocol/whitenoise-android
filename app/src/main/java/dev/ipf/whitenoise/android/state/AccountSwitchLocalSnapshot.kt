@@ -249,25 +249,20 @@ internal fun accountSwitchProfileSeed(
 
 /** Main-confined latest-wins owner for the one-shot account-switch handoff. */
 internal class AccountSwitchLocalSnapshotHandoff {
-    private var generation = 0L
+    private val requests = StalenessGuard()
     private var pending: AccountSwitchLocalSnapshot? = null
 
-    fun beginRequest(): Long {
-        generation += 1L
-        pending = null
-        return generation
-    }
+    /** Starts a switch request and discards any snapshot from its predecessor. */
+    fun beginRequest(): Long = requests.advance { pending = null }
 
-    fun isCurrent(requestGeneration: Long): Boolean = generation == requestGeneration
+    /** Reports whether [requestGeneration] still owns the pending handoff. */
+    fun isCurrent(requestGeneration: Long): Boolean = requests.isCurrent(requestGeneration)
 
+    /** Publishes [snapshot] only while its originating switch remains current. */
     fun publish(
         requestGeneration: Long,
         snapshot: AccountSwitchLocalSnapshot?,
-    ): Boolean {
-        if (!isCurrent(requestGeneration)) return false
-        pending = snapshot
-        return true
-    }
+    ): Boolean = requests.runIfCurrent(requestGeneration) { pending = snapshot }
 
     fun consume(accountRef: String?): AccountSwitchLocalSnapshot? {
         val snapshot = pending

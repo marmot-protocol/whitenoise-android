@@ -23,9 +23,9 @@ internal class AttachmentOpenCoordinator(
     @Volatile
     private var destination: AttachmentOpenDestination? = null
 
-    @Volatile
-    private var openGeneration = 0L
+    private val openRequests = StalenessGuard()
 
+    // staleness-exempt: observable open-intent version consumed by Compose.
     var revision by mutableIntStateOf(0)
         private set
 
@@ -46,11 +46,12 @@ internal class AttachmentOpenCoordinator(
             ?.takeIf { it.matches(request) }
             ?.let { AttachmentOpenRequest(request, it.navigationGeneration) }
 
+    /** Persists a fresh viewer intent and supersedes any older cancellation cleanup. */
     fun requestOpen(request: AttachmentTransferRequest): Boolean {
         val openRequest = openRequest(request) ?: return false
         // A fresh tap supersedes a cancel whose durable revocation has not
         // reached disk yet, so that revocation must not remove this new intent.
-        openGeneration += 1L
+        openRequests.advance()
         AttachmentOpenTrace.begin(openRequest)
         intentStore.markOpenIntent(openRequest)
         AttachmentOpenTrace.phase(openRequest, AttachmentOpenPhase.RequestPersisted)
@@ -89,10 +90,10 @@ internal class AttachmentOpenCoordinator(
      */
     fun cancelOpen(request: AttachmentOpenRequest) {
         AttachmentOpenTrace.finish(request, "cancelled_by_user")
-        val generation = openGeneration
+        val openToken = openRequests.capture()
         scope.launch {
             withContext(persistence) {
-                intentStore.consumeOpenIntentUnlessSuperseded(request) { openGeneration != generation }
+                intentStore.consumeOpenIntentUnlessSuperseded(request) { !openRequests.isCurrent(openToken) }
             }
             revision += 1
         }

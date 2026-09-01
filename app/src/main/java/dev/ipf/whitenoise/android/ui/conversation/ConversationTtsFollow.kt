@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.geometry.Rect
 import dev.ipf.whitenoise.android.audio.tts.TtsState
+import dev.ipf.whitenoise.android.state.StalenessGuard
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsSentenceProjectionSegment
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -90,11 +91,12 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
 
     private val activeRows = mutableStateMapOf<String, Any>()
     private val reports = mutableStateMapOf<ReportKey, StampedReport>()
-    private var viewportGeometryRevision = 0L
+    private val viewportGeometryLifetime = StalenessGuard()
 
     var viewportBoundsInWindow by mutableStateOf<Rect?>(null)
         private set
 
+    // staleness-exempt: observable registry version that triggers Compose remeasurement.
     var revision by mutableLongStateOf(0L)
         private set
 
@@ -118,10 +120,11 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
         revision++
     }
 
+    /** Records sentence geometry under the current viewport lifetime. */
     override fun report(report: ConversationTtsSentenceLayoutReport) {
         if (activeRows[report.target.messageIdHex] !== report.rowInstance) return
         reports[ReportKey(report.target, report.rowInstance, report.renderedLeafId)] =
-            StampedReport(report, viewportGeometryRevision)
+            StampedReport(report, viewportGeometryLifetime.capture())
         revision++
     }
 
@@ -133,20 +136,22 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
         if (reports.remove(ReportKey(target, rowInstance, renderedLeafId)) != null) revision++
     }
 
+    /** Invalidates measured sentences when the visible viewport geometry changes. */
     fun updateViewportBounds(boundsInWindow: Rect) {
         if (viewportBoundsInWindow == boundsInWindow) return
-        if (viewportBoundsInWindow != null) viewportGeometryRevision++
+        if (viewportBoundsInWindow != null) viewportGeometryLifetime.advance()
         viewportBoundsInWindow = boundsInWindow
         revision++
     }
 
+    /** Returns complete current-viewport bounds after every rendered leaf reports. */
     @Suppress("ReturnCount")
     fun completeSentenceBounds(target: ConversationTtsFollowTarget): Rect? {
         val activeRow = activeRows[target.messageIdHex] ?: return null
         val matching =
             reports.values
                 .filter { stamped ->
-                    stamped.viewportGeometryRevision == viewportGeometryRevision &&
+                    viewportGeometryLifetime.isCurrent(stamped.viewportGeometryRevision) &&
                         stamped.report.target == target &&
                         stamped.report.rowInstance === activeRow
                 }.map(StampedReport::report)
