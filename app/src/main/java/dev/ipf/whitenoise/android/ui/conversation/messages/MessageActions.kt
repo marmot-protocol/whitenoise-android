@@ -55,6 +55,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -86,18 +87,22 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
+import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ForwardFailureStage
 import dev.ipf.whitenoise.android.state.ForwardOperationPhase
 import dev.ipf.whitenoise.android.state.ForwardOperationSnapshot
 import dev.ipf.whitenoise.android.state.ForwardTargetPhase
 import dev.ipf.whitenoise.android.state.ForwardTargetProgress
+import dev.ipf.whitenoise.android.state.PendingForwardRequest
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.isForwardOwnerSignedIn
 import dev.ipf.whitenoise.android.ui.chats.chatFolderTriState
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.AppDivider
@@ -107,7 +112,9 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import java.util.Locale
+import java.util.UUID
 
+/** Anchored long-press action menu for one message. */
 @Composable
 internal fun MessageActionMenu(
     expanded: Boolean,
@@ -499,12 +506,15 @@ internal fun forwardTargetMembersPreview(
         ?.takeIf { it.isNotBlank() }
 }
 
+/** Folder bulk-select rows for the account that owns the picker's chat list. */
 internal fun forwardFolderBulkRows(
     appState: WhiteNoiseAppState,
     targets: List<ChatListItem>,
     groupTitleCopy: GroupTitleCopy,
+    ownerAccountRef: String? = appState.activeAccountRef,
+    ownerAccountIdHex: String? = appState.activeAccount?.accountIdHex,
 ): List<Pair<ChatFolder, List<String>>> {
-    val accountRef = appState.activeAccountRef ?: return emptyList()
+    val accountRef = ownerAccountRef ?: return emptyList()
     val store = appState.chatFolderPreferences
     val mutedGroupIds = targets.filter(ChatListItem::engineMuted).mapTo(hashSetOf()) { it.group.groupIdHex }
     return store
@@ -519,17 +529,47 @@ internal fun forwardFolderBulkRows(
                     items = targets,
                     manualChatIds = store.membershipFor(accountRef, folder.id),
                     rule = store.folderRule(accountRef, folder.id),
-                    activeAccountIdHex = appState.activeAccount?.accountIdHex,
+                    activeAccountIdHex = ownerAccountIdHex,
                     isMuted = { groupIdHex ->
                         groupIdHex in mutedGroupIds
                     },
-                    displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
+                    displayTitle = { forwardTargetDisplayTitle(it, appState, accountRef, groupTitleCopy) },
                 ).toList()
         }.filter { (_, memberIds) -> memberIds.size >= 2 }
 }
 
-// No rows at all only when there are no chat rows to show AND no folder rows
-// matched — a query hitting only a folder name must still render that folder.
+/**
+ * Chat title resolved against the account that owns the chat list, so a
+ * non-active destination account's rows never borrow the active account's
+ * contact-name caches.
+ */
+internal fun forwardTargetDisplayTitle(
+    item: ChatListItem,
+    appState: WhiteNoiseAppState,
+    ownerAccountRef: String?,
+    copy: GroupTitleCopy,
+): String =
+    when {
+        ownerAccountRef == null || ownerAccountRef == appState.activeAccountRef ->
+            chatListItemDisplayTitle(item, appState, copy)
+        item.sanitizedNamedTitle != null -> item.sanitizedNamedTitle.orEmpty()
+        else ->
+            GroupProjector.displayTitle(
+                group = item.group,
+                otherMemberAccount = item.presentationOtherMemberAccount,
+                memberCount = item.presentationMemberCount,
+                memberTitle = { appState.contactDisplayNameCached(ownerAccountRef, it) },
+                copy = copy,
+                conversationKind = item.projection?.conversationKind,
+                soleSelfMember = item.presentationActiveAccountIsSoleMember,
+            )
+    }
+
+/**
+ * True only when neither chat rows nor folder rows would render — no rows at
+ * all only when there are no chat rows to show AND no folder rows matched,
+ * because a query hitting only a folder name must still render that folder.
+ */
 internal fun forwardPickerHasNoRows(
     targetsEmpty: Boolean,
     filteredEmpty: Boolean,
@@ -742,26 +782,152 @@ private fun ForwardTargetProgressRow(
     )
 }
 
+/**
+ * One forwarding request bound to its source conversation owner. The picker's
+ * destination account and chat selections are mirrored into the encrypted
+ * no-backup pending-request store so process recreation can restore an
+ * unresolved request; explicit dismissal or acceptance discards that entry.
+ */
 @Composable
 @Suppress("FunctionNaming")
 internal fun ForwardMessageSheet(
     appState: WhiteNoiseAppState,
-    messageCount: Int = 1,
-    attachmentCount: Int = 0,
+    payloads: List<ForwardMessagePayload>,
+    sourceAccountRef: String?,
     originGroupIdHex: String,
     onDismiss: () -> Unit,
-    onForward: (List<String>) -> Boolean,
+    restoredRequest: PendingForwardRequest? = null,
 ) {
+    // Plain remember on purpose: the encrypted store owns recreation, and the
+    // saved-state Bundle must not carry forward-request identifiers.
+    val requestId =
+        remember(originGroupIdHex) {
+            restoredRequest?.requestId ?: UUID.randomUUID().toString()
+        }
+    var pickerTitles by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    val dismissAndDiscard = {
+        appState.forwardRequestPersistence.discard(requestId)
+        onDismiss()
+    }
     ForwardMessagePickerFullScreen(
         appState = appState,
-        messageCount = messageCount,
-        attachmentCount = attachmentCount,
+        messageCount = payloads.size,
+        attachmentCount =
+            payloads.sumOf { payload ->
+                (payload as? ForwardMessagePayload.Media)?.attachments?.size ?: 0
+            },
         originGroupIdHex = originGroupIdHex,
-        onDismiss = onDismiss,
-        onForward = onForward,
+        sourceAccountRef = sourceAccountRef,
+        onDismiss = dismissAndDiscard,
+        onForward = { destinationAccountRef, targetGroupIds ->
+            val started =
+                sourceAccountRef != null &&
+                    appState.startForwardMessages(
+                        targetGroupIds = targetGroupIds,
+                        messages = payloads,
+                        sourceAccountRef = sourceAccountRef,
+                        destinationAccountRef = destinationAccountRef,
+                        targetTitles = pickerTitles,
+                    )
+            if (started) appState.forwardRequestPersistence.discard(requestId)
+            started
+        },
+        initialDestinationAccountRef = restoredRequest?.destinationAccountRef,
+        initialSelectedGroupIds = restoredRequest?.selectedGroupIds.orEmpty(),
+        onPickerStateChanged = { destinationAccountRef, selectedGroupIds, titles ->
+            pickerTitles = titles
+            if (sourceAccountRef != null) {
+                appState.forwardRequestPersistence.persist(
+                    PendingForwardRequest(
+                        requestId = requestId,
+                        sourceAccountRef = sourceAccountRef,
+                        originGroupIdHex = originGroupIdHex,
+                        payloads = payloads,
+                        destinationAccountRef = destinationAccountRef,
+                        selectedGroupIds = selectedGroupIds,
+                    ),
+                )
+            }
+        },
     )
 }
 
+/** Outcome of validating one persisted forward request against a conversation. */
+internal enum class RestoredForwardDisposition {
+    Restore,
+    Ignore,
+    Discard,
+}
+
+/**
+ * Decides whether a persisted forward request may be restored here. A request
+ * belonging to another conversation or another source owner is ignored, and a
+ * request whose source owner or previously chosen destination owner is no
+ * longer a signed-in signing account is discarded — restoration must never
+ * silently substitute another account for either bound owner.
+ */
+internal fun restoredForwardRequestDisposition(
+    request: PendingForwardRequest,
+    boundGroupIdHex: String,
+    boundAccountRef: String?,
+    isOwnerSignedIn: (String) -> Boolean,
+): RestoredForwardDisposition =
+    when {
+        !request.originGroupIdHex.equals(boundGroupIdHex, ignoreCase = true) ->
+            RestoredForwardDisposition.Ignore
+        request.sourceAccountRef != boundAccountRef -> RestoredForwardDisposition.Ignore
+        !isOwnerSignedIn(request.sourceAccountRef) -> RestoredForwardDisposition.Discard
+        request.destinationAccountRef?.let { !isOwnerSignedIn(it) } == true ->
+            RestoredForwardDisposition.Discard
+        else -> RestoredForwardDisposition.Restore
+    }
+
+/**
+ * Restores the single unresolved forward request after process recreation.
+ * Restoration stays bound to the request's recorded source conversation and
+ * source account and never substitutes another account for either bound
+ * owner: a request whose source owner or previously chosen destination owner
+ * is no longer a signed-in signing account is discarded with an explanation
+ * instead of being restored.
+ */
+@Composable
+@Suppress("FunctionNaming")
+internal fun RestoredForwardRequestHost(
+    appState: WhiteNoiseAppState,
+    controller: ConversationController,
+) {
+    var restored by remember { mutableStateOf<PendingForwardRequest?>(null) }
+    LaunchedEffect(controller.group.groupIdHex, controller.boundAccountRef) {
+        val request = appState.forwardRequestPersistence.load() ?: return@LaunchedEffect
+        when (
+            restoredForwardRequestDisposition(
+                request = request,
+                boundGroupIdHex = controller.group.groupIdHex,
+                boundAccountRef = controller.boundAccountRef,
+                isOwnerSignedIn = { appState.isForwardOwnerSignedIn(it) },
+            )
+        ) {
+            RestoredForwardDisposition.Ignore -> Unit
+            RestoredForwardDisposition.Discard -> {
+                appState.forwardRequestPersistence.discard(request.requestId)
+                appState.presentTransient(R.string.forward_restore_discarded)
+            }
+            RestoredForwardDisposition.Restore -> restored = request
+        }
+    }
+    restored?.let { request ->
+        ForwardMessageSheet(
+            appState = appState,
+            payloads = request.payloads,
+            sourceAccountRef = request.sourceAccountRef,
+            originGroupIdHex = request.originGroupIdHex,
+            onDismiss = { restored = null },
+            restoredRequest = request,
+        )
+    }
+}
+
+/** One circular quick-reaction emoji button. */
 @Composable
 private fun EmojiActionButton(
     emoji: String,

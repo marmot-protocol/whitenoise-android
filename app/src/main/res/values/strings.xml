@@ -468,6 +468,7 @@
     <string name="forward_partial_summary">Forwarded to %1$d of %2$d chats</string>
     <string name="forward_failed_summary">Couldn’t forward to the selected chats</string>
     <string name="forward_start_failed">Couldn’t start forwarding. Close and try again.</string>
+    <string name="forward_restore_discarded">Couldn’t safely restore the unfinished forward, so it was discarded</string>
     <string name="forward_retry_failed">Retry failed chats</string>
     <plurals name="forward_attachment_count">
         <item quantity="one">%1$d attachment</item>

@@ -359,6 +359,7 @@
     <string name="forward_partial_summary">%2$d sohbetin %1$d tanesine iletildi</string>
     <string name="forward_failed_summary">Seçilen sohbetlere iletilemedi</string>
     <string name="forward_start_failed">İletme başlatılamadı. Kapatıp tekrar deneyin.</string>
+    <string name="forward_restore_discarded">Tamamlanmamış iletme güvenli şekilde geri yüklenemediği için silindi</string>
     <string name="forward_retry_failed">Başarısız sohbetleri yeniden dene</string>
     <plurals name="forward_attachment_count">
         <item quantity="one">%1$d ek</item>

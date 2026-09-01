@@ -359,6 +359,7 @@
     <string name="forward_partial_summary">Reenviado a %1$d de %2$d chats</string>
     <string name="forward_failed_summary">No se pudo reenviar a los chats seleccionados</string>
     <string name="forward_start_failed">No se pudo iniciar el reenvío. Cierra y vuelve a intentarlo.</string>
+    <string name="forward_restore_discarded">No se pudo restaurar de forma segura el reenvío sin terminar, así que se descartó</string>
     <string name="forward_retry_failed">Reintentar chats fallidos</string>
     <plurals name="forward_attachment_count">
         <item quantity="one">%1$d archivo adjunto</item>

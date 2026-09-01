@@ -351,6 +351,7 @@
     <string name="forward_partial_summary">已轉發至 %1$d / %2$d 個聊天</string>
     <string name="forward_failed_summary">無法轉發至所選聊天</string>
     <string name="forward_start_failed">無法開始轉發。請關閉後重試。</string>
+    <string name="forward_restore_discarded">無法安全還原未完成的轉發，已將其捨棄</string>
     <string name="forward_retry_failed">重試失敗的聊天</string>
     <plurals name="forward_attachment_count">
         <item quantity="one">%1$d 個附件</item>

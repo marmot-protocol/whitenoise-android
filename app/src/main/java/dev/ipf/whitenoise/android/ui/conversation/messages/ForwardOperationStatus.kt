@@ -69,10 +69,15 @@ internal fun ForwardOperationStatusHost(
     val titleCopy = rememberGroupTitleCopy()
     val targetIds = current.targets.map(ForwardTargetProgress::groupIdHex)
     val targetRevision = appState.forwardTargetsRevision
+    // Titles captured at acceptance stay authoritative: a cross-account
+    // destination's chats are not in the active account's forward-target list,
+    // and the strip must never resolve them through another account's caches.
+    val recordedTitles = appState.activeForwardTargetTitles
     val titles =
         remember(
             targetIds,
             targetRevision,
+            recordedTitles,
             appState.forwardTargetMembersRevision,
             appState.profileRevisionForCompose,
             titleCopy,
@@ -82,14 +87,22 @@ internal fun ForwardOperationStatusHost(
                     item.group.groupIdHex.lowercase(Locale.ROOT)
                 }
             targetIds.associateWith { groupIdHex ->
-                itemsById[groupIdHex.lowercase(Locale.ROOT)]?.let { item ->
-                    chatListItemDisplayTitle(item, appState, titleCopy)
-                } ?: groupIdHex.take(FORWARD_TARGET_TITLE_FALLBACK_LENGTH)
+                recordedTitles[groupIdHex.lowercase(Locale.ROOT)]
+                    ?: itemsById[groupIdHex.lowercase(Locale.ROOT)]?.let { item ->
+                        chatListItemDisplayTitle(item, appState, titleCopy)
+                    }
+                    ?: groupIdHex.take(FORWARD_TARGET_TITLE_FALLBACK_LENGTH)
             }
         }
+    val destinationAccountName =
+        appState.activeForwardDestinationAccountRef
+            ?.takeIf { it != appState.activeAccountRef }
+            ?.let { accountRef -> appState.accounts.firstOrNull { it.label == accountRef } }
+            ?.let { account -> appState.networkDisplayName(account.accountIdHex) }
     ForwardOperationStatus(
         snapshot = current,
         targetTitles = titles,
+        destinationAccountName = destinationAccountName,
         onCancel = { appState.cancelActiveForwardOperation() },
         onRetry = { appState.retryActiveForwardOperation() },
         onDismiss = { appState.dismissActiveForwardOperation() },
@@ -110,6 +123,7 @@ internal fun ForwardOperationStatus(
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    destinationAccountName: String? = null,
 ) {
     var detailsVisible by rememberSaveable { mutableStateOf(false) }
     val summary = forwardOperationSummary(snapshot)
@@ -123,6 +137,7 @@ internal fun ForwardOperationStatus(
     ForwardOperationStatusBar(
         snapshot = snapshot,
         summary = summary,
+        destinationAccountName = destinationAccountName,
         animatedProgress = animatedProgress,
         onDetails = { detailsVisible = true },
         onRetry = onRetry,
@@ -145,11 +160,13 @@ internal fun ForwardOperationStatus(
     }
 }
 
+/** Status surface: summary row, optional account label, and live progress. */
 @Composable
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongParameterList")
 private fun ForwardOperationStatusBar(
     snapshot: ForwardOperationSnapshot,
     summary: String,
+    destinationAccountName: String?,
     animatedProgress: Float,
     onDetails: () -> Unit,
     onRetry: () -> Unit,
@@ -165,7 +182,7 @@ private fun ForwardOperationStatusBar(
                 .semantics { liveRegion = LiveRegionMode.Polite },
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            ForwardOperationStatusRow(snapshot, summary, onDetails, onRetry, onDismiss)
+            ForwardOperationStatusRow(snapshot, summary, destinationAccountName, onDetails, onRetry, onDismiss)
             if (snapshot.isActive) {
                 LinearProgressIndicator(
                     progress = { animatedProgress },
@@ -176,11 +193,13 @@ private fun ForwardOperationStatusBar(
     }
 }
 
+/** Summary line with destination-account label, retry, and dismiss affordances. */
 @Composable
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongParameterList")
 private fun ForwardOperationStatusRow(
     snapshot: ForwardOperationSnapshot,
     summary: String,
+    destinationAccountName: String?,
     onDetails: () -> Unit,
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
@@ -204,13 +223,23 @@ private fun ForwardOperationStatusRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             ForwardOperationStatusIcon(snapshot)
-            Text(
-                text = summary,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (destinationAccountName != null) {
+                    Text(
+                        text = stringResource(R.string.share_sending_as_value, destinationAccountName),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             if (snapshot.isActive && snapshot.targets.size > 1) {
                 Text(
                     text = "${snapshot.completedTargets}/${snapshot.targets.size}",

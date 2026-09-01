@@ -359,6 +359,7 @@
     <string name="forward_partial_summary">Inoltrato a %1$d chat su %2$d</string>
     <string name="forward_failed_summary">Impossibile inoltrare alle chat selezionate</string>
     <string name="forward_start_failed">Impossibile avviare l’inoltro. Chiudi e riprova.</string>
+    <string name="forward_restore_discarded">Impossibile ripristinare in modo sicuro l’inoltro non completato, quindi è stato annullato</string>
     <string name="forward_retry_failed">Riprova le chat non riuscite</string>
     <plurals name="forward_attachment_count">
         <item quantity="one">%1$d allegato</item>

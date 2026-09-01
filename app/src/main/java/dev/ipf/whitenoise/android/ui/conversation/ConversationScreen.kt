@@ -171,6 +171,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInfoSheet
+import dev.ipf.whitenoise.android.ui.conversation.messages.RestoredForwardRequestHost
 import dev.ipf.whitenoise.android.ui.conversation.messages.dismissTextSelectionOnOutsideTap
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
@@ -3564,21 +3565,17 @@ internal fun ConversationScreen(
     if (batchForwardSheetOpen && batchSelectionUi.forwardPayloads.isNotEmpty()) {
         ForwardMessageSheet(
             appState = appState,
-            messageCount = batchSelectionUi.forwardPayloads.size,
-            attachmentCount =
-                batchSelectionUi.forwardPayloads.sumOf { payload ->
-                    (payload as? ForwardMessagePayload.Media)?.attachments?.size ?: 0
-                },
+            payloads = batchSelectionUi.forwardPayloads,
+            sourceAccountRef = controller.boundAccountRef,
             originGroupIdHex = controller.group.groupIdHex,
             onDismiss = {
                 batchForwardSheetOpen = false
                 selectedMessages.clear()
             },
-            onForward = { targetGroupIds ->
-                appState.startForwardMessages(targetGroupIds, batchSelectionUi.forwardPayloads)
-            },
         )
     }
+
+    RestoredForwardRequestHost(appState = appState, controller = controller)
 
     batchInfoSelection?.let { infoSelection ->
         val infoRecord = infoSelection.record
