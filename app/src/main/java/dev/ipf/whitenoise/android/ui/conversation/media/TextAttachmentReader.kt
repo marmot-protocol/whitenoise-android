@@ -67,6 +67,7 @@ internal const val TEXT_ATTACHMENT_READER_FILENAME_TAG = "text-attachment-reader
 internal const val TEXT_ATTACHMENT_READER_FILENAME_DIALOG_TAG = "text-attachment-reader-filename-dialog"
 internal const val TEXT_ATTACHMENT_READER_FULL_FILENAME_TAG = "text-attachment-reader-full-filename"
 
+/** Projects a local text attachment and reports the precise media-mix start refusal. */
 private suspend fun WhiteNoiseAppState.speakTextAttachment(
     preview: TextAttachmentPreview,
     senderKey: String,
@@ -85,7 +86,7 @@ private suspend fun WhiteNoiseAppState.speakTextAttachment(
             )
         }
     if (entry.text.isBlank() || !speakAloud(listOf(entry), Locale.getDefault())) {
-        present(R.string.tts_bar_error)
+        present(if (entry.text.isBlank()) R.string.tts_bar_error else ttsStartFailureMessage())
     }
 }
 

@@ -1,14 +1,19 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import android.content.Context
+import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 class AndroidTtsSpeechEngineTest {
@@ -91,6 +96,67 @@ class AndroidTtsSpeechEngineTest {
         assertNull(tts.listener)
     }
 
+    /** Confirms only media-mix speech carries a clamped Android volume bundle. */
+    @Test
+    fun mediaMixSpeechUsesBoundedFrameworkVolumeWhileOrdinarySpeechUsesNoBundle() {
+        val tts = CapturingTextToSpeech(RuntimeEnvironment.getApplication())
+        val engine = AndroidTtsSpeechEngine(tts)
+
+        engine.speak("ordinary", "u1")
+        assertNull(tts.lastParams)
+
+        engine.speak("mixed", "u2", 3f)
+        assertEquals(1f, tts.lastParams?.getFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME))
+        assertEquals("u2", tts.lastUtteranceId)
+    }
+
+    /** Applies the exact saved installed voice for the current engine. */
+    @Test
+    fun languageSelectionAppliesTheExactSavedOfflineVoice() {
+        val fallback = voice("Fallback", Locale.US, 300)
+        val selected = voice("Selected", Locale.UK, 200)
+        val tts = VoiceSelectingTextToSpeech(fallback, setOf(fallback, selected))
+        var resolution: TtsVoiceResolution? = null
+        val engine =
+            AndroidTtsSpeechEngine(
+                textToSpeech = tts,
+                enginePackage = "engine.a",
+                selectedVoice = { TtsVoiceKey("engine.a", "Selected", "en-GB") },
+                onVoiceResolved = { resolution = it },
+            )
+
+        assertEquals(TextToSpeech.LANG_AVAILABLE, engine.setLanguage(Locale.US))
+        assertSame(selected, tts.voice)
+        assertTrue(resolution?.isUsingRequestedVoice == true)
+    }
+
+    /** Falls back to an installed offline voice when the saved key disappears. */
+    @Test
+    fun missingSavedVoiceFallsBackDeterministicallyWithoutUsingNetworkSpeech() {
+        val network = voice("Network", Locale.US, 500, networkRequired = true)
+        val offline = voice("Offline", Locale.UK, 300)
+        val tts = VoiceSelectingTextToSpeech(network, setOf(network, offline))
+        val engine =
+            AndroidTtsSpeechEngine(
+                textToSpeech = tts,
+                enginePackage = "engine.a",
+                selectedVoice = { TtsVoiceKey("engine.a", "Gone", "en-US") },
+            )
+
+        assertEquals(TextToSpeech.LANG_AVAILABLE, engine.setLanguage(Locale.US))
+        assertSame(offline, tts.voice)
+    }
+
+    /** Refuses a language whose engine exposes only network speech. */
+    @Test
+    fun networkOnlyLanguageIsRejectedBeforeSpeechSubmission() {
+        val network = voice("Network", Locale.US, 500, networkRequired = true)
+        val tts = VoiceSelectingTextToSpeech(network, setOf(network))
+        val engine = AndroidTtsSpeechEngine(tts, enginePackage = "engine.a")
+
+        assertEquals(TextToSpeech.LANG_NOT_SUPPORTED, engine.setLanguage(Locale.US))
+    }
+
     private fun listener(calls: MutableList<String>) =
         androidTtsProgressListener(
             onStart = { calls += "start:$it" },
@@ -100,15 +166,62 @@ class AndroidTtsSpeechEngineTest {
             onStop = { id, interrupted -> calls += "stop:$id:$interrupted" },
         )
 
+    /** Creates framework voices with the exact availability needed by each case. */
+    private fun voice(
+        name: String,
+        locale: Locale,
+        quality: Int,
+        networkRequired: Boolean = false,
+    ) = Voice(name, locale, quality, 100, networkRequired, emptySet())
+
+    private class VoiceSelectingTextToSpeech(
+        initialVoice: Voice,
+        private val availableVoices: Set<Voice>,
+    ) : TextToSpeech(RuntimeEnvironment.getApplication(), {}) {
+        private var activeVoice = initialVoice
+
+        /** Models an engine that accepts the requested locale. */
+        override fun setLanguage(locale: Locale?): Int = TextToSpeech.LANG_AVAILABLE
+
+        /** Returns installed and unavailable voices exactly as configured. */
+        override fun getVoices(): MutableSet<Voice> = availableVoices.toMutableSet()
+
+        /** Exposes the voice last accepted by the fake engine. */
+        override fun getVoice(): Voice = activeVoice
+
+        /** Accepts only catalog voices so fallback failures remain observable. */
+        override fun setVoice(voice: Voice?): Int {
+            if (voice == null || voice !in availableVoices) return TextToSpeech.ERROR
+            activeVoice = voice
+            return TextToSpeech.SUCCESS
+        }
+    }
+
     private class CapturingTextToSpeech(
         context: Context,
     ) : TextToSpeech(context, {}) {
         var listener: UtteranceProgressListener? = null
             private set
+        var lastParams: Bundle? = null
+            private set
+        var lastUtteranceId: String? = null
+            private set
 
         override fun setOnUtteranceProgressListener(listener: UtteranceProgressListener?): Int {
             this.listener = listener
             return super.setOnUtteranceProgressListener(listener)
+        }
+
+        /** Captures the framework bundle and utterance identity without synthesizing audio. */
+        override fun speak(
+            text: CharSequence?,
+            queueMode: Int,
+            params: Bundle?,
+            utteranceId: String?,
+        ): Int {
+            lastParams = params
+            lastUtteranceId = utteranceId
+            return TextToSpeech.SUCCESS
         }
     }
 }

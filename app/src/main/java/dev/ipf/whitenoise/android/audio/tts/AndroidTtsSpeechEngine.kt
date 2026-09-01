@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.audio.tts
 
+import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import java.util.Locale
@@ -7,8 +8,45 @@ import java.util.Locale
 /** Thin adapter that keeps Android framework calls out of the queue state machine. */
 internal class AndroidTtsSpeechEngine(
     private val textToSpeech: TextToSpeech,
+    private val enginePackage: String = "",
+    private val selectedVoice: () -> TtsVoiceKey? = { null },
+    private val onVoiceResolved: (TtsVoiceResolution) -> Unit = {},
 ) : TtsSpeechEngine {
-    override fun setLanguage(locale: Locale): Int = textToSpeech.setLanguage(locale)
+    /** Applies the utterance locale and then enforces the saved offline voice policy. */
+    override fun setLanguage(locale: Locale): Int {
+        val status = textToSpeech.setLanguage(locale)
+        if (status < TextToSpeech.LANG_AVAILABLE || enginePackage.isEmpty()) return status
+        val voices = textToSpeech.voices.orEmpty().toList()
+        val resolution =
+            TtsEngineResolver.resolveVoiceSelection(
+                enginePackage = enginePackage,
+                locale = locale,
+                voices = voices,
+                requestedKey = selectedVoice(),
+            )
+        val preferred = resolution.preferredVoice
+        val effective =
+            if (preferred != null && textToSpeech.setVoice(preferred) == TextToSpeech.SUCCESS) {
+                preferred
+            } else {
+                val candidates = TtsEngineResolver.offlineVoiceCandidates(locale, voices)
+                candidates
+                    .asSequence()
+                    .filterNot { it == preferred }
+                    .firstOrNull { candidate ->
+                        textToSpeech.setVoice(candidate) == TextToSpeech.SUCCESS
+                    }
+            }
+        onVoiceResolved(
+            resolution.copy(
+                effectiveKey =
+                    effective?.let { voice ->
+                        TtsVoiceKey(enginePackage, voice.name, voice.locale.toLanguageTag())
+                    },
+            ),
+        )
+        return if (effective == null) TextToSpeech.LANG_NOT_SUPPORTED else status
+    }
 
     override fun setSpeechRate(rate: Float) {
         textToSpeech.setSpeechRate(rate)
@@ -30,6 +68,7 @@ internal class AndroidTtsSpeechEngine(
         textToSpeech.setOnUtteranceProgressListener(null)
     }
 
+    /** Sends Android's per-utterance volume only for explicit media mixing. */
     override fun speak(
         text: String,
         utteranceId: String,
@@ -38,6 +77,20 @@ internal class AndroidTtsSpeechEngine(
             text,
             TextToSpeech.QUEUE_ADD,
             null,
+            utteranceId,
+        )
+
+    override fun speak(
+        text: String,
+        utteranceId: String,
+        volume: Float,
+    ): Int =
+        textToSpeech.speak(
+            text,
+            TextToSpeech.QUEUE_ADD,
+            Bundle().apply {
+                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume.coerceIn(0f, 1f))
+            },
             utteranceId,
         )
 

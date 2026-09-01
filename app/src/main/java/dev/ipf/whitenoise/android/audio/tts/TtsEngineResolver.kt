@@ -9,6 +9,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
+import java.util.Locale
 import kotlin.coroutines.resume
 
 enum class EngineTrust {
@@ -38,9 +39,52 @@ data class TtsEngineHandle(
     val textToSpeech: TextToSpeech,
     val enginePackage: String,
     val trust: EngineTrust,
+    val voiceResolution: TtsVoiceResolution = TtsVoiceResolution.Empty,
 ) {
     fun release() {
         textToSpeech.shutdown()
+    }
+}
+
+/** Stable framework-independent identity for one engine voice. */
+data class TtsVoiceKey(
+    val enginePackage: String,
+    val voiceName: String,
+    val localeTag: String,
+)
+
+/** Why a discovered same-language voice cannot be selected offline. */
+enum class TtsVoiceUnavailableReason {
+    InvalidIdentity,
+    NotInstalled,
+    RequiresNetwork,
+    Ambiguous,
+}
+
+/** One resolver-considered voice, including visible unavailable entries. */
+data class TtsVoiceOption(
+    val key: TtsVoiceKey,
+    val label: String,
+    val localeTag: String,
+    val unavailableReason: TtsVoiceUnavailableReason?,
+) {
+    val selectable: Boolean
+        get() = unavailableReason == null
+}
+
+/** Current catalog, saved choice, and actual effective offline voice. */
+data class TtsVoiceResolution(
+    val localeTag: String,
+    val options: List<TtsVoiceOption>,
+    val requestedKey: TtsVoiceKey?,
+    val effectiveKey: TtsVoiceKey?,
+    internal val preferredVoice: Voice? = null,
+) {
+    val isUsingRequestedVoice: Boolean
+        get() = requestedKey != null && requestedKey == effectiveKey
+
+    internal companion object {
+        val Empty = TtsVoiceResolution("", emptyList(), null, null)
     }
 }
 
@@ -73,6 +117,7 @@ class TtsEngineResolver(
     private val ttsFactory: TtsFactory = DefaultTtsFactory,
     private val engineCatalog: TtsEngineCatalog = AndroidTtsEngineCatalog,
     private val initTimeoutMs: Long = TTS_INIT_TIMEOUT_MS,
+    private val selectedVoice: (String) -> TtsVoiceKey? = { null },
 ) {
     private val speechAudioAttributes: AudioAttributes =
         AudioAttributes
@@ -209,6 +254,7 @@ class TtsEngineResolver(
             handle = null,
         )
 
+    /** Verifies the connected engine and packages its current-locale offline voice catalog. */
     private fun buildResolution(
         tts: TextToSpeech,
         status: Int,
@@ -228,7 +274,8 @@ class TtsEngineResolver(
                 handle = null,
             )
         }
-        if (!configureResolvedEngine(tts)) {
+        val voiceResolution = configureResolvedEngine(tts, activePackage, selectedVoice(activePackage))
+        if (voiceResolution == null) {
             tts.shutdown()
             return TtsResolutionResult(
                 status = status,
@@ -247,6 +294,7 @@ class TtsEngineResolver(
                     textToSpeech = tts,
                     enginePackage = activePackage,
                     trust = trust,
+                    voiceResolution = voiceResolution,
                 ),
         )
     }
@@ -262,17 +310,28 @@ class TtsEngineResolver(
             else -> EngineTrust.Unknown
         }
 
-    private fun configureResolvedEngine(tts: TextToSpeech): Boolean {
-        if (tts.setAudioAttributes(speechAudioAttributes) != TextToSpeech.SUCCESS) return false
-        val currentVoice = tts.voice ?: return true
-        val installedVoices =
-            tts.voices.orEmpty().filter { voice ->
-                !voice.features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)
-            }
-        for (candidate in offlineVoiceCandidates(currentVoice, installedVoices)) {
-            if (tts.setVoice(candidate) == TextToSpeech.SUCCESS) return true
-        }
-        return true
+    /** Applies a valid saved voice or the deterministic installed offline fallback. */
+    private fun configureResolvedEngine(
+        tts: TextToSpeech,
+        enginePackage: String,
+        requestedVoice: TtsVoiceKey?,
+    ): TtsVoiceResolution? {
+        if (tts.setAudioAttributes(speechAudioAttributes) != TextToSpeech.SUCCESS) return null
+        val configuredLocales = appContext.resources.configuration.locales
+        val locale = if (configuredLocales.isEmpty) Locale.getDefault() else configuredLocales[0]
+        val voices = tts.voices.orEmpty().toList()
+        val resolution = resolveVoiceSelection(enginePackage, locale, voices, requestedVoice)
+        val preferred = resolution.preferredVoice
+        val appliedVoice =
+            preferred?.takeIf { tts.setVoice(it) == TextToSpeech.SUCCESS }
+                ?: offlineVoiceCandidates(locale, voices)
+                    .asSequence()
+                    .filterNot { it == preferred }
+                    .firstOrNull { tts.setVoice(it) == TextToSpeech.SUCCESS }
+        val effective =
+            (appliedVoice ?: tts.voice?.takeIf { it.isOfflineInstalledFor(locale) })
+                ?.toVoiceKey(enginePackage)
+        return resolution.copy(effectiveKey = effective)
     }
 
     private fun List<TextToSpeech.EngineInfo>.toTtsEngineInfos(): List<TtsEngineInfo> =
@@ -306,16 +365,85 @@ class TtsEngineResolver(
             voices: Collection<Voice>,
         ): Voice = offlineVoiceCandidates(currentVoice, voices).firstOrNull() ?: currentVoice
 
+        /** Uses the framework's current locale for the established fallback path. */
         fun offlineVoiceCandidates(
             currentVoice: Voice,
+            voices: Collection<Voice>,
+        ): List<Voice> = offlineVoiceCandidates(currentVoice.locale, voices)
+
+        /** Orders installed offline candidates deterministically for an utterance locale. */
+        internal fun offlineVoiceCandidates(
+            locale: Locale,
             voices: Collection<Voice>,
         ): List<Voice> =
             voices
                 .filter { voice ->
-                    !voice.isNetworkConnectionRequired &&
+                    voice.name.isNotBlank() &&
+                        !voice.isNetworkConnectionRequired &&
                         !voice.features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) &&
-                        voice.locale.language == currentVoice.locale.language
-                }.sortedByDescending { it.quality }
+                        voice.locale.language == locale.language
+                }.sortedWith(
+                    compareByDescending<Voice> { it.quality }
+                        .thenBy { it.name }
+                        .thenBy { it.locale.toLanguageTag() },
+                )
+
+        /** Resolves only an exact, unique, installed offline key for this engine and language. */
+        internal fun resolveVoiceSelection(
+            enginePackage: String,
+            locale: Locale,
+            voices: Collection<Voice>,
+            requestedKey: TtsVoiceKey?,
+        ): TtsVoiceResolution {
+            val sameLanguage = voices.filter { it.locale.language == locale.language }
+            val keyCounts = sameLanguage.groupingBy { it.toVoiceKey(enginePackage) }.eachCount()
+            val options =
+                sameLanguage
+                    .map { voice ->
+                        val key = voice.toVoiceKey(enginePackage)
+                        val unavailableReason =
+                            when {
+                                voice.name.isBlank() -> TtsVoiceUnavailableReason.InvalidIdentity
+                                voice.features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) ->
+                                    TtsVoiceUnavailableReason.NotInstalled
+                                voice.isNetworkConnectionRequired -> TtsVoiceUnavailableReason.RequiresNetwork
+                                keyCounts[key] != 1 -> TtsVoiceUnavailableReason.Ambiguous
+                                else -> null
+                            }
+                        TtsVoiceOption(
+                            key,
+                            voice.name.ifBlank { voice.locale.toLanguageTag() },
+                            voice.locale.toLanguageTag(),
+                            unavailableReason,
+                        )
+                    }.sortedWith(compareBy<TtsVoiceOption> { it.localeTag }.thenBy { it.label })
+            val preferred =
+                requestedKey
+                    ?.takeIf { it.enginePackage == enginePackage }
+                    ?.takeIf { exact -> keyCounts[exact] == 1 }
+                    ?.let { exact ->
+                        sameLanguage.singleOrNull { voice ->
+                            voice.toVoiceKey(enginePackage) == exact && voice.isOfflineInstalledFor(locale)
+                        }
+                    }
+            return TtsVoiceResolution(
+                localeTag = locale.toLanguageTag(),
+                options = options,
+                requestedKey = requestedKey,
+                effectiveKey = null,
+                preferredVoice = preferred,
+            )
+        }
+
+        /** Converts framework identity into the exact persisted three-part key. */
+        private fun Voice.toVoiceKey(enginePackage: String) = TtsVoiceKey(enginePackage, name, locale.toLanguageTag())
+
+        /** Enforces language, installation, and network invariants together. */
+        private fun Voice.isOfflineInstalledFor(locale: Locale): Boolean =
+            name.isNotBlank() &&
+                this.locale.language == locale.language &&
+                !isNetworkConnectionRequired &&
+                !features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)
 
         const val TTS_INIT_TIMEOUT_MS = 30_000L
     }
