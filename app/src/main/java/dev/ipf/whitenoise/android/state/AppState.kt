@@ -263,18 +263,6 @@ internal suspend fun resolveNotificationPreviewText(
     ).text.takeIf { it.isNotBlank() }
 }
 
-internal fun accountSummariesWithCreatedIdentity(
-    current: List<AccountSummaryFfi>,
-    created: AccountSummaryFfi,
-): List<AccountSummaryFfi> {
-    val existingIndex =
-        current.indexOfFirst {
-            it.label == created.label || it.accountIdHex.equals(created.accountIdHex, ignoreCase = true)
-        }
-    if (existingIndex < 0) return current + created
-    return current.toMutableList().also { it[existingIndex] = created }
-}
-
 internal data class ProfileGroupInviteOutcome(
     val attempted: Int,
     val failures: Int,
@@ -483,16 +471,6 @@ private data class NotificationSystemText(
     val title: String?,
     val body: String,
 )
-
-internal fun shouldAcceptMediaUploadForAccount(
-    conversationAccountRef: String?,
-    capturedMediaUploadSessionEpoch: Int,
-    activeAccountRef: String?,
-    currentMediaUploadSessionEpoch: Int,
-): Boolean =
-    conversationAccountRef != null &&
-        conversationAccountRef == activeAccountRef &&
-        capturedMediaUploadSessionEpoch == currentMediaUploadSessionEpoch
 
 internal data class ConversationNotificationTarget(
     val accountRef: String,
@@ -1338,6 +1316,7 @@ class WhiteNoiseAppState private constructor(
      * unique `messageIdHex`. Lives here (not on the per-conversation
      * controller) so re-opening a chat doesn't re-download media already
      * fetched this session. Bounded in bytes; see [dev.ipf.whitenoise.android.media.ByteSizeLruCache].
+     * staleness-exempt: this observable cache-mutation version is consumed by attachment UI.
      */
     private val mediaCacheRevisionState = MutableStateFlow(0L)
     internal val mediaCacheRevision: StateFlow<Long> = mediaCacheRevisionState.asStateFlow()
@@ -1453,7 +1432,7 @@ class WhiteNoiseAppState private constructor(
     private var startupMemberDerivedLocalRecorded = false
     private var startupFirstLocalFrameRecorded = false
     private var startupRelayCatchUpRecorded = false
-    private var accountListRevision = 0L
+    private val accountListLifetime = StalenessGuard()
     private var pendingStartupUnreadRefresh: StartupUnreadRefresh? = null
 
     @Volatile
@@ -1914,6 +1893,8 @@ class WhiteNoiseAppState private constructor(
 
     var transientNotice by mutableStateOf<TransientNotice?>(null)
         private set
+
+    // staleness-exempt: monotonically unique notice identity, not an async publication fence.
     private var transientNoticeSequence = 0L
 
     var pendingProfileNpub by mutableStateOf<String?>(null)
@@ -1931,6 +1912,7 @@ class WhiteNoiseAppState private constructor(
     var pendingProfileFromDiscovery by mutableStateOf(false)
         private set
 
+    // staleness-exempt: observable relationship version consumed as a Compose key.
     var relationshipRevision by mutableLongStateOf(0L)
         private set
 
@@ -1943,6 +1925,7 @@ class WhiteNoiseAppState private constructor(
     var auditLogSettings by mutableStateOf<AuditLogSettingsFfi?>(null)
         private set
 
+    // staleness-exempt: observable process identity serialized through destructive-wipe state transitions.
     var runtimeGeneration by mutableIntStateOf(0)
         private set
 
@@ -1975,9 +1958,13 @@ class WhiteNoiseAppState private constructor(
             registry = accountScopedCaches,
             maxEntries = BoundedNpubCache.DEFAULT_MAX_ENTRIES,
         )
+
+    // staleness-exempt: observable profile versions invalidate narrowly keyed Compose projections.
     private var profileRevision by mutableIntStateOf(0)
     private var contactNicknameRevision by mutableIntStateOf(0)
     private var profileAccountRevisionEpoch by mutableIntStateOf(0)
+
+    // staleness-exempt: bounded per-account ordering value, not an async publication guard.
     private var profileAccountRevisionSequence = 0
     private val profileAccountRevisions = mutableStateMapOf<String, Int>()
     private val profileAccountRevisionOrder = linkedSetOf<String>()
@@ -2132,10 +2119,14 @@ class WhiteNoiseAppState private constructor(
     // `failed` before the user has a chance to see the media.
     private val attachmentDownloadGate = AttachmentDownloadGate()
     private val attachmentDownloadIntents = AttachmentDownloadIntentStore(preferences)
+
+    // staleness-exempt: observable preference version consumed as a Compose key.
     private var attachmentDownloadPolicyRevision by mutableIntStateOf(0)
     private val conversationStateRetention = ConversationStateRetention(MAX_RETAINED_CONVERSATION_STATES)
 
     val shareStaging: ShareStagingStore = ShareStagingStore()
+
+    // staleness-exempt: observable draft version combined into the composer revision.
     private var draftHydrationRevision by mutableIntStateOf(0)
 
     /** Changes when content is staged so an already-open chat consumes repeat shares. */
@@ -2254,12 +2245,8 @@ class WhiteNoiseAppState private constructor(
     // in-flight profile refresh captures it at start and discards its result if
     // the epoch moved, so a job that resolves after a switch can't write the
     // old account's data back into the just-cleared caches.
-    private val profileCacheEpoch =
-        java.util.concurrent.atomic
-            .AtomicInteger(0)
-    private val mediaUploadSessionEpoch =
-        java.util.concurrent.atomic
-            .AtomicInteger(0)
+    private val profileCacheLifetime = StalenessGuard()
+    private val mediaUploadSessionLifetime = StalenessGuard()
     private val notificationJob = NotificationJobSlot()
     private val notificationReconnectJob = NotificationJobSlot()
     private val pushWakeCatchUpDrainJob = NotificationJobSlot()
@@ -2270,9 +2257,10 @@ class WhiteNoiseAppState private constructor(
     private val notificationReceiverActive = MutableStateFlow(false)
     private val notificationReceiverRetryWake = MutableStateFlow(0L)
 
+    // staleness-exempt: ordered notification-drain watermark emitted as data to a SharedFlow.
     private val notificationDrainSequence = AtomicLong(0)
-    private val notificationRuntimeRecoveryGeneration = AtomicLong(0)
-    private val notificationPostEpoch = NotificationPostEpoch()
+    private val notificationRuntimeRecovery = StalenessGuard()
+    private val notificationPostEpoch = StalenessGuard()
     private val notificationDrainSignals = MutableSharedFlow<Long>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     // Coalesces per-account unread refreshes across a notification burst so a
@@ -2659,7 +2647,8 @@ class WhiteNoiseAppState private constructor(
             activeUploadKeysByConversation.getOrPut(key) { mutableSetOf() }
         }
 
-    internal fun mediaUploadSessionEpoch(): Int = mediaUploadSessionEpoch.get()
+    /** Captures the account-scoped media-upload lifetime for a suspended send. */
+    internal fun mediaUploadSessionEpoch(): Long = mediaUploadSessionLifetime.capture()
 
     internal suspend fun trackInFlightMediaUpload(
         accountRef: String?,
@@ -2792,11 +2781,12 @@ class WhiteNoiseAppState private constructor(
         runtimeGeneration = state.runtimeGeneration
     }
 
+    /** Fences runtime recovery and drains account subscriptions before the destructive engine wipe. */
     private suspend fun prepareForDestructiveAccountWipe(accountRef: String): Boolean {
         // Fence any foreground-service retry that was captured before this
         // destructive teardown. The wipe/restore path owns listener restart;
         // a delayed service retry must not reinstall work across that boundary.
-        notificationRuntimeRecoveryGeneration.incrementAndGet()
+        notificationRuntimeRecovery.advance()
         networkNotificationRecoverySuppressed = true
         val restartNotifications =
             backgroundConnectionEnabled ||
@@ -3478,7 +3468,7 @@ class WhiteNoiseAppState private constructor(
         AccountCatchUpKey(
             accountRef = activeAccountRef,
             runtimeGeneration = runtimeGeneration,
-            networkGeneration = connectivityNetworkGeneration.get(),
+            networkGeneration = connectivitySignalOwner.captureNetworkGeneration(),
             readinessToken = readinessToken,
         ).let { key ->
             accountCatchUpCoordinator.launch(key) {
@@ -3487,7 +3477,7 @@ class WhiteNoiseAppState private constructor(
                 succeeded &&
                     activeAccountRef == key.accountRef &&
                     runtimeGeneration == key.runtimeGeneration &&
-                    connectivityNetworkGeneration.get() == key.networkGeneration
+                    connectivitySignalOwner.isNetworkGenerationCurrent(key.networkGeneration)
             }
         }
 
@@ -4035,10 +4025,12 @@ class WhiteNoiseAppState private constructor(
         drainPendingPushWakeCatchUpIfNeeded()
     }
 
-    internal fun notificationRuntimeRecoveryGeneration(): Long = notificationRuntimeRecoveryGeneration.get()
+    /** Captures the active notification-runtime recovery lifetime. */
+    internal fun notificationRuntimeRecoveryGeneration(): Long = notificationRuntimeRecovery.capture()
 
+    /** Reports whether a reconnect recovery may still start notification work. */
     internal fun notificationRuntimeRecoveryAllowed(generation: Long): Boolean =
-        !networkNotificationRecoverySuppressed && notificationRuntimeRecoveryGeneration.get() == generation
+        !networkNotificationRecoverySuppressed && notificationRuntimeRecovery.isCurrent(generation)
 
     private suspend fun ensureNotificationReceiverForNetworkReconnect(): Boolean {
         if (!bootstrapCompleted) bootstrap()
@@ -4111,13 +4103,15 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Activates a newly created identity and invalidates older account-list reads atomically. */
     private fun activateCreatedIdentity(summary: AccountSummaryFfi) {
         if (summary.label != activeAccountRef) {
             clearInMemoryMediaCaches()
             clearCrossAccountCaches()
         }
-        accounts = accountSummariesWithCreatedIdentity(accounts, summary)
-        accountListRevision += 1L
+        accountListLifetime.advance {
+            accounts = accountSummariesWithCreatedIdentity(accounts, summary)
+        }
         activeAccountRef = summary.label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, summary.label).apply()
         localNotificationSettings = null
@@ -4324,7 +4318,9 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Publishes the newest engine account snapshot and rejects older list reads. */
     private suspend fun refreshAccountSnapshot(): List<AccountSummaryFfi> {
+        val requestToken = accountListLifetime.advance()
         val refreshedAccounts = marmotIo { listAccounts() }
         val bubbleColorMigrationSucceeded =
             withContext(Dispatchers.IO) {
@@ -4339,17 +4335,22 @@ class WhiteNoiseAppState private constructor(
             // in this process instead of waiting for a restart.
             globalBubbleColors.clear()
         }
-        accounts = refreshedAccounts
-        accountListRevision += 1L
-        releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
-        return refreshedAccounts
+        var publishedAccounts = accounts
+        accountListLifetime.runIfCurrent(requestToken) {
+            accounts = refreshedAccounts
+            releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
+            publishedAccounts = refreshedAccounts
+        }
+        return publishedAccounts
     }
 
+    /** Publishes the newest account snapshot, then refreshes unread state for that accepted set. */
     suspend fun refreshAccounts() {
         val refreshedAccounts = refreshAccountSnapshot()
         refreshAccountUnreadCounts(refreshedAccounts)
     }
 
+    /** Rebuilds the account list after sign-out without allowing an earlier refresh to restore it. */
     private suspend fun accountsAfterSignOut(
         signedOutRef: String,
         engineCompleted: Boolean,
@@ -4362,8 +4363,9 @@ class WhiteNoiseAppState private constructor(
                 appStateDebug(failure) { "post-sign-out account refresh failed; reconciling cached accounts" }
             }.getOrElse {
                 if (engineCompleted) {
-                    accounts = reconcileCachedAccountsAfterSignOut(accounts, signedOutRef)
-                    accountListRevision += 1L
+                    accountListLifetime.advance {
+                        accounts = reconcileCachedAccountsAfterSignOut(accounts, signedOutRef)
+                    }
                 }
                 accounts
             }
@@ -4415,18 +4417,19 @@ class WhiteNoiseAppState private constructor(
         "ReturnCount", // Empty, stale-empty, and stale-in-flight snapshots each stop before publishing.
         "CyclomaticComplexMethod", // Raw and roster-aware paths deliberately share one guarded publication point.
     )
+    /** Refreshes unread projections only while the captured account list remains current. */
     private suspend fun refreshAccountUnreadCounts(
         accountSummaries: List<AccountSummaryFfi> = accounts,
         loadMemberRosters: Boolean = true,
         stillCurrent: () -> Boolean = { true },
     ) {
         if (!stillCurrent()) return
-        val accountListRevisionAtStart = accountListRevision
+        val accountListTokenAtStart = accountListLifetime.capture()
         val refreshGeneration = accountUnreadStore.beginRefresh()
 
         fun refreshIsCurrent(): Boolean =
             stillCurrent() &&
-                accountListRevision == accountListRevisionAtStart &&
+                accountListLifetime.isCurrent(accountListTokenAtStart) &&
                 accountUnreadStore.isRefreshCurrent(refreshGeneration)
 
         val signingAccounts = accountSummaries.filter { it.isSignedInSigningAccount() }
@@ -4970,11 +4973,12 @@ class WhiteNoiseAppState private constructor(
         appStateDebug { "account-switch first-local-frame +${elapsedMs}ms rows=$rowCount" }
     }
 
+    /** Starts startup unread reconciliation under the current account-list lifetime. */
     private fun prepareStartupUnreadRefresh(accountSummaries: List<AccountSummaryFfi>) {
         pendingStartupUnreadRefresh =
             StartupUnreadRefresh(
                 accounts = accountSummaries,
-                accountListRevision = accountListRevision,
+                accountListRevision = accountListLifetime.capture(),
             )
     }
 
@@ -4986,15 +4990,13 @@ class WhiteNoiseAppState private constructor(
         }
         val pending = pendingStartupUnreadRefresh ?: return
         pendingStartupUnreadRefresh = null
-        val revisionGuard =
-            StartupUnreadRevisionGuard(pending.accountListRevision) {
-                accountListRevision
-            }
+        val accountListToken = pending.accountListRevision
+        val accountListIsCurrent = { accountListLifetime.isCurrent(accountListToken) }
         mutationsScope.launch {
             startupPerformance.stage(PerformancePhase.UNREAD_AGGREGATE_REFRESH) {
-                refreshAccountUnreadCounts(pending.accounts, stillCurrent = revisionGuard::isCurrent)
+                refreshAccountUnreadCounts(pending.accounts, stillCurrent = accountListIsCurrent)
             }
-            if (revisionGuard.isCurrent()) {
+            if (accountListIsCurrent()) {
                 startupPerformance.record(PerformancePhase.UNREAD_AGGREGATE_READY)
             }
         }
@@ -5027,7 +5029,7 @@ class WhiteNoiseAppState private constructor(
         mediaThumbnailCache.clear()
         bumpMediaCacheRevision()
         MediaInventory.clear()
-        mediaUploadSessionEpoch.incrementAndGet()
+        mediaUploadSessionLifetime.advance()
         // Uploads run on the app-lifetime mutation scope so they can survive
         // conversation-screen disposal. Account switch/sign-out is different:
         // cancel those old-account sends before dropping the retained bytes so
@@ -5191,7 +5193,7 @@ class WhiteNoiseAppState private constructor(
      */
     private fun clearCrossAccountCaches() {
         assertMainThread { "clearCrossAccountCaches" }
-        profileCacheEpoch.incrementAndGet()
+        profileCacheLifetime.advance()
         accountScopedCaches.clearAll()
         authoritativeMuteOverrides.clear()
         pendingMuteCommands.clear()
@@ -5349,9 +5351,10 @@ class WhiteNoiseAppState private constructor(
                 }
             }
             val refreshedAccounts = runCatchingCancellable { marmotIo { listAccounts() } }.getOrDefault(emptyList())
-            accounts = refreshedAccounts
-            accountListRevision += 1L
-            releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
+            accountListLifetime.advance {
+                accounts = refreshedAccounts
+                releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
+            }
             refreshAccountUnreadCounts(refreshedAccounts)
             val next = refreshedAccounts.firstOrNull()?.label
             activeAccountRef = next
@@ -6547,7 +6550,6 @@ class WhiteNoiseAppState private constructor(
      */
     private val connectivitySignalOwner = ConnectivitySignalOwner()
     val connectivitySignals = connectivitySignalOwner.signals
-    private val connectivityNetworkGeneration = connectivitySignalOwner.networkGeneration
 
     private fun updateConnectivitySignals(
         hasValidatedInternet: Boolean? = null,
@@ -6565,11 +6567,11 @@ class WhiteNoiseAppState private constructor(
         // Offline needs no sample: the write clamp already pinned the signal
         // false, and pool counts read while offline are stale by definition.
         if (!appInForeground || !connectivitySignals.value.hasValidatedInternet) return
-        val generation = connectivityNetworkGeneration.get()
+        val generation = connectivitySignalOwner.captureNetworkGeneration()
         val health = runCatchingCancellable { marmotIo { relayHealth() } }.getOrNull()
         // A snapshot that straddled a network transition describes the wrong
         // network; drop it — the next poll is ≤2s out.
-        if (health == null || connectivityNetworkGeneration.get() != generation) return
+        if (health == null || !connectivitySignalOwner.isNetworkGenerationCurrent(generation)) return
         updateConnectivitySignals(
             relaysConnected =
                 relaysConnectedFromHealth(
@@ -8145,6 +8147,7 @@ class WhiteNoiseAppState private constructor(
         requestProfile(id)
     }
 
+    /** Starts a latest-wins profile refresh for one account presentation. */
     fun requestProfile(accountIdHex: String) {
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
         // Always materialize the local SQLite record independently of relay freshness.
@@ -8155,7 +8158,7 @@ class WhiteNoiseAppState private constructor(
         // sign-out can clear the caches in the gap before this coroutine starts,
         // so the staleness check must compare against the epoch at request time,
         // not whatever it has become by the time the body runs.
-        val requestEpoch = profileCacheEpoch.get()
+        val requestEpoch = profileCacheLifetime.capture()
         profileScope.launch {
             profileRefreshFanoutGate.withPermit {
                 refreshProfile(id, requestEpoch)
@@ -8266,9 +8269,10 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Publishes refreshed profile data only inside the active account-cache lifetime. */
     suspend fun refreshProfile(
         accountIdHex: String,
-        epoch: Int = profileCacheEpoch.get(),
+        epoch: Long = profileCacheLifetime.capture(),
     ) {
         val profile =
             try {
@@ -8318,7 +8322,7 @@ class WhiteNoiseAppState private constructor(
             // while this refresh was in flight, so we don't repopulate them with
             // the previous account's data.
             withContext(Dispatchers.Main.immediate) {
-                if (profileCacheEpoch.get() == epoch) {
+                if (profileCacheLifetime.isCurrent(epoch)) {
                     val current =
                         synchronized(profilePresentationLock) {
                             profilePresentations[accountIdHex] ?: ProfilePresentation.Empty
@@ -9382,6 +9386,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Posts and enriches one update under a foreground/app-lock eligibility epoch. */
     private suspend fun processNotificationUpdate(update: NotificationUpdateFfi) {
         val receivedAtElapsedMs = SystemClock.elapsedRealtime()
         appStateDebug { "notification timing stage=subscription-received elapsed_ms=0 outcome=observed" }
@@ -9630,10 +9635,10 @@ class WhiteNoiseAppState private constructor(
      * every caller shares the same in-flight local read.
      */
     private suspend fun materializeProfileLocally(id: String) {
-        val epoch = profileCacheEpoch.get()
+        val epoch = profileCacheLifetime.capture()
         val seed = loadAccountSwitchProfileSeed(id)
         withContext(Dispatchers.Main.immediate) {
-            if (profileCacheEpoch.get() == epoch) {
+            if (profileCacheLifetime.isCurrent(epoch)) {
                 applyAccountSwitchProfileSeed(seed)
             }
         }
@@ -9850,11 +9855,6 @@ internal suspend fun awaitBootstrapAttempt(
         attempt.await()
         true
     } ?: false
-
-internal fun startupUnreadRefreshIsCurrent(
-    expectedRevision: Long,
-    currentRevision: Long,
-): Boolean = expectedRevision == currentRevision
 
 private const val BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS = 15_000L
 

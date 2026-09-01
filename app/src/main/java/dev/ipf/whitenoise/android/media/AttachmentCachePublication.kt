@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.media
 
 import androidx.annotation.VisibleForTesting
+import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -23,8 +24,7 @@ internal object AttachmentCachePublication {
     private val tmpCounter = AtomicLong()
     private val stripes = Array(STRIPE_COUNT) { Stripe() }
 
-    @Volatile
-    private var wipeGeneration = 0
+    private val wipeLifetime = StalenessGuard()
 
     @Volatile
     private var wipesInProgress = 0
@@ -42,18 +42,19 @@ internal object AttachmentCachePublication {
     var deleteFileForTests: ((File) -> Boolean)? = null
 
     data class Permit(
-        val wipeGeneration: Int,
-        val stripeGeneration: Int,
+        val wipeGeneration: Long,
+        val stripeGeneration: Long,
     )
 
     private class Stripe {
-        var generation = 0
+        val lifetime = StalenessGuard()
         var invalidatingCount = 0
     }
 
+    /** Opens a process-wide wipe fence before any cache files are removed. */
     @Synchronized
     fun onWipeStarted() {
-        wipeGeneration++
+        wipeLifetime.advance()
         wipesInProgress++
     }
 
@@ -82,7 +83,7 @@ internal object AttachmentCachePublication {
             synchronized(this) {
                 if (wipesInProgress > 0) return null
                 if (stripe.invalidatingCount > 0) return null
-                return Permit(wipeGeneration, stripe.generation)
+                return Permit(wipeLifetime.capture(), stripe.lifetime.capture())
             }
         }
     }
@@ -137,27 +138,32 @@ internal object AttachmentCachePublication {
             val stripe = stripeFor(attachmentKey)
             val published =
                 synchronized(stripe) {
-                    if (!permitStillValid(stripe, permit)) {
-                        runCatching { tmp.delete() }
-                        return@synchronized false
-                    }
-                    val renamed =
-                        try {
-                            renameFileForTests?.invoke(tmp, finalFile) ?: tmp.renameTo(finalFile)
-                        } catch (throwable: Throwable) {
+                    var accepted = false
+                    wipeLifetime.runIfCurrent(permit.wipeGeneration) {
+                        if (!permitStillValid(stripe, permit)) {
                             runCatching { tmp.delete() }
-                            throw IOException("failed to publish attachment cache ${finalFile.name}", throwable)
+                            return@runIfCurrent
                         }
-                    if (!renamed) {
-                        runCatching { tmp.delete() }
-                        if (!permitStillValid(stripe, permit)) return@synchronized false
-                        throw IOException("failed to publish attachment cache ${finalFile.name}")
+                        val renamed =
+                            try {
+                                renameFileForTests?.invoke(tmp, finalFile) ?: tmp.renameTo(finalFile)
+                            } catch (throwable: Throwable) {
+                                runCatching { tmp.delete() }
+                                throw IOException("failed to publish attachment cache ${finalFile.name}", throwable)
+                            }
+                        if (!renamed) {
+                            runCatching { tmp.delete() }
+                            if (!permitStillValid(stripe, permit)) return@runIfCurrent
+                            throw IOException("failed to publish attachment cache ${finalFile.name}")
+                        }
+                        if (!permitStillValid(stripe, permit)) {
+                            deleteFinalFile(finalFile)
+                            return@runIfCurrent
+                        }
+                        accepted = true
                     }
-                    if (!permitStillValid(stripe, permit)) {
-                        deleteFinalFile(finalFile)
-                        return@synchronized false
-                    }
-                    true
+                    if (!accepted) runCatching { tmp.delete() }
+                    accepted
                 }
             if (published) AttachmentPlaintextCache.onPublished(finalFile)
             published
@@ -179,6 +185,7 @@ internal object AttachmentCachePublication {
             publishSourceWithPermit(attachmentKey, finalFile, source, permit)
         }
 
+    /** Invalidates one stripe around plaintext eviction and final-file deletion. */
     @Throws(IOException::class)
     suspend fun invalidateAttachmentCache(
         attachmentKey: String,
@@ -191,7 +198,7 @@ internal object AttachmentCachePublication {
         withContext(Dispatchers.IO) {
             synchronized(stripe) {
                 stripe.invalidatingCount++
-                stripe.generation++
+                stripe.lifetime.advance()
                 try {
                     deleteFinalFile(finalFile)
                 } catch (e: IOException) {
@@ -210,7 +217,7 @@ internal object AttachmentCachePublication {
             } finally {
                 synchronized(stripe) {
                     try {
-                        stripe.generation++
+                        stripe.lifetime.advance()
                         deleteFinalFile(finalFile)
                     } catch (e: IOException) {
                         if (deleteError == null) deleteError = e
@@ -224,6 +231,7 @@ internal object AttachmentCachePublication {
         evictionError?.let { throw it }
     }
 
+    /** Creates the temp-file parent only while both captured publication lifetimes remain current. */
     private fun prepareParentForTempWrite(
         attachmentKey: String,
         finalFile: File,
@@ -238,6 +246,7 @@ internal object AttachmentCachePublication {
         }
     }
 
+    /** Removes a final plaintext file or reports an IO failure without an exists/delete race. */
     @Throws(IOException::class)
     private fun deleteFinalFile(finalFile: File) {
         // delete() first, then treat an already-gone file as success — avoids the
@@ -253,12 +262,13 @@ internal object AttachmentCachePublication {
         }
     }
 
+    /** Verifies that neither a wipe nor same-stripe invalidation superseded [permit]. */
     private fun permitStillValid(
         stripe: Stripe,
         permit: Permit,
     ): Boolean =
-        permit.wipeGeneration == wipeGeneration &&
-            permit.stripeGeneration == stripe.generation &&
+        wipeLifetime.isCurrent(permit.wipeGeneration) &&
+            stripe.lifetime.isCurrent(permit.stripeGeneration) &&
             stripe.invalidatingCount == 0
 
     /** Exposes deterministic stripe selection for concurrency regression tests. */

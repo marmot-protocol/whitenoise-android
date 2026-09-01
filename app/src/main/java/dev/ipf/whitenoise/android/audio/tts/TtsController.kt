@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.audio.tts
 
 import android.os.SystemClock
 import android.speech.tts.TextToSpeech
+import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.flow.StateFlow
 import java.util.Locale
 
@@ -71,13 +72,13 @@ class TtsController internal constructor(
     // only closed by the NEXT utterance's onStart. Clearing it alongside
     // activeTiming would refuse every gap there is.
     //
-    // engineEpoch counts engine-queue replacements. The queue stops and
+    // engineQueueLifetime counts engine-queue replacements. The queue stops and
     // re-enqueues the engine on every disruptive path - start, pause, stop,
     // failure, and every requeue, which is also how a speech-rate change lands
     // - and it advances its own generation on exactly those paths. So an
     // opener stamped with the epoch its utterance was submitted under is
     // rejected by a single equality if anything replaced the queue in between.
-    private var engineEpoch = 0L
+    private val engineQueueLifetime = StalenessGuard()
     private var gapOpener: TtsPaceGapOpener? = null
     private var engineHasSpoken = false
     private var bootstrapRetired = false
@@ -107,7 +108,7 @@ class TtsController internal constructor(
                 // bootstrapRetired survive too: the voice does not go cold
                 // again because a session ended, and re-colding it here would
                 // refuse the only gap a two-sentence message produces.
-                engineEpoch += 1
+                engineQueueLifetime.advance()
                 engine?.stop()
             },
             enqueue = { chunk, utteranceId ->
@@ -361,13 +362,15 @@ class TtsController internal constructor(
         }
     }
 
+    /** Loads the calibrated pace for the active engine voice, falling back to the safe default. */
     private fun storedPace(): Double {
         val stored = timingStore?.msPerUnitAt1x(engineKey)
         return stored ?: TtsWordTimingEstimate.DEFAULT_MS_PER_UNIT_AT_1X
     }
 
+    /** Starts a new engine-queue lifetime and clears voice-specific pace evidence. */
     private fun resetPaceMeasurement() {
-        engineEpoch += 1
+        engineQueueLifetime.advance()
         gapOpener = null
         engineHasSpoken = false
         bootstrapRetired = false
@@ -382,7 +385,7 @@ class TtsController internal constructor(
      */
     private fun closePaceGapOpener(completedChunkIndex: Int) {
         val opener = gapOpener ?: return
-        if (opener.epoch != engineEpoch || opener.chunkIndex != completedChunkIndex) return
+        if (!engineQueueLifetime.isCurrent(opener.epoch) || opener.chunkIndex != completedChunkIndex) return
         gapOpener = opener.copy(completed = true, chunkCountAtCompletion = state.value.chunkCount)
     }
 
@@ -402,7 +405,13 @@ class TtsController internal constructor(
         startingChunkIndex: Int,
         startingAtMs: Long,
     ) {
-        val outcome = ttsPaceOutcomeOf(gapOpener, engineEpoch, startingChunkIndex, startingAtMs)
+        val outcome =
+            ttsPaceOutcomeOf(
+                gapOpener,
+                engineQueueLifetime.capture(),
+                startingChunkIndex,
+                startingAtMs,
+            )
         val sample = (outcome as? TtsPaceOutcome.Measured)?.sample ?: return
         val bootstrapPace = paceCalibrator.msPerUnitAt1x
         if (!bootstrapRetired) paceCalibrator.reset(storedPace())
@@ -463,6 +472,7 @@ class TtsController internal constructor(
             onOwnerSurrender = ::pause,
         )
 
+    /** Accepts a current utterance start and opens its range and pace-measurement window. */
     @Synchronized
     private fun onStart(utteranceId: String?) {
         // The queue's validation gate: a stale or superseded utterance neither
@@ -475,7 +485,7 @@ class TtsController internal constructor(
         observePaceGap(chunk.index, startedAt)
         gapOpener =
             TtsPaceGapOpener(
-                epoch = engineEpoch,
+                epoch = engineQueueLifetime.capture(),
                 chunkIndex = chunk.index,
                 startedAtMs = startedAt,
                 rate = appliedRate,

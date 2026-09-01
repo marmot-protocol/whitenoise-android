@@ -10,7 +10,7 @@ import androidx.core.app.Person
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
-import dev.ipf.whitenoise.android.state.NotificationPostEpoch
+import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -333,10 +333,11 @@ class LocalNotificationReplyRaceTest {
         )
     }
 
+    /** Rejects a notification whose foreground-conversation eligibility changes during show. */
     @Test
     fun visibleConversationChangeAfterShowRegistrationPreventsThePost() {
         val presenter = LocalNotificationPresenter(context)
-        val postEpoch = NotificationPostEpoch()
+        val postEpoch = StalenessGuard()
         val capturedEpoch = postEpoch.capture()
         val showRegistered = CountDownLatch(1)
         val releaseShow = CountDownLatch(1)

@@ -2317,18 +2317,6 @@ internal class GroupRosterLoadTracker(
     }
 }
 
-internal class GroupRosterRefreshGeneration {
-    private var generation: Long = 0
-
-    fun begin(): Long = ++generation
-
-    fun invalidate() {
-        generation++
-    }
-
-    fun isCurrent(candidate: Long): Boolean = candidate == generation
-}
-
 internal enum class GroupRosterInvariant {
     GROUP_ID_MISMATCH,
     EMPTY_JOINED_ROSTER,
@@ -3037,6 +3025,8 @@ class ChatsController private constructor(
         private set
 
     private val retryLoadSignal = Channel<Unit>(Channel.CONFLATED)
+
+    // staleness-exempt: observable retry trigger consumed by the chat-list UI.
     var retryGeneration by mutableLongStateOf(0L)
         private set
     private var terminalLoadFailure = false
@@ -3069,14 +3059,16 @@ class ChatsController private constructor(
      * a group id is added, removed, or replaced by snapshot — not on in-place
      * row updates — so foreground provisional opens can reconcile against live
      * backing rows while [items] stays frozen behind an open conversation (#1729).
+     * staleness-exempt: this observable projection membership version is consumed by Compose.
      */
     var materializedGroupsRevision by mutableLongStateOf(0L)
         private set
 
-    /** Complete observable revision for on-demand projections such as the forward picker. */
+    /** Complete observable forward-picker revision; staleness-exempt: it is a Compose version. */
     var forwardTargetsRevision by mutableLongStateOf(0L)
         private set
 
+    // staleness-exempt: observable member projection version consumed by derived UI.
     var memberSnapshotsRevision by mutableLongStateOf(0L)
         private set
 
@@ -3412,6 +3404,8 @@ class ChatsController private constructor(
     // the order local/live activity is accepted. This is bounded to one scalar
     // per materialized row and cleared with the backing projection on bind.
     private val activitySequenceByGroup = mutableMapOf<String, ULong>()
+
+    // staleness-exempt: ordered activity tie-breaker, not an async publication fence.
     private var nextActivitySequence = 0uL
     private val optimisticChatListPreviewByGroup = mutableMapOf<String, OptimisticChatListPreviewState>()
     private val optimisticArchiveByGroup = mutableMapOf<String, OptimisticArchiveIntent>()
@@ -3499,13 +3493,21 @@ class ChatsController private constructor(
     // (account switch, sign-out, or re-bind), the captured epoch no
     // longer matches and the job drops its result instead of poisoning
     // the new account's cache with stale members.
-    private var bindEpoch: Long = 0L
+    private val bindLifetime = StalenessGuard()
+
+    /** Current account-binding token passed through projection helpers. */
+    private val bindEpoch: Long
+        get() = bindLifetime.capture()
 
     // Monotonically increments whenever a live group update invalidates member
     // freshness. Member-fetch jobs capture it and drop results that started
     // before a newer group-details update, so a stale in-flight roster cannot
     // overwrite an authoritative local mutation or live group-state change (#825).
-    private var memberCacheEpoch: Long = 0L
+    private val memberCacheLifetime = StalenessGuard()
+
+    /** Current authoritative member-cache token passed through loaders. */
+    private val memberCacheEpoch: Long
+        get() = memberCacheLifetime.capture()
     private var isCleared = false
 
     private val liveSubscriptionLock = Any()
@@ -3579,7 +3581,7 @@ class ChatsController private constructor(
             hasLoadedLocalSnapshot = accountRef == null
             resetBackingState()
         }
-        bindEpoch += 1L
+        bindLifetime.advance()
         connectionOwner.reset(accountRef, bindEpoch)
         recompute(scheduleBackgroundEnrichment = seededLocalSnapshot == null)
         error = null
@@ -3841,6 +3843,7 @@ class ChatsController private constructor(
         scheduleRecompute()
     }
 
+    /** Invalidates authoritative roster state while retaining display-only continuity. */
     private fun invalidateMemberCacheForGroup(groupIdHex: String) {
         val hasRetryScheduled = memberFetchRetryJobsByGroup[groupIdHex]?.isActive == true
         val hasSnapshot =
@@ -3858,7 +3861,7 @@ class ChatsController private constructor(
                 (groupIdHex to chatListMemberPresentation(members, activeAccountIdHex))
             memberCacheByGroup = memberCacheByGroup - groupIdHex
         }
-        memberCacheEpoch += 1L
+        memberCacheLifetime.advance()
     }
 
     private fun memberSnapshotNeedsFetch(groupIdHex: String): Boolean = !memberCacheByGroup.containsKey(groupIdHex)
@@ -4376,6 +4379,7 @@ class ChatsController private constructor(
         applyLocalGroupProjection(record, members)
     }
 
+    /** Applies a local group mutation and invalidates any older roster fetch. */
     private fun applyLocalGroupProjection(
         record: AppGroupRecordFfi,
         members: List<AppGroupMemberRecordFfi>?,
@@ -4384,7 +4388,7 @@ class ChatsController private constructor(
         val rowKey = chatRowKey(record.groupIdHex)
         if (groupRecordsById[record.groupIdHex] == null && !chatRowsByGroup.containsKey(rowKey)) return
         if (members != null) {
-            memberCacheEpoch += 1L
+            memberCacheLifetime.advance()
             presentationMembersByGroup = presentationMembersByGroup - record.groupIdHex
             cancelMemberSnapshotRetry(record.groupIdHex)
             memberFetchRetryBackoffTierByGroup.remove(record.groupIdHex)
@@ -5621,7 +5625,7 @@ class ChatsController private constructor(
     fun onCleared() {
         if (isCleared) return
         isCleared = true
-        bindEpoch += 1L
+        bindLifetime.advance()
         val jobToCancel =
             synchronized(liveSubscriptionLock) {
                 accountRef = null
@@ -5665,7 +5669,8 @@ class ChatsController private constructor(
         inFlightMediaKindResolves.clear()
     }
 
-    private fun isActiveBindEpoch(epoch: Long): Boolean = !isCleared && bindEpoch == epoch && accountRef != null
+    /** Checks that suspended work still belongs to the live account binding. */
+    private fun isActiveBindEpoch(epoch: Long): Boolean = !isCleared && bindLifetime.isCurrent(epoch) && accountRef != null
 
     private fun recompute(scheduleBackgroundEnrichment: Boolean = true) {
         if (isCleared) return
@@ -5755,6 +5760,7 @@ class ChatsController private constructor(
         schedulePendingMemberFetches(targets)
     }
 
+    /** Starts bounded roster reads stamped with both binding and cache lifetimes. */
     private fun schedulePendingMemberFetches(groupIds: Iterable<String> = chatRows.map { it.groupIdHex }) {
         val account = accountRef ?: return
         val epoch = bindEpoch
@@ -5804,7 +5810,7 @@ class ChatsController private constructor(
                     if (isActiveBindEpoch(epoch)) {
                         inFlightMemberFetches.remove(groupIdHex)
                         if (
-                            cacheEpoch != memberCacheEpoch &&
+                            !memberCacheLifetime.isCurrent(cacheEpoch) &&
                             memberSnapshotNeedsFetch(groupIdHex)
                         ) {
                             // The chat list can be hidden behind an open
@@ -5821,6 +5827,7 @@ class ChatsController private constructor(
         }
     }
 
+    /** Publishes a roster only while both its binding and invalidation tokens remain current. */
     private fun applyFetchedMemberSnapshot(
         groupIdHex: String,
         members: List<AppGroupMemberRecordFfi>,
@@ -5828,7 +5835,7 @@ class ChatsController private constructor(
         cacheEpoch: Long,
         scheduleRecomputeAfterPublish: Boolean = true,
     ) {
-        if (!isActiveBindEpoch(epoch) || cacheEpoch != memberCacheEpoch) return
+        if (!isActiveBindEpoch(epoch) || !memberCacheLifetime.isCurrent(cacheEpoch)) return
         val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
         val knownSelfRemoval = knownSelfRemovalFor(groupIdHex)
         val directConversationCandidate = directConversationCandidateFor(groupIdHex, members)
@@ -6367,18 +6374,18 @@ internal class OptimisticGroupRosterMutationTracker {
     var current by mutableStateOf<OptimisticGroupRosterMutation?>(null)
         private set
 
-    private var generation = 0L
+    private val mutations = StalenessGuard()
 
+    /** Projects [mutation] until its own completion, without clearing a newer mutation. */
     suspend fun <T> track(
         mutation: OptimisticGroupRosterMutation,
         block: suspend () -> T,
     ): T {
-        val token = ++generation
-        current = mutation
+        val token = mutations.advance { current = mutation }
         return try {
             block()
         } finally {
-            if (token == generation) current = null
+            mutations.runIfCurrent(token) { current = null }
         }
     }
 }
@@ -6560,11 +6567,11 @@ class ConversationController(
     internal val memberRosterState: GroupRosterLoadState
         get() = memberRosterLoadTracker.state
 
-    private val memberRosterRefreshGeneration = GroupRosterRefreshGeneration()
+    private val memberRosterRefreshGeneration = StalenessGuard()
 
     // Invalidated when a timeline page or live subscription batch lands so an
     // in-flight full-page refresh cannot clobber newer state (#1849).
-    private val timelineWindowGeneration = GroupRosterRefreshGeneration()
+    private val timelineWindowGeneration = StalenessGuard()
 
     // Authoritative local self-leave marker (issue #787). Short-lived lifecycle
     // state (lives only as long as this controller, never persisted —
@@ -6655,6 +6662,8 @@ class ConversationController(
     internal val errorEdge: ConversationLoadFailureEdge
         get() = conversationLoadFailureEdge(pageError != null, failedPageDirection)
     private val retryLoadSignal = Channel<Unit>(Channel.CONFLATED)
+
+    // staleness-exempt: observable retry trigger; nullable snapshots below retain its value.
     var retryGeneration by mutableLongStateOf(0L)
         private set
     private var terminalLoadFailure = false
@@ -6844,6 +6853,8 @@ class ConversationController(
     private val timelineSubscriptionActiveCallMutex = Mutex()
     private var groupStateSubscription: ConversationGroupStateSubscriptionHandle? = null
     private var startJob: Job? = null
+
+    // staleness-exempt: captured subscription-start token, not a counter owner.
     private var lastStartedGeneration: Long? = null
     private var conversationScope: CoroutineScope? = null
     private var accountTeardownRequested = false
@@ -6859,6 +6870,8 @@ class ConversationController(
     // are dropped wholesale when the toggle turns off. Bounded so a long-lived
     // agent-heavy conversation can't grow them without limit.
     private val streamDebugTimelineItems = linkedMapOf<String, TimelineMessage>()
+
+    // staleness-exempt: ordered synthetic debug-row identifier, not a latest-wins guard.
     private var streamDebugEventSequence: ULong = 0uL
 
     // Bounded LRU set: tombstones are capped so an agent-heavy conversation
@@ -10219,15 +10232,19 @@ class ConversationController(
      */
     var managementState by mutableStateOf<GroupManagementStateFfi?>(null)
         private set
+    private val managementStateLifetime = StalenessGuard()
 
+    /** Publishes only the newest management-capability request for this conversation. */
     suspend fun refreshManagementState() {
         val account = conversationAccountRef ?: return
+        val requestToken = managementStateLifetime.advance()
         runCatchingCancellable {
             appState.marmotIo { groupManagementState(account, group.groupIdHex) }
-        }.onSuccess { managementState = it }
-            .onFailure {
-                if (BuildConfig.DEBUG) Log.w("DMConversation", "management state refresh failed", it)
-            }
+        }.onSuccess { refreshed ->
+            managementStateLifetime.runIfCurrent(requestToken) { managementState = refreshed }
+        }.onFailure {
+            if (BuildConfig.DEBUG) Log.w("DMConversation", "management state refresh failed", it)
+        }
     }
 
     /** Install and require the lifecycle component in one admin commit. */
@@ -10717,11 +10734,12 @@ class ConversationController(
             }
         }
 
+    /** Replaces the timeline only when no newer page or live update superseded the read. */
     private suspend fun refreshCurrentTimeline(
         account: String,
         pageLoader: (suspend () -> TimelinePageFfi)? = null,
     ): List<String> {
-        val refreshGeneration = timelineWindowGeneration.begin()
+        val refreshGeneration = timelineWindowGeneration.advance()
         val page =
             pageLoader?.invoke()
                 ?: appState.marmotIo {
@@ -10829,12 +10847,13 @@ class ConversationController(
         durableStreamPositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
     }
 
+    /** Applies one timeline page and invalidates suspended whole-window refreshes. */
     private suspend fun applyTimelinePage(
         page: TimelinePageFfi,
         replaceWindow: Boolean,
         updatePagination: Boolean,
     ): List<String> {
-        timelineWindowGeneration.invalidate()
+        timelineWindowGeneration.advance()
         val pageMessages = page.messages
         if (replaceWindow) trimStateForWindowReplacement()
         pageMessages.forEach { record ->
@@ -10926,8 +10945,9 @@ class ConversationController(
         )
     }
 
+    /** Applies live timeline changes and invalidates suspended whole-window refreshes. */
     private fun applyTimelineChanges(changes: List<TimelineMessageChangeFfi>): List<String> {
-        timelineWindowGeneration.invalidate()
+        timelineWindowGeneration.advance()
         val displayedProjectedStreamItemIds =
             timelineItemsById.keys.filterTo(mutableSetOf()) { it.startsWith("stream:") }
         val removedIds =
@@ -12075,9 +12095,10 @@ class ConversationController(
         refreshMembers()
     }
 
+    /** Publishes the latest authoritative roster while rejecting older refresh completions. */
     private suspend fun refreshMembers(retryOnHydrationPending: Boolean = true) {
         val account = conversationAccountRef ?: return
-        val refreshGeneration = memberRosterRefreshGeneration.begin()
+        val refreshGeneration = memberRosterRefreshGeneration.advance()
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.STARTED)
         try {
             runCatchingCancellable {
@@ -12293,11 +12314,12 @@ class ConversationController(
         )
     }
 
+    /** Applies committed group details and invalidates any roster refresh launched earlier. */
     private fun applyMutationDetails(
         account: String,
         details: GroupDetailsFfi,
     ) {
-        memberRosterRefreshGeneration.invalidate()
+        memberRosterRefreshGeneration.advance()
         val applied = applyGroupDetails(account, details) ?: return
         appState.applyLocalGroupDetails(account, applied.group, applied.members)
     }

@@ -196,7 +196,7 @@ class NotificationNetworkReconnectCoverageTest {
         )
         assertTrue(
             "destructive teardown must invalidate captured service retries before suppression or suspension",
-            prepare.indexOf("notificationRuntimeRecoveryGeneration.incrementAndGet()") in 0 until
+            prepare.indexOf("notificationRuntimeRecovery.advance()") in 0 until
                 prepare.indexOf("networkNotificationRecoverySuppressed = true"),
         )
         assertTrue(
@@ -204,7 +204,7 @@ class NotificationNetworkReconnectCoverageTest {
             Regex(
                 """fun\s+notificationRuntimeRecoveryAllowed\(generation:\s*Long\):\s*Boolean\s*=\s*""" +
                     """!networkNotificationRecoverySuppressed\s*&&\s*""" +
-                    """notificationRuntimeRecoveryGeneration\.get\(\)\s*==\s*generation""",
+                    """notificationRuntimeRecovery\.isCurrent\(generation\)""",
             ).containsMatchIn(appState),
         )
         assertTrue(

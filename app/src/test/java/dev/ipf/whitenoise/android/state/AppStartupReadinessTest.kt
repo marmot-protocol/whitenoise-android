@@ -1,17 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
 class AppStartupReadinessTest {
-    @Test
-    fun staleBackgroundUnreadFoldCannotOverwriteANewerAccountList() {
-        assertTrue(startupUnreadRefreshIsCurrent(expectedRevision = 4L, currentRevision = 4L))
-        assertFalse(startupUnreadRefreshIsCurrent(expectedRevision = 4L, currentRevision = 5L))
-    }
-
+    /** Pins every startup unread publication to the current account-list lifetime. */
     @Test
     fun staleBackgroundUnreadFoldGuardsAllStatePublication() {
         val source = appStateSource()
@@ -96,8 +90,8 @@ class AppStartupReadinessTest {
                 recorder.indexOf("startupFirstLocalFrameRecorded = true"),
         )
         assertTrue("The deferred fold must survive screen disposal", recorder.contains("mutationsScope.launch"))
-        assertTrue(recorder.contains("StartupUnreadRevisionGuard"))
-        assertTrue(recorder.contains("revisionGuard::isCurrent"))
+        assertTrue(recorder.contains("accountListLifetime.isCurrent"))
+        assertTrue(recorder.contains("stillCurrent = accountListIsCurrent"))
     }
 
     private fun appStateSource(): String =

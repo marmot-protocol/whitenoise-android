@@ -11,6 +11,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * Session-level pagination behavior against the real controller, queue, and
@@ -325,6 +328,44 @@ class TtsHistorySessionTest {
             assertNull(harness.session.edgeState.value)
             assertEquals(listOf("m9"), harness.controller.queuedMessageIds())
             assertTrue(harness.controller.state.value is TtsState.Speaking)
+        }
+
+    /** Proves invalidation cannot replace the queue during accepted edge settlement. */
+    @Test
+    fun invalidationWaitsForAtomicEdgeSettlementBeforeReplacingTheQueue() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.loadTimeline("m2")
+            harness.pager.olderPages.addLast(listOf(harness.record("m1")))
+            harness.speakConversation("m2")
+            val invalidationEntered = CountDownLatch(1)
+            val invalidationFinished = CountDownLatch(1)
+            val executor = Executors.newSingleThreadExecutor()
+            try {
+                harness.session.settlementAwaiterForTests = {
+                    executor.submit {
+                        invalidationEntered.countDown()
+                        harness.session.onSessionCleared()
+                        harness.speakConversation("m9")
+                        invalidationFinished.countDown()
+                    }
+                    assertTrue(invalidationEntered.await(5, TimeUnit.SECONDS))
+                    assertFalse(
+                        "queue replacement must wait until accepted settlement finishes",
+                        invalidationFinished.await(100, TimeUnit.MILLISECONDS),
+                    )
+                }
+
+                harness.session.previousMessage()
+                advanceUntilIdle()
+                assertTrue(invalidationFinished.await(5, TimeUnit.SECONDS))
+
+                assertEquals(listOf("m9"), harness.controller.queuedMessageIds())
+                assertTrue(harness.controller.state.value is TtsState.Speaking)
+            } finally {
+                harness.session.settlementAwaiterForTests = null
+                executor.shutdownNow()
+            }
         }
 
     @Test

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import android.speech.tts.TextToSpeech
+import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -150,7 +151,13 @@ internal class TtsPlaybackQueue(
     private val messageSentenceCount: List<Int>
         get() = projection.messageSentenceCount
     private var currentIndex = 0
-    private var generation = 0L
+    private val playbackCallbacks = StalenessGuard()
+
+    /** Current utterance token embedded in platform callback identifiers. */
+    private val generation: Long
+        get() = playbackCallbacks.capture()
+
+    // staleness-exempt: observable progress version published to Compose state.
     private var messageProgressGeneration = 0L
     private var playbackSessionId: Long = 0L
     private var nextPlaybackSessionId: Long = 0L
@@ -166,6 +173,7 @@ internal class TtsPlaybackQueue(
     // was still in flight. Both are stamped rather than cleared: every reset
     // path advances the generation, so a late resolve is inert for the same
     // reason a stale utterance callback is.
+    // staleness-exempt: captured playback-guard tokens, not counter owners.
     private var edgeRequestGeneration: Long? = null
     private var parkedTerminalGeneration: Long? = null
     private val progress = TtsPlaybackProgress()
@@ -192,12 +200,13 @@ internal class TtsPlaybackQueue(
         if (_state.value is TtsState.Speaking) refreshAtNextBoundary = true
     }
 
+    /** Replaces playback with [messages] and starts a fresh callback lifetime. */
     fun start(
         messages: List<TtsQueuedMessage>,
         startSentenceIndex: Int = 0,
     ) {
         stopEngine()
-        generation += 1
+        playbackCallbacks.advance()
         messageProgressGeneration += 1
         playbackSessionId = nextPlaybackSessionId
         nextPlaybackSessionId += 1
@@ -292,10 +301,11 @@ internal class TtsPlaybackQueue(
         pauseAt(speaking.chunkIndex)
     }
 
+    /** Freezes playback at [chunkIndex] after invalidating callbacks from the stopped engine queue. */
     private fun pauseAt(chunkIndex: Int) {
         val frozenPassage = (_state.value as? TtsState.Speaking)?.passage
         stopEngine()
-        generation += 1
+        playbackCallbacks.advance()
         progress.clearSpokenPayloads()
         rangeTracker.clear()
         // Resume re-reads the rate per utterance anyway, a leaked flag would
@@ -344,9 +354,10 @@ internal class TtsPlaybackQueue(
         enqueueFromCurrentIndex()
     }
 
+    /** Clears the queue and makes every outstanding platform callback stale. */
     fun stop() {
         stopEngine()
-        generation += 1
+        playbackCallbacks.advance()
         rangeTracker.clear()
         messages = emptyList()
         projection = TtsQueueProjection.EMPTY
@@ -750,13 +761,15 @@ internal class TtsPlaybackQueue(
         }
     }
 
+    /** Stops the engine before publishing terminal completion caused by user navigation. */
     private fun completeThroughNavigation() {
         stopEngine()
         finishPlayback()
     }
 
+    /** Publishes terminal idle state after invalidating callbacks from the completed queue. */
     private fun finishPlayback() {
-        generation += 1
+        playbackCallbacks.advance()
         rangeTracker.clear()
         val completedCount = chunks.size
         val completedMessages = messages.size
@@ -785,6 +798,7 @@ internal class TtsPlaybackQueue(
         onTerminal()
     }
 
+    /** Publishes a terminal error and prevents the failed queue from reporting more progress. */
     private fun fail(
         error: TtsError,
         chunkIndex: Int,
@@ -797,7 +811,7 @@ internal class TtsPlaybackQueue(
         messageProgressFraction: Float = TtsMessageProgress.sentenceFallback(sentenceIndex, sentenceCount),
     ) {
         stopEngine()
-        generation += 1
+        playbackCallbacks.advance()
         rangeTracker.clear()
         messages = emptyList()
         projection = TtsQueueProjection.EMPTY
@@ -823,12 +837,13 @@ internal class TtsPlaybackQueue(
         onTerminal()
     }
 
+    /** Replaces pending engine utterances from [chunkIndex] under a new callback token. */
     private fun requeueFrom(
         index: Int,
         announcement: SenderAnnouncement,
     ) {
         stopEngine()
-        generation += 1
+        playbackCallbacks.advance()
         progress.clearSpokenPayloads()
         rangeTracker.clear()
         refreshAtNextBoundary = false
@@ -839,6 +854,7 @@ internal class TtsPlaybackQueue(
         enqueueFromCurrentIndex()
     }
 
+    /** Submits the current callback generation from the selected chunk through the queue tail. */
     private fun enqueueFromCurrentIndex() {
         if (chunks.isEmpty()) {
             _state.value = TtsState.Idle(sessionId = playbackSessionId)

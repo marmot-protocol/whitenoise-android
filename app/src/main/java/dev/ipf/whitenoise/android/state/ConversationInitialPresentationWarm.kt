@@ -43,11 +43,12 @@ internal class ConversationInitialPresentationWarmCoordinator(
     private val warm: suspend (List<String>) -> Unit,
     private val onReady: () -> Unit,
 ) {
-    private var generation = 0L
+    private val preparations = StalenessGuard()
     private var job: Job? = null
     private var deadlineJob: Job? = null
     private var ready = false
 
+    /** Publishes readiness once and cancels both the active warm and its deadline. */
     private fun markReady() {
         if (ready) return
         ready = true
@@ -56,9 +57,10 @@ internal class ConversationInitialPresentationWarmCoordinator(
         onReady()
     }
 
+    /** Replaces the pending warm and admits readiness only for the newest sender page. */
     fun prepare(senders: List<String>) {
         if (ready) return
-        val token = ++generation
+        val token = preparations.advance()
         job?.cancel()
         if (senders.isEmpty()) {
             job = null
@@ -85,7 +87,7 @@ internal class ConversationInitialPresentationWarmCoordinator(
                     // existing lazy path remains authoritative on a local-read
                     // failure, so it must not strand navigation.
                 }
-                if (token == generation) markReady()
+                preparations.runIfCurrent(token, ::markReady)
             }
     }
 }

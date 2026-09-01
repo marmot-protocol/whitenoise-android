@@ -277,6 +277,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue("member-derived readiness must precede visible publication", publishReady > readiness)
     }
 
+    /** Keeps process-scoped catch-up fenced by account, runtime, and shared network lifetime. */
     @Test
     fun catchUpLaunchIsProcessScopedAndDeduplicated() {
         val body = appStateSource().readText().kotlinFunctionBody("launchCatchUpAccounts")
@@ -299,7 +300,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
             "completion must be fenced by account, runtime, and network generation",
             "activeAccountRef == key.accountRef" in body &&
                 "runtimeGeneration == key.runtimeGeneration" in body &&
-                "connectivityNetworkGeneration.get() == key.networkGeneration" in body,
+                "connectivitySignalOwner.isNetworkGenerationCurrent(key.networkGeneration)" in body,
         )
     }
 

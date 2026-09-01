@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.whitenoise.android.media.ByteSizeLruCache
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.REMOTE_PROFILE_IMAGE_MAX_BYTES
+import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -64,7 +65,7 @@ internal object GroupAvatarImageLoader {
             sizeOf = { image -> image.asAndroidBitmap().byteCount.coerceAtLeast(1) },
         )
     private val inFlight = mutableMapOf<String, CompletableDeferred<ImageBitmap?>>()
-    private var generation = 0L
+    private val cacheLifetime = StalenessGuard()
 
     fun peek(key: String?): ImageBitmap? =
         key?.let {
@@ -83,6 +84,7 @@ internal object GroupAvatarImageLoader {
         }
     }
 
+    /** Loads one group avatar and publishes it only within the current cache lifetime. */
     suspend fun load(
         key: String,
         fetchBytes: suspend () -> ByteArray,
@@ -95,7 +97,7 @@ internal object GroupAvatarImageLoader {
 
                 val deferred = CompletableDeferred<ImageBitmap?>()
                 inFlight[key] = deferred
-                val launchedGeneration = generation
+                val launchedGeneration = cacheLifetime.capture()
                 scope.launch {
                     val image =
                         runCatching {
@@ -111,11 +113,11 @@ internal object GroupAvatarImageLoader {
                             }
                         }.getOrNull()
                     synchronized(lock) {
-                        if (launchedGeneration == generation && image != null) {
+                        if (cacheLifetime.isCurrent(launchedGeneration) && image != null) {
                             cache.put(key, image)
                         }
                         inFlight.remove(key, deferred)
-                        deferred.complete(if (launchedGeneration == generation) image else null)
+                        deferred.complete(if (cacheLifetime.isCurrent(launchedGeneration)) image else null)
                     }
                 }
                 PendingGroupAvatarRequest(deferred)
@@ -123,14 +125,16 @@ internal object GroupAvatarImageLoader {
         return request.await()
     }
 
+    /** Checks the cache-lifetime token captured by a suspended caller. */
     private fun isCurrentGeneration(candidate: Long): Boolean =
         synchronized(lock) {
-            candidate == generation
+            cacheLifetime.isCurrent(candidate)
         }
 
+    /** Clears cached group avatars and invalidates every pending completion. */
     fun clear() {
         synchronized(lock) {
-            generation += 1
+            cacheLifetime.advance()
             scope.coroutineContext.cancelChildren()
             cache.clear()
             inFlight.values.forEach { it.complete(null) }

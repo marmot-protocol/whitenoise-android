@@ -17,9 +17,11 @@ internal data class AccountUnreadPublication(
 /** Owns synchronized unread freshness, revisions, and observable publication. */
 internal class AccountUnreadStore {
     private val lock = Any()
+
+    // staleness-exempt: per-account evidence order, not a latest-wins publication fence.
     private var revision = 0L
     private val revisions = mutableMapOf<String, Long>()
-    private var refreshGeneration = 0L
+    private val refreshes = StalenessGuard()
 
     var values by mutableStateOf<Map<String, AccountUnreadValue>>(emptyMap())
         private set
@@ -84,11 +86,12 @@ internal class AccountUnreadStore {
 
     fun snapshot(): Map<String, VersionedAccountUnreadValue> = synchronized(lock) { snapshotLocked() }
 
+    /** Invalidates bulk refreshes and marks one account's count as provisional. */
     fun markUnknown(accountRef: String) {
         synchronized(lock) {
             // Cancel older bulk publications while allowing an already-running
             // exact fold with the same per-account revision to replace unknown.
-            refreshGeneration += 1L
+            refreshes.advance()
             val previous = values[accountRef]
             val unknown =
                 AccountUnreadValue(
@@ -100,13 +103,14 @@ internal class AccountUnreadStore {
         }
     }
 
+    /** Merges an authoritative bulk result when both its lifetime and per-account evidence remain current. */
     fun publishRefresh(
         previous: Map<String, VersionedAccountUnreadValue>,
         refreshed: Map<String, AccountUnreadValue>,
         generation: Long,
     ): AccountUnreadPublication =
         synchronized(lock) {
-            if (refreshGeneration != generation) {
+            if (!refreshes.isCurrent(generation)) {
                 return@synchronized AccountUnreadPublication(snapshotLocked(), emptySet())
             }
             val current = snapshotLocked()
@@ -136,13 +140,14 @@ internal class AccountUnreadStore {
             AccountUnreadPublication(merged, writtenRefs)
         }
 
+    /** Starts a latest-wins bulk unread refresh and returns its publication token. */
     fun beginRefresh(): Long =
         synchronized(lock) {
-            refreshGeneration += 1L
-            refreshGeneration
+            refreshes.advance()
         }
 
-    fun isRefreshCurrent(generation: Long): Boolean = synchronized(lock) { refreshGeneration == generation }
+    /** Reports whether [generation] still owns the bulk unread publication. */
+    fun isRefreshCurrent(generation: Long): Boolean = synchronized(lock) { refreshes.isCurrent(generation) }
 
     fun publishExactIfUnchanged(
         accountRef: String,
