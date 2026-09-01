@@ -178,6 +178,7 @@ internal object ConversationCardPostSynchronizer {
         testHook?.onBarrier(op, barrier, notificationTag, notificationId)
     }
 
+    /** Maps one notification card to its stable mutation-serialization stripe. */
     private fun stripeFor(
         tag: String,
         id: Int,

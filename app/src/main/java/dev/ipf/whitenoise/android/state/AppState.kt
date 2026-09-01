@@ -2781,6 +2781,7 @@ class WhiteNoiseAppState private constructor(
         runtimeGeneration = state.runtimeGeneration
     }
 
+    /** Fences runtime recovery and drains account subscriptions before the destructive engine wipe. */
     private suspend fun prepareForDestructiveAccountWipe(accountRef: String): Boolean {
         // Fence any foreground-service retry that was captured before this
         // destructive teardown. The wipe/restore path owns listener restart;
@@ -4343,6 +4344,7 @@ class WhiteNoiseAppState private constructor(
         return publishedAccounts
     }
 
+    /** Publishes the newest account snapshot, then refreshes unread state for that accepted set. */
     suspend fun refreshAccounts() {
         val refreshedAccounts = refreshAccountSnapshot()
         refreshAccountUnreadCounts(refreshedAccounts)

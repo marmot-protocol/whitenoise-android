@@ -249,11 +249,11 @@ internal class ConversationScrollCoordinator(
     fun beginForegroundRestore(snapshot: ConversationForegroundSnapshot): ConversationForegroundRestoreToken {
         invalidateActiveCommand()
         mode = settledMode
-        foregroundRestoreLifetime.advance()
+        val restoreRevision = foregroundRestoreLifetime.advance()
         foregroundSnapshot = snapshot
         foregroundRestoreInProgress = true
         return ConversationForegroundRestoreToken(
-            revision = foregroundRestoreLifetime.capture(),
+            revision = restoreRevision,
             expectedImeVisible = snapshot.geometry.imeBottomPx > 0,
         )
     }

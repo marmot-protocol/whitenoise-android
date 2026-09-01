@@ -362,6 +362,7 @@ class TtsController internal constructor(
         }
     }
 
+    /** Loads the calibrated pace for the active engine voice, falling back to the safe default. */
     private fun storedPace(): Double {
         val stored = timingStore?.msPerUnitAt1x(engineKey)
         return stored ?: TtsWordTimingEstimate.DEFAULT_MS_PER_UNIT_AT_1X
@@ -471,6 +472,7 @@ class TtsController internal constructor(
             onOwnerSurrender = ::pause,
         )
 
+    /** Accepts a current utterance start and opens its range and pace-measurement window. */
     @Synchronized
     private fun onStart(utteranceId: String?) {
         // The queue's validation gate: a stale or superseded utterance neither

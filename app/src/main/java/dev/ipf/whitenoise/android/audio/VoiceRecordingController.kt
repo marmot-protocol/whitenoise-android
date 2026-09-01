@@ -198,6 +198,7 @@ class VoiceRecordingController internal constructor(
         return true
     }
 
+    /** Clears restart bookkeeping and releases the microphone lease after a stopped restart. */
     private fun completeRestart() {
         restartJob = null
         restarting = false

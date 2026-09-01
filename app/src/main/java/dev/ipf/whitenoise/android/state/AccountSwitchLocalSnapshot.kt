@@ -264,6 +264,7 @@ internal class AccountSwitchLocalSnapshotHandoff {
         snapshot: AccountSwitchLocalSnapshot?,
     ): Boolean = requests.runIfCurrent(requestGeneration) { pending = snapshot }
 
+    /** Consumes the one-shot handoff only for its target account and always clears the slot. */
     fun consume(accountRef: String?): AccountSwitchLocalSnapshot? {
         val snapshot = pending
         pending = null

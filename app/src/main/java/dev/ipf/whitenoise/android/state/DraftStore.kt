@@ -399,6 +399,7 @@ internal class CoalescingDraftWriter(
     private var workerScheduled = false
     private var workerDone = CountDownLatch(0)
 
+    /** Returns an immutable snapshot of the newest accepted in-memory draft values. */
     fun read(): Map<String, String> = synchronized(lock) { values.toMap() }
 
     /** Updates the in-memory draft map and coalesces its encrypted persistence. */
@@ -415,6 +416,7 @@ internal class CoalescingDraftWriter(
         }
     }
 
+    /** Blocks until the coalesced writer has persisted every value accepted before this call. */
     fun flush() {
         while (true) {
             val completion =

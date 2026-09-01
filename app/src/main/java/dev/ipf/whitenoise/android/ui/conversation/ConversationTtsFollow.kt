@@ -110,6 +110,7 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
         revision++
     }
 
+    /** Removes geometry owned by the exact row instance leaving composition. */
     override fun unmountRow(
         messageIdHex: String,
         rowInstance: Any,
@@ -128,6 +129,7 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
         revision++
     }
 
+    /** Removes one rendered-leaf report without disturbing sibling Markdown leaves. */
     override fun clear(
         target: ConversationTtsFollowTarget,
         rowInstance: Any,

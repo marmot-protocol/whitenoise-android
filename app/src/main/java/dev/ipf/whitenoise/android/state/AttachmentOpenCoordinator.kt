@@ -41,6 +41,7 @@ internal class AttachmentOpenCoordinator(
         }
     }
 
+    /** Binds a transfer request to the currently visible destination generation. */
     fun openRequest(request: AttachmentTransferRequest): AttachmentOpenRequest? =
         destination
             ?.takeIf { it.matches(request) }

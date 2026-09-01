@@ -48,6 +48,7 @@ internal class ConversationInitialPresentationWarmCoordinator(
     private var deadlineJob: Job? = null
     private var ready = false
 
+    /** Publishes readiness once and cancels both the active warm and its deadline. */
     private fun markReady() {
         if (ready) return
         ready = true
