@@ -156,6 +156,27 @@ class MarkReadChatListProjectionTest {
         )
     }
 
+    @Test
+    fun markNotificationMessageRead_schedulesAccountReconciliationOnlyWhenTheRowDidNotFold() {
+        val body = appStateSource().readText().kotlinFunctionBody("markNotificationMessageRead")
+
+        assertTrue(
+            "a bound-controller fold must remain the single refresh for the active account",
+            "if (!applyChatListRowFromMarkRead(account, row))" in body,
+        )
+        assertTrue(
+            "an unfolded mark-read must reconcile the acting account's unread aggregate",
+            "reconcileAccountUnreadAfterNotificationMarkRead(account" in body,
+        )
+
+        val reconcileBody =
+            appStateSource().readText().kotlinFunctionBody("reconcileAccountUnreadAfterNotificationMarkRead")
+        assertTrue(
+            "the active account's projection owners must stay its only reconcilers",
+            "if (accountRef == activeAccountRef) return" in reconcileBody,
+        )
+    }
+
     private fun unreadChatRow(lastMessageId: String) =
         chatRow(
             lastMessageId = lastMessageId,

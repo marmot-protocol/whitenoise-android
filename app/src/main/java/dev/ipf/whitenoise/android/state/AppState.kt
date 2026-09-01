@@ -2996,16 +2996,18 @@ class WhiteNoiseAppState private constructor(
     /**
      * Apply the authoritative chat-list row returned by [markTimelineMessageRead].
      * Scoped to the bound [ChatsController] account so a mark-read on one
-     * account cannot fold onto another after a switch.
+     * account cannot fold onto another after a switch. Returns whether the row
+     * reached that bound controller — when it did, the fold's recompute also
+     * reconciles the acting account's per-account unread aggregate.
      */
     fun applyChatListRowFromMarkRead(
         accountRef: String,
         row: ChatListRowFfi?,
-    ) {
-        val projected = row ?: return
-        chatsController
-            ?.takeIf { it.boundAccountRef == accountRef }
-            ?.applyChatListRow(projected)
+    ): Boolean {
+        val projected = row ?: return false
+        val boundController = chatsController?.takeIf { it.boundAccountRef == accountRef }
+        boundController?.applyChatListRow(projected)
+        return boundController != null
     }
 
     internal fun rollbackOptimisticSentPreview(
@@ -7549,11 +7551,46 @@ class WhiteNoiseAppState private constructor(
             // markTimelineMessageRead advances the persisted cursor monotonically;
             // an old notification tap must not move the read marker backwards.
             val row = marmotIo { markTimelineMessageRead(account, group, message) }
-            applyChatListRowFromMarkRead(account, row)
+            if (!applyChatListRowFromMarkRead(account, row)) {
+                reconcileAccountUnreadAfterNotificationMarkRead(account, cursorAdvanced = row != null)
+            }
             true
         }.onFailure {
             if (BuildConfig.DEBUG) Log.w("DMAppState", "notification mark read failed", it)
         }.getOrDefault(false)
+    }
+
+    /**
+     * Reconcile a background [accountRef]'s per-account unread aggregate after
+     * a successful notification-action mark-read whose authoritative row could
+     * not fold into a bound [ChatsController]. Without this, the acting
+     * account's avatar dot keeps presenting the stale pre-action count until an
+     * unrelated refresh happens to land.
+     *
+     * When the read cursor provably advanced, the stored CONFIRMED value is
+     * known-stale: retain the count but stop presenting it, so a failed refresh
+     * degrades honestly instead of keeping a stale dot lit. Reconciliation then
+     * reuses the same coalesced refresh path inbound notification updates use,
+     * which publishes the authoritative post-action projection for exactly this
+     * account and never touches other accounts' values.
+     */
+    private fun reconcileAccountUnreadAfterNotificationMarkRead(
+        accountRef: String,
+        cursorAdvanced: Boolean,
+    ) {
+        // The active account's projection is owned by its bound (or rebinding)
+        // ChatsController and, on the notification-tap open path, by the
+        // account-switch snapshot staging — both publish the authoritative
+        // value themselves. Reconciling here would only add redundant refresh
+        // traffic to the open path; the gap this closes is the account that has
+        // no such owner: a background account acted on from the shade.
+        if (accountRef == activeAccountRef) return
+        if (cursorAdvanced) accountUnreadStore.markUnknown(accountRef)
+        // Honor the same destructive-teardown suppression as inbound-update
+        // maintenance: a wipe owns listener and scheduler restarts, and the
+        // post-restore lifecycle refresh reconciles the retained value.
+        if (networkNotificationRecoverySuppressed) return
+        unreadRefreshScheduler.schedule(accountRef)
     }
 
     suspend fun setLocalNotificationsEnabled(enabled: Boolean): Boolean {
