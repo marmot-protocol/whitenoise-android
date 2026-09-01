@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 import sys
 
@@ -172,6 +173,51 @@ class FindingsTest(unittest.TestCase):
         self.assertIn("open pull requests missing from project: [2]", missing)
         self.assertIn("open pull requests without In Progress status: [2]", stale)
         self.assertEqual([], healthy)
+
+
+class ProjectItemsTest(unittest.TestCase):
+    def test_fetches_every_project_item_beyond_the_old_500_item_cap(self):
+        calls = []
+        expected = [{"id": index} for index in range(527)]
+        with patch.object(checker, "gh_json", side_effect=lambda *args: calls.append(args) or {
+            "totalCount": 527, "items": expected,
+        }):
+            actual = checker.fetch_project_items(527)
+
+        self.assertEqual(expected, actual)
+        self.assertIn("527", calls[0])
+
+    def test_retries_when_the_project_grows_during_pagination(self):
+        calls = []
+        responses = iter([
+            {"totalCount": 528, "items": [{"id": index} for index in range(527)]},
+            {"totalCount": 528, "items": [{"id": index} for index in range(528)]},
+        ])
+        with patch.object(
+            checker, "gh_json", side_effect=lambda *args: calls.append(args) or next(responses)
+        ):
+            actual = checker.fetch_project_items(527)
+
+        self.assertEqual(528, len(actual))
+        self.assertIn("527", calls[0])
+        self.assertIn("528", calls[1])
+
+    def test_fails_loudly_if_the_cli_returns_a_partial_page(self):
+        with patch.object(checker, "gh_json", return_value={
+            "totalCount": 527,
+            "items": [{"id": index} for index in range(500)],
+        }):
+            with self.assertRaisesRegex(RuntimeError, "stopped at 500 of 527"):
+                checker.fetch_project_items(527)
+
+    def test_fails_loudly_if_the_project_keeps_growing(self):
+        responses = iter([
+            {"totalCount": total, "items": [{"id": index} for index in range(total - 1)]}
+            for total in (528, 529, 530)
+        ])
+        with patch.object(checker, "gh_json", side_effect=lambda *args: next(responses)):
+            with self.assertRaisesRegex(RuntimeError, "kept growing during 3"):
+                checker.fetch_project_items(527)
 
 
 if __name__ == "__main__":
