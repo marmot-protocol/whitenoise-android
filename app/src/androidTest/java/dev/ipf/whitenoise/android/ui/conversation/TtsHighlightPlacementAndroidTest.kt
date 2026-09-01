@@ -7,12 +7,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -23,7 +25,9 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -144,6 +148,33 @@ class TtsHighlightPlacementAndroidTest {
         assertExactSecondSentenceBand(SentenceStartPlacement.MidLine)
     }
 
+    /** Markdown styling cannot expand the selected sentence into adjacent inline leaves. */
+    @Test
+    fun markdownSentenceBandPaintsOnlyItsRenderedCharacterCells() {
+        assertExactRenderedSentenceBand(
+            body = THREE_SENTENCES,
+            document = markdownSentenceDocument(),
+            expectedSentence = SECOND_SENTENCE,
+            width = 300.dp,
+            locale = Locale.US,
+            layoutDirection = LayoutDirection.Ltr,
+        )
+    }
+
+    /** RTL paragraph geometry keeps the selected sentence on its rendered right-to-left cells. */
+    @Test
+    fun rtlSentenceBandPaintsOnlyItsRenderedCharacterCells() {
+        assertExactRenderedSentenceBand(
+            body = RTL_THREE_SENTENCES,
+            document = plainTextDocument(RTL_THREE_SENTENCES),
+            expectedSentence = RTL_SECOND_SENTENCE,
+            width = 300.dp,
+            locale = Locale.forLanguageTag("he"),
+            layoutDirection = LayoutDirection.Rtl,
+            expectedParagraphDirection = ResolvedTextDirection.Rtl,
+        )
+    }
+
     /**
      * Finds a real production-row width with the requested layout shape, then
      * compares every changed pixel with the selected sentence's character
@@ -202,21 +233,87 @@ class TtsHighlightPlacementAndroidTest {
         )
     }
 
+    /** Compares a rich or bidi production-row sentence paint with its exact character cells. */
+    private fun assertExactRenderedSentenceBand(
+        body: String,
+        document: MarkdownDocumentFfi,
+        expectedSentence: String,
+        width: Dp,
+        locale: Locale,
+        layoutDirection: LayoutDirection,
+        expectedParagraphDirection: ResolvedTextDirection? = null,
+    ) {
+        val record = speakableRecord(body, document)
+        composeRule.setContent {
+            val item = timelineMessage(record)
+            CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+                WhiteNoiseTheme {
+                    Box(Modifier.width(width)) {
+                        key(item.record.messageIdHex) { row(item) }
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        val idle = captureFrame()
+        speakSentence(record, document, locale, sentenceIndex = 1)
+        val highlightedLeaves = leavesCarryingSentenceHighlight()
+        assertTrue("no rendered leaf carried the selected sentence", highlightedLeaves.isNotEmpty())
+        val renderedSentence =
+            highlightedLeaves.joinToString("") { leaf ->
+                val range = checkNotNull(leaf.config.getOrNull(TtsReadAloudSentenceHighlightRangeKey))
+                leaf.text().substring(range.first, range.last + 1)
+            }
+        assertEquals(expectedSentence, renderedSentence)
+
+        val expectedCells =
+            highlightedLeaves.flatMap { leaf ->
+                val range = checkNotNull(leaf.config.getOrNull(TtsReadAloudSentenceHighlightRangeKey))
+                val layout = textLayout(leaf)
+                val leafBounds = leaf.boundsInRoot
+                if (expectedParagraphDirection != null) {
+                    assertEquals(expectedParagraphDirection, layout.getParagraphDirection(range.first))
+                }
+                range.map { offset ->
+                    layout.getBoundingBox(offset).translate(leafBounds.left, leafBounds.top)
+                }
+            }
+        val active = captureFrame()
+        val changed = idle.changedPixels(active)
+        assertTrue("the selected sentence painted no pixels", changed.isNotEmpty())
+        assertTrue(
+            "sentence paint escaped its Markdown/RTL character cells: " +
+                changed.filterNot { pixel -> expectedCells.any { cell -> cell.contains(pixel.x, pixel.y) } }.take(12),
+            changed.all { pixel -> expectedCells.any { cell -> cell.contains(pixel.x, pixel.y) } },
+        )
+    }
+
     /** Starts playback and seeks the production controller to the second sentence. */
     private fun speakSecondSentence(record: AppMessageRecordFfi) {
+        speakSentence(record, plainTextDocument(THREE_SENTENCES), Locale.US, sentenceIndex = 1)
+    }
+
+    /** Starts playback from the requested logical sentence for a rendered document. */
+    private fun speakSentence(
+        record: AppMessageRecordFfi,
+        document: MarkdownDocumentFfi,
+        locale: Locale,
+        sentenceIndex: Int,
+    ) {
         val entry =
             runBlocking {
                 projectTtsSpeakableEntry(
                     message = record,
                     editedText = null,
                     senderDisplayName = SENDER_NAME,
-                    parseMarkdown = { plainTextDocument(THREE_SENTENCES) },
+                    parseMarkdown = { document },
                 )!!
             }
-        check(appState.ttsController.speak(listOf(entry), Locale.US))
+        check(appState.ttsController.speak(listOf(entry), locale))
         assertEquals(
             TtsSeekResult.Repositioned,
-            appState.ttsController.seekToSentence(MESSAGE_ID, sentenceIndex = 1),
+            appState.ttsController.seekToSentence(MESSAGE_ID, sentenceIndex),
         )
         composeRule.waitForIdle()
     }
@@ -227,7 +324,7 @@ class TtsHighlightPlacementAndroidTest {
         placement: SentenceStartPlacement,
     ): Int =
         checkNotNull(
-            (MIN_WRAP_WIDTH..MAX_WRAP_WIDTH).firstOrNull { candidate ->
+            (MIN_WRAP_WIDTH..MAX_WRAP_WIDTH step WRAP_WIDTH_STEP_DP).firstOrNull { candidate ->
                 composeRule.runOnIdle { wrapWidth.value = candidate.dp }
                 composeRule.waitForIdle()
                 val layout = textLayout(bodyLeaf())
@@ -493,6 +590,14 @@ class TtsHighlightPlacementAndroidTest {
                     node.config.getOrNull(TtsReadAloudSentenceHighlightRangeKey) != null
             }
 
+    /** Returns every rich-text leaf carrying part of the active sentence band in visual order. */
+    private fun leavesCarryingSentenceHighlight(): List<SemanticsNode> =
+        composeRule
+            .onRoot(useUnmergedTree = true)
+            .fetchSemanticsNode()
+            .descendants()
+            .filter { it.config.getOrNull(TtsReadAloudSentenceHighlightRangeKey) != null }
+
     private fun SemanticsNode.descendants(): List<SemanticsNode> = children + children.flatMap { it.descendants() }
 
     private fun SemanticsNode.text(): String =
@@ -546,28 +651,48 @@ class TtsHighlightPlacementAndroidTest {
     private fun timelineMessage(record: AppMessageRecordFfi) =
         TimelineMessage(id = "msg:${record.messageIdHex}", record = record, status = MessageStatus.Received)
 
-    private fun speakableRecord(plaintext: String) =
-        AppMessageRecordFfi(
-            messageIdHex = MESSAGE_ID,
-            direction = "received",
-            groupIdHex = GROUP_ID,
-            sender = SENDER_ID,
-            plaintext = plaintext,
-            contentTokens = plainTextDocument(plaintext),
-            kind = 9uL,
-            tags = emptyList(),
-            sourceEpoch = null,
-            retentionSeconds = null,
-            retentionExpiresAt = null,
-            recordedAt = 1uL,
-            receivedAt = 1uL,
-        )
+    private fun speakableRecord(
+        plaintext: String,
+        document: MarkdownDocumentFfi = plainTextDocument(plaintext),
+    ) = AppMessageRecordFfi(
+        messageIdHex = MESSAGE_ID,
+        direction = "received",
+        groupIdHex = GROUP_ID,
+        sender = SENDER_ID,
+        plaintext = plaintext,
+        contentTokens = document,
+        kind = 9uL,
+        tags = emptyList(),
+        sourceEpoch = null,
+        retentionSeconds = null,
+        retentionExpiresAt = null,
+        recordedAt = 1uL,
+        receivedAt = 1uL,
+    )
 
     private fun plainTextDocument(text: String) =
         MarkdownDocumentFfi(
             truncated = false,
             blankLinesBefore = byteArrayOf(),
             blocks = listOf(MarkdownBlockFfi.Paragraph(inlines = listOf(MarkdownInlineFfi.Text(text)))),
+        )
+
+    /** Keeps the selected second sentence in a styled Markdown leaf between plain siblings. */
+    private fun markdownSentenceDocument() =
+        MarkdownDocumentFfi(
+            truncated = false,
+            blankLinesBefore = byteArrayOf(),
+            blocks =
+                listOf(
+                    MarkdownBlockFfi.Paragraph(
+                        inlines =
+                            listOf(
+                                MarkdownInlineFfi.Text("$FIRST_SENTENCE "),
+                                MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text(SECOND_SENTENCE))),
+                                MarkdownInlineFfi.Text(" $THIRD_SENTENCE"),
+                            ),
+                    ),
+                ),
         )
 
     private fun appState() =
@@ -727,7 +852,12 @@ class TtsHighlightPlacementAndroidTest {
         val SECOND_SENTENCE_START = THREE_SENTENCES.indexOf(SECOND_SENTENCE)
         const val MIN_WRAP_WIDTH = 120
         const val MAX_WRAP_WIDTH = 480
+        const val WRAP_WIDTH_STEP_DP = 4
         const val TEST_LOG_TAG = "WnTtsPlacement"
         const val RASTER_SEAM_PX = 1f
+        const val RTL_FIRST_SENTENCE = "המשפט הראשון כאן."
+        const val RTL_SECOND_SENTENCE = "המשפט השני מודגש."
+        const val RTL_THIRD_SENTENCE = "המשפט השלישי נשאר נקי."
+        const val RTL_THREE_SENTENCES = "$RTL_FIRST_SENTENCE $RTL_SECOND_SENTENCE $RTL_THIRD_SENTENCE"
     }
 }

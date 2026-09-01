@@ -487,14 +487,13 @@ internal fun highlightBoundingBoxes(
                     paragraphDirection = layoutResult.getParagraphDirection(offset),
                 )
         }
-        val codePointLength = Character.charCount(Character.codePointAt(text, offset))
-        offset += codePointLength.takeIf { offset + it <= end } ?: 1
+        offset += Character.charCount(Character.codePointAt(text, offset))
     }
     return characterBoxes.mergeAdjacentHighlightBoxes()
 }
 
 /** Coalesces touching cells on one visual line without bridging visual gaps. */
-private fun List<TtsHighlightBox>.mergeAdjacentHighlightBoxes(): List<TtsHighlightBox> =
+internal fun List<TtsHighlightBox>.mergeAdjacentHighlightBoxes(): List<TtsHighlightBox> =
     groupBy { box -> Triple(box.bounds.top, box.bounds.bottom, box.paragraphDirection) }
         .values
         .flatMap { lineBoxes ->
