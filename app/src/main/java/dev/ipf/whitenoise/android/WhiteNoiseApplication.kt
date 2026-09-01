@@ -41,7 +41,12 @@ open class WhiteNoiseApplication :
     }
     private val backgroundWorkSchedulingGate = BackgroundWorkSchedulingGate()
 
-    val appState: WhiteNoiseAppState by lazy {
+    /**
+     * Process-wide app state. Open so worker tests can substitute a fixture
+     * state behind the same `applicationContext as WhiteNoiseApplication`
+     * boundary the production workers use.
+     */
+    open val appState: WhiteNoiseAppState by lazy {
         WhiteNoiseAppState(this)
     }
 
