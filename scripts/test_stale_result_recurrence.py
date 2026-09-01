@@ -312,7 +312,7 @@ class CommittedFixtureTest(unittest.TestCase):
         """Every committed adjudication entry passes schema validation."""
         with srr.ADJUDICATIONS_PATH.open(encoding="utf-8") as handle:
             adjudications = srr.validate_adjudications(json.load(handle))
-        self.assertGreater(len(adjudications), 0)
+        self.assertEqual(164, len(adjudications))
 
 
 class FetchTest(unittest.TestCase):

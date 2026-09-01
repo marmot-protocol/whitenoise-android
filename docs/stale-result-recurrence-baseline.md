@@ -109,7 +109,7 @@ full issue text:
 
 ## Baseline results
 
-```
+```text
 month    created  eligible  stale  named  stale+named  note
 2026-05       43        40      0      0            0  partial: 2026-05-26 through 2026-05-31
 2026-06      514       300     11     11            0  full month
