@@ -1196,6 +1196,7 @@ internal fun MessageBubble(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .testTag(messageBubbleRowTestTag(record.messageIdHex))
                     .messageBubbleSelectionRow(
                         selectionMode = selectionMode,
                         selected = selected,

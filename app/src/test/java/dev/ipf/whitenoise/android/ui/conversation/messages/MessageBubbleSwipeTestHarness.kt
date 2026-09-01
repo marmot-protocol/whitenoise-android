@@ -89,6 +89,7 @@ internal fun SwipeTestBubbleHost(
                     item = surface.item,
                     controller = surface.controller,
                     appState = surface.appState,
+                    showSenderAvatar = surface.item.record.direction != "sent",
                     composerTextState = ComposerTextState(TextFieldValue("")),
                     highlighted = false,
                     selectionMode = false,

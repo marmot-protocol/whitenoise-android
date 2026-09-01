@@ -97,14 +97,21 @@ class MessageBubbleSwipeReactionTranslationTest {
         assertEquals("chip settles with the bubble", chipAtRest, chip.left(), POSITION_TOLERANCE_PX)
     }
 
-    /** A non-reacted control: the host row never translates while the bubble does. */
+    /**
+     * A non-reacted control measured on the PRODUCTION gesture row (not the
+     * harness box): during a drag the bubble translates while the real row —
+     * whose left edge carries the sender avatar slot — stays at rest, so an
+     * offset accidentally applied to the row itself fails here.
+     */
     @Test
-    fun swipeMovesTheBubbleButNeverTheHostRow() {
+    fun swipeMovesTheBubbleButNeverTheGestureRow() {
         renderBubble(reacted = false, mine = false, media = false, rtl = false)
         val host = composeRule.onNodeWithTag(SWIPE_TEST_HOST_TAG)
+        val gestureRow =
+            composeRule.onNodeWithTag(messageBubbleRowTestTag(SWIPE_TEST_MESSAGE_ID), useUnmergedTree = true)
         val bubbleText =
             composeRule.onNode(hasText(SWIPE_TEST_MESSAGE_BODY, substring = true), useUnmergedTree = true)
-        val hostLeftAtRest = host.left()
+        val rowBoundsAtRest = gestureRow.fetchSemanticsNode().boundsInRoot
         val bubbleAtRest = bubbleText.left()
 
         host.performTouchInput {
@@ -114,7 +121,9 @@ class MessageBubbleSwipeReactionTranslationTest {
         composeRule.waitForIdle()
 
         assertTrue("bubble should translate", abs(bubbleText.left() - bubbleAtRest) > MIN_TRANSLATION_PX)
-        assertEquals("host row must stay at rest", hostLeftAtRest, host.left(), POSITION_TOLERANCE_PX)
+        val rowDuringDrag = gestureRow.fetchSemanticsNode().boundsInRoot
+        assertEquals("gesture row must stay at rest", rowBoundsAtRest.left, rowDuringDrag.left, POSITION_TOLERANCE_PX)
+        assertEquals("gesture row must not stretch", rowBoundsAtRest.right, rowDuringDrag.right, POSITION_TOLERANCE_PX)
 
         host.performTouchInput { cancel() }
         composeRule.waitForIdle()
