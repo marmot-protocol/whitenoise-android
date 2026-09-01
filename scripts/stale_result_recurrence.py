@@ -245,10 +245,12 @@ def snapshot_record(item: dict) -> dict:
 
 
 def month_key(created: datetime) -> str:
+    """Format an aware datetime's calendar month as YYYY-MM."""
     return f"{created.year:04d}-{created.month:02d}"
 
 
 def match_rule_ids(rules: dict, text: str) -> list[str]:
+    """Return the sorted ids of the rules whose patterns match the text."""
     return sorted(rule_id for rule_id, pattern in rules.items() if pattern.search(text))
 
 
@@ -403,6 +405,7 @@ class AmbiguityError(RuntimeError):
     """Raised when keyword matching alone cannot finalize a classification."""
 
     def __init__(self, message: str, unresolved: list[dict]):
+        """Keep the unresolved classifications alongside the error message."""
         super().__init__(message)
         self.unresolved = unresolved
 
@@ -480,17 +483,20 @@ def render_report(summary: dict) -> str:
 
 
 def load_json(path: Path):
+    """Read and decode one JSON file."""
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
 
 
 def dump_json(path: Path, payload) -> None:
+    """Write JSON with stable key order and a trailing newline."""
     with path.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2, sort_keys=True)
         handle.write("\n")
 
 
 def command_fetch(args) -> int:
+    """CLI: fetch the baseline window into a local, uncommitted snapshot."""
     items = fetch_window(gh_json, WINDOW_START, WINDOW_END)
     records = [snapshot_record(item) for item in items]
     records.sort(key=lambda record: record["number"])
@@ -501,6 +507,7 @@ def command_fetch(args) -> int:
 
 
 def command_classify(args) -> int:
+    """CLI: classify a snapshot and write or verify the frozen fixture."""
     records = load_json(Path(args.snapshot))
     adjudications = validate_adjudications(load_json(ADJUDICATIONS_PATH))
     try:
@@ -525,12 +532,14 @@ def command_classify(args) -> int:
 
 
 def command_report(_args) -> int:
+    """CLI: print the aggregate tables from the frozen fixture."""
     classifications = load_json(CLASSIFICATIONS_PATH)
     print(render_report(aggregate(classifications)))
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Parse arguments and dispatch to the selected subcommand."""
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
 
