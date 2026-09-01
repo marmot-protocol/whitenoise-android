@@ -243,9 +243,7 @@ class OfflineRecoveryLatencyDeviceTest {
         requireNotNull(phaseElapsedOrNull(phase)) { "Missing ${phase.wireName} marker" }
 
     /** Returns the elapsed marker for an optional phase. */
-    private fun List<NotificationNetworkRecoverySample>.phaseElapsedOrNull(phase: PerformancePhase): Long? {
-        return firstOrNull { it.phase == phase }?.elapsedMillis
-    }
+    private fun List<NotificationNetworkRecoverySample>.phaseElapsedOrNull(phase: PerformancePhase): Long? = firstOrNull { it.phase == phase }?.elapsedMillis
 
     /** Reports machine-readable cycle progress without message bodies or identifiers. */
     private fun reportCycle(
