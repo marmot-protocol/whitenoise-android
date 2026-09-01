@@ -845,7 +845,7 @@ internal class ForwardTerminalDismissPolicy(
     private val currentSnapshot: () -> ForwardOperationSnapshot?,
     private val dismiss: () -> Unit,
 ) {
-    private var generation = 0L
+    private val dismissals = StalenessGuard()
 
     /** Schedules the delayed dismissal for one terminal snapshot. */
     fun onTerminal(snapshot: ForwardOperationSnapshot) {
@@ -855,11 +855,11 @@ internal class ForwardTerminalDismissPolicy(
         ) {
             return
         }
-        val dismissGeneration = ++generation
+        val dismissGeneration = dismissals.advance()
         scope.launch {
             delay(displayDurationMillis)
-            if (generation == dismissGeneration && currentSnapshot() == snapshot) {
-                dismiss()
+            dismissals.runIfCurrent(dismissGeneration) {
+                if (currentSnapshot() == snapshot) dismiss()
             }
         }
     }

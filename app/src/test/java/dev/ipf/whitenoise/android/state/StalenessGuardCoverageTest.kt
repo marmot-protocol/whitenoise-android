@@ -25,12 +25,12 @@ class StalenessGuardCoverageTest {
                 "AppState.kt" to
                     listOf(
                         "accountListLifetime",
-                        "forwardTerminalDismissals",
                         "profileCacheLifetime",
                         "mediaUploadSessionLifetime",
                         "notificationRuntimeRecovery",
                         "notificationPostEpoch",
                     ),
+                "MessageForwarding.kt" to listOf("dismissals"),
                 "Controllers.kt" to
                     listOf(
                         "bindLifetime",
@@ -310,6 +310,7 @@ class StalenessGuardCoverageTest {
             "ConversationCardPostSynchronizer.kt",
             "TtsController.kt",
             "MessageDraftRepository.kt",
+            "MessageForwarding.kt",
         ).associateWith(::productionSource)
 
     /** Locates one production source from either the module or repository working directory. */
