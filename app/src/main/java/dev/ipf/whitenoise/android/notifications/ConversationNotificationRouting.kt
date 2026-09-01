@@ -146,18 +146,18 @@ internal class ConversationNotificationRouting(
 
     /**
      * Returns the complete per-chat settings model and performs the idempotent
-     * legacy inference. Calling this never creates optional children.
+     * legacy inference. Channel ids are deterministic, so this read path does
+     * not create children before the lifecycle-bound settings preparer has
+     * published the conversation shortcut.
      */
     fun settings(conversation: NotificationConversationDescriptor): List<ConversationNotificationCategorySetting> {
         val primary = ConversationNotificationChannels.primaryMessageParent(conversation.isDm)
         val primaryId =
-            ConversationNotificationChannels.ensureConversationChannel(
-                context = appContext,
+            ConversationNotificationChannels.conversationChannelId(
                 parentChannelId = primary.id,
                 conversationShortcutId = conversation.shortcutId,
-                conversationTitle = conversation.title,
                 vibrationPattern = conversation.primaryVibrationPattern,
-            ) ?: primary.id
+            )
         return buildList {
             add(
                 ConversationNotificationCategorySetting(

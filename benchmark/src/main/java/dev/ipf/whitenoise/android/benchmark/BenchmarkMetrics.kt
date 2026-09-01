@@ -16,7 +16,10 @@ internal const val SCROLL_CHAT_LIST_TRACE = "benchmark:scroll-chat-list"
 internal const val SECONDARY_ACCOUNT_NOTIFICATION_TRACE = "benchmark:secondary-account-notification"
 internal const val OPEN_CONVERSATION_VISIBLE_TRACE = "benchmark:open-conversation-visible"
 internal const val OPEN_CONVERSATION_SETTLED_TRACE = "benchmark:open-conversation-settled"
+internal const val OPEN_CONVERSATION_SETTINGS_TRACE = "benchmark:open-conversation-settings"
 internal const val WARM_RESUME_FIRST_USEFUL_FRAME_TRACE = "WhiteNoise.warmResume.firstUsefulFrame"
+private const val CONVERSATION_SETTINGS_APP_DISPATCH_TRACE =
+    "WNConversationSettings:click_to_start_activity"
 
 private val notificationRoutePhaseSections =
     listOf(
@@ -104,6 +107,25 @@ internal fun openConversationMetrics(): List<Metric> =
             sectionName = OPEN_CONVERSATION_SETTLED_TRACE,
             mode = TraceSectionMetric.Mode.First,
             label = "routeSettledMs",
+            targetPackageOnly = false,
+        ),
+    )
+
+/** App dispatch latency and the separately bounded Android Settings transition. */
+@OptIn(ExperimentalMetricApi::class)
+internal fun conversationSettingsMetrics(): List<Metric> =
+    listOf(
+        FrameTimingMetric(),
+        TraceSectionMetric(
+            sectionName = CONVERSATION_SETTINGS_APP_DISPATCH_TRACE,
+            mode = TraceSectionMetric.Mode.First,
+            label = "clickToStartActivityMs",
+            targetPackageOnly = true,
+        ),
+        TraceSectionMetric(
+            sectionName = OPEN_CONVERSATION_SETTINGS_TRACE,
+            mode = TraceSectionMetric.Mode.First,
+            label = "clickToFirstSettingsFrameMs",
             targetPackageOnly = false,
         ),
     )
