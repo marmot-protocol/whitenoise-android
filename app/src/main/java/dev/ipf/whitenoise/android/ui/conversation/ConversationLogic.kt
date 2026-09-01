@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.state.ComposerDraftSnapshot
 import dev.ipf.whitenoise.android.state.PendingAttachment
@@ -61,6 +62,13 @@ internal fun shouldAutoFocusComposerOnDraftRestore(
 ): Boolean =
     dictationRevisionOnEntry == currentDictationRevision &&
         shouldFocusComposerOnDraftRestore(snapshot)
+
+/** Keeps the navigation-entry revision stable while the same conversation composition is remounted. */
+@Composable
+internal fun rememberComposerDictationRevisionOnEntry(
+    groupIdHex: String,
+    currentRevision: Int,
+): Int = rememberSaveable(groupIdHex) { currentRevision }
 
 /** UI-only scroll anchor for a conversation the user left while reading history. */
 internal data class ConversationScrollSnapshot(

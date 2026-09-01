@@ -2795,7 +2795,11 @@ internal fun ConversationScreen(
     // transcript must rehydrate text/selection without being mistaken for a
     // restored draft and reopening the IME. Re-entering the conversation gets
     // a fresh baseline, so genuine draft restoration still focuses once.
-    val composerDictationRevisionOnEntry = remember(chat.id) { composerDictationRevision }
+    val composerDictationRevisionOnEntry =
+        rememberComposerDictationRevisionOnEntry(
+            groupIdHex = controller.group.groupIdHex,
+            currentRevision = composerDictationRevision,
+        )
     val composerTextState =
         rememberComposerTextState(
             draftKey = controller.group.groupIdHex,

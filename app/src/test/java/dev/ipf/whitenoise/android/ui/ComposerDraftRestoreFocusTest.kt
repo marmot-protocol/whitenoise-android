@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.SoftwareKeyboardController
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -20,9 +21,12 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.conversationRoutePresentationShouldFreeze
+import dev.ipf.whitenoise.android.ui.conversation.rememberComposerDictationRevisionOnEntry
 import dev.ipf.whitenoise.android.ui.conversation.shouldAutoFocusComposerOnDraftRestore
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,11 +47,16 @@ class ComposerDraftRestoreFocusTest {
         lateinit var composerState: ComposerTextState
         var focusGainCount = 0
         val keyboardController = RecordingSoftwareKeyboardController()
+        val restorationTester = StateRestorationTester(composeRule)
 
-        composeRule.setContent {
+        restorationTester.setContent {
             val snapshot = persistedDraft
             val autoFocusConsumed = remember(draftKey) { mutableStateOf(false) }
-            val dictationRevisionOnEntry = remember(draftKey) { dictationRevision }
+            val dictationRevisionOnEntry =
+                rememberComposerDictationRevisionOnEntry(
+                    groupIdHex = draftKey,
+                    currentRevision = dictationRevision,
+                )
             composerState =
                 rememberComposerTextState(
                     draftKey = draftKey,
@@ -88,6 +97,9 @@ class ComposerDraftRestoreFocusTest {
         }
         composeRule.waitForIdle()
 
+        restorationTester.emulateSavedInstanceStateRestore()
+        composeRule.waitForIdle()
+
         composeRule.runOnIdle {
             assertEquals(accepted, composerState.valueState.value)
             assertEquals(0, focusGainCount)
@@ -97,6 +109,33 @@ class ComposerDraftRestoreFocusTest {
         composeRule.onNodeWithText("accepted words").performClick()
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertEquals(1, focusGainCount) }
+    }
+
+    @Test
+    fun draftRestorePolicyCoversGenuineDictationAndMissingDraftCases() {
+        val snapshot = ComposerDraftSnapshot(TextFieldValue("saved draft"), focusOnRestore = true)
+
+        assertTrue(
+            shouldAutoFocusComposerOnDraftRestore(
+                snapshot = snapshot,
+                dictationRevisionOnEntry = 7,
+                currentDictationRevision = 7,
+            ),
+        )
+        assertFalse(
+            shouldAutoFocusComposerOnDraftRestore(
+                snapshot = snapshot,
+                dictationRevisionOnEntry = 7,
+                currentDictationRevision = 8,
+            ),
+        )
+        assertFalse(
+            shouldAutoFocusComposerOnDraftRestore(
+                snapshot = null,
+                dictationRevisionOnEntry = 7,
+                currentDictationRevision = 7,
+            ),
+        )
     }
 
     private class RecordingSoftwareKeyboardController : SoftwareKeyboardController {
@@ -119,6 +158,7 @@ class ComposerDraftRestoreFocusTest {
         composeRule.setContent {
             focusManager = LocalFocusManager.current
             val autoFocusConsumed = remember(draftKey) { mutableStateOf(false) }
+            val snapshot = ComposerDraftSnapshot(TextFieldValue("saved draft"), focusOnRestore = true)
             WhiteNoiseTheme {
                 Surface {
                     if (showComposer) {
@@ -127,9 +167,14 @@ class ComposerDraftRestoreFocusTest {
                             messageTextCopy = MessageTextCopy.Default,
                             onCancelReply = {},
                             onSend = { _, _ -> },
-                            initialDraft = TextFieldValue("saved draft"),
+                            initialDraft = snapshot.textFieldValue,
                             draftKey = draftKey,
-                            autoFocusOnDraftRestore = true,
+                            autoFocusOnDraftRestore =
+                                shouldAutoFocusComposerOnDraftRestore(
+                                    snapshot = snapshot,
+                                    dictationRevisionOnEntry = 0,
+                                    currentDictationRevision = 0,
+                                ),
                             autoFocusConsumedState = autoFocusConsumed,
                             onComposerFocusChanged = { focused ->
                                 if (focused) focusGainCount += 1
