@@ -642,9 +642,11 @@ class ConversationDictationControllerTest {
         fixture.platform.listener.onResult("Hello")
         fixture.platform.listener.onResult(",")
         fixture.platform.listener.onResult("world")
+        fixture.platform.listener.onBeginningOfSpeech()
+        fixture.platform.listener.onResult("world")
         fixture.controller.stop()
 
-        assertEquals("Hello, world", fixture.drafts.getValue(key()).text)
+        assertEquals("Hello, world world", fixture.drafts.getValue(key()).text)
         assertEquals(1, fixture.writes)
     }
 

@@ -40,6 +40,7 @@ class StateSourceSizeCeilingTest {
         // Lowered as `ChatListItem` and then the chat-list sort moved to their own
         // same-package files.
         const val CONTROLLERS_MAX_LINES = 12759
+
         // Deliberately raised for PR #2392's covered app-owned dictation integration. Keep this exact so
         // unrelated AppState growth remains blocked after the stacked branch is merged with current master.
         const val APP_STATE_MAX_LINES = 10226

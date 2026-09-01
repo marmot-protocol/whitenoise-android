@@ -329,7 +329,8 @@ class ComposerBarScreenshotTest {
             dictationPreview = DictationPreview.ElsewhereListening,
         )
 
-        composeRule.onNodeWithContentDescription("Cancel dictation").assertDoesNotExist()
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.dictation_cancel)).assertDoesNotExist()
         composeRule.onNodeWithText("Draft message text").assertIsDisplayed()
     }
 
@@ -347,7 +348,7 @@ class ComposerBarScreenshotTest {
             )
 
             val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-            composeRule.onNodeWithContentDescription("Cancel dictation").assertDoesNotExist()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.dictation_cancel)).assertDoesNotExist()
             composeRule
                 .onNodeWithContentDescription(context.getString(R.string.voice_message_record))
                 .assertDoesNotExist()
