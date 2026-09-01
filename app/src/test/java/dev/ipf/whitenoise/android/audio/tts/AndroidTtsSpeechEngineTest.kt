@@ -157,6 +157,22 @@ class AndroidTtsSpeechEngineTest {
         assertEquals(TextToSpeech.LANG_NOT_SUPPORTED, engine.setLanguage(Locale.US))
     }
 
+    /** Preserves an accepted framework language when an engine has no optional voice catalog. */
+    @Test
+    fun emptyVoiceCatalogKeepsTheFrameworkLanguageStatus() {
+        val tts = EmptyCatalogTextToSpeech()
+        var resolution: TtsVoiceResolution? = null
+        val engine =
+            AndroidTtsSpeechEngine(
+                textToSpeech = tts,
+                enginePackage = "engine.a",
+                onVoiceResolved = { resolution = it },
+            )
+
+        assertEquals(TextToSpeech.LANG_COUNTRY_AVAILABLE, engine.setLanguage(Locale.US))
+        assertNull(resolution)
+    }
+
     private fun listener(calls: MutableList<String>) =
         androidTtsProgressListener(
             onStart = { calls += "start:$it" },
@@ -195,6 +211,13 @@ class AndroidTtsSpeechEngineTest {
             activeVoice = voice
             return TextToSpeech.SUCCESS
         }
+    }
+
+    /** Models a usable engine that relies on its default voice and exposes no catalog. */
+    private class EmptyCatalogTextToSpeech : TextToSpeech(RuntimeEnvironment.getApplication(), {}) {
+        override fun setLanguage(locale: Locale?): Int = TextToSpeech.LANG_COUNTRY_AVAILABLE
+
+        override fun getVoices(): MutableSet<Voice> = mutableSetOf()
     }
 
     private class CapturingTextToSpeech(

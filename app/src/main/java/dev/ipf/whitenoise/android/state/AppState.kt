@@ -77,8 +77,6 @@ import dev.ipf.whitenoise.android.audio.tts.TtsHistorySession
 import dev.ipf.whitenoise.android.audio.tts.TtsPlaybackForegroundService
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
-import dev.ipf.whitenoise.android.audio.tts.TtsStartFailure
-import dev.ipf.whitenoise.android.audio.tts.TtsVoiceKey
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
 import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
@@ -1726,36 +1724,18 @@ class WhiteNoiseAppState private constructor(
         ttsController.onSpeechRateChanged()
     }
 
-    /** Enables the explicitly opted-in active-media mixing mode. */
-    fun setTtsMediaMixEnabled(enabled: Boolean) {
-        ttsMediaMixPreferences.setEnabled(enabled)
-    }
-
-    /** Applies a bounded mix level at the next queued sentence boundary. */
-    fun setTtsMediaMixVolume(volume: TtsMediaMixVolume) {
-        ttsMediaMixPreferences.setVolume(volume)
-        ttsController.onMediaMixVolumeChanged()
-    }
-
-    /** Accessible copy for the latest read-aloud start refusal. */
-    @StringRes
-    fun ttsStartFailureMessage(): Int =
-        when (ttsController.lastStartFailure) {
-            TtsStartFailure.MediaNotActive -> R.string.tts_media_mix_no_active_media
-            else -> R.string.tts_bar_error
-        }
-
     private var attachedTtsHandle: TtsEngineHandle? = null
 
     /** Publishes discovery state and atomically replaces the controller's engine adapter. */
     private fun publishTtsResolution(resolution: TtsResolutionResult?) {
         ttsResolution = resolution
         val handle = resolution?.handle
-        ttsVoiceResolution = handle?.voiceResolution ?: TtsVoiceResolution.Empty
         // A refresh that kept the same engine handle must not re-attach:
         // attachEngine treats every attach as a replacement and stops any
-        // in-flight speech. Only a genuinely new (or dropped) handle swaps.
+        // in-flight speech. It must also preserve the utterance-locale voice
+        // resolution most recently published by the attached adapter.
         if (handle === attachedTtsHandle) return
+        ttsVoiceResolution = handle?.voiceResolution ?: TtsVoiceResolution.Empty
         attachedTtsHandle = handle
         if (handle != null) {
             ttsController.attachEngine(
@@ -2257,7 +2237,7 @@ class WhiteNoiseAppState private constructor(
     private val profileScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private val profileRefreshFanoutGate = Semaphore(PROFILE_REFRESH_FANOUT)
-    private val mutationsScope =
+    internal val mutationsScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     internal val attachmentOpens =
         AttachmentOpenCoordinator(
@@ -6398,15 +6378,6 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    fun ttsEngineChoice(): TtsEngineChoice = ttsResolution?.engineChoice() ?: TtsEngineChoice(null, emptyList())
-
-    fun resolvedTtsEnginePackage(): String? =
-        ttsEngineResolver.preferredEnginePackage(
-            engines = ttsEngineChoice().engines,
-            defaultPackage = ttsEngineChoice().defaultPackage,
-            selectedOverride = ttsEnginePreferences.selectedEngine(),
-        )
-
     fun acknowledgeTtsTrustWarning(enginePackage: String) {
         ttsWarningPreferences.acknowledge(enginePackage)
     }
@@ -6424,17 +6395,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Saves a voice for the active engine and safely swaps in a newly configured handle. */
-    fun selectTtsVoice(voice: TtsVoiceKey?) {
-        val enginePackage = resolvedTtsEnginePackage() ?: return
-        if (voice != null && voice.enginePackage != enginePackage) return
-        mutationsScope.launch {
-            ttsVoicePreferences.setSelectedVoice(enginePackage, voice)
-            selectTtsEngineLocked(enginePackage)
-        }
-    }
-
-    private suspend fun selectTtsEngineLocked(enginePackage: String) {
+    internal suspend fun selectTtsEngineLocked(enginePackage: String) {
         ttsRefreshMutex.withLock {
             val current =
                 TtsEngineSelectionSnapshot(

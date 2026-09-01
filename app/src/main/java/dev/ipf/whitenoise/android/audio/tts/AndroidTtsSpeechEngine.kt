@@ -17,6 +17,11 @@ internal class AndroidTtsSpeechEngine(
         val status = textToSpeech.setLanguage(locale)
         if (status < TextToSpeech.LANG_AVAILABLE || enginePackage.isEmpty()) return status
         val voices = textToSpeech.voices.orEmpty().toList()
+        // Some otherwise usable engines synthesize through their default language
+        // without exposing a Voice catalog. Preserve the framework's accepted
+        // language status instead of treating the missing optional catalog as a
+        // hard language failure.
+        if (voices.isEmpty()) return status
         val resolution =
             TtsEngineResolver.resolveVoiceSelection(
                 enginePackage = enginePackage,
