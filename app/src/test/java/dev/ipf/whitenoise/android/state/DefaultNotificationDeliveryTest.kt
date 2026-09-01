@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -7,6 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DefaultNotificationDeliveryTest {
+    /** Requires both global registration success and an active-account fingerprint. */
     @Test
     fun nativePushEnablementRequiresAllAccountsAndActiveRegistration() {
         assertTrue(
@@ -29,6 +31,7 @@ class DefaultNotificationDeliveryTest {
         )
     }
 
+    /** Confirms a usable native-push path replaces the persistent connection. */
     @Test
     fun nativePushDisablesPersistentConnectionWhenAvailable() =
         runTest {
@@ -38,7 +41,7 @@ class DefaultNotificationDeliveryTest {
 
             val configured =
                 configureDefaultNotificationDelivery(
-                    nativePushAvailable = true,
+                    nativePushCapability = NativePushCapability.Available,
                     enableNativePush = {
                         nativePushEnableCalls += 1
                         true
@@ -59,6 +62,7 @@ class DefaultNotificationDeliveryTest {
             assertEquals(listOf(false), backgroundUpdates)
         }
 
+    /** Keeps the persistent relay connected when build configuration blocks native push. */
     @Test
     fun missingNativePushUsesPersistentConnection() =
         runTest {
@@ -68,7 +72,7 @@ class DefaultNotificationDeliveryTest {
 
             val configured =
                 configureDefaultNotificationDelivery(
-                    nativePushAvailable = false,
+                    nativePushCapability = NativePushCapability.MissingPushServerConfiguration,
                     enableNativePush = {
                         nativePushEnableCalled = true
                         true
@@ -89,6 +93,7 @@ class DefaultNotificationDeliveryTest {
             assertEquals(listOf(true), backgroundUpdates)
         }
 
+    /** Rolls back a failed native-push enable before restoring persistent delivery. */
     @Test
     fun failedNativePushEnableFallsBackToPersistentConnection() =
         runTest {
@@ -96,7 +101,7 @@ class DefaultNotificationDeliveryTest {
 
             val configured =
                 configureDefaultNotificationDelivery(
-                    nativePushAvailable = true,
+                    nativePushCapability = NativePushCapability.Available,
                     enableNativePush = {
                         updates += "native:on"
                         false
@@ -115,6 +120,7 @@ class DefaultNotificationDeliveryTest {
             assertEquals(listOf("native:on", "native:off", "background:true"), updates)
         }
 
+    /** Restores persistent delivery when disabling native push during rollback fails. */
     @Test
     fun failedNativePushShutdownRestoresPersistentConnection() =
         runTest {
@@ -122,7 +128,7 @@ class DefaultNotificationDeliveryTest {
 
             val configured =
                 configureDefaultNotificationDelivery(
-                    nativePushAvailable = true,
+                    nativePushCapability = NativePushCapability.Available,
                     enableNativePush = {
                         updates += "native:on"
                         true
@@ -144,6 +150,7 @@ class DefaultNotificationDeliveryTest {
             )
         }
 
+    /** Reports incomplete configuration when rollback fails despite restoring delivery. */
     @Test
     fun failedNativePushRollbackReportsUnconfiguredButRestoresPersistentConnection() =
         runTest {
@@ -151,7 +158,7 @@ class DefaultNotificationDeliveryTest {
 
             val configured =
                 configureDefaultNotificationDelivery(
-                    nativePushAvailable = true,
+                    nativePushCapability = NativePushCapability.Available,
                     enableNativePush = {
                         updates += "native:on"
                         true

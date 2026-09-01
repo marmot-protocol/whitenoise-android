@@ -125,6 +125,7 @@ import dev.ipf.whitenoise.android.notifications.ConversationVibrationPreferences
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPolicy
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
+import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationChannels
 import dev.ipf.whitenoise.android.notifications.NotificationReactionSendOutcome
 import dev.ipf.whitenoise.android.notifications.NotificationReplyCommitProbe
@@ -206,6 +207,7 @@ import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
+import dev.ipf.whitenoise.android.notifications.nativePushCapability as resolveNativePushCapability
 import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
 
 internal suspend fun resolveNotificationMentionDisplayName(
@@ -575,13 +577,13 @@ internal suspend fun runNotificationReconnectOnNetworkRestore(
  * persistent fallback is restored, keeping the two delivery modes exclusive.
  */
 internal suspend fun configureDefaultNotificationDelivery(
-    nativePushAvailable: Boolean,
+    nativePushCapability: NativePushCapability,
     enableNativePush: suspend () -> Boolean,
     disableNativePush: suspend () -> Boolean,
     setBackgroundConnectionEnabled: suspend (Boolean) -> Boolean,
 ): Boolean {
     val configured =
-        if (!nativePushAvailable) {
+        if (!nativePushCapability.isAvailable) {
             setBackgroundConnectionEnabled(true)
         } else {
             val nativePushReady = enableNativePush()
@@ -7785,23 +7787,23 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Whether real push notifications can run on this device + build. True
-     * only if (1) the build is configured with a MIP-05 push server pubkey,
-     * (2) Google Play Services is available on the device, AND (3) the
-     * Firebase app has actually been initialized at process start. Without
-     * (3), `FirebaseMessaging.getInstance()` throws `IllegalStateException`
-     * deep in the FCM SDK; the gate keeps that exception out of the
-     * foreground / account-switch / token-rotation paths that would
-     * otherwise crash the process. False on F-Droid/Zapstore installs
-     * lacking GMS, on builds without
-     * [BuildConfig.WHITENOISE_PUSH_SERVER_PUBKEY_HEX], on emulators without
-     * Play Services, and on builds where Firebase isn't initialized.
+     * Returns the first unmet native-push prerequisite for this build and
+     * device. Later checks are skipped when an earlier prerequisite is absent,
+     * which keeps configuration-free builds away from Firebase token work.
      */
-    fun isNativePushAvailable(config: PushServerConfig? = PushServerConfig.current()): Boolean {
-        if (config == null) return false
-        val status = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(appContext)
-        if (status != ConnectionResult.SUCCESS) return false
-        return FirebaseApp.getApps(appContext).isNotEmpty()
+    internal fun nativePushCapability(config: PushServerConfig? = PushServerConfig.current()): NativePushCapability {
+        val pushServerConfigured = config != null
+        val googlePlayServicesAvailable =
+            pushServerConfigured &&
+                GoogleApiAvailability
+                    .getInstance()
+                    .isGooglePlayServicesAvailable(appContext) == ConnectionResult.SUCCESS
+        val firebaseInitialized = googlePlayServicesAvailable && FirebaseApp.getApps(appContext).isNotEmpty()
+        return resolveNativePushCapability(
+            pushServerConfigured = pushServerConfigured,
+            googlePlayServicesAvailable = googlePlayServicesAvailable,
+            firebaseInitialized = firebaseInitialized,
+        )
     }
 
     /**
@@ -7831,6 +7833,10 @@ class WhiteNoiseAppState private constructor(
     private suspend fun hasConfirmedNativePushRegistration(account: String): Boolean =
         nativePushSyncMutex.withLock { perAccountSyncedFingerprints.containsKey(account) }
 
+    /**
+     * Replays pending server-side cleanup before registering every enabled
+     * account, and never reaches token acquisition unless capability is available.
+     */
     @Suppress("ReturnCount")
     private suspend fun syncNativePushRegistrationIfEnabledLocked(): Boolean {
         // Drain before resolving the push-server config so a clear that
@@ -7841,7 +7847,7 @@ class WhiteNoiseAppState private constructor(
         drainPendingPushClears()
         drainPendingPushDisables()
         val config = PushServerConfig.current() ?: return false
-        if (!isNativePushAvailable(config)) return false
+        if (!nativePushCapability(config).isAvailable) return false
         var accountRefs = accounts.map { it.label }
         if (accountRefs.isEmpty()) {
             // Only clear the durable #755 retry flag when the account list is
@@ -7987,7 +7993,7 @@ class WhiteNoiseAppState private constructor(
                 present(R.string.toast_no_active_account)
                 return false
             }
-        if (enabled && !isNativePushAvailable()) return false
+        if (enabled && !nativePushCapability().isAvailable) return false
         return runCatching {
             val settings = marmotIo { setNativePushEnabled(account, enabled) }
             localNotificationSettings = settings
@@ -8065,8 +8071,9 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Fetches and retains a non-blank FCM token only when every push prerequisite is available. */
     private suspend fun fetchFcmTokenOrNull(): String? {
-        if (!isNativePushAvailable()) return null
+        if (!nativePushCapability().isAvailable) return null
         val token =
             runCatchingCancellable {
                 suspendCancellableCoroutine<String?> { continuation ->
@@ -8124,6 +8131,10 @@ class WhiteNoiseAppState private constructor(
         preferences.edit().putBoolean(DISAPPEARING_TOOLTIP_SHOWN_KEY, true).commit()
     }
 
+    /**
+     * Performs the one-time default delivery setup, falling back to the
+     * persistent connection whenever native push cannot be used or enabled.
+     */
     suspend fun enableDefaultNotificationsIfReady(): Boolean {
         if (defaultNotificationsEnableAttempted) return false
         val account = activeAccountRef ?: return false
@@ -8134,7 +8145,7 @@ class WhiteNoiseAppState private constructor(
         localNotificationSettings = settings
         if (!settings.localNotificationsEnabled) return false
         return configureDefaultNotificationDelivery(
-            nativePushAvailable = isNativePushAvailable(),
+            nativePushCapability = nativePushCapability(),
             enableNativePush = { setNativePushEnabled(true) },
             disableNativePush = { setNativePushEnabled(false) },
             setBackgroundConnectionEnabled = ::setBackgroundConnectionEnabled,
