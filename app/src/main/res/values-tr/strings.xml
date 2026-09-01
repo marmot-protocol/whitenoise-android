@@ -678,8 +678,8 @@
     <string name="tts_playback_action_play">Oynat</string>
     <string name="tts_playback_action_pause">Duraklat</string>
     <string name="tts_playback_action_stop">Durdur</string>
-    <string name="tts_playback_action_previous_message">Önceki mesaj</string>
-    <string name="tts_playback_action_next_message">Sonraki mesaj</string>
+    <string name="tts_playback_action_previous_sentence">Önceki cümle</string>
+    <string name="tts_playback_action_next_sentence">Sonraki cümle</string>
     <string name="toast_restarting">Yeniden başlatılıyor</string>
     <string name="toast_identity_created">Kimlik oluşturuldu</string>
     <string name="toast_couldnt_create_identity">Kimlik oluşturulamadı</string>

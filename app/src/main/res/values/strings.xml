@@ -926,8 +926,8 @@
     <string name="tts_playback_action_play">Play</string>
     <string name="tts_playback_action_pause">Pause</string>
     <string name="tts_playback_action_stop">Stop</string>
-    <string name="tts_playback_action_previous_message">Previous message</string>
-    <string name="tts_playback_action_next_message">Next message</string>
+    <string name="tts_playback_action_previous_sentence">Previous sentence</string>
+    <string name="tts_playback_action_next_sentence">Next sentence</string>
     <string name="background_connection_special_use_subtype" translatable="false">Restart the user-enabled encrypted message background connection after device boot or app update.</string>
     <string name="toast_restarting">Restarting</string>
     <string name="toast_identity_created">Identity created</string>

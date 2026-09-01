@@ -18,6 +18,46 @@ import java.util.Locale
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class TtsHistorySessionTest {
+    /** Older-edge sentence navigation lands on the preceding message's final sentence. */
+    @Test
+    fun previousSentencePagesOlderAndTargetsTheLastLogicalSentence() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.pager.loaded += harness.record("m2", sentences = 2)
+            harness.pager.olderPages.addLast(listOf(harness.record("m1", sentences = 3)))
+            harness.speakEntries(listOf(harness.entry("m2", sentences = 2)))
+
+            harness.session.previousSentence()
+            advanceUntilIdle()
+
+            assertEquals(listOf("m1", "m2"), harness.controller.queuedMessageIds())
+            val state = harness.controller.state.value as TtsState.Speaking
+            assertEquals(0, state.messageIndex)
+            assertEquals(2, state.sentenceIndexWithinMessage)
+            assertTrue(harness.spokenTexts().any { it == "Nm1: More m1 3." })
+        }
+
+    /** Newer-edge sentence navigation pages once and targets the next message's first sentence. */
+    @Test
+    fun nextSentencePagesNewerAndTargetsTheFirstLogicalSentence() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.pager.loaded += harness.record("m1", sentences = 2)
+            harness.pager.newerPages.addLast(listOf(harness.record("m2", sentences = 3)))
+            harness.speakEntries(listOf(harness.entry("m1", sentences = 2)))
+
+            harness.session.nextSentence()
+            assertEquals(1, harness.controller.state.value.sentenceIndexWithinMessage)
+            harness.session.nextSentence()
+            advanceUntilIdle()
+
+            assertEquals(listOf("m1", "m2"), harness.controller.queuedMessageIds())
+            val state = harness.controller.state.value as TtsState.Speaking
+            assertEquals(1, state.messageIndex)
+            assertEquals(0, state.sentenceIndexWithinMessage)
+            assertTrue(harness.spokenTexts().any { it == "Nm2: Text m2." })
+        }
+
     @Test
     fun conversationSourceUsesThePlaybackSessionAndClearsAtItsTerminalBoundary() =
         runTest {

@@ -678,8 +678,8 @@
     <string name="tts_playback_action_play">Riproduci</string>
     <string name="tts_playback_action_pause">Metti in pausa</string>
     <string name="tts_playback_action_stop">Interrompi</string>
-    <string name="tts_playback_action_previous_message">Messaggio precedente</string>
-    <string name="tts_playback_action_next_message">Messaggio successivo</string>
+    <string name="tts_playback_action_previous_sentence">Frase precedente</string>
+    <string name="tts_playback_action_next_sentence">Frase successiva</string>
     <string name="toast_restarting">Riavvio</string>
     <string name="toast_identity_created">Identità creata</string>
     <string name="toast_couldnt_create_identity">Impossibile creare l’identità</string>

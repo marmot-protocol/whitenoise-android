@@ -710,8 +710,8 @@
     <string name="tts_playback_action_play">Воспроизвести</string>
     <string name="tts_playback_action_pause">Пауза</string>
     <string name="tts_playback_action_stop">Остановить</string>
-    <string name="tts_playback_action_previous_message">Предыдущее сообщение</string>
-    <string name="tts_playback_action_next_message">Следующее сообщение</string>
+    <string name="tts_playback_action_previous_sentence">Предыдущее предложение</string>
+    <string name="tts_playback_action_next_sentence">Следующее предложение</string>
     <string name="toast_restarting">Перезапуск</string>
     <string name="toast_identity_created">Идентичность создана</string>
     <string name="toast_couldnt_create_identity">Не удалось создать идентификатор</string>
