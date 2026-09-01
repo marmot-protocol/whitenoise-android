@@ -99,7 +99,11 @@ import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
+import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
+import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
+import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
+import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.diagnostics.StartupPerformanceDiagnostics
 import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
@@ -534,22 +538,6 @@ internal suspend fun dismissConversationNotificationsOnOpen(
 ) {
     conversationOpenDismissalTarget(activeAccountRef, groupIdHex)?.let { target ->
         dismissConversationNotifications(target.accountRef, target.groupIdHex)
-    }
-}
-
-/**
- * Offline-to-online recovery shared by durable outbound work and notifications.
- * Outbound work is woken first; [subscribeNotifications] is a passive broadcast
- * with no replay, so account catch-up still waits until a receiver is listening.
- */
-internal suspend fun runNotificationReconnectOnNetworkRestore(
-    wakeDurableOutbound: suspend () -> Unit,
-    ensureNotificationReceiverActive: suspend () -> Boolean,
-    catchUpAccounts: suspend () -> Unit,
-) {
-    wakeDurableOutbound()
-    if (ensureNotificationReceiverActive()) {
-        catchUpAccounts()
     }
 }
 
@@ -2301,6 +2289,10 @@ class WhiteNoiseAppState private constructor(
     private val notificationJob = NotificationJobSlot()
     private val notificationReconnectJob = NotificationJobSlot()
     private val pushWakeCatchUpDrainJob = NotificationJobSlot()
+    private val notificationReconnectRequestedGeneration = AtomicLong(0L)
+    private val notificationReconnectCompletedGeneration = AtomicLong(0L)
+    private val notificationNetworkRecoveryTraceLock = Any()
+    private var notificationNetworkRecoveryTrace: NotificationNetworkRecoveryPerformanceTrace? = null
 
     @Volatile
     private var networkNotificationRecoverySuppressed = false
@@ -2885,6 +2877,7 @@ class WhiteNoiseAppState private constructor(
         refreshLocalNotificationSettings()
         networkNotificationRecoverySuppressed = false
         if (restartNotifications) startNotificationListener()
+        resumeNotificationNetworkRecoveryIfPending()
     }
 
     private suspend fun stopNotificationListenerForAccountTeardown() {
@@ -3975,7 +3968,7 @@ class WhiteNoiseAppState private constructor(
      * behind that barrier, while signer restoration happens before Ready.
      */
     private suspend fun completeReceiverGatedStartup() {
-        val receiverReady = awaitNotificationReceiverForStartup()
+        val receiverReady = awaitNotificationReceiverForStartupWithin(notificationReceiverTimeoutMillis())
         appStateDebug { "marmot started; notification receiver active=$receiverReady" }
         startupPerformance.stage(PerformancePhase.NOTIFICATION_PRIVACY_SETUP) { refreshSecurityPrivacySettings() }
     }
@@ -4054,7 +4047,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun resumeCompletedBootstrap(): Boolean {
         if (!bootstrapCompleted) return false
         if (accounts.isNotEmpty()) phase = AppPhase.Ready
-        val receiverReady = awaitNotificationReceiverForStartup()
+        val receiverReady = awaitNotificationReceiverForStartupWithin(notificationReceiverTimeoutMillis())
         appStateDebug { "bootstrap resumed; notification receiver active=$receiverReady" }
         if (accounts.isEmpty()) phase = AppPhase.Onboarding
         return true
@@ -4062,13 +4055,14 @@ class WhiteNoiseAppState private constructor(
 
     private fun receiverUnavailable() = IllegalStateException("notification receiver unavailable during bootstrap")
 
-    private suspend fun awaitNotificationReceiverForStartup(): Boolean {
+    /** Await the process receiver within a caller-specific bounded budget. */
+    private suspend fun awaitNotificationReceiverForStartupWithin(timeoutMillis: Long): Boolean {
         if (networkNotificationRecoverySuppressed) return false
         return awaitNotificationReceiverForStartup(
             notificationJob = notificationJob,
             receiverActive = notificationReceiverActive,
             receiverRetryWake = notificationReceiverRetryWake,
-            timeoutMillis = notificationReceiverTimeoutMillis(),
+            timeoutMillis = timeoutMillis,
             launchListener = ::launchNotificationListenerLoop,
         )
     }
@@ -4086,7 +4080,7 @@ class WhiteNoiseAppState private constructor(
         }
         localNotificationPresenter.ensureChannels()
         refreshLocalNotificationPermission()
-        if (!awaitNotificationReceiverForStartup()) throw receiverUnavailable()
+        if (!awaitNotificationReceiverForStartupWithin(notificationReceiverTimeoutMillis())) throw receiverUnavailable()
         if (accounts.isEmpty()) refreshAccounts()
         refreshLocalNotificationSettings()
         drainPendingNativePushRegistrationSyncIfNeeded()
@@ -4106,7 +4100,14 @@ class WhiteNoiseAppState private constructor(
 
         localNotificationPresenter.ensureChannels()
         refreshLocalNotificationPermission()
-        val receiverReady = awaitNotificationReceiverForStartup()
+        val receiverReady =
+            awaitNotificationReceiverForStartupWithin(
+                timeoutMillis =
+                    minOf(
+                        notificationReceiverTimeoutMillis(),
+                        NOTIFICATION_NETWORK_RECOVERY_RECEIVER_TIMEOUT_MILLIS,
+                    ),
+            )
         if (receiverReady && !networkNotificationRecoverySuppressed) {
             if (accounts.isEmpty()) refreshAccounts()
             if (!networkNotificationRecoverySuppressed && notificationReceiverActive.value) {
@@ -5438,6 +5439,7 @@ class WhiteNoiseAppState private constructor(
             }
             networkNotificationRecoverySuppressed = false
             if (restartNotifications) startNotificationListener()
+            resumeNotificationNetworkRecoveryIfPending()
             refreshLocalNotificationSettings()
             return outcome
         } finally {
@@ -6805,11 +6807,55 @@ class WhiteNoiseAppState private constructor(
         updateConnectivitySignals(hasValidatedInternet = recovery.hasUsableInternet)
         if (!recovery.restored) return
         validatedConnectivityRecoveryGenerationMutable.update { generation -> generation + 1 }
+        beginNotificationNetworkRecoveryTrace(validatedConnectivityRecoveryGenerationMutable.value)
         scheduleNotificationReconnectOnNetworkRestore()
     }
 
+    /** Begin one privacy-safe, process-local trace for this recovery generation. */
+    private fun beginNotificationNetworkRecoveryTrace(generation: Long) {
+        val trace = PerformanceDiagnostics.begin(PerformanceOperation.SYNC_CATCH_UP)
+        synchronized(notificationNetworkRecoveryTraceLock) {
+            notificationNetworkRecoveryTrace =
+                trace?.let { NotificationNetworkRecoveryPerformanceTrace(generation, it) }
+        }
+        trace?.let {
+            PerformanceDiagnostics.record(
+                trace = it,
+                phase = PerformancePhase.NETWORK_RESTORED,
+                elapsedMs = 0L,
+                result = PerformanceResult.PENDING,
+            )
+        }
+    }
+
+    /** Record a bounded phase only when it still belongs to the current edge. */
+    private fun recordNotificationNetworkRecoveryPhase(
+        generation: Long,
+        phase: PerformancePhase,
+        result: PerformanceResult,
+        layer: PerformanceLayer,
+        attempt: Int,
+    ) {
+        val state =
+            synchronized(notificationNetworkRecoveryTraceLock) {
+                notificationNetworkRecoveryTrace?.takeIf { it.generation == generation }
+            } ?: return
+        PerformanceDiagnostics.record(
+            trace = state.trace,
+            phase = phase,
+            elapsedMs = (SystemClock.elapsedRealtime() - state.trace.startedAtMs).coerceAtLeast(0L),
+            result = result,
+            layer = layer,
+            attempt = attempt,
+        )
+    }
+
+    /** Retain the newest validated recovery edge until its account catch-up succeeds. */
     private fun scheduleNotificationReconnectOnNetworkRestore() {
         if (networkNotificationRecoverySuppressed) return
+        notificationReconnectRequestedGeneration.accumulateAndGet(
+            validatedConnectivityRecoveryGenerationMutable.value,
+        ) { current, requested -> maxOf(current, requested) }
         notificationReconnectJob.startIfInactive {
             val reconnectJob =
                 notificationScope.launch {
@@ -6818,28 +6864,147 @@ class WhiteNoiseAppState private constructor(
                     // launch would otherwise survive a wipe's cancel sweep
                     // (the wipe sets the flag before sweeping the slots).
                     if (networkNotificationRecoverySuppressed) return@launch
-                    runNotificationReconnectOnNetworkRestore(
-                        wakeDurableOutbound = {
-                            runCatchingCancellable { marmotIo { notifyConnectivityRestored() } }
-                                .onFailure { throwable ->
-                                    appStateDebug(throwable) {
-                                        "durable outbound connectivity wake failed: ${throwable.readableMessage()}"
-                                    }
-                                }
+                    drainNotificationNetworkRecovery(
+                        shouldContinue = {
+                            !networkNotificationRecoverySuppressed && hasValidatedInternet()
                         },
-                        ensureNotificationReceiverActive = ::ensureNotificationReceiverForNetworkReconnect,
-                        catchUpAccounts = {
-                            val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
-                            if (catchUpAccountsBestEffort()) {
-                                clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
+                        requestedGeneration = notificationReconnectRequestedGeneration::get,
+                        completedGeneration = notificationReconnectCompletedGeneration::get,
+                        runAttempt = ::runNotificationNetworkRecoveryAttempt,
+                        markCompleted = { generation ->
+                            notificationReconnectCompletedGeneration.accumulateAndGet(
+                                generation,
+                            ) { current, completed -> maxOf(current, completed) }
+                        },
+                        awaitRetry = { generation, attempt ->
+                            appStateDebug {
+                                "notification network recovery pending attempt=$attempt"
                             }
+                            awaitNotificationRetryWindow(
+                                retryWake = validatedConnectivityRecoveryGeneration,
+                                capturedGeneration = generation,
+                                backoffMillis = notificationNetworkRecoveryRetryDelayMillis(attempt),
+                            )
                         },
                     )
                 }
             reconnectJob.invokeOnCompletion { cause ->
-                if (cause == null) schedulePendingPushWakeCatchUpDrain()
+                if (cause == null) {
+                    if (
+                        !networkNotificationRecoverySuppressed &&
+                        hasValidatedInternet() &&
+                        notificationReconnectRequestedGeneration.get() >
+                        notificationReconnectCompletedGeneration.get()
+                    ) {
+                        scheduleNotificationReconnectOnNetworkRestore()
+                    }
+                    schedulePendingPushWakeCatchUpDrain()
+                }
             }
             reconnectJob
+        }
+    }
+
+    /** Resume a retained edge after account teardown releases its recovery fence. */
+    private fun resumeNotificationNetworkRecoveryIfPending() {
+        if (
+            hasValidatedInternet() &&
+            notificationReconnectRequestedGeneration.get() >
+            notificationReconnectCompletedGeneration.get()
+        ) {
+            scheduleNotificationReconnectOnNetworkRestore()
+        }
+    }
+
+    /** Run one receiver-gated catch-up attempt for the current recovery generation. */
+    private suspend fun runNotificationNetworkRecoveryAttempt(
+        generation: Long,
+        attempt: Int,
+    ): NotificationNetworkRecoveryOutcome {
+        recordNotificationNetworkRecoveryPhase(
+            generation = generation,
+            phase = PerformancePhase.RECOVERY_ATTEMPT,
+            result = PerformanceResult.PENDING,
+            layer = PerformanceLayer.ANDROID,
+            attempt = attempt,
+        )
+        return runNotificationReconnectOnNetworkRestore(
+            wakeDurableOutbound = { wakeDurableOutboundForNetworkRecovery(generation, attempt) },
+            ensureNotificationReceiverActive = {
+                ensureNotificationReceiverForNetworkRecovery(generation, attempt)
+            },
+            catchUpAccounts = { catchUpAccountsForNetworkRecovery(generation, attempt) },
+        )
+    }
+
+    /** Wake MDK's retained outbound work and record only its typed outcome. */
+    private suspend fun wakeDurableOutboundForNetworkRecovery(
+        generation: Long,
+        attempt: Int,
+    ) {
+        val wake = runCatchingCancellable { marmotIo { notifyConnectivityRestored() } }
+        wake.onFailure { throwable ->
+            appStateDebug(throwable) {
+                "durable outbound connectivity wake failed: ${throwable.readableMessage()}"
+            }
+        }
+        recordNotificationNetworkRecoveryPhase(
+            generation = generation,
+            phase = PerformancePhase.CONNECTIVITY_WAKE_READY,
+            result = if (wake.isSuccess) PerformanceResult.SUCCESS else PerformanceResult.FAILURE,
+            layer = PerformanceLayer.MDK,
+            attempt = attempt,
+        )
+    }
+
+    /** Establish the passive notification receiver before any inbound catch-up. */
+    private suspend fun ensureNotificationReceiverForNetworkRecovery(
+        generation: Long,
+        attempt: Int,
+    ): Boolean {
+        val ready = ensureNotificationReceiverForNetworkReconnect()
+        recordNotificationNetworkRecoveryPhase(
+            generation = generation,
+            phase =
+                if (ready) {
+                    PerformancePhase.NOTIFICATION_RECEIVER_READY
+                } else {
+                    PerformancePhase.NOTIFICATION_RECEIVER_RETRY
+                },
+            result = if (ready) PerformanceResult.SUCCESS else PerformanceResult.PENDING,
+            layer = PerformanceLayer.ANDROID,
+            attempt = attempt,
+        )
+        return ready
+    }
+
+    /** Run the authoritative MDK catch-up and leave failures queued for retry. */
+    private suspend fun catchUpAccountsForNetworkRecovery(
+        generation: Long,
+        attempt: Int,
+    ): Boolean {
+        val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
+        recordNotificationNetworkRecoveryPhase(
+            generation = generation,
+            phase = PerformancePhase.ACCOUNT_CATCH_UP_START,
+            result = PerformanceResult.PENDING,
+            layer = PerformanceLayer.MDK,
+            attempt = attempt,
+        )
+        return catchUpAccountsBestEffort().also { succeeded ->
+            if (succeeded) clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
+            recordNotificationNetworkRecoveryPhase(
+                generation = generation,
+                phase =
+                    if (succeeded) {
+                        PerformancePhase.ACCOUNT_CATCH_UP_READY
+                    } else {
+                        PerformancePhase.ACCOUNT_CATCH_UP_RETRY
+                    },
+                result = if (succeeded) PerformanceResult.SUCCESS else PerformanceResult.PENDING,
+                layer = PerformanceLayer.MDK,
+                attempt = attempt,
+            )
         }
     }
 
@@ -9881,6 +10046,7 @@ class WhiteNoiseAppState private constructor(
         private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
         private const val NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS = 60_000L
         private const val NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS = 5_000L
+        private const val NOTIFICATION_NETWORK_RECOVERY_RECEIVER_TIMEOUT_MILLIS = 3_000L
 
         private const val NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS = 10_000L
         private const val MAX_RETAINED_CONVERSATION_STATES = 32

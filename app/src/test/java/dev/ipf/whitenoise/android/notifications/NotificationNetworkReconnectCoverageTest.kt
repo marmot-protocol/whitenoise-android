@@ -59,6 +59,7 @@ class NotificationNetworkReconnectCoverageTest {
                     catchUpAccounts = {
                         recoverySteps += "catch-up"
                         passiveReceiver.emitRelayBacklog("offline-window-message")
+                        true
                     },
                 )
 
@@ -86,13 +87,17 @@ class NotificationNetworkReconnectCoverageTest {
             runNotificationReconnectOnNetworkRestore(
                 wakeDurableOutbound = { outboundWakeRan = true },
                 ensureNotificationReceiverActive = { false },
-                catchUpAccounts = { catchUpRan = true },
+                catchUpAccounts = {
+                    catchUpRan = true
+                    true
+                },
             )
 
             assertTrue("durable outbound recovery must not depend on the receiver", outboundWakeRan)
             assertFalse("catch-up must not run without a confirmed receiver", catchUpRan)
         }
 
+    @Suppress("CyclomaticComplexMethod", "LongMethod") // One source-ordering contract is clearer together.
     @Test
     fun offlineToOnlineTransitionReconnectsNotificationRuntimeWithoutPushWakeMarker() {
         val appState = appStateSource().readText()
@@ -101,6 +106,10 @@ class NotificationNetworkReconnectCoverageTest {
         val validatedListener = appState.functionBody("registerValidatedInternetListener")
         val usableRecovery = appState.functionBody("noteUsableValidatedInternetSnapshot")
         val reconnect = appState.functionBody("scheduleNotificationReconnectOnNetworkRestore")
+        val attempt = appState.functionBody("runNotificationNetworkRecoveryAttempt")
+        val outboundWake = appState.functionBody("wakeDurableOutboundForNetworkRecovery")
+        val receiverRecovery = appState.functionBody("ensureNotificationReceiverForNetworkRecovery")
+        val accountCatchUp = appState.functionBody("catchUpAccountsForNetworkRecovery")
         val receiver = appState.functionBody("ensureNotificationReceiverForNetworkReconnect")
         val listenerLoop = appState.functionBody("runNotificationListenerLoop")
 
@@ -117,11 +126,12 @@ class NotificationNetworkReconnectCoverageTest {
             "only validated aggregate recovery may wake pending sends and schedule reconnect",
             "if (!recovery.restored) return" in usableRecovery &&
                 "validatedConnectivityRecoveryGenerationMutable.update" in usableRecovery &&
+                "beginNotificationNetworkRecoveryTrace" in usableRecovery &&
                 "scheduleNotificationReconnectOnNetworkRestore()" in usableRecovery,
         )
         assertTrue(
             "notification reconnect must reuse the current listener and await its shared receiver state",
-            "awaitNotificationReceiverForStartup(" in receiver &&
+            "awaitNotificationReceiverForStartupWithin(" in receiver &&
                 "notificationJob.cancelAndJoin()" !in receiver,
         )
         assertTrue(
@@ -132,14 +142,15 @@ class NotificationNetworkReconnectCoverageTest {
         )
         assertTrue(
             "notification reconnect must wake durable outbound work before catch-up",
-            "ensureNotificationReceiverForNetworkReconnect" in reconnect &&
-                "notifyConnectivityRestored()" in reconnect &&
-                "catchUpAccountsBestEffort()" in reconnect &&
-                reconnect.indexOf("notifyConnectivityRestored()") <
-                reconnect.indexOf("ensureNotificationReceiverForNetworkReconnect") &&
-                reconnect.indexOf("ensureNotificationReceiverForNetworkReconnect") <
-                reconnect.indexOf("catchUpAccountsBestEffort()") &&
-                "pushWakeCatchUpPending()" !in reconnect,
+            "wakeDurableOutboundForNetworkRecovery" in attempt &&
+                "ensureNotificationReceiverForNetworkRecovery" in attempt &&
+                "catchUpAccountsForNetworkRecovery" in attempt &&
+                "notifyConnectivityRestored()" in outboundWake &&
+                "ensureNotificationReceiverForNetworkReconnect" in receiverRecovery &&
+                "PerformancePhase.NOTIFICATION_RECEIVER_RETRY" in receiverRecovery &&
+                "catchUpAccountsBestEffort()" in accountCatchUp &&
+                "PerformancePhase.ACCOUNT_CATCH_UP_RETRY" in accountCatchUp &&
+                "pushWakeCatchUpPending()" !in accountCatchUp,
         )
         assertTrue(
             "bootstrap failure must not imply a receiver is ready for reconnect catch-up",
@@ -148,7 +159,15 @@ class NotificationNetworkReconnectCoverageTest {
         )
         assertTrue(
             "reconnect requests must be coalesced while in flight",
-            "notificationReconnectJob.startIfInactive" in reconnect,
+            "notificationReconnectRequestedGeneration.accumulateAndGet" in reconnect &&
+                "notificationReconnectJob.startIfInactive" in reconnect &&
+                "drainNotificationNetworkRecovery" in reconnect,
+        )
+        assertTrue(
+            "a receiver timeout or catch-up failure must remain queued after the current job settles",
+            "notificationReconnectRequestedGeneration.get()" in reconnect &&
+                "notificationReconnectCompletedGeneration.get()" in reconnect &&
+                "scheduleNotificationReconnectOnNetworkRestore()" in reconnect.substringAfter("invokeOnCompletion"),
         )
     }
 
