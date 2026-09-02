@@ -20,7 +20,7 @@ internal fun Modifier.expandedComposerActionRow(progress: () -> Float): Modifier
         val placeable =
             measurable.measure(
                 constraints.copy(
-                    minHeight = actionSize,
+                    minHeight = actionSize.coerceAtMost(constraints.maxHeight),
                 ),
             )
         layout(placeable.width + inset, placeable.height + inset) {

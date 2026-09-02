@@ -1314,7 +1314,7 @@ internal fun ComposerBar(
                                 ),
                     )
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                        verticalAlignment = Alignment.Bottom,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier =
                             Modifier
