@@ -67,7 +67,6 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
-import dev.ipf.whitenoise.android.audio.tts.TtsEngineChoice
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineResolver
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionResult
@@ -77,6 +76,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsHistorySession
 import dev.ipf.whitenoise.android.audio.tts.TtsPlaybackForegroundService
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
 import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
@@ -1498,13 +1498,18 @@ class WhiteNoiseAppState private constructor(
     internal val chatFolderPreferences = ChatFolderPreferences(appContext)
     internal val ttsWarningPreferences = TtsWarningPreferences(appContext)
     internal val ttsEnginePreferences = TtsEnginePreferences(appContext)
-    internal val ttsEngineResolver = TtsEngineResolver(appContext)
+    internal val ttsVoicePreferences = TtsVoicePreferences(appContext)
+    internal val ttsEngineResolver =
+        TtsEngineResolver(appContext, selectedVoice = ttsVoicePreferences::selectedVoice)
     internal val ttsRatePreferences = TtsRatePreferences(appContext)
+    internal val ttsMediaMixPreferences = TtsMediaMixPreferences(appContext)
 
     // Process-wide read-aloud playback: survives navigation between chats and
     // back to the chat list, matching VoicePlaybackController's lifetime.
-    val ttsController = createAppTtsController(appContext, ttsRatePreferences)
+    val ttsController = createAppTtsController(appContext, ttsRatePreferences, ttsMediaMixPreferences)
     var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
+        private set
+    var ttsVoiceResolution by mutableStateOf(TtsVoiceResolution.Empty)
         private set
 
     // The (account, conversation) pair that owns the current auto-read
@@ -1709,17 +1714,25 @@ class WhiteNoiseAppState private constructor(
 
     private var attachedTtsHandle: TtsEngineHandle? = null
 
+    /** Publishes discovery state and atomically replaces the controller's engine adapter. */
     private fun publishTtsResolution(resolution: TtsResolutionResult?) {
         ttsResolution = resolution
         val handle = resolution?.handle
         // A refresh that kept the same engine handle must not re-attach:
         // attachEngine treats every attach as a replacement and stops any
-        // in-flight speech. Only a genuinely new (or dropped) handle swaps.
+        // in-flight speech. It must also preserve the utterance-locale voice
+        // resolution most recently published by the attached adapter.
         if (handle === attachedTtsHandle) return
+        ttsVoiceResolution = handle?.voiceResolution ?: TtsVoiceResolution.Empty
         attachedTtsHandle = handle
         if (handle != null) {
             ttsController.attachEngine(
-                AndroidTtsSpeechEngine(handle.textToSpeech),
+                AndroidTtsSpeechEngine(
+                    textToSpeech = handle.textToSpeech,
+                    enginePackage = handle.enginePackage,
+                    selectedVoice = { ttsVoicePreferences.selectedVoice(handle.enginePackage) },
+                    onVoiceResolved = { voiceResolution -> ttsVoiceResolution = voiceResolution },
+                ),
                 engineKey = handle.enginePackage,
             )
         } else {
@@ -2212,7 +2225,7 @@ class WhiteNoiseAppState private constructor(
     private val profileScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private val profileRefreshFanoutGate = Semaphore(PROFILE_REFRESH_FANOUT)
-    private val mutationsScope =
+    internal val mutationsScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     internal val attachmentOpens =
         AttachmentOpenCoordinator(
@@ -6364,15 +6377,6 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    fun ttsEngineChoice(): TtsEngineChoice = ttsResolution?.engineChoice() ?: TtsEngineChoice(null, emptyList())
-
-    fun resolvedTtsEnginePackage(): String? =
-        ttsEngineResolver.preferredEnginePackage(
-            engines = ttsEngineChoice().engines,
-            defaultPackage = ttsEngineChoice().defaultPackage,
-            selectedOverride = ttsEnginePreferences.selectedEngine(),
-        )
-
     fun acknowledgeTtsTrustWarning(enginePackage: String) {
         ttsWarningPreferences.acknowledge(enginePackage)
     }
@@ -6390,7 +6394,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private suspend fun selectTtsEngineLocked(enginePackage: String) {
+    internal suspend fun selectTtsEngineLocked(enginePackage: String) {
         ttsRefreshMutex.withLock {
             val current =
                 TtsEngineSelectionSnapshot(

@@ -100,6 +100,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isBlueFreeAccentVisible
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.state.withoutBlueChannel
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
@@ -956,6 +957,8 @@ internal fun MessageBubble(
     // opened from a text selection, start at the containing visible sentence.
     // The ordinary long-press action starts at the message top; only an
     // explicit text double-tap supplies a seek offset (#2136).
+
+    /** Starts from the selected sentence and preserves a specific start-gate explanation. */
     fun startSpeakAloud(
         visibleText: String? = null,
         visibleOffset: Int? = null,
@@ -991,7 +994,7 @@ internal fun MessageBubble(
                     locale,
                     startSentenceIndex,
                 )
-            if (!started) appState.present(R.string.tts_bar_error)
+            if (!started) appState.present(appState.ttsStartFailureMessage())
         }
     }
 

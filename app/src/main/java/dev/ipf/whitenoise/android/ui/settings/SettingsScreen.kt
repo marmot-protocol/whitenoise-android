@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -71,8 +72,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
@@ -614,23 +617,44 @@ internal fun SelectableSettingsRow(
     )
 }
 
-// A selectable row that also shows a supporting line (e.g. the approximate
-// per-photo size delta) under the title. Mirrors [SelectableSettingsRow] but
-// with a subtitle slot.
+/**
+ * Selectable row with supporting copy and optional merged accessibility text.
+ * Disabled choices remain visible so the supporting line can explain why.
+ */
 @Composable
 internal fun SelectableSettingsRowWithSubtitle(
     title: String,
     subtitle: String,
     selected: Boolean,
+    enabled: Boolean = true,
+    accessibilityLabel: String? = null,
     onClick: () -> Unit,
 ) {
+    val rowModifier =
+        Modifier
+            .settingsRowAmoledSurfaceBorder()
+            .selectable(
+                selected = selected,
+                enabled = enabled,
+                onClick = onClick,
+                role = Role.RadioButton,
+            )
     ListItem(
         modifier =
-            Modifier
-                .settingsRowAmoledSurfaceBorder()
-                .selectable(selected = selected, onClick = onClick, role = Role.RadioButton),
+            if (accessibilityLabel == null) {
+                rowModifier
+            } else {
+                rowModifier.semantics(mergeDescendants = true) {
+                    contentDescription = accessibilityLabel
+                }
+            },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        headlineContent = { Text(title) },
+        headlineContent = {
+            Text(
+                title,
+                color = if (enabled) Color.Unspecified else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
         supportingContent = {
             Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
         },
@@ -639,13 +663,19 @@ internal fun SelectableSettingsRowWithSubtitle(
                 Icon(
                     Icons.Default.Check,
                     contentDescription = stringResource(R.string.selected),
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint =
+                        if (enabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                 )
             }
         },
     )
 }
 
+/** Renders a settings toggle with optional in-row padding for segmented lists. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun SettingsSwitchRow(
@@ -655,13 +685,17 @@ internal fun SettingsSwitchRow(
     enabled: Boolean = true,
     busy: Boolean = false,
     switchModifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    contentSpacing: Dp = 0.dp,
     icon: ImageVector? = null,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
-            .settingsRowAmoledSurfaceBorder(),
+            .settingsRowAmoledSurfaceBorder()
+            .padding(contentPadding),
+        horizontalArrangement = Arrangement.spacedBy(contentSpacing),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
