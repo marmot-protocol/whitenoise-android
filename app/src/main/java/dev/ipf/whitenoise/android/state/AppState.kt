@@ -8580,7 +8580,7 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Targeted local read for a message-notification tap. This avoids waiting
-     * for the target account's broad chat-list projection to bind (#586).
+     * for the target account's broad chat-list projection to bind.
      */
     suspend fun loadNotificationChatListItem(
         accountRef: String,
@@ -8599,20 +8599,10 @@ class WhiteNoiseAppState private constructor(
     suspend fun preloadNotificationChatListItem(
         accountRef: String,
         groupIdHex: String,
-    ): ChatListItem =
-        coroutineScope {
-            // These are independent SQLite-backed reads. Start both before
-            // awaiting either so the exact unread projection does not give up
-            // the fast inactive-account route introduced for #586.
-            val details = async { marmotIo { groupDetails(accountRef, groupIdHex) } }
-            val projection = async { loadNotificationChatListProjection(accountRef, groupIdHex) }
-            val activeAccountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
-            chatListItemFromNotificationProjection(
-                details = details.await(),
-                activeAccountIdHex = activeAccountIdHex,
-                projection = projection.await(),
-            )
-        }
+    ): ChatListItem {
+        val projection = loadNotificationChatListProjection(accountRef, groupIdHex)
+        return chatListItemFromNotificationProjection(projection)
+    }
 
     /**
      * Read the notification target's exact pre-read chat-list row. Failure or a

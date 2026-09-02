@@ -10,7 +10,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Reproducible warm-process fixture for #586.
+ * Reproducible warm-process fixture for inactive-account notification opens.
  *
  * Prepare the non-debuggable `benchmark` target on an API 35 Pixel 8-class
  * device with two signed-in accounts and local conversation history. Deliver at
@@ -85,7 +85,7 @@ class SecondaryAccountNotificationNavigationMacrobenchmark {
         Log.i(BENCHMARK_LOG_TAG, report)
         check(identityFailures == 0 && budgetFailures == 0) {
             "Secondary-account notification route failed: $report. " +
-                "Inspect accountActivation, groupDetails, targetTimeline, initialAnchor, " +
+                "Inspect accountActivation, targetProjection, targetTimeline, initialAnchor, " +
                 "controllerBind, and firstConversationFrame slices."
         }
     }

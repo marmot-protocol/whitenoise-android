@@ -1004,7 +1004,7 @@ internal fun MainShell(
                             loadTarget = {
                                 NotificationRouteTrace.tracePhase(
                                     requestId = routingRequestId,
-                                    sectionName = NotificationRouteTraceSection.GROUP_DETAILS,
+                                    sectionName = NotificationRouteTraceSection.TARGET_PROJECTION,
                                 ) {
                                     appState.preloadNotificationChatListItem(
                                         accountRef = preloadKey.accountRef,
@@ -1021,7 +1021,7 @@ internal fun MainShell(
                             // Published before activation completes: a ready
                             // local read re-fires the routing effect, which
                             // commits the conversation open immediately while
-                            // the switch keeps settling behind it (#586).
+                            // the switch keeps settling behind it.
                             onPreload = {
                                 notificationMessagePreload = it
                             },
@@ -1107,7 +1107,7 @@ internal fun MainShell(
                                     loadNotificationMessageDirectly {
                                         NotificationRouteTrace.tracePhase(
                                             requestId = routingRequestId,
-                                            sectionName = NotificationRouteTraceSection.GROUP_DETAILS,
+                                            sectionName = NotificationRouteTraceSection.TARGET_PROJECTION,
                                         ) {
                                             appState.loadNotificationChatListItem(
                                                 accountRef = target.accountRef,
@@ -1147,7 +1147,7 @@ internal fun MainShell(
                                 loadNotificationMessageDirectly {
                                     NotificationRouteTrace.tracePhase(
                                         requestId = routingRequestId,
-                                        sectionName = NotificationRouteTraceSection.GROUP_DETAILS,
+                                        sectionName = NotificationRouteTraceSection.TARGET_PROJECTION,
                                     ) {
                                         appState.loadNotificationChatListItem(
                                             accountRef = target.accountRef,

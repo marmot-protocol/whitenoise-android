@@ -25,7 +25,7 @@ private val notificationRoutePhaseSections =
     listOf(
         "WhiteNoise.notificationRoute.total",
         "WhiteNoise.notificationRoute.accountActivation",
-        "WhiteNoise.notificationRoute.groupDetails",
+        "WhiteNoise.notificationRoute.targetProjection",
         "WhiteNoise.notificationRoute.controllerBind",
         "WhiteNoise.notificationRoute.targetTimeline",
         "WhiteNoise.notificationRoute.initialAnchor",
