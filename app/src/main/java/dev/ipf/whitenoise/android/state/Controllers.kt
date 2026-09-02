@@ -3604,7 +3604,7 @@ class ChatsController private constructor(
             val catchUpGate = ChatListCatchUpGate()
             var retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
             var localFramePresented = preserveLoadedContent && seededLocalSnapshot == null && keepLoadedContent
-            var pendingReadinessCatchUp: Deferred<Boolean>? = null
+            var pendingReadinessCatchUp: Deferred<AccountCatchUpResult>? = null
             var initialSubscriptionProjection = true
             if (seededLocalSnapshot != null) {
                 // Render the preinstalled one-shot seed before live or background enrichment.

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -41,8 +42,8 @@ class ChatListConnectionStateTest {
             assertSame(first, shared)
             assertNotSame(first, newerNetwork)
             release.complete(Unit)
-            assertTrue(first.await())
-            assertTrue(newerNetwork.await())
+            assertEquals(AccountCatchUpOutcome.Succeeded, first.await().outcome)
+            assertEquals(AccountCatchUpOutcome.Succeeded, newerNetwork.await().outcome)
         }
 
     /** Native catch-up calls for different network generations must never overlap. */
@@ -84,8 +85,8 @@ class ChatListConnectionStateTest {
 
             assertFalse("a successor must wait for the active native call", secondStarted.isCompleted)
             releaseFirst.complete(Unit)
-            assertTrue(first.await())
-            assertTrue(second.await())
+            assertEquals(AccountCatchUpOutcome.Succeeded, first.await().outcome)
+            assertEquals(AccountCatchUpOutcome.Succeeded, second.await().outcome)
             assertEquals(1, maximumInFlight)
         }
 
@@ -121,10 +122,96 @@ class ChatListConnectionStateTest {
                 }
 
             releaseFirst.complete(Unit)
-            assertTrue(first.await())
-            assertFalse(superseded.await())
-            assertTrue(newest.await())
+            assertEquals(AccountCatchUpOutcome.Succeeded, first.await().outcome)
+            assertEquals(AccountCatchUpOutcome.Superseded, superseded.await().outcome)
+            assertEquals(AccountCatchUpOutcome.Succeeded, newest.await().outcome)
             assertEquals(listOf(8L, 10L), attempts)
+        }
+
+    /** Work started before a new trigger cannot satisfy that trigger's catch-up. */
+    @Test
+    fun catchUpAfterATriggerQueuesBehindOlderMatchingWork() =
+        runTest {
+            val coordinator = AccountCatchUpCoordinator(this)
+            val key =
+                AccountCatchUpKey(
+                    accountRef = "personal",
+                    runtimeGeneration = 4,
+                    networkGeneration = 8L,
+                )
+            val oldStarted = CompletableDeferred<Unit>()
+            val releaseOld = CompletableDeferred<Unit>()
+            val freshStarted = CompletableDeferred<Unit>()
+            val old =
+                coordinator.launch(key) {
+                    oldStarted.complete(Unit)
+                    releaseOld.await()
+                    true
+                }
+            oldStarted.await()
+
+            val observedStartSequence = coordinator.captureStartSequence()
+            val fresh =
+                coordinator.launchAfter(observedStartSequence, key) {
+                    freshStarted.complete(Unit)
+                    true
+                }
+
+            assertNotSame(old, fresh)
+            assertFalse(freshStarted.isCompleted)
+            releaseOld.complete(Unit)
+            assertEquals(observedStartSequence, old.await().startSequence)
+            assertEquals(AccountCatchUpOutcome.Succeeded, fresh.await().outcome)
+            assertTrue(requireNotNull(fresh.await().startSequence) > observedStartSequence)
+        }
+
+    /** Successful work from before a push cannot clear the newly recorded wake. */
+    @Test
+    fun pushWakeClearsOnlyAfterTheFreshSuccessorCompletes() =
+        runTest {
+            val coordinator = AccountCatchUpCoordinator(this)
+            val key =
+                AccountCatchUpKey(
+                    accountRef = "personal",
+                    runtimeGeneration = 4,
+                    networkGeneration = 8L,
+                )
+            val oldStarted = CompletableDeferred<Unit>()
+            val releaseOld = CompletableDeferred<Unit>()
+            val freshStarted = CompletableDeferred<Unit>()
+            val releaseFresh = CompletableDeferred<Unit>()
+            var markerCleared = false
+
+            coordinator.launch(key) {
+                oldStarted.complete(Unit)
+                releaseOld.await()
+                true
+            }
+            oldStarted.await()
+            val observedStartSequence = coordinator.captureStartSequence()
+            val drain =
+                async {
+                    runCatchUpAfterTrigger(
+                        observedStartSequence = observedStartSequence,
+                        launchAfter = { sequence ->
+                            coordinator.launchAfter(sequence, key) {
+                                freshStarted.complete(Unit)
+                                releaseFresh.await()
+                                true
+                            }
+                        },
+                        onSucceeded = { markerCleared = true },
+                    )
+                }
+            runCurrent()
+
+            releaseOld.complete(Unit)
+            freshStarted.await()
+            assertFalse("the older success must leave the push marker pending", markerCleared)
+            releaseFresh.complete(Unit)
+
+            assertEquals(AccountCatchUpOutcome.Succeeded, drain.await().outcome)
+            assertTrue(markerCleared)
         }
 
     @Test
@@ -263,7 +350,30 @@ class ChatListConnectionStateTest {
 
         assertEquals(
             ChatListConnectionPhase.Idle,
-            attempting.catchUpFailed(requireNotNull(attempting.evidenceTokenOrNull())).phase,
+            attempting
+                .applyCatchUpResult(
+                    token = requireNotNull(attempting.evidenceTokenOrNull()),
+                    result = AccountCatchUpResult(AccountCatchUpOutcome.Failed),
+                ).phase,
+        )
+    }
+
+    /** Coalescing is neutral: a request that never ran cannot invalidate readiness. */
+    @Test
+    fun supersededCatchUpPreservesTheCurrentReadinessPhase() {
+        val attempting =
+            ChatListConnectionState().beginSessionAttempt(
+                accountRef = "personal",
+                runtimeGeneration = 4,
+                bindEpoch = 7,
+            )
+
+        assertEquals(
+            attempting,
+            attempting.applyCatchUpResult(
+                token = requireNotNull(attempting.evidenceTokenOrNull()),
+                result = AccountCatchUpResult(AccountCatchUpOutcome.Superseded),
+            ),
         )
     }
 

@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.notifications
 
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.propertyInitializerCall
+import dev.ipf.whitenoise.android.state.AccountCatchUpOutcome
+import dev.ipf.whitenoise.android.state.AccountCatchUpResult
 import dev.ipf.whitenoise.android.state.NotificationJobSlot
 import dev.ipf.whitenoise.android.state.awaitActiveNotificationReceiver
 import dev.ipf.whitenoise.android.state.runNotificationReconnectOnNetworkRestore
@@ -60,7 +62,7 @@ class NotificationNetworkReconnectCoverageTest {
                     catchUpAccounts = {
                         recoverySteps += "catch-up"
                         passiveReceiver.emitRelayBacklog("offline-window-message")
-                        true
+                        AccountCatchUpResult(AccountCatchUpOutcome.Succeeded)
                     },
                 )
 
@@ -90,7 +92,7 @@ class NotificationNetworkReconnectCoverageTest {
                 ensureNotificationReceiverActive = { false },
                 catchUpAccounts = {
                     catchUpRan = true
-                    true
+                    AccountCatchUpResult(AccountCatchUpOutcome.Succeeded)
                 },
             )
 
@@ -150,7 +152,7 @@ class NotificationNetworkReconnectCoverageTest {
                 "catchUpAccounts =" in attempt &&
                 "notifyConnectivityRestored()" in bridge &&
                 "ensureNotificationReceiverForNetworkReconnect" in bridge &&
-                "launchCatchUpAccounts().await()" in bridge &&
+                "catchUpAfterObservedPushWake(pendingGeneration)" in bridge &&
                 "PerformancePhase.NOTIFICATION_RECEIVER_RETRY" in attempt &&
                 "PerformancePhase.ACCOUNT_CATCH_UP_RETRY" in attempt &&
                 "pushWakeCatchUpPending()" !in bridge,
@@ -208,7 +210,7 @@ class NotificationNetworkReconnectCoverageTest {
 
         assertTrue(
             "foreground recovery must share catch-up without sending another transport wake",
-            "launchCatchUpAccounts().await()" in body &&
+            "catchUpAfterObservedPushWake(pendingGeneration)" in body &&
                 "notifyConnectivityRestored()" !in body,
         )
     }

@@ -116,11 +116,17 @@ internal fun ChatListConnectionState.readyFromCatchUp(token: ChatListConnectionE
         this
     }
 
-internal fun ChatListConnectionState.catchUpFailed(token: ChatListConnectionEvidenceToken): ChatListConnectionState =
-    if (matches(token) && phase.canAcceptReadiness) {
-        invalidateReadiness()
-    } else {
-        this
+/** Applies only executed catch-up outcomes; coalesced requests leave readiness unchanged. */
+internal fun ChatListConnectionState.applyCatchUpResult(
+    token: ChatListConnectionEvidenceToken,
+    result: AccountCatchUpResult,
+): ChatListConnectionState =
+    when (result.outcome) {
+        AccountCatchUpOutcome.Succeeded -> readyFromCatchUp(token)
+        AccountCatchUpOutcome.Failed -> {
+            if (matches(token) && phase.canAcceptReadiness) invalidateReadiness() else this
+        }
+        AccountCatchUpOutcome.Superseded -> this
     }
 
 internal fun ChatListConnectionState.readyFromLiveUpdate(
@@ -211,18 +217,13 @@ internal class ChatListConnectionOwner(
         return state
     }
 
-    fun observe(catchUp: Deferred<Boolean>) {
+    fun observe(catchUp: Deferred<AccountCatchUpResult>) {
         val token = state.evidenceTokenOrNull() ?: return
         if (!state.phase.canAcceptReadiness) return
         readinessJob?.cancel()
         readinessJob =
             scope.launch {
-                state =
-                    if (catchUp.await()) {
-                        state.readyFromCatchUp(token)
-                    } else {
-                        state.catchUpFailed(token)
-                    }
+                state = state.applyCatchUpResult(token, catchUp.await())
             }
     }
 
@@ -275,7 +276,7 @@ internal class ChatListConnectionOwner(
         }
 
     /** Starts or joins the process-owned catch-up for the current account and network lifetime. */
-    fun launchCatchUp(): Deferred<Boolean> = appState.launchCatchUpAccounts()
+    fun launchCatchUp(): Deferred<AccountCatchUpResult> = appState.launchCatchUpAccounts()
 
     fun invalidate() {
         readinessJob?.cancel()

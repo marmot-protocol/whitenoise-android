@@ -291,7 +291,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
     /** Keeps process-scoped catch-up fenced by account, runtime, and shared network lifetime. */
     @Test
     fun catchUpLaunchIsProcessScopedAndDeduplicated() {
-        val body = appStateSource().readText().kotlinFunctionBody("launchCatchUpAccounts")
+        val body = appStateSource().readText().kotlinFunctionBody("launchAccountCatchUp")
         val coordinator = connectivityRuntimeSource().readText()
 
         assertTrue(
@@ -300,11 +300,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
         )
         assertTrue(
             "readiness callers must receive a result without owning the native job",
-            "val result: CompletableDeferred<Boolean>" in coordinator,
+            "val result: CompletableDeferred<AccountCatchUpResult>" in coordinator,
         )
         assertTrue(
             "only identity-matched callers may share an active catch-up",
-            "it.key == key" in coordinator,
+            "request.key == key" in coordinator,
         )
         assertTrue(
             "the background job must run the result-bearing best-effort catch-up",
@@ -324,7 +324,10 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val body = appStateSource().readText().kotlinFunctionBody("catchUpAfterForegroundActivation")
 
         assertFalse("foreground recovery must not duplicate the transport wake", "notifyConnectivityRestored()" in body)
-        assertTrue("foreground recovery must join the process catch-up", "launchCatchUpAccounts().await()" in body)
+        assertTrue(
+            "foreground recovery must use the post-trigger catch-up boundary",
+            "catchUpAfterObservedPushWake(pendingGeneration)" in body,
+        )
     }
 
     /** Durable push recovery joins the same process-owned native call. */
@@ -332,7 +335,10 @@ class AccountSwitchLocalSnapshotOrderingTest {
     fun pushWakeRecoveryUsesTheSharedCatchUp() {
         val body = appStateSource().readText().kotlinFunctionBody("drainPendingPushWakeCatchUpIfNeeded")
 
-        assertTrue("push-wake recovery must join the process catch-up", "launchCatchUpAccounts().await()" in body)
+        assertTrue(
+            "push-wake recovery must use the post-trigger catch-up boundary",
+            "catchUpAfterObservedPushWake(pendingGeneration)" in body,
+        )
         assertFalse("push-wake recovery must not bypass coordination", "catchUpAccountsBestEffort()" in body)
     }
 

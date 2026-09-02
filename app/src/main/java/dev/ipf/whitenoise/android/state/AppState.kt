@@ -3575,13 +3575,15 @@ class WhiteNoiseAppState private constructor(
      * consumers. Callers for the same account, runtime, and network share one
      * in-flight result; a newer identity waits instead of overlapping native work.
      */
-    internal fun launchCatchUpAccounts(): Deferred<Boolean> =
+    internal fun launchCatchUpAccounts(): Deferred<AccountCatchUpResult> = launchAccountCatchUp(mustStartAfter = null)
+
+    private fun launchAccountCatchUp(mustStartAfter: Long?): Deferred<AccountCatchUpResult> =
         AccountCatchUpKey(
             accountRef = activeAccountRef,
             runtimeGeneration = runtimeGeneration,
             networkGeneration = connectivitySignalOwner.captureNetworkGeneration(),
         ).let { key ->
-            accountCatchUpCoordinator.launch(key) {
+            val catchUp: suspend () -> Boolean = {
                 val succeeded = catchUpAccountsBestEffort()
                 if (succeeded) recordStartupRelayCatchUpReady()
                 succeeded &&
@@ -3589,7 +3591,23 @@ class WhiteNoiseAppState private constructor(
                     runtimeGeneration == key.runtimeGeneration &&
                     connectivitySignalOwner.isNetworkGenerationCurrent(key.networkGeneration)
             }
+            if (mustStartAfter == null) {
+                accountCatchUpCoordinator.launch(key, catchUp)
+            } else {
+                accountCatchUpCoordinator.launchAfter(mustStartAfter, key, catchUp)
+            }
         }
+
+    /** Runs catch-up work fresh enough to acknowledge the observed push-wake marker. */
+    private suspend fun catchUpAfterObservedPushWake(pendingGeneration: Long): AccountCatchUpResult {
+        if (pendingGeneration == 0L) return launchCatchUpAccounts().await()
+        val observedStartSequence = accountCatchUpCoordinator.captureStartSequence()
+        return runCatchUpAfterTrigger(
+            observedStartSequence = observedStartSequence,
+            launchAfter = { sequence -> launchAccountCatchUp(mustStartAfter = sequence) },
+            onSucceeded = { clearPendingPushWakeCatchUpIfObserved(pendingGeneration) },
+        )
+    }
 
     private suspend fun catchUpAccountsBestEffort(): Boolean =
         runCatchingCancellable { marmotIo { catchUpAccounts() } }
@@ -3617,9 +3635,7 @@ class WhiteNoiseAppState private constructor(
         isForegroundCatchUpRunning = true
         try {
             val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
-            if (launchCatchUpAccounts().await()) {
-                clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
-            }
+            catchUpAfterObservedPushWake(pendingGeneration)
         } finally {
             isForegroundCatchUpRunning = false
         }
@@ -4182,13 +4198,11 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Joins the shared catch-up before clearing the matching durable push-wake generation. */
+    /** Runs work started after the durable wake before clearing its matching generation. */
     private suspend fun drainPendingPushWakeCatchUpIfNeeded() {
         val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
         if (pendingGeneration == 0L) return
-        if (launchCatchUpAccounts().await()) {
-            clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
-        }
+        catchUpAfterObservedPushWake(pendingGeneration)
     }
 
     private fun clearPendingPushWakeCatchUpIfObserved(pendingGeneration: Long) {
@@ -6663,9 +6677,7 @@ class WhiteNoiseAppState private constructor(
             ensureNotificationReceiverActive = ::ensureNotificationReceiverForNetworkReconnect,
             catchUpAccounts = {
                 val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
-                launchCatchUpAccounts().await().also { succeeded ->
-                    if (succeeded) clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
-                }
+                catchUpAfterObservedPushWake(pendingGeneration)
             },
             awaitRetry = { generation, attempt ->
                 appStateDebug { "notification network recovery pending attempt=$attempt" }

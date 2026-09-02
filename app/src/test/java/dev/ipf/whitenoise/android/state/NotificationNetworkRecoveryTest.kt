@@ -231,7 +231,7 @@ class NotificationNetworkRecoveryTest {
                         },
                         catchUpAccounts = {
                             catchUpRan = true
-                            true
+                            AccountCatchUpResult(AccountCatchUpOutcome.Succeeded)
                         },
                     )
                 }
@@ -258,7 +258,7 @@ class NotificationNetworkRecoveryTest {
                     ensureNotificationReceiverActive = { false },
                     catchUpAccounts = {
                         catchUpRan = true
-                        true
+                        AccountCatchUpResult(AccountCatchUpOutcome.Succeeded)
                     },
                 )
 
@@ -273,10 +273,42 @@ class NotificationNetworkRecoveryTest {
                 runNotificationReconnectOnNetworkRestore(
                     wakeDurableOutbound = {},
                     ensureNotificationReceiverActive = { true },
-                    catchUpAccounts = { false },
+                    catchUpAccounts = { AccountCatchUpResult(AccountCatchUpOutcome.Failed) },
                 )
 
             assertEquals(NotificationNetworkRecoveryOutcome.CatchUpFailed, result)
+        }
+
+    /** Coalescing follows the replacement without repeating the recovery attempt. */
+    @Test
+    fun supersededCatchUpStaysWithinOneRecoveryAttempt() =
+        runTest {
+            var wakes = 0
+            var receiverChecks = 0
+            var catchUps = 0
+            val result =
+                runNotificationReconnectOnNetworkRestore(
+                    wakeDurableOutbound = { wakes += 1 },
+                    ensureNotificationReceiverActive = {
+                        receiverChecks += 1
+                        true
+                    },
+                    catchUpAccounts = {
+                        catchUps += 1
+                        AccountCatchUpResult(
+                            if (catchUps == 1) {
+                                AccountCatchUpOutcome.Superseded
+                            } else {
+                                AccountCatchUpOutcome.Succeeded
+                            },
+                        )
+                    },
+                )
+
+            assertEquals(NotificationNetworkRecoveryOutcome.Success, result)
+            assertEquals(1, wakes)
+            assertEquals(1, receiverChecks)
+            assertEquals(2, catchUps)
         }
 
     @Test
@@ -422,7 +454,7 @@ class NotificationNetworkRecoveryTest {
                     ensureNotificationReceiverActive = { true },
                     catchUpAccounts = {
                         attempts += 1
-                        false
+                        AccountCatchUpResult(AccountCatchUpOutcome.Failed)
                     },
                     awaitRetry = { _, _ -> },
                     onDrainCompleted = { completedDrains += 1 },
@@ -462,7 +494,7 @@ class NotificationNetworkRecoveryTest {
                     shouldContinue = { true },
                     wakeDurableOutbound = { true },
                     ensureNotificationReceiverActive = { true },
-                    catchUpAccounts = { true },
+                    catchUpAccounts = { AccountCatchUpResult(AccountCatchUpOutcome.Succeeded) },
                     awaitRetry = { _, _ -> error("success must not retry") },
                     onDrainCompleted = { completedDrains += 1 },
                     diagnostics =

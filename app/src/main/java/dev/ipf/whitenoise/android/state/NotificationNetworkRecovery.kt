@@ -377,7 +377,7 @@ internal class NotificationNetworkRecoveryCoordinator(
     private val shouldContinue: () -> Boolean,
     private val wakeDurableOutbound: suspend () -> Boolean,
     private val ensureNotificationReceiverActive: suspend () -> Boolean,
-    private val catchUpAccounts: suspend () -> Boolean,
+    private val catchUpAccounts: suspend () -> AccountCatchUpResult,
     private val awaitRetry: suspend (generation: Long, attempt: Int) -> Unit,
     private val onDrainCompleted: () -> Unit,
     private val diagnostics: NotificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
@@ -517,19 +517,21 @@ internal class NotificationNetworkRecoveryCoordinator(
                     layer = PerformanceLayer.MDK,
                     attempt = attempt,
                 )
-                val succeeded = catchUpAccounts()
-                if (succeeded) {
-                    diagnostics.catchUpSucceeded(generation, attempt)
-                } else {
-                    diagnostics.attemptPhase(
-                        generation = generation,
-                        phase = PerformancePhase.ACCOUNT_CATCH_UP_RETRY,
-                        result = PerformanceResult.PENDING,
-                        layer = PerformanceLayer.MDK,
-                        attempt = attempt,
-                    )
+                val result = catchUpAccounts()
+                when (result.outcome) {
+                    AccountCatchUpOutcome.Succeeded -> diagnostics.catchUpSucceeded(generation, attempt)
+                    AccountCatchUpOutcome.Failed -> {
+                        diagnostics.attemptPhase(
+                            generation = generation,
+                            phase = PerformancePhase.ACCOUNT_CATCH_UP_RETRY,
+                            result = PerformanceResult.PENDING,
+                            layer = PerformanceLayer.MDK,
+                            attempt = attempt,
+                        )
+                    }
+                    AccountCatchUpOutcome.Superseded -> Unit
                 }
-                succeeded
+                result
             },
         )
     }
@@ -552,7 +554,7 @@ internal class NotificationNetworkRecoveryCoordinator(
 internal suspend fun runNotificationReconnectOnNetworkRestore(
     wakeDurableOutbound: suspend () -> Unit,
     ensureNotificationReceiverActive: suspend () -> Boolean,
-    catchUpAccounts: suspend () -> Boolean,
+    catchUpAccounts: suspend () -> AccountCatchUpResult,
 ): NotificationNetworkRecoveryOutcome =
     coroutineScope {
         val outboundWake = async(start = CoroutineStart.UNDISPATCHED) { wakeDurableOutbound() }
@@ -563,13 +565,20 @@ internal suspend fun runNotificationReconnectOnNetworkRestore(
             outboundWake.await()
             NotificationNetworkRecoveryOutcome.ReceiverUnavailable
         } else {
-            val catchUp = async(start = CoroutineStart.UNDISPATCHED) { catchUpAccounts() }
-            val caughtUp = catchUp.await()
+            val catchUp =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    var result = catchUpAccounts()
+                    while (result.outcome == AccountCatchUpOutcome.Superseded) {
+                        result = catchUpAccounts()
+                    }
+                    result
+                }
+            val catchUpResult = catchUp.await()
             outboundWake.await()
-            if (caughtUp) {
-                NotificationNetworkRecoveryOutcome.Success
-            } else {
-                NotificationNetworkRecoveryOutcome.CatchUpFailed
+            when (catchUpResult.outcome) {
+                AccountCatchUpOutcome.Succeeded -> NotificationNetworkRecoveryOutcome.Success
+                AccountCatchUpOutcome.Failed -> NotificationNetworkRecoveryOutcome.CatchUpFailed
+                AccountCatchUpOutcome.Superseded -> error("superseded catch-up escaped the replacement loop")
             }
         }
     }
