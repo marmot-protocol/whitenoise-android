@@ -42,47 +42,15 @@ class ComposerDraftRestoreFocusTest {
     @Test
     fun inPlaceDictationCompletionRehydratesComposerWithoutRequestingFocusOrIme() {
         val fixture = DictationRestoreFixture()
-        val restorationTester = StateRestorationTester(composeRule)
-
-        restorationTester.setContent {
-            val snapshot = fixture.persistedDraft
-            val autoFocusConsumed = remember(fixture.draftKey) { mutableStateOf(false) }
-            val dictationRevisionOnEntry =
-                rememberComposerDictationRevisionOnEntry(
-                    groupIdHex = fixture.draftKey,
-                    currentRevision = fixture.dictationRevision,
-                )
-            fixture.composerState =
-                rememberComposerTextState(
-                    draftKey = fixture.draftKey,
-                    initialDraft = snapshot?.textFieldValue ?: TextFieldValue(),
-                    externalRevision = 0 to fixture.dictationRevision,
-                )
-            WhiteNoiseTheme {
-                Surface {
-                    ComposerBar(
-                        replyingTo = null,
-                        messageTextCopy = MessageTextCopy.Default,
-                        onCancelReply = {},
-                        onSend = { _, _ -> },
-                        initialDraft = snapshot?.textFieldValue ?: TextFieldValue(),
-                        draftKey = fixture.draftKey,
-                        textState = fixture.composerState,
-                        autoFocusOnDraftRestore =
-                            shouldAutoFocusComposerOnDraftRestore(
-                                snapshot = snapshot,
-                                dictationRevisionOnEntry = dictationRevisionOnEntry,
-                                currentDictationRevision = fixture.dictationRevision,
-                            ),
-                        autoFocusConsumedState = autoFocusConsumed,
-                        softwareKeyboardController = fixture.keyboardController,
-                        onComposerFocusChanged = { focused ->
-                            if (focused) fixture.focusGainCount += 1
-                        },
-                    )
-                }
-            }
-        }
+        val restorationTester =
+            setCompletionContent(
+                draftKey = fixture.draftKey,
+                snapshot = { fixture.persistedDraft },
+                currentRevision = { fixture.dictationRevision },
+                keyboardController = fixture.keyboardController,
+                onComposerState = { fixture.composerState = it },
+                onFocusGained = { fixture.focusGainCount += 1 },
+            )
         composeRule.waitForIdle()
 
         val accepted = TextFieldValue("accepted words", TextRange(3, 11))
@@ -130,6 +98,57 @@ class ComposerDraftRestoreFocusTest {
             ),
         )
     }
+
+    /** Installs the real composer restore path with observable focus and keyboard seams. */
+    private fun setCompletionContent(
+        draftKey: String,
+        snapshot: () -> ComposerDraftSnapshot?,
+        currentRevision: () -> Int,
+        keyboardController: SoftwareKeyboardController,
+        onComposerState: (ComposerTextState) -> Unit,
+        onFocusGained: () -> Unit,
+    ): StateRestorationTester =
+        StateRestorationTester(composeRule).also { restorationTester ->
+            restorationTester.setContent {
+                val currentSnapshot = snapshot()
+                val revision = currentRevision()
+                val autoFocusConsumed = remember(draftKey) { mutableStateOf(false) }
+                val revisionOnEntry =
+                    rememberComposerDictationRevisionOnEntry(
+                        groupIdHex = draftKey,
+                        currentRevision = revision,
+                    )
+                val composerState =
+                    rememberComposerTextState(
+                        draftKey = draftKey,
+                        initialDraft = currentSnapshot?.textFieldValue ?: TextFieldValue(),
+                        externalRevision = 0 to revision,
+                    )
+                onComposerState(composerState)
+                WhiteNoiseTheme {
+                    Surface {
+                        ComposerBar(
+                            replyingTo = null,
+                            messageTextCopy = MessageTextCopy.Default,
+                            onCancelReply = {},
+                            onSend = { _, _ -> },
+                            initialDraft = currentSnapshot?.textFieldValue ?: TextFieldValue(),
+                            draftKey = draftKey,
+                            textState = composerState,
+                            autoFocusOnDraftRestore =
+                                shouldAutoFocusComposerOnDraftRestore(
+                                    snapshot = currentSnapshot,
+                                    dictationRevisionOnEntry = revisionOnEntry,
+                                    currentDictationRevision = revision,
+                                ),
+                            autoFocusConsumedState = autoFocusConsumed,
+                            softwareKeyboardController = keyboardController,
+                            onComposerFocusChanged = { focused -> if (focused) onFocusGained() },
+                        )
+                    }
+                }
+            }
+        }
 
     private class RecordingSoftwareKeyboardController : SoftwareKeyboardController {
         var showRequests = 0

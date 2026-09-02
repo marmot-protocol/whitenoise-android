@@ -1296,7 +1296,6 @@
     <string name="voice_message_recording_failed">Couldn\'t record voice message</string>
     <string name="voice_message_microphone_busy">The microphone is in use by another app. Close it there and try again.</string>
     <string name="dictate_text">Dictate text</string>
-    <string name="dictation_in_use_other_chat">Dictation is active in another chat</string>
     <string name="dictation_preparing">Preparing dictation…</string>
     <string name="dictation_checking_service">Checking speech service…</string>
     <string name="dictation_opening_service">Opening speech service…</string>
@@ -1304,9 +1303,10 @@
     <string name="dictation_starting">Starting dictation…</string>
     <string name="dictation_listening">Dictating…</string>
     <string name="dictation_processing">Transcribing…</string>
-    <string name="dictation_stop">Stop dictation</string>
     <string name="dictation_done">Done</string>
     <string name="dictation_cancel">Cancel dictation</string>
+    <string name="dictation_notification_stop">Stop transcription</string>
+    <string name="dictation_notification_permission_limited">Notification permission is off. Dictation will stop if White Noise leaves the foreground.</string>
     <string name="dictation_notification_title">Dictation active</string>
     <string name="dictation_notification_text">Use Done to finish or Cancel to discard</string>
     <string name="notification_channel_dictation">Dictation</string>

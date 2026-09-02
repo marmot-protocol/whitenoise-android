@@ -5,6 +5,8 @@ import androidx.compose.ui.text.input.TextFieldValue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -341,6 +343,75 @@ class ConversationDictationControllerTest {
         assertTrue(rejectedSession.destroyed)
         assertEquals(1, microphoneReleases)
         assertEquals(1, durableStops)
+    }
+
+    /** Verifies provider fallback cannot replace another conversation's active app-owned session. */
+    @Test
+    fun providerFallbackForAnotherConversationPreservesTheActiveOriginAndTranscript() {
+        val fixture = fixture(draft = TextFieldValue("Source", TextRange(6)))
+        fixture.drafts[OTHER_ACCOUNT to OTHER_GROUP] = TextFieldValue("Other", TextRange(5))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("retained words")
+        val activeSession = fixture.platform.session
+        val activeSessionId = fixture.controller.state.sessionId
+
+        assertFalse(
+            fixture.controller.requestProviderActivityStart(
+                OTHER_ACCOUNT,
+                OTHER_GROUP,
+                fixture.drafts.getValue(OTHER_ACCOUNT to OTHER_GROUP),
+            ),
+        )
+        assertEquals(activeSessionId, fixture.controller.state.sessionId)
+        assertTrue(fixture.controller.isOwnedBy(ACCOUNT, GROUP))
+        assertFalse(activeSession.cancelled)
+        assertFalse(activeSession.destroyed)
+
+        fixture.controller.stop()
+
+        assertEquals("Source retained words", fixture.drafts.getValue(key()).text)
+        assertEquals("Other", fixture.drafts.getValue(OTHER_ACCOUNT to OTHER_GROUP).text)
+    }
+
+    /** Verifies a provider attribution rejection falls back without changing the captured origin. */
+    @Test
+    fun providerAttributionRejectionFallsBackToProviderActivityForTheSameTarget() {
+        val fixture = fixture(draft = TextFieldValue("Origin", TextRange(6)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val rejectedSession = fixture.platform.session
+
+        fixture.platform.listener.onError(ConversationDictationFailure.PermissionDenied)
+
+        val pending = fixture.controller.state as ConversationDictationState.ProviderActivityRequired
+        assertEquals(ConversationDictationMode.ProviderActivity, pending.target.mode)
+        assertTrue(pending.target.matchesConversation(ACCOUNT, GROUP))
+        assertEquals("Origin", pending.target.capturedDraft.text)
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertFalse(fixture.controller.hasDurableSession)
+        assertEquals(1, rejectedSession.destroyCalls)
+
+        assertTrue(fixture.controller.beginProviderActivityLaunch(fixture.controller.providerActivityRequestId))
+        fixture.controller.onProviderActivityResult("fallback words")
+
+        assertEquals("Origin fallback words", fixture.drafts.getValue(key()).text)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
+    /** Verifies an actual app permission loss fails instead of launching provider-owned UI. */
+    @Test
+    fun revokedAppPermissionDoesNotUseProviderActivityFallback() {
+        val platform = FakePlatform()
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        platform.hasPermission = false
+
+        platform.listener.onError(ConversationDictationFailure.PermissionDenied)
+
+        assertEquals(
+            ConversationDictationFailure.PermissionDenied,
+            (fixture.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertEquals(0L, fixture.controller.providerActivityRequestId)
     }
 
     @Test
@@ -782,6 +853,46 @@ class ConversationDictationControllerTest {
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
 
+    /** Verifies a hung automatic send is cancelled, releases its service, and retains review text. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun sendOnFinishTimeoutReleasesDurableOwnershipAndRequiresReview() =
+        runTest {
+            var durableStops = 0
+            var sendCancelled = false
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetValidator = { _, _ -> true },
+                    targetValidationScope = this,
+                    deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
+                    stopDurableSession = { durableStops += 1 },
+                    sendTranscriptIfOriginUnchanged = {
+                        try {
+                            awaitCancellation()
+                        } finally {
+                            sendCancelled = true
+                        }
+                    },
+                )
+
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.controller.stop()
+            fixture.platform.listener.onResult("dictated")
+            runCurrent()
+
+            assertTrue(fixture.controller.hasDurableSession)
+            advanceTimeBy(20_000L)
+            runCurrent()
+
+            val review = fixture.controller.state as ConversationDictationState.ReviewRequired
+            assertEquals("dictated", review.transcript)
+            assertEquals("Draft", fixture.drafts.getValue(key()).text)
+            assertTrue(sendCancelled)
+            assertFalse(fixture.controller.hasDurableSession)
+            assertEquals(1, durableStops)
+        }
+
     /** Verifies rejected sends and concurrent edits preserve both the draft and transcript for review. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
@@ -952,6 +1063,38 @@ class ConversationDictationControllerTest {
         assertFalse(fixture.controller.hasDurableSession)
     }
 
+    /** Verifies empty generations after speech never auto-send the retained transcript. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun repeatedNoSpeechAfterSpeechRequiresReviewInsteadOfSending() =
+        runTest {
+            var sendCalls = 0
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Anchor"),
+                    targetValidationScope = this,
+                    deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
+                    sendTranscriptIfOriginUnchanged = {
+                        sendCalls += 1
+                        true
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onResult("retained words")
+
+            repeat(9) {
+                fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+            }
+            advanceUntilIdle()
+
+            assertEquals(0, sendCalls)
+            assertEquals(
+                "retained words",
+                (fixture.controller.state as ConversationDictationState.ReviewRequired).transcript,
+            )
+            assertEquals("Anchor", fixture.drafts.getValue(key()).text)
+        }
+
     /** Verifies every generation watchdog retains already recognized words for explicit review. */
     @Test
     fun recognitionWatchdogsRetainAccumulatedTranscriptForReview() {
@@ -1010,6 +1153,40 @@ class ConversationDictationControllerTest {
         provider.controller.beginProviderActivityLaunch(provider.controller.providerActivityRequestId)
         provider.controller.onAppBackgrounded()
         assertTrue(provider.controller.state is ConversationDictationState.ProviderActivityActive)
+    }
+
+    /** Verifies a session without notification controls is disclosed and remains foreground-only. */
+    @Test
+    fun unavailableNotificationControlsStopCaptureOutsideTheForeground() {
+        var limitationNotices = 0
+        var releases = 0
+        val backgrounded =
+            fixture(
+                draft = TextFieldValue("Keep"),
+                releaseMicrophone = { releases += 1 },
+                canContinueInBackground = { false },
+                onBackgroundContinuationUnavailable = { limitationNotices += 1 },
+            )
+
+        backgrounded.controller.requestStart(ACCOUNT, GROUP, backgrounded.drafts.getValue(key()))
+
+        assertEquals(1, limitationNotices)
+        assertTrue(backgrounded.controller.hasDurableSession)
+        backgrounded.controller.onAppBackgrounded()
+        assertTrue(backgrounded.controller.state is ConversationDictationState.Idle)
+        assertFalse(backgrounded.controller.hasDurableSession)
+        assertEquals(1, releases)
+
+        val taskRemoved =
+            fixture(
+                draft = TextFieldValue("Keep"),
+                canContinueInBackground = { false },
+            )
+        taskRemoved.controller.requestStart(ACCOUNT, GROUP, taskRemoved.drafts.getValue(key()))
+        taskRemoved.controller.onTaskRemoved()
+
+        assertTrue(taskRemoved.controller.state is ConversationDictationState.Idle)
+        assertFalse(taskRemoved.controller.hasDurableSession)
     }
 
     /** Verifies service startup rejection and destruction release capture exactly once. */
@@ -1198,6 +1375,8 @@ class ConversationDictationControllerTest {
         releaseMicrophone: () -> Unit = {},
         startDurableSession: () -> Boolean = { true },
         stopDurableSession: () -> Unit = {},
+        canContinueInBackground: () -> Boolean = { true },
+        onBackgroundContinuationUnavailable: () -> Unit = {},
         finishAfterSilenceMillis: () -> Long? = { null },
         deliveryMode: () -> ConversationDictationDeliveryMode = {
             ConversationDictationDeliveryMode.PasteIntoDraft
@@ -1237,6 +1416,8 @@ class ConversationDictationControllerTest {
                 releaseMicrophone = releaseMicrophone,
                 startDurableSession = startDurableSession,
                 stopDurableSession = stopDurableSession,
+                canContinueInBackground = canContinueInBackground,
+                onBackgroundContinuationUnavailable = onBackgroundContinuationUnavailable,
                 disclosureAccepted = { true },
                 markDisclosureAccepted = {},
                 elapsedRealtime = { 100L },

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="dictation_done">Fine</string>
+    <string name="dictation_notification_stop">Interrompi trascrizione</string>
+    <string name="dictation_notification_permission_limited">L’autorizzazione alle notifiche è disattivata. La dettatura si interromperà se White Noise lascia il primo piano.</string>
     <string name="dictation_notification_title">Dettatura attiva</string>
     <string name="dictation_notification_text">Usa Fine per terminare o Annulla per eliminare</string>
     <string name="notification_channel_dictation">Dettatura</string>

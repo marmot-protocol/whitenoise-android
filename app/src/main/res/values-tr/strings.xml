@@ -1624,7 +1624,6 @@
     <string name="composer_expand_full_screen">Mesaj alanını genişlet</string>
     <string name="composer_collapse">Mesaj alanını daralt</string>
     <string name="dictate_text">Metni dikte et</string>
-    <string name="dictation_in_use_other_chat">Dikte başka bir sohbette etkin</string>
     <string name="dictation_preparing">Dikte hazırlanıyor…</string>
     <string name="dictation_checking_service">Konuşma hizmeti kontrol ediliyor…</string>
     <string name="dictation_opening_service">Konuşma hizmeti açılıyor…</string>
@@ -1632,7 +1631,6 @@
     <string name="dictation_starting">Dikte başlatılıyor…</string>
     <string name="dictation_listening">Dikte ediliyor…</string>
     <string name="dictation_processing">Metne dönüştürülüyor…</string>
-    <string name="dictation_stop">Dikteyi durdur</string>
     <string name="dictation_cancel">Dikteyi iptal et</string>
     <string name="dictation_provider_unavailable">Konuşma tanıma kullanılamıyor</string>
     <string name="dictation_permission_denied">Mikrofon izni gerekiyor</string>

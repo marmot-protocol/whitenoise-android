@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -208,6 +209,7 @@ internal fun WhiteNoiseApp(
     val transientNotice = appState.transientNotice
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
+    val softwareKeyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     val dictation = appState.conversationDictation
     val dictationState = dictation.state
@@ -366,7 +368,9 @@ internal fun WhiteNoiseApp(
         }
     }
     LaunchedEffect(dictationProviderActivityRequestId, dictationImeVisible) {
-        if (dictationProviderActivityRequestId > 0L && !dictationImeVisible) {
+        if (dictationProviderActivityRequestId > 0L && dictationImeVisible) {
+            softwareKeyboardController?.hide()
+        } else if (dictationProviderActivityRequestId > 0L) {
             // Let the bounded readiness state draw before provider UI backgrounds White Noise.
             withFrameNanos { }
             if (dictation.beginProviderActivityLaunch(dictationProviderActivityRequestId)) {

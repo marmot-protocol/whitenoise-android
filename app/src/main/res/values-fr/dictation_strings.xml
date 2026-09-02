@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="dictation_done">Terminer</string>
+    <string name="dictation_notification_stop">Arrêter la transcription</string>
+    <string name="dictation_notification_permission_limited">L’autorisation de notification est désactivée. La dictée s’arrêtera si White Noise quitte le premier plan.</string>
     <string name="dictation_notification_title">Dictée active</string>
     <string name="dictation_notification_text">Utilisez Terminer pour finir ou Annuler pour supprimer</string>
     <string name="notification_channel_dictation">Dictée</string>

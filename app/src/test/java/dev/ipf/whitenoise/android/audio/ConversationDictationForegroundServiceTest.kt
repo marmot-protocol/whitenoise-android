@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import androidx.compose.ui.text.input.TextFieldValue
+import dev.ipf.whitenoise.android.R
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -77,6 +78,9 @@ class ConversationDictationForegroundServiceTest {
                 .orEmpty()
         assertFalse(title.contains("account", ignoreCase = true))
         assertFalse(title.contains("group", ignoreCase = true))
+        assertEquals(2, notification.actions.size)
+        assertEquals(service.getString(R.string.dictation_notification_stop), notification.actions[0].title)
+        assertEquals(service.getString(R.string.cancel), notification.actions[1].title)
 
         service.onStartCommand(
             Intent(service, service::class.java).setAction(ConversationDictationForegroundService.ACTION_DONE),

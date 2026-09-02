@@ -132,15 +132,14 @@ class ConversationDictationCoordinatorTest {
             val listener = fixture.platform.listener
             val session = fixture.platform.session
             listener.onReady()
+            if (failure == ConversationDictationFailure.PermissionDenied) {
+                fixture.platform.hasPermission = false
+            }
 
             listener.onError(failure)
             listener.onResult("late")
 
-            if (failure == ConversationDictationFailure.PermissionDenied) {
-                assertTrue(fixture.controller.state is ConversationDictationState.ProviderActivityRequired)
-            } else {
-                assertEquals(failure, (fixture.controller.state as ConversationDictationState.Failed).reason)
-            }
+            assertEquals(failure, (fixture.controller.state as ConversationDictationState.Failed).reason)
             assertEquals("Keep", fixture.draft.text)
             assertEquals(0, fixture.writes)
             assertEquals(1, fixture.releases)
@@ -412,7 +411,7 @@ class ConversationDictationCoordinatorTest {
     }
 
     private class MatrixPlatform(
-        private val hasPermission: Boolean = true,
+        var hasPermission: Boolean = true,
         private val recognitionAvailable: Boolean = true,
         private val providerActivityAvailable: Boolean = true,
     ) : ConversationDictationPlatform {

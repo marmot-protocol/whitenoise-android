@@ -33,7 +33,7 @@ class ConversationDictationForegroundService : Service() {
     /** Dictation is command-only and never exposes a bound service interface. */
     override fun onBind(intent: Intent?): IBinder? = null
 
-    /** Promotes capture before routing generic Done/Cancel notification actions to the process owner. */
+    /** Promotes capture before routing Stop-transcription/Cancel actions to the process owner. */
     override fun onStartCommand(
         intent: Intent?,
         flags: Int,
@@ -78,7 +78,7 @@ class ConversationDictationForegroundService : Service() {
     /** Deliberately preserves explicit capture when the user removes the UI task from recents. */
     override fun onTaskRemoved(rootIntent: Intent?) {
         // Product contract: a recents swipe leaves explicit dictation running.
-        // Done and Cancel remain available in the foreground notification.
+        // Stop transcription and Cancel remain available in the foreground notification.
         super.onTaskRemoved(rootIntent)
     }
 
@@ -103,11 +103,16 @@ class ConversationDictationForegroundService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
-            .addAction(action(android.R.drawable.ic_media_pause, R.string.dictation_done, ACTION_DONE))
             .addAction(
                 action(
+                    android.R.drawable.ic_media_pause,
+                    R.string.dictation_notification_stop,
+                    ACTION_DONE,
+                ),
+            ).addAction(
+                action(
                     android.R.drawable.ic_menu_close_clear_cancel,
-                    R.string.dictation_cancel,
+                    R.string.cancel,
                     ACTION_CANCEL,
                 ),
             ).build()
@@ -147,7 +152,7 @@ class ConversationDictationForegroundService : Service() {
 
     companion object {
         private const val CHANNEL_ID = "composer_dictation"
-        private const val NOTIFICATION_ID = 0x77D1
+        internal const val NOTIFICATION_ID = 0x77D1
         internal const val ACTION_DONE = "dev.ipf.whitenoise.android.dictation.DONE"
         internal const val ACTION_CANCEL = "dev.ipf.whitenoise.android.dictation.CANCEL"
 

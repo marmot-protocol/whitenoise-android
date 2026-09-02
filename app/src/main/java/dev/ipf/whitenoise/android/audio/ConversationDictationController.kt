@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -269,6 +270,8 @@ internal class ConversationDictationController internal constructor(
     private val releaseMicrophone: () -> Unit = {},
     private val startDurableSession: () -> Boolean = { true },
     private val stopDurableSession: () -> Unit = {},
+    private val canContinueInBackground: () -> Boolean = { true },
+    private val onBackgroundContinuationUnavailable: () -> Unit = {},
     private val deliveryMode: () -> ConversationDictationDeliveryMode = {
         ConversationDictationDeliveryMode.PasteIntoDraft
     },
@@ -301,6 +304,7 @@ internal class ConversationDictationController internal constructor(
             ConversationDictationDeliveryMode.PasteIntoDraft
         },
         sendTranscriptIfOriginUnchanged: suspend (ConversationDictationSendRequest) -> Boolean = { false },
+        onBackgroundContinuationUnavailable: () -> Unit = {},
     ) : this(
         platform = AndroidConversationDictationPlatform(context.applicationContext),
         readDraft = readDraft,
@@ -313,6 +317,14 @@ internal class ConversationDictationController internal constructor(
         releaseMicrophone = releaseMicrophone,
         startDurableSession = { ConversationDictationForegroundService.start(context.applicationContext) },
         stopDurableSession = { ConversationDictationForegroundService.stop(context.applicationContext) },
+        canContinueInBackground = {
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                ContextCompat.checkSelfPermission(
+                    context.applicationContext,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                ) == PackageManager.PERMISSION_GRANTED
+        },
+        onBackgroundContinuationUnavailable = onBackgroundContinuationUnavailable,
         finishAfterSilenceMillis = finishAfterSilenceMillis,
         deliveryMode = deliveryMode,
         sendTranscriptIfOriginUnchanged = sendTranscriptIfOriginUnchanged,
@@ -406,13 +418,24 @@ internal class ConversationDictationController internal constructor(
         accountRef: String,
         groupIdHex: String,
         draft: TextFieldValue,
-    ): Boolean =
-        requestStart(
+    ): Boolean {
+        val current = state
+        val targetsAnotherConversation =
+            current.target?.matchesConversation(accountRef, groupIdHex) == false
+        if (
+            targetsAnotherConversation &&
+            current !is ConversationDictationState.Idle &&
+            current !is ConversationDictationState.Failed
+        ) {
+            return false
+        }
+        return requestStart(
             accountRef = accountRef,
             groupIdHex = groupIdHex,
             draft = draft,
             mode = ConversationDictationMode.ProviderActivity,
         )
+    }
 
     /** Captures one immutable target and replaces any safely replaceable prior session. */
     private fun requestStart(
@@ -429,6 +452,9 @@ internal class ConversationDictationController internal constructor(
         if (state is ConversationDictationState.ProviderActivityActive) return false
         if (blocksNewRequest && hasSameTarget(accountRef, groupIdHex, mode)) {
             return false
+        }
+        if (mode == ConversationDictationMode.InApp && !canContinueInBackground()) {
+            onBackgroundContinuationUnavailable()
         }
 
         // A request for a different target/mode is an explicit replacement.
@@ -671,7 +697,7 @@ internal class ConversationDictationController internal constructor(
             is ConversationDictationState.Starting,
             is ConversationDictationState.Listening,
             is ConversationDictationState.Processing,
-            -> if (!durableSession) cancel()
+            -> if (!durableSession || !canContinueInBackground()) cancel()
             // Launching the provider Activity necessarily backgrounds White
             // Noise. Its registered ActivityResult callback remains the owner
             // across that transition and across Activity recreation.
@@ -684,7 +710,7 @@ internal class ConversationDictationController internal constructor(
 
     /** Keeps service-backed capture alive when the UI task is removed from recents. */
     fun onTaskRemoved() {
-        if (!durableSession) cancel()
+        if (!durableSession || !canContinueInBackground()) cancel()
     }
 
     /** Cancels capture if Android destroys the service that makes background ownership explicit. */
@@ -868,17 +894,11 @@ internal class ConversationDictationController internal constructor(
                             finalizeAccumulatedTranscript(sessionId, target)
                         !finishRequested && error == ConversationDictationFailure.NoSpeech ->
                             restartAfterNoSpeech(sessionId, target)
+                        accumulatedTranscript.isNotBlank() -> retainAccumulatedTranscriptForReview(sessionId, target)
                         !finishRequested &&
                             error == ConversationDictationFailure.PermissionDenied &&
-                            accumulatedTranscript.isBlank() -> {
-                            // Android's RecognitionService can reject an otherwise granted caller at the
-                            // AppOps/attribution boundary. Release app-owned capture before delegating to
-                            // the provider's exported Activity so compatible offline providers still work.
-                            clearRecognitionSession(cancel = false)
-                            resetTranscriptSession()
-                            prepareProviderActivity(sessionId, target)
-                        }
-                        accumulatedTranscript.isNotBlank() -> retainAccumulatedTranscriptForReview(sessionId, target)
+                            platform.hasRecordAudioPermission() ->
+                            fallBackToProviderActivity(sessionId, target)
                         else -> fail(sessionId, target, error)
                     }
                 }
@@ -900,6 +920,26 @@ internal class ConversationDictationController internal constructor(
                 )
             }
         }
+    }
+
+    /**
+     * Falls back to provider-owned UI when the selected recognition service rejects Android's
+     * caller-attribution contract even though White Noise still holds its microphone grant.
+     */
+    private fun fallBackToProviderActivity(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+    ) {
+        if (!targetAvailable(target.accountRef, target.groupIdHex)) {
+            cancel()
+            return
+        }
+        clearRecognitionSession(cancel = false)
+        resetTranscriptSession()
+        prepareProviderActivity(
+            sessionId = sessionId,
+            target = target.copy(mode = ConversationDictationMode.ProviderActivity),
+        )
     }
 
     /** Bounds consecutive empty provider generations so a broken recognizer cannot spin forever. */
@@ -1116,33 +1156,42 @@ internal class ConversationDictationController internal constructor(
         clearRecognitionSession(cancel = false, releaseDurableSession = false)
         state = ConversationDictationState.Processing(sessionId, target)
         scope.launch {
-            if (state.sessionId != sessionId) return@launch
-            val accepted =
-                try {
-                    sendTranscriptIfOriginUnchanged(sendRequest)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Throwable) {
-                    false
+            try {
+                if (state.sessionId != sessionId) return@launch
+                val accepted =
+                    try {
+                        withTimeoutOrNull(SEND_TIMEOUT_MILLIS) {
+                            sendTranscriptIfOriginUnchanged(sendRequest)
+                        } ?: false
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Throwable) {
+                        false
+                    }
+                if (state.sessionId != sessionId) return@launch
+                if (!accepted) {
+                    clearRecognitionSession(cancel = false)
+                    resetTranscriptSession()
+                    state = ConversationDictationState.ReviewRequired(sessionId, target, transcript)
+                    return@launch
                 }
-            if (state.sessionId != sessionId) return@launch
-            if (!accepted) {
-                clearRecognitionSession(cancel = false)
-                resetTranscriptSession()
-                state = ConversationDictationState.ReviewRequired(sessionId, target, transcript)
-                return@launch
+                // The immutable payload was accepted. Clear only the untouched
+                // origin draft; a concurrent edit wins the conditional write.
+                runCatching {
+                    writeDraft(
+                        target.accountRef,
+                        target.groupIdHex,
+                        target.capturedDraftRevision,
+                        TextFieldValue(""),
+                    )
+                }
+                complete(target)
+            } finally {
+                if (state.sessionId == sessionId && durableSession) {
+                    durableSession = false
+                    runCatching(stopDurableSession)
+                }
             }
-            // The immutable payload was accepted. Clear only the untouched
-            // origin draft; a concurrent edit wins the conditional write.
-            runCatching {
-                writeDraft(
-                    target.accountRef,
-                    target.groupIdHex,
-                    target.capturedDraftRevision,
-                    TextFieldValue(""),
-                )
-            }
-            complete(target)
         }
     }
 
@@ -1259,6 +1308,7 @@ internal class ConversationDictationController internal constructor(
         const val PROVIDER_READINESS_TIMEOUT_MILLIS = 1_500L
         const val MAX_SESSION_MILLIS = 30L * 60L * 1_000L
         const val PROCESSING_TIMEOUT_MILLIS = 20_000L
+        const val SEND_TIMEOUT_MILLIS = 20_000L
         const val MAX_CONSECUTIVE_NO_SPEECH_RESTARTS = 8
         const val MAX_CONDITIONAL_WRITE_ATTEMPTS = 2
     }

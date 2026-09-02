@@ -1599,7 +1599,6 @@
     <string name="composer_expand_full_screen">展开消息输入框</string>
     <string name="composer_collapse">收起消息输入框</string>
     <string name="dictate_text">听写文本</string>
-    <string name="dictation_in_use_other_chat">正在另一个聊天中听写</string>
     <string name="dictation_preparing">正在准备听写…</string>
     <string name="dictation_checking_service">正在检查语音服务…</string>
     <string name="dictation_opening_service">正在打开语音服务…</string>
@@ -1607,7 +1606,6 @@
     <string name="dictation_starting">正在启动听写…</string>
     <string name="dictation_listening">正在听写…</string>
     <string name="dictation_processing">正在转写…</string>
-    <string name="dictation_stop">停止听写</string>
     <string name="dictation_cancel">取消听写</string>
     <string name="dictation_provider_unavailable">语音识别不可用</string>
     <string name="dictation_permission_denied">需要麦克风权限</string>

@@ -47,6 +47,21 @@ class WhiteNoiseAppDictationTest {
         )
     }
 
+    /** Verifies every acceptance-specified non-origin destination delegates controls to the root. */
+    @Test
+    fun `chat list settings profile and non-origin chat retain root controls`() {
+        listOf("chat list", "settings", "profile", "non-origin conversation").forEach { destination ->
+            assertTrue(
+                "$destination must retain the process-owned dictation control",
+                shouldShowConversationDictationFloatingControl(
+                    state = listening,
+                    originVisible = false,
+                    appLockScreenVisible = false,
+                ),
+            )
+        }
+    }
+
     /** Verifies privacy gates never expose dictation controls above lock or preflight surfaces. */
     @Test
     fun `privacy and preflight surfaces never expose the root float`() {
