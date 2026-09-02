@@ -47,7 +47,9 @@ internal data class ComposerReadingAnchor(
  */
 @Suppress("CyclomaticComplexMethod", "LongMethod")
 internal suspend fun PointerInputScope.composerEditorReadingScrollGestures(
-    scrollBy: (Float) -> Unit,
+    // Returns whether the dispatch actually moved the viewport, so no-op
+    // events are never consumed away from ancestor scroll containers.
+    scrollBy: (Float) -> Boolean,
     onReadingScroll: () -> Unit,
 ) {
     val touchSlop = viewConfiguration.touchSlop
@@ -66,11 +68,15 @@ internal suspend fun PointerInputScope.composerEditorReadingScrollGestures(
                     event.changes.forEach { change ->
                         val tick = change.scrollDelta.y
                         if (tick != 0f) {
-                            onReadingScroll()
                             // Density-scaled so a wheel tick travels the same
                             // visual distance as in every other scrollable.
-                            scrollBy(tick * COMPOSER_WHEEL_SCROLL_STEP.toPx())
-                            change.consume()
+                            // Consume and arm only when the editor actually
+                            // moved: a non-overflowing draft or a boundary tick
+                            // belongs to the ancestor scroll container.
+                            if (scrollBy(tick * COMPOSER_WHEEL_SCROLL_STEP.toPx())) {
+                                onReadingScroll()
+                                change.consume()
+                            }
                         }
                     }
                 PointerEventType.Press -> {

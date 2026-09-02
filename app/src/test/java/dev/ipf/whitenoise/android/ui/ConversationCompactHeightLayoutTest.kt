@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -117,10 +118,21 @@ class ConversationCompactHeightLayoutTest {
         composer.assertIsDisplayed()
         composeRule.onNodeWithContentDescription(context.getString(R.string.send)).assertIsDisplayed()
         val editorHeight = composer.fetchSemanticsNode().boundsInRoot.height
-        val oneLinePx = with(composeRule.density) { 24.dp.toPx() }
+        // One line measured through sp so the threshold scales with the font,
+        // not just the display density. The 2x compact viewport is a shared
+        // fixed budget: the contract is one viable scaled line for the editor
+        // alongside the grown (capped) bar, not multi-line growth.
+        val oneScaledLinePx = with(composeRule.density) { 16.sp.toPx() * 2f * 1.2f }
         assertTrue(
-            "a 2x-font draft must keep a multi-line editor viewport, got ${editorHeight}px",
-            editorHeight > oneLinePx * 1.8f,
+            "a 2x-font draft must keep at least one scaled editor line viable, got ${editorHeight}px",
+            editorHeight >= oneScaledLinePx,
+        )
+        val cappedCompactBarPx = with(composeRule.density) { 72.dp.toPx() }
+        assertEquals(
+            "the compact top bar must grow to its capped 2x-font height so the title line cannot clip",
+            cappedCompactBarPx,
+            topBarHeight(),
+            1f,
         )
     }
 

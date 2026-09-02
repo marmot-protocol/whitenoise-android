@@ -222,7 +222,7 @@ internal fun ConversationBottomBar(
                             onEmojiUsed = onEmojiUsed,
                             topInteractionClearance =
                                 if (compactHeight) {
-                                    CompactConversationTopInteractionClearance
+                                    compactTopClearanceFor(LocalDensity.current.fontScale)
                                 } else {
                                     ConversationTopInteractionClearance
                                 },
