@@ -26,7 +26,32 @@ internal val CompactConversationViewportThreshold = 240.dp
 internal val CompactConversationTopBarHeight = 48.dp
 
 /** Composer clearance below a compact top bar for the full-screen composer. */
-internal val CompactConversationTopInteractionClearance = 48.dp
+internal val CompactConversationTopClearance = 48.dp
+
+/**
+ * Growth cap for the compact chrome under enlarged fonts. The compact viewport
+ * is a fixed budget shared with the composer: unbounded bar growth at 200%
+ * text would starve the editor below one line, so the bar grows enough for its
+ * single scaled title line and the title ellipsizes beyond this point.
+ */
+private const val COMPACT_CHROME_MAX_FONT_GROWTH = 1.5f
+
+private fun scaleChrome(
+    base: Dp,
+    scale: Float,
+): Dp = base * scale.coerceIn(1f, COMPACT_CHROME_MAX_FONT_GROWTH)
+
+/**
+ * [CompactConversationTopBarHeight] honoring the user's font scale: the bar
+ * holds one line of title text, so at enlarged accessibility text it grows
+ * with that line instead of clipping it at the 1x height — bounded by
+ * [COMPACT_CHROME_MAX_FONT_GROWTH] so the composer keeps a viable share of the
+ * compact viewport, and never below the 1x height.
+ */
+internal fun compactTopBarHeightFor(fontScale: Float): Dp = scaleChrome(CompactConversationTopBarHeight, fontScale)
+
+/** The full-screen composer clearance matching [compactTopBarHeightFor]. */
+internal fun compactTopClearanceFor(fontScale: Float): Dp = scaleChrome(CompactConversationTopClearance, fontScale)
 
 /**
  * Smallest automatic composer allowance that keeps the active draft line, its

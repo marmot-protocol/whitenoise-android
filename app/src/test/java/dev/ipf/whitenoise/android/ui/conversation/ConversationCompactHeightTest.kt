@@ -126,4 +126,30 @@ class ConversationCompactHeightTest {
         assertFalse(composerMultilineControlsSuppressed(resolveAutomaticComposerCeiling(266.dp)))
         assertFalse(composerMultilineControlsSuppressed(resolveAutomaticComposerCeiling(600.dp)))
     }
+
+    /**
+     * The compact top bar holds one line of title text, so enlarged
+     * accessibility text grows the bar (and the matching composer clearance)
+     * with the scale instead of clipping the line at the 1x height.
+     */
+    @Test
+    fun compactTopBarChromeScalesWithEnlargedFontsAndNeverShrinks() {
+        assertEquals(48.dp, compactTopBarHeightFor(fontScale = 1f))
+        assertEquals(60.dp, compactTopBarHeightFor(fontScale = 1.25f))
+        assertEquals(48.dp, compactTopBarHeightFor(fontScale = 0.85f))
+        assertEquals(60.dp, compactTopClearanceFor(fontScale = 1.25f))
+        assertEquals(48.dp, compactTopClearanceFor(fontScale = 0.85f))
+    }
+
+    /**
+     * The compact viewport is a fixed budget shared with the composer, so bar
+     * growth is bounded: past the cap the title ellipsizes instead of the bar
+     * starving the editor below one line.
+     */
+    @Test
+    fun compactTopBarChromeGrowthIsBoundedSoTheComposerKeepsItsShare() {
+        assertEquals(72.dp, compactTopBarHeightFor(fontScale = 2f))
+        assertEquals(72.dp, compactTopBarHeightFor(fontScale = 3f))
+        assertEquals(72.dp, compactTopClearanceFor(fontScale = 2f))
+    }
 }

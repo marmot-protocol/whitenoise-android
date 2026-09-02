@@ -875,6 +875,51 @@ class ComposerExpansionBehaviorTest {
         assertTrue("ScrollBy must move the editor viewport", editorScrollValue() < before)
     }
 
+    /**
+     * Accessibility services branch on the ScrollBy action's result: a
+     * boundary or zero-delta invocation must report failure so the service can
+     * announce the edge or move to another scroll container, instead of a
+     * false success from an unmoved viewport.
+     */
+    @Test
+    fun accessibilityScrollActionReportsFailureAtBoundariesAndForZeroDelta() {
+        val draft = (1..40).joinToString("\n") { "Draft line $it" }
+        render(draft)
+        composeRule.onNode(hasSetTextAction()).performClick()
+        composeRule.waitForIdle()
+        resizeHandle().performTouchInput {
+            swipe(center, Offset(center.x, center.y + 220f), durationMillis = 320)
+        }
+        composeRule.waitForIdle()
+
+        fun invokeScrollBy(y: Float): Boolean {
+            var handled = false
+            composeRule.runOnUiThread {
+                handled =
+                    composeRule
+                        .onNode(hasSetTextAction())
+                        .fetchSemanticsNode()
+                        .config[SemanticsActions.ScrollBy]
+                        .action
+                        ?.invoke(0f, y) == true
+            }
+            composeRule.waitForIdle()
+            return handled
+        }
+
+        // Scroll hard to the top; the final over-scroll must report failure.
+        while (editorScrollValue() > 0f) {
+            val moved = invokeScrollBy(-10_000f) || editorScrollValue() == 0f
+            assertTrue("moving toward the top must report success", moved)
+        }
+        assertEquals(0f, editorScrollValue(), 0.5f)
+        assertTrue("an over-scroll at the top boundary must report failure", !invokeScrollBy(-48f))
+        assertTrue("a zero delta must report failure", !invokeScrollBy(0f))
+
+        assertTrue("scrolling away from the boundary must report success", invokeScrollBy(96f))
+        assertTrue(editorScrollValue() > 0f)
+    }
+
     @Test
     fun editingAfterAReadingScrollRestoresCaretFollowing() {
         val draft = (1..40).joinToString("\n") { "Draft line $it" }

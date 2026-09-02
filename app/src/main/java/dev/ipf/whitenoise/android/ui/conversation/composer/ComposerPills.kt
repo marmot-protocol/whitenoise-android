@@ -712,7 +712,11 @@ internal fun ComposerPill(
                             // through untouched.
                             .pointerInput(Unit) {
                                 composerEditorReadingScrollGestures(
-                                    scrollBy = { delta -> composerScrollState.dispatchRawDelta(delta) },
+                                    scrollBy = { delta ->
+                                        val before = composerScrollState.value
+                                        composerScrollState.dispatchRawDelta(delta)
+                                        composerScrollState.value != before
+                                    },
                                     onReadingScroll = {
                                         // A non-overflowing editor has nothing to
                                         // read toward; arming would only suspend
@@ -790,11 +794,18 @@ internal fun ComposerPill(
                                     // arm the anchor before moving the shared state,
                                     // overriding verticalScroll's un-anchored action.
                                     scrollBy { _, y ->
-                                        if (composerScrollState.maxValue > 0) {
+                                        // Report success and arm reading intent
+                                        // only when the viewport actually moved:
+                                        // a boundary or zero-delta action must
+                                        // let the service announce the edge or
+                                        // move to another scroll container.
+                                        val before = composerScrollState.value
+                                        composerScrollState.dispatchRawDelta(y)
+                                        val moved = composerScrollState.value != before
+                                        if (moved) {
                                             readingScrollAnchor = ComposerReadingAnchor.of(textFieldValue)
                                         }
-                                        composerScrollState.dispatchRawDelta(y)
-                                        true
+                                        moved
                                     }
                                 }
                                 // The automatic composer has a hard viewport ceiling.
