@@ -41,27 +41,22 @@ class ComposerDraftRestoreFocusTest {
 
     @Test
     fun inPlaceDictationCompletionRehydratesComposerWithoutRequestingFocusOrIme() {
-        val draftKey = "conversation-1"
-        var persistedDraft by mutableStateOf<ComposerDraftSnapshot?>(null)
-        var dictationRevision by mutableIntStateOf(0)
-        lateinit var composerState: ComposerTextState
-        var focusGainCount = 0
-        val keyboardController = RecordingSoftwareKeyboardController()
+        val fixture = DictationRestoreFixture()
         val restorationTester = StateRestorationTester(composeRule)
 
         restorationTester.setContent {
-            val snapshot = persistedDraft
-            val autoFocusConsumed = remember(draftKey) { mutableStateOf(false) }
+            val snapshot = fixture.persistedDraft
+            val autoFocusConsumed = remember(fixture.draftKey) { mutableStateOf(false) }
             val dictationRevisionOnEntry =
                 rememberComposerDictationRevisionOnEntry(
-                    groupIdHex = draftKey,
-                    currentRevision = dictationRevision,
+                    groupIdHex = fixture.draftKey,
+                    currentRevision = fixture.dictationRevision,
                 )
-            composerState =
+            fixture.composerState =
                 rememberComposerTextState(
-                    draftKey = draftKey,
+                    draftKey = fixture.draftKey,
                     initialDraft = snapshot?.textFieldValue ?: TextFieldValue(),
-                    externalRevision = 0 to dictationRevision,
+                    externalRevision = 0 to fixture.dictationRevision,
                 )
             WhiteNoiseTheme {
                 Surface {
@@ -71,18 +66,18 @@ class ComposerDraftRestoreFocusTest {
                         onCancelReply = {},
                         onSend = { _, _ -> },
                         initialDraft = snapshot?.textFieldValue ?: TextFieldValue(),
-                        draftKey = draftKey,
-                        textState = composerState,
+                        draftKey = fixture.draftKey,
+                        textState = fixture.composerState,
                         autoFocusOnDraftRestore =
                             shouldAutoFocusComposerOnDraftRestore(
                                 snapshot = snapshot,
                                 dictationRevisionOnEntry = dictationRevisionOnEntry,
-                                currentDictationRevision = dictationRevision,
+                                currentDictationRevision = fixture.dictationRevision,
                             ),
                         autoFocusConsumedState = autoFocusConsumed,
-                        softwareKeyboardController = keyboardController,
+                        softwareKeyboardController = fixture.keyboardController,
                         onComposerFocusChanged = { focused ->
-                            if (focused) focusGainCount += 1
+                            if (focused) fixture.focusGainCount += 1
                         },
                     )
                 }
@@ -92,8 +87,8 @@ class ComposerDraftRestoreFocusTest {
 
         val accepted = TextFieldValue("accepted words", TextRange(3, 11))
         composeRule.runOnIdle {
-            persistedDraft = ComposerDraftSnapshot(accepted, focusOnRestore = true)
-            dictationRevision += 1
+            fixture.persistedDraft = ComposerDraftSnapshot(accepted, focusOnRestore = true)
+            fixture.dictationRevision += 1
         }
         composeRule.waitForIdle()
 
@@ -101,14 +96,12 @@ class ComposerDraftRestoreFocusTest {
         composeRule.waitForIdle()
 
         composeRule.runOnIdle {
-            assertEquals(accepted, composerState.valueState.value)
-            assertEquals(0, focusGainCount)
-            assertEquals(0, keyboardController.showRequests)
+            assertEquals(accepted, fixture.composerState.valueState.value)
+            assertEquals(0, fixture.focusGainCount)
+            assertEquals(0, fixture.keyboardController.showRequests)
         }
 
-        composeRule.onNodeWithText("accepted words").performClick()
-        composeRule.waitForIdle()
-        composeRule.runOnIdle { assertEquals(1, focusGainCount) }
+        assertManualComposerFocusStillWorks(fixture)
     }
 
     @Test
@@ -146,6 +139,23 @@ class ComposerDraftRestoreFocusTest {
         }
 
         override fun hide() = Unit
+    }
+
+    /** Mutable state shared by the dictation restore composition and its assertions. */
+    private class DictationRestoreFixture {
+        val draftKey = "conversation-1"
+        var persistedDraft by mutableStateOf<ComposerDraftSnapshot?>(null)
+        var dictationRevision by mutableIntStateOf(0)
+        lateinit var composerState: ComposerTextState
+        var focusGainCount = 0
+        val keyboardController = RecordingSoftwareKeyboardController()
+    }
+
+    /** Confirms suppressing restore focus does not prevent a later explicit user focus. */
+    private fun assertManualComposerFocusStillWorks(fixture: DictationRestoreFixture) {
+        composeRule.onNodeWithText("accepted words").performClick()
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertEquals(1, fixture.focusGainCount) }
     }
 
     @Test
