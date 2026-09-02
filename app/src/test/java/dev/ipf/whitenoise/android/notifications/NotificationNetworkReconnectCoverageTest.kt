@@ -111,6 +111,7 @@ class NotificationNetworkReconnectCoverageTest {
         val noteRecovery = recovery.functionBody("noteNetworkRestored")
         val reconnect = recovery.functionBody("schedule")
         val resume = recovery.functionBody("resumeIfPending")
+        val runnable = recovery.functionBody("hasRunnableRequest")
         val attempt = recovery.functionBody("runAttempt")
         val bridge = appState.propertyInitializerCall("notificationNetworkRecovery")
         val receiver = appState.functionBody("ensureNotificationReceiverForNetworkReconnect")
@@ -149,7 +150,7 @@ class NotificationNetworkReconnectCoverageTest {
                 "catchUpAccounts =" in attempt &&
                 "notifyConnectivityRestored()" in bridge &&
                 "ensureNotificationReceiverForNetworkReconnect" in bridge &&
-                "catchUpAccountsBestEffort()" in bridge &&
+                "launchCatchUpAccounts().await()" in bridge &&
                 "PerformancePhase.NOTIFICATION_RECEIVER_RETRY" in attempt &&
                 "PerformancePhase.ACCOUNT_CATCH_UP_RETRY" in attempt &&
                 "pushWakeCatchUpPending()" !in bridge,
@@ -166,10 +167,11 @@ class NotificationNetworkReconnectCoverageTest {
                 "drainNotificationNetworkRecovery" in reconnect,
         )
         assertTrue(
-            "a receiver timeout or catch-up failure must remain queued after the current job settles",
-            "requestedGeneration.get()" in resume &&
-                "completedGeneration.get()" in resume &&
-                "resumeIfPending()" in reconnect.substringAfter("invokeOnCompletion"),
+            "lifecycle resume and job completion must not reopen an exhausted recovery circuit",
+            "hasRunnableRequest()" in resume &&
+                "resumeIfPending()" in reconnect.substringAfter("invokeOnCompletion") &&
+                "requested > completedGeneration.get()" in runnable &&
+                "requested > exhaustedGeneration.get()" in runnable,
         )
     }
 
@@ -200,14 +202,13 @@ class NotificationNetworkReconnectCoverageTest {
     }
 
     @Test
-    fun foregroundCatchUpWakesDurableOutboundBeforeAccountCatchUp() {
+    fun foregroundCatchUpUsesSharedCoordinatorWithoutAnotherConnectivityWake() {
         val body = appStateSource().readText().functionBody("catchUpAfterForegroundActivation")
-        val wake = body.indexOf("notifyConnectivityRestored()")
-        val catchUp = body.indexOf("catchUpAccountsBestEffort()")
 
         assertTrue(
-            "foreground recovery must wake retained outbound work before account catch-up",
-            "hasValidatedInternet()" in body && wake >= 0 && catchUp > wake,
+            "foreground recovery must share catch-up without sending another transport wake",
+            "launchCatchUpAccounts().await()" in body &&
+                "notifyConnectivityRestored()" !in body,
         )
     }
 
