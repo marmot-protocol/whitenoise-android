@@ -2242,6 +2242,13 @@ class WhiteNoiseAppState private constructor(
                 )
             },
         )
+    internal val attachmentInstallerHandoffs =
+        AttachmentInstallerHandoffCoordinator(
+            intentStore = attachmentDownloadIntents,
+            scope = mutationsScope,
+            enqueue = ::enqueueAttachmentDownload,
+            foregroundEligible = { appInForeground && !appLockScreenVisible },
+        )
     private val forwardTerminalDismiss =
         ForwardTerminalDismissPolicy(
             scope = mutationsScope,

@@ -118,6 +118,10 @@ internal fun MediaFileBubble(
         remember(reference.mediaType, reference.fileName) {
             textAttachmentCandidate(reference.mediaType, reference.fileName)
         }
+    val usesDurableInstallerHandoff =
+        remember(mine, reference.mediaType, reference.fileName) {
+            !mine && isAndroidPackageOpenCandidate(reference.mediaType, reference.fileName)
+        }
     val noOpenAppMessage = stringResource(R.string.media_no_app_to_open)
     val couldntOpenMessage = stringResource(R.string.media_couldnt_open)
     val couldntLoadMessage = stringResource(R.string.media_couldnt_load)
@@ -155,6 +159,10 @@ internal fun MediaFileBubble(
     // navigation or process death cannot let the policy restart what the user
     // stopped. Only an explicit tap clears it.
     val cancelledByUser = controller.automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex)
+    val installerHandoffPending =
+        usesDurableInstallerHandoff &&
+            controller.hasAttachmentInstallerHandoff(messageIdHex, attachmentIndex, reference.sourceEpoch)
+    val opening = if (usesDurableInstallerHandoff) installerHandoffPending else openRequested
     val autoDownloadAllowed =
         !cancelledByUser &&
             shouldMaterializeAttachmentAutomatically(
@@ -188,7 +196,9 @@ internal fun MediaFileBubble(
         reference.sourceEpoch,
         appState.attachmentOpens.revision,
         lifecycleOwner,
+        usesDurableInstallerHandoff,
     ) {
+        if (usesDurableInstallerHandoff) return@LaunchedEffect
         val request = controller.attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return@LaunchedEffect
         if (!appState.attachmentOpens.hasIntent(request)) return@LaunchedEffect
         AttachmentOpenTrace.phase(request, AttachmentOpenPhase.MaterializationStarted)
@@ -341,12 +351,21 @@ internal fun MediaFileBubble(
                             canRequestAttachmentOpen(transferState, reference.sourceEpoch, mine),
                     onLongClick = onLongPress,
                     onClick = {
-                        if (openRequested) return@combinedClickable
+                        if (opening) return@combinedClickable
                         if (textCandidate != null) {
                             readerOpen = true
                             return@combinedClickable
                         }
-                        openRequested = controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                        openRequested =
+                            if (usesDurableInstallerHandoff) {
+                                controller.requestAttachmentInstallerHandoff(
+                                    messageIdHex,
+                                    attachmentIndex,
+                                    reference.sourceEpoch,
+                                )
+                            } else {
+                                controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                            }
                     },
                 ),
     ) {
@@ -359,7 +378,7 @@ internal fun MediaFileBubble(
             status = status,
             retention = retention,
             reserveRetentionSpace = reserveRetentionSpace,
-            openPending = openRequested,
+            openPending = opening,
             onCancelTransfer = { controller.cancelAttachmentTransfer(messageIdHex, attachmentIndex) },
         )
     }

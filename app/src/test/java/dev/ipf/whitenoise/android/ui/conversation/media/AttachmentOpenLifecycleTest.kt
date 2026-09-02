@@ -1,8 +1,14 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import android.content.Context
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.state.AttachmentDownloadIntentStore
+import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
+import dev.ipf.whitenoise.android.state.AttachmentInstallerHandoffCoordinator
+import dev.ipf.whitenoise.android.state.AttachmentInstallerHandoffRequest
 import dev.ipf.whitenoise.android.state.AttachmentOpenRequest
 import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
@@ -11,8 +17,11 @@ import dev.ipf.whitenoise.android.state.attachmentOpenDestinationVisible
 import dev.ipf.whitenoise.android.state.newAttachmentOpenNavigationGeneration
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
@@ -30,6 +39,47 @@ import java.util.UUID
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class AttachmentOpenLifecycleTest {
+    /** Route changes preserve APK intent; only app foreground gates its dispatch. */
+    @Test
+    fun installerHandoffSurvivesRouteChangeButDefersInTheBackground() {
+        val preferences =
+            ApplicationProvider
+                .getApplicationContext<Context>()
+                .getSharedPreferences("attachment-installer-lifecycle-test", Context.MODE_PRIVATE)
+        preferences.edit().clear().commit()
+        val store = AttachmentDownloadIntentStore(preferences)
+        val transfer =
+            AttachmentTransferRequest(
+                accountRef = "account-a",
+                groupIdHex = "ab".repeat(16),
+                messageIdHex = "cd".repeat(32),
+                attachmentIndex = 0,
+            )
+        val request = AttachmentInstallerHandoffRequest(transfer, sourceEpoch = 7uL)
+        val scope = CoroutineScope(SupervisorJob())
+        var foreground = false
+        try {
+            assertTrue(store.markInstallerHandoff(request))
+            store.retainOpenIntentsForDestination(
+                AttachmentOpenRequest(transfer.copy(accountRef = "account-b"), 9L).destination,
+            )
+            val coordinator =
+                AttachmentInstallerHandoffCoordinator(
+                    intentStore = store,
+                    scope = scope,
+                    enqueue = { _, priority -> assertEquals(AttachmentDownloadPriority.Interactive, priority) },
+                    foregroundEligible = { foreground },
+                )
+
+            assertEquals(request, coordinator.pending())
+            assertFalse(coordinator.canDispatch(request))
+            foreground = true
+            assertTrue(coordinator.canDispatch(request))
+        } finally {
+            scope.cancel()
+        }
+    }
+
     @Test
     fun externalDispatchRequiresTheExactVisibleNavigationSession() {
         val transfer =

@@ -16,6 +16,9 @@ import androidx.work.workDataOf
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -64,8 +67,8 @@ internal object AttachmentDownloadWorkData {
         val attachmentIndex = data.getInt(KEY_ATTACHMENT_INDEX, -1)
         val valid =
             accountRef.isNotBlank() &&
-                HEX_ID.matches(groupIdHex) &&
-                HEX_ID.matches(messageIdHex) &&
+                GROUP_ID_HEX.matches(groupIdHex) &&
+                MESSAGE_ID_HEX.matches(messageIdHex) &&
                 attachmentIndex >= 0
         return if (valid) {
             AttachmentTransferRequest(accountRef, groupIdHex, messageIdHex, attachmentIndex)
@@ -74,7 +77,8 @@ internal object AttachmentDownloadWorkData {
         }
     }
 
-    private val HEX_ID = Regex("^[0-9a-fA-F]{64}$")
+    private val GROUP_ID_HEX = Regex("^[0-9a-fA-F]{32}$")
+    private val MESSAGE_ID_HEX = Regex("^[0-9a-fA-F]{64}$")
 }
 
 internal fun attachmentDownloadWorkName(request: AttachmentTransferRequest): String {
@@ -115,6 +119,32 @@ internal fun shouldCancelQueuedAutomaticWork(
 ): Boolean =
     state in setOf(WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED) &&
         !hasInteractiveIntent
+
+internal enum class AttachmentDownloadWorkState {
+    Active,
+    Finished,
+}
+
+/**
+ * Observes the durable transfer independently of a conversation controller.
+ * The interactive preference bridges enqueue registration, when WorkManager's
+ * first snapshot can still be empty or contain only an older generation.
+ */
+internal fun attachmentDownloadWorkState(
+    context: Context,
+    request: AttachmentTransferRequest,
+    hasInteractiveIntent: () -> Boolean,
+): Flow<AttachmentDownloadWorkState> =
+    WorkManager
+        .getInstance(context.applicationContext)
+        .getWorkInfosForUniqueWorkFlow(attachmentDownloadWorkName(request))
+        .map { infos ->
+            if (hasInteractiveIntent() || infos.any { !it.state.isFinished }) {
+                AttachmentDownloadWorkState.Active
+            } else {
+                AttachmentDownloadWorkState.Finished
+            }
+        }.distinctUntilChanged()
 
 internal class AttachmentReferenceNotReadyException : IllegalStateException("attachment reference is not projected yet")
 

@@ -7,6 +7,16 @@ import org.junit.Test
 import java.io.File
 
 class AttachmentDownloadProductionWiringTest {
+    /** APK installer completion is owned by the app shell, not the originating bubble. */
+    @Test
+    fun installerHandoffOwnerOutlivesTheOriginatingFileBubble() {
+        val bubble = source("MediaFileBubble.kt").normalized()
+        val shell = projectSource("ui/navigation/MainShell.kt").normalized()
+
+        assertTrue("requestAttachmentInstallerHandoff(" in bubble)
+        assertTrue("attachmentInstallerHandoffEffect(appState" in shell)
+    }
+
     @Test
     fun visibleMediaPromotesAnAutomaticTransferWhenTheUserTapsIt() {
         val image = source("MediaImageBubbles.kt").normalized()
