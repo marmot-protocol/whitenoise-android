@@ -2497,10 +2497,7 @@ internal fun chatListItemFromAuthoritativeGroupDetails(
  * is loaded by the conversation after navigation and may be queued behind
  * account activation. The row still preserves pre-read unread state.
  */
-internal fun chatListItemFromNotificationProjection(
-    projection: ChatListRowFfi,
-): ChatListItem =
-    chatListItemFromProjection(row = projection)
+internal fun chatListItemFromNotificationProjection(projection: ChatListRowFfi): ChatListItem = chatListItemFromProjection(row = projection)
 
 /**
  * When a provisional open (no chat-list row yet) is already foregrounded,
@@ -3729,33 +3726,7 @@ class ChatsController private constructor(
                                         } ?: break
                                     receivedLiveUpdate = true
                                     connectionOwner.noteLiveUpdate(connectionAttempt)
-                                    when (update) {
-                                        is ChatListSubscriptionUpdateFfi.Row -> {
-                                            val row = update.row
-                                            requestChatRowProfiles(row)
-                                            chatsDebug {
-                                                "chat list update account=${accountRef.take(8)} trigger=${update.trigger} ${row.debugSummary()}"
-                                            }
-                                            foldChatRow(row, update.trigger)
-                                        }
-                                        is ChatListSubscriptionUpdateFfi.Snapshot -> {
-                                            chatsDebug {
-                                                "chat list snapshot account=${accountRef.take(8)} " +
-                                                    "trigger=${update.trigger} rows=${update.rows.size}"
-                                            }
-                                            // Contract: atomically replace the held rows and drop
-                                            // any prior row absent from the snapshot.
-                                            update.rows.forEach(::requestChatRowProfiles)
-                                            replaceChatRows(update.rows)
-                                            scheduleRecompute()
-                                        }
-                                        is ChatListSubscriptionUpdateFfi.RemoveRow -> {
-                                            chatsDebug {
-                                                "chat list remove account=${accountRef.take(8)} trigger=${update.trigger} id=${update.groupIdHex.take(8)}"
-                                            }
-                                            removeChatRow(update.groupIdHex)
-                                        }
-                                    }
+                                    applyChatListSubscriptionUpdate(accountRef, update)
                                 }
                             },
                             second = {
@@ -4754,6 +4725,41 @@ class ChatsController private constructor(
                 )
             },
         )
+
+    /** Applies one ordered update emitted by the active chat-list subscription. */
+    @VisibleForTesting
+    internal fun applyChatListSubscriptionUpdate(
+        accountRef: String,
+        update: ChatListSubscriptionUpdateFfi,
+    ) {
+        when (update) {
+            is ChatListSubscriptionUpdateFfi.Row -> {
+                val row = update.row
+                requestChatRowProfiles(row)
+                chatsDebug {
+                    "chat list update account=${accountRef.take(8)} trigger=${update.trigger} ${row.debugSummary()}"
+                }
+                foldChatRow(row, update.trigger)
+            }
+            is ChatListSubscriptionUpdateFfi.Snapshot -> {
+                chatsDebug {
+                    "chat list snapshot account=${accountRef.take(8)} " +
+                        "trigger=${update.trigger} rows=${update.rows.size}"
+                }
+                // Contract: atomically replace the held rows and drop any prior
+                // row absent from the snapshot.
+                update.rows.forEach(::requestChatRowProfiles)
+                replaceChatRows(update.rows)
+                scheduleRecompute()
+            }
+            is ChatListSubscriptionUpdateFfi.RemoveRow -> {
+                chatsDebug {
+                    "chat list remove account=${accountRef.take(8)} trigger=${update.trigger} id=${update.groupIdHex.take(8)}"
+                }
+                removeChatRow(update.groupIdHex)
+            }
+        }
+    }
 
     private fun foldChatRow(
         row: ChatListRowFfi,

@@ -12,6 +12,8 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -471,6 +473,33 @@ class ConversationSendRetryIntegrationTest {
         }
 
     @Test
+    fun sameSecondIncomingSubscriptionOwnsFirstReturnFrameAndRejectsLateSentEcho() =
+        runTest {
+            val appState = appState()
+            val chatsController =
+                attachedChatsController(
+                    appState = appState,
+                    accountRef = ACCOUNT_REF,
+                    row = chatListRow(),
+                )
+            val conversationController = acceptedPendingConversationController(appState)
+
+            conversationController.send("hello")
+            val sentRow = sentChatListRow()
+            val incomingMessageId = "0a".repeat(32)
+            val incomingRow = incomingChatListRow(sentRow, incomingMessageId)
+
+            chatsController.applyNewLastMessage(incomingRow)
+            chatsController.setChatListVisible(true)
+            assertIncomingOwnsChatListProjection(chatsController, incomingMessageId)
+
+            chatsController.setChatListVisible(false)
+            chatsController.applyNewLastMessage(sentRow)
+            chatsController.setChatListVisible(true)
+            assertIncomingOwnsChatListProjection(chatsController, incomingMessageId)
+        }
+
+    @Test
     fun acceptedPendingSeparatesOptimisticAndDurableAcceptanceCallbacks() =
         runTest {
             val callbacks = mutableListOf<String>()
@@ -825,6 +854,91 @@ class ConversationSendRetryIntegrationTest {
             acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
             maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
         )
+
+    private fun acceptedPendingConversationController(appState: WhiteNoiseAppState): ConversationController {
+        lateinit var controller: ConversationController
+        controller =
+            ConversationController(
+                appState = appState,
+                initialGroup = group(),
+                initialMemberSnapshot = memberSnapshot(),
+                textPublisher = { _, _, _, _ ->
+                    controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                        listOf(
+                            TimelineMessageChangeFfi.Upsert(
+                                trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
+                                message =
+                                    projectedMessage(
+                                        recordedAt = 20uL,
+                                        retentionSeconds = null,
+                                        retentionExpiresAt = null,
+                                    ),
+                            ),
+                        ),
+                    )
+                    SendSummaryFfi(
+                        published = 0u,
+                        messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                        acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
+                        maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                    )
+                },
+            )
+        return controller
+    }
+
+    private fun sentChatListRow(): ChatListRowFfi {
+        val row = chatListRow()
+        return row.copy(
+            lastMessage =
+                requireNotNull(row.lastMessage).copy(
+                    messageIdHex = CONFIRMED_MESSAGE_ID,
+                    plaintext = "hello",
+                    timelineAt = 20uL,
+                    deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED,
+                ),
+            activitySortAt = 20uL,
+            updatedAt = 20uL,
+        )
+    }
+
+    private fun incomingChatListRow(
+        sentRow: ChatListRowFfi,
+        messageId: String,
+    ): ChatListRowFfi =
+        sentRow.copy(
+            lastMessage =
+                requireNotNull(sentRow.lastMessage).copy(
+                    messageIdHex = messageId,
+                    sender = "e5".repeat(32),
+                    plaintext = "same-second incoming",
+                    deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                ),
+            unreadCount = 1uL,
+            hasUnread = true,
+            firstUnreadMessageIdHex = messageId,
+        )
+
+    private fun ChatsController.applyNewLastMessage(row: ChatListRowFfi) {
+        applyChatListSubscriptionUpdate(
+            accountRef = ACCOUNT_REF,
+            update =
+                ChatListSubscriptionUpdateFfi.Row(
+                    trigger = ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+                    row = row,
+                ),
+        )
+    }
+
+    private fun assertIncomingOwnsChatListProjection(
+        controller: ChatsController,
+        messageId: String,
+    ) {
+        val projection = controller.items.single().projection
+        assertEquals(messageId, projection?.lastMessage?.messageIdHex)
+        assertEquals("same-second incoming", projection?.lastMessage?.plaintext)
+        assertEquals(1uL, projection?.unreadCount)
+    }
 
     private fun appState() =
         WhiteNoiseAppState(
