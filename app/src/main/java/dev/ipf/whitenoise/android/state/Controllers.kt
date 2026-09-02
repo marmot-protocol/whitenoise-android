@@ -395,39 +395,6 @@ private fun reconcileReadDerivedUnread(incoming: ChatListRowFfi): ChatListRowFfi
     }
 
 /**
- * Returns whether an ordered subscription event introduces a different last
- * message without moving to an earlier timestamp. Message identifiers are
- * opaque, so their lexical order cannot establish causality within one second.
- */
-private fun observesDistinctNewLastMessage(
-    current: ChatListRowFfi,
-    incoming: ChatListRowFfi,
-    trigger: ChatListUpdateTriggerFfi,
-): Boolean {
-    val incomingLast = incoming.lastMessage
-    val currentLast = current.lastMessage
-    return trigger == ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE &&
-        incomingLast != null &&
-        (
-            currentLast == null ||
-                (
-                    incomingLast.messageIdHex != currentLast.messageIdHex &&
-                        incomingLast.timelineAt >= currentLast.timelineAt
-                )
-        )
-}
-
-/** Determines whether this fold carries causally ordered message activity. */
-private fun observesSubscriptionActivity(
-    current: ChatListRowFfi?,
-    folded: ChatListRowFfi,
-    trigger: ChatListUpdateTriggerFfi?,
-): Boolean =
-    current != null &&
-        trigger != null &&
-        observesDistinctNewLastMessage(current, folded, trigger)
-
-/**
  * Field-wise reducer for live chat-list subscription rows. Subscription rows
  * are ordered full projections, so all non-read fields are authoritative — in
  * particular, a deletion may move [ChatListRowFfi.lastMessage] backwards or to
