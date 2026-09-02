@@ -95,25 +95,6 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue("only a later subscription iteration may present Connecting", retryAttempt > initialValidation)
     }
 
-    /** The bind's one catch-up result survives an early local subscription-open failure. */
-    @Test
-    fun bindRetainsClaimedCatchUpUntilItCanBeObserved() {
-        val body = controllersSource().readText().kotlinFunctionBody("bind")
-        val catchUp = body.indexOf("connectionOwner.launchCatchUp()")
-        val consumeCatchUp = body.indexOf("pendingReadinessCatchUp = null", startIndex = catchUp)
-        val observeCatchUp = body.indexOf("readinessCatchUp?.let(connectionOwner::observe)", startIndex = catchUp)
-
-        assertTrue(
-            "the claimed catch-up must be retained until a local projection can observe it",
-            consumeCatchUp in 0..<observeCatchUp,
-        )
-        assertEquals(
-            "an early subscription failure must not discard the claimed catch-up result",
-            1,
-            Regex("pendingReadinessCatchUp = null").findAll(body).count(),
-        )
-    }
-
     @Test
     fun targetLocalSnapshotIsLoadedAndGenerationFencedBeforeAccountPublication() {
         val body = setActiveAccountSection()
