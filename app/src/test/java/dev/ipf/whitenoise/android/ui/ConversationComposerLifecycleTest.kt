@@ -210,10 +210,6 @@ private fun ComposerLifecycleHarness(
                     emojiPickerOpen = false,
                     onValueChange = onValueChange,
                     onEmojiPickerToggle = {},
-                    onAttachmentsToggle = {},
-                    attachmentSheetOpen = false,
-                    onPickFromGallery = null,
-                    onPickDocument = null,
                     onComposerFocusChanged = onComposerFocusChanged,
                 )
             }

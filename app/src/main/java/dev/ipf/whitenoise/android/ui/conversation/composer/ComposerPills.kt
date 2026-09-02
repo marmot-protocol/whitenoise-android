@@ -7,7 +7,6 @@ import android.window.OnBackInvokedDispatcher
 import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -33,7 +32,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,14 +39,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Key
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -333,20 +325,7 @@ internal fun ComposerPill(
     emojiPickerOpen: Boolean,
     onValueChange: (TextFieldValue) -> Unit,
     onEmojiPickerToggle: () -> Unit,
-    onAttachmentsToggle: () -> Unit,
-    attachmentSheetOpen: Boolean,
-    onPickFromGallery: (() -> Unit)?,
-    onPickDocument: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    onDictation: (() -> Unit)? = null,
-    dictationControls: (@Composable RowScope.() -> Unit)? = null,
-    // Gate inputs only: the sheet these open lives in ComposerBar, but the
-    // attach button must appear whenever ANY attachment action is wired, not
-    // just gallery/document.
-    hasCameraCapture: Boolean = false,
-    hasLocationShare: Boolean = false,
-    hasUserShare: Boolean = false,
-    hasContactShare: Boolean = false,
     highlightMentionChips: Boolean = false,
     mentionCandidates: List<MentionComposer.Candidate> = emptyList(),
     enterKeyBehavior: EnterKeyBehavior = EnterKeyBehavior.SendMessage,
@@ -536,35 +515,12 @@ internal fun ComposerPill(
             selectionLayout?.let { composerScrollState.keepComposerSelectionVisible(it) }
         }
     }
-    val hasAttachmentAction =
-        onPickFromGallery != null ||
-            onPickDocument != null ||
-            hasCameraCapture ||
-            hasLocationShare ||
-            hasUserShare ||
-            hasContactShare
     var multilineControls by remember { mutableStateOf(false) }
-    val targetDictationControlWidth =
-        when {
-            dictationControls != null -> 96.dp
-            onDictation != null -> 48.dp
-            else -> 0.dp
-        }
-    val dictationControlWidth by
-        animateDpAsState(
-            targetValue = targetDictationControlWidth,
-            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-            label = "composer dictation control morph",
-        )
     val compactTrailingReserve =
         4.dp +
-            dictationControlWidth +
-            (if (hasAttachmentAction) 36.dp else 0.dp) +
             (if (trailingAction != null) 44.dp else 0.dp)
     val compactMeasurementTrailingReserve =
         4.dp +
-            dictationControlWidth +
-            (if (hasAttachmentAction) 36.dp else 0.dp) +
             (if (compactMeasurementReservesTrailingAction) 44.dp else 0.dp)
     val composerTextStyle =
         LocalTextStyle.current.copy(
@@ -927,54 +883,8 @@ internal fun ComposerPill(
                     modifier =
                         Modifier
                             .align(Alignment.BottomEnd)
-                            .height(if (onDictation != null || dictationControls != null) 48.dp else 44.dp),
+                            .height(44.dp),
                 ) {
-                    if (dictationControls != null) {
-                        dictationControls()
-                    } else if (onDictation != null) {
-                        IconButton(
-                            onClick = onDictation,
-                            enabled = inputContentVisible,
-                            modifier =
-                                Modifier
-                                    .size(48.dp)
-                                    .alpha(if (inputContentVisible) 1f else 0f)
-                                    .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
-                        ) {
-                            // A waveform keeps text dictation visually distinct from
-                            // the plain microphone used by hold-to-record voice notes.
-                            Icon(
-                                Icons.Default.GraphicEq,
-                                contentDescription = stringResource(R.string.dictate_text),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(21.dp),
-                            )
-                        }
-                    }
-                    if (hasAttachmentAction) {
-                        IconButton(
-                            onClick = onAttachmentsToggle,
-                            enabled = inputContentVisible,
-                            modifier =
-                                Modifier
-                                    .size(36.dp)
-                                    .alpha(if (inputContentVisible) 1f else 0f)
-                                    .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
-                        ) {
-                            // Swap the glyph on open (X) the way the emoji toggle swaps
-                            // to a keyboard, so sighted users get a visual cue, not just
-                            // a changed content description.
-                            Icon(
-                                if (attachmentSheetOpen) Icons.Default.Close else Icons.Default.AttachFile,
-                                contentDescription =
-                                    stringResource(
-                                        if (attachmentSheetOpen) R.string.close else R.string.attach_options,
-                                    ),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(22.dp),
-                            )
-                        }
-                    }
                     if (expandedTrailingActionInset > 0.dp) {
                         Spacer(
                             Modifier.deferredPadding(

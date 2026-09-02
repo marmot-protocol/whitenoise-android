@@ -51,10 +51,6 @@ class ComposerEmojiActionContractTest {
                         emojiPickerOpen = pickerOpen,
                         onValueChange = {},
                         onEmojiPickerToggle = { pickerOpen = !pickerOpen },
-                        onAttachmentsToggle = {},
-                        attachmentSheetOpen = false,
-                        onPickFromGallery = null,
-                        onPickDocument = null,
                     )
                 }
             }

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,19 +31,29 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.math.hypot
 
 /**
  * Hold-to-record voice button. Press → start; release inside the button
@@ -85,54 +96,13 @@ internal fun MicHoldButton(controller: dev.ipf.whitenoise.android.audio.VoiceRec
                         // already handled stop/send/cancel.
                         down.consume()
                         haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                        var canceled = false
-                        var locked = false
-                        var terminated = false
-                        try {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.firstOrNull { it.id == down.id }
-                                if (change == null) {
-                                    // Parent stole the pointer — cancel rather than orphan the recorder.
-                                    controller.cancel()
-                                    terminated = true
-                                    break
-                                }
-                                change.consume()
-                                val deltaX = change.position.x - down.position.x
-                                val deltaY = change.position.y - down.position.y
-                                controller.updateDrag(deltaX, deltaY, cancelThresholdPx, lockThresholdPx)
-                                if (!locked && -deltaY > lockThresholdPx && -deltaX <= cancelThresholdPx) {
-                                    locked = true
-                                    haptics.performHapticFeedback(
-                                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
-                                    )
-                                    controller.lock()
-                                    terminated = true
-                                    return@awaitEachGesture
-                                }
-                                if (!canceled && -deltaX > cancelThresholdPx) {
-                                    canceled = true
-                                    haptics.performHapticFeedback(
-                                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
-                                    )
-                                } else if (canceled && -deltaX <= cancelThresholdPx) {
-                                    canceled = false
-                                }
-                                if (change.changedToUp() || !change.pressed) {
-                                    if (canceled) controller.cancel() else controller.stop()
-                                    terminated = true
-                                    break
-                                }
-                            }
-                        } finally {
-                            // Composable removal / coroutine cancellation while still
-                            // recording-unlocked → cancel cleanly instead of letting
-                            // the recorder tick to the MAX_RECORDING_MS auto-stop.
-                            if (!terminated && controller.isRecording && !controller.locked) {
-                                controller.cancel()
-                            }
-                        }
+                        runVoiceRecordingDragGesture(
+                            controller = controller,
+                            down = down,
+                            cancelThresholdPx = cancelThresholdPx,
+                            lockThresholdPx = lockThresholdPx,
+                            haptics = haptics,
+                        )
                     }
                 },
         containerColor =
@@ -147,6 +117,212 @@ internal fun MicHoldButton(controller: dev.ipf.whitenoise.android.audio.VoiceRec
             Icons.Default.Mic,
             contentDescription = stringResource(R.string.voice_message_record),
         )
+    }
+}
+
+/** One composer microphone slot: tap starts dictation, while press-and-hold records a voice note. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun ComposerMicrophoneButton(
+    onDictation: () -> Unit,
+    voiceRecordingController: dev.ipf.whitenoise.android.audio.VoiceRecordingController? = null,
+) {
+    val latestOnDictation by rememberUpdatedState(onDictation)
+    val haptics = LocalHapticFeedback.current
+    val density = LocalDensity.current
+    val cancelThresholdPx = with(density) { 120.dp.toPx() }
+    val lockThresholdPx = with(density) { 80.dp.toPx() }
+    val voiceMessageLabel = stringResource(R.string.voice_message_record)
+    val gestureModifier =
+        if (voiceRecordingController == null) {
+            Modifier
+        } else {
+            Modifier
+                .semantics {
+                    onLongClick(label = voiceMessageLabel) {
+                        if (voiceRecordingController.start()) {
+                            voiceRecordingController.lock()
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                }.pointerInput(voiceRecordingController) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        down.consume()
+                        when (awaitComposerMicrophonePress(down)) {
+                            ComposerMicrophonePress.Tap -> latestOnDictation()
+                            ComposerMicrophonePress.Cancelled -> Unit
+                            ComposerMicrophonePress.LongPress -> {
+                                if (!voiceRecordingController.start()) return@awaitEachGesture
+                                haptics.performHapticFeedback(
+                                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
+                                )
+                                runVoiceRecordingDragGesture(
+                                    controller = voiceRecordingController,
+                                    down = down,
+                                    cancelThresholdPx = cancelThresholdPx,
+                                    lockThresholdPx = lockThresholdPx,
+                                    haptics = haptics,
+                                )
+                            }
+                        }
+                    }
+                }
+        }
+    FloatingActionButton(
+        onClick = { latestOnDictation() },
+        modifier = Modifier.size(48.dp).then(gestureModifier),
+        containerColor = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+    ) {
+        Icon(
+            Icons.Default.Mic,
+            contentDescription = stringResource(R.string.dictate_text),
+        )
+    }
+}
+
+private enum class ComposerMicrophonePress {
+    Tap,
+    LongPress,
+    Cancelled,
+}
+
+/** Resolves the short-tap/long-press boundary before either microphone feature takes ownership. */
+private suspend fun AwaitPointerEventScope.awaitComposerMicrophonePress(down: PointerInputChange) =
+    withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+        var resolution: ComposerMicrophonePress? = null
+        while (resolution == null) {
+            val change =
+                awaitPointerEvent().changes.firstOrNull { it.id == down.id }
+                    ?: return@withTimeoutOrNull ComposerMicrophonePress.Cancelled
+            val deltaX = change.position.x - down.position.x
+            val deltaY = change.position.y - down.position.y
+            resolution =
+                when {
+                    hypot(deltaX, deltaY) > viewConfiguration.touchSlop -> ComposerMicrophonePress.Cancelled
+                    change.changedToUp() || !change.pressed -> ComposerMicrophonePress.Tap
+                    else -> null
+                }
+            change.consume()
+        }
+        checkNotNull(resolution)
+    } ?: ComposerMicrophonePress.LongPress
+
+private data class VoiceRecordingDragProgress(
+    val canceling: Boolean = false,
+    val complete: Boolean = false,
+)
+
+/** Completes the existing drag-to-cancel/drag-to-lock voice-note contract after capture starts. */
+private suspend fun AwaitPointerEventScope.runVoiceRecordingDragGesture(
+    controller: dev.ipf.whitenoise.android.audio.VoiceRecordingController,
+    down: PointerInputChange,
+    cancelThresholdPx: Float,
+    lockThresholdPx: Float,
+    haptics: HapticFeedback,
+) {
+    var progress = VoiceRecordingDragProgress()
+    try {
+        while (!progress.complete) {
+            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
+            if (change == null) {
+                controller.cancel()
+                progress = progress.copy(complete = true)
+                continue
+            }
+            change.consume()
+            progress =
+                handleVoiceRecordingDragChange(
+                    controller = controller,
+                    change = change,
+                    down = down,
+                    cancelThresholdPx = cancelThresholdPx,
+                    lockThresholdPx = lockThresholdPx,
+                    wasCanceling = progress.canceling,
+                    haptics = haptics,
+                )
+        }
+    } finally {
+        if (!progress.complete && controller.isRecording && !controller.locked) controller.cancel()
+    }
+}
+
+/** Applies one pointer update and reports whether voice recording owns more input. */
+private fun handleVoiceRecordingDragChange(
+    controller: dev.ipf.whitenoise.android.audio.VoiceRecordingController,
+    change: PointerInputChange,
+    down: PointerInputChange,
+    cancelThresholdPx: Float,
+    lockThresholdPx: Float,
+    wasCanceling: Boolean,
+    haptics: HapticFeedback,
+): VoiceRecordingDragProgress {
+    val deltaX = change.position.x - down.position.x
+    val deltaY = change.position.y - down.position.y
+    controller.updateDrag(deltaX, deltaY, cancelThresholdPx, lockThresholdPx)
+    val canceling = -deltaX > cancelThresholdPx
+    if (canceling && !wasCanceling) {
+        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+    }
+    return when {
+        -deltaY > lockThresholdPx && -deltaX <= cancelThresholdPx -> {
+            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+            controller.lock()
+            VoiceRecordingDragProgress(complete = true)
+        }
+        change.changedToUp() || !change.pressed -> {
+            if (canceling) controller.cancel() else controller.stop()
+            VoiceRecordingDragProgress(canceling = canceling, complete = true)
+        }
+        else -> VoiceRecordingDragProgress(canceling = canceling)
+    }
+}
+
+/** Renders the single microphone slot or its app-owned Done/Cancel replacement. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun ComposerMicrophoneControl(
+    state: ConversationDictationState,
+    activeController: ConversationDictationController?,
+    showVoiceMicrophone: Boolean,
+    voiceController: dev.ipf.whitenoise.android.audio.VoiceRecordingController?,
+    dictationCanStart: Boolean,
+    reserveDictationActions: Boolean,
+    onDictation: (() -> Unit)?,
+) {
+    val reservesDictationActions =
+        reserveDictationActions && (dictationCanStart || activeController != null)
+    Box(
+        modifier = if (reservesDictationActions) Modifier.width(96.dp) else Modifier,
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        activeController?.let { controller ->
+            ConversationDictationCompactActions(
+                state = state,
+                controller = controller,
+            )
+        }
+        if (showVoiceMicrophone) {
+            val recorder = checkNotNull(voiceController)
+            Box(contentAlignment = Alignment.BottomCenter) {
+                LockHintAbove(controller = recorder)
+                if (dictationCanStart) {
+                    ComposerMicrophoneButton(
+                        onDictation = checkNotNull(onDictation),
+                        voiceRecordingController = recorder,
+                    )
+                } else {
+                    MicHoldButton(controller = recorder)
+                }
+            }
+        } else if (dictationCanStart) {
+            ComposerMicrophoneButton(
+                onDictation = checkNotNull(onDictation),
+            )
+        }
     }
 }
 

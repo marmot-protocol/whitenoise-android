@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -33,6 +34,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -1126,15 +1128,81 @@ internal fun ComposerBar(
                 val dictationActiveInComposer =
                     dictationOwnedByComposer && dictationState !is ConversationDictationState.Idle
                 val activeDictationController = dictationController?.takeIf { dictationActiveInComposer }
-                val showMicButton =
+                val dictationCanStartHere =
+                    startAppOwnedDictation != null &&
+                        dictationState is ConversationDictationState.Idle &&
+                        !dictationPendingElsewhere
+                val voiceMicEligible =
                     (text.isBlank() || isRecordingVoice) &&
                         editingMessageId == null &&
                         voiceRecordingController != null &&
                         !dictationActiveInComposer
-                val showPrimaryTrailingAction = !(showMicButton && dictationPendingElsewhere)
-                val primaryTrailingActionWidth =
-                    if (showMicButton && voiceRecordingController.locked) 84.dp else 44.dp
-                val trailingControlsWidth = primaryTrailingActionWidth
+                val showVoiceMicButton = voiceMicEligible && !dictationPendingElsewhere
+                val showLockedVoiceControls = showVoiceMicButton && voiceRecordingController.locked
+                val showIdleMicrophone =
+                    !showLockedVoiceControls &&
+                        activeDictationController == null &&
+                        (showVoiceMicButton || dictationCanStartHere)
+                val hasAttachmentAction =
+                    onPickFromGallery != null ||
+                        onPickDocument != null ||
+                        onCaptureFromCamera != null ||
+                        onShareLocation != null ||
+                        onShareUser != null ||
+                        onShareContact != null
+                val showAttachmentButton = hasAttachmentAction && !isRecordingVoice
+                val showSendButton =
+                    !isRecordingVoice &&
+                        !(voiceMicEligible && dictationPendingElsewhere) &&
+                        (
+                            text.isNotBlank() ||
+                                (
+                                    !showIdleMicrophone &&
+                                        activeDictationController == null &&
+                                        !showLockedVoiceControls
+                                )
+                        )
+                val reserveDictationActionSlot = showAttachmentButton && !showSendButton
+                val trailingControlCount =
+                    listOf(
+                        showLockedVoiceControls || showIdleMicrophone,
+                        activeDictationController != null,
+                        showAttachmentButton,
+                        showSendButton,
+                    ).count { it }
+                val trailingControlSpacing =
+                    when (trailingControlCount) {
+                        2 -> 4.dp
+                        3 -> 8.dp
+                        4 -> 12.dp
+                        else -> 0.dp
+                    }
+                val targetTrailingControlsWidth =
+                    (if (showLockedVoiceControls) 88.dp else 0.dp) +
+                        (
+                            if (showIdleMicrophone) {
+                                // Dictation replaces the microphone with two actions. Reserve that
+                                // complete slot only when an attachment precedes it; controls after
+                                // the microphone are already anchored by the trailing row edge.
+                                when {
+                                    dictationCanStartHere && reserveDictationActionSlot -> 96.dp
+                                    dictationCanStartHere -> 48.dp
+                                    else -> 44.dp
+                                }
+                            } else {
+                                0.dp
+                            }
+                        ) +
+                        (if (activeDictationController != null) 96.dp else 0.dp) +
+                        (if (showAttachmentButton) 36.dp else 0.dp) +
+                        (if (showSendButton) 44.dp else 0.dp) +
+                        trailingControlSpacing
+                val trailingControlsWidth by
+                    animateDpAsState(
+                        targetValue = targetTrailingControlsWidth,
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                        label = "composer microphone control morph",
+                    )
                 BoxWithConstraints(
                     modifier =
                         Modifier
@@ -1148,7 +1216,7 @@ internal fun ComposerBar(
                             ),
                 ) {
                     // Keep the field composed and focusable throughout dictation. The
-                    // app-owned controls replace only the waveform slot, so an open IME
+                    // trailing microphone morphs into app-owned controls, so an open IME
                     // stays open and a closed IME is never raised implicitly.
                     ComposerPill(
                         textFieldValue = textFieldValue,
@@ -1175,14 +1243,6 @@ internal fun ComposerBar(
                                 openComposerEmojiPane()
                             }
                         },
-                        onAttachmentsToggle = {
-                            if (attachmentSheetState.isOpen) {
-                                attachmentSheetState.dismiss()
-                            } else {
-                                openComposerAttachmentSheet()
-                            }
-                        },
-                        attachmentSheetOpen = attachmentSheetState.isOpen,
                         preImeBackEnabled = !composerEmojiPickerOpen && !attachmentSheetState.isOpen,
                         onPreImeBack = {
                             if (composerExpansion.mode != ComposerExpansionMode.Automatic) {
@@ -1196,28 +1256,7 @@ internal fun ComposerBar(
                                 keyboardController?.hide()
                             }
                         },
-                        hasCameraCapture = onCaptureFromCamera != null,
-                        hasLocationShare = onShareLocation != null,
-                        hasUserShare = onShareUser != null,
-                        hasContactShare = onShareContact != null,
-                        onPickFromGallery = onPickFromGallery,
-                        onPickDocument = onPickDocument,
                         onPasteImageUris = onPasteImageUris?.takeIf { editingMessageId == null && !isRecordingVoice },
-                        onDictation =
-                            startAppOwnedDictation?.takeIf {
-                                dictationState is ConversationDictationState.Idle &&
-                                    !dictationPendingElsewhere &&
-                                    !isRecordingVoice
-                            },
-                        dictationControls =
-                            activeDictationController?.let { activeController ->
-                                {
-                                    ConversationDictationCompactActions(
-                                        state = dictationState,
-                                        controller = activeController,
-                                    )
-                                }
-                            },
                         highlightMentionChips = mentionPickerEnabled,
                         mentionCandidates = mentionCandidates,
                         enterKeyBehavior = enterKeyBehavior,
@@ -1282,9 +1321,7 @@ internal fun ComposerBar(
                                 .align(Alignment.BottomEnd)
                                 .expandedComposerActionRow { expandedActionInsetProgress.value },
                     ) {
-                        // This call site stays shared by idle and recording states;
-                        // moving it would break the active hold gesture's identity.
-                        if (showPrimaryTrailingAction && showMicButton && voiceRecordingController.locked) {
+                        if (showLockedVoiceControls) {
                             IconButton(
                                 onClick = { voiceRecordingController.cancel() },
                                 modifier = Modifier.size(40.dp),
@@ -1307,23 +1344,74 @@ internal fun ComposerBar(
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
-                        } else if (showPrimaryTrailingAction && showMicButton) {
-                            Box(contentAlignment = Alignment.BottomCenter) {
-                                LockHintAbove(controller = voiceRecordingController)
-                                MicHoldButton(controller = voiceRecordingController)
-                            }
-                        } else if (showPrimaryTrailingAction) {
-                            FloatingActionButton(
-                                onClick = { submitMessage() },
-                                modifier = Modifier.composerActionSize { expandedActionInsetProgress.value },
-                                containerColor = actionColors.container,
-                                contentColor = actionColors.content,
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = stringResource(R.string.send),
-                                    modifier = Modifier.size(20.dp),
+                        } else {
+                            if (showSendButton) {
+                                ComposerMicrophoneControl(
+                                    state = dictationState,
+                                    activeController = activeDictationController,
+                                    showVoiceMicrophone = showVoiceMicButton,
+                                    voiceController = voiceRecordingController,
+                                    dictationCanStart = dictationCanStartHere,
+                                    reserveDictationActions = reserveDictationActionSlot,
+                                    onDictation = startAppOwnedDictation,
                                 )
+                            }
+                            if (showAttachmentButton) {
+                                IconButton(
+                                    onClick = {
+                                        if (attachmentSheetState.isOpen) {
+                                            attachmentSheetState.dismiss()
+                                        } else {
+                                            openComposerAttachmentSheet()
+                                        }
+                                    },
+                                    modifier = Modifier.size(36.dp),
+                                ) {
+                                    val attachmentIcon =
+                                        if (attachmentSheetState.isOpen) {
+                                            Icons.Default.Close
+                                        } else {
+                                            Icons.Default.AttachFile
+                                        }
+                                    Icon(
+                                        attachmentIcon,
+                                        contentDescription =
+                                            stringResource(
+                                                if (attachmentSheetState.isOpen) {
+                                                    R.string.close
+                                                } else {
+                                                    R.string.attach_options
+                                                },
+                                            ),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(22.dp),
+                                    )
+                                }
+                            }
+                            if (!showSendButton) {
+                                ComposerMicrophoneControl(
+                                    state = dictationState,
+                                    activeController = activeDictationController,
+                                    showVoiceMicrophone = showVoiceMicButton,
+                                    voiceController = voiceRecordingController,
+                                    dictationCanStart = dictationCanStartHere,
+                                    reserveDictationActions = reserveDictationActionSlot,
+                                    onDictation = startAppOwnedDictation,
+                                )
+                            }
+                            if (showSendButton) {
+                                FloatingActionButton(
+                                    onClick = { submitMessage() },
+                                    modifier = Modifier.composerActionSize { expandedActionInsetProgress.value },
+                                    containerColor = actionColors.container,
+                                    contentColor = actionColors.content,
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Send,
+                                        contentDescription = stringResource(R.string.send),
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
                             }
                         }
                     }
@@ -1336,9 +1424,15 @@ internal fun ComposerBar(
                                     .padding(
                                         end =
                                             if (expandedControlLayout) {
-                                                if (voiceRecordingController.locked) 84.dp else 44.dp
+                                                when {
+                                                    voiceRecordingController.locked -> 88.dp
+                                                    dictationCanStartHere -> 48.dp
+                                                    else -> 44.dp
+                                                }
                                             } else if (voiceRecordingController.locked) {
-                                                92.dp
+                                                96.dp
+                                            } else if (dictationCanStartHere) {
+                                                56.dp
                                             } else {
                                                 52.dp
                                             },

@@ -181,10 +181,6 @@ class ComposerImeHandoffBackTest {
                         emojiPickerOpen = false,
                         onValueChange = { harness.value = it },
                         onEmojiPickerToggle = {},
-                        onAttachmentsToggle = {},
-                        attachmentSheetOpen = false,
-                        onPickFromGallery = null,
-                        onPickDocument = null,
                         onComposerFocusChanged = {},
                         preImeBackEnabled = true,
                         onPreImeBack = {

@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.core.content.ContextCompat
+import androidx.core.content.PermissionChecker
 import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrAfter
 import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrBefore
 import kotlinx.coroutines.CancellationException
@@ -73,6 +74,13 @@ internal data class ConversationDictationSendRequest(
     val expectedDraftText: String,
     val payload: String,
 )
+
+/** Separates a definite send rejection from a dispatch whose completion could not be observed. */
+private enum class ConversationDictationSendOutcome {
+    Accepted,
+    Rejected,
+    Unknown,
+}
 
 internal enum class ConversationDictationFailure {
     ProviderUnavailable,
@@ -171,6 +179,13 @@ internal sealed interface ConversationDictationState {
         override val target: ConversationDictationTarget,
         val transcript: String,
     ) : ConversationDictationState
+
+    /** A send timed out after dispatch, so the transcript must not be presented as safely retryable. */
+    data class DeliveryUnknown(
+        override val sessionId: Long,
+        override val target: ConversationDictationTarget,
+        val transcript: String,
+    ) : ConversationDictationState
 }
 
 internal interface ConversationDictationRecognitionListener {
@@ -206,9 +221,24 @@ internal interface ConversationDictationRecognitionSession {
 
 internal class ConversationDictationProviderUnavailableException : IllegalStateException()
 
+/** Effective microphone access after combining the runtime grant with Android's app-op policy. */
+internal enum class ConversationDictationMicrophoneAccess {
+    Granted,
+    RuntimePermissionRequired,
+    AppOpDenied,
+}
+
 internal interface ConversationDictationPlatform {
     /** Whether White Noise currently has permission to capture microphone audio. */
     fun hasRecordAudioPermission(): Boolean
+
+    /** Distinguishes a requestable runtime denial from a settings-owned app-op denial. */
+    fun microphoneAccess(): ConversationDictationMicrophoneAccess =
+        if (hasRecordAudioPermission()) {
+            ConversationDictationMicrophoneAccess.Granted
+        } else {
+            ConversationDictationMicrophoneAccess.RuntimePermissionRequired
+        }
 
     /** Whether an in-process recognition service can be created. */
     fun recognitionAvailable(): Boolean
@@ -521,7 +551,14 @@ internal class ConversationDictationController internal constructor(
                 )
             return
         }
-        startWhenProviderAvailable(pending.sessionId, pending.target)
+        when (platform.microphoneAccess()) {
+            ConversationDictationMicrophoneAccess.Granted ->
+                startWhenProviderAvailable(pending.sessionId, pending.target)
+            ConversationDictationMicrophoneAccess.RuntimePermissionRequired ->
+                fail(pending.sessionId, pending.target, ConversationDictationFailure.PermissionDenied)
+            ConversationDictationMicrophoneAccess.AppOpDenied ->
+                fail(pending.sessionId, pending.target, ConversationDictationFailure.PermissionPermanentlyDenied)
+        }
     }
 
     /** Requests terminal provider output, or immediately commits segments already accumulated. */
@@ -674,6 +711,11 @@ internal class ConversationDictationController internal constructor(
         if (state is ConversationDictationState.ReviewRequired) state = ConversationDictationState.Idle
     }
 
+    /** Discards the local transcript after an explicitly acknowledged unknown send outcome. */
+    fun dismissDeliveryUnknown() {
+        if (state is ConversationDictationState.DeliveryUnknown) state = ConversationDictationState.Idle
+    }
+
     /** Cancels the session if its exact origin conversation was removed. */
     fun onTargetRemoved(
         accountRef: String,
@@ -772,12 +814,20 @@ internal class ConversationDictationController internal constructor(
         sessionId: Long,
         target: ConversationDictationTarget,
     ) {
-        if (!platform.hasRecordAudioPermission()) {
-            state = ConversationDictationState.PermissionRequired(sessionId, target)
-            _permissionRequestId.longValue += 1L
-            return
+        when (platform.microphoneAccess()) {
+            ConversationDictationMicrophoneAccess.Granted -> startWhenProviderAvailable(sessionId, target)
+            ConversationDictationMicrophoneAccess.RuntimePermissionRequired -> {
+                state = ConversationDictationState.PermissionRequired(sessionId, target)
+                _permissionRequestId.longValue += 1L
+            }
+            ConversationDictationMicrophoneAccess.AppOpDenied ->
+                state =
+                    ConversationDictationState.Failed(
+                        sessionId,
+                        target,
+                        ConversationDictationFailure.PermissionPermanentlyDenied,
+                    )
         }
-        startWhenProviderAvailable(sessionId, target)
     }
 
     /** Re-checks the selected provider after permission is known before opening the microphone. */
@@ -1143,48 +1193,78 @@ internal class ConversationDictationController internal constructor(
         target: ConversationDictationTarget,
         transcript: String,
     ) {
-        val current = readDraft(target.accountRef, target.groupIdHex)
-        if (
-            current.revision != target.capturedDraftRevision ||
-            current.value.text != target.capturedDraft.text
-        ) {
-            clearRecognitionSession(cancel = false)
-            resetTranscriptSession()
-            state = ConversationDictationState.ReviewRequired(sessionId, target, transcript)
+        if (!capturedDraftIsCurrent(target)) {
+            transitionToReviewRequired(sessionId, target, transcript)
             return
         }
         val sendRequest = conversationDictationSendRequest(target, transcript)
         val scope = targetValidationScope
         if (sendRequest == null || scope == null) {
-            clearRecognitionSession(cancel = false)
-            resetTranscriptSession()
-            state = ConversationDictationState.ReviewRequired(sessionId, target, transcript)
+            transitionToReviewRequired(sessionId, target, transcript)
             return
         }
         clearRecognitionSession(cancel = false, releaseDurableSession = false)
         state = ConversationDictationState.Processing(sessionId, target)
         scope.launch {
-            try {
-                if (state.sessionId != sessionId) return@launch
-                val accepted =
-                    try {
-                        withTimeoutOrNull(SEND_TIMEOUT_MILLIS) {
-                            sendTranscriptIfOriginUnchanged(sendRequest)
-                        } ?: false
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (_: Throwable) {
-                        false
-                    }
-                if (state.sessionId != sessionId) return@launch
-                if (!accepted) {
-                    clearRecognitionSession(cancel = false)
-                    resetTranscriptSession()
-                    state = ConversationDictationState.ReviewRequired(sessionId, target, transcript)
-                    return@launch
+            finishTranscriptSend(sessionId, target, transcript, sendRequest)
+        }
+    }
+
+    /** Checks the origin draft snapshot before an immutable send is launched. */
+    private fun capturedDraftIsCurrent(target: ConversationDictationTarget): Boolean {
+        val current = readDraft(target.accountRef, target.groupIdHex)
+        return current.revision == target.capturedDraftRevision &&
+            current.value.text == target.capturedDraft.text
+    }
+
+    /** Owns the asynchronous send lifecycle and always releases its durable service lease. */
+    private suspend fun finishTranscriptSend(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        transcript: String,
+        sendRequest: ConversationDictationSendRequest,
+    ) {
+        try {
+            if (state.sessionId != sessionId) return
+            val outcome = awaitTranscriptSendOutcome(sendRequest)
+            if (state.sessionId != sessionId) return
+            applyTranscriptSendOutcome(sessionId, target, transcript, outcome)
+        } finally {
+            if (state.sessionId == sessionId && durableSession) {
+                durableSession = false
+                runCatching(stopDurableSession)
+            }
+        }
+    }
+
+    /** Distinguishes a definite MDK rejection from a send whose completion cannot be observed safely. */
+    private suspend fun awaitTranscriptSendOutcome(sendRequest: ConversationDictationSendRequest) =
+        try {
+            withTimeoutOrNull(SEND_TIMEOUT_MILLIS) {
+                if (sendTranscriptIfOriginUnchanged(sendRequest)) {
+                    ConversationDictationSendOutcome.Accepted
+                } else {
+                    ConversationDictationSendOutcome.Rejected
                 }
-                // The immutable payload was accepted. Clear only the untouched
-                // origin draft; a concurrent edit wins the conditional write.
+            } ?: ConversationDictationSendOutcome.Unknown
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            ConversationDictationSendOutcome.Unknown
+        }
+
+    /** Publishes the terminal state without offering a duplicate retry after an unknown outcome. */
+    private fun applyTranscriptSendOutcome(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        transcript: String,
+        outcome: ConversationDictationSendOutcome,
+    ) {
+        when (outcome) {
+            ConversationDictationSendOutcome.Rejected -> transitionToReviewRequired(sessionId, target, transcript)
+            ConversationDictationSendOutcome.Unknown -> transitionToDeliveryUnknown(sessionId, target, transcript)
+            ConversationDictationSendOutcome.Accepted -> {
+                // Clear only the untouched origin draft; a concurrent edit wins the conditional write.
                 runCatching {
                     writeDraft(
                         target.accountRef,
@@ -1194,13 +1274,30 @@ internal class ConversationDictationController internal constructor(
                     )
                 }
                 complete(target)
-            } finally {
-                if (state.sessionId == sessionId && durableSession) {
-                    durableSession = false
-                    runCatching(stopDurableSession)
-                }
             }
         }
+    }
+
+    /** Retains a rejected transcript for the existing explicit merge/review flow. */
+    private fun transitionToReviewRequired(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        transcript: String,
+    ) {
+        clearRecognitionSession(cancel = false)
+        resetTranscriptSession()
+        state = ConversationDictationState.ReviewRequired(sessionId, target, transcript)
+    }
+
+    /** Retains an unconfirmed transcript without exposing the unsafe retry/insert action. */
+    private fun transitionToDeliveryUnknown(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        transcript: String,
+    ) {
+        clearRecognitionSession(cancel = false)
+        resetTranscriptSession()
+        state = ConversationDictationState.DeliveryUnknown(sessionId, target, transcript)
     }
 
     /** Keeps durable ownership while asynchronously validating the origin through MDK. */
@@ -1546,6 +1643,19 @@ private class AndroidConversationDictationPlatform(
             context,
             Manifest.permission.RECORD_AUDIO,
         ) == PackageManager.PERMISSION_GRANTED
+
+    /** Includes the RECORD_AUDIO app-op so privacy-policy denial cannot masquerade as a usable grant. */
+    override fun microphoneAccess(): ConversationDictationMicrophoneAccess {
+        if (!hasRecordAudioPermission()) return ConversationDictationMicrophoneAccess.RuntimePermissionRequired
+        return if (
+            PermissionChecker.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PermissionChecker.PERMISSION_GRANTED
+        ) {
+            ConversationDictationMicrophoneAccess.Granted
+        } else {
+            ConversationDictationMicrophoneAccess.AppOpDenied
+        }
+    }
 
     /** Checks that Android's exact selected recognition service is still installed. */
     override fun recognitionAvailable(): Boolean {

@@ -211,7 +211,7 @@ class ComposerBarScreenshotTest {
     }
 
     @Test
-    fun composerDictationIsVisuallyDistinctFromVoiceNoteOnBlankDraft() {
+    fun composerUsesOneMicrophoneForDictationAndVoiceNoteOnBlankDraft() {
         val voiceRecording = previewVoiceRecordingController()
         try {
             render(
@@ -225,7 +225,7 @@ class ComposerBarScreenshotTest {
             composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).assertIsDisplayed()
             composeRule
                 .onNodeWithContentDescription(context.getString(R.string.voice_message_record))
-                .assertIsDisplayed()
+                .assertDoesNotExist()
             composeRule
                 .onNodeWithTag(TAG)
                 .captureRoboImage("src/test/snapshots/composer_dictation_and_voice_note_idle_compact.png")

@@ -21,7 +21,6 @@ internal fun Modifier.expandedComposerActionRow(progress: () -> Float): Modifier
             measurable.measure(
                 constraints.copy(
                     minHeight = actionSize,
-                    maxHeight = actionSize,
                 ),
             )
         layout(placeable.width + inset, placeable.height + inset) {

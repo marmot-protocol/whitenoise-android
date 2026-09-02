@@ -45,6 +45,13 @@ class WhiteNoiseAppDictationTest {
                 appLockScreenVisible = false,
             ),
         )
+        assertTrue(
+            shouldShowConversationDictationFloatingControl(
+                state = ConversationDictationState.DeliveryUnknown(1L, target, "hello"),
+                originVisible = false,
+                appLockScreenVisible = false,
+            ),
+        )
     }
 
     /** Verifies every acceptance-specified non-origin destination delegates controls to the root. */

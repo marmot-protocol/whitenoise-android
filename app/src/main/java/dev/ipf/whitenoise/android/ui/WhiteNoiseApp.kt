@@ -106,6 +106,7 @@ internal fun shouldShowConversationDictationFloatingControl(
             is ConversationDictationState.ProviderActivityActive,
             is ConversationDictationState.Failed,
             is ConversationDictationState.ReviewRequired,
+            is ConversationDictationState.DeliveryUnknown,
             -> true
             ConversationDictationState.Idle,
             is ConversationDictationState.DisclosureRequired,

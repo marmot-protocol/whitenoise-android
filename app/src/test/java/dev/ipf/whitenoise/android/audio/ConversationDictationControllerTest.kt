@@ -308,6 +308,24 @@ class ConversationDictationControllerTest {
         assertFalse(platform.session.started)
     }
 
+    /** Verifies a settings-owned microphone denial does not loop through the runtime permission dialog. */
+    @Test
+    fun appOpDeniedFailsWithAnActionableSettingsStateWithoutRequestingRuntimePermission() {
+        val platform =
+            FakePlatform(
+                hasPermission = true,
+                microphoneAccessOverride = ConversationDictationMicrophoneAccess.AppOpDenied,
+            )
+        val fixture = fixture(draft = TextFieldValue("", TextRange.Zero), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        val failure = fixture.controller.state as ConversationDictationState.Failed
+        assertEquals(ConversationDictationFailure.PermissionPermanentlyDenied, failure.reason)
+        assertEquals(0L, fixture.controller.permissionRequestId)
+        assertFalse(platform.session.started)
+    }
+
     @Test
     fun providerActivityPathUsesProviderUiWithoutAppPermissionOrMicrophoneLease() {
         var microphoneAcquireCalls = 0
@@ -875,7 +893,7 @@ class ConversationDictationControllerTest {
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
 
-    /** Verifies a hung automatic send is cancelled, releases its service, and retains review text. */
+    /** Verifies a hung send is cancelled, releases its service, and cannot be mistaken for a safe retry. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun sendOnFinishTimeoutReleasesDurableOwnershipAndRequiresReview() =
@@ -907,8 +925,8 @@ class ConversationDictationControllerTest {
             advanceTimeBy(20_000L)
             runCurrent()
 
-            val review = fixture.controller.state as ConversationDictationState.ReviewRequired
-            assertEquals("dictated", review.transcript)
+            val unknown = fixture.controller.state as ConversationDictationState.DeliveryUnknown
+            assertEquals("dictated", unknown.transcript)
             assertEquals("Draft", fixture.drafts.getValue(key()).text)
             assertTrue(sendCancelled)
             assertFalse(fixture.controller.hasDurableSession)
@@ -1478,6 +1496,7 @@ class ConversationDictationControllerTest {
         var hasPermission: Boolean = true,
         var available: Boolean = true,
         var activityAvailable: Boolean = true,
+        var microphoneAccessOverride: ConversationDictationMicrophoneAccess? = null,
         private val deferActivityReadiness: Boolean = false,
         var createFailure: Throwable? = null,
     ) : ConversationDictationPlatform {
@@ -1491,6 +1510,8 @@ class ConversationDictationControllerTest {
             private set
 
         override fun hasRecordAudioPermission(): Boolean = hasPermission
+
+        override fun microphoneAccess(): ConversationDictationMicrophoneAccess = microphoneAccessOverride ?: super.microphoneAccess()
 
         override fun recognitionAvailable(): Boolean = available
 

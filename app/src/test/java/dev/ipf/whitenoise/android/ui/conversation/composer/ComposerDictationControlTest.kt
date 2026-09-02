@@ -6,6 +6,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
@@ -16,6 +19,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -88,9 +92,10 @@ class ComposerDictationControlTest {
     /** Verifies app-owned controls replace only their compact slot and leave adjacent actions stable. */
     @Test
     fun compactComposerActionMorphsToAppOwnedDoneAndCancelWithoutMovingNeighbors() {
-        val controller = render(draft = TextFieldValue("Ready"))
+        val controller = render(draft = TextFieldValue("Ready"), withAttachments = true)
         val field = composeRule.onNode(hasSetTextAction()).performClick().assertIsFocused()
         val emojiBefore = composeRule.onNodeWithContentDescription("Open emoji picker").getUnclippedBoundsInRoot()
+        val attachmentBefore = composeRule.onNodeWithContentDescription("Add attachment").getUnclippedBoundsInRoot()
         val sendBefore = composeRule.onNodeWithContentDescription("Send").getUnclippedBoundsInRoot()
 
         composeRule.onNodeWithContentDescription("Dictate text").performClick()
@@ -105,7 +110,47 @@ class ComposerDictationControlTest {
             emojiBefore,
             composeRule.onNodeWithContentDescription("Open emoji picker").getUnclippedBoundsInRoot(),
         )
+        assertEquals(
+            attachmentBefore,
+            composeRule.onNodeWithContentDescription("Add attachment").getUnclippedBoundsInRoot(),
+        )
         assertEquals(sendBefore, composeRule.onNodeWithContentDescription("Send").getUnclippedBoundsInRoot())
+    }
+
+    /** Verifies the wider dictation actions keep the attachment anchored when Send is absent. */
+    @Test
+    fun blankComposerDictationMorphDoesNotMoveAttachment() {
+        val controller = render(withAttachments = true)
+        val attachmentBefore =
+            composeRule.onNodeWithContentDescription("Add attachment").getUnclippedBoundsInRoot()
+
+        composeRule.onNodeWithContentDescription("Dictate text").performClick()
+
+        assertTrue(controller.state is ConversationDictationState.Starting)
+        composeRule.onNodeWithContentDescription("Done").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Cancel dictation").assertIsDisplayed()
+        assertEquals(
+            attachmentBefore,
+            composeRule.onNodeWithContentDescription("Add attachment").getUnclippedBoundsInRoot(),
+        )
+    }
+
+    /** Verifies the same attachment anchor contract under mirrored layout direction. */
+    @Test
+    fun blankRtlComposerDictationMorphDoesNotMoveAttachment() {
+        val controller = render(rtl = true, withAttachments = true)
+        val attachmentBefore =
+            composeRule.onNodeWithContentDescription("Add attachment").getUnclippedBoundsInRoot()
+
+        composeRule.onNodeWithContentDescription("Dictate text").performClick()
+
+        assertTrue(controller.state is ConversationDictationState.Starting)
+        composeRule.onNodeWithContentDescription("Done").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Cancel dictation").assertIsDisplayed()
+        assertEquals(
+            attachmentBefore,
+            composeRule.onNodeWithContentDescription("Add attachment").getUnclippedBoundsInRoot(),
+        )
     }
 
     /** Verifies starting dictation does not focus a composer whose keyboard was already closed. */
@@ -122,22 +167,89 @@ class ComposerDictationControlTest {
         composeRule.onNodeWithContentDescription("Cancel dictation").assertIsDisplayed()
     }
 
-    /** Verifies app-owned dictation removes the competing voice-note microphone from the same composer. */
+    /** Verifies the unified microphone morphs to dictation controls without exposing a second voice action. */
     @Test
-    fun composerOwnedDictationSuppressesTheCompetingVoiceNoteMicrophone() {
+    fun composerOwnedDictationMorphsTheUnifiedMicrophone() {
         val voiceRecording = previewVoiceRecordingController()
         try {
             render(voiceRecordingController = voiceRecording)
-            composeRule.onNodeWithContentDescription("Hold to record voice message").assertExists()
+            composeRule.onNodeWithContentDescription("Dictate text").assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("Hold to record voice message").assertDoesNotExist()
 
             composeRule.onNodeWithContentDescription("Dictate text").performClick()
 
+            composeRule.onNodeWithContentDescription("Dictate text").assertDoesNotExist()
             composeRule.onNodeWithContentDescription("Hold to record voice message").assertDoesNotExist()
             composeRule.onNodeWithContentDescription("Done").assertIsDisplayed()
             composeRule.onNodeWithContentDescription("Cancel dictation").assertIsDisplayed()
         } finally {
             voiceRecording.release()
         }
+    }
+
+    /** Verifies the visible mic is one slot: tap dictates and long press retains voice-note access. */
+    @Test
+    fun microphoneSlotOwnsBothTapToDictateAndLongPressVoiceNoteActions() {
+        val voiceRecording = previewVoiceRecordingController()
+        try {
+            val controller = render(voiceRecordingController = voiceRecording)
+            val microphone =
+                composeRule
+                    .onNodeWithContentDescription("Dictate text")
+                    .assertIsDisplayed()
+                    .assert(SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick))
+
+            composeRule.onNodeWithContentDescription("Hold to record voice message").assertDoesNotExist()
+            microphone.performClick()
+
+            assertTrue(controller.state is ConversationDictationState.Starting)
+            composeRule.onNodeWithContentDescription("Done").assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("Cancel dictation").assertIsDisplayed()
+        } finally {
+            voiceRecording.release()
+        }
+    }
+
+    /** Verifies assistive long-click ownership starts voice capture without also starting dictation. */
+    @Test
+    fun microphoneSlotLongClickStartsAndLocksVoiceWithoutStartingDictation() {
+        val voiceRecording = previewVoiceRecordingController()
+        try {
+            val controller = render(voiceRecordingController = voiceRecording)
+
+            composeRule
+                .onNodeWithContentDescription("Dictate text")
+                .performSemanticsAction(SemanticsActions.OnLongClick)
+
+            assertTrue(voiceRecording.isRecording)
+            assertTrue(voiceRecording.locked)
+            assertTrue(controller.state is ConversationDictationState.Idle)
+        } finally {
+            voiceRecording.cancel()
+            voiceRecording.release()
+        }
+    }
+
+    /** Verifies the exact visible microphone enters disclosure before it can acquire audio. */
+    @Test
+    fun visibleMicrophoneStartsDisclosurePreflight() {
+        val controller = render(disclosureAccepted = false)
+
+        composeRule.onNodeWithContentDescription("Dictate text").performClick()
+
+        assertTrue(controller.state is ConversationDictationState.DisclosureRequired)
+        assertEquals(0L, controller.permissionRequestId)
+    }
+
+    /** Verifies the exact visible microphone requests runtime access instead of looking active. */
+    @Test
+    fun visibleMicrophoneStartsPermissionPreflightWhenAccessIsMissing() {
+        val controller = render(permissionGranted = false)
+
+        composeRule.onNodeWithContentDescription("Dictate text").performClick()
+
+        assertTrue(controller.state is ConversationDictationState.PermissionRequired)
+        assertEquals(1L, controller.permissionRequestId)
     }
 
     @Test
@@ -177,7 +289,10 @@ class ComposerDictationControlTest {
         assertTrue(dictation.right - dictation.left >= 48.dp)
         assertTrue(dictation.bottom - dictation.top >= 48.dp)
         assertTrue("RTL emoji action must remain on the leading side", action.left >= field.left)
-        assertTrue("RTL dictation action must not overlap the text field", dictation.right <= field.left)
+        assertTrue(
+            "RTL microphone $dictation and emoji $action actions must not overlap",
+            dictation.right <= action.left,
+        )
     }
 
     private fun render(
@@ -186,8 +301,15 @@ class ComposerDictationControlTest {
         draft: TextFieldValue = TextFieldValue(""),
         withAttachments: Boolean = false,
         voiceRecordingController: VoiceRecordingController? = null,
+        permissionGranted: Boolean = true,
+        disclosureAccepted: Boolean = true,
     ): ConversationDictationController {
-        val dictationController = idleDictationController(draft)
+        val dictationController =
+            idleDictationController(
+                draft = draft,
+                permissionGranted = permissionGranted,
+                disclosureAccepted = disclosureAccepted,
+            )
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
@@ -227,18 +349,24 @@ class ComposerDictationControlTest {
         )
     }
 
-    private fun idleDictationController(draft: TextFieldValue): ConversationDictationController =
+    private fun idleDictationController(
+        draft: TextFieldValue,
+        permissionGranted: Boolean,
+        disclosureAccepted: Boolean,
+    ): ConversationDictationController =
         ConversationDictationController(
-            platform = FakeDictationPlatform,
+            platform = FakeDictationPlatform(permissionGranted),
             readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, 0L) },
             writeDraft = { _, _, _, _ -> true },
-            disclosureAccepted = { true },
+            disclosureAccepted = { disclosureAccepted },
             markDisclosureAccepted = {},
             scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
         )
 
-    private data object FakeDictationPlatform : ConversationDictationPlatform {
-        override fun hasRecordAudioPermission() = true
+    private class FakeDictationPlatform(
+        private val permissionGranted: Boolean,
+    ) : ConversationDictationPlatform {
+        override fun hasRecordAudioPermission() = permissionGranted
 
         override fun recognitionAvailable() = true
 

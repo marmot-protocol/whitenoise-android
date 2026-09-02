@@ -131,6 +131,7 @@ internal fun ConversationDictationCompactActions(
     if (reviewDialogOpen && state is ConversationDictationState.ReviewRequired) {
         ConversationDictationReviewDialog(
             transcript = state.transcript,
+            titleRes = R.string.dictation_review_title,
             onInsert = {
                 reviewDialogOpen = false
                 controller.insertReviewAtEnd()
@@ -138,6 +139,17 @@ internal fun ConversationDictationCompactActions(
             onDiscard = {
                 reviewDialogOpen = false
                 controller.dismissReview()
+            },
+            onDismiss = { reviewDialogOpen = false },
+        )
+    } else if (reviewDialogOpen && state is ConversationDictationState.DeliveryUnknown) {
+        ConversationDictationReviewDialog(
+            transcript = state.transcript,
+            titleRes = R.string.delivery_not_confirmed,
+            onInsert = null,
+            onDiscard = {
+                reviewDialogOpen = false
+                controller.dismissDeliveryUnknown()
             },
             onDismiss = { reviewDialogOpen = false },
         )
@@ -164,11 +176,20 @@ private fun ConversationDictationPrimaryAction(
                 )
             }
         is ConversationDictationState.Failed -> ConversationDictationFailureAction(state, controller)
-        is ConversationDictationState.ReviewRequired ->
+        is ConversationDictationState.ReviewRequired,
+        is ConversationDictationState.DeliveryUnknown,
+        ->
             IconButton(onClick = onReview, modifier = Modifier.size(48.dp)) {
                 Icon(
                     Icons.Default.Edit,
-                    contentDescription = stringResource(R.string.dictation_review_action),
+                    contentDescription =
+                        stringResource(
+                            if (state is ConversationDictationState.DeliveryUnknown) {
+                                R.string.delivery_not_confirmed
+                            } else {
+                                R.string.dictation_review_action
+                            },
+                        ),
                 )
             }
         else ->
@@ -215,12 +236,15 @@ private fun ConversationDictationDismissAction(
         when (state) {
             is ConversationDictationState.Failed -> controller::dismissFailure
             is ConversationDictationState.ReviewRequired -> controller::dismissReview
+            is ConversationDictationState.DeliveryUnknown -> controller::dismissDeliveryUnknown
             else -> controller::cancel
         }
     val label =
         when (state) {
             is ConversationDictationState.Failed -> R.string.dismiss
-            is ConversationDictationState.ReviewRequired -> R.string.dictation_discard_transcript
+            is ConversationDictationState.ReviewRequired,
+            is ConversationDictationState.DeliveryUnknown,
+            -> R.string.dictation_discard_transcript
             else -> R.string.dictation_cancel
         }
     IconButton(onClick = onClick, modifier = Modifier.size(48.dp)) {
@@ -236,14 +260,15 @@ private fun ConversationDictationDismissAction(
 @Composable
 private fun ConversationDictationReviewDialog(
     transcript: String,
-    onInsert: () -> Unit,
+    titleRes: Int,
+    onInsert: (() -> Unit)?,
     onDiscard: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.dictation_review_title)) },
+        title = { Text(stringResource(titleRes)) },
         text = { Text(transcript) },
         confirmButton = {
             Row {
@@ -255,8 +280,10 @@ private fun ConversationDictationReviewDialog(
                 ) {
                     Text(stringResource(R.string.copy))
                 }
-                TextButton(onClick = onInsert) {
-                    Text(stringResource(R.string.dictation_insert_at_end))
+                if (onInsert != null) {
+                    TextButton(onClick = onInsert) {
+                        Text(stringResource(R.string.dictation_insert_at_end))
+                    }
                 }
             }
         },
@@ -284,6 +311,7 @@ private fun dictationStatusLabel(state: ConversationDictationState): String =
         is ConversationDictationState.Processing -> stringResource(R.string.dictation_processing)
         is ConversationDictationState.Failed -> dictationFailureLabel(state.reason)
         is ConversationDictationState.ReviewRequired -> stringResource(R.string.dictation_review_required)
+        is ConversationDictationState.DeliveryUnknown -> stringResource(R.string.delivery_not_confirmed)
         is ConversationDictationState.Idle -> ""
     }
 
