@@ -243,6 +243,7 @@ class OfflineRecoveryLatencyDeviceTest {
         requireNotNull(phaseElapsedOrNull(phase)) { "Missing ${phase.wireName} marker" }
 
     /** Returns the elapsed marker for an optional phase. */
+    @Suppress("MaxLineLength") // Keeping the typed extension expression together follows the project's Kotlin style.
     private fun List<NotificationNetworkRecoverySample>.phaseElapsedOrNull(phase: PerformancePhase): Long? = firstOrNull { it.phase == phase }?.elapsedMillis
 
     /** Reports machine-readable cycle progress without message bodies or identifiers. */

@@ -127,6 +127,7 @@ internal data class NotificationNetworkRecoverySample(
  * Joins Android, MDK-return, projection, and Compose markers under one opaque
  * generation. The bounded samples contain only enum values and numbers.
  */
+@Suppress("TooManyFunctions") // Typed phase entry points keep callers from constructing invalid samples.
 internal class NotificationNetworkRecoveryDiagnostics(
     private val nowMillis: () -> Long = SystemClock::elapsedRealtime,
     private val traceFactory: () -> PerformanceTrace? = {
@@ -343,6 +344,7 @@ internal enum class NotificationNetworkRecoveryOutcome {
  * Owns the coalesced reconnect job, retained generations, retry policy, and
  * privacy-safe Android phase trace for validated network recovery.
  */
+@Suppress("TooManyFunctions") // Recovery lifecycle and typed diagnostic forwarding form one ownership boundary.
 internal class NotificationNetworkRecoveryCoordinator(
     private val scope: CoroutineScope,
     private val shouldContinue: () -> Boolean,

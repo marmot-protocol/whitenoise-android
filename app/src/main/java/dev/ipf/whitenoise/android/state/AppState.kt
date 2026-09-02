@@ -1237,7 +1237,8 @@ class WhiteNoiseAppState private constructor(
         notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
         notificationCardCancellationDispatcher: CoroutineDispatcher = processNotificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis: () -> Long = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
-        notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
+        notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics =
+            NotificationNetworkRecoveryDiagnostics(),
         inboundShareTextStager: ((String, String, String) -> Unit)? = null,
         preferences: SharedPreferences? = null,
     ) : this(

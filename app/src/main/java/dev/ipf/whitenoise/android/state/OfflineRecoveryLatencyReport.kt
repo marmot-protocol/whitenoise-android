@@ -21,6 +21,7 @@ internal data class OfflineRecoveryLatencyReport(
  * Aggregates one successful marker per generation and phase. Retry/pending
  * observations cannot make a failed attempt look like a completed cycle.
  */
+@Suppress("MaxLineLength") // The explicit sample and report types make this test-facing boundary self-describing.
 internal fun offlineRecoveryLatencyReport(samples: List<NotificationNetworkRecoverySample>): OfflineRecoveryLatencyReport {
     val successful = samples.filter { it.result == PerformanceResult.SUCCESS }
     val completedGenerations =
@@ -44,11 +45,14 @@ private fun phaseLatency(samples: List<Long>): OfflineRecoveryPhaseLatency {
     require(samples.isNotEmpty())
     val ordered = samples.sorted()
     return OfflineRecoveryPhaseLatency(
-        p50Millis = nearestRank(ordered, 0.50),
-        p95Millis = nearestRank(ordered, 0.95),
+        p50Millis = nearestRank(ordered, P50_PERCENTILE),
+        p95Millis = nearestRank(ordered, P95_PERCENTILE),
         maximumMillis = ordered.last(),
     )
 }
+
+private const val P50_PERCENTILE = 0.50
+private const val P95_PERCENTILE = 0.95
 
 /** Returns the conventional nearest-rank percentile from sorted values. */
 private fun nearestRank(

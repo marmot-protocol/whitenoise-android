@@ -3034,7 +3034,7 @@ class ChatsController private constructor(
     /** Recovery generation represented by the latest published row snapshot. */
     var recoveryProjectionGeneration by mutableLongStateOf(0L)
         private set
-    private var pendingRecoveryProjectionGeneration = 0L
+    private val pendingRecoveryProjectionGeneration = RecoveryProjectionGenerationHandoff()
 
     fun retryLoad() {
         if (terminalLoadFailure) {
@@ -3698,8 +3698,7 @@ class ChatsController private constructor(
                                     appState.recoveryDiagnostics
                                         .recordChatListSubscriptionReceived()
                                         ?.let { generation ->
-                                            pendingRecoveryProjectionGeneration =
-                                                maxOf(pendingRecoveryProjectionGeneration, generation)
+                                            pendingRecoveryProjectionGeneration.publish(generation)
                                         }
                                     receivedLiveUpdate = true
                                     connectionOwner.noteLiveUpdate(connectionAttempt)
@@ -5652,7 +5651,7 @@ class ChatsController private constructor(
         error = null
         pendingRecompute = false
         recomputeScheduled = false
-        pendingRecoveryProjectionGeneration = 0L
+        pendingRecoveryProjectionGeneration.clear()
         recoveryProjectionGeneration = 0L
         recomputeScope.cancel()
     }
@@ -5732,9 +5731,8 @@ class ChatsController private constructor(
         val avatarWarmTargets = visible.take(CHAT_LIST_AVATAR_WARM_ROWS)
         items = visible
         archivedItems = archived
-        val recoveryGeneration = pendingRecoveryProjectionGeneration
+        val recoveryGeneration = pendingRecoveryProjectionGeneration.consume()
         if (recoveryGeneration > 0L) {
-            pendingRecoveryProjectionGeneration = 0L
             if (
                 appState.recoveryDiagnostics.recordChatListProjectionPublished(
                     generation = recoveryGeneration,
