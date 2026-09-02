@@ -3607,11 +3607,7 @@ class ChatsController private constructor(
             var pendingReadinessCatchUp: Deferred<Boolean>? = null
             var initialSubscriptionProjection = true
             if (seededLocalSnapshot != null) {
-                // The one-shot MDK seed was installed synchronously during
-                // controller construction, before this LaunchedEffect began.
-                // Give that target-account composition a complete draw, then
-                // start every live/background enrichment path without ever
-                // replacing it with LoadingScreen or EmptyChats.
+                // Render the preinstalled one-shot seed before live or background enrichment.
                 awaitRenderedChatListFrame()
                 if (shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
                     appState.recordAccountSwitchLocalSnapshotRendered(accountRef, chatRows.size)
@@ -3677,8 +3673,7 @@ class ChatsController private constructor(
                     error = null
                     recompute()
 
-                    // The per-account SQLite projection is the local-ready
-                    // boundary. Draw it before relay catch-up; later stream updates fold fresh state.
+                    // Draw the local projection before catch-up; live updates fold fresh state afterward.
                     if (!localFramePresented) {
                         awaitRenderedChatListFrame()
                         appState.recordAccountSwitchLocalSnapshotRendered(accountRef, chatRows.size)
