@@ -136,6 +136,10 @@ internal fun ConversationDictationCompactActions(
                 reviewDialogOpen = false
                 controller.insertReviewAtEnd()
             },
+            onCopy = {
+                reviewDialogOpen = false
+                controller.dismissReview()
+            },
             onDiscard = {
                 reviewDialogOpen = false
                 controller.dismissReview()
@@ -147,6 +151,7 @@ internal fun ConversationDictationCompactActions(
             transcript = state.transcript,
             titleRes = R.string.delivery_not_confirmed,
             onInsert = null,
+            onCopy = { reviewDialogOpen = false },
             onDiscard = {
                 reviewDialogOpen = false
                 controller.dismissDeliveryUnknown()
@@ -262,6 +267,7 @@ private fun ConversationDictationReviewDialog(
     transcript: String,
     titleRes: Int,
     onInsert: (() -> Unit)?,
+    onCopy: () -> Unit,
     onDiscard: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -275,7 +281,7 @@ private fun ConversationDictationReviewDialog(
                 TextButton(
                     onClick = {
                         clipboard.setText(AnnotatedString(transcript))
-                        onDiscard()
+                        onCopy()
                     },
                 ) {
                     Text(stringResource(R.string.copy))

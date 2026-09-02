@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
@@ -35,6 +36,9 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -137,6 +141,32 @@ class ConversationDictationFloatingControlTest {
         composeRule.onNodeWithTag(COMPOSER_DICTATION_REVIEW_DIALOG_TAG).assertIsDisplayed()
         composeRule.onNodeWithText("dictated words").assertIsDisplayed()
         assertTrue(fixture.controller.state is ConversationDictationState.ReviewRequired)
+    }
+
+    /** Verifies Copy is non-destructive when durable send acceptance cannot be confirmed. */
+    @Test
+    fun copyingUnknownDeliveryTranscriptKeepsItAvailableUntilDiscard() {
+        val fixture =
+            fixture(
+                initial = TextFieldValue("Original", TextRange(8)),
+                deliveryMode = ConversationDictationDeliveryMode.SendOnFinish,
+                sendTranscript = { error("delivery acknowledgement lost") },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        fixture.platform.listener.onReady()
+        fixture.controller.stop()
+        fixture.platform.listener.onResult("dictated words")
+        render(fixture)
+
+        assertTrue(fixture.controller.state is ConversationDictationState.DeliveryUnknown)
+        composeRule.onNodeWithContentDescription("Delivery not confirmed").performClick()
+        composeRule.onNodeWithText("Copy").performClick()
+
+        assertTrue(fixture.controller.state is ConversationDictationState.DeliveryUnknown)
+        composeRule.onNodeWithContentDescription("Delivery not confirmed").performClick()
+        composeRule.onNodeWithText("dictated words").assertIsDisplayed()
+        composeRule.onNodeWithText("Discard").performClick()
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 
     /** Verifies provider-readiness feedback and cancellation fit at large font in RTL. */
@@ -244,6 +274,8 @@ class ConversationDictationFloatingControlTest {
     private fun fixture(
         initial: TextFieldValue,
         deferActivityReadiness: Boolean = false,
+        deliveryMode: ConversationDictationDeliveryMode = ConversationDictationDeliveryMode.PasteIntoDraft,
+        sendTranscript: suspend () -> Boolean = { false },
     ): Fixture {
         val platform = FakePlatform(deferActivityReadiness)
         var draft = initial
@@ -263,6 +295,20 @@ class ConversationDictationFloatingControlTest {
                 },
                 disclosureAccepted = { true },
                 markDisclosureAccepted = {},
+                targetValidator =
+                    if (deliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
+                        { _, _ -> true }
+                    } else {
+                        null
+                    },
+                targetValidationScope =
+                    if (deliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
+                        CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+                    } else {
+                        null
+                    },
+                deliveryMode = { deliveryMode },
+                sendTranscriptIfOriginUnchanged = { sendTranscript() },
                 scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
             )
         return Fixture(
