@@ -94,7 +94,9 @@ import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.conversation.composerMultilineControlsSuppressed
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
+import dev.ipf.whitenoise.android.ui.conversation.resolveAutomaticComposerCeiling
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -390,12 +392,13 @@ internal fun ComposerBar(
     var composerEmojiPickerRequested by remember { mutableStateOf(false) }
     var composerEmojiSearchActive by remember { mutableStateOf(false) }
     var composerKeyboardRestorePending by remember { mutableStateOf(false) }
+    // The user-selected expansion mode survives rotation and window resizes:
+    // manual and full-screen heights re-clamp against the live post-inset
+    // maximum in composerHeightPx, so a stale pixel height cannot overflow the
+    // rotated viewport. Only a chat switch or font-scale change resets it.
     var composerExpansion by
         remember(
             draftKey,
-            configuration.orientation,
-            configuration.screenWidthDp,
-            configuration.screenHeightDp,
             configuration.fontScale,
         ) {
             mutableStateOf(ComposerExpansionState())
@@ -880,10 +883,7 @@ internal fun ComposerBar(
         val maximumComposerHeight =
             (boundedHeight - statusBarTop - topInteractionClearance - bottomInset - customInputPaneHeight)
                 .coerceAtLeast(44.dp)
-        val automaticComposerCeiling =
-            (maximumComposerHeight * 0.5f)
-                .coerceAtLeast(44.dp)
-                .coerceAtMost(maximumComposerHeight)
+        val automaticComposerCeiling = resolveAutomaticComposerCeiling(maximumComposerHeight)
         val maximumComposerHeightPx = with(density) { maximumComposerHeight.toPx() }
         val minimumManualComposerHeightPx =
             with(density) {
@@ -1262,6 +1262,7 @@ internal fun ComposerBar(
                         compactMeasurementReservesTrailingAction = false,
                         compactOuterEndInset = trailingControlsWidth + 8.dp,
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
+                        multilineControlsSuppressed = composerMultilineControlsSuppressed(automaticComposerCeiling),
                         modifier =
                             Modifier
                                 .fillMaxWidth()

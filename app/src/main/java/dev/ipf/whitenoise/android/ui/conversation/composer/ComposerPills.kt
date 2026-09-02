@@ -66,6 +66,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -91,6 +92,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.scrollBy
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -269,6 +271,7 @@ private suspend fun ScrollState.keepComposerSelectionVisible(selection: Composer
  */
 private fun Modifier.keepComposerSelectionVisibleDuringLayout(
     scrollState: ScrollState,
+    correctionGate: ComposerLayoutCaretCorrectionGate,
     selectionLayout: () -> ComposerSelectionLayout?,
 ): Modifier =
     layout { measurable, constraints ->
@@ -282,12 +285,40 @@ private fun Modifier.keepComposerSelectionVisibleDuringLayout(
                     selection = selection,
                 )
             val delta = target - scrollState.value
-            if (delta != 0) scrollState.dispatchRawDelta(delta.toFloat())
+            // One measure-time dispatch per distinct correction: this pass
+            // reads geometry that can be one frame stale, so re-dispatching the
+            // same correction against the settled effect-time value ping-pongs
+            // the scroll forever and Compose never goes idle. The ordinary
+            // effect owns steady-state convergence.
+            if (delta != 0 && correctionGate.shouldCorrect(selection, scrollState.viewportSize, scrollState.maxValue)) {
+                scrollState.dispatchRawDelta(delta.toFloat())
+            }
         }
         layout(placeable.width, placeable.height) {
             placeable.placeRelative(0, 0)
         }
     }
+
+/** Deduplicates identical measure-time caret corrections; see the caller. */
+private class ComposerLayoutCaretCorrectionGate {
+    private var lastSelection: ComposerSelectionLayout? = null
+    private var lastViewport: Int = -1
+    private var lastMaxScroll: Int = -1
+
+    fun shouldCorrect(
+        selection: ComposerSelectionLayout,
+        viewport: Int,
+        maxScroll: Int,
+    ): Boolean {
+        val changed = selection != lastSelection || viewport != lastViewport || maxScroll != lastMaxScroll
+        if (changed) {
+            lastSelection = selection
+            lastViewport = viewport
+            lastMaxScroll = maxScroll
+        }
+        return changed
+    }
+}
 
 /**
  * Renders the editable composer pill and coordinates its compact, multiline,
@@ -343,6 +374,11 @@ internal fun ComposerPill(
     inputContentVisible: Boolean = true,
     inputFocusEnabled: Boolean = true,
     onMultilineControlsChanged: (Boolean) -> Unit = {},
+    // Compact-height viewports cannot afford the expanded control layout, whose
+    // fixed header and action-row overhead consumes the whole compact composer
+    // ceiling and squeezes the editor viewport to zero, so they pin the inline
+    // single-row controls regardless of the measured line count.
+    multilineControlsSuppressed: Boolean = false,
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -454,6 +490,27 @@ internal fun ComposerPill(
             mentionVisualTransformation.filter(AnnotatedString(textFieldValue.text))
         }
     val composerScrollState = rememberScrollState()
+    // Reading intent: a deliberate user scroll (touch drag, mouse wheel,
+    // trackpad) anchors to the exact draft and selection it happened on and
+    // suspends caret-following while that anchor still matches, so the next
+    // layout pass cannot snap the viewport back to the caret. Any edit or
+    // selection change invalidates the anchor synchronously — the comparison
+    // is a plain value check readable during measure — which preserves the
+    // paste/dictation/bulk-replacement first-frame caret guarantees.
+    var readingScrollAnchor by remember { mutableStateOf<ComposerReadingAnchor?>(null) }
+    // The gesture owner below lives in a pointerInput(Unit) block, so it must
+    // read the live field value at arm time rather than a stale capture.
+    val latestTextFieldValue by rememberUpdatedState(textFieldValue)
+    val caretFollowSuspended =
+        readingScrollAnchor?.matches(textFieldValue) == true
+    SideEffect {
+        // A mismatched anchor is retired for good, not merely dormant: an edit
+        // that later restores the identical (text, selection) pair — type a
+        // character, delete it — must not silently re-suspend caret-following
+        // with no live reading intent behind it.
+        if (readingScrollAnchor != null && !caretFollowSuspended) readingScrollAnchor = null
+    }
+    val layoutCorrectionGate = remember { ComposerLayoutCaretCorrectionGate() }
     var textLayoutSnapshot by remember { mutableStateOf<ComposerTextLayoutSnapshot?>(null) }
     val selectionLayout =
         remember(textLayoutSnapshot, textFieldValue.text, textFieldValue.selection, transformedText) {
@@ -469,8 +526,15 @@ internal fun ComposerPill(
                     )
                 }
         }
-    LaunchedEffect(selectionLayout, composerScrollState.viewportSize, composerScrollState.maxValue) {
-        selectionLayout?.let { composerScrollState.keepComposerSelectionVisible(it) }
+    LaunchedEffect(
+        selectionLayout,
+        composerScrollState.viewportSize,
+        composerScrollState.maxValue,
+        caretFollowSuspended,
+    ) {
+        if (!caretFollowSuspended) {
+            selectionLayout?.let { composerScrollState.keepComposerSelectionVisible(it) }
+        }
     }
     val hasAttachmentAction =
         onPickFromGallery != null ||
@@ -532,13 +596,17 @@ internal fun ComposerPill(
             }
         }
     val visualMultilineControls =
-        compactLineCount?.let { lineCount ->
-            when {
-                multilineControls && lineCount <= 1 -> false
-                !multilineControls && lineCount >= 3 -> true
-                else -> multilineControls
-            }
-        } ?: multilineControls
+        when {
+            multilineControlsSuppressed -> false
+            else ->
+                compactLineCount?.let { lineCount ->
+                    when {
+                        multilineControls && lineCount <= 1 -> false
+                        !multilineControls && lineCount >= 3 -> true
+                        else -> multilineControls
+                    }
+                } ?: multilineControls
+        }
     val expandedLayout = visualMultilineControls || expansionMode != ComposerExpansionMode.Automatic
     // One progress value owns the moving editor and action edges. The handle's
     // 24dp border reservation is installed atomically when expansion starts;
@@ -573,6 +641,7 @@ internal fun ComposerPill(
     fun updateMultilineControls(lineCount: Int) {
         val nextMultilineControls =
             when {
+                multilineControlsSuppressed -> false
                 multilineControls && lineCount <= 1 -> false
                 !multilineControls && lineCount >= 3 -> true
                 else -> multilineControls
@@ -584,7 +653,7 @@ internal fun ComposerPill(
     }
 
     SideEffect {
-        if (compactLineCount != null && visualMultilineControls != multilineControls) {
+        if ((compactLineCount != null || multilineControlsSuppressed) && visualMultilineControls != multilineControls) {
             multilineControls = visualMultilineControls
             onMultilineControlsChanged(visualMultilineControls)
         }
@@ -633,7 +702,27 @@ internal fun ComposerPill(
                             .align(Alignment.TopStart)
                             .fillMaxWidth()
                             .then(expandedHeightModifier)
-                            .deferredPadding(
+                            // The text field's internal handlers consume plain
+                            // drags without ever scrolling this height-capped
+                            // viewport, so the editor's one explicit scroll owner
+                            // lives here, covering the whole editor viewport:
+                            // early vertical drags and wheel/trackpad ticks drive
+                            // composerScrollState directly and arm reading
+                            // intent, while taps and long-press selection pass
+                            // through untouched.
+                            .pointerInput(Unit) {
+                                composerEditorReadingScrollGestures(
+                                    scrollBy = { delta -> composerScrollState.dispatchRawDelta(delta) },
+                                    onReadingScroll = {
+                                        // A non-overflowing editor has nothing to
+                                        // read toward; arming would only suspend
+                                        // caret-following for no scroll intent.
+                                        if (composerScrollState.maxValue > 0) {
+                                            readingScrollAnchor = ComposerReadingAnchor.of(latestTextFieldValue)
+                                        }
+                                    },
+                                )
+                            }.deferredPadding(
                                 // Keep the editable text on one stable leading
                                 // axis while the pill widens. Animating this
                                 // inset made the live draft slide ~40dp during
@@ -663,6 +752,7 @@ internal fun ComposerPill(
                             ).alpha(if (inputContentVisible) 1f else 0f)
                             .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
                 ) {
+                    val editorOverflowColor = composerResizeHandleColor()
                     BasicTextField(
                         value = textFieldValue,
                         onValueChange = onValueChange,
@@ -670,7 +760,20 @@ internal fun ComposerPill(
                             Modifier
                                 .fillMaxWidth()
                                 .then(expandedHeightModifier)
-                                .keepComposerSelectionVisibleDuringLayout(composerScrollState) {
+                                // Drawn outside the scroll modifier so the thumb
+                                // paints in viewport coordinates over the clipped
+                                // editor, only while the draft overflows it.
+                                .drawWithContent {
+                                    drawContent()
+                                    drawComposerEditorOverflowAffordance(
+                                        scrollValue = composerScrollState.value,
+                                        maxScroll = composerScrollState.maxValue,
+                                        color = editorOverflowColor,
+                                    )
+                                }.keepComposerSelectionVisibleDuringLayout(composerScrollState, layoutCorrectionGate) {
+                                    if (readingScrollAnchor?.matches(textFieldValue) == true) {
+                                        return@keepComposerSelectionVisibleDuringLayout null
+                                    }
                                     textLayoutSnapshot
                                         ?.takeIf {
                                             it.sourceText == textFieldValue.text &&
@@ -682,6 +785,17 @@ internal fun ComposerPill(
                                                 transformedText = snapshot.transformedText,
                                             )
                                         }
+                                }.semantics {
+                                    // Accessibility scrolls are reading intent too:
+                                    // arm the anchor before moving the shared state,
+                                    // overriding verticalScroll's un-anchored action.
+                                    scrollBy { _, y ->
+                                        if (composerScrollState.maxValue > 0) {
+                                            readingScrollAnchor = ComposerReadingAnchor.of(textFieldValue)
+                                        }
+                                        composerScrollState.dispatchRawDelta(y)
+                                        true
+                                    }
                                 }
                                 // The automatic composer has a hard viewport ceiling.
                                 // Measure the editor at its natural height and own the
