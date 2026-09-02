@@ -286,6 +286,28 @@ class ConversationDictationControllerTest {
         assertTrue(platform.session.started)
     }
 
+    /** Requests microphone access before reporting that the selected speech provider is unavailable. */
+    @Test
+    fun missingPermissionPrecedesProviderAvailabilityCheck() {
+        val platform = FakePlatform(hasPermission = false, available = false)
+        val fixture = fixture(draft = TextFieldValue("", TextRange.Zero), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        assertTrue(fixture.controller.state is ConversationDictationState.PermissionRequired)
+        assertEquals(1L, fixture.controller.permissionRequestId)
+        assertFalse(platform.session.started)
+
+        platform.hasPermission = true
+        fixture.controller.onPermissionResult(granted = true)
+
+        assertEquals(
+            ConversationDictationFailure.ProviderUnavailable,
+            (fixture.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertFalse(platform.session.started)
+    }
+
     @Test
     fun providerActivityPathUsesProviderUiWithoutAppPermissionOrMicrophoneLease() {
         var microphoneAcquireCalls = 0

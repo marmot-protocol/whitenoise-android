@@ -521,7 +521,7 @@ internal class ConversationDictationController internal constructor(
                 )
             return
         }
-        startRecognition(pending.sessionId, pending.target)
+        startWhenProviderAvailable(pending.sessionId, pending.target)
     }
 
     /** Requests terminal provider output, or immediately commits segments already accumulated. */
@@ -767,19 +767,27 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
-    /** Verifies provider and permission prerequisites before creating a recognizer generation. */
+    /** Requests microphone access before checking the provider needed for app-owned recognition. */
     private fun startOrRequestPermission(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+    ) {
+        if (!platform.hasRecordAudioPermission()) {
+            state = ConversationDictationState.PermissionRequired(sessionId, target)
+            _permissionRequestId.longValue += 1L
+            return
+        }
+        startWhenProviderAvailable(sessionId, target)
+    }
+
+    /** Re-checks the selected provider after permission is known before opening the microphone. */
+    private fun startWhenProviderAvailable(
         sessionId: Long,
         target: ConversationDictationTarget,
     ) {
         state = ConversationDictationState.Starting(sessionId, target)
         if (!platform.recognitionAvailable()) {
             fail(sessionId, target, ConversationDictationFailure.ProviderUnavailable)
-            return
-        }
-        if (!platform.hasRecordAudioPermission()) {
-            state = ConversationDictationState.PermissionRequired(sessionId, target)
-            _permissionRequestId.longValue += 1L
             return
         }
         startRecognition(sessionId, target)
