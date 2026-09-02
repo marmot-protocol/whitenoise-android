@@ -290,6 +290,32 @@ class PerformanceDiagnosticBuildGateTest {
         assertTrue(report.contains("read_phase_value first_local_frame elapsed_ms"))
     }
 
+    @Test
+    fun benchmarkRouteMarkersUseExistenceRatherThanVisibleBounds() {
+        val journeys =
+            rootSource(
+                "benchmark/src/main/java/dev/ipf/whitenoise/android/benchmark/WhiteNoiseJourneys.kt",
+            )
+
+        listOf(
+            "MAIN_SHELL_ROUTE_SETTLED",
+            "CONVERSATION_ROUTE_SETTLED",
+            "CONVERSATION_CONTROLLER_RELEASED",
+        ).forEach { marker ->
+            assertFalse(journeys.contains("waitForVisibleTag(PerformanceTags.$marker"))
+            assertTrue(journeys.contains("waitForTag(PerformanceTags.$marker"))
+        }
+    }
+
+    @Test
+    fun benchmarkRunnerForwardsNotificationFixtureArguments() {
+        val runner = rootSource("scripts/run-performance-benchmarks.sh")
+
+        assertTrue(runner.contains("-e notificationTexts"))
+        assertTrue(runner.contains("-e notificationConversationTitles"))
+        assertTrue(runner.contains("-e notificationSourceAccountRef"))
+    }
+
     private fun source(relativePath: String): String =
         sequenceOf(File(relativePath), File("app/$relativePath"))
             .firstOrNull(File::isFile)

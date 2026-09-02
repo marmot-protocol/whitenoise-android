@@ -267,12 +267,14 @@ internal class WhiteNoiseJourneys {
         waitForVisibleTag(PerformanceTags.CONVERSATION_TRANSCRIPT_VISIBLE)
     }
 
+    /** Waits for the nonvisual marker proving the destination route rendered after settling. */
     fun waitForConversationRouteSettled() {
-        waitForVisibleTag(PerformanceTags.CONVERSATION_ROUTE_SETTLED)
+        waitForTag(PerformanceTags.CONVERSATION_ROUTE_SETTLED)
     }
 
+    /** Waits for the nonvisual marker proving the outgoing conversation controller was released. */
     fun waitForConversationControllerReleased() {
-        waitForVisibleTag(PerformanceTags.CONVERSATION_CONTROLLER_RELEASED)
+        waitForTag(PerformanceTags.CONVERSATION_CONTROLLER_RELEASED)
     }
 
     fun createGroup(
@@ -308,7 +310,7 @@ internal class WhiteNoiseJourneys {
             waitForVisibleTagAbsent(otherAccountAvatarTag, NOTIFICATION_ROUTE_TIMEOUT_MS)
         }
         waitForVisibleTag(PerformanceTags.NEW_MESSAGE, NOTIFICATION_ROUTE_TIMEOUT_MS)
-        waitForVisibleTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED, NOTIFICATION_ROUTE_TIMEOUT_MS)
+        waitForTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED, NOTIFICATION_ROUTE_TIMEOUT_MS)
         device.waitForIdle()
     }
 
@@ -377,7 +379,7 @@ internal class WhiteNoiseJourneys {
             device.waitForIdle()
         }
         waitForVisibleTag(PerformanceTags.NEW_MESSAGE)
-        waitForVisibleTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED)
+        waitForTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED)
         device.waitForIdle()
     }
 

@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicInteger
 internal object NotificationRouteTraceSection {
     const val TOTAL = "WhiteNoise.notificationRoute.total"
     const val ACCOUNT_ACTIVATION = "WhiteNoise.notificationRoute.accountActivation"
-    const val GROUP_DETAILS = "WhiteNoise.notificationRoute.groupDetails"
+    const val TARGET_PROJECTION = "WhiteNoise.notificationRoute.targetProjection"
     const val CONTROLLER_BIND = "WhiteNoise.notificationRoute.controllerBind"
     const val TARGET_TIMELINE = "WhiteNoise.notificationRoute.targetTimeline"
     const val INITIAL_ANCHOR = "WhiteNoise.notificationRoute.initialAnchor"

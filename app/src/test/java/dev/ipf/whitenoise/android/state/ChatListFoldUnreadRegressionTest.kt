@@ -13,9 +13,9 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Regression for issue #1383: stale chat-list subscription rows must not
- * overwrite a fresher in-memory read watermark or resurrect an inflated
- * [unreadCount]. Exercises [reduceSubscriptionChatListRow] directly.
+ * Stale chat-list subscription rows must not overwrite a fresher in-memory
+ * read watermark or resurrect an inflated [unreadCount]. Exercises
+ * [reduceSubscriptionChatListRow] directly.
  */
 class ChatListFoldUnreadRegressionTest {
     @Test
@@ -144,6 +144,40 @@ class ChatListFoldUnreadRegressionTest {
         assertEquals(1uL, folded.unreadCount)
         assertEquals(true, folded.hasUnread)
         assertEquals(idTail, folded.firstUnreadMessageIdHex)
+    }
+
+    @Test
+    fun distinctSameSecondLastMessageAddsUnreadRegardlessOfIdentifierOrder() {
+        val current =
+            row(
+                messageId = idB,
+                lastMessageAt = 200uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 200uL,
+                lastReadMessageIdHex = idB,
+            )
+        val incoming =
+            row(
+                messageId = idA,
+                lastMessageAt = 200uL,
+                unreadCount = 1uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = idAnchor,
+            )
+
+        val folded =
+            reduceSubscriptionChatListRow(
+                current,
+                incoming,
+                ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+            )
+
+        assertEquals(idA, folded.lastMessage?.messageIdHex)
+        assertEquals(1uL, folded.unreadCount)
+        assertEquals(true, folded.hasUnread)
+        assertEquals(idA, folded.firstUnreadMessageIdHex)
+        assertEquals(200uL, folded.lastReadTimelineAt)
+        assertEquals(idB, folded.lastReadMessageIdHex)
     }
 
     @Test

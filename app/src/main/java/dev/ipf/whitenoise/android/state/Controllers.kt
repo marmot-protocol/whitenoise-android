@@ -418,27 +418,20 @@ internal fun reduceSubscriptionChatListRow(
 
     val newLastMessage = incoming.lastMessage
     val currentLastMessage = current.lastMessage
+    val distinctNewLastMessage = observesDistinctNewLastMessage(current, incoming, trigger)
     val advancesLastMessage =
         newLastMessage != null &&
             (
                 currentLastMessage == null ||
-                    compareTimelineAtMessageIdHex(
-                        newLastMessage.timelineAt,
-                        newLastMessage.messageIdHex,
-                        currentLastMessage.timelineAt,
-                        currentLastMessage.messageIdHex,
-                    ) > 0
+                    newLastMessage.timelineAt > currentLastMessage.timelineAt ||
+                    (distinctNewLastMessage && newLastMessage.timelineAt == currentLastMessage.timelineAt)
             )
     val advancesPastRead =
         newLastMessage != null &&
             (
                 !currentReadComplete ||
-                    compareTimelineAtMessageIdHex(
-                        newLastMessage.timelineAt,
-                        newLastMessage.messageIdHex,
-                        current.lastReadTimelineAt!!,
-                        current.lastReadMessageIdHex!!,
-                    ) > 0
+                    newLastMessage.timelineAt > current.lastReadTimelineAt!! ||
+                    (distinctNewLastMessage && newLastMessage.timelineAt == current.lastReadTimelineAt)
             )
     val addsUnread =
         trigger == ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE &&
@@ -2464,22 +2457,12 @@ internal fun chatListItemFromAuthoritativeGroupDetails(
 }
 
 /**
- * Combine the targeted group-details read used by notification routing with the
- * same account's pre-read chat-list projection. A message-notification open
- * must carry this projection into its first frame: opening from group details
- * alone leaves unread state unknown until the broad list binds, by which point
- * notification read-through may already have advanced the durable cursor.
+ * Build the first notification-open frame solely from the exact local row.
+ * Membership enrichment is intentionally absent from this boundary because it
+ * is loaded by the conversation after navigation and may be queued behind
+ * account activation. The row still preserves pre-read unread state.
  */
-internal fun chatListItemFromNotificationProjection(
-    details: GroupDetailsFfi,
-    activeAccountIdHex: String?,
-    projection: ChatListRowFfi,
-): ChatListItem {
-    require(details.group.groupIdHex.equals(projection.groupIdHex, ignoreCase = true)) {
-        "notification projection belongs to another group"
-    }
-    return chatListItemFromAuthoritativeGroupDetails(details, activeAccountIdHex).copy(projection = projection)
-}
+internal fun chatListItemFromNotificationProjection(projection: ChatListRowFfi): ChatListItem = chatListItemFromProjection(row = projection)
 
 /**
  * When a provisional open (no chat-list row yet) is already foregrounded,
@@ -3092,6 +3075,13 @@ class ChatsController private constructor(
         current: ChatListRowFfi,
     ): Boolean = compareChatListActivity(previous, current) > 0
 
+    /** Chooses when a materialized row receives a fresh in-memory order token. */
+    private fun shouldAdvanceChatActivitySequence(
+        current: ChatListRowFfi?,
+        folded: ChatListRowFfi,
+        observesNewActivity: Boolean,
+    ): Boolean = current == null || chatListActivityAdvanced(current, folded) || observesNewActivity
+
     private fun compareChatListActivity(
         previous: ChatListRowFfi,
         current: ChatListRowFfi,
@@ -3239,6 +3229,7 @@ class ChatsController private constructor(
         state: OptimisticChatListPreviewState,
         row: ChatListRowFfi,
         acceptBackwardActivity: Boolean = false,
+        observesNewActivity: Boolean = false,
     ) {
         val activityCompare = compareChatListActivity(state.baselineRow, row)
         val match =
@@ -3288,7 +3279,14 @@ class ChatsController private constructor(
         } else if (acceptBackwardActivity && foldSnapshotKeepingConfirmedSend(state, row)) {
             acceptRow = false
         } else {
-            acceptRow = foldUnmatchedChatListRow(state, row, activityCompare, acceptBackwardActivity)
+            acceptRow =
+                foldUnmatchedChatListRow(
+                    state,
+                    row,
+                    activityCompare,
+                    acceptBackwardActivity,
+                    observesNewActivity,
+                )
         }
         if (acceptRow) state.baselineRow = row
     }
@@ -3304,6 +3302,7 @@ class ChatsController private constructor(
         row: ChatListRowFfi,
         activityCompare: Int,
         acceptBackwardActivity: Boolean,
+        observesNewActivity: Boolean,
     ): Boolean {
         val knownActivitySequence =
             state.baselineActivitySequenceByLastMessage[chatListLastMessageActivity(row)]
@@ -3318,7 +3317,7 @@ class ChatsController private constructor(
                 }
             }
 
-            activityCompare > 0 -> {
+            activityCompare > 0 || observesNewActivity -> {
                 state.baselineActivitySequence = nextChatActivitySequence()
                 rememberBaselineActivitySequence(state, row, state.baselineActivitySequence)
                 state.entries.entries.removeAll { (_, entry) ->
@@ -3702,33 +3701,7 @@ class ChatsController private constructor(
                                         }
                                     receivedLiveUpdate = true
                                     connectionOwner.noteLiveUpdate(connectionAttempt)
-                                    when (update) {
-                                        is ChatListSubscriptionUpdateFfi.Row -> {
-                                            val row = update.row
-                                            requestChatRowProfiles(row)
-                                            chatsDebug {
-                                                "chat list update account=${accountRef.take(8)} trigger=${update.trigger} ${row.debugSummary()}"
-                                            }
-                                            foldChatRow(row, update.trigger)
-                                        }
-                                        is ChatListSubscriptionUpdateFfi.Snapshot -> {
-                                            chatsDebug {
-                                                "chat list snapshot account=${accountRef.take(8)} " +
-                                                    "trigger=${update.trigger} rows=${update.rows.size}"
-                                            }
-                                            // Contract: atomically replace the held rows and drop
-                                            // any prior row absent from the snapshot.
-                                            update.rows.forEach(::requestChatRowProfiles)
-                                            replaceChatRows(update.rows)
-                                            scheduleRecompute()
-                                        }
-                                        is ChatListSubscriptionUpdateFfi.RemoveRow -> {
-                                            chatsDebug {
-                                                "chat list remove account=${accountRef.take(8)} trigger=${update.trigger} id=${update.groupIdHex.take(8)}"
-                                            }
-                                            removeChatRow(update.groupIdHex)
-                                        }
-                                    }
+                                    applyChatListSubscriptionUpdate(accountRef, update)
                                 }
                             },
                             second = {
@@ -4748,6 +4721,41 @@ class ChatsController private constructor(
             },
         )
 
+    /** Applies one ordered update emitted by the active chat-list subscription. */
+    @VisibleForTesting
+    internal fun applyChatListSubscriptionUpdate(
+        accountRef: String,
+        update: ChatListSubscriptionUpdateFfi,
+    ) {
+        when (update) {
+            is ChatListSubscriptionUpdateFfi.Row -> {
+                val row = update.row
+                requestChatRowProfiles(row)
+                chatsDebug {
+                    "chat list update account=${accountRef.take(8)} trigger=${update.trigger} ${row.debugSummary()}"
+                }
+                foldChatRow(row, update.trigger)
+            }
+            is ChatListSubscriptionUpdateFfi.Snapshot -> {
+                chatsDebug {
+                    "chat list snapshot account=${accountRef.take(8)} " +
+                        "trigger=${update.trigger} rows=${update.rows.size}"
+                }
+                // Contract: atomically replace the held rows and drop any prior
+                // row absent from the snapshot.
+                update.rows.forEach(::requestChatRowProfiles)
+                replaceChatRows(update.rows)
+                scheduleRecompute()
+            }
+            is ChatListSubscriptionUpdateFfi.RemoveRow -> {
+                chatsDebug {
+                    "chat list remove account=${accountRef.take(8)} trigger=${update.trigger} id=${update.groupIdHex.take(8)}"
+                }
+                removeChatRow(update.groupIdHex)
+            }
+        }
+    }
+
     private fun foldChatRow(
         row: ChatListRowFfi,
         trigger: ChatListUpdateTriggerFfi? = null,
@@ -4764,6 +4772,7 @@ class ChatsController private constructor(
                 trigger != null -> reduceSubscriptionChatListRow(current, row, trigger)
                 else -> row
             }
+        val observesNewActivity = observesSubscriptionActivity(current, folded, trigger)
         if (current != null && row.unreadCount > folded.unreadCount) {
             logStaleChatListUnreadRejected(
                 keptUnread = folded.unreadCount,
@@ -4774,7 +4783,7 @@ class ChatsController private constructor(
         val membershipChanged = current == null
         if (state == null) {
             chatRowsByGroup[key] = folded
-            if (current == null || chatListActivityAdvanced(current, folded)) {
+            if (shouldAdvanceChatActivitySequence(current, folded, observesNewActivity)) {
                 activitySequenceByGroup[key] = nextChatActivitySequence()
             }
         } else {
@@ -4782,6 +4791,7 @@ class ChatsController private constructor(
                 state,
                 folded,
                 acceptBackwardActivity = trigger == ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
+                observesNewActivity = observesNewActivity,
             )
             materializeOptimisticChatListPreview(key, state)
         }

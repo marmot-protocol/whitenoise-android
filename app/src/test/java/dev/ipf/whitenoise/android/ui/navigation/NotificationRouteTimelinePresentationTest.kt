@@ -264,11 +264,6 @@ class NotificationRouteTimelinePresentationTest {
         ) { proxy, method, arguments ->
             when (method.name) {
                 "groupDetails" -> {
-                    routeGate.preloadStarted.countDown()
-                    check(routeGate.releasePreload.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-                        "notification preload gate timed out"
-                    }
-                    routeGate.preloadCompleted.countDown()
                     groupDetails()
                 }
                 "chatListRow" -> {
@@ -276,6 +271,11 @@ class NotificationRouteTimelinePresentationTest {
                     val groupIdHex = arguments?.getOrNull(1) as? String
                     check(accountRef == TARGET_ACCOUNT) { "projection read used an unknown account" }
                     check(groupIdHex == ConversationTimelineTestIds.GROUP_ID) { "projection read used the wrong group" }
+                    routeGate.preloadStarted.countDown()
+                    check(routeGate.releasePreload.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+                        "notification preload gate timed out"
+                    }
+                    routeGate.preloadCompleted.countDown()
                     preGapChatListRow()
                 }
                 "subscribeChatList" -> {

@@ -997,6 +997,39 @@ class OptimisticSentPreviewOrderingTest {
 @Config(sdk = [36], qualifiers = "en")
 class OptimisticSentPreviewAuthoritativeFoldTest {
     @Test
+    fun distinctSameSecondActivitySupersedesAnUnresolvedOptimisticPreview() {
+        val controller = controllerWithRows(row("chat-b", "Zulu", 20uL))
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "pending B", 20uL))
+        applySubscriptionChatListRow(
+            controller,
+            row("chat-b", "Zulu", 20uL).copy(
+                lastMessage =
+                    preview(
+                        "0a-incoming-b",
+                        "same-second incoming",
+                        20uL,
+                        ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    ),
+                unreadCount = 1uL,
+                hasUnread = true,
+                firstUnreadMessageIdHex = "0a-incoming-b",
+            ),
+            ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+        )
+        controller.commitOptimisticSentPreview("chat-b", "temp-b", "ff-sent-b")
+        controller.setChatListVisible(true)
+
+        val projection = controller.items.single().projection
+        assertEquals("0a-incoming-b", projection?.lastMessage?.messageIdHex)
+        assertEquals("same-second incoming", projection?.lastMessage?.plaintext)
+        assertEquals(1uL, projection?.unreadCount)
+        assertEquals(true, projection?.hasUnread)
+        assertEquals("0a-incoming-b", projection?.firstUnreadMessageIdHex)
+    }
+
+    @Test
     fun backwardSameSecondSubscriptionRowUpdatesContentWithoutLoweringOrder() {
         val controller = controllerWithRows(row("chat-a", "Alpha", 20uL), row("chat-b", "Zulu", 10uL))
 

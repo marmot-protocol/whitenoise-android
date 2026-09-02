@@ -376,6 +376,18 @@ if [[ -n "${INVITE_NAME:-}" ]]; then
   instrument_command="$instrument_command \
 -e inviteName $(quote_device_shell_arg "$INVITE_NAME")"
 fi
+if [[ -n "${NOTIFICATION_TEXTS:-}" ]]; then
+  instrument_command="$instrument_command \
+-e notificationTexts $(quote_device_shell_arg "$NOTIFICATION_TEXTS")"
+fi
+if [[ -n "${NOTIFICATION_CONVERSATION_TITLES:-}" ]]; then
+  instrument_command="$instrument_command \
+-e notificationConversationTitles $(quote_device_shell_arg "$NOTIFICATION_CONVERSATION_TITLES")"
+fi
+if [[ -n "${NOTIFICATION_SOURCE_ACCOUNT_REF:-}" ]]; then
+  instrument_command="$instrument_command \
+-e notificationSourceAccountRef $(quote_device_shell_arg "$NOTIFICATION_SOURCE_ACCOUNT_REF")"
+fi
 instrument_command="$instrument_command \
 $(quote_device_shell_arg "$runner")"
 
