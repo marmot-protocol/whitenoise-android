@@ -1144,7 +1144,8 @@ internal fun ComposerBar(
                         activeDictationController == null &&
                         (showVoiceMicButton || dictationCanStartHere)
                 val hasAttachmentAction =
-                    onPickFromGallery != null ||
+                    onPickRecentMedia != null ||
+                        onPickFromGallery != null ||
                         onPickDocument != null ||
                         onCaptureFromCamera != null ||
                         onShareLocation != null ||

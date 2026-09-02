@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import android.app.Application
+import android.net.Uri
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
@@ -41,6 +42,7 @@ class ComposerAttachmentSheetBehaviorTest {
     private fun string(resId: Int): String = app.getString(resId)
 
     private fun renderComposer(
+        onPickRecentMedia: ((Uri) -> Unit)? = null,
         onPickFromGallery: (() -> Unit)? = {},
         onCaptureFromCamera: (() -> Unit)? = null,
         onPickDocument: (() -> Unit)? = {},
@@ -56,6 +58,7 @@ class ComposerAttachmentSheetBehaviorTest {
                         messageTextCopy = MessageTextCopy.Default,
                         onCancelReply = {},
                         onSend = { _, _ -> },
+                        onPickRecentMedia = onPickRecentMedia,
                         onPickFromGallery = onPickFromGallery,
                         onCaptureFromCamera = onCaptureFromCamera,
                         onPickDocument = onPickDocument,
@@ -119,6 +122,17 @@ class ComposerAttachmentSheetBehaviorTest {
 
         assertEquals(1, cameraClicks)
         composeRule.onNodeWithText(string(R.string.attach_take_photo)).assertDoesNotExist()
+    }
+
+    @Test
+    fun recentMediaOnlyComposerUsesTheSingleAttachmentTrigger() {
+        renderComposer(
+            onPickRecentMedia = {},
+            onPickFromGallery = null,
+            onPickDocument = null,
+        )
+
+        composeRule.onNodeWithContentDescription(string(R.string.attach_options)).assertIsDisplayed()
     }
 
     @Test
