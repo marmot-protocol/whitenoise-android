@@ -1444,7 +1444,7 @@
     <string name="tts_settings_engine_title">Sprachausgabe</string>
     <string name="tts_settings_rate_title">Sprechgeschwindigkeit</string>
     <string name="tts_media_mix_title">Über wiedergegebenen Medien sprechen</string>
-    <string name="tts_media_mix_subtitle">Startet nur, wenn andere Audioinhalte wiedergegeben werden; White Noise fordert deren Dämpfung an, steuert sie aber nicht</string>
+    <string name="tts_media_mix_subtitle">Startet nur, wenn andere Audioinhalte wiedergegeben werden; White Noise steuert diese nicht</string>
     <string name="tts_media_mix_volume_title">Lautstärke über Medien</string>
     <string name="tts_media_mix_volume_quiet">Leise</string>
     <string name="tts_media_mix_volume_medium">Mittel</string>

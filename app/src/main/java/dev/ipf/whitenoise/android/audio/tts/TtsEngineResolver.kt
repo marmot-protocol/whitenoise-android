@@ -41,6 +41,7 @@ data class TtsEngineHandle(
     val trust: EngineTrust,
     val voiceResolution: TtsVoiceResolution = TtsVoiceResolution.Empty,
 ) {
+    /** Shuts down the framework engine when this resolved handle is replaced. */
     fun release() {
         textToSpeech.shutdown()
     }
@@ -97,6 +98,7 @@ data class TtsResolutionResult(
     val hasUsableEngine: Boolean
         get() = status == TextToSpeech.SUCCESS && engines.isNotEmpty()
 
+    /** Projects the resolved catalog into the settings screen's engine choice. */
     fun engineChoice(): TtsEngineChoice =
         TtsEngineChoice(
             defaultPackage = defaultEnginePackage,
@@ -128,6 +130,7 @@ class TtsEngineResolver(
 
     private val resolutionMutex = Mutex()
 
+    /** Classifies an installed engine without treating unknown packages as trusted. */
     fun classify(packageName: String): EngineTrust =
         if (packageName in LOCAL_ENGINE_PACKAGES) {
             EngineTrust.Local
@@ -135,6 +138,7 @@ class TtsEngineResolver(
             EngineTrust.Unknown
         }
 
+    /** Initializes one engine and returns its verified package, trust, and offline voices. */
     suspend fun resolve(enginePackage: String? = null): TtsResolutionResult =
         resolutionMutex.withLock {
             try {
@@ -229,6 +233,7 @@ class TtsEngineResolver(
             }
         }
 
+    /** Chooses an explicit installed override, safe local default, or sole engine. */
     fun preferredEnginePackage(
         engines: List<TtsEngineInfo>,
         defaultPackage: String?,
@@ -246,6 +251,7 @@ class TtsEngineResolver(
         }
     }
 
+    /** Represents a failed initialization without exposing a partially initialized handle. */
     private fun unusableResolution(status: Int): TtsResolutionResult =
         TtsResolutionResult(
             status = status,
@@ -299,6 +305,7 @@ class TtsEngineResolver(
         )
     }
 
+    /** Trusts only a framework-verified default; explicit selections remain unknown. */
     private fun resolveHandleTrust(
         requestedEnginePackage: String?,
         verifiedPackage: String?,
@@ -323,6 +330,7 @@ class TtsEngineResolver(
         return applyResolvedVoice(tts, enginePackage, locale, voices, requestedVoice)
     }
 
+    /** Normalizes framework engine metadata into a stable, label-sorted catalog. */
     private fun List<TextToSpeech.EngineInfo>.toTtsEngineInfos(): List<TtsEngineInfo> =
         map { info ->
             val label = info.label.ifBlank { info.name }

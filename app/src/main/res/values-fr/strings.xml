@@ -1446,7 +1446,7 @@
     <string name="tts_settings_engine_title">Moteur</string>
     <string name="tts_settings_rate_title">Débit de parole</string>
     <string name="tts_media_mix_title">Parler par-dessus un contenu audio en cours de lecture</string>
-    <string name="tts_media_mix_subtitle">Démarre uniquement pendant la lecture d’un autre contenu audio ; White Noise demande son atténuation, mais ne le contrôle pas</string>
+    <string name="tts_media_mix_subtitle">Démarre uniquement pendant la lecture d’un autre contenu audio ; White Noise ne le contrôle pas</string>
     <string name="tts_media_mix_volume_title">Volume de la voix sur le média</string>
     <string name="tts_media_mix_volume_quiet">Faible</string>
     <string name="tts_media_mix_volume_medium">Moyen</string>

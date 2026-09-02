@@ -1419,7 +1419,7 @@
     <string name="tts_settings_engine_title">引擎</string>
     <string name="tts_settings_rate_title">语速</string>
     <string name="tts_media_mix_title">在播放媒体时朗读</string>
-    <string name="tts_media_mix_subtitle">仅在其他音频播放时启动；White Noise 会请求降低其音量，但不会控制播放</string>
+    <string name="tts_media_mix_subtitle">仅在其他音频播放时启动；White Noise 不会控制其他音频</string>
     <string name="tts_media_mix_volume_title">媒体播放时的朗读音量</string>
     <string name="tts_media_mix_volume_quiet">低</string>
     <string name="tts_media_mix_volume_medium">中</string>

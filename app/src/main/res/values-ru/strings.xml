@@ -1508,7 +1508,7 @@
     <string name="tts_settings_engine_title">Движок</string>
     <string name="tts_settings_rate_title">Скорость речи</string>
     <string name="tts_media_mix_title">Озвучивать поверх воспроизводимого медиа</string>
-    <string name="tts_media_mix_subtitle">Запускается только при воспроизведении другого аудио; White Noise запрашивает приглушение, но не управляет им</string>
+    <string name="tts_media_mix_subtitle">Запускается только при воспроизведении другого аудио; White Noise не управляет им</string>
     <string name="tts_media_mix_volume_title">Громкость речи поверх медиа</string>
     <string name="tts_media_mix_volume_quiet">Тихо</string>
     <string name="tts_media_mix_volume_medium">Средне</string>

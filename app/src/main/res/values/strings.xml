@@ -1593,7 +1593,7 @@
     <string name="tts_settings_engine_title">Engine</string>
     <string name="tts_settings_rate_title">Speech rate</string>
     <string name="tts_media_mix_title">Speak over playing media</string>
-    <string name="tts_media_mix_subtitle">Only starts while other audio is playing; White Noise asks it to duck but does not control it</string>
+    <string name="tts_media_mix_subtitle">Only starts while other audio is playing; White Noise does not control that audio</string>
     <string name="tts_media_mix_volume_title">Speech-over-media volume</string>
     <string name="tts_media_mix_volume_quiet">Quiet</string>
     <string name="tts_media_mix_volume_medium">Medium</string>

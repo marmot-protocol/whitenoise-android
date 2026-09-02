@@ -1446,7 +1446,7 @@
     <string name="tts_settings_engine_title">Motor</string>
     <string name="tts_settings_rate_title">Velocidad de voz</string>
     <string name="tts_media_mix_title">Hablar sobre contenido multimedia en reproducción</string>
-    <string name="tts_media_mix_subtitle">Solo se inicia mientras se reproduce otro audio; White Noise solicita que se atenúe, pero no lo controla</string>
+    <string name="tts_media_mix_subtitle">Solo se inicia mientras se reproduce otro audio; White Noise no controla ese audio</string>
     <string name="tts_media_mix_volume_title">Volumen de voz sobre contenido multimedia</string>
     <string name="tts_media_mix_volume_quiet">Bajo</string>
     <string name="tts_media_mix_volume_medium">Medio</string>
