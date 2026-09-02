@@ -444,6 +444,26 @@ class NostrEventCardResolverTest {
         assertEquals("body", generic.summary)
     }
 
+    /** Verifies only readable note and article kinds retain a bounded full-content body. */
+    @Test
+    fun noteRetainsFullReaderBodyWhileOtherTypedKindsRemainUnchanged() {
+        val fullNote = "n".repeat(70_000)
+        val note = event("a".repeat(64), kind = 1, content = fullNote).toCardModel()
+        val article = event("b".repeat(64), kind = 30_023, content = "Full article").toCardModel()
+        val nonReaders =
+            listOf(
+                event("c".repeat(64), kind = 34_235, content = "Video").toCardModel(),
+                event("d".repeat(64), kind = 30_063, content = "Release").toCardModel(),
+                event("e".repeat(64), kind = 1_063, content = "File").toCardModel(),
+                event("f".repeat(64), kind = 7_777, content = "Generic").toCardModel(),
+            )
+
+        assertEquals("n".repeat(420), note.summary)
+        assertEquals("n".repeat(64 * 1_024), note.readerBody)
+        assertEquals("Full article", article.readerBody)
+        assertTrue(nonReaders.all { it.readerBody == null })
+    }
+
     @Test
     fun textBoundsPreserveCompleteUnicodeCodePoints() {
         val emoji = "\uD83D\uDE00"

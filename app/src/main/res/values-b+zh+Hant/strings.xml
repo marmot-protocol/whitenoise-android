@@ -1586,6 +1586,7 @@
     <string name="nostr_event_failed">無法載入此事件。請檢查網路連線後再試一次。</string>
     <string name="nostr_event_open">開啟事件</string>
     <string name="nostr_event_read_article">閱讀文章</string>
+    <string name="nostr_event_read_note">閱讀完整貼文</string>
     <string name="nostr_event_play_video">播放影片</string>
     <string name="nostr_video_playback_failed">無法播放此影片。</string>
     <string name="nostr_event_copy">複製事件參照</string>

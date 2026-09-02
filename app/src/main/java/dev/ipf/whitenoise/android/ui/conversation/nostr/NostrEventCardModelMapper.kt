@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 
+/** Maps a verified Nostr event into the bounded presentation model used by cards and readers. */
 internal fun NostrEvent.toCardModel(): NostrEventCardModel {
     val cardKind = cardKind()
     val videoMetadata = takeIf { cardKind == NostrEventCardKind.Video }?.videoMetadata()
@@ -16,7 +17,12 @@ internal fun NostrEvent.toCardModel(): NostrEventCardModel {
         title = cardTitle(cardKind, tagTitle)?.safeField(),
         summary = cardSummary(cardKind, tagSummary).safeExcerpt(),
         metadata = cardMetadata(cardKind, videoMetadata).map(String::safeField),
-        readerBody = content.safeReaderBody().takeIf { cardKind == NostrEventCardKind.Article && it.isNotBlank() },
+        readerBody =
+            content
+                .safeReaderBody()
+                .takeIf {
+                    (cardKind == NostrEventCardKind.Note || cardKind == NostrEventCardKind.Article) && it.isNotBlank()
+                },
         mediaUrl = videoMetadata?.url,
         mediaMimeType = videoMetadata?.mimeType,
     )
