@@ -166,7 +166,10 @@ internal fun timelineRecord(
         retentionExpiresAt = null,
     )
 
-internal fun conversationTimelineTestAppState(liveSubscriptions: ConversationLiveSubscriptions): WhiteNoiseAppState =
+internal fun conversationTimelineTestAppState(
+    liveSubscriptions: ConversationLiveSubscriptions,
+    recoveryDiagnostics: NotificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
+): WhiteNoiseAppState =
     WhiteNoiseAppState(
         context = ApplicationProvider.getApplicationContext<Context>(),
         draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
@@ -183,8 +186,9 @@ internal fun conversationTimelineTestAppState(liveSubscriptions: ConversationLiv
                 ),
             ),
         activeAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,
+        notificationNetworkRecoveryDiagnostics = recoveryDiagnostics,
     ).also { state ->
-        state.conversationLiveSubscriptionsOverride = liveSubscriptions
+        state.liveSubscriptionOverrides.conversation = liveSubscriptions
     }
 
 internal fun conversationTimelineTestGroup(): AppGroupRecordFfi =

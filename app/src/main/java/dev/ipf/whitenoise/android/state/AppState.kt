@@ -538,22 +538,6 @@ internal suspend fun dismissConversationNotificationsOnOpen(
 }
 
 /**
- * Offline-to-online recovery shared by durable outbound work and notifications.
- * Outbound work is woken first; [subscribeNotifications] is a passive broadcast
- * with no replay, so account catch-up still waits until a receiver is listening.
- */
-internal suspend fun runNotificationReconnectOnNetworkRestore(
-    wakeDurableOutbound: suspend () -> Unit,
-    ensureNotificationReceiverActive: suspend () -> Boolean,
-    catchUpAccounts: suspend () -> Unit,
-) {
-    wakeDurableOutbound()
-    if (ensureNotificationReceiverActive()) {
-        catchUpAccounts()
-    }
-}
-
-/**
  * Prefer the battery-efficient native-push wake path when this build/device
  * supports it. If enabling push fails, retain the persistent relay connection
  * so first-run setup never silently leaves the account without background
@@ -1207,6 +1191,7 @@ class WhiteNoiseAppState private constructor(
     private val notificationDispatcher: CoroutineDispatcher,
     private val notificationCardCancellationDispatcher: CoroutineDispatcher,
     private val notificationReceiverTimeoutMillis: () -> Long,
+    private val notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics,
     private val inboundShareTextStager: ((String, String, String) -> Unit)?,
     preferencesOverride: SharedPreferences?,
     initialAccounts: List<AccountSummaryFfi>,
@@ -1228,6 +1213,7 @@ class WhiteNoiseAppState private constructor(
             notificationDispatcher = Dispatchers.IO,
             notificationCardCancellationDispatcher = processNotificationCardCancellationDispatcher,
             notificationReceiverTimeoutMillis = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
+            notificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
             inboundShareTextStager = null,
             preferencesOverride = null,
             initialAccounts = emptyList(),
@@ -1251,6 +1237,8 @@ class WhiteNoiseAppState private constructor(
         notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
         notificationCardCancellationDispatcher: CoroutineDispatcher = processNotificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis: () -> Long = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
+        notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics =
+            NotificationNetworkRecoveryDiagnostics(),
         inboundShareTextStager: ((String, String, String) -> Unit)? = null,
         preferences: SharedPreferences? = null,
     ) : this(
@@ -1268,6 +1256,7 @@ class WhiteNoiseAppState private constructor(
         notificationDispatcher = notificationDispatcher,
         notificationCardCancellationDispatcher = notificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis = notificationReceiverTimeoutMillis,
+        notificationNetworkRecoveryDiagnostics = notificationNetworkRecoveryDiagnostics,
         inboundShareTextStager = inboundShareTextStager,
         preferencesOverride = preferences,
         initialAccounts = accounts,
@@ -2299,7 +2288,6 @@ class WhiteNoiseAppState private constructor(
     private val profileCacheLifetime = StalenessGuard()
     private val mediaUploadSessionLifetime = StalenessGuard()
     private val notificationJob = NotificationJobSlot()
-    private val notificationReconnectJob = NotificationJobSlot()
     private val pushWakeCatchUpDrainJob = NotificationJobSlot()
 
     @Volatile
@@ -2809,7 +2797,7 @@ class WhiteNoiseAppState private constructor(
         synchronized(conversationControllerLock) { conversationControllers.remove(controller) }
     }
 
-    internal var conversationLiveSubscriptionsOverride: ConversationLiveSubscriptions? = null
+    internal val liveSubscriptionOverrides = LiveSubscriptionOverrides()
 
     internal fun deliverConfirmedMediaHandoff(
         accountRef: String?,
@@ -2858,7 +2846,7 @@ class WhiteNoiseAppState private constructor(
         val restartNotifications =
             backgroundConnectionEnabled ||
                 notificationJob.isActive() ||
-                notificationReconnectJob.isActive() ||
+                notificationNetworkRecovery.isActive() ||
                 pushWakeCatchUpDrainJob.isActive()
         val chatsControllerForTeardown = chatsController
         val conversationControllersForTeardown = conversationControllersForAccountTeardown()
@@ -2873,6 +2861,7 @@ class WhiteNoiseAppState private constructor(
         return restartNotifications
     }
 
+    /** Restores account and notification state after a wipe fails before commit. */
     private suspend fun restoreAfterFailedDestructiveAccountWipe(
         accountRef: String,
         restartNotifications: Boolean,
@@ -2885,10 +2874,12 @@ class WhiteNoiseAppState private constructor(
         refreshLocalNotificationSettings()
         networkNotificationRecoverySuppressed = false
         if (restartNotifications) startNotificationListener()
+        notificationNetworkRecovery.resumeIfPending()
     }
 
+    /** Cancels reconnect producers before stopping the passive notification receiver. */
     private suspend fun stopNotificationListenerForAccountTeardown() {
-        notificationReconnectJob.cancelAndJoin()
+        notificationNetworkRecovery.cancelAndJoin()
         pushWakeCatchUpDrainJob.cancelAndJoin()
         notificationJob.cancelAndJoin()
         unreadRefreshScheduler.cancelAndClear()
@@ -3975,7 +3966,7 @@ class WhiteNoiseAppState private constructor(
      * behind that barrier, while signer restoration happens before Ready.
      */
     private suspend fun completeReceiverGatedStartup() {
-        val receiverReady = awaitNotificationReceiverForStartup()
+        val receiverReady = awaitNotificationReceiverForStartupWithin(notificationReceiverTimeoutMillis())
         appStateDebug { "marmot started; notification receiver active=$receiverReady" }
         startupPerformance.stage(PerformancePhase.NOTIFICATION_PRIVACY_SETUP) { refreshSecurityPrivacySettings() }
     }
@@ -4054,7 +4045,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun resumeCompletedBootstrap(): Boolean {
         if (!bootstrapCompleted) return false
         if (accounts.isNotEmpty()) phase = AppPhase.Ready
-        val receiverReady = awaitNotificationReceiverForStartup()
+        val receiverReady = awaitNotificationReceiverForStartupWithin(notificationReceiverTimeoutMillis())
         appStateDebug { "bootstrap resumed; notification receiver active=$receiverReady" }
         if (accounts.isEmpty()) phase = AppPhase.Onboarding
         return true
@@ -4062,13 +4053,14 @@ class WhiteNoiseAppState private constructor(
 
     private fun receiverUnavailable() = IllegalStateException("notification receiver unavailable during bootstrap")
 
-    private suspend fun awaitNotificationReceiverForStartup(): Boolean {
+    /** Await the process receiver within a caller-specific bounded budget. */
+    private suspend fun awaitNotificationReceiverForStartupWithin(timeoutMillis: Long): Boolean {
         if (networkNotificationRecoverySuppressed) return false
         return awaitNotificationReceiverForStartup(
             notificationJob = notificationJob,
             receiverActive = notificationReceiverActive,
             receiverRetryWake = notificationReceiverRetryWake,
-            timeoutMillis = notificationReceiverTimeoutMillis(),
+            timeoutMillis = timeoutMillis,
             launchListener = ::launchNotificationListenerLoop,
         )
     }
@@ -4086,7 +4078,7 @@ class WhiteNoiseAppState private constructor(
         }
         localNotificationPresenter.ensureChannels()
         refreshLocalNotificationPermission()
-        if (!awaitNotificationReceiverForStartup()) throw receiverUnavailable()
+        if (!awaitNotificationReceiverForStartupWithin(notificationReceiverTimeoutMillis())) throw receiverUnavailable()
         if (accounts.isEmpty()) refreshAccounts()
         refreshLocalNotificationSettings()
         drainPendingNativePushRegistrationSyncIfNeeded()
@@ -4106,7 +4098,14 @@ class WhiteNoiseAppState private constructor(
 
         localNotificationPresenter.ensureChannels()
         refreshLocalNotificationPermission()
-        val receiverReady = awaitNotificationReceiverForStartup()
+        val receiverReady =
+            awaitNotificationReceiverForStartupWithin(
+                timeoutMillis =
+                    minOf(
+                        notificationReceiverTimeoutMillis(),
+                        NOTIFICATION_NETWORK_RECOVERY_RECEIVER_TIMEOUT_MILLIS,
+                    ),
+            )
         if (receiverReady && !networkNotificationRecoverySuppressed) {
             if (accounts.isEmpty()) refreshAccounts()
             if (!networkNotificationRecoverySuppressed && notificationReceiverActive.value) {
@@ -5438,6 +5437,7 @@ class WhiteNoiseAppState private constructor(
             }
             networkNotificationRecoverySuppressed = false
             if (restartNotifications) startNotificationListener()
+            notificationNetworkRecovery.resumeIfPending()
             refreshLocalNotificationSettings()
             return outcome
         } finally {
@@ -6608,6 +6608,46 @@ class WhiteNoiseAppState private constructor(
     internal val validatedConnectivityRecoveryGeneration: StateFlow<Long> =
         validatedConnectivityRecoveryGenerationMutable.asStateFlow()
 
+    /** Coordinates retained receiver-gated catch-up outside the main state source. */
+    private val notificationNetworkRecovery =
+        NotificationNetworkRecoveryCoordinator(
+            scope = notificationScope,
+            shouldContinue = { !networkNotificationRecoverySuppressed && hasValidatedInternet() },
+            wakeDurableOutbound = {
+                // A retained generation deliberately reissues this wake after
+                // a retry; MDK coalesces connectivity-restored commands so it
+                // interrupts stale backoff without duplicating account workers.
+                val wake = runCatchingCancellable { marmotIo { notifyConnectivityRestored() } }
+                wake.onFailure { throwable ->
+                    appStateDebug(throwable) {
+                        "durable outbound connectivity wake failed: ${throwable.readableMessage()}"
+                    }
+                }
+                wake.isSuccess
+            },
+            ensureNotificationReceiverActive = ::ensureNotificationReceiverForNetworkReconnect,
+            catchUpAccounts = {
+                val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
+                catchUpAccountsBestEffort().also { succeeded ->
+                    if (succeeded) clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
+                }
+            },
+            awaitRetry = { generation, attempt ->
+                appStateDebug { "notification network recovery pending attempt=$attempt" }
+                awaitNotificationRetryWindow(
+                    retryWake = validatedConnectivityRecoveryGeneration,
+                    capturedGeneration = generation,
+                    backoffMillis = notificationNetworkRecoveryRetryDelayMillis(attempt),
+                )
+            },
+            onDrainCompleted = ::schedulePendingPushWakeCatchUpDrain,
+            diagnostics = notificationNetworkRecoveryDiagnostics,
+        )
+
+    /** Process-owned recovery attribution shared by projections and Compose. */
+    internal val recoveryDiagnostics: NotificationNetworkRecoveryCoordinator
+        get() = notificationNetworkRecovery
+
     /**
      * Reactive Android-validated internet and aggregate relay fallback inputs
      * for the chat-list connectivity banner. Active-account attempt and
@@ -6805,47 +6845,13 @@ class WhiteNoiseAppState private constructor(
         updateConnectivitySignals(hasValidatedInternet = recovery.hasUsableInternet)
         if (!recovery.restored) return
         validatedConnectivityRecoveryGenerationMutable.update { generation -> generation + 1 }
-        scheduleNotificationReconnectOnNetworkRestore()
+        notificationNetworkRecovery.noteNetworkRestored(validatedConnectivityRecoveryGenerationMutable.value)
     }
 
-    private fun scheduleNotificationReconnectOnNetworkRestore() {
-        if (networkNotificationRecoverySuppressed) return
-        notificationReconnectJob.startIfInactive {
-            val reconnectJob =
-                notificationScope.launch {
-                    // Re-check under the launched coroutine: a connectivity
-                    // callback preempted between the outer check and this
-                    // launch would otherwise survive a wipe's cancel sweep
-                    // (the wipe sets the flag before sweeping the slots).
-                    if (networkNotificationRecoverySuppressed) return@launch
-                    runNotificationReconnectOnNetworkRestore(
-                        wakeDurableOutbound = {
-                            runCatchingCancellable { marmotIo { notifyConnectivityRestored() } }
-                                .onFailure { throwable ->
-                                    appStateDebug(throwable) {
-                                        "durable outbound connectivity wake failed: ${throwable.readableMessage()}"
-                                    }
-                                }
-                        },
-                        ensureNotificationReceiverActive = ::ensureNotificationReceiverForNetworkReconnect,
-                        catchUpAccounts = {
-                            val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
-                            if (catchUpAccountsBestEffort()) {
-                                clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
-                            }
-                        },
-                    )
-                }
-            reconnectJob.invokeOnCompletion { cause ->
-                if (cause == null) schedulePendingPushWakeCatchUpDrain()
-            }
-            reconnectJob
-        }
-    }
-
+    /** Starts push-wake catch-up only when network recovery does not own the receiver. */
     private fun schedulePendingPushWakeCatchUpDrain() {
         if (networkNotificationRecoverySuppressed || !pushTokenStore.pushWakeCatchUpPending()) return
-        if (notificationReconnectJob.isActive()) return
+        if (notificationNetworkRecovery.isActive()) return
         pushWakeCatchUpDrainJob.startIfInactive {
             notificationScope.launch { ensureNotificationRuntimeStarted() }
         }
@@ -9881,6 +9887,7 @@ class WhiteNoiseAppState private constructor(
         private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
         private const val NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS = 60_000L
         private const val NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS = 5_000L
+        private const val NOTIFICATION_NETWORK_RECOVERY_RECEIVER_TIMEOUT_MILLIS = 3_000L
 
         private const val NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS = 10_000L
         private const val MAX_RETAINED_CONVERSATION_STATES = 32

@@ -182,12 +182,13 @@ class NotificationPushWakeDrainCoverageTest {
         )
     }
 
+    /** Verifies connectivity recovery and push wake share one ordered drain owner. */
     @Test
     fun pendingPushWakeDrainUsesSingleFlightAndGenerationClear() {
         val appState = appStateSource().readText()
         val drain = appStateFunctionBody("drainPendingPushWakeCatchUpIfNeeded")
         val clearObserved = appStateFunctionBody("clearPendingPushWakeCatchUpIfObserved")
-        val reconnect = appStateFunctionBody("scheduleNotificationReconnectOnNetworkRestore")
+        val reconnect = notificationNetworkRecoverySource().readText().kotlinFunctionBody("schedule")
         val schedule = appStateFunctionBody("schedulePendingPushWakeCatchUpDrain")
 
         assertTrue(
@@ -201,7 +202,7 @@ class NotificationPushWakeDrainCoverageTest {
         )
         assertTrue(
             "connectivity callbacks must defer push-wake drain while reconnect owns receiver readiness",
-            "notificationReconnectJob.isActive()" in schedule &&
+            "notificationNetworkRecovery.isActive()" in schedule &&
                 "pushWakeCatchUpDrainJob.startIfInactive" in schedule &&
                 "notificationScope.launch" in schedule &&
                 "ensureNotificationRuntimeStarted()" in schedule,
@@ -209,7 +210,8 @@ class NotificationPushWakeDrainCoverageTest {
         assertTrue(
             "reconnect completion must retry a pending marker when its catch-up did not clear it",
             "invokeOnCompletion" in reconnect &&
-                "schedulePendingPushWakeCatchUpDrain()" in reconnect,
+                "onDrainCompleted()" in reconnect &&
+                "onDrainCompleted = ::schedulePendingPushWakeCatchUpDrain" in appState,
         )
         assertTrue(
             "foreground catch-up must use the same generation clear helper as runtime-start drains",
@@ -239,6 +241,14 @@ class NotificationPushWakeDrainCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing AppState.kt source file")
+
+    /** Locates the isolated network-recovery coordinator source. */
+    private fun notificationNetworkRecoverySource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/NotificationNetworkRecovery.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/NotificationNetworkRecovery.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing NotificationNetworkRecovery.kt source file")
 
     private fun firebaseServiceSource(): File =
         listOf(

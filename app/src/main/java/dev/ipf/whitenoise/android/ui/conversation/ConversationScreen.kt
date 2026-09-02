@@ -944,6 +944,13 @@ internal fun ConversationScreen(
                     selectableMessages[item.record.messageIdHex]?.let { item.id to it }
                 }.toMap()
         }
+    LaunchedEffect(controller, controller.recoveryProjectionGeneration, renderedTimeline) {
+        val generation = controller.recoveryProjectionGeneration
+        if (generation > 0L) {
+            withFrameNanos { }
+            appState.recoveryDiagnostics.recordFirstVisibleFrame(generation)
+        }
+    }
     val timelineIdSet = remember(orderedTimelineIds) { orderedTimelineIds.toSet() }
     val selectableTimelineIds = remember(timelineSelectionById) { timelineSelectionById.keys }
     val dragSelectionDensity = LocalDensity.current

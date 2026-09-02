@@ -1,0 +1,369 @@
+package dev.ipf.whitenoise.android.state
+
+import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
+import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
+import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
+import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
+import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class NotificationNetworkRecoveryTest {
+    /** One generation reaches both Android projections and its first rendered frame. */
+    @Test
+    fun successfulRecoveryCarriesOneGenerationThroughTheVisibleFrame() {
+        var now = 0L
+        val recorded = mutableListOf<PerformancePhase>()
+        val diagnostics =
+            NotificationNetworkRecoveryDiagnostics(
+                nowMillis = { now },
+                traceFactory = { performanceTrace(1L, now) },
+                traceRecorder = { _, phase, _, _, _, _, _ -> recorded += phase },
+            )
+
+        diagnostics.networkRestored(1L)
+        diagnostics.attemptStarted(1L, 1)
+        now = 100L
+        diagnostics.attemptPhase(
+            generation = 1L,
+            phase = PerformancePhase.NOTIFICATION_RECEIVER_READY,
+            result = PerformanceResult.SUCCESS,
+            layer = PerformanceLayer.ANDROID,
+            attempt = 1,
+        )
+        now = 200L
+        diagnostics.attemptPhase(
+            generation = 1L,
+            phase = PerformancePhase.ACCOUNT_CATCH_UP_START,
+            result = PerformanceResult.PENDING,
+            layer = PerformanceLayer.MDK,
+            attempt = 1,
+        )
+        now = 700L
+        diagnostics.catchUpSucceeded(1L, 1)
+        now = 800L
+        assertEquals(1L, diagnostics.chatListSubscriptionReceived())
+        assertEquals(1L, diagnostics.timelineSubscriptionReceived())
+        now = 850L
+        assertTrue(diagnostics.chatListProjectionPublished(1L, 1))
+        assertTrue(diagnostics.timelineProjectionPublished(1L, 1))
+        now = 900L
+        assertTrue(diagnostics.firstVisibleFrame(1L))
+
+        assertEquals(
+            listOf(
+                PerformancePhase.NETWORK_RESTORED,
+                PerformancePhase.RECOVERY_ATTEMPT,
+                PerformancePhase.NOTIFICATION_RECEIVER_READY,
+                PerformancePhase.ACCOUNT_CATCH_UP_START,
+                PerformancePhase.ACCOUNT_SUBSCRIPTION_ACTIVATED,
+                PerformancePhase.CURRENT_REPLAY_COMPLETE,
+                PerformancePhase.DURABLE_INGEST_READY,
+                PerformancePhase.ACCOUNT_CATCH_UP_READY,
+                PerformancePhase.CHAT_LIST_SUBSCRIPTION_RECEIVED,
+                PerformancePhase.TIMELINE_SUBSCRIPTION_RECEIVED,
+                PerformancePhase.CHAT_LIST_PROJECTION_PUBLISHED,
+                PerformancePhase.TIMELINE_PROJECTION_PUBLISHED,
+                PerformancePhase.RECOVERY_FIRST_VISIBLE_FRAME,
+            ),
+            recorded,
+        )
+        assertEquals(900L, diagnostics.samples().last().elapsedMillis)
+    }
+
+    /** Twenty controlled cycles produce the required percentile report within budget. */
+    @Test
+    fun twentyForegroundCyclesReportEveryRecoveryPhaseWithinBudget() {
+        var now = 0L
+        var generation = 0L
+        val diagnostics =
+            NotificationNetworkRecoveryDiagnostics(
+                nowMillis = { now },
+                traceFactory = { performanceTrace(generation, now) },
+                traceRecorder = { _, _, _, _, _, _, _ -> },
+            )
+
+        repeat(20) { cycle ->
+            generation = cycle + 1L
+            diagnostics.networkRestored(generation)
+            diagnostics.attemptStarted(generation, 1)
+            now += 100L
+            diagnostics.attemptPhase(
+                generation,
+                PerformancePhase.NOTIFICATION_RECEIVER_READY,
+                PerformanceResult.SUCCESS,
+                PerformanceLayer.ANDROID,
+                1,
+            )
+            now += 100L
+            diagnostics.attemptPhase(
+                generation,
+                PerformancePhase.ACCOUNT_CATCH_UP_START,
+                PerformanceResult.PENDING,
+                PerformanceLayer.MDK,
+                1,
+            )
+            now += 500L
+            diagnostics.catchUpSucceeded(generation, 1)
+            now += 100L
+            val receiptGeneration = requireNotNull(diagnostics.timelineSubscriptionReceived())
+            now += 100L
+            assertTrue(diagnostics.timelineProjectionPublished(receiptGeneration, 1))
+            now += 100L
+            assertTrue(diagnostics.firstVisibleFrame(receiptGeneration))
+            now += 100L
+        }
+
+        val report = offlineRecoveryLatencyReport(diagnostics.samples())
+        assertEquals(20, report.completedCycles)
+        assertTrue(
+            requireNotNull(report.phaseLatencies[PerformancePhase.ACCOUNT_SUBSCRIPTION_ACTIVATED]).maximumMillis <=
+                3_000L,
+        )
+        assertTrue(
+            requireNotNull(report.phaseLatencies[PerformancePhase.RECOVERY_FIRST_VISIBLE_FRAME]).maximumMillis <=
+                5_000L,
+        )
+        assertEquals(900L, report.phaseLatencies[PerformancePhase.TIMELINE_PROJECTION_PUBLISHED]?.p95Millis)
+    }
+
+    /** A coalesced successor must not suppress phases from the attempt already running. */
+    @Test
+    fun newerPendingTraceDoesNotDiscardTheInFlightGeneration() {
+        val traces = NotificationNetworkRecoveryPerformanceTraces()
+        val first = performanceTrace(1L)
+        val second = performanceTrace(2L)
+
+        assertTrue(traces.begin(1L) { first })
+        traces.activate(1L)
+        assertTrue(traces.begin(2L) { second })
+
+        assertEquals(first, traces.forGeneration(1L))
+        assertEquals(second, traces.forGeneration(2L))
+    }
+
+    /** A late stale edge cannot move diagnostic ownership behind the newest edge. */
+    @Test
+    fun staleTraceCannotReplaceANewerGeneration() {
+        val traces = NotificationNetworkRecoveryPerformanceTraces()
+        val newer = performanceTrace(2L)
+
+        assertTrue(traces.begin(2L) { newer })
+        assertFalse(traces.begin(1L) { performanceTrace(1L) })
+
+        assertEquals(null, traces.forGeneration(1L))
+        assertEquals(newer, traces.forGeneration(2L))
+    }
+
+    /** Multiple queued edges retain only the newest successor beside the active trace. */
+    @Test
+    fun newestPendingTraceSupersedesOnlyTheUnattemptedGeneration() {
+        val traces = NotificationNetworkRecoveryPerformanceTraces()
+        val active = performanceTrace(1L)
+        val newest = performanceTrace(3L)
+
+        traces.begin(1L) { active }
+        traces.activate(1L)
+        traces.begin(2L) { performanceTrace(2L) }
+        traces.begin(3L) { newest }
+
+        assertEquals(active, traces.forGeneration(1L))
+        assertEquals(null, traces.forGeneration(2L))
+        assertEquals(newest, traces.forGeneration(3L))
+    }
+
+    @Test
+    fun receiverRecoveryOverlapsOutboundWakeAndCatchUpStartsWhenReceiverReady() =
+        runTest {
+            val wakeStarted = CompletableDeferred<Unit>()
+            val receiverStarted = CompletableDeferred<Unit>()
+            val releaseWake = CompletableDeferred<Unit>()
+            val releaseReceiver = CompletableDeferred<Boolean>()
+            var catchUpRan = false
+
+            val result =
+                async {
+                    runNotificationReconnectOnNetworkRestore(
+                        wakeDurableOutbound = {
+                            wakeStarted.complete(Unit)
+                            releaseWake.await()
+                        },
+                        ensureNotificationReceiverActive = {
+                            receiverStarted.complete(Unit)
+                            releaseReceiver.await()
+                        },
+                        catchUpAccounts = {
+                            catchUpRan = true
+                            true
+                        },
+                    )
+                }
+
+            wakeStarted.await()
+            receiverStarted.await()
+            releaseReceiver.complete(true)
+            runCurrent()
+            assertTrue("receiver readiness should start catch-up without waiting for outbound wake", catchUpRan)
+            assertFalse("the attempt must still settle its outbound wake", result.isCompleted)
+
+            releaseWake.complete(Unit)
+            assertEquals(NotificationNetworkRecoveryOutcome.Success, result.await())
+        }
+
+    @Test
+    fun unavailableReceiverLeavesCatchUpPending() =
+        runTest {
+            var catchUpRan = false
+
+            val result =
+                runNotificationReconnectOnNetworkRestore(
+                    wakeDurableOutbound = {},
+                    ensureNotificationReceiverActive = { false },
+                    catchUpAccounts = {
+                        catchUpRan = true
+                        true
+                    },
+                )
+
+            assertEquals(NotificationNetworkRecoveryOutcome.ReceiverUnavailable, result)
+            assertFalse(catchUpRan)
+        }
+
+    @Test
+    fun failedCatchUpIsRetryable() =
+        runTest {
+            val result =
+                runNotificationReconnectOnNetworkRestore(
+                    wakeDurableOutbound = {},
+                    ensureNotificationReceiverActive = { true },
+                    catchUpAccounts = { false },
+                )
+
+            assertEquals(NotificationNetworkRecoveryOutcome.CatchUpFailed, result)
+        }
+
+    @Test
+    fun drainRetriesTheSameGenerationUntilCatchUpSucceeds() =
+        runTest {
+            var requested = 1L
+            var completed = 0L
+            val attempts = mutableListOf<Pair<Long, Int>>()
+            val retries = mutableListOf<Int>()
+
+            drainNotificationNetworkRecovery(
+                shouldContinue = { true },
+                requestedGeneration = { requested },
+                completedGeneration = { completed },
+                runAttempt = { generation, attempt ->
+                    attempts += generation to attempt
+                    if (attempt == 1) {
+                        NotificationNetworkRecoveryOutcome.ReceiverUnavailable
+                    } else {
+                        NotificationNetworkRecoveryOutcome.Success
+                    }
+                },
+                markCompleted = { completed = it },
+                awaitRetry = { _, attempt -> retries += attempt },
+            )
+
+            assertEquals(listOf(1L to 1, 1L to 2), attempts)
+            assertEquals(listOf(1), retries)
+            assertEquals(1L, completed)
+        }
+
+    @Test
+    fun drainCoalescesAnInFlightEdgeToTheNewestGeneration() =
+        runTest {
+            var requested = 1L
+            var completed = 0L
+            val attemptedGenerations = mutableListOf<Long>()
+
+            drainNotificationNetworkRecovery(
+                shouldContinue = { true },
+                requestedGeneration = { requested },
+                completedGeneration = { completed },
+                runAttempt = { generation, _ ->
+                    attemptedGenerations += generation
+                    if (generation == 1L) requested = 3L
+                    NotificationNetworkRecoveryOutcome.Success
+                },
+                markCompleted = { completed = it },
+                awaitRetry = { _, _ -> error("a successful recovery must not back off") },
+            )
+
+            assertEquals(listOf(1L, 3L), attemptedGenerations)
+            assertEquals(3L, completed)
+        }
+
+    @Test
+    fun newerGenerationStartsWithAFreshRetryBudget() =
+        runTest {
+            var requested = 1L
+            var completed = 0L
+            val attempts = mutableListOf<Pair<Long, Int>>()
+
+            drainNotificationNetworkRecovery(
+                shouldContinue = { true },
+                requestedGeneration = { requested },
+                completedGeneration = { completed },
+                runAttempt = { generation, attempt ->
+                    attempts += generation to attempt
+                    if (generation == 1L) {
+                        NotificationNetworkRecoveryOutcome.ReceiverUnavailable
+                    } else {
+                        NotificationNetworkRecoveryOutcome.Success
+                    }
+                },
+                markCompleted = { completed = it },
+                awaitRetry = { _, _ -> requested = 2L },
+            )
+
+            assertEquals(listOf(1L to 1, 2L to 1), attempts)
+            assertEquals(2L, completed)
+        }
+
+    @Test
+    fun drainRetainsTheGenerationWhenConnectivityDropsDuringRetry() =
+        runTest {
+            var online = true
+            var completed = 0L
+
+            drainNotificationNetworkRecovery(
+                shouldContinue = { online },
+                requestedGeneration = { 7L },
+                completedGeneration = { completed },
+                runAttempt = { _, _ -> NotificationNetworkRecoveryOutcome.CatchUpFailed },
+                markCompleted = { completed = it },
+                awaitRetry = { _, _ -> online = false },
+            )
+
+            assertEquals(0L, completed)
+        }
+
+    @Test
+    fun retryDelayIsPromptAndBounded() {
+        assertEquals(500L, notificationNetworkRecoveryRetryDelayMillis(1))
+        assertEquals(1_000L, notificationNetworkRecoveryRetryDelayMillis(2))
+        assertEquals(8_000L, notificationNetworkRecoveryRetryDelayMillis(100))
+    }
+
+    /** Creates an opaque trace token for generation-ownership tests. */
+    private fun performanceTrace(
+        generation: Long,
+        startedAtMillis: Long = 0L,
+    ): PerformanceTrace =
+        PerformanceTrace(
+            operation = PerformanceOperation.SYNC_CATCH_UP,
+            sessionGeneration = 1L,
+            operationId = generation,
+            startedAtMs = startedAtMillis,
+        )
+}

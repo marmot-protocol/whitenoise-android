@@ -88,4 +88,4 @@ internal class ConversationLiveSubscriptions(
 }
 
 internal fun WhiteNoiseAppState.conversationLiveSubscriptions(): ConversationLiveSubscriptions =
-    conversationLiveSubscriptionsOverride ?: ConversationLiveSubscriptions.bind(this)
+    liveSubscriptionOverrides.conversation ?: ConversationLiveSubscriptions.bind(this)
