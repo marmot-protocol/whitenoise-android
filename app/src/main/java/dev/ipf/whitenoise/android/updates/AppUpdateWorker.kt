@@ -16,11 +16,22 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
 
-class AppUpdateWorker(
-    appContext: Context,
-    params: WorkerParameters,
-) : CoroutineWorker(appContext, params) {
-    private val repository = AppUpdateRepository(appContext)
+class AppUpdateWorker : CoroutineWorker {
+    private val repository: AppUpdateRepository
+
+    constructor(
+        appContext: Context,
+        params: WorkerParameters,
+    ) : this(appContext, params, AppUpdateRepository(appContext))
+
+    /** Test seam mirroring the sweep worker: inject the repository to control the update-check boundary. */
+    internal constructor(
+        appContext: Context,
+        params: WorkerParameters,
+        repository: AppUpdateRepository,
+    ) : super(appContext, params) {
+        this.repository = repository
+    }
 
     override suspend fun doWork(): Result {
         if (shouldSkipForMeteredDataSaver(applicationContext)) return Result.success()

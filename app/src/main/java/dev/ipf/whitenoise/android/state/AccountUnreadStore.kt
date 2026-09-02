@@ -89,8 +89,6 @@ internal class AccountUnreadStore {
     /** Invalidates bulk refreshes and marks one account's count as provisional. */
     fun markUnknown(accountRef: String) {
         synchronized(lock) {
-            // Cancel older bulk publications while allowing an already-running
-            // exact fold with the same per-account revision to replace unknown.
             refreshes.advance()
             val previous = values[accountRef]
             val unknown =
@@ -99,6 +97,13 @@ internal class AccountUnreadStore {
                     freshness = AccountUnreadFreshness.UNKNOWN,
                     hasManualUnread = previous?.hasManualUnread,
                 )
+            // The mutation behind this call is per-account evidence: advance
+            // the account's revision so an exact fold snapshotted before the
+            // mutation can no longer pass publishExactIfUnchanged and restore
+            // the pre-mutation CONFIRMED value. A fold started after this call
+            // snapshots the new revision and publishes normally.
+            revision += 1L
+            revisions[accountRef] = revision
             if (previous != unknown) values = values + (accountRef to unknown)
         }
     }

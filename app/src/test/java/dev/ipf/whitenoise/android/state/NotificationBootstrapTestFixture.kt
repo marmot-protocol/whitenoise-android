@@ -4,6 +4,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Looper
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.ChatListRowFfi
@@ -18,6 +19,8 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
+import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -53,6 +56,12 @@ internal class NotificationBootstrapTestFixture(
     private val chatGroups: List<AppGroupRecordFfi> = emptyList(),
     private val markReadRow: ChatListRowFfi? = null,
     private val signInFailure: Throwable? = null,
+    // Optional behavior hooks so worker/reconciliation tests can steer the FFI
+    // boundary per call; every default preserves the fixture's original shape.
+    private val onChatList: ((accountRef: String) -> List<ChatListRowFfi>)? = null,
+    private val onMarkTimelineMessageRead: (() -> ChatListRowFfi?)? = null,
+    private val onSendText: ((accountRef: String, groupIdHex: String, text: String) -> SendSummaryFfi)? = null,
+    private val onReactToMessage: (() -> SendSummaryFfi)? = null,
 ) {
     private val appContext = context.applicationContext
     private val updates = Channel<NotificationUpdateFfi>(Channel.UNLIMITED)
@@ -81,6 +90,8 @@ internal class NotificationBootstrapTestFixture(
     val memberProjectionCalls = AtomicInteger(0)
     val signerRegistrationCalls = AtomicInteger(0)
     val markReadCalls = AtomicInteger(0)
+    val sendTextCalls = AtomicInteger(0)
+    val reactToMessageCalls = AtomicInteger(0)
     val npubCalls = AtomicInteger(0)
     val senderDisplayNameCalls = AtomicInteger(0)
 
@@ -162,7 +173,33 @@ internal class NotificationBootstrapTestFixture(
                     )
                 "markTimelineMessageRead" -> {
                     markReadCalls.incrementAndGet()
-                    markReadRow
+                    onMarkTimelineMessageRead?.invoke() ?: markReadRow
+                }
+                "sendText" -> {
+                    sendTextCalls.incrementAndGet()
+                    val hook = onSendText ?: throw UnsupportedOperationException("Unexpected Marmot call: sendText")
+                    hook(arguments?.get(0) as String, arguments[1] as String, arguments[2] as String)
+                }
+                "reactToMessage" -> {
+                    reactToMessageCalls.incrementAndGet()
+                    val hook =
+                        onReactToMessage
+                            ?: throw UnsupportedOperationException("Unexpected Marmot call: reactToMessage")
+                    hook()
+                }
+                "groupMembers" -> {
+                    val accountRef = arguments?.get(0) as String
+                    // A loaded roster missing the querying account suppresses that
+                    // row's unread count, so answer with the account itself.
+                    accounts
+                        .filter { it.label == accountRef }
+                        .map { member ->
+                            AppGroupMemberRecordFfi(
+                                memberIdHex = member.accountIdHex,
+                                account = member.label,
+                                local = true,
+                            )
+                        }
                 }
                 "npub" -> {
                     npubCalls.incrementAndGet()
@@ -177,7 +214,11 @@ internal class NotificationBootstrapTestFixture(
                     localSnapshotGroupSubscriptionCalls.incrementAndGet()
                     emptyChatsSubscription()
                 }
-                "chatList" -> emptyList<Any>()
+                "chatList" -> onChatList?.invoke(arguments?.get(0) as String) ?: emptyList<Any>()
+                "timelineMessages" ->
+                    // An exhausted, empty page: recovery probes conclude
+                    // NotCommitted deterministically instead of erroring.
+                    TimelinePageFfi(messages = emptyList(), hasMoreBefore = false, hasMoreAfter = false)
                 "groupMemberIdsPage" -> {
                     memberProjectionCalls.incrementAndGet()
                     emptyList<Any>()
