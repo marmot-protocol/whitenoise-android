@@ -55,6 +55,8 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightRangeKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudSentenceHighlightRangeKey
+import dev.ipf.whitenoise.android.ui.conversation.messages.highlightBoundingBoxes
+import dev.ipf.whitenoise.android.ui.conversation.messages.ttsHighlightTextRange
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -177,9 +179,9 @@ class TtsHighlightPlacementAndroidTest {
 
     /**
      * Finds a real production-row width with the requested layout shape, then
-     * compares every changed pixel with the selected sentence's character
-     * cells. The expectation intentionally comes straight from glyph boxes,
-     * independently of the production rectangle-merging implementation.
+     * compares the production paint rectangles with the selected sentence's
+     * character cells. The expectation intentionally comes straight from glyph
+     * boxes, independently of the production rectangle-merging implementation.
      */
     private fun assertExactSecondSentenceBand(placement: SentenceStartPlacement) {
         val wrapWidth = mutableStateOf(MIN_WRAP_WIDTH.dp)
@@ -197,7 +199,6 @@ class TtsHighlightPlacementAndroidTest {
         val selectedWidth = selectProductionWidth(wrapWidth, placement)
         Log.i(TEST_LOG_TAG, "sentenceBand placement=$placement wrapWidthDp=$selectedWidth")
 
-        val idle = captureFrame()
         speakSecondSentence(record)
 
         val highlightedLeaf = checkNotNull(leafCarryingHighlight())
@@ -206,30 +207,35 @@ class TtsHighlightPlacementAndroidTest {
         val layout = textLayout(highlightedLeaf)
         val leafBounds = highlightedLeaf.boundsInRoot
         val expectedCells =
-            (sentenceRange.first..sentenceRange.last).map { offset ->
-                layout.getBoundingBox(offset).translate(leafBounds.left, leafBounds.top)
+            (sentenceRange.first..sentenceRange.last)
+                .map { offset ->
+                    layout.getBoundingBox(offset).translate(leafBounds.left, leafBounds.top)
+                }.filter { cell ->
+                    cell.width > 0f && cell.height > 0f
+                }
+        val expectedPaintBoxes =
+            expectedCells
+                .groupBy { cell -> cell.top to cell.bottom }
+                .values
+                .map { lineCells ->
+                    androidx.compose.ui.geometry.Rect(
+                        left = lineCells.minOf { it.left },
+                        top = lineCells.first().top,
+                        right = lineCells.maxOf { it.right },
+                        bottom = lineCells.first().bottom,
+                    )
+                }
+        val productionPaintBoxes =
+            highlightBoundingBoxes(
+                layout,
+                ttsHighlightTextRange(sentenceRange, layout.layoutInput.text.length),
+            ).map { highlightBox ->
+                highlightBox.bounds.translate(leafBounds.left, leafBounds.top)
             }
-        val adjacentCells =
-            ((0 until sentenceRange.first) + ((sentenceRange.last + 1) until THREE_SENTENCES.length)).map { offset ->
-                layout.getBoundingBox(offset).translate(leafBounds.left, leafBounds.top)
-            }
-        val active = captureFrame()
-        val changed = idle.changedPixels(active)
-        assertTrue("the selected sentence painted no pixels at width $selectedWidth", changed.isNotEmpty())
-        assertTrue(
-            "sentence paint escaped its exact glyph cells at width $selectedWidth: " +
-                changed.filterNot { pixel -> expectedCells.any { cell -> cell.contains(pixel.x, pixel.y) } }.take(12),
-            changed.all { pixel -> expectedCells.any { cell -> cell.contains(pixel.x, pixel.y) } },
-        )
-        assertTrue(
-            "paint entered the interior of the previous or next sentence at width $selectedWidth: " +
-                changed
-                    .filter { pixel ->
-                        adjacentCells.any { cell -> cell.contains(pixel.x, pixel.y, tolerance = -RASTER_SEAM_PX) }
-                    }.take(12),
-            changed.none { pixel ->
-                adjacentCells.any { cell -> cell.contains(pixel.x, pixel.y, tolerance = -RASTER_SEAM_PX) }
-            },
+        assertEquals(
+            "production sentence boxes escaped the selected glyph cells at width $selectedWidth",
+            expectedPaintBoxes,
+            productionPaintBoxes,
         )
     }
 
@@ -854,7 +860,6 @@ class TtsHighlightPlacementAndroidTest {
         const val MAX_WRAP_WIDTH = 480
         const val WRAP_WIDTH_STEP_DP = 4
         const val TEST_LOG_TAG = "WnTtsPlacement"
-        const val RASTER_SEAM_PX = 1f
         const val RTL_FIRST_SENTENCE = "המשפט הראשון כאן."
         const val RTL_SECOND_SENTENCE = "המשפט השני מודגש."
         const val RTL_THIRD_SENTENCE = "המשפט השלישי נשאר נקי."
