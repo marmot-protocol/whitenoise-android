@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -77,6 +78,34 @@ class NotificationNetworkRecoveryTest {
             recorded,
         )
         assertEquals(900L, diagnostics.samples().last().elapsedMillis)
+    }
+
+    /** Exhaustion is a typed terminal phase and releases downstream attribution. */
+    @Test
+    fun exhaustedRecoveryRecordsFailureAndReleasesItsTrace() {
+        val recorded = mutableListOf<Triple<PerformancePhase, PerformanceResult, PerformanceLayer>>()
+        val diagnostics =
+            NotificationNetworkRecoveryDiagnostics(
+                nowMillis = { 100L },
+                traceFactory = { performanceTrace(1L) },
+                traceRecorder = { _, phase, _, result, layer, _, _ ->
+                    recorded += Triple(phase, result, layer)
+                },
+            )
+
+        diagnostics.networkRestored(1L)
+        diagnostics.attemptStarted(1L, 4)
+        diagnostics.retryExhausted(1L, 4, NotificationNetworkRecoveryOutcome.CatchUpFailed)
+
+        assertEquals(
+            Triple(
+                PerformancePhase.RECOVERY_RETRY_EXHAUSTED,
+                PerformanceResult.FAILURE,
+                PerformanceLayer.MDK,
+            ),
+            recorded.last(),
+        )
+        assertEquals(null, diagnostics.chatListSubscriptionReceived())
     }
 
     /** Twenty controlled cycles produce the required percentile report within budget. */
@@ -346,6 +375,108 @@ class NotificationNetworkRecoveryTest {
             )
 
             assertEquals(0L, completed)
+        }
+
+    /** One bad network generation opens the circuit instead of retrying forever. */
+    @Test
+    fun drainStopsWhenTheRetryBudgetIsExhausted() =
+        runTest {
+            val attempts = mutableListOf<Int>()
+            val retries = mutableListOf<Int>()
+            var exhausted: Pair<Long, NotificationNetworkRecoveryOutcome>? = null
+
+            drainNotificationNetworkRecovery(
+                shouldContinue = { true },
+                requestedGeneration = { 7L },
+                completedGeneration = { 0L },
+                runAttempt = { _, attempt ->
+                    attempts += attempt
+                    NotificationNetworkRecoveryOutcome.CatchUpFailed
+                },
+                markCompleted = { error("a failed generation must not be completed") },
+                awaitRetry = { _, attempt -> retries += attempt },
+                maxAttempts = 4,
+                onRetryExhausted = { generation, outcome -> exhausted = generation to outcome },
+            )
+
+            assertEquals(listOf(1, 2, 3, 4), attempts)
+            assertEquals(listOf(1, 2, 3), retries)
+            assertEquals(7L to NotificationNetworkRecoveryOutcome.CatchUpFailed, exhausted)
+        }
+
+    /** A stopped generation stays quiet until a genuinely newer network edge. */
+    @Test
+    fun exhaustedCoordinatorRequiresANewerGeneration() =
+        runTest {
+            var attempts = 0
+            var wakes = 0
+            var completedDrains = 0
+            val coordinator =
+                NotificationNetworkRecoveryCoordinator(
+                    scope = this,
+                    shouldContinue = { true },
+                    wakeDurableOutbound = {
+                        wakes += 1
+                        true
+                    },
+                    ensureNotificationReceiverActive = { true },
+                    catchUpAccounts = {
+                        attempts += 1
+                        false
+                    },
+                    awaitRetry = { _, _ -> },
+                    onDrainCompleted = { completedDrains += 1 },
+                    diagnostics =
+                        NotificationNetworkRecoveryDiagnostics(
+                            nowMillis = { 0L },
+                            traceFactory = { null },
+                            traceRecorder = { _, _, _, _, _, _, _ -> },
+                        ),
+                )
+
+            coordinator.noteNetworkRestored(1L)
+            advanceUntilIdle()
+            assertEquals(4, attempts)
+            assertEquals("one edge must issue one outbound wake", 1, wakes)
+            assertEquals("exhaustion must not start an independent drain", 0, completedDrains)
+
+            coordinator.resumeIfPending()
+            advanceUntilIdle()
+            assertEquals("a lifecycle resume alone must not reopen the circuit", 4, attempts)
+
+            coordinator.noteNetworkRestored(2L)
+            advanceUntilIdle()
+            assertEquals(8, attempts)
+            assertEquals(2, wakes)
+            assertEquals(0, completedDrains)
+        }
+
+    /** Successful recovery may hand remaining durable work to its next drain. */
+    @Test
+    fun successfulCoordinatorRunsTheCompletionHandoff() =
+        runTest {
+            var completedDrains = 0
+            val coordinator =
+                NotificationNetworkRecoveryCoordinator(
+                    scope = this,
+                    shouldContinue = { true },
+                    wakeDurableOutbound = { true },
+                    ensureNotificationReceiverActive = { true },
+                    catchUpAccounts = { true },
+                    awaitRetry = { _, _ -> error("success must not retry") },
+                    onDrainCompleted = { completedDrains += 1 },
+                    diagnostics =
+                        NotificationNetworkRecoveryDiagnostics(
+                            nowMillis = { 0L },
+                            traceFactory = { null },
+                            traceRecorder = { _, _, _, _, _, _, _ -> },
+                        ),
+                )
+
+            coordinator.noteNetworkRestored(1L)
+            advanceUntilIdle()
+
+            assertEquals(1, completedDrains)
         }
 
     @Test

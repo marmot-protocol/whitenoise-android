@@ -3566,21 +3566,20 @@ class WhiteNoiseAppState private constructor(
      * caller can always `await` this without it becoming a hard gate.
      */
     suspend fun catchUpAccounts() {
-        catchUpAccountsBestEffort()
+        launchCatchUpAccounts().await()
     }
 
     /**
      * Starts a process-owned catch-up after a chat list has rendered its local
      * snapshot. A blocked relay call must not block that controller's live
-     * consumers. Only callers with the same account, runtime, network, and
-     * readiness identity may share an in-flight result.
+     * consumers. Callers for the same account, runtime, and network share one
+     * in-flight result; a newer identity waits instead of overlapping native work.
      */
-    internal fun launchCatchUpAccounts(readinessToken: ChatListConnectionEvidenceToken? = null): Deferred<Boolean> =
+    internal fun launchCatchUpAccounts(): Deferred<Boolean> =
         AccountCatchUpKey(
             accountRef = activeAccountRef,
             runtimeGeneration = runtimeGeneration,
             networkGeneration = connectivitySignalOwner.captureNetworkGeneration(),
-            readinessToken = readinessToken,
         ).let { key ->
             accountCatchUpCoordinator.launch(key) {
                 val succeeded = catchUpAccountsBestEffort()
@@ -3617,16 +3616,8 @@ class WhiteNoiseAppState private constructor(
         }
         isForegroundCatchUpRunning = true
         try {
-            if (hasValidatedInternet()) {
-                runCatchingCancellable { marmotIo { notifyConnectivityRestored() } }
-                    .onFailure { throwable ->
-                        appStateDebug(throwable) {
-                            "foreground connectivity wake failed: ${throwable.readableMessage()}"
-                        }
-                    }
-            }
             val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
-            if (catchUpAccountsBestEffort()) {
+            if (launchCatchUpAccounts().await()) {
                 clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
             }
         } finally {
@@ -4194,7 +4185,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun drainPendingPushWakeCatchUpIfNeeded() {
         val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
         if (pendingGeneration == 0L) return
-        if (catchUpAccountsBestEffort()) {
+        if (launchCatchUpAccounts().await()) {
             clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
         }
     }
@@ -6658,9 +6649,8 @@ class WhiteNoiseAppState private constructor(
             scope = notificationScope,
             shouldContinue = { !networkNotificationRecoverySuppressed && hasValidatedInternet() },
             wakeDurableOutbound = {
-                // A retained generation deliberately reissues this wake after
-                // a retry; MDK coalesces connectivity-restored commands so it
-                // interrupts stale backoff without duplicating account workers.
+                // One connectivity edge needs one outbound wake. Catch-up owns
+                // later bounded retries, so they cannot amplify transport work.
                 val wake = runCatchingCancellable { marmotIo { notifyConnectivityRestored() } }
                 wake.onFailure { throwable ->
                     appStateDebug(throwable) {
@@ -6672,7 +6662,7 @@ class WhiteNoiseAppState private constructor(
             ensureNotificationReceiverActive = ::ensureNotificationReceiverForNetworkReconnect,
             catchUpAccounts = {
                 val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
-                catchUpAccountsBestEffort().also { succeeded ->
+                launchCatchUpAccounts().await().also { succeeded ->
                     if (succeeded) clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
                 }
             },

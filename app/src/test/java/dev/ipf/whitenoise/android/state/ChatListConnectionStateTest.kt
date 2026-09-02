@@ -5,6 +5,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -22,7 +23,6 @@ class ChatListConnectionStateTest {
                     accountRef = "personal",
                     runtimeGeneration = 4,
                     networkGeneration = 8L,
-                    readinessToken = null,
                 )
             val first =
                 coordinator.launch(key) {
@@ -42,6 +42,88 @@ class ChatListConnectionStateTest {
             release.complete(Unit)
             assertTrue(first.await())
             assertTrue(newerNetwork.await())
+        }
+
+    /** Native catch-up calls for different network generations must never overlap. */
+    @Test
+    fun catchUpSerializesDifferentNetworkGenerations() =
+        runTest {
+            val coordinator = AccountCatchUpCoordinator(this)
+            val firstStarted = CompletableDeferred<Unit>()
+            val releaseFirst = CompletableDeferred<Unit>()
+            val secondStarted = CompletableDeferred<Unit>()
+            var inFlight = 0
+            var maximumInFlight = 0
+            val firstKey =
+                AccountCatchUpKey(
+                    accountRef = "personal",
+                    runtimeGeneration = 4,
+                    networkGeneration = 8L,
+                )
+
+            val first =
+                coordinator.launch(firstKey) {
+                    inFlight += 1
+                    maximumInFlight = maxOf(maximumInFlight, inFlight)
+                    firstStarted.complete(Unit)
+                    releaseFirst.await()
+                    inFlight -= 1
+                    true
+                }
+            firstStarted.await()
+            val second =
+                coordinator.launch(firstKey.copy(networkGeneration = 9L)) {
+                    inFlight += 1
+                    maximumInFlight = maxOf(maximumInFlight, inFlight)
+                    secondStarted.complete(Unit)
+                    inFlight -= 1
+                    true
+                }
+            runCurrent()
+
+            assertFalse("a successor must wait for the active native call", secondStarted.isCompleted)
+            releaseFirst.complete(Unit)
+            assertTrue(first.await())
+            assertTrue(second.await())
+            assertEquals(1, maximumInFlight)
+        }
+
+    /** Only the newest queued network generation should run after an active catch-up. */
+    @Test
+    fun catchUpCoalescesQueuedNetworkGenerations() =
+        runTest {
+            val coordinator = AccountCatchUpCoordinator(this)
+            val releaseFirst = CompletableDeferred<Unit>()
+            val firstKey =
+                AccountCatchUpKey(
+                    accountRef = "personal",
+                    runtimeGeneration = 4,
+                    networkGeneration = 8L,
+                )
+            val attempts = mutableListOf<Long>()
+            val first =
+                coordinator.launch(firstKey) {
+                    attempts += 8L
+                    releaseFirst.await()
+                    true
+                }
+            runCurrent()
+            val superseded =
+                coordinator.launch(firstKey.copy(networkGeneration = 9L)) {
+                    attempts += 9L
+                    true
+                }
+            val newest =
+                coordinator.launch(firstKey.copy(networkGeneration = 10L)) {
+                    attempts += 10L
+                    true
+                }
+
+            releaseFirst.complete(Unit)
+            assertTrue(first.await())
+            assertFalse(superseded.await())
+            assertTrue(newest.await())
+            assertEquals(listOf(8L, 10L), attempts)
         }
 
     @Test

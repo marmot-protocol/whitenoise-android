@@ -298,10 +298,13 @@ class AccountSwitchLocalSnapshotOrderingTest {
             "a blocked catch-up must run outside the controller bind job",
             "accountCatchUpCoordinator.launch" in body,
         )
-        assertTrue("readiness callers must be able to await the result", "scope.async" in coordinator)
+        assertTrue(
+            "readiness callers must receive a result without owning the native job",
+            "val result: CompletableDeferred<Boolean>" in coordinator,
+        )
         assertTrue(
             "only identity-matched callers may share an active catch-up",
-            "it.isActive && activeKey == key" in coordinator,
+            "it.key == key" in coordinator,
         )
         assertTrue(
             "the background job must run the result-bearing best-effort catch-up",
@@ -313,6 +316,24 @@ class AccountSwitchLocalSnapshotOrderingTest {
                 "runtimeGeneration == key.runtimeGeneration" in body &&
                 "connectivitySignalOwner.isNetworkGenerationCurrent(key.networkGeneration)" in body,
         )
+    }
+
+    /** Foreground recovery shares catch-up without issuing a second transport wake. */
+    @Test
+    fun foregroundRecoveryUsesTheSharedCatchUpOnly() {
+        val body = appStateSource().readText().kotlinFunctionBody("catchUpAfterForegroundActivation")
+
+        assertFalse("foreground recovery must not duplicate the transport wake", "notifyConnectivityRestored()" in body)
+        assertTrue("foreground recovery must join the process catch-up", "launchCatchUpAccounts().await()" in body)
+    }
+
+    /** Durable push recovery joins the same process-owned native call. */
+    @Test
+    fun pushWakeRecoveryUsesTheSharedCatchUp() {
+        val body = appStateSource().readText().kotlinFunctionBody("drainPendingPushWakeCatchUpIfNeeded")
+
+        assertTrue("push-wake recovery must join the process catch-up", "launchCatchUpAccounts().await()" in body)
+        assertFalse("push-wake recovery must not bypass coordination", "catchUpAccountsBestEffort()" in body)
     }
 
     @Test

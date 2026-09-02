@@ -1,12 +1,13 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedOnNetworkChange
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 data class ConnectivitySignals(
     val hasValidatedInternet: Boolean = false,
@@ -56,25 +57,79 @@ internal data class AccountCatchUpKey(
     val accountRef: String?,
     val runtimeGeneration: Int,
     val networkGeneration: Long,
-    val readinessToken: ChatListConnectionEvidenceToken?,
 )
 
+/** Serializes process-wide native catch-up while coalescing queued successors. */
 internal class AccountCatchUpCoordinator(
     private val scope: CoroutineScope,
 ) {
-    private var activeJob: Deferred<Boolean>? = null
-    private var activeKey: AccountCatchUpKey? = null
+    private data class Request(
+        val key: AccountCatchUpKey,
+        val result: CompletableDeferred<Boolean>,
+        val block: suspend () -> Boolean,
+    )
+
+    private var running: Request? = null
+    private var pending: Request? = null
     private val lock = Any()
 
+    /**
+     * Shares an exact in-flight request, otherwise retains only the newest
+     * successor and starts it after the current native call has settled.
+     */
     fun launch(
         key: AccountCatchUpKey,
         block: suspend () -> Boolean,
-    ): Deferred<Boolean> =
-        synchronized(lock) {
-            activeJob?.takeIf { it.isActive && activeKey == key }
-                ?: scope.async { block() }.also {
-                    activeJob = it
-                    activeKey = key
-                }
+    ): Deferred<Boolean> {
+        var requestToStart: Request? = null
+        var superseded: Request? = null
+        val result =
+            synchronized(lock) {
+                running?.takeIf { it.key == key }?.result
+                    ?: pending?.takeIf { it.key == key }?.result
+                    ?: Request(key, CompletableDeferred(), block)
+                        .also { request ->
+                            if (running == null) {
+                                running = request
+                                requestToStart = request
+                            } else {
+                                superseded = pending
+                                pending = request
+                            }
+                        }.result
+            }
+        superseded?.result?.complete(false)
+        requestToStart?.let(::start)
+        return result
+    }
+
+    /** Runs one request and hands ownership directly to the newest successor. */
+    private fun start(request: Request) {
+        val job =
+            scope.launch {
+                runCatchingCancellable { request.block() }
+                    .onSuccess { request.result.complete(it) }
+                    .onFailure { request.result.completeExceptionally(it) }
+            }
+        job.invokeOnCompletion { cause -> finish(request, cause) }
+    }
+
+    /** Completes cancellation and starts the successor outside the coordinator lock. */
+    private fun finish(
+        request: Request,
+        cause: Throwable?,
+    ) {
+        if (cause != null && !request.result.isCompleted) {
+            request.result.completeExceptionally(cause)
         }
+        val successor =
+            synchronized(lock) {
+                if (running !== request) return@synchronized null
+                pending.also {
+                    running = it
+                    pending = null
+                }
+            }
+        successor?.let(::start)
+    }
 }

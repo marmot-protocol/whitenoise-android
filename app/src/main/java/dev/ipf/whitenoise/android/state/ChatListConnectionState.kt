@@ -274,7 +274,7 @@ internal class ChatListConnectionOwner(
             -> true
         }
 
-    fun launchCatchUp(): Deferred<Boolean> = appState.launchCatchUpAccounts(state.evidenceTokenOrNull())
+    fun launchCatchUp(): Deferred<Boolean> = appState.launchCatchUpAccounts()
 
     fun invalidate() {
         readinessJob?.cancel()

@@ -47,6 +47,7 @@ internal enum class PerformancePhase(
     RELAY_CATCH_UP_READY("relay_catch_up_ready"),
     NETWORK_RESTORED("network_restored"),
     RECOVERY_ATTEMPT("recovery_attempt"),
+    RECOVERY_RETRY_EXHAUSTED("recovery_retry_exhausted"),
     CONNECTIVITY_WAKE_READY("connectivity_wake_ready"),
     NOTIFICATION_RECEIVER_READY("notification_receiver_ready"),
     NOTIFICATION_RECEIVER_RETRY("notification_receiver_retry"),
