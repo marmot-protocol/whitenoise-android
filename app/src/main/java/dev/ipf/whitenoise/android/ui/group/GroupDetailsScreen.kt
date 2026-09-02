@@ -308,6 +308,10 @@ internal fun GroupDetailsScreen(
     // Scoped to the visible group; the controller mutation continues on appState
     // if the user switches conversations, but this sheet stops tracking it.
     var activeMutation by remember(controller.group.groupIdHex) { mutableStateOf<ActiveGroupMutation?>(null) }
+    // Tap-time archive direction, recorded before the mutation coroutine is
+    // dispatched so the menu's progress label can never read the pre-intent
+    // presented state and show the opposite direction.
+    var pendingArchiveTarget by remember(controller.group.groupIdHex) { mutableStateOf<Boolean?>(null) }
     var pendingConfirm by remember { mutableStateOf<DetailsConfirm?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -471,6 +475,7 @@ internal fun GroupDetailsScreen(
                 // onSuccess() may have already dismissed this sheet; clearing
                 // detached Compose state is harmless in that case.
                 activeMutation = null
+                pendingArchiveTarget = null
             }
         }
     }
@@ -817,12 +822,10 @@ internal fun GroupDetailsScreen(
                                 text = {
                                     Text(
                                         stringResource(
-                                            when {
-                                                activeMutation?.action == GroupMutationAction.Archive && controller.group.archived -> R.string.restoring_chat
-                                                activeMutation?.action == GroupMutationAction.Archive -> R.string.archiving_chat
-                                                controller.group.archived -> R.string.unarchive_chat
-                                                else -> R.string.archive_chat
-                                            },
+                                            archiveMenuLabelForTarget(
+                                                pendingArchiveTarget = pendingArchiveTarget,
+                                                presentedArchived = controller.presentedArchived,
+                                            ),
                                         ),
                                         style = MaterialTheme.typography.bodyLarge,
                                     )
@@ -831,9 +834,11 @@ internal fun GroupDetailsScreen(
                                 enabled = activeMutation == null && !controller.mutationInFlight,
                                 onClick = {
                                     menuOpen = false
+                                    val target = !controller.presentedArchived
+                                    pendingArchiveTarget = target
                                     runGroupMutation(
                                         action = GroupMutationAction.Archive,
-                                        mutation = { controller.setArchived(!controller.group.archived) },
+                                        mutation = { controller.setArchived(target) },
                                     )
                                 },
                             )
@@ -931,7 +936,7 @@ internal fun GroupDetailsScreen(
                 seed = controller.avatarAccount ?: controller.group.groupIdHex,
                 pictureUrl = controller.avatarUrl,
                 picture = encryptedGroupAvatar,
-                archived = controller.group.archived,
+                archived = controller.presentedArchived,
                 onEdit =
                     if (canShowEditAction) {
                         { showEditGroup = true }
@@ -1484,14 +1489,14 @@ internal fun GroupDetailsScreen(
                         icon = Icons.Default.Archive,
                         title =
                             stringResource(
-                                if (controller.group.archived) R.string.unarchive_chat else R.string.archive_chat,
+                                if (controller.presentedArchived) R.string.unarchive_chat else R.string.archive_chat,
                             ),
                         enabled = !mutationsBlocked,
                         inProgress = activeMutation?.action == GroupMutationAction.Archive,
                         onClick = {
                             runGroupMutation(
                                 action = GroupMutationAction.Archive,
-                                mutation = { controller.setArchived(!controller.group.archived) },
+                                mutation = { controller.setArchived(!controller.presentedArchived) },
                             )
                         },
                     )

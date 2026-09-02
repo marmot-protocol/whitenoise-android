@@ -264,7 +264,7 @@ internal fun ConversationTopBar(
                                 text = {
                                     Text(
                                         stringResource(
-                                            if (controller.group.archived) R.string.unarchive else R.string.archive,
+                                            if (controller.presentedArchived) R.string.unarchive else R.string.archive,
                                         ),
                                         style = MaterialTheme.typography.bodyLarge,
                                     )

@@ -2945,6 +2945,17 @@ class WhiteNoiseAppState private constructor(
             ?.commitOptimisticSentPreview(groupIdHex, optimisticMessageIdHex, confirmedMessageIdHex)
     }
 
+    internal fun hydrateOptimisticSentPreviewTokens(
+        accountRef: String?,
+        groupIdHex: String,
+        messageIdHex: String,
+        tokens: MarkdownDocumentFfi,
+    ) {
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.hydrateOptimisticSentPreviewTokens(groupIdHex, messageIdHex, tokens)
+    }
+
     internal fun failOptimisticSentPreview(
         accountRef: String?,
         groupIdHex: String,
@@ -2953,6 +2964,33 @@ class WhiteNoiseAppState private constructor(
         chatsController
             ?.takeIf { it.boundAccountRef == accountRef }
             ?.failOptimisticSentPreview(groupIdHex, optimisticMessageIdHex)
+    }
+
+    /**
+     * Begin a presentation-only chat-list archive intent for a
+     * conversation-surface archive/restore, scoped to the bound
+     * [ChatsController] account like the other chat-list bridges so an intent
+     * from one account cannot land on another controller after a switch.
+     */
+    internal fun beginChatListArchiveIntent(
+        accountRef: String?,
+        groupIdHex: String,
+        archived: Boolean,
+    ): OptimisticArchiveIntent? =
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.beginConversationArchiveIntent(groupIdHex, archived)
+
+    /** Retire [intent] once its engine commit settled; a rebound controller ignores it. */
+    internal fun finishChatListArchiveIntent(
+        accountRef: String?,
+        groupIdHex: String,
+        intent: OptimisticArchiveIntent?,
+    ) {
+        intent ?: return
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.finishConversationArchiveIntent(groupIdHex, intent)
     }
 
     /**

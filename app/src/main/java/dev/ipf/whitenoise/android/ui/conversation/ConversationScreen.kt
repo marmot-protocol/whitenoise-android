@@ -2966,7 +2966,7 @@ internal fun ConversationScreen(
                 },
                 onToggleArchived = {
                     menuOpen = false
-                    appState.launchMutation { controller.setArchived(!controller.group.archived) }
+                    appState.launchMutation { controller.setArchived(!controller.presentedArchived) }
                 },
                 onRequestLeave = {
                     menuOpen = false

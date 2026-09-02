@@ -2903,7 +2903,7 @@ private data class RemovedChatRowSnapshot(
     val optimisticState: OptimisticChatListPreviewState?,
 )
 
-private class OptimisticArchiveIntent(
+internal class OptimisticArchiveIntent(
     val bindEpoch: Long,
     val archived: Boolean,
 )
@@ -4290,6 +4290,26 @@ class ChatsController private constructor(
         return true
     }
 
+    /**
+     * Rebind a pending optimistic preview's parsed Markdown once the async
+     * hydration lands, keeping the preview's tokens equal to what a projected
+     * echo of the same message will carry. Deliberately narrower than
+     * [applyOptimisticSentPreview]: no activity bump, and an entry already
+     * confirmed or retired keeps its authoritative state.
+     */
+    internal fun hydrateOptimisticSentPreviewTokens(
+        groupIdHex: String,
+        messageIdHex: String,
+        tokens: MarkdownDocumentFfi,
+    ) {
+        val rowKey = chatRowKey(groupIdHex)
+        val state = optimisticChatListPreviewByGroup[rowKey].takeIf { accountRef != null } ?: return
+        val entry = state.entries[messageIdHex]?.takeIf { it.confirmedMessageIdHex == null } ?: return
+        state.entries[messageIdHex] = entry.copy(preview = entry.preview.copy(contentTokens = tokens))
+        materializeOptimisticChatListPreview(rowKey, state)
+        scheduleRecompute()
+    }
+
     internal fun commitOptimisticSentPreview(
         groupIdHex: String,
         optimisticMessageIdHex: String,
@@ -5089,6 +5109,24 @@ class ChatsController private constructor(
         }
         return succeeded
     }
+
+    /**
+     * Begin a single-row presentation-only archive intent on behalf of a
+     * conversation surface (top bar or Group Details), so the chat-list row
+     * moves in the same frame the surface acknowledges the action. Returns null
+     * when the row is absent or already presents [archived]; the caller must
+     * finish the returned intent once its engine commit settles either way.
+     */
+    internal fun beginConversationArchiveIntent(
+        groupIdHex: String,
+        archived: Boolean,
+    ): OptimisticArchiveIntent? = beginOptimisticArchive(listOf(groupIdHex), archived, bindEpoch).singleOrNull()?.second
+
+    /** Retire a conversation-surface archive intent; stale or rebound intents are ignored. */
+    internal fun finishConversationArchiveIntent(
+        groupIdHex: String,
+        intent: OptimisticArchiveIntent,
+    ) = finishOptimisticArchive(groupIdHex, intent)
 
     private fun beginOptimisticArchive(
         groupIds: Collection<String>,
@@ -6476,6 +6514,11 @@ class ConversationController(
     private val mediaPublisher: MediaPublisher = { account, groupIdHex, references, caption ->
         appState.marmotIo { sendMediaAttachments(account, groupIdHex, references, caption) }
     },
+    private val markdownParser: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
+    private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi =
+        { account, groupIdHex, archived ->
+            appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
+        },
     private val clockMillis: () -> Long = System::currentTimeMillis,
     private val inviteAcceptor: InviteAcceptor = { account, groupIdHex ->
         appState.marmotIo(MarmotTraceSection.ACCEPT_GROUP_INVITE) {
@@ -6487,6 +6530,29 @@ class ConversationController(
 
     var group by mutableStateOf(initialGroup)
         private set
+
+    /** The accepted in-flight archive/restore, presentation-only; identity-compared on settle. */
+    private class ConversationArchiveIntent(
+        val archived: Boolean,
+    )
+
+    private var pendingArchiveIntent by mutableStateOf<ConversationArchiveIntent?>(null)
+
+    // Main-confined count of authoritative group applications (subscription
+    // updates and details/rebind round-trips). A mutation captures it before
+    // suspending in engine I/O and applies its returned record only while the
+    // count is unchanged, so a newer authoritative update always wins over a
+    // late completion.
+    private var groupAuthorityEpoch = 0L
+
+    /**
+     * Archived state the conversation surfaces should present: the accepted
+     * in-flight archive/restore intent when one exists, else the authoritative
+     * group. Failure or cancellation only clears the intent, so the newest
+     * authoritative state shows through instead of a captured snapshot.
+     */
+    val presentedArchived: Boolean
+        get() = pendingArchiveIntent?.archived ?: group.archived
 
     private var acceptedInvitePeerAccount by mutableStateOf<String?>(null)
 
@@ -7538,8 +7604,14 @@ class ConversationController(
     // the current policy changes so optimistic-send state is immediately
     // reconciled. Each row's pinned deadline remains independent of the current
     // policy, so historical rows are never reinterpreted by this republish.
+
+    /** Test entry to the subscription-update application path. */
+    @VisibleForTesting
+    internal fun applyGroupStateForTest(update: AppGroupRecordFfi) = applyGroupState(update)
+
     private fun applyGroupState(update: AppGroupRecordFfi) {
         val previousRetention = group.disappearingMessageSecs
+        groupAuthorityEpoch += 1L
         group =
             reconcileTerminalSelfMembership(
                 update = update,
@@ -7775,6 +7847,37 @@ class ConversationController(
     }
 
     /**
+     * Parse the sent text into the same Markdown AST projected records carry
+     * and rebind it onto the already-published optimistic bubble and chat-list
+     * preview. Only the bubble's first paint is decoupled from this FFI hop —
+     * an accepted Send must paint on the next frame even when the IO lane is
+     * congested — while the network publish still runs after the parse, so the
+     * send's total latency matches the previous parse-first ordering.
+     * A parse failure keeps the plain-text presentation, and
+     * a bubble already reconciled or rolled back is left alone. Returns the
+     * record now backing the bubble so later reconciliation and failure
+     * retention keep the styled document instead of the pre-parse snapshot.
+     */
+    private suspend fun hydrateOptimisticSendMarkdown(
+        optimisticKey: String,
+        tempId: String,
+        text: String,
+    ): AppMessageRecordFfi? {
+        val tokens =
+            runCatchingCancellable { markdownParser(text) }
+                .getOrNull()
+                ?.takeIf { it.blocks.isNotEmpty() }
+        val pending = optimisticMessages[optimisticKey]
+        if (tokens == null || pending == null || pending.record.messageIdHex != tempId) return null
+        val hydrated = pending.record.copy(contentTokens = tokens)
+        optimisticMessages[optimisticKey] = pending.copy(record = hydrated)
+        messageById[tempId] = hydrated
+        publishTimelineFromIndexes()
+        appState.hydrateOptimisticSentPreviewTokens(conversationAccountRef, group.groupIdHex, tempId, tokens)
+        return hydrated
+    }
+
+    /**
      * Send a text message. [onAccepted] runs once the optimistic bubble has
      * been committed to the projection and published — i.e. the send has
      * visibly started. [onDurablyAccepted] runs only after MDK returns a typed
@@ -7850,10 +7953,13 @@ class ConversationController(
                 groupIdHex = group.groupIdHex,
                 sender = conversationAccountIdHex ?: "",
                 plaintext = trimmed,
-                // Parse locally so the optimistic bubble renders the same
-                // markdown the projected record will carry once the send
-                // round-trips — no plain→styled flash on confirm.
-                contentTokens = appState.parseMarkdownOrEmpty(trimmed),
+                // Publish with an empty AST so the bubble reaches the very next
+                // frame without first suspending on the parse FFI's IO hop — a
+                // congested IO lane used to hold the whole bubble hostage. An
+                // empty document renders the plaintext unstyled;
+                // hydrateOptimisticSendMarkdown below rebinds the styled
+                // document the projected record will carry.
+                contentTokens = EMPTY_MARKDOWN_DOCUMENT,
                 kind = 9uL,
                 tags =
                     replyTarget
@@ -7918,7 +8024,12 @@ class ConversationController(
         // clock is on screen. Everything after this is the "clock lingers"
         // window the issue is about.
         sendTrace(trace, PerformancePhase.OPTIMISTIC_SHOWN, result = PerformanceResult.PENDING)
+        // Starts as the plain-rendered record so every failure path below has a
+        // valid record even if hydration is cut short; the styled rebind lands
+        // inside the same try region as the publish it precedes.
+        var publishedRecord = optimistic
         try {
+            publishedRecord = hydrateOptimisticSendMarkdown(optimisticKey, tempId, trimmed) ?: optimistic
             // Publish with a retry sweep so a *transient* relay-pool gap
             // (socket teardown mid-reconnect, doze wake, network change) doesn't
             // surface as a user-visible "send failed" the instant the pool looks
@@ -7937,7 +8048,7 @@ class ConversationController(
                     acceptDisposition = summary.acceptDisposition,
                     optimisticKey = optimisticKey,
                     tempId = tempId,
-                    optimisticRecord = optimistic,
+                    optimisticRecord = publishedRecord,
                     optimisticMessages = optimisticMessages,
                     messageById = messageById,
                     projectedMessageIds = projectedMessageIds,
@@ -8016,13 +8127,13 @@ class ConversationController(
                 optimisticMessages = optimisticMessages,
                 messageById = messageById,
                 key = optimisticKey,
-                optimistic = optimistic,
+                optimistic = publishedRecord,
                 timelineOrder = optimisticOrder,
             )
             suppressProjectedTimelineItems(
                 unpublishedProjectionIdsMatchingMessage(
                     timelineRecords = timelineRecords,
-                    message = optimistic,
+                    message = publishedRecord,
                     activeAccountIdHex = conversationAccountIdHex,
                 ),
             )
@@ -9835,23 +9946,53 @@ class ConversationController(
             }
         }
 
+    /**
+     * Archive or restore this conversation with a presentation-only optimistic
+     * intent: the conversation surfaces and the bound chat-list row acknowledge
+     * the accepted action before the engine commit starts or waits behind the
+     * group commit lock. MDK stays authoritative — success settles into the
+     * returned group in the same frame the intent retires, while failure or
+     * cancellation clears only the matching intent so the newest authoritative
+     * projection shows through instead of a captured snapshot. The mutation
+     * lock drops repeated taps while one logical mutation is in flight, so no
+     * duplicate commits or conflicting overlays can start.
+     */
     suspend fun setArchived(archived: Boolean): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
-            runCatchingCancellable {
-                appState.withGroupCommitLock(account, group.groupIdHex) {
-                    val updated = appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
-                    group = updated
-                    appState.applyLocalGroupUpdate(updated)
-                }
-                presentConversationTransient(
-                    if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored,
-                )
-                true
-            }.onFailure {
-                recordMutationFailure(R.string.toast_couldnt_update_chat, "GROUP_ARCHIVE_UPDATE", it)
-            }.getOrDefault(false)
+            val groupIdHex = group.groupIdHex
+            val intent = ConversationArchiveIntent(archived)
+            pendingArchiveIntent = intent
+            val chatListIntent = appState.beginChatListArchiveIntent(account, groupIdHex, archived)
+            val authorityEpochBefore = groupAuthorityEpoch
+            try {
+                runCatchingCancellable {
+                    appState.withGroupCommitLock(account, groupIdHex) {
+                        val updated = groupArchivedUpdater(account, groupIdHex, archived)
+                        // A newer authoritative application (subscription update
+                        // or details round-trip) that landed while this commit
+                        // was in flight wins over the late success; the engine's
+                        // own archive-change event reconverges the projection.
+                        if (groupAuthorityEpoch == authorityEpochBefore) {
+                            group = updated
+                            appState.applyLocalGroupUpdate(updated)
+                        }
+                    }
+                    presentConversationTransient(
+                        if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored,
+                    )
+                    true
+                }.onFailure {
+                    recordMutationFailure(R.string.toast_couldnt_update_chat, "GROUP_ARCHIVE_UPDATE", it)
+                }.getOrDefault(false)
+            } finally {
+                // Identity-compared so a newer action's intent is never cleared
+                // by an older completion, and account/group switches (which
+                // rebind the chat list) cannot receive this stale settle.
+                if (pendingArchiveIntent === intent) pendingArchiveIntent = null
+                appState.finishChatListArchiveIntent(account, groupIdHex, chatListIntent)
+            }
         }
 
     suspend fun deleteGroupLocal(): Boolean =
@@ -12287,6 +12428,7 @@ class ConversationController(
             return null
         }
         val applied = resolution.applied
+        groupAuthorityEpoch += 1L
         group =
             reconcileTerminalSelfMembership(
                 update = applied.group,

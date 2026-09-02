@@ -38,8 +38,10 @@ class StateSourceSizeCeilingTest {
 
     internal companion object {
         // Lowered as `ChatListItem` and then the chat-list sort moved to their own
-        // same-package files.
-        const val CONTROLLERS_MAX_LINES = 12759
+        // same-package files. Controllers raised deliberately for the
+        // optimistic archive/restore intents and the send Markdown hydration,
+        // both pinned by executing controller-level tests.
+        const val CONTROLLERS_MAX_LINES = 12867
 
         // Deliberately raised for PR #2392's covered app-owned dictation integration. Keep this exact so
         // unrelated AppState growth remains blocked after the stacked branch is merged with current master.
