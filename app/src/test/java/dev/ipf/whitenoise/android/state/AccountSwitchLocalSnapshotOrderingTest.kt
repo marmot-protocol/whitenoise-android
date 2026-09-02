@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** Regression coverage for issue #1698's local-ready account-switch boundary. */
+/** Regression coverage for the local-ready account-switch boundary. */
 class AccountSwitchLocalSnapshotOrderingTest {
     @Test
     fun profileSeedSetIncludesEveryVisibleOtherAccountAndExcludesOverflow() {
@@ -41,6 +41,8 @@ class AccountSwitchLocalSnapshotOrderingTest {
     @Test
     fun bindPublishesLocalSnapshotsAndAFrameBeforeCatchUp() {
         val body = controllersSource().readText().kotlinFunctionBody("bind")
+        val retryLoop = body.indexOf("while (coroutineContext.isActive")
+        val catchUpGate = body.indexOf("val catchUpGate = ChatListCatchUpGate()")
         val seededSnapshot = body.indexOf("val seededLocalSnapshot")
         val seededRenderFrame = body.indexOf("awaitRenderedChatListFrame()", startIndex = seededSnapshot)
         val seededCatchUp = body.indexOf("appState.launchCatchUpAccounts()", startIndex = seededRenderFrame)
@@ -60,6 +62,10 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val retryAttempt = body.indexOf("connectionOwner.beginSessionAttempt", startIndex = initialValidation)
 
         assertTrue("a constructor seed must be detected before bind clears state", seededSnapshot >= 0)
+        assertTrue(
+            "the catch-up gate must be scoped to the bind rather than a retry iteration",
+            catchUpGate in 0..<retryLoop,
+        )
         assertTrue("the seeded target list must draw before its catch-up starts", seededCatchUp > seededRenderFrame)
         assertTrue(
             "deferred rosters must wait for the batched live hydration instead of starting an N-call fan-out",
@@ -75,6 +81,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue(
             "a retry must be able to re-prove application readiness",
             body.indexOf("pendingReadinessCatchUp", startIndex = catchUp) > catchUp,
+        )
+        assertEquals(
+            "local subscription reopening must not launch another full catch-up",
+            1,
+            Regex("connectionOwner\\.launchCatchUp\\(\\)").findAll(body).count(),
         )
         assertTrue(
             "live consumers must start after catch-up is launched",
