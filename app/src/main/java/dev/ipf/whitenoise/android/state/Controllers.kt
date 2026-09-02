@@ -9893,7 +9893,7 @@ class ConversationController(
                         onTransientFailure = { attempt ->
                             Log.w(
                                 "DMConversation",
-                                "invite accept transport unavailable; retrying " +
+                                "invite acceptance temporarily unavailable; retrying " +
                                     "attempt=$attempt/$IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS",
                             )
                         },
