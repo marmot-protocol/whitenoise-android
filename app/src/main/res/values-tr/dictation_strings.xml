@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="dictation_done">Bitti</string>
+    <string name="dictation_notification_stop">Transkripsiyonu durdur</string>
+    <string name="dictation_notification_permission_limited">Bildirim izni kapalı. White Noise ön plandan ayrılırsa dikte durdurulur.</string>
     <string name="dictation_notification_title">Dikte etkin</string>
     <string name="dictation_notification_text">Bitirmek için Bitti’ye, silmek için İptal’e dokunun</string>
     <string name="notification_channel_dictation">Dikte</string>

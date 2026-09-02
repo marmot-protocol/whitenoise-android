@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="dictation_done">完成</string>
+    <string name="dictation_notification_stop">停止轉寫</string>
+    <string name="dictation_notification_permission_limited">通知權限已關閉。如果 White Noise 離開前景，聽寫將停止。</string>
     <string name="dictation_notification_title">聽寫進行中</string>
     <string name="dictation_notification_text">點選「完成」以結束，或點選「取消」以捨棄</string>
     <string name="notification_channel_dictation">聽寫</string>

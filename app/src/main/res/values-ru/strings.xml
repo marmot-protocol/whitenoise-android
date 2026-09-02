@@ -1668,7 +1668,6 @@
     <string name="composer_expand_full_screen">Развернуть поле сообщения</string>
     <string name="composer_collapse">Свернуть поле сообщения</string>
     <string name="dictate_text">Продиктовать текст</string>
-    <string name="dictation_in_use_other_chat">Диктовка активна в другом чате</string>
     <string name="dictation_preparing">Подготовка диктовки…</string>
     <string name="dictation_checking_service">Проверка службы распознавания речи…</string>
     <string name="dictation_opening_service">Открытие службы распознавания речи…</string>
@@ -1676,7 +1675,6 @@
     <string name="dictation_starting">Запуск диктовки…</string>
     <string name="dictation_listening">Диктовка…</string>
     <string name="dictation_processing">Расшифровка…</string>
-    <string name="dictation_stop">Остановить диктовку</string>
     <string name="dictation_cancel">Отменить диктовку</string>
     <string name="dictation_provider_unavailable">Распознавание речи недоступно</string>
     <string name="dictation_permission_denied">Требуется доступ к микрофону</string>

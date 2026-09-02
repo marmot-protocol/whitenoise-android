@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="dictation_done">Готово</string>
+    <string name="dictation_notification_stop">Остановить расшифровку</string>
+    <string name="dictation_notification_permission_limited">Разрешение на уведомления отключено. Диктовка остановится, если White Noise перестанет быть активным приложением.</string>
     <string name="dictation_notification_title">Диктовка активна</string>
     <string name="dictation_notification_text">Нажмите «Готово», чтобы завершить, или «Отмена», чтобы удалить</string>
     <string name="notification_channel_dictation">Диктовка</string>

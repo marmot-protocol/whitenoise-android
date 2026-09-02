@@ -1331,6 +1331,9 @@ class WhiteNoiseAppState private constructor(
                     }
                 }
             },
+            onBackgroundContinuationUnavailable = {
+                present(R.string.dictation_notification_permission_limited)
+            },
         )
     }
 

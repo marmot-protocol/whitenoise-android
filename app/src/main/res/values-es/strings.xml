@@ -1606,7 +1606,6 @@
     <string name="composer_expand_full_screen">Expandir el campo de mensaje</string>
     <string name="composer_collapse">Contraer el campo de mensaje</string>
     <string name="dictate_text">Dictar texto</string>
-    <string name="dictation_in_use_other_chat">El dictado está activo en otro chat</string>
     <string name="dictation_preparing">Preparando el dictado…</string>
     <string name="dictation_checking_service">Comprobando el servicio de voz…</string>
     <string name="dictation_opening_service">Abriendo el servicio de voz…</string>
@@ -1614,7 +1613,6 @@
     <string name="dictation_starting">Iniciando el dictado…</string>
     <string name="dictation_listening">Dictando…</string>
     <string name="dictation_processing">Transcribiendo…</string>
-    <string name="dictation_stop">Detener dictado</string>
     <string name="dictation_cancel">Cancelar dictado</string>
     <string name="dictation_provider_unavailable">El reconocimiento de voz no está disponible</string>
     <string name="dictation_permission_denied">Se necesita permiso para usar el micrófono</string>

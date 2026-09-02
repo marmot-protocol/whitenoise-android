@@ -1604,7 +1604,6 @@
     <string name="composer_expand_full_screen">Nachrichtenfeld maximieren</string>
     <string name="composer_collapse">Nachrichtenfeld minimieren</string>
     <string name="dictate_text">Text diktieren</string>
-    <string name="dictation_in_use_other_chat">Diktat ist in einem anderen Chat aktiv</string>
     <string name="dictation_preparing">Diktat wird vorbereitet…</string>
     <string name="dictation_checking_service">Sprachdienst wird geprüft…</string>
     <string name="dictation_opening_service">Sprachdienst wird geöffnet…</string>
@@ -1612,7 +1611,6 @@
     <string name="dictation_starting">Diktat wird gestartet…</string>
     <string name="dictation_listening">Diktieren…</string>
     <string name="dictation_processing">Wird transkribiert…</string>
-    <string name="dictation_stop">Diktat beenden</string>
     <string name="dictation_cancel">Diktat abbrechen</string>
     <string name="dictation_provider_unavailable">Spracherkennung ist nicht verfügbar</string>
     <string name="dictation_permission_denied">Mikrofonberechtigung ist erforderlich</string>
@@ -1634,6 +1632,8 @@
     <string name="dictation_disclosure_message">Dein installierter Sprachdienst verarbeitet diktierte Audiodaten und kann sie an seinen Anbieter senden. White Noise fügt den zurückgegebenen Text standardmäßig in deinen Entwurf ein; automatisches Senden ist nur verfügbar, wenn du es ausdrücklich in den Diktateinstellungen aktivierst.</string>
     <string name="dictation_continue">Weiter</string>
     <string name="dictation_done">Fertig</string>
+    <string name="dictation_notification_stop">Transkription beenden</string>
+    <string name="dictation_notification_permission_limited">Die Benachrichtigungsberechtigung ist deaktiviert. Das Diktat wird beendet, wenn White Noise nicht mehr im Vordergrund ist.</string>
     <string name="dictation_notification_title">Diktat aktiv</string>
     <string name="dictation_notification_text">Mit Fertig beenden oder mit Abbrechen verwerfen</string>
     <string name="notification_channel_dictation">Diktat</string>

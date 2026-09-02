@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="dictation_done">Listo</string>
+    <string name="dictation_notification_stop">Detener transcripción</string>
+    <string name="dictation_notification_permission_limited">El permiso de notificaciones está desactivado. El dictado se detendrá si White Noise deja de estar en primer plano.</string>
     <string name="dictation_notification_title">Dictado activo</string>
     <string name="dictation_notification_text">Usa Listo para terminar o Cancelar para descartar</string>
     <string name="notification_channel_dictation">Dictado</string>

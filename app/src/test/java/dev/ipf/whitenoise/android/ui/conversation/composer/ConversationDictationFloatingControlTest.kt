@@ -1,8 +1,12 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -173,6 +177,45 @@ class ConversationDictationFloatingControlTest {
         }
     }
 
+    /** Verifies the root float and playback transport remain separate, visible, and reachable. */
+    @Test
+    fun rootFloatCoexistsAboveThePlaybackBarWithoutOverlap() {
+        val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        fixture.platform.listener.onReady()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.width(320.dp).height(640.dp).testTag(ROOT_TAG)) {
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(64.dp)
+                            .testTag(PLAYBACK_BAR_TAG),
+                    )
+                    ConversationDictationFloatingControl(
+                        state = fixture.controller.state,
+                        controller = fixture.controller,
+                        modifier =
+                            Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 16.dp, bottom = 88.dp),
+                    )
+                }
+            }
+        }
+
+        val playback = composeRule.onNodeWithTag(PLAYBACK_BAR_TAG).assertIsDisplayed().getUnclippedBoundsInRoot()
+        val dictation =
+            composeRule
+                .onNodeWithTag(APP_DICTATION_FLOAT_TAG)
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+        assertTrue(dictation.bottom <= playback.top)
+        composeRule.onNodeWithContentDescription("Done").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Cancel dictation").assertIsDisplayed()
+    }
+
     /** Renders the app-root control under configurable density-direction conditions. */
     private fun render(
         fixture: Fixture,
@@ -278,5 +321,6 @@ class ConversationDictationFloatingControlTest {
         const val ACCOUNT = "account"
         const val GROUP = "group"
         const val ROOT_TAG = "dictation-strip-test-root"
+        const val PLAYBACK_BAR_TAG = "dictation-playback-coexistence-probe"
     }
 }
