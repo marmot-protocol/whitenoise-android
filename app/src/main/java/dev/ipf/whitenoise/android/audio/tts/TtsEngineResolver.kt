@@ -374,12 +374,8 @@ class TtsEngineResolver(
             voices: Collection<Voice>,
         ): List<Voice> =
             voices
-                .filter { voice ->
-                    voice.name.isNotBlank() &&
-                        !voice.isNetworkConnectionRequired &&
-                        !voice.features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) &&
-                        voice.locale.language == locale.language
-                }.sortedWith(
+                .filter { it.isOfflineInstalledFor(locale) }
+                .sortedWith(
                     compareByDescending<Voice> { it.quality }
                         .thenBy { it.name }
                         .thenBy { it.locale.toLanguageTag() },
@@ -392,7 +388,7 @@ class TtsEngineResolver(
             voices: Collection<Voice>,
             requestedKey: TtsVoiceKey?,
         ): TtsVoiceResolution {
-            val sameLanguage = voices.filter { it.locale.language == locale.language }
+            val sameLanguage = voices.filter { it.locale.matchesLanguage(locale) }
             val keyCounts = sameLanguage.groupingBy { it.toVoiceKey(enginePackage) }.eachCount()
             val options =
                 sameLanguage
@@ -460,9 +456,20 @@ class TtsEngineResolver(
         /** Enforces language, installation, and network invariants together. */
         private fun Voice.isOfflineInstalledFor(locale: Locale): Boolean =
             name.isNotBlank() &&
-                this.locale.language == locale.language &&
+                this.locale.matchesLanguage(locale) &&
                 !isNetworkConnectionRequired &&
                 !features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)
+
+        /** Matches equivalent ISO-639-1 and ISO-639-2 language codes without trusting malformed locale data. */
+        private fun Locale.matchesLanguage(other: Locale): Boolean {
+            if (language.isBlank() || other.language.isBlank()) return false
+            if (language.equals(other.language, ignoreCase = true)) return true
+            val iso3Language = runCatching { getISO3Language() }.getOrNull()
+            val otherIso3Language = runCatching { other.getISO3Language() }.getOrNull()
+            return !iso3Language.isNullOrBlank() &&
+                !otherIso3Language.isNullOrBlank() &&
+                iso3Language.equals(otherIso3Language, ignoreCase = true)
+        }
 
         const val TTS_INIT_TIMEOUT_MS = 30_000L
     }

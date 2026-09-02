@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -74,6 +75,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
@@ -673,6 +675,7 @@ internal fun SelectableSettingsRowWithSubtitle(
     )
 }
 
+/** Renders a settings toggle with optional in-row padding for segmented lists. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun SettingsSwitchRow(
@@ -682,13 +685,17 @@ internal fun SettingsSwitchRow(
     enabled: Boolean = true,
     busy: Boolean = false,
     switchModifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    contentSpacing: Dp = 0.dp,
     icon: ImageVector? = null,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
-            .settingsRowAmoledSurfaceBorder(),
+            .settingsRowAmoledSurfaceBorder()
+            .padding(contentPadding),
+        horizontalArrangement = Arrangement.spacedBy(contentSpacing),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {

@@ -1444,7 +1444,7 @@
     <string name="tts_settings_engine_title">Motor</string>
     <string name="tts_settings_rate_title">Konuşma hızı</string>
     <string name="tts_media_mix_title">Çalan medyanın üzerinden konuş</string>
-    <string name="tts_media_mix_subtitle">Yalnızca başka ses çalarken başlar; White Noise bu sesi kontrol etmez</string>
+    <string name="tts_media_mix_subtitle">Yalnızca başka ses çalarken başlar; White Noise diğer sesi kontrol etmez</string>
     <string name="tts_media_mix_volume_title">Medya üzeri konuşma ses düzeyi</string>
     <string name="tts_media_mix_volume_quiet">Düşük</string>
     <string name="tts_media_mix_volume_medium">Orta</string>

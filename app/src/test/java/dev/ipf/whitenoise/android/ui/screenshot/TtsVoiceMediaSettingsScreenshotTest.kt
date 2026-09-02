@@ -19,6 +19,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceKey
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceOption
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceUnavailableReason
+import dev.ipf.whitenoise.android.ui.group.TtsAutoReadGlobalDefaultRow
 import dev.ipf.whitenoise.android.ui.settings.SelectableSettingsRowWithSubtitle
 import dev.ipf.whitenoise.android.ui.settings.ttsMediaMixToggleRow
 import dev.ipf.whitenoise.android.ui.settings.ttsVoicePickerRow
@@ -57,7 +58,7 @@ class TtsVoiceMediaSettingsScreenshotTest {
 
     /** Captures wrapping and trailing controls under RTL and 200% text. */
     @Test
-    @Config(sdk = [36], qualifiers = "w320dp-h780dp-mdpi")
+    @Config(sdk = [36], qualifiers = "w320dp-h1400dp-mdpi")
     fun voiceAndMediaMixRowsRtlLargeFont() {
         composeRule.setContent {
             CompositionLocalProvider(
@@ -84,6 +85,7 @@ class TtsVoiceMediaSettingsScreenshotTest {
         accessibilityCasesOnly: Boolean = false,
     ) {
         Column(Modifier.width(width).testTag(GALLERY_TAG)) {
+            TtsAutoReadGlobalDefaultRow(checked = true, onCheckedChange = {})
             ttsMediaMixToggleRow(checked = true, onCheckedChange = {})
             if (!accessibilityCasesOnly) {
                 SelectableSettingsRowWithSubtitle(

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -402,6 +403,8 @@ internal fun ttsMediaMixToggleRow(
         title = title,
         subtitle = subtitle,
         checked = checked,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        contentSpacing = 16.dp,
         switchModifier =
             Modifier.semantics {
                 contentDescription = "$title. $subtitle"

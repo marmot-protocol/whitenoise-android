@@ -117,6 +117,25 @@ class TtsVoiceResolverTest {
         assertTrue(result.options.any { it.unavailableReason == TtsVoiceUnavailableReason.Ambiguous })
     }
 
+    /** Accepts an equivalent ISO-639-2 voice while excluding a different ISO-639-2 language. */
+    @Test
+    fun iso639EquivalentVoiceCodesResolveWithoutAdmittingOtherLanguages() {
+        val english = voice("English ISO3", Locale.forLanguageTag("eng"), quality = 300)
+        val french = voice("French ISO3", Locale.forLanguageTag("fra"), quality = 500)
+        val englishKey = TtsVoiceKey("engine.a", "English ISO3", "eng")
+
+        val result =
+            TtsEngineResolver.resolveVoiceSelection(
+                enginePackage = "engine.a",
+                locale = Locale.US,
+                voices = listOf(french, english),
+                requestedKey = englishKey,
+            )
+
+        assertEquals(listOf("English ISO3"), result.options.map { it.label })
+        assertSame(english, result.preferredVoice)
+    }
+
     /** Discovers the device locale instead of inheriting an engine's stale language. */
     @Test
     fun initialVoiceCatalogUsesCurrentLocaleWhenEngineVoiceDiffers() =

@@ -162,6 +162,17 @@ class AndroidTtsSpeechEngineTest {
         assertEquals(TextToSpeech.LANG_NOT_SUPPORTED, engine.setLanguage(Locale.US))
     }
 
+    /** Keeps an installed ISO-639-2 voice usable for the equivalent ISO-639-1 utterance locale. */
+    @Test
+    fun equivalentThreeLetterLanguageVoiceRemainsUsable() {
+        val english = voice("English ISO3", Locale.forLanguageTag("eng"), 300)
+        val tts = VoiceSelectingTextToSpeech(english, setOf(english))
+        val engine = AndroidTtsSpeechEngine(tts, enginePackage = "engine.a")
+
+        assertEquals(TextToSpeech.LANG_AVAILABLE, engine.setLanguage(Locale.US))
+        assertSame(english, tts.voice)
+    }
+
     /** Preserves an accepted framework language when an engine has no optional voice catalog. */
     @Test
     fun emptyVoiceCatalogKeepsTheFrameworkLanguageStatus() {
