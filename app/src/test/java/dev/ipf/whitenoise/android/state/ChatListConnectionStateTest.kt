@@ -13,6 +13,7 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatListConnectionStateTest {
+    /** Matching account, runtime, and network identities must share one native catch-up result. */
     @Test
     fun catchUpSharesOnlyAnExactReadinessIdentity() =
         runTest {

@@ -274,6 +274,7 @@ internal class ChatListConnectionOwner(
             -> true
         }
 
+    /** Starts or joins the process-owned catch-up for the current account and network lifetime. */
     fun launchCatchUp(): Deferred<Boolean> = appState.launchCatchUpAccounts()
 
     fun invalidate() {

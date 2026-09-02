@@ -4182,6 +4182,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Joins the shared catch-up before clearing the matching durable push-wake generation. */
     private suspend fun drainPendingPushWakeCatchUpIfNeeded() {
         val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
         if (pendingGeneration == 0L) return

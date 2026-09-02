@@ -201,6 +201,7 @@ class NotificationNetworkReconnectCoverageTest {
         )
     }
 
+    /** Foreground catch-up must not replay the transport wake owned by network recovery. */
     @Test
     fun foregroundCatchUpUsesSharedCoordinatorWithoutAnotherConnectivityWake() {
         val body = appStateSource().readText().functionBody("catchUpAfterForegroundActivation")
