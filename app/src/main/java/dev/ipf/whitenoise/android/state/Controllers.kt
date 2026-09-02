@@ -3742,7 +3742,6 @@ class ChatsController private constructor(
                                 ),
                         )
                 } finally {
-                    pendingReadinessCatchUp = null
                     synchronized(liveSubscriptionLock) {
                         if (activeChatListSubscription === chatListSubscription) {
                             activeChatListSubscription = null
