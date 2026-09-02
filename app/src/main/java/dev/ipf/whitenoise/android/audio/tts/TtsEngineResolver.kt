@@ -461,15 +461,18 @@ class TtsEngineResolver(
                 !features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)
 
         /** Matches equivalent ISO-639-1 and ISO-639-2 language codes without trusting malformed locale data. */
-        private fun Locale.matchesLanguage(other: Locale): Boolean {
-            if (language.isBlank() || other.language.isBlank()) return false
-            if (language.equals(other.language, ignoreCase = true)) return true
-            val iso3Language = runCatching { getISO3Language() }.getOrNull()
-            val otherIso3Language = runCatching { other.getISO3Language() }.getOrNull()
-            return !iso3Language.isNullOrBlank() &&
-                !otherIso3Language.isNullOrBlank() &&
-                iso3Language.equals(otherIso3Language, ignoreCase = true)
-        }
+        private fun Locale.matchesLanguage(other: Locale): Boolean =
+            when {
+                language.isBlank() || other.language.isBlank() -> false
+                language.equals(other.language, ignoreCase = true) -> true
+                else -> {
+                    val iso3Language = runCatching { getISO3Language() }.getOrNull()
+                    val otherIso3Language = runCatching { other.getISO3Language() }.getOrNull()
+                    !iso3Language.isNullOrBlank() &&
+                        !otherIso3Language.isNullOrBlank() &&
+                        iso3Language.equals(otherIso3Language, ignoreCase = true)
+                }
+            }
 
         const val TTS_INIT_TIMEOUT_MS = 30_000L
     }
