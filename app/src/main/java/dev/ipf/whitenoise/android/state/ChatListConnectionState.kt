@@ -198,6 +198,7 @@ internal class ChatListConnectionOwner(
     var state by mutableStateOf(ChatListConnectionState())
         private set
 
+    /** Starts a new bind lifetime and clears readiness inherited from the previous account. */
     fun reset(
         accountRef: String?,
         bindEpoch: Long,
@@ -211,6 +212,7 @@ internal class ChatListConnectionOwner(
             )
     }
 
+    /** Opens a fenced session attempt for the current runtime and bind lifetime. */
     fun beginSessionAttempt(
         accountRef: String,
         bindEpoch: Long,
@@ -220,6 +222,7 @@ internal class ChatListConnectionOwner(
         return state
     }
 
+    /** Moves a current session attempt into subscription validation. */
     fun beginSubscriptionValidation(
         accountRef: String,
         bindEpoch: Long,
@@ -251,6 +254,7 @@ internal class ChatListConnectionOwner(
             }
     }
 
+    /** Publishes live-update readiness only when the captured attempt remains current. */
     fun noteLiveUpdate(attempt: ChatListConnectionState) {
         val account = attempt.accountRef ?: return
         state =
@@ -263,6 +267,7 @@ internal class ChatListConnectionOwner(
             )
     }
 
+    /** Completes the captured attempt without allowing stale work to replace newer state. */
     fun finishSessionAttempt(attempt: ChatListConnectionState) {
         val account = attempt.accountRef ?: return
         val finished =
@@ -278,6 +283,7 @@ internal class ChatListConnectionOwner(
         }
     }
 
+    /** Re-evaluates readiness after connectivity, lifecycle, or subscription evidence changes. */
     fun refresh(presentAttempt: Boolean) {
         if (!cleared) {
             when {
@@ -302,11 +308,13 @@ internal class ChatListConnectionOwner(
     /** Starts or joins the process-owned catch-up for the current account and network lifetime. */
     fun launchCatchUp(): Deferred<AccountCatchUpResult> = launchCatchUpRequest()
 
+    /** Invalidates current readiness and cancels any result awaiting publication. */
     fun invalidate() {
         readinessJob?.cancel()
         if (state.phase != ChatListConnectionPhase.Idle) state = state.invalidateReadiness()
     }
 
+    /** Permanently releases this owner and its pending readiness observation. */
     fun clear() {
         cleared = true
         readinessJob?.cancel()

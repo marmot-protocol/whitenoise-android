@@ -19,6 +19,7 @@ import org.junit.Test
 import java.io.File
 
 class NotificationNetworkReconnectCoverageTest {
+    /** Initial online discovery seeds state without manufacturing a recovery edge. */
     @Test
     fun initialNetworkSeedEstablishesBaselineWithoutReconnect() {
         val listener = appStateSource().readText().functionBody("registerActiveNetworkListener")
@@ -38,6 +39,7 @@ class NotificationNetworkReconnectCoverageTest {
         )
     }
 
+    /** Availability without capabilities clears transport details until Android supplies them. */
     @Test
     fun networkAvailableWithoutCapabilitiesClearsStaleTransportTypes() {
         val networkSnapshot = appStateSource().readText().functionBody("noteActiveNetworkSnapshot")
@@ -48,6 +50,7 @@ class NotificationNetworkReconnectCoverageTest {
         )
     }
 
+    /** Offline backlog reaches the active receiver without depending on a push-wake marker. */
     @Test
     fun offlineToOnlineRecoveryPostsMissedNotificationWithoutPushWakeMarker() =
         runTest {
@@ -81,6 +84,7 @@ class NotificationNetworkReconnectCoverageTest {
             }
         }
 
+    /** Receiver setup failure prevents inbound catch-up while leaving outbound wake independent. */
     @Test
     fun offlineToOnlineRecoverySkipsCatchUpWhenReceiverCannotBeEstablished() =
         runTest {

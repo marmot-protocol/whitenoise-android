@@ -9879,6 +9879,7 @@ class ConversationController(
         appState.dismissConversationNotifications(account, group.groupIdHex)
     }
 
+    /** Accepts the current invitation once, retaining optimistic state across safe bounded retries. */
     suspend fun acceptInvite(notify: Boolean = true): Boolean =
         withMutationLockResult(false) {
             val account = conversationAccountRef ?: return@withMutationLockResult false
