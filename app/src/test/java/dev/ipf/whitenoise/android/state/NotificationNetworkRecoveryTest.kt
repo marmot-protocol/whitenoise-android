@@ -590,6 +590,18 @@ class NotificationNetworkRecoveryTest {
             assertTrue(circuit.claimIndependentDrain(9L, pendingPushWakeGeneration))
         }
 
+    /** A newer claim must not erase the exhausted history needed to reject a delayed older scheduler. */
+    @Test
+    fun newerClaimDoesNotReopenAnExhaustedTrigger() {
+        val circuit = NotificationPushWakeRecoveryCircuit()
+
+        circuit.noteRecoveryAttempt(networkGeneration = 7L, pushWakeGeneration = 11L)
+        circuit.noteRecoveryExhausted(networkGeneration = 7L)
+        assertTrue(circuit.claimIndependentDrain(networkGeneration = 8L, pushWakeGeneration = 11L))
+
+        assertFalse(circuit.claimIndependentDrain(networkGeneration = 7L, pushWakeGeneration = 11L))
+    }
+
     /** Successful recovery may hand remaining durable work to its next drain. */
     @Test
     fun successfulCoordinatorRunsTheCompletionHandoff() =

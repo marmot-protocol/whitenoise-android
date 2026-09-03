@@ -3579,6 +3579,7 @@ class WhiteNoiseAppState private constructor(
      */
     internal fun launchCatchUpAccounts(): Deferred<AccountCatchUpResult> = launchAccountCatchUp(mustStartAfter = null)
 
+    /** Builds the current catch-up identity and serializes its native work process-wide. */
     private fun launchAccountCatchUp(mustStartAfter: Long?): Deferred<AccountCatchUpResult> =
         AccountCatchUpKey(
             accountRef = activeAccountRef,
@@ -4207,6 +4208,7 @@ class WhiteNoiseAppState private constructor(
         catchUpAfterObservedPushWake(pendingGeneration)
     }
 
+    /** Clears only the durable wake generation acknowledged by successful fresh work. */
     private fun clearPendingPushWakeCatchUpIfObserved(pendingGeneration: Long) {
         if (pendingGeneration == 0L) return
         if (pushTokenStore.clearPendingPushWakeCatchUp(pendingGeneration)) {

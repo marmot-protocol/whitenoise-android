@@ -103,12 +103,14 @@ internal class NotificationNetworkRecoveryPerformanceTraces {
         synchronized(lock) { release(generation) }
     }
 
+    /** Releases a trace once both native readiness and the first visible frame are present. */
     private fun completeIfFinished(generation: Long) {
         if (generation in catchUpReadyGenerations && generation in firstVisibleGenerations) {
             release(generation)
         }
     }
 
+    /** Removes all retained diagnostic state for one terminal generation. */
     private fun release(generation: Long) {
         traces.remove(generation)
         recordedPhases.remove(generation)
@@ -316,6 +318,7 @@ internal class NotificationNetworkRecoveryDiagnostics(
     /** Returns a bounded numeric-only snapshot for an instrumented report. */
     fun samples(): List<NotificationNetworkRecoverySample> = synchronized(sampleLock) { recentSamples.toList() }
 
+    /** Records a one-shot phase against the generation currently owning recovery. */
     private fun recordCurrentOnce(
         phase: PerformancePhase,
         layer: PerformanceLayer,
@@ -325,6 +328,7 @@ internal class NotificationNetworkRecoveryDiagnostics(
         return generation.takeIf { recordOnce(it, phase, layer, count) }
     }
 
+    /** Claims and records a phase only if the supplied generation still owns it. */
     private fun recordOnce(
         generation: Long,
         phase: PerformancePhase,
@@ -336,6 +340,7 @@ internal class NotificationNetworkRecoveryDiagnostics(
         return true
     }
 
+    /** Emits one bounded numeric sample and forwards it to the diagnostics backend. */
     private fun record(
         generation: Long,
         phase: PerformancePhase,
@@ -367,16 +372,17 @@ internal enum class NotificationNetworkRecoveryOutcome {
     CatchUpFailed,
 }
 
+/** Pair of monotonic network and durable-wake generations sharing one recovery budget. */
 private data class RecoveryTrigger(
     val networkGeneration: Long,
     val pushWakeGeneration: Long,
 )
 
-/** Prevents an exhausted recovery trigger from escaping through an independent drain path. */
+/** Prevents exhausted or independently claimed triggers from escaping their shared retry budget. */
 internal class NotificationPushWakeRecoveryCircuit {
     private val lock = Any()
     private var lastRecoveryAttempt: RecoveryTrigger? = null
-    private var consumedTrigger: RecoveryTrigger? = null
+    private var processedTriggerFrontier: RecoveryTrigger? = null
 
     /** Captures the durable wake generation visible when a recovery attempt starts. */
     fun noteRecoveryAttempt(
@@ -393,7 +399,7 @@ internal class NotificationPushWakeRecoveryCircuit {
         synchronized(lock) {
             lastRecoveryAttempt
                 ?.takeIf { trigger -> trigger.networkGeneration == networkGeneration }
-                ?.let { trigger -> consumedTrigger = trigger }
+                ?.let(::advanceProcessedFrontier)
         }
     }
 
@@ -414,12 +420,34 @@ internal class NotificationPushWakeRecoveryCircuit {
         synchronized(lock) {
             val trigger = RecoveryTrigger(networkGeneration, pushWakeGeneration)
             if (!isAllowed(trigger)) return@synchronized false
-            consumedTrigger = trigger
+            advanceProcessedFrontier(trigger)
             true
         }
 
     /** Evaluates one trigger while the circuit lock is already held. */
-    private fun isAllowed(trigger: RecoveryTrigger) = trigger.pushWakeGeneration != 0L && consumedTrigger != trigger
+    private fun isAllowed(trigger: RecoveryTrigger): Boolean {
+        val processed = processedTriggerFrontier
+        return trigger.pushWakeGeneration != 0L &&
+            (
+                processed == null ||
+                    trigger.networkGeneration > processed.networkGeneration ||
+                    trigger.pushWakeGeneration > processed.pushWakeGeneration
+            )
+    }
+
+    /** Retains every processed generation boundary without growing per-trigger state. */
+    private fun advanceProcessedFrontier(trigger: RecoveryTrigger) {
+        val processed = processedTriggerFrontier
+        processedTriggerFrontier =
+            if (processed == null) {
+                trigger
+            } else {
+                RecoveryTrigger(
+                    networkGeneration = maxOf(processed.networkGeneration, trigger.networkGeneration),
+                    pushWakeGeneration = maxOf(processed.pushWakeGeneration, trigger.pushWakeGeneration),
+                )
+            }
+    }
 }
 
 /**

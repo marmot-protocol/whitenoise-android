@@ -73,6 +73,7 @@ internal data class AccountCatchUpResult(
     val outcome: AccountCatchUpOutcome,
     val startSequence: Long? = null,
 ) {
+    /** True only when the request executed successfully rather than failing or being coalesced. */
     val succeeded: Boolean
         get() = outcome == AccountCatchUpOutcome.Succeeded
 }
@@ -132,6 +133,7 @@ internal class AccountCatchUpCoordinator(
         val block: suspend () -> Boolean,
         var startSequence: Long? = null,
     ) {
+        /** Reports whether this request is guaranteed to start after an observed trigger. */
         fun startsAfter(sequence: Long): Boolean = startSequence?.let { it > sequence } ?: true
     }
 
@@ -159,6 +161,7 @@ internal class AccountCatchUpCoordinator(
         block: suspend () -> Boolean,
     ): Deferred<AccountCatchUpResult> = launch(key, mustStartAfter = sequence, block)
 
+    /** Shares eligible work or atomically replaces the single queued successor. */
     private fun launch(
         key: AccountCatchUpKey,
         mustStartAfter: Long?,
