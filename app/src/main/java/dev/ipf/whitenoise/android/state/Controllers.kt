@@ -9290,37 +9290,6 @@ class ConversationController(
         )
     }
 
-    /** Creates an app-owned installer request that survives conversation navigation. */
-    internal fun requestAttachmentInstallerHandoff(
-        messageIdHex: String,
-        attachmentIndex: Int,
-        sourceEpoch: ULong,
-    ): Boolean {
-        val transfer = attachmentTransferRequest(messageIdHex, attachmentIndex) ?: return false
-        val request = AttachmentInstallerHandoffRequest(transfer, sourceEpoch)
-        return appState.attachmentInstallerHandoffs.request(request)
-    }
-
-    /** True while this APK card owns the app-scoped one-shot installer request. */
-    internal fun hasAttachmentInstallerHandoff(
-        messageIdHex: String,
-        attachmentIndex: Int,
-        sourceEpoch: ULong,
-    ): Boolean {
-        val transfer = attachmentTransferRequest(messageIdHex, attachmentIndex) ?: return false
-        val request = AttachmentInstallerHandoffRequest(transfer, sourceEpoch)
-        return appState.attachmentInstallerHandoffs.hasPending(request)
-    }
-
-    /** Stable Android scheduling identity for this controller-owned attachment. */
-    internal fun attachmentTransferRequest(
-        messageIdHex: String,
-        attachmentIndex: Int,
-    ): AttachmentTransferRequest? {
-        val account = conversationAccountRef ?: return null
-        return AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex)
-    }
-
     internal fun attachmentOpenRequest(
         messageIdHex: String,
         attachmentIndex: Int,

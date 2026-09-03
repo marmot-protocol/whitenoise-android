@@ -40,8 +40,10 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.cancelAttachmentTransfer
+import dev.ipf.whitenoise.android.state.hasAttachmentInstallerHandoff
 import dev.ipf.whitenoise.android.state.hasCachedAttachmentInMemory
 import dev.ipf.whitenoise.android.state.refreshAttachmentTransferState
+import dev.ipf.whitenoise.android.state.requestAttachmentInstallerHandoff
 import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.suspendCancellableCoroutine

@@ -159,3 +159,34 @@ internal class AttachmentInstallerHandoffCoordinator(
     @Suppress("MaxLineLength")
     fun canDispatch(request: AttachmentInstallerHandoffRequest): Boolean = request.transfer != cancelledTransfer && foregroundEligible()
 }
+
+/** Creates an app-owned installer request that survives conversation navigation. */
+internal fun ConversationController.requestAttachmentInstallerHandoff(
+    messageIdHex: String,
+    attachmentIndex: Int,
+    sourceEpoch: ULong,
+): Boolean {
+    val transfer = attachmentTransferRequest(messageIdHex, attachmentIndex) ?: return false
+    val request = AttachmentInstallerHandoffRequest(transfer, sourceEpoch)
+    return appState.attachmentInstallerHandoffs.request(request)
+}
+
+/** True while this APK card owns the app-scoped one-shot installer request. */
+internal fun ConversationController.hasAttachmentInstallerHandoff(
+    messageIdHex: String,
+    attachmentIndex: Int,
+    sourceEpoch: ULong,
+): Boolean {
+    val transfer = attachmentTransferRequest(messageIdHex, attachmentIndex) ?: return false
+    val request = AttachmentInstallerHandoffRequest(transfer, sourceEpoch)
+    return appState.attachmentInstallerHandoffs.hasPending(request)
+}
+
+/** Stable Android scheduling identity for this controller-owned attachment. */
+internal fun ConversationController.attachmentTransferRequest(
+    messageIdHex: String,
+    attachmentIndex: Int,
+): AttachmentTransferRequest? {
+    val account = boundAccountRef ?: return null
+    return AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex)
+}
