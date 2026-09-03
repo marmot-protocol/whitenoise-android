@@ -1281,8 +1281,8 @@
     <string name="user_search_searching">正在搜索网络…</string>
     <string name="user_search_incomplete">部分网络结果可能缺失。</string>
     <string name="user_search_failed">无法搜索网络。请检查网络连接后重试。</string>
-    <string name="user_search_following">已关注</string>
-    <string name="user_search_network">来自网络</string>
+    <string name="user_search_you_follow">你已关注</string>
+    <string name="user_search_result">搜索结果</string>
     <string name="paste_npub">粘贴 npub</string>
     <string name="start_chat">开始聊天</string>
     <string name="name_this_group">为群组命名</string>

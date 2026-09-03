@@ -1306,8 +1306,8 @@
     <string name="user_search_searching">Ağda aranıyor…</string>
     <string name="user_search_incomplete">Bazı ağ sonuçları eksik olabilir.</string>
     <string name="user_search_failed">Ağda arama yapılamadı. Bağlantınızı kontrol edip tekrar deneyin.</string>
-    <string name="user_search_following">Takip ediliyor</string>
-    <string name="user_search_network">Ağdan</string>
+    <string name="user_search_you_follow">Takip ediyorsunuz</string>
+    <string name="user_search_result">Arama sonucu</string>
     <string name="paste_npub">npub yapıştır</string>
     <string name="start_chat">Sohbet başlat</string>
     <string name="name_this_group">Gruba ad verin</string>

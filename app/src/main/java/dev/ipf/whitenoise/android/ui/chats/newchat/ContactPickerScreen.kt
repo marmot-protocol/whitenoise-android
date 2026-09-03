@@ -307,8 +307,8 @@ internal fun ContactPickerScreen(
                             title = candidate.displayName,
                             subtitle =
                                 when {
-                                    candidate.isFollowing -> stringResource(R.string.user_search_following)
-                                    candidate.searchProfile != null -> stringResource(R.string.user_search_network)
+                                    candidate.isFollowing -> stringResource(R.string.user_search_you_follow)
+                                    candidate.searchProfile != null -> stringResource(R.string.user_search_result)
                                     else -> appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
                                 },
                             avatarSeed = candidate.accountIdHex,

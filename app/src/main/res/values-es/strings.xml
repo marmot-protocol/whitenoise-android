@@ -1308,8 +1308,8 @@
     <string name="user_search_searching">Buscando en la red…</string>
     <string name="user_search_incomplete">Puede que falten algunos resultados de la red.</string>
     <string name="user_search_failed">No se pudo buscar en la red. Comprueba tu conexión e inténtalo de nuevo.</string>
-    <string name="user_search_following">Siguiendo</string>
-    <string name="user_search_network">De la red</string>
+    <string name="user_search_you_follow">Sigues a esta persona</string>
+    <string name="user_search_result">Resultado de búsqueda</string>
     <string name="paste_npub">Pegar npub</string>
     <string name="start_chat">Iniciar chat</string>
     <string name="name_this_group">Nombra este grupo</string>
