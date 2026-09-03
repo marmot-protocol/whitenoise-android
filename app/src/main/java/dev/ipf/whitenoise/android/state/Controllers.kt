@@ -3601,21 +3601,20 @@ class ChatsController private constructor(
         }
         appState.refreshDraftSummaries(accountRef)
         try {
+            val catchUpGate = ChatListCatchUpGate()
             var retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
             var localFramePresented = preserveLoadedContent && seededLocalSnapshot == null && keepLoadedContent
             var pendingReadinessCatchUp: Deferred<Boolean>? = null
             var initialSubscriptionProjection = true
             if (seededLocalSnapshot != null) {
-                // The one-shot MDK seed was installed synchronously during
-                // controller construction, before this LaunchedEffect began.
-                // Give that target-account composition a complete draw, then
-                // start every live/background enrichment path without ever
-                // replacing it with LoadingScreen or EmptyChats.
+                // Render the preinstalled one-shot seed before live or background enrichment.
                 awaitRenderedChatListFrame()
                 if (shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
                     appState.recordAccountSwitchLocalSnapshotRendered(accountRef, chatRows.size)
                     localFramePresented = true
-                    pendingReadinessCatchUp = appState.launchCatchUpAccounts()
+                    if (catchUpGate.claimInitial()) {
+                        pendingReadinessCatchUp = appState.launchCatchUpAccounts()
+                    }
                     // A performance-shaped handoff may contain only the
                     // rosters needed to render first-frame identity. Do not
                     // turn every deferred named-group roster into an N-call
@@ -3674,17 +3673,18 @@ class ChatsController private constructor(
                     error = null
                     recompute()
 
-                    // The per-account SQLite projection is the local-ready
-                    // boundary. Draw it before relay catch-up; later stream updates fold fresh state (#252, #1698).
+                    // Draw the local projection before catch-up; live updates fold fresh state afterward.
                     if (!localFramePresented) {
                         awaitRenderedChatListFrame()
                         appState.recordAccountSwitchLocalSnapshotRendered(accountRef, chatRows.size)
                         localFramePresented = true
+                    }
+                    if (pendingReadinessCatchUp == null && catchUpGate.claimInitial()) {
                         pendingReadinessCatchUp = connectionOwner.launchCatchUp()
                     }
-                    val readinessCatchUp = pendingReadinessCatchUp ?: connectionOwner.launchCatchUp()
+                    val readinessCatchUp = pendingReadinessCatchUp
                     pendingReadinessCatchUp = null
-                    connectionOwner.observe(readinessCatchUp)
+                    readinessCatchUp?.let(connectionOwner::observe)
 
                     coroutineScope {
                         runUntilFirstLiveSubscriptionEnds(
@@ -3742,7 +3742,6 @@ class ChatsController private constructor(
                                 ),
                         )
                 } finally {
-                    pendingReadinessCatchUp = null
                     synchronized(liveSubscriptionLock) {
                         if (activeChatListSubscription === chatListSubscription) {
                             activeChatListSubscription = null
