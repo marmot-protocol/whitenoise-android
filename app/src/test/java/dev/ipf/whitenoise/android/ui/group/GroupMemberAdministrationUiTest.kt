@@ -52,4 +52,38 @@ class GroupMemberAdministrationUiTest {
         composeRule.onNode(hasClickAction()).assertIsEnabled().performClick()
         composeRule.runOnIdle { assertEquals(1, opens) }
     }
+
+    /**
+     * A self-admin group opened with a warm member snapshot must present the
+     * action enabled on the first composed frame, while the authoritative
+     * roster refresh is still LOADING, and must open on tap.
+     */
+    @Test
+    fun aSeededSelfMemberEnablesAddMemberOnTheFirstFrameWhileTheRosterLoads() {
+        var rosterState by mutableStateOf(GroupRosterLoadState.LOADING)
+        var opens = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                GroupDetailsAddMemberAction(
+                    visible = true,
+                    rosterState = rosterState,
+                    mutationsBlocked = false,
+                    onClick = { opens++ },
+                    seededSelfMember = true,
+                )
+            }
+        }
+
+        composeRule.onNode(hasClickAction()).assertIsEnabled().performClick()
+        composeRule.runOnIdle { assertEquals(1, opens) }
+
+        // The seed is presentation only: a roster that fails or disagrees with
+        // itself withdraws the action even though the seed still says member.
+        listOf(GroupRosterLoadState.FAILED, GroupRosterLoadState.INCONSISTENT).forEach { state ->
+            composeRule.runOnIdle { rosterState = state }
+            composeRule.onNode(hasClickAction()).assertIsNotEnabled()
+        }
+        composeRule.runOnIdle { rosterState = GroupRosterLoadState.READY }
+        composeRule.onNode(hasClickAction()).assertIsEnabled()
+    }
 }

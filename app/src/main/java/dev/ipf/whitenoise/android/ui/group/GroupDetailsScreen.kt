@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.group
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -328,8 +329,23 @@ internal fun GroupDetailsScreen(
     val groupTerminal = controller.group.disbanding || controller.group.disbanded
     val rosterReady = controller.memberRosterState == GroupRosterLoadState.READY
     val canEdit = !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin && !groupTerminal
-    val canAdministerMembers = !isDm && canEdit && rosterReady
+    // Presentation-only: a warm member seed plus the admin list on the group
+    // record enables administration on the first frame; the invite commit
+    // still requires the authoritative roster inside the controller.
+    val canAdministerMembers =
+        !isDm && canEdit && memberAdministrationPresentable(controller.memberRosterState, controller.seededSelfMember)
     val mutationsBlocked = activeMutation != null || controller.mutationInFlight
+    val detailsOpenedAtMs = remember(controller.group.groupIdHex) { SystemClock.elapsedRealtime() }
+    var administrationLatencyReported by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    LaunchedEffect(canAdministerMembers) {
+        if (canAdministerMembers && !administrationLatencyReported) {
+            administrationLatencyReported = true
+            reportMemberAdministrationEnabledLatency(
+                elapsedMs = SystemClock.elapsedRealtime() - detailsOpenedAtMs,
+                rosterState = controller.memberRosterState,
+            )
+        }
+    }
     LaunchedEffect(autoOpenAddMember, canAdministerMembers) {
         if (autoOpenAddMember && canAdministerMembers) {
             showAddMember = true
@@ -743,7 +759,10 @@ internal fun GroupDetailsScreen(
             },
             confirmIcon = Icons.Default.Check,
             confirmLabel = stringResource(R.string.add_member),
-            busy = adding || controller.mutationInFlight,
+            // The picker opens optimistically from the seed, but the commit
+            // needs the authoritative roster: hold the confirm busy until it
+            // lands instead of letting a tap hit the controller's gate silently.
+            busy = adding || controller.mutationInFlight || !rosterReady,
             autoSelectResolvedIdentifier = true,
             excludeAccountIdHexes =
                 (controller.presentedMembers.map { it.memberIdHex } + controller.pendingInviteMemberRefs).toSet(),
@@ -966,6 +985,7 @@ internal fun GroupDetailsScreen(
                         rosterState = controller.memberRosterState,
                         mutationsBlocked = mutationsBlocked,
                         onClick = { showAddMember = true },
+                        seededSelfMember = controller.seededSelfMember,
                     )
                     if (onOpenSearch != null) {
                         QuickActionButton(
