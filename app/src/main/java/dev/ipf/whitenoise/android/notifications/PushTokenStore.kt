@@ -16,6 +16,7 @@ private const val KEY_FCM_TOKEN = "fcm_token"
 private const val KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC = "pending_native_push_registration_sync"
 private const val KEY_PENDING_PUSH_WAKE_CATCH_UP = "pending_push_wake_catch_up"
 private const val KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION = "pending_push_wake_catch_up_generation"
+private const val KEY_PUSH_WAKE_CATCH_UP_SEQUENCE = "push_wake_catch_up_sequence"
 private const val KEY_PENDING_CLEARS = "pending_clears"
 private const val KEY_PENDING_DISABLES = "pending_native_push_disables"
 private const val NO_PENDING_PUSH_WAKE_CATCH_UP = 0L
@@ -94,14 +95,23 @@ class PushTokenStore(
      */
     fun pendingPushWakeCatchUpGeneration(): Long = synchronized(LOCK) { pendingPushWakeCatchUpGenerationLocked() }
 
-    // commit() (not apply()) so the #1160 retry marker is durable before the
-    // Firebase background service returns and the process can be killed.
+    /**
+     * Durably records a distinct pending wake before the background service
+     * returns. The retained sequence makes later wakes distinguishable even
+     * after an earlier marker was cleared.
+     */
     @SuppressLint("ApplySharedPref")
     fun recordPendingPushWakeCatchUp() {
         synchronized(LOCK) {
-            val nextGeneration = nextPushWakeCatchUpGeneration(pendingPushWakeCatchUpGenerationLocked())
+            val previousGeneration =
+                maxOf(
+                    pendingPushWakeCatchUpGenerationLocked(),
+                    preferences.getLong(KEY_PUSH_WAKE_CATCH_UP_SEQUENCE, NO_PENDING_PUSH_WAKE_CATCH_UP),
+                )
+            val nextGeneration = nextPushWakeCatchUpGeneration(previousGeneration)
             preferences
                 .edit()
+                .putLong(KEY_PUSH_WAKE_CATCH_UP_SEQUENCE, nextGeneration)
                 .putLong(KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION, nextGeneration)
                 .remove(KEY_PENDING_PUSH_WAKE_CATCH_UP)
                 .commit()
@@ -143,6 +153,7 @@ class PushTokenStore(
         }
     }
 
+    /** Advances the durable wake sequence while reserving zero for no pending work. */
     private fun nextPushWakeCatchUpGeneration(current: Long): Long =
         if (current in LEGACY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION until Long.MAX_VALUE) {
             current + 1
@@ -263,6 +274,7 @@ class PushTokenStore(
     }
 }
 
+/** Copies legacy push state into secure storage without overwriting newer values. */
 internal fun migrateLegacyPushTokenPreferences(
     legacy: SharedPreferences,
     secure: SharedPreferences,
@@ -275,6 +287,7 @@ internal fun migrateLegacyPushTokenPreferences(
     copyBooleanIfMissing(legacyValues, secure, editor, KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC).also { wrote = wrote || it }
     copyBooleanIfMissing(legacyValues, secure, editor, KEY_PENDING_PUSH_WAKE_CATCH_UP).also { wrote = wrote || it }
     copyLongIfMissing(legacyValues, secure, editor, KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION).also { wrote = wrote || it }
+    copyLongIfMissing(legacyValues, secure, editor, KEY_PUSH_WAKE_CATCH_UP_SEQUENCE).also { wrote = wrote || it }
     copyStringSetIfMissing(legacyValues, secure, editor, KEY_PENDING_CLEARS).also { wrote = wrote || it }
     copyStringSetIfMissing(legacyValues, secure, editor, KEY_PENDING_DISABLES).also { wrote = wrote || it }
     if (!wrote || editor.commit()) {

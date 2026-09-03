@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.notifications
 
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.propertyInitializerCall
+import dev.ipf.whitenoise.android.state.AccountCatchUpOutcome
+import dev.ipf.whitenoise.android.state.AccountCatchUpResult
 import dev.ipf.whitenoise.android.state.NotificationJobSlot
 import dev.ipf.whitenoise.android.state.awaitActiveNotificationReceiver
 import dev.ipf.whitenoise.android.state.runNotificationReconnectOnNetworkRestore
@@ -17,6 +19,7 @@ import org.junit.Test
 import java.io.File
 
 class NotificationNetworkReconnectCoverageTest {
+    /** Initial online discovery seeds state without manufacturing a recovery edge. */
     @Test
     fun initialNetworkSeedEstablishesBaselineWithoutReconnect() {
         val listener = appStateSource().readText().functionBody("registerActiveNetworkListener")
@@ -36,6 +39,7 @@ class NotificationNetworkReconnectCoverageTest {
         )
     }
 
+    /** Availability without capabilities clears transport details until Android supplies them. */
     @Test
     fun networkAvailableWithoutCapabilitiesClearsStaleTransportTypes() {
         val networkSnapshot = appStateSource().readText().functionBody("noteActiveNetworkSnapshot")
@@ -46,6 +50,7 @@ class NotificationNetworkReconnectCoverageTest {
         )
     }
 
+    /** Offline backlog reaches the active receiver without depending on a push-wake marker. */
     @Test
     fun offlineToOnlineRecoveryPostsMissedNotificationWithoutPushWakeMarker() =
         runTest {
@@ -60,7 +65,7 @@ class NotificationNetworkReconnectCoverageTest {
                     catchUpAccounts = {
                         recoverySteps += "catch-up"
                         passiveReceiver.emitRelayBacklog("offline-window-message")
-                        true
+                        AccountCatchUpResult(AccountCatchUpOutcome.Succeeded)
                     },
                 )
 
@@ -79,6 +84,7 @@ class NotificationNetworkReconnectCoverageTest {
             }
         }
 
+    /** Receiver setup failure prevents inbound catch-up while leaving outbound wake independent. */
     @Test
     fun offlineToOnlineRecoverySkipsCatchUpWhenReceiverCannotBeEstablished() =
         runTest {
@@ -90,7 +96,7 @@ class NotificationNetworkReconnectCoverageTest {
                 ensureNotificationReceiverActive = { false },
                 catchUpAccounts = {
                     catchUpRan = true
-                    true
+                    AccountCatchUpResult(AccountCatchUpOutcome.Succeeded)
                 },
             )
 
@@ -111,6 +117,7 @@ class NotificationNetworkReconnectCoverageTest {
         val noteRecovery = recovery.functionBody("noteNetworkRestored")
         val reconnect = recovery.functionBody("schedule")
         val resume = recovery.functionBody("resumeIfPending")
+        val runnable = recovery.functionBody("hasRunnableRequest")
         val attempt = recovery.functionBody("runAttempt")
         val bridge = appState.propertyInitializerCall("notificationNetworkRecovery")
         val receiver = appState.functionBody("ensureNotificationReceiverForNetworkReconnect")
@@ -149,7 +156,7 @@ class NotificationNetworkReconnectCoverageTest {
                 "catchUpAccounts =" in attempt &&
                 "notifyConnectivityRestored()" in bridge &&
                 "ensureNotificationReceiverForNetworkReconnect" in bridge &&
-                "catchUpAccountsBestEffort()" in bridge &&
+                "catchUpAfterObservedPushWake(pendingGeneration)" in bridge &&
                 "PerformancePhase.NOTIFICATION_RECEIVER_RETRY" in attempt &&
                 "PerformancePhase.ACCOUNT_CATCH_UP_RETRY" in attempt &&
                 "pushWakeCatchUpPending()" !in bridge,
@@ -166,10 +173,11 @@ class NotificationNetworkReconnectCoverageTest {
                 "drainNotificationNetworkRecovery" in reconnect,
         )
         assertTrue(
-            "a receiver timeout or catch-up failure must remain queued after the current job settles",
-            "requestedGeneration.get()" in resume &&
-                "completedGeneration.get()" in resume &&
-                "resumeIfPending()" in reconnect.substringAfter("invokeOnCompletion"),
+            "lifecycle resume and job completion must not reopen an exhausted recovery circuit",
+            "hasRunnableRequest()" in resume &&
+                "resumeIfPending()" in reconnect.substringAfter("invokeOnCompletion") &&
+                "requested > completedGeneration.get()" in runnable &&
+                "requested > exhaustedGeneration.get()" in runnable,
         )
     }
 
@@ -199,15 +207,15 @@ class NotificationNetworkReconnectCoverageTest {
         )
     }
 
+    /** Foreground catch-up must not replay the transport wake owned by network recovery. */
     @Test
-    fun foregroundCatchUpWakesDurableOutboundBeforeAccountCatchUp() {
+    fun foregroundCatchUpUsesSharedCoordinatorWithoutAnotherConnectivityWake() {
         val body = appStateSource().readText().functionBody("catchUpAfterForegroundActivation")
-        val wake = body.indexOf("notifyConnectivityRestored()")
-        val catchUp = body.indexOf("catchUpAccountsBestEffort()")
 
         assertTrue(
-            "foreground recovery must wake retained outbound work before account catch-up",
-            "hasValidatedInternet()" in body && wake >= 0 && catchUp > wake,
+            "foreground recovery must share catch-up without sending another transport wake",
+            "catchUpAfterObservedPushWake(pendingGeneration)" in body &&
+                "notifyConnectivityRestored()" !in body,
         )
     }
 
@@ -262,7 +270,7 @@ class NotificationNetworkReconnectCoverageTest {
             "!networkNotificationRecoverySuppressed && hasValidatedInternet()" in bridge &&
                 "if (!shouldContinue()) return" in reconnect &&
                 "if (!shouldContinue()) return@launch" in reconnect &&
-                "if (networkNotificationRecoverySuppressed ||" in pendingPushDrain,
+                "networkNotificationRecoverySuppressed ||" in pendingPushDrain,
         )
         assertTrue(
             "failed and successful wipes must release reconnect suppression before listener restart",

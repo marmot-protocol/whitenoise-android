@@ -3604,7 +3604,7 @@ class ChatsController private constructor(
             val catchUpGate = ChatListCatchUpGate()
             var retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
             var localFramePresented = preserveLoadedContent && seededLocalSnapshot == null && keepLoadedContent
-            var pendingReadinessCatchUp: Deferred<Boolean>? = null
+            var pendingReadinessCatchUp: Deferred<AccountCatchUpResult>? = null
             var initialSubscriptionProjection = true
             if (seededLocalSnapshot != null) {
                 // Render the preinstalled one-shot seed before live or background enrichment.
@@ -9879,6 +9879,7 @@ class ConversationController(
         appState.dismissConversationNotifications(account, group.groupIdHex)
     }
 
+    /** Accepts the current invitation once, retaining optimistic state across safe bounded retries. */
     suspend fun acceptInvite(notify: Boolean = true): Boolean =
         withMutationLockResult(false) {
             val account = conversationAccountRef ?: return@withMutationLockResult false
@@ -9893,7 +9894,7 @@ class ConversationController(
                         onTransientFailure = { attempt ->
                             Log.w(
                                 "DMConversation",
-                                "invite accept transport unavailable; retrying " +
+                                "invite acceptance temporarily unavailable; retrying " +
                                     "attempt=$attempt/$IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS",
                             )
                         },

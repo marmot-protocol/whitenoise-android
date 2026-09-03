@@ -194,7 +194,7 @@ class NotificationPushWakeDrainCoverageTest {
         assertTrue(
             "drain must capture the durable marker generation it observed before catch-up",
             "pendingPushWakeCatchUpGeneration()" in drain &&
-                "clearPendingPushWakeCatchUpIfObserved(pendingGeneration)" in drain,
+                "catchUpAfterObservedPushWake(pendingGeneration)" in drain,
         )
         assertTrue(
             "clear helper must only clear the observed durable marker generation",
@@ -203,9 +203,19 @@ class NotificationPushWakeDrainCoverageTest {
         assertTrue(
             "connectivity callbacks must defer push-wake drain while reconnect owns receiver readiness",
             "notificationNetworkRecovery.isActive()" in schedule &&
+                "notificationPushWakeRecoveryCircuit.allowsIndependentDrain" in schedule &&
+                "notificationPushWakeRecoveryCircuit.claimIndependentDrain" in schedule &&
                 "pushWakeCatchUpDrainJob.startIfInactive" in schedule &&
-                "notificationScope.launch" in schedule &&
+                "notificationScope" in schedule &&
+                ".launch {" in schedule &&
                 "ensureNotificationRuntimeStarted()" in schedule,
+        )
+        assertTrue(
+            "recovery exhaustion must block the exact network and durable-wake trigger it attempted",
+            "onRecoveryAttemptStarted =" in appState &&
+                "notificationPushWakeRecoveryCircuit.noteRecoveryAttempt" in appState &&
+                "onRecoveryExhausted =" in appState &&
+                "notificationPushWakeRecoveryCircuit.noteRecoveryExhausted" in appState,
         )
         assertTrue(
             "reconnect completion must retry a pending marker when its catch-up did not clear it",

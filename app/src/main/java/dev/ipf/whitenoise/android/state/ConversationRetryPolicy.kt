@@ -138,10 +138,22 @@ internal fun isTransientRuntimeWorkerError(throwable: Throwable): Boolean =
         .causeChain()
         .any { it is MarmotKitException.TransportClosed }
 
+/**
+ * Limits automatic mutation retries to failures that are typed as transient
+ * and to connection gaps that prove the operation never reached a relay.
+ * Ambiguous worker timeouts and queue pressure remain terminal here.
+ */
 internal fun isRetryableIdempotentMutationError(throwable: Throwable): Boolean =
-    isTransientRuntimeWorkerError(throwable) || isTransientRelaySendError(throwable)
+    isTransientRuntimeWorkerError(throwable) ||
+        throwable.causeChain().any { cause ->
+            cause is MarmotKitException.AccountWorkerBusy ||
+                cause is MarmotKitException.RuntimeBusy ||
+                cause is MarmotKitException.AccountSessionBusy ||
+                cause is MarmotKitException.StorageBusy
+        } ||
+        isTransientRelaySendError(throwable)
 
-/** Retry an idempotent mutation across a closed worker or proven connection gap. */
+/** Retry an idempotent mutation across typed transient contention or a proven connection gap. */
 @Suppress("TooGenericExceptionCaught") // FFI/runtime failures are classified; cancellation is always rethrown.
 internal suspend fun <T> retryIdempotentRuntimeMutation(
     onTransientFailure: suspend (attempt: Int) -> Unit = {},

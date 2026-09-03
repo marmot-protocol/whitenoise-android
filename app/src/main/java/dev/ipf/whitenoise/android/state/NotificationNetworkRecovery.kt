@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicLong
 private const val NETWORK_RECOVERY_INITIAL_RETRY_DELAY_MS = 500L
 private const val NETWORK_RECOVERY_MAX_RETRY_DELAY_MS = 8_000L
 private const val NETWORK_RECOVERY_MAX_RETRY_DOUBLINGS = 63
+private const val NETWORK_RECOVERY_MAX_ATTEMPTS = 4
 
 /**
  * Retains the active diagnostic trace and only the newest coalesced successor.
@@ -97,12 +98,19 @@ internal class NotificationNetworkRecoveryPerformanceTraces {
         }
     }
 
+    /** Releases a generation that cannot make progress without a fresh trigger. */
+    fun abandon(generation: Long) {
+        synchronized(lock) { release(generation) }
+    }
+
+    /** Releases a trace once both native readiness and the first visible frame are present. */
     private fun completeIfFinished(generation: Long) {
         if (generation in catchUpReadyGenerations && generation in firstVisibleGenerations) {
             release(generation)
         }
     }
 
+    /** Removes all retained diagnostic state for one terminal generation. */
     private fun release(generation: Long) {
         traces.remove(generation)
         recordedPhases.remove(generation)
@@ -234,6 +242,27 @@ internal class NotificationNetworkRecoveryDiagnostics(
         traces.markCatchUpReady(generation)
     }
 
+    /** Records the terminal bounded-retry decision and releases its trace. */
+    fun retryExhausted(
+        generation: Long,
+        attempt: Int,
+        outcome: NotificationNetworkRecoveryOutcome,
+    ) {
+        record(
+            generation = generation,
+            phase = PerformancePhase.RECOVERY_RETRY_EXHAUSTED,
+            result = PerformanceResult.FAILURE,
+            layer =
+                if (outcome == NotificationNetworkRecoveryOutcome.ReceiverUnavailable) {
+                    PerformanceLayer.ANDROID
+                } else {
+                    PerformanceLayer.MDK
+                },
+            attempt = attempt,
+        )
+        traces.abandon(generation)
+    }
+
     /** Attributes the first chat-list subscription update after recovery. */
     fun chatListSubscriptionReceived(count: Int = 1): Long? =
         recordCurrentOnce(
@@ -289,6 +318,7 @@ internal class NotificationNetworkRecoveryDiagnostics(
     /** Returns a bounded numeric-only snapshot for an instrumented report. */
     fun samples(): List<NotificationNetworkRecoverySample> = synchronized(sampleLock) { recentSamples.toList() }
 
+    /** Records a one-shot phase against the generation currently owning recovery. */
     private fun recordCurrentOnce(
         phase: PerformancePhase,
         layer: PerformanceLayer,
@@ -298,6 +328,7 @@ internal class NotificationNetworkRecoveryDiagnostics(
         return generation.takeIf { recordOnce(it, phase, layer, count) }
     }
 
+    /** Claims and records a phase only if the supplied generation still owns it. */
     private fun recordOnce(
         generation: Long,
         phase: PerformancePhase,
@@ -309,6 +340,7 @@ internal class NotificationNetworkRecoveryDiagnostics(
         return true
     }
 
+    /** Emits one bounded numeric sample and forwards it to the diagnostics backend. */
     private fun record(
         generation: Long,
         phase: PerformancePhase,
@@ -340,6 +372,84 @@ internal enum class NotificationNetworkRecoveryOutcome {
     CatchUpFailed,
 }
 
+/** Pair of monotonic network and durable-wake generations sharing one recovery budget. */
+private data class RecoveryTrigger(
+    val networkGeneration: Long,
+    val pushWakeGeneration: Long,
+)
+
+/** Prevents exhausted or independently claimed triggers from escaping their shared retry budget. */
+internal class NotificationPushWakeRecoveryCircuit {
+    private val lock = Any()
+    private var lastRecoveryAttempt: RecoveryTrigger? = null
+    private var processedTriggerFrontier: RecoveryTrigger? = null
+
+    /** Captures the durable wake generation visible when a recovery attempt starts. */
+    fun noteRecoveryAttempt(
+        networkGeneration: Long,
+        pushWakeGeneration: Long,
+    ) {
+        synchronized(lock) {
+            lastRecoveryAttempt = RecoveryTrigger(networkGeneration, pushWakeGeneration)
+        }
+    }
+
+    /** Opens the circuit for the trigger actually observed by the exhausted attempt. */
+    fun noteRecoveryExhausted(networkGeneration: Long) {
+        synchronized(lock) {
+            lastRecoveryAttempt
+                ?.takeIf { trigger -> trigger.networkGeneration == networkGeneration }
+                ?.let(::advanceProcessedFrontier)
+        }
+    }
+
+    /** Reports whether the pending trigger has a fresh independent-drain budget. */
+    fun allowsIndependentDrain(
+        networkGeneration: Long,
+        pushWakeGeneration: Long,
+    ): Boolean =
+        synchronized(lock) {
+            isAllowed(RecoveryTrigger(networkGeneration, pushWakeGeneration))
+        }
+
+    /** Atomically spends the independent-drain budget for one network and durable-wake trigger. */
+    fun claimIndependentDrain(
+        networkGeneration: Long,
+        pushWakeGeneration: Long,
+    ): Boolean =
+        synchronized(lock) {
+            val trigger = RecoveryTrigger(networkGeneration, pushWakeGeneration)
+            if (!isAllowed(trigger)) return@synchronized false
+            advanceProcessedFrontier(trigger)
+            true
+        }
+
+    /** Evaluates one trigger while the circuit lock is already held. */
+    private fun isAllowed(trigger: RecoveryTrigger): Boolean {
+        val processed = processedTriggerFrontier
+        return trigger.pushWakeGeneration != 0L &&
+            (
+                processed == null ||
+                    trigger.networkGeneration > processed.networkGeneration ||
+                    trigger.pushWakeGeneration > processed.pushWakeGeneration
+            )
+    }
+
+    /** Retains every processed generation boundary without growing per-trigger state. */
+    private fun advanceProcessedFrontier(trigger: RecoveryTrigger) {
+        val processed = processedTriggerFrontier
+        processedTriggerFrontier =
+            if (processed == null) {
+                trigger
+            } else {
+                RecoveryTrigger(
+                    networkGeneration = maxOf(processed.networkGeneration, trigger.networkGeneration),
+                    pushWakeGeneration = maxOf(processed.pushWakeGeneration, trigger.pushWakeGeneration),
+                )
+            }
+    }
+}
+
 /**
  * Owns the coalesced reconnect job, retained generations, retry policy, and
  * privacy-safe Android phase trace for validated network recovery.
@@ -350,14 +460,20 @@ internal class NotificationNetworkRecoveryCoordinator(
     private val shouldContinue: () -> Boolean,
     private val wakeDurableOutbound: suspend () -> Boolean,
     private val ensureNotificationReceiverActive: suspend () -> Boolean,
-    private val catchUpAccounts: suspend () -> Boolean,
+    private val catchUpAccounts: suspend () -> AccountCatchUpResult,
     private val awaitRetry: suspend (generation: Long, attempt: Int) -> Unit,
     private val onDrainCompleted: () -> Unit,
+    private val onRecoveryAttemptStarted: (generation: Long) -> Unit = {},
+    private val onRecoveryExhausted: (
+        generation: Long,
+        outcome: NotificationNetworkRecoveryOutcome,
+    ) -> Unit = { _, _ -> },
     private val diagnostics: NotificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
 ) {
     private val job = NotificationJobSlot()
     private val requestedGeneration = AtomicLong(0L)
     private val completedGeneration = AtomicLong(0L)
+    private val exhaustedGeneration = AtomicLong(0L)
 
     /** Retains and schedules the newest validated offline-to-online edge. */
     fun noteNetworkRestored(generation: Long) {
@@ -368,7 +484,7 @@ internal class NotificationNetworkRecoveryCoordinator(
 
     /** Resumes retained recovery after a temporary lifecycle suppression ends. */
     fun resumeIfPending() {
-        if (shouldContinue() && requestedGeneration.get() > completedGeneration.get()) schedule()
+        if (shouldContinue() && hasRunnableRequest()) schedule()
     }
 
     /** Reports whether a recovery drain currently owns the reconnect slot. */
@@ -403,7 +519,7 @@ internal class NotificationNetworkRecoveryCoordinator(
 
     /** Starts one drain and guarantees a follow-up for any newer retained edge. */
     private fun schedule() {
-        if (!shouldContinue()) return
+        if (!shouldContinue() || !hasRunnableRequest()) return
         job.startIfInactive {
             val reconnectJob =
                 scope.launch {
@@ -417,16 +533,36 @@ internal class NotificationNetworkRecoveryCoordinator(
                             completedGeneration.accumulateAndGet(generation, ::maxOf)
                         },
                         awaitRetry = awaitRetry,
+                        maxAttempts = NETWORK_RECOVERY_MAX_ATTEMPTS,
+                        onRetryExhausted = { generation, outcome ->
+                            exhaustedGeneration.accumulateAndGet(generation, ::maxOf)
+                            onRecoveryExhausted(generation, outcome)
+                            diagnostics.retryExhausted(
+                                generation = generation,
+                                attempt = NETWORK_RECOVERY_MAX_ATTEMPTS,
+                                outcome = outcome,
+                            )
+                        },
                     )
                 }
             reconnectJob.invokeOnCompletion { cause ->
                 if (cause == null) {
                     resumeIfPending()
-                    onDrainCompleted()
+                    val terminalGeneration =
+                        maxOf(completedGeneration.get(), exhaustedGeneration.get())
+                    if (requestedGeneration.get() <= terminalGeneration) {
+                        onDrainCompleted()
+                    }
                 }
             }
             reconnectJob
         }
+    }
+
+    /** True only for work that has neither succeeded nor opened its circuit. */
+    private fun hasRunnableRequest(): Boolean {
+        val requested = requestedGeneration.get()
+        return requested > completedGeneration.get() && requested > exhaustedGeneration.get()
     }
 
     /** Runs one receiver-gated catch-up attempt and records its typed phases. */
@@ -434,17 +570,20 @@ internal class NotificationNetworkRecoveryCoordinator(
         generation: Long,
         attempt: Int,
     ): NotificationNetworkRecoveryOutcome {
+        onRecoveryAttemptStarted(generation)
         recordAttemptStart(generation, attempt)
         return runNotificationReconnectOnNetworkRestore(
             wakeDurableOutbound = {
-                val succeeded = wakeDurableOutbound()
-                diagnostics.attemptPhase(
-                    generation = generation,
-                    phase = PerformancePhase.CONNECTIVITY_WAKE_READY,
-                    result = if (succeeded) PerformanceResult.SUCCESS else PerformanceResult.FAILURE,
-                    layer = PerformanceLayer.MDK,
-                    attempt = attempt,
-                )
+                if (attempt == 1) {
+                    val succeeded = wakeDurableOutbound()
+                    diagnostics.attemptPhase(
+                        generation = generation,
+                        phase = PerformancePhase.CONNECTIVITY_WAKE_READY,
+                        result = if (succeeded) PerformanceResult.SUCCESS else PerformanceResult.FAILURE,
+                        layer = PerformanceLayer.MDK,
+                        attempt = attempt,
+                    )
+                }
             },
             ensureNotificationReceiverActive = {
                 val ready = ensureNotificationReceiverActive()
@@ -470,19 +609,21 @@ internal class NotificationNetworkRecoveryCoordinator(
                     layer = PerformanceLayer.MDK,
                     attempt = attempt,
                 )
-                val succeeded = catchUpAccounts()
-                if (succeeded) {
-                    diagnostics.catchUpSucceeded(generation, attempt)
-                } else {
-                    diagnostics.attemptPhase(
-                        generation = generation,
-                        phase = PerformancePhase.ACCOUNT_CATCH_UP_RETRY,
-                        result = PerformanceResult.PENDING,
-                        layer = PerformanceLayer.MDK,
-                        attempt = attempt,
-                    )
+                val result = catchUpAccounts()
+                when (result.outcome) {
+                    AccountCatchUpOutcome.Succeeded -> diagnostics.catchUpSucceeded(generation, attempt)
+                    AccountCatchUpOutcome.Failed -> {
+                        diagnostics.attemptPhase(
+                            generation = generation,
+                            phase = PerformancePhase.ACCOUNT_CATCH_UP_RETRY,
+                            result = PerformanceResult.PENDING,
+                            layer = PerformanceLayer.MDK,
+                            attempt = attempt,
+                        )
+                    }
+                    AccountCatchUpOutcome.Superseded -> Unit
                 }
-                succeeded
+                result
             },
         )
     }
@@ -505,7 +646,8 @@ internal class NotificationNetworkRecoveryCoordinator(
 internal suspend fun runNotificationReconnectOnNetworkRestore(
     wakeDurableOutbound: suspend () -> Unit,
     ensureNotificationReceiverActive: suspend () -> Boolean,
-    catchUpAccounts: suspend () -> Boolean,
+    catchUpAccounts: suspend () -> AccountCatchUpResult,
+    maxSupersededReplacements: Int = CATCH_UP_MAX_SUPERSEDED_REPLACEMENTS,
 ): NotificationNetworkRecoveryOutcome =
     coroutineScope {
         val outboundWake = async(start = CoroutineStart.UNDISPATCHED) { wakeDurableOutbound() }
@@ -516,13 +658,20 @@ internal suspend fun runNotificationReconnectOnNetworkRestore(
             outboundWake.await()
             NotificationNetworkRecoveryOutcome.ReceiverUnavailable
         } else {
-            val catchUp = async(start = CoroutineStart.UNDISPATCHED) { catchUpAccounts() }
-            val caughtUp = catchUp.await()
+            val catchUp =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    awaitCatchUpAfterSupersession(
+                        initial = catchUpAccounts(),
+                        maxSupersededReplacements = maxSupersededReplacements,
+                        launchReplacement = catchUpAccounts,
+                    )
+                }
+            val catchUpResult = catchUp.await()
             outboundWake.await()
-            if (caughtUp) {
-                NotificationNetworkRecoveryOutcome.Success
-            } else {
-                NotificationNetworkRecoveryOutcome.CatchUpFailed
+            when (catchUpResult.outcome) {
+                AccountCatchUpOutcome.Succeeded -> NotificationNetworkRecoveryOutcome.Success
+                AccountCatchUpOutcome.Failed -> NotificationNetworkRecoveryOutcome.CatchUpFailed
+                AccountCatchUpOutcome.Superseded -> error("superseded catch-up escaped the replacement loop")
             }
         }
     }
@@ -538,7 +687,10 @@ internal suspend fun drainNotificationNetworkRecovery(
     runAttempt: suspend (generation: Long, attempt: Int) -> NotificationNetworkRecoveryOutcome,
     markCompleted: (generation: Long) -> Unit,
     awaitRetry: suspend (generation: Long, attempt: Int) -> Unit,
+    maxAttempts: Int = NETWORK_RECOVERY_MAX_ATTEMPTS,
+    onRetryExhausted: (generation: Long, outcome: NotificationNetworkRecoveryOutcome) -> Unit = { _, _ -> },
 ) {
+    require(maxAttempts > 0) { "maxAttempts must be positive" }
     var attempt = 1
     var attemptGeneration: Long? = null
     while (currentCoroutineContext().isActive && shouldContinue()) {
@@ -548,7 +700,7 @@ internal suspend fun drainNotificationNetworkRecovery(
             attemptGeneration = generation
             attempt = 1
         }
-        when (runAttempt(generation, attempt)) {
+        when (val outcome = runAttempt(generation, attempt)) {
             NotificationNetworkRecoveryOutcome.Success -> {
                 markCompleted(generation)
                 attemptGeneration = null
@@ -557,6 +709,10 @@ internal suspend fun drainNotificationNetworkRecovery(
             NotificationNetworkRecoveryOutcome.ReceiverUnavailable,
             NotificationNetworkRecoveryOutcome.CatchUpFailed,
             -> {
+                if (attempt >= maxAttempts) {
+                    onRetryExhausted(generation, outcome)
+                    return
+                }
                 awaitRetry(generation, attempt)
                 attempt = (attempt + 1).coerceAtMost(Int.MAX_VALUE)
             }

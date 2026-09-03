@@ -28,9 +28,12 @@ import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
@@ -100,6 +103,133 @@ class ConversationSendRetryIntegrationTest {
             assertEquals(2, attempts)
             assertFalse(controller.group.pendingConfirmation)
             assertEquals(null, appState.toast)
+        }
+
+    /** Keeps one logical acceptance pending across typed transient runtime contention. */
+    @Test
+    fun acceptInviteRetriesTypedContentionWithoutRollingBackOrReportingAnError() =
+        runTest {
+            val transientFailures =
+                listOf(
+                    MarmotKitException.AccountWorkerBusy(),
+                    MarmotKitException.RuntimeBusy(),
+                    MarmotKitException.AccountSessionBusy(),
+                    MarmotKitException.StorageBusy("database is locked"),
+                )
+
+            transientFailures.forEach { transientFailure ->
+                val appState = appState()
+                var attempts = 0
+                lateinit var controller: ConversationController
+                controller =
+                    ConversationController(
+                        appState = appState,
+                        initialGroup = group(pendingConfirmation = true),
+                        initialMemberSnapshot = memberSnapshot(),
+                        inviteAcceptor = { _, _ ->
+                            attempts += 1
+                            assertFalse(controller.group.pendingConfirmation)
+                            if (attempts == 1) throw transientFailure
+                            group(pendingConfirmation = false)
+                        },
+                    )
+
+                assertTrue(controller.acceptInvite(notify = false))
+
+                assertEquals(2, attempts)
+                assertFalse(controller.group.pendingConfirmation)
+                assertEquals(null, appState.toast)
+            }
+        }
+
+    /** Exhaustion restores the authoritative invite once and reports one actionable failure. */
+    @Test
+    fun acceptInviteRollsBackOnceAfterPersistentContentionExhaustsTheRetryBudget() =
+        runTest {
+            val appState = appState()
+            var attempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(pendingConfirmation = true),
+                    initialMemberSnapshot = memberSnapshot(),
+                    inviteAcceptor = { _, _ ->
+                        attempts += 1
+                        throw MarmotKitException.StorageBusy("database is locked")
+                    },
+                )
+
+            assertFalse(controller.acceptInvite(notify = false))
+
+            assertEquals(IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS, attempts)
+            assertTrue(controller.group.pendingConfirmation)
+            assertTrue(appState.toast?.diagnosticReport?.contains("operation=GROUP_INVITE_ACCEPT") == true)
+            assertTrue(appState.toast?.diagnosticReport?.contains("error=RESOURCE_BUSY") == true)
+        }
+
+    /** Cancellation restores truthful invite state without presenting an error. */
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun cancellingInviteAcceptanceDuringContentionBackoffRollsBackSilently() =
+        runTest {
+            val appState = appState()
+            var attempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(pendingConfirmation = true),
+                    initialMemberSnapshot = memberSnapshot(),
+                    inviteAcceptor = { _, _ ->
+                        attempts += 1
+                        throw MarmotKitException.AccountWorkerBusy()
+                    },
+                )
+            val acceptance = async { controller.acceptInvite(notify = false) }
+
+            runCurrent()
+            assertEquals(1, attempts)
+            assertFalse(controller.group.pendingConfirmation)
+
+            acceptance.cancelAndJoin()
+
+            assertTrue(controller.group.pendingConfirmation)
+            assertEquals(null, appState.toast)
+        }
+
+    /** A repeated tap cannot start another logical accept while the first one is pending. */
+    @Test
+    fun repeatedInviteTapIsDroppedWhileContentionRetryIsInFlight() =
+        runTest {
+            val appState = appState()
+            val firstAttemptStarted = CompletableDeferred<Unit>()
+            val releaseFirstAttempt = CompletableDeferred<Unit>()
+            var attempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(pendingConfirmation = true),
+                    initialMemberSnapshot = memberSnapshot(),
+                    inviteAcceptor = { _, _ ->
+                        attempts += 1
+                        if (attempts == 1) {
+                            firstAttemptStarted.complete(Unit)
+                            releaseFirstAttempt.await()
+                            throw MarmotKitException.AccountWorkerBusy()
+                        }
+                        group(pendingConfirmation = false)
+                    },
+                )
+            val firstAcceptance = async { controller.acceptInvite(notify = false) }
+            firstAttemptStarted.await()
+
+            assertFalse(controller.acceptInvite(notify = false))
+            assertEquals(1, attempts)
+            assertEquals(null, appState.toast)
+
+            releaseFirstAttempt.complete(Unit)
+            assertTrue(firstAcceptance.await())
+            assertEquals(2, attempts)
+            assertFalse(controller.group.pendingConfirmation)
         }
 
     @Test

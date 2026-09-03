@@ -196,6 +196,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.yield
 import java.net.IDN
 import java.net.InetAddress
 import java.net.URI
@@ -2302,6 +2303,7 @@ class WhiteNoiseAppState private constructor(
     private val mediaUploadSessionLifetime = StalenessGuard()
     private val notificationJob = NotificationJobSlot()
     private val pushWakeCatchUpDrainJob = NotificationJobSlot()
+    private val notificationPushWakeRecoveryCircuit = NotificationPushWakeRecoveryCircuit()
 
     @Volatile
     private var networkNotificationRecoverySuppressed = false
@@ -3566,23 +3568,25 @@ class WhiteNoiseAppState private constructor(
      * caller can always `await` this without it becoming a hard gate.
      */
     suspend fun catchUpAccounts() {
-        catchUpAccountsBestEffort()
+        launchCatchUpAccounts().await()
     }
 
     /**
      * Starts a process-owned catch-up after a chat list has rendered its local
      * snapshot. A blocked relay call must not block that controller's live
-     * consumers. Only callers with the same account, runtime, network, and
-     * readiness identity may share an in-flight result.
+     * consumers. Callers for the same account, runtime, and network share one
+     * in-flight result; a newer identity waits instead of overlapping native work.
      */
-    internal fun launchCatchUpAccounts(readinessToken: ChatListConnectionEvidenceToken? = null): Deferred<Boolean> =
+    internal fun launchCatchUpAccounts(): Deferred<AccountCatchUpResult> = launchAccountCatchUp(mustStartAfter = null)
+
+    /** Builds the current catch-up identity and serializes its native work process-wide. */
+    private fun launchAccountCatchUp(mustStartAfter: Long?): Deferred<AccountCatchUpResult> =
         AccountCatchUpKey(
             accountRef = activeAccountRef,
             runtimeGeneration = runtimeGeneration,
             networkGeneration = connectivitySignalOwner.captureNetworkGeneration(),
-            readinessToken = readinessToken,
         ).let { key ->
-            accountCatchUpCoordinator.launch(key) {
+            val catchUp: suspend () -> Boolean = {
                 val succeeded = catchUpAccountsBestEffort()
                 if (succeeded) recordStartupRelayCatchUpReady()
                 succeeded &&
@@ -3590,7 +3594,23 @@ class WhiteNoiseAppState private constructor(
                     runtimeGeneration == key.runtimeGeneration &&
                     connectivitySignalOwner.isNetworkGenerationCurrent(key.networkGeneration)
             }
+            if (mustStartAfter == null) {
+                accountCatchUpCoordinator.launch(key, catchUp)
+            } else {
+                accountCatchUpCoordinator.launchAfter(mustStartAfter, key, catchUp)
+            }
         }
+
+    /** Runs catch-up work fresh enough to acknowledge the observed push-wake marker. */
+    private suspend fun catchUpAfterObservedPushWake(pendingGeneration: Long): AccountCatchUpResult {
+        if (pendingGeneration == 0L) return launchCatchUpAccounts().await()
+        val observedStartSequence = accountCatchUpCoordinator.captureStartSequence()
+        return runCatchUpAfterTrigger(
+            observedStartSequence = observedStartSequence,
+            launchAfter = { sequence -> launchAccountCatchUp(mustStartAfter = sequence) },
+            onSucceeded = { clearPendingPushWakeCatchUpIfObserved(pendingGeneration) },
+        )
+    }
 
     private suspend fun catchUpAccountsBestEffort(): Boolean =
         runCatchingCancellable { marmotIo { catchUpAccounts() } }
@@ -3617,18 +3637,8 @@ class WhiteNoiseAppState private constructor(
         }
         isForegroundCatchUpRunning = true
         try {
-            if (hasValidatedInternet()) {
-                runCatchingCancellable { marmotIo { notifyConnectivityRestored() } }
-                    .onFailure { throwable ->
-                        appStateDebug(throwable) {
-                            "foreground connectivity wake failed: ${throwable.readableMessage()}"
-                        }
-                    }
-            }
             val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
-            if (catchUpAccountsBestEffort()) {
-                clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
-            }
+            catchUpAfterObservedPushWake(pendingGeneration)
         } finally {
             isForegroundCatchUpRunning = false
         }
@@ -4191,14 +4201,14 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Runs work started after the durable wake before clearing its matching generation. */
     private suspend fun drainPendingPushWakeCatchUpIfNeeded() {
         val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
         if (pendingGeneration == 0L) return
-        if (catchUpAccountsBestEffort()) {
-            clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
-        }
+        catchUpAfterObservedPushWake(pendingGeneration)
     }
 
+    /** Clears only the durable wake generation acknowledged by successful fresh work. */
     private fun clearPendingPushWakeCatchUpIfObserved(pendingGeneration: Long) {
         if (pendingGeneration == 0L) return
         if (pushTokenStore.clearPendingPushWakeCatchUp(pendingGeneration)) {
@@ -6658,9 +6668,8 @@ class WhiteNoiseAppState private constructor(
             scope = notificationScope,
             shouldContinue = { !networkNotificationRecoverySuppressed && hasValidatedInternet() },
             wakeDurableOutbound = {
-                // A retained generation deliberately reissues this wake after
-                // a retry; MDK coalesces connectivity-restored commands so it
-                // interrupts stale backoff without duplicating account workers.
+                // One connectivity edge needs one outbound wake. Catch-up owns
+                // later bounded retries, so they cannot amplify transport work.
                 val wake = runCatchingCancellable { marmotIo { notifyConnectivityRestored() } }
                 wake.onFailure { throwable ->
                     appStateDebug(throwable) {
@@ -6672,9 +6681,7 @@ class WhiteNoiseAppState private constructor(
             ensureNotificationReceiverActive = ::ensureNotificationReceiverForNetworkReconnect,
             catchUpAccounts = {
                 val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
-                catchUpAccountsBestEffort().also { succeeded ->
-                    if (succeeded) clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
-                }
+                catchUpAfterObservedPushWake(pendingGeneration)
             },
             awaitRetry = { generation, attempt ->
                 appStateDebug { "notification network recovery pending attempt=$attempt" }
@@ -6683,6 +6690,15 @@ class WhiteNoiseAppState private constructor(
                     capturedGeneration = generation,
                     backoffMillis = notificationNetworkRecoveryRetryDelayMillis(attempt),
                 )
+            },
+            onRecoveryAttemptStarted = { networkGeneration ->
+                notificationPushWakeRecoveryCircuit.noteRecoveryAttempt(
+                    networkGeneration = networkGeneration,
+                    pushWakeGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration(),
+                )
+            },
+            onRecoveryExhausted = { networkGeneration, _ ->
+                notificationPushWakeRecoveryCircuit.noteRecoveryExhausted(networkGeneration)
             },
             onDrainCompleted = ::schedulePendingPushWakeCatchUpDrain,
             diagnostics = notificationNetworkRecoveryDiagnostics,
@@ -6894,10 +6910,50 @@ class WhiteNoiseAppState private constructor(
 
     /** Starts push-wake catch-up only when network recovery does not own the receiver. */
     private fun schedulePendingPushWakeCatchUpDrain() {
-        if (networkNotificationRecoverySuppressed || !pushTokenStore.pushWakeCatchUpPending()) return
-        if (notificationNetworkRecovery.isActive()) return
+        val pendingPushWakeGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
+        val networkGeneration = validatedConnectivityRecoveryGenerationMutable.value
+        val runtimeUnavailable =
+            networkNotificationRecoverySuppressed ||
+                pendingPushWakeGeneration == 0L ||
+                notificationNetworkRecovery.isActive()
+        val triggerAlreadyConsumed =
+            !notificationPushWakeRecoveryCircuit.allowsIndependentDrain(
+                networkGeneration = networkGeneration,
+                pushWakeGeneration = pendingPushWakeGeneration,
+            )
+        if (runtimeUnavailable || triggerAlreadyConsumed) {
+            return
+        }
         pushWakeCatchUpDrainJob.startIfInactive {
-            notificationScope.launch { ensureNotificationRuntimeStarted() }
+            notificationScope
+                .launch {
+                    if (
+                        notificationPushWakeRecoveryCircuit.claimIndependentDrain(
+                            networkGeneration = networkGeneration,
+                            pushWakeGeneration = pendingPushWakeGeneration,
+                        )
+                    ) {
+                        ensureNotificationRuntimeStarted()
+                    }
+                }.also { drainJob ->
+                    drainJob.invokeOnCompletion {
+                        val currentPushWakeGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
+                        val currentNetworkGeneration = validatedConnectivityRecoveryGenerationMutable.value
+                        if (
+                            currentPushWakeGeneration != 0L &&
+                            (
+                                currentPushWakeGeneration != pendingPushWakeGeneration ||
+                                    currentNetworkGeneration != networkGeneration
+                            )
+                        ) {
+                            notificationScope.launch {
+                                // Completion can run inline while the job slot lock is held.
+                                yield()
+                                schedulePendingPushWakeCatchUpDrain()
+                            }
+                        }
+                    }
+                }
         }
     }
 
