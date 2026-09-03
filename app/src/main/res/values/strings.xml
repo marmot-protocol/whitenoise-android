@@ -1455,8 +1455,8 @@
     <string name="user_search_searching">Searching the network…</string>
     <string name="user_search_incomplete">Some network results may be missing.</string>
     <string name="user_search_failed">Couldn’t search the network. Check your connection and try again.</string>
-    <string name="user_search_following">Following</string>
-    <string name="user_search_network">From the network</string>
+    <string name="user_search_you_follow">You follow</string>
+    <string name="user_search_result">Search result</string>
     <string name="paste_npub">Paste npub</string>
     <string name="start_chat">Start chat</string>
     <string name="name_this_group">Name this group</string>

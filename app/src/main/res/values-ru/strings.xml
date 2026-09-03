@@ -1368,8 +1368,8 @@
     <string name="user_search_searching">Поиск в сети…</string>
     <string name="user_search_incomplete">Некоторые результаты сети могут отсутствовать.</string>
     <string name="user_search_failed">Не удалось выполнить поиск в сети. Проверьте подключение и повторите попытку.</string>
-    <string name="user_search_following">Вы подписаны</string>
-    <string name="user_search_network">Из сети</string>
+    <string name="user_search_you_follow">Вы подписаны</string>
+    <string name="user_search_result">Результат поиска</string>
     <string name="paste_npub">Вставить npub</string>
     <string name="start_chat">Начать чат</string>
     <string name="name_this_group">Назовите группу</string>

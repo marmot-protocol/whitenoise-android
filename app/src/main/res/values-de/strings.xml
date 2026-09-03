@@ -1306,8 +1306,8 @@
     <string name="user_search_searching">Netzwerk wird durchsucht…</string>
     <string name="user_search_incomplete">Einige Netzwerkergebnisse fehlen möglicherweise.</string>
     <string name="user_search_failed">Das Netzwerk konnte nicht durchsucht werden. Prüfe deine Verbindung und versuche es erneut.</string>
-    <string name="user_search_following">Du folgst</string>
-    <string name="user_search_network">Aus dem Netzwerk</string>
+    <string name="user_search_you_follow">Du folgst</string>
+    <string name="user_search_result">Suchergebnis</string>
     <string name="paste_npub">npub einfügen</string>
     <string name="start_chat">Chat starten</string>
     <string name="name_this_group">Gruppe benennen</string>

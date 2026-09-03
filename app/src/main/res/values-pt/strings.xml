@@ -1308,8 +1308,8 @@
     <string name="user_search_searching">Pesquisando na rede…</string>
     <string name="user_search_incomplete">Alguns resultados da rede podem estar ausentes.</string>
     <string name="user_search_failed">Não foi possível pesquisar na rede. Verifique sua conexão e tente novamente.</string>
-    <string name="user_search_following">Seguindo</string>
-    <string name="user_search_network">Da rede</string>
+    <string name="user_search_you_follow">Você segue</string>
+    <string name="user_search_result">Resultado da pesquisa</string>
     <string name="paste_npub">Colar npub</string>
     <string name="start_chat">Iniciar conversa</string>
     <string name="name_this_group">Dê um nome ao grupo</string>

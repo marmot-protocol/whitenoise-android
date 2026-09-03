@@ -1281,8 +1281,8 @@
     <string name="user_search_searching">正在搜尋網路…</string>
     <string name="user_search_incomplete">部分網路結果可能缺少。</string>
     <string name="user_search_failed">無法搜尋網路。請檢查網路連線後再試一次。</string>
-    <string name="user_search_following">已追蹤</string>
-    <string name="user_search_network">來自網路</string>
+    <string name="user_search_you_follow">你已追蹤</string>
+    <string name="user_search_result">搜尋結果</string>
     <string name="paste_npub">貼上 npub</string>
     <string name="start_chat">開始聊天</string>
     <string name="name_this_group">為群組命名</string>
