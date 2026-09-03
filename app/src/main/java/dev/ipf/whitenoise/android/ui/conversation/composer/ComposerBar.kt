@@ -307,6 +307,10 @@ internal fun rememberComposerTextState(
     externalRevision: Any? = 0,
 ): ComposerTextState = remember(draftKey, externalRevision) { ComposerTextState(initialDraft) }
 
+/**
+ * Owns the conversation input, its panes, and a stable trailing action row so
+ * microphone state changes never displace editing or send affordances.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ComposerBar(
@@ -1204,6 +1208,21 @@ internal fun ComposerBar(
                         animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
                         label = "composer microphone control morph",
                     )
+                val targetCompactOuterEndInset =
+                    when {
+                        showLockedVoiceControls -> targetTrailingControlsWidth + 4.dp
+                        showSendButton -> 48.dp
+                        activeDictationController != null -> 100.dp
+                        showIdleMicrophone && dictationCanStartHere -> 52.dp
+                        showIdleMicrophone -> 48.dp
+                        else -> 0.dp
+                    }
+                val compactOuterEndInset by
+                    animateDpAsState(
+                        targetValue = targetCompactOuterEndInset,
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                        label = "composer primary action separation",
+                    )
                 BoxWithConstraints(
                     modifier =
                         Modifier
@@ -1300,7 +1319,9 @@ internal fun ComposerBar(
                             (maxWidth - trailingControlsWidth - 8.dp)
                                 .coerceAtLeast(1.dp),
                         compactMeasurementReservesTrailingAction = false,
-                        compactOuterEndInset = trailingControlsWidth + 8.dp,
+                        compactOuterEndInset = compactOuterEndInset,
+                        compactTrailingActionInset =
+                            (trailingControlsWidth - compactOuterEndInset).coerceAtLeast(0.dp),
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
                         multilineControlsSuppressed = composerMultilineControlsSuppressed(automaticComposerCeiling),
                         modifier =
@@ -1354,6 +1375,7 @@ internal fun ComposerBar(
                                     voiceController = voiceRecordingController,
                                     dictationCanStart = dictationCanStartHere,
                                     reserveDictationActions = reserveDictationActionSlot,
+                                    emphasized = false,
                                     onDictation = startAppOwnedDictation,
                                 )
                             }
@@ -1397,6 +1419,7 @@ internal fun ComposerBar(
                                     voiceController = voiceRecordingController,
                                     dictationCanStart = dictationCanStartHere,
                                     reserveDictationActions = reserveDictationActionSlot,
+                                    emphasized = true,
                                     onDictation = startAppOwnedDictation,
                                 )
                             }

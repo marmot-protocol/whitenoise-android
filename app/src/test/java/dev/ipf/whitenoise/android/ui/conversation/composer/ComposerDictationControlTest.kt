@@ -22,6 +22,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -151,6 +152,49 @@ class ComposerDictationControlTest {
             attachmentBefore,
             composeRule.onNodeWithContentDescription("Add attachment").getUnclippedBoundsInRoot(),
         )
+    }
+
+    /** Keeps input affordances in the field while the primary microphone morph stays outside it. */
+    @Test
+    fun composerRestoresInputPillAndSeparatePrimaryActionHierarchy() {
+        val voiceRecording = previewVoiceRecordingController()
+        try {
+            render(withAttachments = true, voiceRecordingController = voiceRecording)
+
+            val idleSurface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).getUnclippedBoundsInRoot()
+            assertContainedBy(
+                container = idleSurface,
+                child = composeRule.onNodeWithContentDescription("Open emoji picker").getUnclippedBoundsInRoot(),
+                label = "emoji",
+            )
+            assertContainedBy(
+                container = idleSurface,
+                child = composeRule.onNodeWithContentDescription("Add attachment").getUnclippedBoundsInRoot(),
+                label = "attachment",
+            )
+            val microphone =
+                composeRule.onNodeWithContentDescription("Dictate text").getUnclippedBoundsInRoot()
+            assertTrue(
+                "microphone $microphone must remain a separate trailing action after $idleSurface",
+                microphone.left >= idleSurface.right,
+            )
+
+            composeRule.onNodeWithContentDescription("Dictate text").performClick()
+
+            val activeSurface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).getUnclippedBoundsInRoot()
+            val attachment =
+                composeRule.onNodeWithContentDescription("Add attachment").getUnclippedBoundsInRoot()
+            assertContainedBy(container = activeSurface, child = attachment, label = "attachment")
+            val done = composeRule.onNodeWithContentDescription("Done").getUnclippedBoundsInRoot()
+            val cancel =
+                composeRule.onNodeWithContentDescription("Cancel dictation").getUnclippedBoundsInRoot()
+            assertTrue(
+                "active actions $done / $cancel must remain separate from $activeSurface",
+                done.left >= activeSurface.right && cancel.left >= activeSurface.right,
+            )
+        } finally {
+            voiceRecording.release()
+        }
     }
 
     /** Verifies starting dictation does not focus a composer whose keyboard was already closed. */
@@ -334,6 +378,18 @@ class ComposerDictationControlTest {
             }
         }
         return dictationController
+    }
+
+    /** Verifies that an input affordance remains visually contained by the composer pill. */
+    private fun assertContainedBy(
+        container: DpRect,
+        child: DpRect,
+        label: String,
+    ) {
+        assertTrue("$label left edge $child escapes $container", child.left >= container.left)
+        assertTrue("$label top edge $child escapes $container", child.top >= container.top)
+        assertTrue("$label right edge $child escapes $container", child.right <= container.right)
+        assertTrue("$label bottom edge $child escapes $container", child.bottom <= container.bottom)
     }
 
     /** Creates a no-I/O voice recorder used only to exercise composer action ownership. */

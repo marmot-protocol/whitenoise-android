@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -104,30 +105,20 @@ internal fun ConversationDictationCompactActions(
     state: ConversationDictationState,
     controller: ConversationDictationController,
     modifier: Modifier = Modifier,
+    emphasized: Boolean = true,
 ) {
     if (state is ConversationDictationState.Idle) return
     val status = dictationStatusLabel(state)
     var reviewDialogOpen by remember(state.sessionId) { mutableStateOf(false) }
-    Row(
-        modifier =
-            modifier
-                .width(96.dp)
-                .testTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)
-                .semantics {
-                    liveRegion = LiveRegionMode.Polite
-                    stateDescription = status
-                },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.End,
-    ) {
-        ConversationDictationPrimaryAction(
-            state = state,
-            controller = controller,
-            status = status,
-            onReview = { reviewDialogOpen = true },
-        )
-        ConversationDictationDismissAction(state, controller)
-    }
+    val actionColors = dictationCompactActionColors(state, emphasized)
+    ConversationDictationActionSurface(
+        state = state,
+        controller = controller,
+        status = status,
+        actionColors = actionColors,
+        modifier = modifier,
+        onReview = { reviewDialogOpen = true },
+    )
     if (reviewDialogOpen && state is ConversationDictationState.ReviewRequired) {
         ConversationDictationReviewDialog(
             transcript = state.transcript,
@@ -161,6 +152,74 @@ internal fun ConversationDictationCompactActions(
     }
 }
 
+/** Draws the state-aware two-slot action capsule without owning review-dialog state. */
+@Composable
+private fun ConversationDictationActionSurface(
+    state: ConversationDictationState,
+    controller: ConversationDictationController,
+    status: String,
+    actionColors: DictationCompactActionColors,
+    modifier: Modifier,
+    onReview: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = actionColors.container,
+        contentColor = actionColors.content,
+        modifier =
+            modifier
+                .width(96.dp)
+                .testTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)
+                .semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    stateDescription = status
+                },
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End,
+        ) {
+            ConversationDictationPrimaryAction(
+                state = state,
+                controller = controller,
+                status = status,
+                onReview = onReview,
+            )
+            ConversationDictationDismissAction(state, controller)
+        }
+    }
+}
+
+private data class DictationCompactActionColors(
+    val container: Color,
+    val content: Color,
+)
+
+/** Selects semantic container colors while reserving strong emphasis for the lone primary action. */
+@Composable
+private fun dictationCompactActionColors(
+    state: ConversationDictationState,
+    emphasized: Boolean,
+): DictationCompactActionColors {
+    val colors = MaterialTheme.colorScheme
+    return when (state) {
+        is ConversationDictationState.Failed ->
+            DictationCompactActionColors(colors.errorContainer, colors.onErrorContainer)
+        is ConversationDictationState.ReviewRequired,
+        is ConversationDictationState.DeliveryUnknown,
+        -> DictationCompactActionColors(colors.tertiaryContainer, colors.onTertiaryContainer)
+        is ConversationDictationState.Starting,
+        is ConversationDictationState.Listening,
+        ->
+            if (emphasized) {
+                DictationCompactActionColors(colors.primaryContainer, colors.onPrimaryContainer)
+            } else {
+                DictationCompactActionColors(colors.secondaryContainer, colors.onSecondaryContainer)
+            }
+        else -> DictationCompactActionColors(colors.secondaryContainer, colors.onSecondaryContainer)
+    }
+}
+
 /** Shows Done, recovery, review, or progress in the first compact action slot. */
 @Composable
 private fun ConversationDictationPrimaryAction(
@@ -177,7 +236,6 @@ private fun ConversationDictationPrimaryAction(
                 Icon(
                     Icons.Default.Check,
                     contentDescription = stringResource(R.string.dictation_done),
-                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
         is ConversationDictationState.Failed -> ConversationDictationFailureAction(state, controller)
@@ -205,6 +263,7 @@ private fun ConversationDictationPrimaryAction(
                         .padding(14.dp)
                         .semantics { contentDescription = status },
                 strokeWidth = 2.dp,
+                color = androidx.compose.material3.LocalContentColor.current,
             )
     }
 }

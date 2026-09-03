@@ -350,6 +350,7 @@ internal fun ComposerPill(
     compactMeasurementWidth: Dp? = null,
     compactMeasurementReservesTrailingAction: Boolean = trailingAction != null,
     compactOuterEndInset: Dp = 0.dp,
+    compactTrailingActionInset: Dp = 0.dp,
     inputContentVisible: Boolean = true,
     inputFocusEnabled: Boolean = true,
     onMultilineControlsChanged: (Boolean) -> Unit = {},
@@ -518,6 +519,7 @@ internal fun ComposerPill(
     var multilineControls by remember { mutableStateOf(false) }
     val compactTrailingReserve =
         4.dp +
+            compactTrailingActionInset +
             (if (trailingAction != null) 44.dp else 0.dp)
     val compactMeasurementTrailingReserve =
         4.dp +

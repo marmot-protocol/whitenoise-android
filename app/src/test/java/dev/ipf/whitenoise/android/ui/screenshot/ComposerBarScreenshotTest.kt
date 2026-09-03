@@ -31,6 +31,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
+import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
@@ -229,6 +230,48 @@ class ComposerBarScreenshotTest {
             composeRule
                 .onNodeWithTag(TAG)
                 .captureRoboImage("src/test/snapshots/composer_dictation_and_voice_note_idle_compact.png")
+        } finally {
+            voiceRecording.release()
+        }
+    }
+
+    /** Captures an input pill with its attachment and a separate unified microphone action. */
+    @Test
+    fun composerKeepsAttachmentInInputPillAndMicrophoneSeparate() {
+        val voiceRecording = previewVoiceRecordingController()
+        try {
+            render(
+                darkTheme = false,
+                draft = "",
+                width = 320,
+                dictationPreview = DictationPreview.Idle,
+                voiceRecordingController = voiceRecording,
+                attachmentsEnabled = true,
+            )
+            composeRule
+                .onNodeWithTag(TAG)
+                .captureRoboImage("src/test/snapshots/composer_input_pill_idle_compact_light.png")
+        } finally {
+            voiceRecording.release()
+        }
+    }
+
+    /** Captures compact retry and cancel actions separately from the input pill. */
+    @Test
+    fun composerKeepsFailedDictationActionsSeparateFromInputPill() {
+        val voiceRecording = previewVoiceRecordingController()
+        try {
+            render(
+                darkTheme = false,
+                draft = "",
+                width = 320,
+                dictationPreview = DictationPreview.Failed,
+                voiceRecordingController = voiceRecording,
+                attachmentsEnabled = true,
+            )
+            composeRule
+                .onNodeWithTag(TAG)
+                .captureRoboImage("src/test/snapshots/composer_dictation_failed_compact_light.png")
         } finally {
             voiceRecording.release()
         }
@@ -509,6 +552,7 @@ class ComposerBarScreenshotTest {
         )
     }
 
+    /** Creates a deterministic controller in the requested visual state without platform I/O. */
     private fun createDictationPreview(
         preview: DictationPreview,
         draft: TextFieldValue,
@@ -534,6 +578,10 @@ class ComposerBarScreenshotTest {
                 controller.requestStart(ACCOUNT, GROUP, draft)
                 platform.listener.onReady()
                 platform.listener.onEndOfSpeech()
+            }
+            DictationPreview.Failed -> {
+                controller.requestStart(ACCOUNT, GROUP, draft)
+                platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
             }
             DictationPreview.ElsewhereListening -> {
                 controller.requestStart(OTHER_ACCOUNT, OTHER_GROUP, draft)
@@ -580,6 +628,7 @@ class ComposerBarScreenshotTest {
         Idle,
         Listening,
         Processing,
+        Failed,
         ElsewhereListening,
     }
 

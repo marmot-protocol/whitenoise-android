@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -126,6 +127,7 @@ internal fun MicHoldButton(controller: dev.ipf.whitenoise.android.audio.VoiceRec
 internal fun ComposerMicrophoneButton(
     onDictation: () -> Unit,
     voiceRecordingController: dev.ipf.whitenoise.android.audio.VoiceRecordingController? = null,
+    emphasized: Boolean = true,
 ) {
     val latestOnDictation by rememberUpdatedState(onDictation)
     val haptics = LocalHapticFeedback.current
@@ -171,16 +173,45 @@ internal fun ComposerMicrophoneButton(
                     }
                 }
         }
-    FloatingActionButton(
+    val buttonModifier = Modifier.size(48.dp).then(gestureModifier)
+    ComposerMicrophoneButtonContent(
+        emphasized = emphasized,
+        modifier = buttonModifier,
         onClick = { latestOnDictation() },
-        modifier = Modifier.size(48.dp).then(gestureModifier),
-        containerColor = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary,
-    ) {
-        Icon(
-            Icons.Default.Mic,
-            contentDescription = stringResource(R.string.dictate_text),
-        )
+    )
+}
+
+/** Renders the microphone as a primary action or a quiet in-field affordance. */
+@Suppress("FunctionNaming")
+@Composable
+private fun ComposerMicrophoneButtonContent(
+    emphasized: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    if (emphasized) {
+        FloatingActionButton(
+            onClick = onClick,
+            modifier = modifier,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        ) {
+            Icon(
+                Icons.Default.Mic,
+                contentDescription = stringResource(R.string.dictate_text),
+            )
+        }
+    } else {
+        IconButton(
+            onClick = onClick,
+            modifier = modifier,
+        ) {
+            Icon(
+                Icons.Default.Mic,
+                contentDescription = stringResource(R.string.dictate_text),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -291,6 +322,7 @@ internal fun ComposerMicrophoneControl(
     voiceController: dev.ipf.whitenoise.android.audio.VoiceRecordingController?,
     dictationCanStart: Boolean,
     reserveDictationActions: Boolean,
+    emphasized: Boolean,
     onDictation: (() -> Unit)?,
 ) {
     val reservesDictationActions =
@@ -303,6 +335,7 @@ internal fun ComposerMicrophoneControl(
             ConversationDictationCompactActions(
                 state = state,
                 controller = controller,
+                emphasized = emphasized,
             )
         }
         if (showVoiceMicrophone) {
@@ -313,6 +346,7 @@ internal fun ComposerMicrophoneControl(
                     ComposerMicrophoneButton(
                         onDictation = checkNotNull(onDictation),
                         voiceRecordingController = recorder,
+                        emphasized = emphasized,
                     )
                 } else {
                     MicHoldButton(controller = recorder)
@@ -321,6 +355,7 @@ internal fun ComposerMicrophoneControl(
         } else if (dictationCanStart) {
             ComposerMicrophoneButton(
                 onDictation = checkNotNull(onDictation),
+                emphasized = emphasized,
             )
         }
     }
