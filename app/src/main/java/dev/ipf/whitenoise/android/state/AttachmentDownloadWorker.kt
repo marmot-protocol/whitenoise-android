@@ -16,11 +16,16 @@ import androidx.work.workDataOf
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 private const val ATTACHMENT_PREFERENCES_NAME = "whitenoise"
+internal val ATTACHMENT_GROUP_ID_HEX = Regex("^[0-9a-fA-F]{32}$")
+internal val ATTACHMENT_MESSAGE_ID_HEX = Regex("^[0-9a-fA-F]{64}$")
 
 /**
  * Minimal identity needed to find an attachment again from MDK after process
@@ -35,6 +40,7 @@ internal data class AttachmentTransferRequest(
     val attachmentIndex: Int,
 )
 
+/** Returns the encrypted-cache key for this protocol-owned attachment identity. */
 internal fun AttachmentTransferRequest.cacheKey(): String =
     mediaCacheKey(
         accountRef,
@@ -49,6 +55,7 @@ internal object AttachmentDownloadWorkData {
     private const val KEY_MESSAGE_ID_HEX = "message_id_hex"
     private const val KEY_ATTACHMENT_INDEX = "attachment_index"
 
+    /** Encodes only the minimal identity needed for MDK to resolve the attachment again. */
     fun encode(request: AttachmentTransferRequest): Data =
         workDataOf(
             KEY_ACCOUNT_REF to request.accountRef,
@@ -57,6 +64,7 @@ internal object AttachmentDownloadWorkData {
             KEY_ATTACHMENT_INDEX to request.attachmentIndex,
         )
 
+    /** Rejects malformed WorkManager input before it can reach MDK or cache paths. */
     fun decode(data: Data): AttachmentTransferRequest? {
         val accountRef = data.getString(KEY_ACCOUNT_REF).orEmpty()
         val groupIdHex = data.getString(KEY_GROUP_ID_HEX).orEmpty()
@@ -64,8 +72,8 @@ internal object AttachmentDownloadWorkData {
         val attachmentIndex = data.getInt(KEY_ATTACHMENT_INDEX, -1)
         val valid =
             accountRef.isNotBlank() &&
-                HEX_ID.matches(groupIdHex) &&
-                HEX_ID.matches(messageIdHex) &&
+                ATTACHMENT_GROUP_ID_HEX.matches(groupIdHex) &&
+                ATTACHMENT_MESSAGE_ID_HEX.matches(messageIdHex) &&
                 attachmentIndex >= 0
         return if (valid) {
             AttachmentTransferRequest(accountRef, groupIdHex, messageIdHex, attachmentIndex)
@@ -73,10 +81,9 @@ internal object AttachmentDownloadWorkData {
             null
         }
     }
-
-    private val HEX_ID = Regex("^[0-9a-fA-F]{64}$")
 }
 
+/** Returns the unique WorkManager name used to coalesce this attachment transfer. */
 internal fun attachmentDownloadWorkName(request: AttachmentTransferRequest): String {
     val canonical =
         listOf(
@@ -88,17 +95,20 @@ internal fun attachmentDownloadWorkName(request: AttachmentTransferRequest): Str
     return "attachment_download_${attachmentIdentityDigest(canonical)}"
 }
 
+/** Produces a stable lowercase digest without persisting the source identity. */
 internal fun attachmentIdentityDigest(value: String): String =
     MessageDigest
         .getInstance("SHA-256")
         .digest(value.toByteArray())
         .joinToString("") { byte -> "%02x".format(byte.toInt() and BYTE_MASK) }
 
+/** Returns the WorkManager tag used to pause one account's automatic backlog. */
 internal fun attachmentAutomaticAccountTag(accountRef: String): String {
     val identity = attachmentIdentityDigest(accountRef)
     return "attachment_download_auto_account_$identity"
 }
 
+/** Returns the WorkManager tag shared by automatic and interactive instances. */
 internal fun attachmentIdentityTag(request: AttachmentTransferRequest): String =
     "attachment_download_identity_${attachmentIdentityDigest(attachmentDownloadWorkName(request))}"
 
@@ -115,6 +125,32 @@ internal fun shouldCancelQueuedAutomaticWork(
 ): Boolean =
     state in setOf(WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED) &&
         !hasInteractiveIntent
+
+internal enum class AttachmentDownloadWorkState {
+    Active,
+    Finished,
+}
+
+/**
+ * Observes the durable transfer independently of a conversation controller.
+ * The interactive preference bridges enqueue registration, when WorkManager's
+ * first snapshot can still be empty or contain only an older generation.
+ */
+internal fun attachmentDownloadWorkState(
+    context: Context,
+    request: AttachmentTransferRequest,
+    hasInteractiveIntent: () -> Boolean,
+): Flow<AttachmentDownloadWorkState> =
+    WorkManager
+        .getInstance(context.applicationContext)
+        .getWorkInfosForUniqueWorkFlow(attachmentDownloadWorkName(request))
+        .map { infos ->
+            if (hasInteractiveIntent() || infos.any { !it.state.isFinished }) {
+                AttachmentDownloadWorkState.Active
+            } else {
+                AttachmentDownloadWorkState.Finished
+            }
+        }.distinctUntilChanged()
 
 internal class AttachmentReferenceNotReadyException : IllegalStateException("attachment reference is not projected yet")
 
@@ -300,6 +336,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
 private fun attachmentIntentStore(context: Context): AttachmentDownloadIntentStore =
     AttachmentDownloadIntentStore(
         context.getSharedPreferences(ATTACHMENT_PREFERENCES_NAME, Context.MODE_PRIVATE),
+        EncryptedAttachmentInstallerHandoffRecordStore.create(context),
     )
 
 private fun AttachmentDownloadIntentStore.priorityFor(request: AttachmentTransferRequest): AttachmentDownloadPriority =

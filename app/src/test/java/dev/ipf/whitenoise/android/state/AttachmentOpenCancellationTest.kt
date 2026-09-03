@@ -80,6 +80,35 @@ class AttachmentOpenCancellationTest {
             }
         }
 
+    /** Explicit transfer cancellation also revokes the app-scoped APK handoff. */
+    @Test
+    fun cancellingATransferRevokesItsInstallerHandoff() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val scope = CoroutineScope(SupervisorJob() + dispatcher)
+            val store = AttachmentDownloadIntentStore(preferences)
+            val installerRequest = AttachmentInstallerHandoffRequest(REQUEST, sourceEpoch = 7uL)
+            try {
+                assertTrue(store.markInstallerHandoff(installerRequest))
+                val coordinator =
+                    AttachmentInstallerHandoffCoordinator(
+                        intentStore = store,
+                        scope = scope,
+                        enqueue = { _, _ -> },
+                        foregroundEligible = { true },
+                        persistence = dispatcher,
+                    )
+
+                coordinator.cancel(REQUEST)
+                assertFalse(coordinator.hasPending(installerRequest))
+                testScheduler.advanceUntilIdle()
+
+                assertFalse(store.hasInstallerHandoff(installerRequest))
+            } finally {
+                scope.cancel()
+            }
+        }
+
     private fun coordinator(
         store: AttachmentDownloadIntentStore,
         scope: CoroutineScope,
@@ -103,7 +132,7 @@ class AttachmentOpenCancellationTest {
         val REQUEST =
             AttachmentTransferRequest(
                 accountRef = "account-a",
-                groupIdHex = "ab".repeat(32),
+                groupIdHex = "ab".repeat(16),
                 messageIdHex = "cd".repeat(32),
                 attachmentIndex = 0,
             )

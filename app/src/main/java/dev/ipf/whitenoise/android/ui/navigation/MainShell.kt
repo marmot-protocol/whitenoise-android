@@ -83,6 +83,7 @@ import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.rememberConversationControllerCopy
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
+import dev.ipf.whitenoise.android.ui.conversation.media.attachmentInstallerHandoffEffect
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsScreen
@@ -341,6 +342,7 @@ internal fun MainShell(
     inboundAppUpdateTap: Int = 0,
     onAppUpdateTapHandled: (Int) -> Unit = {},
 ) {
+    attachmentInstallerHandoffEffect(appState)
     val shellStateHolder =
         remember(appState, stateHolder) {
             stateHolder ?: MainShellStateHolder(appState, SavedStateHandle())

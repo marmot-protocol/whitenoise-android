@@ -2172,7 +2172,11 @@ class WhiteNoiseAppState private constructor(
     // retries keep transient queued-behind failures from sticking tiles in
     // `failed` before the user has a chance to see the media.
     private val attachmentDownloadGate = AttachmentDownloadGate()
-    private val attachmentDownloadIntents = AttachmentDownloadIntentStore(preferences)
+    private val attachmentDownloadIntents =
+        AttachmentDownloadIntentStore(
+            preferences,
+            EncryptedAttachmentInstallerHandoffRecordStore.create(appContext),
+        )
 
     // staleness-exempt: observable preference version consumed as a Compose key.
     private var attachmentDownloadPolicyRevision by mutableIntStateOf(0)
@@ -2242,6 +2246,13 @@ class WhiteNoiseAppState private constructor(
                     activeConversationGroupIdHex,
                 )
             },
+        )
+    internal val attachmentInstallerHandoffs =
+        AttachmentInstallerHandoffCoordinator(
+            intentStore = attachmentDownloadIntents,
+            scope = mutationsScope,
+            enqueue = ::enqueueAttachmentDownload,
+            foregroundEligible = { appInForeground && !appLockScreenVisible },
         )
     private val forwardTerminalDismiss =
         ForwardTerminalDismissPolicy(

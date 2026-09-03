@@ -5,7 +5,13 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import androidx.core.content.FileProvider
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.state.AttachmentDownloadIntentStore
+import dev.ipf.whitenoise.android.state.AttachmentInstallerHandoffRequest
+import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
 import dev.ipf.whitenoise.android.state.AttachmentOpenIntentClaim
+import dev.ipf.whitenoise.android.state.AttachmentOpenRequest
+import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -29,6 +35,7 @@ import kotlin.coroutines.cancellation.CancellationException
 class ReceivedApkAttachmentOpenIntegrationTest {
     private val artifacts = mutableListOf<File>()
 
+    /** Warms Robolectric's FileProvider roots before tests dispatch from background contexts. */
     @Before
     fun setUp() {
         clearFileProviderStrategyCache()
@@ -39,12 +46,14 @@ class ReceivedApkAttachmentOpenIntegrationTest {
         fileProviderUri(applicationContext(), seed)
     }
 
+    /** Removes generated artifacts and resets FileProvider's process-local strategy cache. */
     @After
     fun tearDown() {
         artifacts.forEach(File::delete)
         clearFileProviderStrategyCache()
     }
 
+    /** Targets unknown-sources permission to White Noise instead of a generic settings screen. */
     @Test
     fun installerPermissionRecoveryTargetsThisApplicationPackage() {
         val context = applicationContext()
@@ -55,6 +64,7 @@ class ReceivedApkAttachmentOpenIntegrationTest {
         assertEquals("package:${context.packageName}", intent.data?.toString())
     }
 
+    /** Normalizes explicit and filename-inferred APK candidates to the platform installer contract. */
     @Test
     fun correctlyTypedGenericAndBlankReceivedApksLaunchTheInstallerIntent() =
         runTest {
@@ -90,6 +100,70 @@ class ReceivedApkAttachmentOpenIntegrationTest {
             }
         }
 
+    /** Leaving the tapped chat cannot revoke the app-owned installer launch. */
+    @Test
+    fun downloadedApkLaunchesExactlyOnceAfterAnInAppDestinationChange() =
+        runTest {
+            val source = validApkArtifact("navigation-survivor.apk")
+            val context = RecordingContext(applicationContext())
+            val preferences =
+                ApplicationProvider
+                    .getApplicationContext<Context>()
+                    .getSharedPreferences("received-apk-navigation-test", Context.MODE_PRIVATE)
+            preferences.edit().clear().commit()
+            val store = AttachmentDownloadIntentStore(preferences)
+            val transfer =
+                AttachmentTransferRequest(
+                    accountRef = "account-a",
+                    groupIdHex = "ab".repeat(16),
+                    messageIdHex = "cd".repeat(32),
+                    attachmentIndex = 0,
+                )
+            val installerRequest = AttachmentInstallerHandoffRequest(transfer, sourceEpoch = 7uL)
+            val oldViewerRequest = AttachmentOpenRequest(transfer, navigationGeneration = 7L)
+            val nextDestination =
+                AttachmentOpenDestination(
+                    accountRef = "account-b",
+                    groupIdHex = "ef".repeat(16),
+                    navigationGeneration = 8L,
+                )
+            assertTrue(store.markInstallerHandoff(installerRequest))
+
+            store.retainOpenIntentsForDestination(nextDestination)
+            val claim = requireNotNull(store.claimInstallerHandoff(installerRequest))
+            val result =
+                openAttachmentWithPersistedInstallerPermission(
+                    source = source,
+                    mediaType = ANDROID_PACKAGE_MIME,
+                    fileName = "navigation-survivor.apk",
+                    open = { requestedSource, requestedMediaType, requestedFileName ->
+                        openAttachmentExternally(
+                            context = context,
+                            source = requestedSource,
+                            mediaType = requestedMediaType,
+                            fileName = requestedFileName,
+                            selfUpdateEnabled = true,
+                            canRequestPackageInstalls = { true },
+                        )
+                    },
+                    requestInstallPermission = { true },
+                    persistence =
+                        InstallerPermissionPersistence(
+                            claim = claim,
+                            begin = { store.beginInstallerPermissionHandoff(installerRequest) },
+                            finish = { store.finishInstallerPermissionHandoff(installerRequest) },
+                            abandon = { store.abandonInstallerPermissionHandoff(installerRequest) },
+                        ),
+                )
+
+            assertEquals(OpenAttachmentResult.Opened, result)
+            assertEquals(Intent.ACTION_INSTALL_PACKAGE, context.startedIntent?.action)
+            assertNull(store.claimInstallerHandoff(installerRequest))
+            assertNull(store.pendingInstallerHandoff())
+            assertTrue(oldViewerRequest.navigationGeneration != nextDestination.navigationGeneration)
+        }
+
+    /** Rejects filename-inferred APKs whose verified payload is not an Android package. */
     @Test
     fun genericApkNameWithNonApkArtifactIsRejectedBeforeDispatch() =
         runTest {
@@ -119,6 +193,7 @@ class ReceivedApkAttachmentOpenIntegrationTest {
             assertNull(context.startedIntent)
         }
 
+    /** Preserves a specific non-APK MIME type even when the remote filename ends in APK. */
     @Test
     fun conflictingNonGenericMimeNeverUsesFilenameInference() =
         runTest {

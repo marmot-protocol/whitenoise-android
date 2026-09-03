@@ -14,6 +14,7 @@ internal fun ConversationController.cancelAttachmentTransfer(
     attachmentIndex: Int,
 ) {
     val openRequest = attachmentOpenRequest(messageIdHex, attachmentIndex)
+    val transferRequest = attachmentTransferRequest(messageIdHex, attachmentIndex)
     boundAccountRef?.let { account ->
         appState.cancelAttachmentDownload(
             AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
@@ -21,6 +22,7 @@ internal fun ConversationController.cancelAttachmentTransfer(
     }
     attachmentTransfers.cancel(attachmentTransferKey(messageIdHex, attachmentIndex))
     openRequest?.let { appState.attachmentOpens.cancelOpen(it) }
+    transferRequest?.let { appState.attachmentInstallerHandoffs.cancel(it) }
 }
 
 /** True while the user's cancel of this attachment still blocks the automatic path. */
