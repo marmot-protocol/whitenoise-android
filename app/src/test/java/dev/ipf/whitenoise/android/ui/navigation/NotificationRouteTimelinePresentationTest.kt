@@ -30,7 +30,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.assertTimelineSubscriptionSnapshotBeforeFirstNextUpdate
+import dev.ipf.whitenoise.android.state.assertTimelineSubscriptionSnapshotBeforeFirstNextWindow
 import dev.ipf.whitenoise.android.state.awaitConversationCondition
 import dev.ipf.whitenoise.android.state.awaitOpenedTimelineSubscriptionsClosed
 import dev.ipf.whitenoise.android.state.conversationTimelineReconnectFixtures
@@ -158,8 +158,8 @@ class NotificationRouteTimelinePresentationTest {
     ) {
         assertFalse(ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(mountedController))
         appState.setAppInForeground(false)
-        awaitCondition { firstSubscription.nextUpdateCallCount == 1 }
-        firstSubscription.endUpdates()
+        awaitCondition { firstSubscription.nextWindowCallCount == 1 }
+        firstSubscription.endWindows()
         awaitCondition { firstSubscription.closeCallCount == 1 }
         runBlocking { mountedController.retryLoadFailure() }
         awaitCondition {
@@ -192,8 +192,8 @@ class NotificationRouteTimelinePresentationTest {
         assertEquals(1, attachedControllers.size)
         assertSame(mountedController, attachedControllers.single())
         assertEquals(2, scriptedSubscriptions.timelineSubscriptionOpenCount)
-        awaitConversationCondition { replacementSubscription.nextUpdateCallCount >= 1 }
-        assertTimelineSubscriptionSnapshotBeforeFirstNextUpdate(replacementSubscription)
+        awaitConversationCondition { replacementSubscription.nextWindowCallCount >= 1 }
+        assertTimelineSubscriptionSnapshotBeforeFirstNextWindow(replacementSubscription)
         composeRule.onNodeWithText("notified body").assertIsDisplayed()
         assertFalse(attachedControllers.any { it !== mountedController })
     }

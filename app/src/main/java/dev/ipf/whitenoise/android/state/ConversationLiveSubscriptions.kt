@@ -4,7 +4,6 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.GroupStateSubscription
 import dev.ipf.marmotkit.TimelineMessagesSubscription
 import dev.ipf.marmotkit.TimelinePageFfi
-import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
 
 /**
  * Lifecycle-shaped seam for conversation live subscriptions. Production binds
@@ -14,7 +13,8 @@ import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
 internal interface ConversationTimelineSubscriptionHandle {
     fun snapshot(): TimelinePageFfi?
 
-    suspend fun nextUpdate(): TimelineSubscriptionUpdateFfi?
+    /** Returns MDK's next authoritative, ordered, and bounded timeline window. */
+    suspend fun nextWindow(): TimelinePageFfi?
 
     suspend fun paginateBackwards(count: UInt): TimelinePageFfi
 
@@ -36,7 +36,7 @@ internal class FfiConversationTimelineSubscriptionHandle(
 ) : ConversationTimelineSubscriptionHandle {
     override fun snapshot(): TimelinePageFfi? = subscription.snapshot()
 
-    override suspend fun nextUpdate(): TimelineSubscriptionUpdateFfi? = subscription.nextUpdate()
+    override suspend fun nextWindow(): TimelinePageFfi? = subscription.next()
 
     override suspend fun paginateBackwards(count: UInt): TimelinePageFfi = subscription.paginateBackwards(count)
 

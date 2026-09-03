@@ -10,6 +10,7 @@ class CompareTimelineMessagesTest {
         id: String,
         recordedAt: ULong,
         order: ULong,
+        authoritativeOrder: ULong? = null,
     ) = TimelineMessage(
         id = id,
         record =
@@ -35,6 +36,7 @@ class CompareTimelineMessagesTest {
             ),
         status = MessageStatus.Received,
         timelineOrder = order,
+        authoritativeOrder = authoritativeOrder,
     )
 
     @Test
@@ -58,5 +60,29 @@ class CompareTimelineMessagesTest {
         ).forEach { permutation ->
             assertEquals(expected, permutation.sortedWith(::compareTimelineMessages).map { it.id })
         }
+    }
+
+    @Test
+    fun displayOrderPreservesAuthoritativeRowsAndKeepsOptimisticSendAtLiveHead() {
+        val system = msg("system", recordedAt = 200uL, order = 0uL, authoritativeOrder = 0uL)
+        val app = msg("app", recordedAt = 100uL, order = 0uL, authoritativeOrder = 1uL)
+        val optimistic = msg("optimistic", recordedAt = 300uL, order = 1uL)
+
+        assertEquals(
+            listOf("system", "app", "optimistic"),
+            orderTimelineMessagesForDisplay(listOf(app, optimistic, system)).map { it.id },
+        )
+    }
+
+    @Test
+    fun displayOrderMergesTransientPositionBridgeWithoutReorderingAuthoritativeRows() {
+        val first = msg("first", recordedAt = 100uL, order = 0uL, authoritativeOrder = 0uL)
+        val second = msg("second", recordedAt = 300uL, order = 0uL, authoritativeOrder = 1uL)
+        val bridge = msg("bridge", recordedAt = 200uL, order = 1uL)
+
+        assertEquals(
+            listOf("first", "bridge", "second"),
+            orderTimelineMessagesForDisplay(listOf(second, bridge, first)).map { it.id },
+        )
     }
 }
