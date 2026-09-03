@@ -1613,6 +1613,7 @@
     <string name="nostr_event_failed">No se pudo cargar este evento. Comprueba tu conexión e inténtalo de nuevo.</string>
     <string name="nostr_event_open">Abrir evento</string>
     <string name="nostr_event_read_article">Leer artículo</string>
+    <string name="nostr_event_read_note">Leer nota completa</string>
     <string name="nostr_event_play_video">Reproducir vídeo</string>
     <string name="nostr_video_playback_failed">No se pudo reproducir este vídeo.</string>
     <string name="nostr_event_copy">Copiar referencia del evento</string>

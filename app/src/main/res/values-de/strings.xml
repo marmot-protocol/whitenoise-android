@@ -1611,6 +1611,7 @@
     <string name="nostr_event_failed">Dieses Ereignis konnte nicht geladen werden. Prüfe deine Verbindung und versuche es erneut.</string>
     <string name="nostr_event_open">Ereignis öffnen</string>
     <string name="nostr_event_read_article">Artikel lesen</string>
+    <string name="nostr_event_read_note">Vollständige Notiz lesen</string>
     <string name="nostr_event_play_video">Video abspielen</string>
     <string name="nostr_video_playback_failed">Dieses Video konnte nicht abgespielt werden.</string>
     <string name="nostr_event_copy">Ereignisreferenz kopieren</string>

@@ -1586,6 +1586,7 @@
     <string name="nostr_event_failed">无法加载此事件。请检查网络连接后重试。</string>
     <string name="nostr_event_open">打开事件</string>
     <string name="nostr_event_read_article">阅读文章</string>
+    <string name="nostr_event_read_note">阅读完整短文</string>
     <string name="nostr_event_play_video">播放视频</string>
     <string name="nostr_video_playback_failed">无法播放此视频。</string>
     <string name="nostr_event_copy">复制事件引用</string>

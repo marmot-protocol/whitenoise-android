@@ -6,6 +6,7 @@ import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -34,7 +36,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,6 +48,7 @@ import dev.ipf.whitenoise.android.core.NostrEventReferenceOccurrence
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import kotlinx.coroutines.launch
 
+/** Renders bounded event cards and owns their lifecycle-bound note/article/video viewers. */
 @Composable
 internal fun NostrEventCards(
     references: List<NostrEventReferenceOccurrence>,
@@ -56,7 +61,7 @@ internal fun NostrEventCards(
     modifier: Modifier = Modifier,
 ) {
     if (references.isEmpty()) return
-    var articleCard by remember(resolver) { mutableStateOf<NostrEventCardModel?>(null) }
+    var readerSelection by remember(resolver) { mutableStateOf<NostrEventReaderSelection?>(null) }
     var videoCard by remember(resolver) { mutableStateOf<NostrEventCardModel?>(null) }
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -69,20 +74,23 @@ internal fun NostrEventCards(
                     resolver = resolver,
                     authorDisplayName = authorDisplayName,
                     contentColor = contentColor,
-                    onReadArticle = { articleCard = it },
+                    onReadEvent = { card, authoredReference ->
+                        readerSelection = NostrEventReaderSelection(card, authoredReference)
+                    },
                     onPlayVideo = { videoCard = it },
                 )
             }
         }
     }
-    articleCard?.let { card ->
-        NostrArticleReaderDialog(
-            card = card,
+    readerSelection?.let { selection ->
+        NostrEventReaderDialog(
+            card = selection.card,
+            authoredReference = selection.authoredReference,
             authorDisplayName = authorDisplayName,
             mentionDisplayName = mentionDisplayName,
             onNostrProfileTap = onNostrProfileTap,
             parseMarkdown = parseMarkdown,
-            onDismiss = { articleCard = null },
+            onDismiss = { readerSelection = null },
         )
     }
     videoCard?.let { card ->
@@ -94,13 +102,19 @@ internal fun NostrEventCards(
     }
 }
 
+private data class NostrEventReaderSelection(
+    val card: NostrEventCardModel,
+    val authoredReference: String?,
+)
+
+/** Connects one resolved card to its independent retry, copy, external-open, and reader actions. */
 @Composable
 private fun ResolvedNostrEventCard(
     occurrence: NostrEventReferenceOccurrence,
     resolver: NostrEventCardResolver,
     authorDisplayName: (String) -> String,
     contentColor: Color,
-    onReadArticle: (NostrEventCardModel) -> Unit,
+    onReadEvent: (NostrEventCardModel, String?) -> Unit,
     onPlayVideo: (NostrEventCardModel) -> Unit,
 ) {
     val context = LocalContext.current
@@ -122,9 +136,11 @@ private fun ResolvedNostrEventCard(
                 )
             }
         },
+        onReadNote = { card -> onReadEvent(card, authoredReference) },
         onOpen = { card ->
             when {
-                card?.kind == NostrEventCardKind.Article && !card.readerBody.isNullOrBlank() -> onReadArticle(card)
+                card?.kind == NostrEventCardKind.Article && !card.readerBody.isNullOrBlank() ->
+                    onReadEvent(card, null)
                 card?.kind == NostrEventCardKind.Video && card.mediaUrl != null -> onPlayVideo(card)
                 else ->
                     runCatching {
@@ -138,6 +154,7 @@ private fun ResolvedNostrEventCard(
     )
 }
 
+/** Renders a resolved or fallback event-card state with independent semantic actions. */
 @Composable
 internal fun NostrEventCard(
     state: NostrEventCardState,
@@ -146,6 +163,7 @@ internal fun NostrEventCard(
     onRetry: () -> Unit,
     onCopy: () -> Unit,
     onOpen: (NostrEventCardModel?) -> Unit,
+    onReadNote: (NostrEventCardModel) -> Unit = {},
     referenceLabel: String? = null,
 ) {
     val openDescription = stringResource(R.string.nostr_event_open)
@@ -167,10 +185,12 @@ internal fun NostrEventCard(
             onRetry = onRetry,
             onCopy = onCopy,
             onOpen = onOpen,
+            onReadNote = onReadNote,
         )
     }
 }
 
+/** Selects the loaded, retryable, or loading card presentation without changing fallback actions. */
 @Composable
 private fun EventCardBody(
     state: NostrEventCardState,
@@ -182,6 +202,7 @@ private fun EventCardBody(
     onRetry: () -> Unit,
     onCopy: () -> Unit,
     onOpen: (NostrEventCardModel?) -> Unit,
+    onReadNote: (NostrEventCardModel) -> Unit,
 ) {
     when (state) {
         NostrEventCardState.Loading ->
@@ -237,10 +258,12 @@ private fun EventCardBody(
                 copyDescription = copyDescription,
                 onCopy = onCopy,
                 onOpen = { onOpen(state.card) },
+                onReadNote = { onReadNote(state.card) },
             )
     }
 }
 
+/** Renders the verified event summary and keeps its header actions separate from note reading. */
 @Composable
 private fun LoadedEventCard(
     card: NostrEventCardModel,
@@ -250,6 +273,7 @@ private fun LoadedEventCard(
     copyDescription: String,
     onCopy: () -> Unit,
     onOpen: () -> Unit,
+    onReadNote: () -> Unit,
 ) {
     val primaryAction = card.primaryAction()
     Column(Modifier.padding(start = 10.dp, top = 6.dp, end = 4.dp, bottom = 7.dp)) {
@@ -274,7 +298,11 @@ private fun LoadedEventCard(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        LoadedEventSummary(card.summary, contentColor)
+        LoadedEventSummary(
+            card = card,
+            contentColor = contentColor,
+            onReadNote = onReadNote,
+        )
         LoadedEventMetadata(card.metadata, contentColor)
         EventReferenceLabel(referenceLabel, contentColor)
     }
@@ -343,15 +371,31 @@ private fun LoadedEventHeader(
     }
 }
 
+/** Makes the whole visible kind-1 preview a button while leaving other summaries inert. */
 @Composable
 private fun LoadedEventSummary(
-    summary: String?,
+    card: NostrEventCardModel,
     contentColor: Color,
+    onReadNote: () -> Unit,
 ) {
-    summary?.takeIf(String::isNotBlank)?.let {
+    card.summary?.takeIf(String::isNotBlank)?.let { summary ->
         Spacer(Modifier.height(4.dp))
+        val modifier =
+            if (card.kind == NostrEventCardKind.Note && !card.readerBody.isNullOrBlank()) {
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        onClickLabel = stringResource(R.string.nostr_event_read_note),
+                        role = Role.Button,
+                        onClick = onReadNote,
+                    ).minimumInteractiveComponentSize()
+                    .testTag(NOSTR_NOTE_PREVIEW_ACTION_TAG)
+            } else {
+                Modifier
+            }
         Text(
-            text = it,
+            text = summary,
+            modifier = modifier,
             style = MaterialTheme.typography.bodyMedium,
             color = contentColor,
             maxLines = 3,
@@ -383,6 +427,8 @@ internal fun compactEventReference(authoredReference: String): String {
     if (normalized.length <= COMPACT_REFERENCE_LENGTH) return normalized
     return "${normalized.take(COMPACT_REFERENCE_PREFIX)}…${normalized.takeLast(COMPACT_REFERENCE_SUFFIX)}"
 }
+
+internal const val NOSTR_NOTE_PREVIEW_ACTION_TAG = "nostr-note-preview-action"
 
 private const val MAX_CARDS_PER_MESSAGE = 3
 private const val COMPACT_REFERENCE_LENGTH = 28

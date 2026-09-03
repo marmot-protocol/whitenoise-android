@@ -1675,6 +1675,7 @@
     <string name="nostr_event_failed">Не удалось загрузить это событие. Проверьте подключение и повторите попытку.</string>
     <string name="nostr_event_open">Открыть событие</string>
     <string name="nostr_event_read_article">Читать статью</string>
+    <string name="nostr_event_read_note">Прочитать заметку полностью</string>
     <string name="nostr_event_play_video">Воспроизвести видео</string>
     <string name="nostr_video_playback_failed">Не удалось воспроизвести видео.</string>
     <string name="nostr_event_copy">Копировать ссылку на событие</string>

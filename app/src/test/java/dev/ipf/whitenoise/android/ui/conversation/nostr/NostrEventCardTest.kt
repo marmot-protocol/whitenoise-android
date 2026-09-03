@@ -1,11 +1,21 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -151,6 +161,74 @@ class NostrEventCardTest {
 
         composeRule.onNodeWithText("Alice Rivers").assertIsDisplayed()
         composeRule.onNodeWithText("nevent1qqqqqqq…ending1").assertIsDisplayed()
+    }
+
+    /** Verifies every point in the ellipsized note preview invokes only the in-app reader action. */
+    @Test
+    fun longNotePreviewIsOneFullWidthLocalizedActionIndependentOfHeaderControls() {
+        val card =
+            noteCard().copy(
+                summary = "A long referenced note ".repeat(40),
+                readerBody = "Complete note body",
+            )
+        val readCards = mutableListOf<NostrEventCardModel>()
+        var copies = 0
+        var opens = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NostrEventCard(
+                    state = NostrEventCardState.Loaded(card),
+                    authorDisplayName = { "Alex" },
+                    contentColor = Color.Black,
+                    onRetry = {},
+                    onCopy = { copies++ },
+                    onOpen = { opens++ },
+                    onReadNote = { readCards += it },
+                )
+            }
+        }
+
+        val preview = composeRule.onNodeWithTag(NOSTR_NOTE_PREVIEW_ACTION_TAG)
+        preview.assertIsDisplayed().assertHasClickAction()
+        val semantics = preview.fetchSemanticsNode().config
+        assertEquals(Role.Button, semantics[SemanticsProperties.Role])
+        assertEquals(string(R.string.nostr_event_read_note), semantics[SemanticsActions.OnClick].label)
+
+        preview.performTouchInput {
+            click(Offset(x = 1f, y = centerY))
+            click(center)
+            click(Offset(x = width - 1f, y = centerY))
+        }
+        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_copy)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_open)).performClick()
+
+        assertEquals(listOf(card, card, card), readCards)
+        assertEquals(1, copies)
+        assertEquals(1, opens)
+    }
+
+    /** Verifies a readable one-line note still reserves the Material minimum touch-target height. */
+    @Test
+    fun shortNotePreviewHasMinimumInteractiveHeight() {
+        val card = noteCard().copy(readerBody = "Complete note body")
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NostrEventCard(
+                    state = NostrEventCardState.Loaded(card),
+                    authorDisplayName = { "Alex" },
+                    contentColor = Color.Black,
+                    onRetry = {},
+                    onCopy = {},
+                    onOpen = {},
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(NOSTR_NOTE_PREVIEW_ACTION_TAG)
+            .assertIsDisplayed()
+            .assertHasClickAction()
+            .assertHeightIsAtLeast(48.dp)
     }
 
     private fun string(resId: Int): String =
