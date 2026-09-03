@@ -315,6 +315,8 @@ internal fun ContactPickerScreen(
                             avatarUrl =
                                 appState.avatarUrl(candidate.accountIdHex)
                                     ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
+                            isFollowed = candidate.isFollowing,
+                            selectionState = isSelected,
                             enabled = !busy,
                             onClick = { toggle(candidate) },
                             onLongClick = {

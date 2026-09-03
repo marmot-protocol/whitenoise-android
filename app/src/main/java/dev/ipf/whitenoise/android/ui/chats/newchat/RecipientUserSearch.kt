@@ -27,7 +27,9 @@ import dev.ipf.whitenoise.android.ui.theme.Dimens
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
@@ -38,6 +40,14 @@ internal data class RecipientUserSearchState(
     val failed: Boolean = false,
     /** The account's whole follow list, so local contacts can be flagged too. */
     val followedAccountIds: Set<String> = emptySet(),
+)
+
+/** Identifies the query and account relationship snapshot owned by one search producer. */
+internal data class RecipientSearchRequestKey(
+    val query: String,
+    val activeAccountRef: String?,
+    val activeAccountIdHex: String?,
+    val relationshipRevision: Long,
 )
 
 internal data class RecipientSearchProgress(
@@ -66,6 +76,13 @@ internal suspend fun loadRecipientSearchFollowIds(load: suspend () -> List<Strin
             },
         )
 
+/** Rejects a value returned after the owning query or account coroutine was cancelled. */
+internal suspend fun <T> awaitCurrentRecipientSearchValue(load: suspend () -> T): T {
+    val value = load()
+    currentCoroutineContext().ensureActive()
+    return value
+}
+
 /** Fold the streamed batches into one aggregate view, emitting after each step. */
 internal suspend fun aggregateRecipientSearchUpdates(
     nextUpdate: suspend () -> UserSearchUpdateFfi?,
@@ -75,7 +92,7 @@ internal suspend fun aggregateRecipientSearchUpdates(
     val aggregate = ArrayList<UserDirectorySearchResultFfi>()
     var progress = RecipientSearchProgress()
     while (!progress.completed) {
-        val update = nextUpdate() ?: break
+        val update = awaitCurrentRecipientSearchValue(nextUpdate) ?: break
         aggregate += update.newResults
         progress = progress.withTrigger(update.trigger)
         emit(
@@ -90,12 +107,17 @@ internal suspend fun aggregateRecipientSearchUpdates(
     }
 }
 
+/** Runs one native search subscription and closes it even when its owner is replaced or cancelled. */
 internal suspend fun <T : AutoCloseable, R> withClosedRecipientSearchSubscription(
     open: suspend () -> T,
     consume: suspend (T) -> R,
 ): R {
     val subscription = open()
-    val consumption = runCatching { consume(subscription) }
+    val consumption =
+        runCatching {
+            currentCoroutineContext().ensureActive()
+            consume(subscription)
+        }
     val closeFailure =
         withContext(NonCancellable + Dispatchers.IO) {
             runCatching { subscription.close() }.exceptionOrNull()
@@ -147,8 +169,13 @@ internal fun rememberRecipientUserSearchState(
     val activeAccountIdHex = appState.activeAccount?.accountIdHex
     return produceState(
         initialValue = RecipientUserSearchState(),
-        key1 = trimmed,
-        key2 = Triple(activeAccountRef, activeAccountIdHex, appState.relationshipRevision),
+        key1 =
+            RecipientSearchRequestKey(
+                query = trimmed,
+                activeAccountRef = activeAccountRef,
+                activeAccountIdHex = activeAccountIdHex,
+                relationshipRevision = appState.relationshipRevision,
+            ),
     ) {
         if (trimmed.isEmpty() || !isPlainNameQuery(trimmed)) {
             value = RecipientUserSearchState()
@@ -165,8 +192,10 @@ internal fun rememberRecipientUserSearchState(
         delay(USER_SEARCH_DEBOUNCE_MILLIS)
         try {
             val followedIds =
-                loadRecipientSearchFollowIds {
-                    appState.marmotIo { accountFollows(activeAccountRef) }
+                awaitCurrentRecipientSearchValue {
+                    loadRecipientSearchFollowIds {
+                        appState.marmotIo { accountFollows(activeAccountRef) }
+                    }
                 }
             value = value.copy(followedAccountIds = followedIds)
             withClosedRecipientSearchSubscription(
@@ -188,6 +217,7 @@ internal fun rememberRecipientUserSearchState(
                     )
                 },
             )
+            currentCoroutineContext().ensureActive()
             if (value.isSearching) value = value.copy(isSearching = false)
         } catch (cancelled: CancellationException) {
             throw cancelled
