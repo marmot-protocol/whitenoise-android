@@ -176,9 +176,21 @@ private fun ChatListConnectionState.sessionIdentityOrNull(): ChatListConnectionS
 
 /** Owns the controller's observable readiness state and stale-result fences. */
 internal class ChatListConnectionOwner(
-    private val appState: WhiteNoiseAppState,
+    private val runtimeGeneration: () -> Int,
+    private val hasValidatedInternet: () -> Boolean,
+    private val launchCatchUpRequest: () -> Deferred<AccountCatchUpResult>,
     private val hasCurrentSubscriptions: () -> Boolean,
 ) {
+    constructor(
+        appState: WhiteNoiseAppState,
+        hasCurrentSubscriptions: () -> Boolean,
+    ) : this(
+        runtimeGeneration = { appState.runtimeGeneration },
+        hasValidatedInternet = { appState.connectivitySignals.value.hasValidatedInternet },
+        launchCatchUpRequest = appState::launchCatchUpAccounts,
+        hasCurrentSubscriptions = hasCurrentSubscriptions,
+    )
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var readinessJob: Job? = null
     private var cleared = false
@@ -194,7 +206,7 @@ internal class ChatListConnectionOwner(
         state =
             ChatListConnectionState(
                 accountRef = accountRef,
-                runtimeGeneration = appState.runtimeGeneration,
+                runtimeGeneration = runtimeGeneration(),
                 bindEpoch = bindEpoch,
             )
     }
@@ -204,7 +216,7 @@ internal class ChatListConnectionOwner(
         bindEpoch: Long,
     ): ChatListConnectionState {
         readinessJob?.cancel()
-        state = state.beginSessionAttempt(accountRef, appState.runtimeGeneration, bindEpoch)
+        state = state.beginSessionAttempt(accountRef, runtimeGeneration(), bindEpoch)
         return state
     }
 
@@ -213,17 +225,26 @@ internal class ChatListConnectionOwner(
         bindEpoch: Long,
     ): ChatListConnectionState {
         readinessJob?.cancel()
-        state = state.beginSubscriptionValidation(accountRef, appState.runtimeGeneration, bindEpoch)
+        state = state.beginSubscriptionValidation(accountRef, runtimeGeneration(), bindEpoch)
         return state
     }
 
+    /** Observes replacement catch-ups until current readiness evidence sees executed work. */
     fun observe(catchUp: Deferred<AccountCatchUpResult>) {
         val token = state.evidenceTokenOrNull() ?: return
         if (!state.phase.canAcceptReadiness) return
         readinessJob?.cancel()
         readinessJob =
             scope.launch {
-                state = state.applyCatchUpResult(token, catchUp.await())
+                var result = catchUp.await()
+                while (
+                    result.outcome == AccountCatchUpOutcome.Superseded &&
+                    state.matches(token) &&
+                    state.phase.canAcceptReadiness
+                ) {
+                    result = launchCatchUpRequest().await()
+                }
+                state = state.applyCatchUpResult(token, result)
             }
     }
 
@@ -235,7 +256,7 @@ internal class ChatListConnectionOwner(
                 runtimeGeneration = attempt.runtimeGeneration,
                 bindEpoch = attempt.bindEpoch,
                 sessionAttemptId = attempt.sessionAttemptId,
-                hasValidatedInternet = appState.connectivitySignals.value.hasValidatedInternet,
+                hasValidatedInternet = hasValidatedInternet(),
             )
     }
 
@@ -257,7 +278,7 @@ internal class ChatListConnectionOwner(
     fun refresh(presentAttempt: Boolean) {
         if (!cleared) {
             when {
-                !appState.connectivitySignals.value.hasValidatedInternet -> invalidate()
+                !hasValidatedInternet() -> invalidate()
                 hasCurrentSubscriptions() && shouldRefresh(presentAttempt) -> {
                     state = state.beginReadinessRefresh(presentAttempt)
                     observe(launchCatchUp())
@@ -276,7 +297,7 @@ internal class ChatListConnectionOwner(
         }
 
     /** Starts or joins the process-owned catch-up for the current account and network lifetime. */
-    fun launchCatchUp(): Deferred<AccountCatchUpResult> = appState.launchCatchUpAccounts()
+    fun launchCatchUp(): Deferred<AccountCatchUpResult> = launchCatchUpRequest()
 
     fun invalidate() {
         readinessJob?.cancel()

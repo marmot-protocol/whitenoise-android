@@ -1,10 +1,14 @@
 package dev.ipf.whitenoise.android.state
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
@@ -376,6 +380,43 @@ class ChatListConnectionStateTest {
             ),
         )
     }
+
+    /** A readiness observer follows the replacement work instead of remaining mid-attempt. */
+    @Test
+    fun ownerFollowsSupersededCatchUpToReplacementSuccess() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val replacement = CompletableDeferred<AccountCatchUpResult>()
+            var replacementJoinCount = 0
+            val owner =
+                ChatListConnectionOwner(
+                    runtimeGeneration = { 4 },
+                    hasValidatedInternet = { true },
+                    launchCatchUpRequest = {
+                        replacementJoinCount += 1
+                        replacement
+                    },
+                    hasCurrentSubscriptions = { true },
+                )
+            try {
+                owner.beginSessionAttempt(accountRef = "personal", bindEpoch = 7)
+                owner.observe(
+                    CompletableDeferred(AccountCatchUpResult(AccountCatchUpOutcome.Superseded)),
+                )
+                runCurrent()
+
+                assertEquals(1, replacementJoinCount)
+                assertEquals(ChatListConnectionPhase.Attempting, owner.state.phase)
+
+                replacement.complete(AccountCatchUpResult(AccountCatchUpOutcome.Succeeded))
+                runCurrent()
+
+                assertEquals(ChatListConnectionPhase.Ready, owner.state.phase)
+            } finally {
+                owner.clear()
+                Dispatchers.resetMain()
+            }
+        }
 
     @Test
     fun liveUpdateRequiresCurrentSessionAndValidatedInternet() {
