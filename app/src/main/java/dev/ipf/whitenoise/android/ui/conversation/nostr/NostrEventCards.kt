@@ -20,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -387,7 +388,8 @@ private fun LoadedEventSummary(
                         onClickLabel = stringResource(R.string.nostr_event_read_note),
                         role = Role.Button,
                         onClick = onReadNote,
-                    ).testTag(NOSTR_NOTE_PREVIEW_ACTION_TAG)
+                    ).minimumInteractiveComponentSize()
+                    .testTag(NOSTR_NOTE_PREVIEW_ACTION_TAG)
             } else {
                 Modifier
             }
