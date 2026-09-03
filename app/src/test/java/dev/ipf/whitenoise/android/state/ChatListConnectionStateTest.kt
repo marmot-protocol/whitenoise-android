@@ -218,6 +218,29 @@ class ChatListConnectionStateTest {
             assertTrue(markerCleared)
         }
 
+    /** A triggered drain preserves its marker and fails into backoff after bounded coalescing. */
+    @Test
+    fun triggeredCatchUpBoundsSupersededReplacements() =
+        runTest {
+            var launches = 0
+            var markerCleared = false
+
+            val result =
+                runCatchUpAfterTrigger(
+                    observedStartSequence = 8L,
+                    launchAfter = {
+                        launches += 1
+                        CompletableDeferred(AccountCatchUpResult(AccountCatchUpOutcome.Superseded))
+                    },
+                    onSucceeded = { markerCleared = true },
+                    maxSupersededReplacements = 2,
+                )
+
+            assertEquals(AccountCatchUpOutcome.Failed, result.outcome)
+            assertEquals(3, launches)
+            assertFalse(markerCleared)
+        }
+
     @Test
     fun subscriptionLifecycleCoversDropRetryAndRecovery() {
         val firstValidation =
@@ -412,6 +435,37 @@ class ChatListConnectionStateTest {
                 runCurrent()
 
                 assertEquals(ChatListConnectionPhase.Ready, owner.state.phase)
+            } finally {
+                owner.clear()
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** A readiness observer yields back to refresh instead of spinning under continuous churn. */
+    @Test
+    fun ownerBoundsSupersededCatchUpReplacements() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            var replacementJoinCount = 0
+            val owner =
+                ChatListConnectionOwner(
+                    runtimeGeneration = { 4 },
+                    hasValidatedInternet = { true },
+                    launchCatchUpRequest = {
+                        replacementJoinCount += 1
+                        CompletableDeferred(AccountCatchUpResult(AccountCatchUpOutcome.Superseded))
+                    },
+                    hasCurrentSubscriptions = { true },
+                )
+            try {
+                owner.beginSessionAttempt(accountRef = "personal", bindEpoch = 7)
+                owner.observe(
+                    CompletableDeferred(AccountCatchUpResult(AccountCatchUpOutcome.Superseded)),
+                )
+                runCurrent()
+
+                assertEquals(CATCH_UP_MAX_SUPERSEDED_REPLACEMENTS, replacementJoinCount)
+                assertEquals(ChatListConnectionPhase.Idle, owner.state.phase)
             } finally {
                 owner.clear()
                 Dispatchers.resetMain()

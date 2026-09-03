@@ -311,6 +311,27 @@ class NotificationNetworkRecoveryTest {
             assertEquals(2, catchUps)
         }
 
+    /** Coalescing churn returns to the outer retry budget after a finite number of joins. */
+    @Test
+    fun supersededCatchUpIsBoundedWithinRecoveryAttempt() =
+        runTest {
+            var catchUps = 0
+
+            val result =
+                runNotificationReconnectOnNetworkRestore(
+                    wakeDurableOutbound = {},
+                    ensureNotificationReceiverActive = { true },
+                    catchUpAccounts = {
+                        catchUps += 1
+                        AccountCatchUpResult(AccountCatchUpOutcome.Superseded)
+                    },
+                    maxSupersededReplacements = 2,
+                )
+
+            assertEquals(NotificationNetworkRecoveryOutcome.CatchUpFailed, result)
+            assertEquals(3, catchUps)
+        }
+
     @Test
     fun drainRetriesTheSameGenerationUntilCatchUpSucceeds() =
         runTest {

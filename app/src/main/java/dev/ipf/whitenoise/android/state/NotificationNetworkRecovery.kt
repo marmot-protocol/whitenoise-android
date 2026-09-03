@@ -617,6 +617,7 @@ internal suspend fun runNotificationReconnectOnNetworkRestore(
     wakeDurableOutbound: suspend () -> Unit,
     ensureNotificationReceiverActive: suspend () -> Boolean,
     catchUpAccounts: suspend () -> AccountCatchUpResult,
+    maxSupersededReplacements: Int = CATCH_UP_MAX_SUPERSEDED_REPLACEMENTS,
 ): NotificationNetworkRecoveryOutcome =
     coroutineScope {
         val outboundWake = async(start = CoroutineStart.UNDISPATCHED) { wakeDurableOutbound() }
@@ -629,11 +630,11 @@ internal suspend fun runNotificationReconnectOnNetworkRestore(
         } else {
             val catchUp =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    var result = catchUpAccounts()
-                    while (result.outcome == AccountCatchUpOutcome.Superseded) {
-                        result = catchUpAccounts()
-                    }
-                    result
+                    awaitCatchUpAfterSupersession(
+                        initial = catchUpAccounts(),
+                        maxSupersededReplacements = maxSupersededReplacements,
+                        launchReplacement = catchUpAccounts,
+                    )
                 }
             val catchUpResult = catchUp.await()
             outboundWake.await()

@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+internal const val CATCH_UP_MAX_SUPERSEDED_REPLACEMENTS = 3
+
 data class ConnectivitySignals(
     val hasValidatedInternet: Boolean = false,
     val relaysConnected: Boolean = true,
@@ -76,23 +78,48 @@ internal data class AccountCatchUpResult(
 }
 
 /**
+ * Follows coalesced catch-up work up to a finite replacement budget.
+ * Exhaustion becomes a retryable failure so callers yield to their outer backoff policy.
+ */
+internal suspend fun awaitCatchUpAfterSupersession(
+    initial: AccountCatchUpResult,
+    maxSupersededReplacements: Int = CATCH_UP_MAX_SUPERSEDED_REPLACEMENTS,
+    launchReplacement: suspend () -> AccountCatchUpResult,
+): AccountCatchUpResult {
+    require(maxSupersededReplacements >= 0) { "maxSupersededReplacements cannot be negative" }
+    var result = initial
+    repeat(maxSupersededReplacements) {
+        if (result.outcome != AccountCatchUpOutcome.Superseded) return result
+        result = launchReplacement()
+    }
+    return if (result.outcome == AccountCatchUpOutcome.Superseded) {
+        AccountCatchUpResult(AccountCatchUpOutcome.Failed)
+    } else {
+        result
+    }
+}
+
+/**
  * Awaits executed work that began after an external trigger and acknowledges
- * that trigger only after the fresh work succeeds. Further coalescing is
- * followed without treating it as an execution failure.
+ * that trigger only after the fresh work succeeds. Coalescing is followed
+ * within a finite budget before returning a retryable failure.
  */
 internal suspend fun runCatchUpAfterTrigger(
     observedStartSequence: Long,
     launchAfter: (Long) -> Deferred<AccountCatchUpResult>,
     onSucceeded: () -> Unit,
+    maxSupersededReplacements: Int = CATCH_UP_MAX_SUPERSEDED_REPLACEMENTS,
 ): AccountCatchUpResult {
-    while (true) {
-        val result = launchAfter(observedStartSequence).await()
-        if (result.outcome == AccountCatchUpOutcome.Superseded) continue
-        if (result.succeeded && result.startSequence?.let { it > observedStartSequence } == true) {
-            onSucceeded()
-        }
-        return result
+    val result =
+        awaitCatchUpAfterSupersession(
+            initial = launchAfter(observedStartSequence).await(),
+            maxSupersededReplacements = maxSupersededReplacements,
+            launchReplacement = { launchAfter(observedStartSequence).await() },
+        )
+    if (result.succeeded && result.startSequence?.let { it > observedStartSequence } == true) {
+        onSucceeded()
     }
+    return result
 }
 
 /** Serializes process-wide native catch-up while coalescing queued successors. */

@@ -229,21 +229,24 @@ internal class ChatListConnectionOwner(
         return state
     }
 
-    /** Observes replacement catch-ups until current readiness evidence sees executed work. */
+    /** Observes bounded replacement work while the captured readiness evidence remains current. */
     fun observe(catchUp: Deferred<AccountCatchUpResult>) {
         val token = state.evidenceTokenOrNull() ?: return
         if (!state.phase.canAcceptReadiness) return
         readinessJob?.cancel()
         readinessJob =
             scope.launch {
-                var result = catchUp.await()
-                while (
-                    result.outcome == AccountCatchUpOutcome.Superseded &&
-                    state.matches(token) &&
-                    state.phase.canAcceptReadiness
-                ) {
-                    result = launchCatchUpRequest().await()
-                }
+                val result =
+                    awaitCatchUpAfterSupersession(
+                        initial = catchUp.await(),
+                        launchReplacement = {
+                            if (!state.matches(token) || !state.phase.canAcceptReadiness) {
+                                AccountCatchUpResult(AccountCatchUpOutcome.Failed)
+                            } else {
+                                launchCatchUpRequest().await()
+                            }
+                        },
+                    )
                 state = state.applyCatchUpResult(token, result)
             }
     }
