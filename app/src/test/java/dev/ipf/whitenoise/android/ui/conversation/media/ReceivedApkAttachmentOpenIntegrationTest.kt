@@ -35,6 +35,7 @@ import kotlin.coroutines.cancellation.CancellationException
 class ReceivedApkAttachmentOpenIntegrationTest {
     private val artifacts = mutableListOf<File>()
 
+    /** Warms Robolectric's FileProvider roots before tests dispatch from background contexts. */
     @Before
     fun setUp() {
         clearFileProviderStrategyCache()
@@ -45,12 +46,14 @@ class ReceivedApkAttachmentOpenIntegrationTest {
         fileProviderUri(applicationContext(), seed)
     }
 
+    /** Removes generated artifacts and resets FileProvider's process-local strategy cache. */
     @After
     fun tearDown() {
         artifacts.forEach(File::delete)
         clearFileProviderStrategyCache()
     }
 
+    /** Targets unknown-sources permission to White Noise instead of a generic settings screen. */
     @Test
     fun installerPermissionRecoveryTargetsThisApplicationPackage() {
         val context = applicationContext()
@@ -61,6 +64,7 @@ class ReceivedApkAttachmentOpenIntegrationTest {
         assertEquals("package:${context.packageName}", intent.data?.toString())
     }
 
+    /** Normalizes explicit and filename-inferred APK candidates to the platform installer contract. */
     @Test
     fun correctlyTypedGenericAndBlankReceivedApksLaunchTheInstallerIntent() =
         runTest {
@@ -159,6 +163,7 @@ class ReceivedApkAttachmentOpenIntegrationTest {
             assertTrue(oldViewerRequest.navigationGeneration != nextDestination.navigationGeneration)
         }
 
+    /** Rejects filename-inferred APKs whose verified payload is not an Android package. */
     @Test
     fun genericApkNameWithNonApkArtifactIsRejectedBeforeDispatch() =
         runTest {
@@ -188,6 +193,7 @@ class ReceivedApkAttachmentOpenIntegrationTest {
             assertNull(context.startedIntent)
         }
 
+    /** Preserves a specific non-APK MIME type even when the remote filename ends in APK. */
     @Test
     fun conflictingNonGenericMimeNeverUsesFilenameInference() =
         runTest {

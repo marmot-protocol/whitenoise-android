@@ -58,7 +58,7 @@ class AttachmentInstallerHandoffCoordinatorTest {
                         persistence = dispatcher,
                     )
 
-                assertTrue(coordinator.request(REQUEST))
+                coordinator.request(REQUEST) { error("persistence should succeed") }
 
                 assertEquals(0, enqueueCount)
                 assertNull(store.pendingInstallerHandoff())
@@ -73,6 +73,76 @@ class AttachmentInstallerHandoffCoordinatorTest {
             }
         }
 
+    /** Hydrates once off the caller path, then serves pending identity reads from memory. */
+    @Test
+    fun pendingQueriesUseTheHydratedCacheWithoutRepeatedRecordReads() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val scope = CoroutineScope(SupervisorJob() + dispatcher)
+            val records = TrackingInstallerHandoffRecordStore()
+            val store = AttachmentDownloadIntentStore(preferences, records)
+            assertTrue(store.markInstallerHandoff(REQUEST))
+            records.resetReadCount()
+            try {
+                val coordinator =
+                    AttachmentInstallerHandoffCoordinator(
+                        intentStore = store,
+                        scope = scope,
+                        enqueue = { _, _ -> },
+                        foregroundEligible = { true },
+                        persistence = dispatcher,
+                    )
+
+                assertNull(coordinator.pending())
+                assertFalse(coordinator.hasPending(REQUEST))
+                assertEquals(0, records.readCount)
+
+                testScheduler.runCurrent()
+
+                assertEquals(REQUEST, coordinator.pending())
+                assertTrue(coordinator.hasPending(REQUEST))
+                assertEquals(1, records.readCount)
+                assertEquals(REQUEST, coordinator.pending())
+                assertTrue(coordinator.hasPending(REQUEST))
+                assertEquals(1, records.readCount)
+            } finally {
+                scope.cancel()
+            }
+        }
+
+    /** Reports a durable-write failure and never admits the associated transfer. */
+    @Test
+    fun failedPersistenceReportsTheOpenFailureAndClearsPendingState() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val scope = CoroutineScope(SupervisorJob() + dispatcher)
+            val records = TrackingInstallerHandoffRecordStore().apply { writesSucceed = false }
+            var enqueueCount = 0
+            var failureCount = 0
+            try {
+                val coordinator =
+                    AttachmentInstallerHandoffCoordinator(
+                        intentStore = AttachmentDownloadIntentStore(preferences, records),
+                        scope = scope,
+                        enqueue = { _, _ -> enqueueCount++ },
+                        foregroundEligible = { true },
+                        persistence = dispatcher,
+                    )
+
+                coordinator.request(REQUEST) { failureCount++ }
+                assertTrue(coordinator.hasPending(REQUEST))
+
+                testScheduler.runCurrent()
+
+                assertEquals(1, failureCount)
+                assertEquals(0, enqueueCount)
+                assertFalse(coordinator.hasPending(REQUEST))
+                assertNull(coordinator.pending())
+            } finally {
+                scope.cancel()
+            }
+        }
+
     /** A same-identity re-tap survives cancellation that was already queued. */
     @Test
     fun freshTapSupersedesAsynchronousCancellation() =
@@ -81,10 +151,10 @@ class AttachmentInstallerHandoffCoordinatorTest {
             val scope = CoroutineScope(SupervisorJob() + dispatcher)
             val coordinator = coordinator(scope, dispatcher)
             try {
-                assertTrue(coordinator.request(REQUEST))
+                coordinator.request(REQUEST) { error("persistence should succeed") }
                 testScheduler.runCurrent()
                 coordinator.cancel(TRANSFER)
-                assertTrue(coordinator.request(REQUEST))
+                coordinator.request(REQUEST) { error("persistence should succeed") }
 
                 testScheduler.advanceUntilIdle()
 
@@ -126,7 +196,7 @@ class AttachmentInstallerHandoffCoordinatorTest {
             val scope = CoroutineScope(SupervisorJob() + dispatcher)
             val coordinator = coordinator(scope, dispatcher)
             try {
-                assertTrue(coordinator.request(REQUEST))
+                coordinator.request(REQUEST) { error("persistence should succeed") }
                 testScheduler.runCurrent()
 
                 coordinator.cancel(TRANSFER)
@@ -163,6 +233,7 @@ class AttachmentInstallerHandoffCoordinatorTest {
                     persistence = dispatcher,
                 )
             try {
+                testScheduler.runCurrent()
                 coordinator.ensureTransfer(REQUEST)
                 coordinator.ensureTransfer(REQUEST)
 
@@ -190,6 +261,7 @@ class AttachmentInstallerHandoffCoordinatorTest {
                     persistence = dispatcher,
                 )
             try {
+                testScheduler.runCurrent()
                 coordinator.ensureTransfer(REQUEST)
                 assertEquals(AttachmentOpenIntentClaim.Fresh, coordinator.claim(REQUEST))
                 coordinator.restore(REQUEST)
@@ -220,6 +292,36 @@ class AttachmentInstallerHandoffCoordinatorTest {
             preferences,
             installerHandoffRecords,
         )
+
+    /** Record-store probe used to distinguish hydration reads from cached UI reads. */
+    private class TrackingInstallerHandoffRecordStore : AttachmentInstallerHandoffRecordStore {
+        private var values: Map<String, String> = emptyMap()
+
+        var readCount: Int = 0
+            private set
+
+        var writesSucceed: Boolean = true
+
+        /** Returns a defensive record snapshot while counting persistence access. */
+        override fun readAll(): Map<String, String> =
+            synchronized(this) {
+                readCount++
+                values.toMap()
+            }
+
+        /** Replaces the record only while durable writes are configured to succeed. */
+        override fun replaceAllDurably(values: Map<String, String>): Boolean =
+            synchronized(this) {
+                if (!writesSucceed) return@synchronized false
+                this.values = values.toMap()
+                true
+            }
+
+        /** Resets only observation state, preserving the seeded durable record. */
+        fun resetReadCount() {
+            readCount = 0
+        }
+    }
 
     private companion object {
         val TRANSFER =

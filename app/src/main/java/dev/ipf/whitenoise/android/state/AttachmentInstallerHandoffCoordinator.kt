@@ -35,14 +35,32 @@ internal class AttachmentInstallerHandoffCoordinator(
     @Volatile
     private var queuedRequest: AttachmentInstallerHandoffRequest? = null
 
+    @Volatile
+    private var persistedRequest: AttachmentInstallerHandoffRequest? = null
+
     private val scheduledRequests = mutableSetOf<AttachmentInstallerHandoffRequest>()
 
     // staleness-exempt: observable handoff version consumed by Compose.
     var revision by mutableIntStateOf(0)
         private set
 
-    /** Persists off the UI thread before admitting work, superseding an older APK tap. */
-    fun request(request: AttachmentInstallerHandoffRequest): Boolean {
+    init {
+        val token = requests.capture()
+        scope.launch {
+            if (!requests.isCurrent(token)) return@launch
+            val pending = withContext(persistence) { intentStore.pendingInstallerHandoff() }
+            requests.runIfCurrent(token) {
+                persistedRequest = pending
+                revision += 1
+            }
+        }
+    }
+
+    /** Persists off the UI thread before admitting work and reports a failed durable commit. */
+    fun request(
+        request: AttachmentInstallerHandoffRequest,
+        onPersistenceFailure: () -> Unit,
+    ) {
         // Fence an already-queued cancellation before the new record becomes
         // visible, so it cannot consume this same-identity re-tap.
         val token = requests.advance()
@@ -50,28 +68,35 @@ internal class AttachmentInstallerHandoffCoordinator(
         queuedRequest = request
         revision += 1
         scope.launch {
-            val committed =
+            val (committed, pending) =
                 withContext(persistence) {
-                    intentStore.markInstallerHandoffUnlessSuperseded(request) {
-                        !requests.isCurrent(token)
-                    }
+                    val persisted =
+                        intentStore.markInstallerHandoffUnlessSuperseded(request) {
+                            !requests.isCurrent(token)
+                        }
+                    persisted to intentStore.pendingInstallerHandoff()
                 }
-            if (!requests.isCurrent(token)) return@launch
-            queuedRequest = null
+            val published =
+                requests.runIfCurrent(token) {
+                    queuedRequest = null
+                    persistedRequest = pending
+                    revision += 1
+                }
+            if (!published) return@launch
             if (committed) {
                 scheduledRequests += request
                 enqueue(request.transfer, AttachmentDownloadPriority.Interactive)
+            } else {
+                onPersistenceFailure()
             }
-            revision += 1
         }
-        return true
     }
 
     /** Restarts a persisted handoff's durable transfer once in a replacement process. */
     fun ensureTransfer(request: AttachmentInstallerHandoffRequest) {
         if (
             request.transfer != cancelledTransfer &&
-            intentStore.hasInstallerHandoff(request) &&
+            persistedRequest == request &&
             scheduledRequests.add(request)
         ) {
             enqueue(request.transfer, AttachmentDownloadPriority.Interactive)
@@ -79,15 +104,14 @@ internal class AttachmentInstallerHandoffCoordinator(
     }
 
     /** Restores one process-owned observer from the exact persisted identity. */
-    fun pending(): AttachmentInstallerHandoffRequest? =
-        (queuedRequest ?: intentStore.pendingInstallerHandoff())
-            ?.takeUnless { it.transfer == cancelledTransfer }
+    @Suppress("MaxLineLength")
+    fun pending(): AttachmentInstallerHandoffRequest? = persistedRequest?.takeUnless { it.transfer == cancelledTransfer }
 
     /** True while this card owns the current app-scoped pending indication. */
     fun hasPending(request: AttachmentInstallerHandoffRequest): Boolean {
         revision
         return request.transfer != cancelledTransfer &&
-            (queuedRequest == request || intentStore.hasInstallerHandoff(request))
+            (queuedRequest == request || persistedRequest == request)
     }
 
     /** Bridges the short interval before WorkManager publishes its generation. */
@@ -100,6 +124,7 @@ internal class AttachmentInstallerHandoffCoordinator(
             if (request.transfer == cancelledTransfer) null else intentStore.claimInstallerHandoff(request)
         }.also {
             if (it != null) {
+                if (persistedRequest == request) persistedRequest = null
                 revision += 1
             }
         }
@@ -109,6 +134,7 @@ internal class AttachmentInstallerHandoffCoordinator(
         withContext(persistence) { intentStore.consumeInstallerHandoff(request) }
             .also {
                 if (it) {
+                    if (persistedRequest == request) persistedRequest = null
                     scheduledRequests -= request
                     revision += 1
                 }
@@ -125,15 +151,23 @@ internal class AttachmentInstallerHandoffCoordinator(
     /** Makes an interrupted Settings handoff visible to a replacement owner. */
     fun abandonInstallPermission(request: AttachmentInstallerHandoffRequest) {
         intentStore.abandonInstallerPermissionHandoff(request)
+        persistedRequest = request
         revision += 1
     }
 
     /** Re-arms a claim when Android never accepted the external activity. */
     suspend fun restore(request: AttachmentInstallerHandoffRequest) {
-        withContext(persistence) {
-            if (request.transfer != cancelledTransfer) intentStore.restoreInstallerHandoff(request)
+        val token = requests.capture()
+        val restored =
+            withContext(persistence) {
+                if (request.transfer != cancelledTransfer) intentStore.restoreInstallerHandoff(request) else false
+            }
+        if (restored) {
+            requests.runIfCurrent(token) {
+                persistedRequest = request
+                revision += 1
+            }
         }
-        revision += 1
     }
 
     /**
@@ -144,6 +178,7 @@ internal class AttachmentInstallerHandoffCoordinator(
         val token = requests.advance()
         cancelledTransfer = transfer
         if (queuedRequest?.transfer == transfer) queuedRequest = null
+        if (persistedRequest?.transfer == transfer) persistedRequest = null
         scheduledRequests.removeAll { it.transfer == transfer }
         revision += 1
         scope.launch {
@@ -165,10 +200,13 @@ internal fun ConversationController.requestAttachmentInstallerHandoff(
     messageIdHex: String,
     attachmentIndex: Int,
     sourceEpoch: ULong,
-): Boolean {
-    val transfer = attachmentTransferRequest(messageIdHex, attachmentIndex) ?: return false
+    onPersistenceFailure: () -> Unit,
+) {
+    val transfer =
+        attachmentTransferRequest(messageIdHex, attachmentIndex)
+            ?: return onPersistenceFailure()
     val request = AttachmentInstallerHandoffRequest(transfer, sourceEpoch)
-    return appState.attachmentInstallerHandoffs.request(request)
+    appState.attachmentInstallerHandoffs.request(request, onPersistenceFailure)
 }
 
 /** True while this APK card owns the app-scoped one-shot installer request. */

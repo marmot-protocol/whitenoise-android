@@ -363,6 +363,9 @@ internal fun MediaFileBubble(
                                 messageIdHex,
                                 attachmentIndex,
                                 reference.sourceEpoch,
+                                onPersistenceFailure = {
+                                    appState.present(couldntOpenMessage, copyable = true)
+                                },
                             )
                         } else {
                             openRequested = controller.requestAttachmentOpen(messageIdHex, attachmentIndex)

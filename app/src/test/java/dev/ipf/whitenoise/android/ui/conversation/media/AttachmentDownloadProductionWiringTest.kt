@@ -16,6 +16,9 @@ class AttachmentDownloadProductionWiringTest {
         val worker = projectSource("state/AttachmentDownloadWorker.kt").normalized()
 
         assertTrue("requestAttachmentInstallerHandoff(" in bubble)
+        assertTrue(
+            "onPersistenceFailure = { appState.present(couldntOpenMessage, copyable = true) }" in bubble,
+        )
         assertTrue("attachmentInstallerHandoffEffect(appState" in shell)
         assertTrue("EncryptedAttachmentInstallerHandoffRecordStore.create(appContext)" in appState)
         assertTrue("EncryptedAttachmentInstallerHandoffRecordStore.create(context)" in worker)
