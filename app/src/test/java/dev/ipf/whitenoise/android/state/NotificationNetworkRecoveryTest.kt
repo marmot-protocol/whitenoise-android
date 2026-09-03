@@ -491,17 +491,18 @@ class NotificationNetworkRecoveryTest {
             advanceUntilIdle()
             assertEquals(4, attempts)
             assertEquals("one edge must issue one outbound wake", 1, wakes)
-            assertEquals("exhaustion must not start an independent drain", 0, completedDrains)
+            assertEquals("terminal exhaustion must offer one independent handoff", 1, completedDrains)
 
             coordinator.resumeIfPending()
             advanceUntilIdle()
             assertEquals("a lifecycle resume alone must not reopen the circuit", 4, attempts)
+            assertEquals("a lifecycle resume must not repeat the handoff", 1, completedDrains)
 
             coordinator.noteNetworkRestored(2L)
             advanceUntilIdle()
             assertEquals(8, attempts)
             assertEquals(2, wakes)
-            assertEquals(0, completedDrains)
+            assertEquals(2, completedDrains)
         }
 
     /** A callback after exhaustion cannot retry the same durable wake outside the coordinator. */
@@ -549,12 +550,13 @@ class NotificationNetworkRecoveryTest {
             assertTrue(circuit.claimIndependentDrain(8L, pendingPushWakeGeneration + 1L))
         }
 
-    /** A wake recorded during the final attempt remains eligible as a newer trigger. */
+    /** A wake recorded during the final attempt is handed to exactly one independent drain. */
     @Test
-    fun exhaustionDoesNotBlockPushWakeRecordedDuringFinalAttempt() =
+    fun exhaustionHandsPushWakeRecordedDuringFinalAttemptToIndependentDrain() =
         runTest {
             val circuit = NotificationPushWakeRecoveryCircuit()
             var attempts = 0
+            var independentDrains = 0
             var pendingPushWakeGeneration = 20L
             val coordinator =
                 NotificationNetworkRecoveryCoordinator(
@@ -568,7 +570,11 @@ class NotificationNetworkRecoveryTest {
                         AccountCatchUpResult(AccountCatchUpOutcome.Failed)
                     },
                     awaitRetry = { _, _ -> },
-                    onDrainCompleted = {},
+                    onDrainCompleted = {
+                        if (circuit.claimIndependentDrain(9L, pendingPushWakeGeneration)) {
+                            independentDrains += 1
+                        }
+                    },
                     onRecoveryAttemptStarted = { networkGeneration ->
                         circuit.noteRecoveryAttempt(networkGeneration, pendingPushWakeGeneration)
                     },
@@ -586,8 +592,10 @@ class NotificationNetworkRecoveryTest {
             coordinator.noteNetworkRestored(9L)
             advanceUntilIdle()
 
+            assertEquals(4, attempts)
+            assertEquals(1, independentDrains)
             assertFalse(circuit.claimIndependentDrain(9L, 20L))
-            assertTrue(circuit.claimIndependentDrain(9L, pendingPushWakeGeneration))
+            assertFalse(circuit.claimIndependentDrain(9L, pendingPushWakeGeneration))
         }
 
     /** A newer claim keeps delayed old work blocked without closing the circuit to later generations. */

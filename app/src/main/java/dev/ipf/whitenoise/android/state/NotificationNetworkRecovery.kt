@@ -548,7 +548,9 @@ internal class NotificationNetworkRecoveryCoordinator(
             reconnectJob.invokeOnCompletion { cause ->
                 if (cause == null) {
                     resumeIfPending()
-                    if (requestedGeneration.get() <= completedGeneration.get()) {
+                    val terminalGeneration =
+                        maxOf(completedGeneration.get(), exhaustedGeneration.get())
+                    if (requestedGeneration.get() <= terminalGeneration) {
                         onDrainCompleted()
                     }
                 }
