@@ -12,9 +12,13 @@ class AttachmentDownloadProductionWiringTest {
     fun installerHandoffOwnerOutlivesTheOriginatingFileBubble() {
         val bubble = source("MediaFileBubble.kt").normalized()
         val shell = projectSource("ui/navigation/MainShell.kt").normalized()
+        val appState = projectSource("state/AppState.kt").normalized()
+        val worker = projectSource("state/AttachmentDownloadWorker.kt").normalized()
 
         assertTrue("requestAttachmentInstallerHandoff(" in bubble)
         assertTrue("attachmentInstallerHandoffEffect(appState" in shell)
+        assertTrue("EncryptedAttachmentInstallerHandoffRecordStore.create(appContext)" in appState)
+        assertTrue("EncryptedAttachmentInstallerHandoffRecordStore.create(context)" in worker)
     }
 
     @Test

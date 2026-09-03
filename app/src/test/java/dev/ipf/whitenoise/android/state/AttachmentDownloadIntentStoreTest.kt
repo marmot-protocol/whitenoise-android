@@ -13,6 +13,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.util.UUID
+import javax.crypto.KeyGenerator
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -21,15 +22,18 @@ class AttachmentDownloadIntentStoreTest {
     private val preferences by lazy {
         context.getSharedPreferences("attachment-download-intent-test", Context.MODE_PRIVATE)
     }
+    private val installerHandoffRecords = VolatileAttachmentInstallerHandoffRecordStore()
 
+    /** Clears durable and process-local ownership between examples. */
     @Before
     fun reset() {
-        AttachmentDownloadIntentStore(preferences).apply {
+        intentStore().apply {
             abandonInstallPermissionRequest(OPEN_REQUEST_A)
             abandonInstallPermissionRequest(OPEN_REQUEST_B)
             abandonInstallerPermissionHandoff(INSTALLER_REQUEST_A)
             abandonInstallerPermissionHandoff(INSTALLER_REQUEST_B)
         }
+        installerHandoffRecords.replaceAllDurably(emptyMap())
         preferences.edit().clear().commit()
     }
 
@@ -121,24 +125,24 @@ class AttachmentDownloadIntentStoreTest {
     /** Installer handoff is app-owned and must not be pruned with route-scoped viewers. */
     @Test
     fun installerHandoffSurvivesNavigationCleanupAndProcessRecreation() {
-        val store = AttachmentDownloadIntentStore(preferences)
+        val store = intentStore()
         assertTrue(store.markInstallerHandoff(INSTALLER_REQUEST_A))
         store.markOpenIntent(OPEN_REQUEST_A)
 
         store.retainOpenIntentsForDestination(OPEN_REQUEST_B.destination)
 
         assertFalse(store.hasDispatchableOpenIntent(OPEN_REQUEST_A))
-        assertEquals(INSTALLER_REQUEST_A, AttachmentDownloadIntentStore(preferences).pendingInstallerHandoff())
+        assertEquals(INSTALLER_REQUEST_A, intentStore().pendingInstallerHandoff())
     }
 
     /** A different projection epoch cannot claim a persisted attachment handoff. */
     @Test
     fun installerHandoffPersistsAndMatchesTheExactSourceEpoch() {
-        val store = AttachmentDownloadIntentStore(preferences)
+        val store = intentStore()
         val differentEpoch = INSTALLER_REQUEST_A.copy(sourceEpoch = 8uL)
         assertTrue(store.markInstallerHandoff(INSTALLER_REQUEST_A))
 
-        val recreated = AttachmentDownloadIntentStore(preferences)
+        val recreated = intentStore()
         assertEquals(INSTALLER_REQUEST_A, recreated.pendingInstallerHandoff())
         assertNull(recreated.claimInstallerHandoff(differentEpoch))
         assertEquals(INSTALLER_REQUEST_A, recreated.pendingInstallerHandoff())
@@ -147,32 +151,32 @@ class AttachmentDownloadIntentStoreTest {
     /** A later APK tap replaces an older pending installer destination atomically. */
     @Test
     fun latestInstallerHandoffSupersedesThePreviousAttachment() {
-        val store = AttachmentDownloadIntentStore(preferences)
+        val store = intentStore()
         assertTrue(store.markInstallerHandoff(INSTALLER_REQUEST_A))
         assertTrue(store.markInstallerHandoff(INSTALLER_REQUEST_B))
 
         assertEquals(INSTALLER_REQUEST_B, store.pendingInstallerHandoff())
         assertNull(store.claimInstallerHandoff(INSTALLER_REQUEST_A))
         assertEquals(AttachmentOpenIntentClaim.Fresh, store.claimInstallerHandoff(INSTALLER_REQUEST_B))
-        assertNull(AttachmentDownloadIntentStore(preferences).pendingInstallerHandoff())
+        assertNull(intentStore().pendingInstallerHandoff())
     }
 
     /** The durable record can be accepted only once across recreated app owners. */
     @Test
     fun installerHandoffClaimIsExactlyOnceAcrossProcessOwners() {
-        AttachmentDownloadIntentStore(preferences).markInstallerHandoff(INSTALLER_REQUEST_A)
+        intentStore().markInstallerHandoff(INSTALLER_REQUEST_A)
 
         assertEquals(
             AttachmentOpenIntentClaim.Fresh,
-            AttachmentDownloadIntentStore(preferences).claimInstallerHandoff(INSTALLER_REQUEST_A),
+            intentStore().claimInstallerHandoff(INSTALLER_REQUEST_A),
         )
-        assertNull(AttachmentDownloadIntentStore(preferences).claimInstallerHandoff(INSTALLER_REQUEST_A))
+        assertNull(intentStore().claimInstallerHandoff(INSTALLER_REQUEST_A))
     }
 
     /** A stale claimed launch cannot overwrite a newer tap before dispatch. */
     @Test
     fun supersedingTapWinsTheClaimToPermissionHandoffRace() {
-        val store = AttachmentDownloadIntentStore(preferences)
+        val store = intentStore()
         store.markInstallerHandoff(INSTALLER_REQUEST_A)
         assertEquals(AttachmentOpenIntentClaim.Fresh, store.claimInstallerHandoff(INSTALLER_REQUEST_A))
 
@@ -186,7 +190,7 @@ class AttachmentDownloadIntentStoreTest {
     /** Settings recovery stays durable but only a replacement process may claim it. */
     @Test
     fun installerPermissionHandoffRecoversAfterItsActiveOwnerIsAbandoned() {
-        val store = AttachmentDownloadIntentStore(preferences)
+        val store = intentStore()
         store.markInstallerHandoff(INSTALLER_REQUEST_A)
         assertEquals(AttachmentOpenIntentClaim.Fresh, store.claimInstallerHandoff(INSTALLER_REQUEST_A))
         assertTrue(store.beginInstallerPermissionHandoff(INSTALLER_REQUEST_A))
@@ -194,13 +198,46 @@ class AttachmentDownloadIntentStoreTest {
 
         store.abandonInstallerPermissionHandoff(INSTALLER_REQUEST_A)
 
-        val recreated = AttachmentDownloadIntentStore(preferences)
+        val recreated = intentStore()
         assertEquals(INSTALLER_REQUEST_A, recreated.pendingInstallerHandoff())
         assertEquals(
             AttachmentOpenIntentClaim.InstallPermissionRecovery,
             recreated.claimInstallerHandoff(INSTALLER_REQUEST_A),
         )
         assertNull(recreated.claimInstallerHandoff(INSTALLER_REQUEST_A))
+    }
+
+    /** Keeps installer recovery durable across instances without exposing its identity at rest. */
+    @Test
+    fun encryptedInstallerHandoffSurvivesRecreationWithoutPlaintextPreferences() {
+        val fileName = "attachment-installer-handoff-encrypted-test"
+        context.deleteSharedPreferences(fileName)
+        val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+        val keyProvider =
+            object : SecureStoreKeyProvider {
+                override fun secretKey() = key
+            }
+        val firstRecords =
+            EncryptedAttachmentInstallerHandoffRecordStore(
+                KeystoreSecureStore(context, fileName, keyProvider),
+            )
+        assertTrue(AttachmentDownloadIntentStore(preferences, firstRecords).markInstallerHandoff(INSTALLER_REQUEST_A))
+
+        val raw = context.getSharedPreferences(fileName, Context.MODE_PRIVATE).all
+        val sealed = raw.values.joinToString()
+        assertEquals(setOf("payload"), raw.keys)
+        assertFalse(sealed.contains(INSTALLER_REQUEST_A.transfer.accountRef))
+        assertFalse(sealed.contains(INSTALLER_REQUEST_A.transfer.groupIdHex))
+        assertFalse(sealed.contains(INSTALLER_REQUEST_A.transfer.messageIdHex))
+
+        val recreatedRecords =
+            EncryptedAttachmentInstallerHandoffRecordStore(
+                KeystoreSecureStore(context, fileName, keyProvider),
+            )
+        assertEquals(
+            INSTALLER_REQUEST_A,
+            AttachmentDownloadIntentStore(preferences, recreatedRecords).pendingInstallerHandoff(),
+        )
     }
 
     @Test
@@ -299,6 +336,13 @@ class AttachmentDownloadIntentStoreTest {
         assertTrue(store.consumeOpenIntentUnlessSuperseded(OPEN_REQUEST_A) { false })
         assertFalse(store.hasOpenIntent(OPEN_REQUEST_A))
     }
+
+    /** Creates a store whose installer record survives simulated process-owner recreation. */
+    private fun intentStore(): AttachmentDownloadIntentStore =
+        AttachmentDownloadIntentStore(
+            preferences,
+            installerHandoffRecords,
+        )
 
     private companion object {
         const val ACCOUNT_A = "account-a"

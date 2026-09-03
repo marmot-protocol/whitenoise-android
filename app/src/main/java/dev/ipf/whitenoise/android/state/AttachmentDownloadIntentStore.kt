@@ -9,6 +9,12 @@ internal enum class AttachmentOpenIntentClaim {
 }
 
 private const val OPEN_TOKEN_SEPARATOR = ":"
+private const val INSTALLER_HANDOFF_ACCOUNT = "attachment_installer_handoff_account"
+private const val INSTALLER_HANDOFF_GROUP = "attachment_installer_handoff_group"
+private const val INSTALLER_HANDOFF_MESSAGE = "attachment_installer_handoff_message"
+private const val INSTALLER_HANDOFF_INDEX = "attachment_installer_handoff_index"
+private const val INSTALLER_HANDOFF_SOURCE_EPOCH = "attachment_installer_handoff_source_epoch"
+private const val INSTALLER_HANDOFF_PHASE = "attachment_installer_handoff_phase"
 
 private enum class InstallerHandoffPhase {
     Fresh,
@@ -27,6 +33,8 @@ private data class PersistedInstallerHandoff(
 @Suppress("TooManyFunctions") // Cohesive persistence boundary for one attachment-intent record type.
 internal class AttachmentDownloadIntentStore(
     private val preferences: SharedPreferences,
+    private val installerHandoffRecords: AttachmentInstallerHandoffRecordStore =
+        VolatileAttachmentInstallerHandoffRecordStore(),
 ) {
     fun pauseAutomatic(accountRef: String) = updateSet(PAUSED_ACCOUNTS) { it + accountToken(accountRef) }
 
@@ -380,25 +388,7 @@ internal class AttachmentDownloadIntentStore(
     /** Commits the whole installer record as one SharedPreferences transaction. */
     private fun commitInstallerHandoff(next: PersistedInstallerHandoff?): Boolean {
         val previous = readInstallerHandoff()
-        val editor = preferences.edit()
-        if (next == null) {
-            editor
-                .remove(INSTALLER_HANDOFF_ACCOUNT)
-                .remove(INSTALLER_HANDOFF_GROUP)
-                .remove(INSTALLER_HANDOFF_MESSAGE)
-                .remove(INSTALLER_HANDOFF_INDEX)
-                .remove(INSTALLER_HANDOFF_SOURCE_EPOCH)
-                .remove(INSTALLER_HANDOFF_PHASE)
-        } else {
-            editor
-                .putString(INSTALLER_HANDOFF_ACCOUNT, next.request.transfer.accountRef)
-                .putString(INSTALLER_HANDOFF_GROUP, next.request.transfer.groupIdHex)
-                .putString(INSTALLER_HANDOFF_MESSAGE, next.request.transfer.messageIdHex)
-                .putInt(INSTALLER_HANDOFF_INDEX, next.request.transfer.attachmentIndex)
-                .putLong(INSTALLER_HANDOFF_SOURCE_EPOCH, next.request.sourceEpoch.toLong())
-                .putString(INSTALLER_HANDOFF_PHASE, next.phase.name)
-        }
-        val committed = editor.commit()
+        val committed = installerHandoffRecords.replaceAllDurably(next?.toPersistedValues().orEmpty())
         if (!committed) {
             restoreInstallerHandoffRecord(previous)
             Log.w(TAG, "installer handoff commit failed; previous scheduling state restored")
@@ -408,23 +398,20 @@ internal class AttachmentDownloadIntentStore(
 
     /** Restores only a structurally complete installer identity from disk. */
     private fun readInstallerHandoff(): PersistedInstallerHandoff? {
-        val account = preferences.getString(INSTALLER_HANDOFF_ACCOUNT, null).orEmpty()
-        val group = preferences.getString(INSTALLER_HANDOFF_GROUP, null).orEmpty()
-        val message = preferences.getString(INSTALLER_HANDOFF_MESSAGE, null).orEmpty()
-        val index = preferences.getInt(INSTALLER_HANDOFF_INDEX, -1)
-        val sourceEpoch =
-            preferences
-                .takeIf { it.contains(INSTALLER_HANDOFF_SOURCE_EPOCH) }
-                ?.getLong(INSTALLER_HANDOFF_SOURCE_EPOCH, 0L)
-                ?.toULong()
+        val values = installerHandoffRecords.readAll()
+        val account = values[INSTALLER_HANDOFF_ACCOUNT].orEmpty()
+        val group = values[INSTALLER_HANDOFF_GROUP].orEmpty()
+        val message = values[INSTALLER_HANDOFF_MESSAGE].orEmpty()
+        val index = values[INSTALLER_HANDOFF_INDEX]?.toIntOrNull() ?: -1
+        val sourceEpoch = values[INSTALLER_HANDOFF_SOURCE_EPOCH]?.toULongOrNull()
         val phase =
-            preferences
-                .getString(INSTALLER_HANDOFF_PHASE, null)
-                ?.let { runCatching { InstallerHandoffPhase.valueOf(it) }.getOrNull() }
+            values[INSTALLER_HANDOFF_PHASE]?.let {
+                runCatching { InstallerHandoffPhase.valueOf(it) }.getOrNull()
+            }
         val validIdentity =
             account.isNotBlank() &&
-                GROUP_ID_HEX.matches(group) &&
-                MESSAGE_ID_HEX.matches(message)
+                ATTACHMENT_GROUP_ID_HEX.matches(group) &&
+                ATTACHMENT_MESSAGE_ID_HEX.matches(message)
         val validRecord = validIdentity && index >= 0 && sourceEpoch != null && phase != null
         if (!validRecord) {
             return null
@@ -441,25 +428,9 @@ internal class AttachmentDownloadIntentStore(
 
     /** Repairs SharedPreferences' in-memory view after a failed synchronous commit. */
     private fun restoreInstallerHandoffRecord(handoff: PersistedInstallerHandoff?) {
-        val editor = preferences.edit()
-        if (handoff == null) {
-            editor
-                .remove(INSTALLER_HANDOFF_ACCOUNT)
-                .remove(INSTALLER_HANDOFF_GROUP)
-                .remove(INSTALLER_HANDOFF_MESSAGE)
-                .remove(INSTALLER_HANDOFF_INDEX)
-                .remove(INSTALLER_HANDOFF_SOURCE_EPOCH)
-                .remove(INSTALLER_HANDOFF_PHASE)
-        } else {
-            editor
-                .putString(INSTALLER_HANDOFF_ACCOUNT, handoff.request.transfer.accountRef)
-                .putString(INSTALLER_HANDOFF_GROUP, handoff.request.transfer.groupIdHex)
-                .putString(INSTALLER_HANDOFF_MESSAGE, handoff.request.transfer.messageIdHex)
-                .putInt(INSTALLER_HANDOFF_INDEX, handoff.request.transfer.attachmentIndex)
-                .putLong(INSTALLER_HANDOFF_SOURCE_EPOCH, handoff.request.sourceEpoch.toLong())
-                .putString(INSTALLER_HANDOFF_PHASE, handoff.phase.name)
+        if (!installerHandoffRecords.replaceAllDurably(handoff?.toPersistedValues().orEmpty())) {
+            Log.w(TAG, "installer handoff rollback failed; scheduling state remains unavailable")
         }
-        editor.apply()
     }
 
     private fun readSet(key: String): Set<String> = preferences.getStringSet(key, emptySet()).orEmpty().toSet()
@@ -482,22 +453,28 @@ internal class AttachmentDownloadIntentStore(
         const val OPEN_IDENTITIES = "attachment_download_open_identities"
         const val INSTALL_PERMISSION_IDENTITIES = "attachment_install_permission_identities"
         val ACTIVE_INSTALL_PERMISSION_IDENTITIES = mutableSetOf<String>()
-        const val INSTALLER_HANDOFF_ACCOUNT = "attachment_installer_handoff_account"
-        const val INSTALLER_HANDOFF_GROUP = "attachment_installer_handoff_group"
-        const val INSTALLER_HANDOFF_MESSAGE = "attachment_installer_handoff_message"
-        const val INSTALLER_HANDOFF_INDEX = "attachment_installer_handoff_index"
-        const val INSTALLER_HANDOFF_SOURCE_EPOCH = "attachment_installer_handoff_source_epoch"
-        const val INSTALLER_HANDOFF_PHASE = "attachment_installer_handoff_phase"
         val ACTIVE_INSTALLER_PERMISSION_HANDOFFS = mutableSetOf<String>()
-        val GROUP_ID_HEX = Regex("^[0-9a-fA-F]{32}$")
-        val MESSAGE_ID_HEX = Regex("^[0-9a-fA-F]{64}$")
     }
 }
 
+/** Encodes one handoff for the encrypted record store without protocol attachment data. */
+private fun PersistedInstallerHandoff.toPersistedValues(): Map<String, String> =
+    mapOf(
+        INSTALLER_HANDOFF_ACCOUNT to request.transfer.accountRef,
+        INSTALLER_HANDOFF_GROUP to request.transfer.groupIdHex,
+        INSTALLER_HANDOFF_MESSAGE to request.transfer.messageIdHex,
+        INSTALLER_HANDOFF_INDEX to request.transfer.attachmentIndex.toString(),
+        INSTALLER_HANDOFF_SOURCE_EPOCH to request.sourceEpoch.toString(),
+        INSTALLER_HANDOFF_PHASE to phase.name,
+    )
+
+/** Hides a raw account reference before it enters ordinary preferences. */
 private fun accountToken(accountRef: String): String = attachmentIdentityDigest(accountRef)
 
+/** Produces the opaque token shared by transfer-intent sets. */
 private fun requestToken(request: AttachmentTransferRequest): String = attachmentIdentityTag(request)
 
+/** Scopes a viewer handoff to one account, group, and navigation session. */
 private fun destinationToken(destination: AttachmentOpenDestination): String =
     attachmentIdentityDigest(
         listOf(
@@ -507,6 +484,7 @@ private fun destinationToken(destination: AttachmentOpenDestination): String =
         ).joinToString("\u0000"),
     )
 
+/** Combines route and attachment identity so stale destinations cannot claim a launch. */
 private fun openRequestToken(request: AttachmentOpenRequest): String =
     buildString {
         append(destinationToken(request.destination))

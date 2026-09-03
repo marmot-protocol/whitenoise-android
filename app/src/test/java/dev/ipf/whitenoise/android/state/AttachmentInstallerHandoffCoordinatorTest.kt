@@ -25,11 +25,13 @@ class AttachmentInstallerHandoffCoordinatorTest {
     private val preferences by lazy {
         context.getSharedPreferences("attachment-installer-coordinator-test", Context.MODE_PRIVATE)
     }
+    private val installerHandoffRecords = VolatileAttachmentInstallerHandoffRecordStore()
 
     /** Clears durable and volatile permission ownership between examples. */
     @Before
     fun reset() {
-        AttachmentDownloadIntentStore(preferences).abandonInstallerPermissionHandoff(REQUEST)
+        intentStore().abandonInstallerPermissionHandoff(REQUEST)
+        installerHandoffRecords.replaceAllDurably(emptyMap())
         preferences.edit().clear().commit()
     }
 
@@ -39,7 +41,7 @@ class AttachmentInstallerHandoffCoordinatorTest {
         runTest {
             val dispatcher = StandardTestDispatcher(testScheduler)
             val scope = CoroutineScope(SupervisorJob() + dispatcher)
-            val store = AttachmentDownloadIntentStore(preferences)
+            val store = intentStore()
             var enqueueCount = 0
             try {
                 val coordinator =
@@ -102,7 +104,7 @@ class AttachmentInstallerHandoffCoordinatorTest {
         try {
             val coordinator =
                 AttachmentInstallerHandoffCoordinator(
-                    intentStore = AttachmentDownloadIntentStore(preferences),
+                    intentStore = intentStore(),
                     scope = scope,
                     enqueue = { _, _ -> },
                     foregroundEligible = { foreground },
@@ -133,7 +135,7 @@ class AttachmentInstallerHandoffCoordinatorTest {
                 assertNull(coordinator.pending())
                 assertFalse(coordinator.canDispatch(REQUEST))
                 testScheduler.advanceUntilIdle()
-                assertNull(AttachmentDownloadIntentStore(preferences).pendingInstallerHandoff())
+                assertNull(intentStore().pendingInstallerHandoff())
             } finally {
                 scope.cancel()
             }
@@ -145,7 +147,7 @@ class AttachmentInstallerHandoffCoordinatorTest {
         runTest {
             val dispatcher = StandardTestDispatcher(testScheduler)
             val scope = CoroutineScope(SupervisorJob() + dispatcher)
-            val store = AttachmentDownloadIntentStore(preferences)
+            val store = intentStore()
             assertTrue(store.markInstallerHandoff(REQUEST))
             var enqueueCount = 0
             val coordinator =
@@ -176,7 +178,7 @@ class AttachmentInstallerHandoffCoordinatorTest {
         runTest {
             val dispatcher = StandardTestDispatcher(testScheduler)
             val scope = CoroutineScope(SupervisorJob() + dispatcher)
-            val store = AttachmentDownloadIntentStore(preferences)
+            val store = intentStore()
             assertTrue(store.markInstallerHandoff(REQUEST))
             var enqueueCount = 0
             val coordinator =
@@ -205,11 +207,18 @@ class AttachmentInstallerHandoffCoordinatorTest {
         dispatcher: CoroutineDispatcher,
     ): AttachmentInstallerHandoffCoordinator =
         AttachmentInstallerHandoffCoordinator(
-            intentStore = AttachmentDownloadIntentStore(preferences),
+            intentStore = intentStore(),
             scope = scope,
             enqueue = { _, _ -> },
             foregroundEligible = { true },
             persistence = dispatcher,
+        )
+
+    /** Creates a process owner over the test's shared durable installer record. */
+    private fun intentStore(): AttachmentDownloadIntentStore =
+        AttachmentDownloadIntentStore(
+            preferences,
+            installerHandoffRecords,
         )
 
     private companion object {

@@ -356,16 +356,15 @@ internal fun MediaFileBubble(
                             readerOpen = true
                             return@combinedClickable
                         }
-                        openRequested =
-                            if (usesDurableInstallerHandoff) {
-                                controller.requestAttachmentInstallerHandoff(
-                                    messageIdHex,
-                                    attachmentIndex,
-                                    reference.sourceEpoch,
-                                )
-                            } else {
-                                controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
-                            }
+                        if (usesDurableInstallerHandoff) {
+                            controller.requestAttachmentInstallerHandoff(
+                                messageIdHex,
+                                attachmentIndex,
+                                reference.sourceEpoch,
+                            )
+                        } else {
+                            openRequested = controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                        }
                     },
                 ),
     ) {
