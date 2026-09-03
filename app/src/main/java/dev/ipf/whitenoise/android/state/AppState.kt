@@ -196,6 +196,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.yield
 import java.net.IDN
 import java.net.InetAddress
 import java.net.URI
@@ -2302,6 +2303,7 @@ class WhiteNoiseAppState private constructor(
     private val mediaUploadSessionLifetime = StalenessGuard()
     private val notificationJob = NotificationJobSlot()
     private val pushWakeCatchUpDrainJob = NotificationJobSlot()
+    private val notificationPushWakeRecoveryCircuit = NotificationPushWakeRecoveryCircuit()
 
     @Volatile
     private var networkNotificationRecoverySuppressed = false
@@ -6687,6 +6689,15 @@ class WhiteNoiseAppState private constructor(
                     backoffMillis = notificationNetworkRecoveryRetryDelayMillis(attempt),
                 )
             },
+            onRecoveryAttemptStarted = { networkGeneration ->
+                notificationPushWakeRecoveryCircuit.noteRecoveryAttempt(
+                    networkGeneration = networkGeneration,
+                    pushWakeGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration(),
+                )
+            },
+            onRecoveryExhausted = { networkGeneration, _ ->
+                notificationPushWakeRecoveryCircuit.noteRecoveryExhausted(networkGeneration)
+            },
             onDrainCompleted = ::schedulePendingPushWakeCatchUpDrain,
             diagnostics = notificationNetworkRecoveryDiagnostics,
         )
@@ -6897,10 +6908,50 @@ class WhiteNoiseAppState private constructor(
 
     /** Starts push-wake catch-up only when network recovery does not own the receiver. */
     private fun schedulePendingPushWakeCatchUpDrain() {
-        if (networkNotificationRecoverySuppressed || !pushTokenStore.pushWakeCatchUpPending()) return
-        if (notificationNetworkRecovery.isActive()) return
+        val pendingPushWakeGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
+        val networkGeneration = validatedConnectivityRecoveryGenerationMutable.value
+        val runtimeUnavailable =
+            networkNotificationRecoverySuppressed ||
+                pendingPushWakeGeneration == 0L ||
+                notificationNetworkRecovery.isActive()
+        val triggerAlreadyConsumed =
+            !notificationPushWakeRecoveryCircuit.allowsIndependentDrain(
+                networkGeneration = networkGeneration,
+                pushWakeGeneration = pendingPushWakeGeneration,
+            )
+        if (runtimeUnavailable || triggerAlreadyConsumed) {
+            return
+        }
         pushWakeCatchUpDrainJob.startIfInactive {
-            notificationScope.launch { ensureNotificationRuntimeStarted() }
+            notificationScope
+                .launch {
+                    if (
+                        notificationPushWakeRecoveryCircuit.claimIndependentDrain(
+                            networkGeneration = networkGeneration,
+                            pushWakeGeneration = pendingPushWakeGeneration,
+                        )
+                    ) {
+                        ensureNotificationRuntimeStarted()
+                    }
+                }.also { drainJob ->
+                    drainJob.invokeOnCompletion {
+                        val currentPushWakeGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
+                        val currentNetworkGeneration = validatedConnectivityRecoveryGenerationMutable.value
+                        if (
+                            currentPushWakeGeneration != 0L &&
+                            (
+                                currentPushWakeGeneration != pendingPushWakeGeneration ||
+                                    currentNetworkGeneration != networkGeneration
+                            )
+                        ) {
+                            notificationScope.launch {
+                                // Completion can run inline while the job slot lock is held.
+                                yield()
+                                schedulePendingPushWakeCatchUpDrain()
+                            }
+                        }
+                    }
+                }
         }
     }
 

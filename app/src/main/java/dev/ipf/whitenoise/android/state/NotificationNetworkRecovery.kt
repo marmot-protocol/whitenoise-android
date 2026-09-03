@@ -367,6 +367,61 @@ internal enum class NotificationNetworkRecoveryOutcome {
     CatchUpFailed,
 }
 
+private data class RecoveryTrigger(
+    val networkGeneration: Long,
+    val pushWakeGeneration: Long,
+)
+
+/** Prevents an exhausted recovery trigger from escaping through an independent drain path. */
+internal class NotificationPushWakeRecoveryCircuit {
+    private val lock = Any()
+    private var lastRecoveryAttempt: RecoveryTrigger? = null
+    private var consumedTrigger: RecoveryTrigger? = null
+
+    /** Captures the durable wake generation visible when a recovery attempt starts. */
+    fun noteRecoveryAttempt(
+        networkGeneration: Long,
+        pushWakeGeneration: Long,
+    ) {
+        synchronized(lock) {
+            lastRecoveryAttempt = RecoveryTrigger(networkGeneration, pushWakeGeneration)
+        }
+    }
+
+    /** Opens the circuit for the trigger actually observed by the exhausted attempt. */
+    fun noteRecoveryExhausted(networkGeneration: Long) {
+        synchronized(lock) {
+            lastRecoveryAttempt
+                ?.takeIf { trigger -> trigger.networkGeneration == networkGeneration }
+                ?.let { trigger -> consumedTrigger = trigger }
+        }
+    }
+
+    /** Reports whether the pending trigger has a fresh independent-drain budget. */
+    fun allowsIndependentDrain(
+        networkGeneration: Long,
+        pushWakeGeneration: Long,
+    ): Boolean =
+        synchronized(lock) {
+            isAllowed(RecoveryTrigger(networkGeneration, pushWakeGeneration))
+        }
+
+    /** Atomically spends the independent-drain budget for one network and durable-wake trigger. */
+    fun claimIndependentDrain(
+        networkGeneration: Long,
+        pushWakeGeneration: Long,
+    ): Boolean =
+        synchronized(lock) {
+            val trigger = RecoveryTrigger(networkGeneration, pushWakeGeneration)
+            if (!isAllowed(trigger)) return@synchronized false
+            consumedTrigger = trigger
+            true
+        }
+
+    /** Evaluates one trigger while the circuit lock is already held. */
+    private fun isAllowed(trigger: RecoveryTrigger) = trigger.pushWakeGeneration != 0L && consumedTrigger != trigger
+}
+
 /**
  * Owns the coalesced reconnect job, retained generations, retry policy, and
  * privacy-safe Android phase trace for validated network recovery.
@@ -380,6 +435,11 @@ internal class NotificationNetworkRecoveryCoordinator(
     private val catchUpAccounts: suspend () -> AccountCatchUpResult,
     private val awaitRetry: suspend (generation: Long, attempt: Int) -> Unit,
     private val onDrainCompleted: () -> Unit,
+    private val onRecoveryAttemptStarted: (generation: Long) -> Unit = {},
+    private val onRecoveryExhausted: (
+        generation: Long,
+        outcome: NotificationNetworkRecoveryOutcome,
+    ) -> Unit = { _, _ -> },
     private val diagnostics: NotificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
 ) {
     private val job = NotificationJobSlot()
@@ -448,6 +508,7 @@ internal class NotificationNetworkRecoveryCoordinator(
                         maxAttempts = NETWORK_RECOVERY_MAX_ATTEMPTS,
                         onRetryExhausted = { generation, outcome ->
                             exhaustedGeneration.accumulateAndGet(generation, ::maxOf)
+                            onRecoveryExhausted(generation, outcome)
                             diagnostics.retryExhausted(
                                 generation = generation,
                                 attempt = NETWORK_RECOVERY_MAX_ATTEMPTS,
@@ -479,6 +540,7 @@ internal class NotificationNetworkRecoveryCoordinator(
         generation: Long,
         attempt: Int,
     ): NotificationNetworkRecoveryOutcome {
+        onRecoveryAttemptStarted(generation)
         recordAttemptStart(generation, attempt)
         return runNotificationReconnectOnNetworkRestore(
             wakeDurableOutbound = {

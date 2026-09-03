@@ -266,7 +266,7 @@ class NotificationNetworkReconnectCoverageTest {
             "!networkNotificationRecoverySuppressed && hasValidatedInternet()" in bridge &&
                 "if (!shouldContinue()) return" in reconnect &&
                 "if (!shouldContinue()) return@launch" in reconnect &&
-                "if (networkNotificationRecoverySuppressed ||" in pendingPushDrain,
+                "networkNotificationRecoverySuppressed ||" in pendingPushDrain,
         )
         assertTrue(
             "failed and successful wipes must release reconnect suppression before listener restart",

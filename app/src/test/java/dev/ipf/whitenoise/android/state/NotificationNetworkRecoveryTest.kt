@@ -483,6 +483,92 @@ class NotificationNetworkRecoveryTest {
             assertEquals(0, completedDrains)
         }
 
+    /** A callback after exhaustion cannot retry the same durable wake outside the coordinator. */
+    @Test
+    fun exhaustedRecoveryBlocksIndependentDrainForTheSameTrigger() =
+        runTest {
+            val circuit = NotificationPushWakeRecoveryCircuit()
+            var catchUps = 0
+            val pendingPushWakeGeneration = 11L
+            val coordinator =
+                NotificationNetworkRecoveryCoordinator(
+                    scope = this,
+                    shouldContinue = { true },
+                    wakeDurableOutbound = { true },
+                    ensureNotificationReceiverActive = { true },
+                    catchUpAccounts = {
+                        catchUps += 1
+                        AccountCatchUpResult(AccountCatchUpOutcome.Failed)
+                    },
+                    awaitRetry = { _, _ -> },
+                    onDrainCompleted = {},
+                    onRecoveryAttemptStarted = { networkGeneration ->
+                        circuit.noteRecoveryAttempt(networkGeneration, pendingPushWakeGeneration)
+                    },
+                    onRecoveryExhausted = { networkGeneration, _ ->
+                        circuit.noteRecoveryExhausted(networkGeneration)
+                    },
+                    diagnostics =
+                        NotificationNetworkRecoveryDiagnostics(
+                            nowMillis = { 0L },
+                            traceFactory = { null },
+                            traceRecorder = { _, _, _, _, _, _, _ -> },
+                        ),
+                )
+
+            coordinator.noteNetworkRestored(7L)
+            advanceUntilIdle()
+            assertEquals(4, catchUps)
+
+            if (circuit.claimIndependentDrain(7L, pendingPushWakeGeneration)) catchUps += 1
+
+            assertEquals("the same trigger must remain capped at four attempts", 4, catchUps)
+            assertTrue(circuit.claimIndependentDrain(8L, pendingPushWakeGeneration))
+            assertFalse(circuit.claimIndependentDrain(8L, pendingPushWakeGeneration))
+            assertTrue(circuit.claimIndependentDrain(8L, pendingPushWakeGeneration + 1L))
+        }
+
+    /** A wake recorded during the final attempt remains eligible as a newer trigger. */
+    @Test
+    fun exhaustionDoesNotBlockPushWakeRecordedDuringFinalAttempt() =
+        runTest {
+            val circuit = NotificationPushWakeRecoveryCircuit()
+            var attempts = 0
+            var pendingPushWakeGeneration = 20L
+            val coordinator =
+                NotificationNetworkRecoveryCoordinator(
+                    scope = this,
+                    shouldContinue = { true },
+                    wakeDurableOutbound = { true },
+                    ensureNotificationReceiverActive = { true },
+                    catchUpAccounts = {
+                        attempts += 1
+                        if (attempts == 4) pendingPushWakeGeneration += 1L
+                        AccountCatchUpResult(AccountCatchUpOutcome.Failed)
+                    },
+                    awaitRetry = { _, _ -> },
+                    onDrainCompleted = {},
+                    onRecoveryAttemptStarted = { networkGeneration ->
+                        circuit.noteRecoveryAttempt(networkGeneration, pendingPushWakeGeneration)
+                    },
+                    onRecoveryExhausted = { networkGeneration, _ ->
+                        circuit.noteRecoveryExhausted(networkGeneration)
+                    },
+                    diagnostics =
+                        NotificationNetworkRecoveryDiagnostics(
+                            nowMillis = { 0L },
+                            traceFactory = { null },
+                            traceRecorder = { _, _, _, _, _, _, _ -> },
+                        ),
+                )
+
+            coordinator.noteNetworkRestored(9L)
+            advanceUntilIdle()
+
+            assertFalse(circuit.claimIndependentDrain(9L, 20L))
+            assertTrue(circuit.claimIndependentDrain(9L, pendingPushWakeGeneration))
+        }
+
     /** Successful recovery may hand remaining durable work to its next drain. */
     @Test
     fun successfulCoordinatorRunsTheCompletionHandoff() =
