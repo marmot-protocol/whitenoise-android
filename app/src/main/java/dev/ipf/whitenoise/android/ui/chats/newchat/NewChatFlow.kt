@@ -602,6 +602,7 @@ private fun NewMessageScreen(
                             avatarUrl =
                                 appState.avatarUrl(candidate.accountIdHex)
                                     ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
+                            isFollowed = candidate.isFollowing,
                             enabled = creatingHex == null,
                             onClick = {
                                 if (candidate.source == null && candidate.searchProfile != null) {

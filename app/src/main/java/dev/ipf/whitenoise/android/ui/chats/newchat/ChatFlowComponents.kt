@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
@@ -110,6 +111,13 @@ internal fun FlowSearchField(
     )
 }
 
+/**
+ * Renders a reusable person row while keeping relationship and selection states independent.
+ *
+ * [isFollowed] adds the followed-person avatar badge and exports the localized `You follow`
+ * state once from the row. [selectionState] remains separate so multi-select pickers can expose
+ * selected and followed at the same time without making the badge look like a selection control.
+ */
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
 internal fun ContactRow(
@@ -118,6 +126,8 @@ internal fun ContactRow(
     avatarSeed: String,
     avatarUrl: String?,
     avatarImage: ImageBitmap? = null,
+    isFollowed: Boolean = false,
+    selectionState: Boolean? = null,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
@@ -126,6 +136,13 @@ internal fun ContactRow(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val copyLabel = stringResource(R.string.copy)
+    val followedStateDescription =
+        if (isFollowed) {
+            stringResource(R.string.user_search_you_follow)
+        } else {
+            null
+        }
+    val rowRole = if (selectionState == null) Role.Button else Role.Checkbox
     Row(
         modifier =
             modifier
@@ -135,30 +152,36 @@ internal fun ContactRow(
                     if (onClick != null && onLongClick != null) {
                         it.combinedClickable(
                             enabled = enabled,
-                            role = Role.Button,
+                            role = rowRole,
                             onLongClick = onLongClick,
                             onClick = onClick,
                         )
                     } else if (onClick != null) {
                         it.clickable(
                             enabled = enabled,
-                            role = Role.Button,
+                            role = rowRole,
                             onClick = onClick,
                         )
                     } else {
                         it
                     }
-                }.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
+                }.recipientRelationshipSemantics(followedStateDescription, selectionState)
+                .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
     ) {
-        Avatar(
-            title = title,
-            seed = avatarSeed,
-            size = 48.dp,
-            pictureUrl = avatarUrl?.takeIf { avatarImage == null },
-            picture = avatarImage,
-        )
+        Box(modifier = Modifier.size(48.dp)) {
+            Avatar(
+                title = title,
+                seed = avatarSeed,
+                size = 48.dp,
+                pictureUrl = avatarUrl?.takeIf { avatarImage == null },
+                picture = avatarImage,
+            )
+            if (isFollowed) {
+                FollowedPersonBadge(modifier = Modifier.align(Alignment.BottomEnd))
+            }
+        }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXxs)) {
             Text(
                 title,
@@ -174,7 +197,9 @@ internal fun ContactRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier =
-                        if (onSubtitleClick == null) {
+                        if (followedStateDescription != null && subtitle == followedStateDescription) {
+                            Modifier.clearAndSetSemantics { }
+                        } else if (onSubtitleClick == null) {
                             Modifier
                         } else {
                             Modifier
