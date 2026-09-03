@@ -302,6 +302,12 @@ internal fun accountSelectorState(
         refreshing = refreshing,
     )
 
+/**
+ * Renders the current account snapshot while a background refresh reconciles it.
+ *
+ * Loading replaces the list only when no in-session snapshot exists, so opening the sheet never
+ * hides accounts that are already ready to switch.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun AccountSelectorContent(
@@ -320,7 +326,7 @@ internal fun AccountSelectorContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(stringResource(R.string.switch_account), style = MaterialTheme.typography.titleLarge)
-        if (state.refreshing) {
+        if (state.refreshing && state.accounts.isEmpty()) {
             Box(Modifier.fillMaxWidth().heightIn(min = 120.dp), contentAlignment = Alignment.Center) {
                 LoadingIndicator()
             }
