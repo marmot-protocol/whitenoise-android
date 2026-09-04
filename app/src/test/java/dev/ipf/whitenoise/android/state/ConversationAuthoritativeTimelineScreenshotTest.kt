@@ -20,7 +20,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.TimeZone
 
-/** Compose-level proof that the controller's authoritative order reaches visible rows. */
+/** Compose-level proof that authoritative and unresolved-local row order reaches visible rows. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
@@ -28,14 +28,14 @@ class ConversationAuthoritativeTimelineScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** Renders and captures the membership row above the application message it authorizes. */
+    /** Keeps an old unconfirmed row chronological without breaking the membership boundary. */
     @Test
-    fun membershipRowIsDisplayedAboveTheMessageItAuthorizes() {
+    fun oldUnconfirmedRowRendersBeforeTheAuthoritativePair() {
         val fixture = screenshotFixture()
         val originalTimeZone = TimeZone.getDefault()
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         try {
-            awaitConversationCondition { fixture.controller.timeline.size == 2 }
+            awaitConversationCondition { fixture.controller.timeline.size == 3 }
             showConversation(fixture)
             assertRowsAndCapture()
         } finally {
@@ -49,7 +49,10 @@ class ConversationAuthoritativeTimelineScreenshotTest {
     private fun screenshotFixture(): ScreenshotFixture {
         val subscription =
             ScriptedConversationTimelineSubscription(
-                timelinePage(membershipRecord(), appRecord()),
+                // MDK returns unresolved local rows in its trailing optimistic
+                // bucket. Android must merge this old row chronologically while
+                // retaining the authoritative membership/application pair.
+                timelinePage(membershipRecord(), appRecord(), unconfirmedLocalRecord()),
             )
         val scripted =
             ScriptedConversationLiveSubscriptions(
@@ -107,23 +110,27 @@ class ConversationAuthoritativeTimelineScreenshotTest {
         }
     }
 
-    /** Confirms both rows are visible in MDK order before writing the baseline. */
+    /** Confirms the local row and authoritative pair are visible in display order. */
     private fun assertRowsAndCapture() {
+        val unconfirmedRow = composeRule.onNodeWithText("old unconfirmed send")
         val systemRow = composeRule.onNodeWithText("You added", substring = true)
         val appRow = composeRule.onNodeWithText("body-$APP_MESSAGE_ID")
         appRow.performScrollTo()
         composeRule.waitForIdle()
+        unconfirmedRow.assertIsDisplayed()
         systemRow.assertIsDisplayed()
         appRow.assertIsDisplayed()
+        val unconfirmedTop = unconfirmedRow.fetchSemanticsNode().boundsInRoot.top
         val systemTop = systemRow.fetchSemanticsNode().boundsInRoot.top
         val appTop = appRow.fetchSemanticsNode().boundsInRoot.top
+        assertTrue("old unconfirmed row must not occupy the live head", unconfirmedTop < systemTop)
         assertTrue("membership row must render above the authorized app message", systemTop < appTop)
         composeRule
             .onRoot()
             .captureRoboImage("src/test/snapshots/conversation_authoritative_timeline_order_light.png")
     }
 
-    /** Builds the later-timestamp membership event shown at the top of the capture. */
+    /** Builds the later-timestamp membership event that anchors the authoritative pair. */
     private fun membershipRecord() =
         timelineRecord(
             messageId = SYSTEM_MESSAGE_ID,
@@ -154,6 +161,19 @@ class ConversationAuthoritativeTimelineScreenshotTest {
             timelineAt = 100uL,
         ).copy(sourceEpoch = SOURCE_EPOCH)
 
+    /** Builds an old local-only failed send that MDK returns after canonical history. */
+    private fun unconfirmedLocalRecord() =
+        timelineRecord(
+            messageId = UNCONFIRMED_MESSAGE_ID,
+            timelineAt = 50uL,
+            plaintext = "old unconfirmed send",
+        ).copy(
+            sourceMessageIdHex = null,
+            direction = "sent",
+            sender = ConversationTimelineTestIds.ACCOUNT_ID,
+            invalidationStatus = "local_publish_failed",
+        )
+
     /** Values shared by the render and cleanup phases of one screenshot assertion. */
     private data class ScreenshotFixture(
         val controller: ConversationController,
@@ -165,5 +185,6 @@ class ConversationAuthoritativeTimelineScreenshotTest {
         const val SOURCE_EPOCH = 7uL
         val SYSTEM_MESSAGE_ID = "ff".repeat(32)
         val APP_MESSAGE_ID = "00".repeat(32)
+        val UNCONFIRMED_MESSAGE_ID = "33".repeat(32)
     }
 }

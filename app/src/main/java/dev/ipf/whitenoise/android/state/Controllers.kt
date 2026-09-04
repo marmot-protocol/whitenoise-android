@@ -11018,7 +11018,14 @@ class ConversationController(
         if (replaceWindow) trimStateForWindowReplacement()
         authoritativeTimelineOrderByMessageId.clear()
         pageMessages.forEachIndexed { index, record ->
-            authoritativeTimelineOrderByMessageId[record.messageIdHex] = index.toULong()
+            // MDK places unresolved local projections after accepted history as
+            // an optimistic-head bucket. They carry no accepted-history position,
+            // so keep them as timestamped overlays; otherwise an old failed send
+            // can become the bottom row and make a newly confirmed bubble jump
+            // upward out of view when it acquires a source epoch.
+            if (record.hasHistoryPosition()) {
+                authoritativeTimelineOrderByMessageId[record.messageIdHex] = index.toULong()
+            }
             val actionRecord =
                 upsertProjectedRecord(
                     record,
