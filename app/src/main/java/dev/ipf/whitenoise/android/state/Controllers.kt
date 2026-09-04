@@ -3296,12 +3296,18 @@ class ChatsController private constructor(
         }
     }
 
+    /**
+     * Folds [row] into the optimistic baseline and returns the row that is safe
+     * to expose to conversation-scoped consumers. A pending matching echo is
+     * intentionally returned while parked; a rejected stale replay returns the
+     * already-accepted baseline instead.
+     */
     private fun foldOptimisticChatListBaseline(
         state: OptimisticChatListPreviewState,
         row: ChatListRowFfi,
         acceptBackwardActivity: Boolean = false,
         observesNewActivity: Boolean = false,
-    ) {
+    ): ChatListRowFfi {
         val activityCompare = compareChatListActivity(state.baselineRow, row)
         val match =
             matchingOptimisticPreview(state, row)
@@ -3321,7 +3327,7 @@ class ChatsController private constructor(
             // reports whether publishing succeeded. Keep it provisional so a
             // later failure still restores the pre-send baseline.
             state.entries[pendingEntryKey] = state.entries.getValue(pendingEntryKey).copy(pendingAuthoritativeRow = row)
-            return
+            return row
         }
         var acceptRow = true
         if (match != null) {
@@ -3360,6 +3366,7 @@ class ChatsController private constructor(
                 )
         }
         if (acceptRow) state.baselineRow = row
+        return if (acceptRow) row else state.baselineRow
     }
 
     /**
@@ -4855,23 +4862,50 @@ class ChatsController private constructor(
             return
         }
         val membershipChanged = current == null
-        if (state == null) {
-            chatRowsByGroup[key] = folded
-            if (shouldAdvanceChatActivitySequence(current, folded, observesNewActivity)) {
-                activitySequenceByGroup[key] = nextChatActivitySequence()
+        val effectivePublicationRow =
+            if (state == null) {
+                chatRowsByGroup[key] = folded
+                if (shouldAdvanceChatActivitySequence(current, folded, observesNewActivity)) {
+                    activitySequenceByGroup[key] = nextChatActivitySequence()
+                }
+                folded
+            } else {
+                foldOptimisticChatListBaseline(
+                    state,
+                    folded,
+                    acceptBackwardActivity = trigger == ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
+                    observesNewActivity = observesNewActivity,
+                ).also {
+                    materializeOptimisticChatListPreview(key, state)
+                }
             }
-        } else {
-            foldOptimisticChatListBaseline(
-                state,
-                folded,
-                acceptBackwardActivity = trigger == ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
-                observesNewActivity = observesNewActivity,
-            )
-            materializeOptimisticChatListPreview(key, state)
-        }
-        appState.publishConversationChatListRow(accountRef, folded)
+        appState.publishConversationChatListRow(accountRef, effectivePublicationRow)
         if (membershipChanged) noteMaterializedGroupMembershipChanged()
         scheduleRecompute()
+    }
+
+    /** Replaces one snapshot row and returns the metadata row safe to publish. */
+    private fun replaceChatRow(
+        key: String,
+        row: ChatListRowFfi,
+        previous: ChatListRowFfi?,
+        previousSequence: ULong?,
+        wasMaterialized: Boolean,
+        optimisticState: OptimisticChatListPreviewState?,
+    ): ChatListRowFfi {
+        if (optimisticState != null) {
+            return foldOptimisticChatListBaseline(optimisticState, row, acceptBackwardActivity = true).also {
+                materializeOptimisticChatListPreview(key, optimisticState)
+            }
+        }
+        chatRowsByGroup[key] = row
+        activitySequenceByGroup[key] =
+            when {
+                previous == null && wasMaterialized -> nextChatActivitySequence()
+                previous != null && chatListActivityAdvanced(previous, row) -> nextChatActivitySequence()
+                else -> previousSequence ?: 0uL
+            }
+        return row
     }
 
     /**
@@ -4915,21 +4949,16 @@ class ChatsController private constructor(
         rows.forEach { row ->
             val key = chatRowKey(row.groupIdHex)
             val previous = previousRowsByGroup[key]
-            val state = optimisticChatListPreviewByGroup[key]
-            if (state == null) {
-                chatRowsByGroup[key] = row
-                val sequence =
-                    when {
-                        previous == null && wasMaterialized -> nextChatActivitySequence()
-                        previous != null && chatListActivityAdvanced(previous, row) -> nextChatActivitySequence()
-                        else -> previousSequences[key] ?: 0uL
-                    }
-                activitySequenceByGroup[key] = sequence
-            } else {
-                foldOptimisticChatListBaseline(state, row, acceptBackwardActivity = true)
-                materializeOptimisticChatListPreview(key, state)
-            }
-            appState.publishConversationChatListRow(accountRef, row)
+            val effectivePublicationRow =
+                replaceChatRow(
+                    key = key,
+                    row = row,
+                    previous = previous,
+                    previousSequence = previousSequences[key],
+                    wasMaterialized = wasMaterialized,
+                    optimisticState = optimisticChatListPreviewByGroup[key],
+                )
+            appState.publishConversationChatListRow(accountRef, effectivePublicationRow)
         }
         optimisticChatListPreviewByGroup.keys.retainAll(chatRowsByGroup.keys)
         val liveGroupIds = rows.mapTo(mutableSetOf()) { it.groupIdHex }
