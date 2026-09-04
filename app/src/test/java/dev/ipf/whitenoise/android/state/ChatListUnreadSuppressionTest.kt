@@ -105,9 +105,15 @@ class ChatListUnreadSuppressionTest {
     }
 
     @Test
-    fun coldOpenFallbackRecordCarriesTheRowsDisbandState() {
+    fun coldOpenFallbackRecordCarriesTheRowsTerminalState() {
         // A projection-only cold open (full group record still loading) must
-        // not flash an active composer for a disbanding/disbanded chat.
+        // not flash an active composer for an unrecoverable or disbanded chat.
+        val unrecoverable =
+            emptyGroupRecord(
+                row("group-a", 0uL).copy(lifecycleState = GroupLifecycleStateFfi.UNRECOVERABLE),
+            )
+        assertTrue(unrecoverable.unrecoverable)
+
         val disbanding = emptyGroupRecord(row("group-a", 0uL).copy(disbanding = true))
         assertTrue(disbanding.disbanding)
         assertFalse(disbanding.disbanded)

@@ -4,6 +4,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Looper
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
@@ -61,6 +62,7 @@ internal class NotificationBootstrapTestFixture(
     // Optional behavior hooks so worker/reconciliation tests can steer the FFI
     // boundary per call; every default preserves the fixture's original shape.
     private val onChatList: ((accountRef: String) -> List<ChatListRowFfi>)? = null,
+    private val onGroupMemberIdsPage: ((groupIds: List<String>) -> List<AppGroupMemberIdsFfi>)? = null,
     private val onMarkTimelineMessageRead: (() -> ChatListRowFfi?)? = null,
     private val onSendText: ((accountRef: String, groupIdHex: String, text: String) -> SendSummaryFfi)? = null,
     private val onReactToMessage: (() -> SendSummaryFfi)? = null,
@@ -91,6 +93,7 @@ internal class NotificationBootstrapTestFixture(
     val localSnapshotSubscriptionCalls = AtomicInteger(0)
     val localSnapshotGroupSubscriptionCalls = AtomicInteger(0)
     val localSnapshotReadCalls = AtomicInteger(0)
+    val directChatListCalls = AtomicInteger(0)
     val memberProjectionCalls = AtomicInteger(0)
     val signerRegistrationCalls = AtomicInteger(0)
     val markReadCalls = AtomicInteger(0)
@@ -219,14 +222,19 @@ internal class NotificationBootstrapTestFixture(
                     localSnapshotGroupSubscriptionCalls.incrementAndGet()
                     emptyChatsSubscription()
                 }
-                "chatList" -> onChatList?.invoke(arguments?.get(0) as String) ?: emptyList<Any>()
+                "chatList" -> {
+                    directChatListCalls.incrementAndGet()
+                    onChatList?.invoke(arguments?.get(0) as String) ?: chatListRows
+                }
                 "timelineMessages" ->
                     // An exhausted, empty page: recovery probes conclude
                     // NotCommitted deterministically instead of erroring.
                     TimelinePageFfi(messages = emptyList(), hasMoreBefore = false, hasMoreAfter = false)
                 "groupMemberIdsPage" -> {
                     memberProjectionCalls.incrementAndGet()
-                    emptyList<Any>()
+                    @Suppress("UNCHECKED_CAST")
+                    val groupIds = arguments?.get(1) as List<String>
+                    onGroupMemberIdsPage?.invoke(groupIds) ?: emptyList<AppGroupMemberIdsFfi>()
                 }
                 "userProfile" -> null
                 "displayName" -> {

@@ -149,29 +149,16 @@ class AccountSwitchLocalSnapshotOrderingTest {
     }
 
     @Test
-    fun localPreloadFencesEverySuspendingStageAndAlwaysClosesTemporarySubscriptions() {
+    fun localPreloadFencesEverySuspendingStageAndDefersLiveSubscriptions() {
         val source = appStateSource().readText()
         val body = source.kotlinFunctionBody("loadAccountSwitchLocalSnapshot")
         val presentation = source.kotlinFunctionBody("loadAccountSwitchPresentationSeeds")
-        val firstSubscription = body.indexOf("subscribeChatList")
-        val firstGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = firstSubscription)
-        val secondSubscription = body.indexOf("subscribeChats", startIndex = firstGuard)
-        val secondGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = secondSubscription)
-        val groupsStart = body.indexOf("val groupsDeferred = async", startIndex = secondGuard)
-        val groupsSnapshot = body.indexOf("chatsSubscription.snapshot()", startIndex = groupsStart)
-        val rows = body.indexOf("chatListSubscription.snapshot()", startIndex = groupsSnapshot)
+        val rows = body.indexOf("chatList(accountRef, includeArchived = true)")
         val rowsGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = rows)
-        val presentationStart = body.indexOf("val presentationDeferred", startIndex = rowsGuard)
-        val groupsAwait = body.indexOf("groupsDeferred.await()", startIndex = presentationStart)
-        val groupsGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = groupsAwait)
-        val groupsReadyCount =
-            body.indexOf(
-                "recordAccountSwitchPreloadStage(accountRef, \"cached-groups-ready\", groups.size)",
-                startIndex = groupsGuard,
-            )
-        val presentationAwait = body.indexOf("presentationDeferred.await()", startIndex = groupsGuard)
-        val presentationGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = presentationAwait)
-        val cleanup = body.indexOf("withContext(NonCancellable + Dispatchers.IO)", startIndex = groupsGuard)
+        val rowsReady = body.indexOf("\"cached-chat-rows-ready\"", startIndex = rowsGuard)
+        val presentationStart = body.indexOf("loadAccountSwitchPresentationSeeds", startIndex = rowsReady)
+        val presentationGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = presentationStart)
+        val snapshot = body.indexOf("AccountSwitchLocalSnapshot(", startIndex = presentationGuard)
         val topBarProfiles = presentation.indexOf("topBarProfilesDeferred = async")
         val members = presentation.indexOf("loadAccountSwitchMemberIds")
         val membersGuard = presentation.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = members)
@@ -184,21 +171,19 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val topBarAwait = presentation.indexOf("topBarProfilesDeferred.await()", startIndex = directProfilesGuard)
         val topBarGuard = presentation.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = topBarAwait)
 
-        assertTrue(firstGuard > firstSubscription)
-        assertTrue(secondGuard > secondSubscription)
-        assertTrue("the independent group snapshot must start before the row snapshot", groupsSnapshot > groupsStart)
+        assertTrue("one authoritative row read must replace temporary subscription admission", rows >= 0)
         assertTrue(rowsGuard > rows)
-        assertTrue("presentation work must overlap the already-started group snapshot", presentationStart > rowsGuard)
-        assertTrue(groupsGuard > groupsAwait)
-        assertTrue("cached-group diagnostics must report groups rather than rows", groupsReadyCount > groupsGuard)
-        assertTrue(presentationGuard > presentationAwait)
+        assertTrue("row readiness must be recorded after the generation guard", rowsReady > rowsGuard)
+        assertTrue("identity presentation must follow the authoritative rows", presentationStart > rowsReady)
+        assertTrue(presentationGuard > presentationStart)
+        assertTrue(snapshot > presentationGuard)
+        assertTrue("the pre-activation handoff must defer full groups", "groups = emptyList()" in body)
+        assertFalse("chat-list live admission belongs to the target controller", "subscribeChatList" in body)
+        assertFalse("full group projection belongs to the target controller", "subscribeChats" in body)
         assertTrue("bounded top-bar profiles must overlap member projection", topBarProfiles in 0..<members)
         assertTrue(membersGuard > members)
         assertTrue(directProfilesGuard > directProfiles)
         assertTrue(topBarGuard > topBarAwait)
-        assertTrue("temporary subscriptions must close even for stale/cancelled loads", cleanup > groupsGuard)
-        assertTrue("chat-list subscription must close", "chatListSubscription?.close()" in body)
-        assertTrue("group subscription must close", "chatsSubscription?.close()" in body)
     }
 
     @Test

@@ -33,8 +33,6 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
-import dev.ipf.marmotkit.ChatListSubscription
-import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
@@ -4781,59 +4779,38 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Read the target account's local MDK projection before publishing the new
-     * active account. The old account remains composed behind the selector
-     * while these on-device reads run, so the first target composition can be
-     * the cached list rather than a loading placeholder.
+     * Reads the target account's authoritative local chat rows before publishing
+     * the new active account. The first target composition receives these rows
+     * instead of a loading placeholder; its controller owns full group and live
+     * subscription admission after that seeded frame is visible.
      */
     private suspend fun loadAccountSwitchLocalSnapshot(
         accountRef: String,
         generation: Long,
         includePresentationSeeds: Boolean = true,
-    ): AccountSwitchLocalSnapshot? {
-        var chatListSubscription: ChatListSubscription? = null
-        var chatsSubscription: ChatsSubscription? = null
-        return try {
-            chatListSubscription = marmotIo { subscribeChatList(accountRef, includeArchived = true) }
+    ): AccountSwitchLocalSnapshot? =
+        try {
+            val rows = marmotIo { chatList(accountRef, includeArchived = true) }
             ensureAccountSwitchRequestIsCurrent(generation)
-            chatsSubscription = marmotIo { subscribeChats(accountRef, includeArchived = true) }
-            ensureAccountSwitchRequestIsCurrent(generation)
-            recordAccountSwitchPreloadStage(accountRef, "local-subscriptions-ready", 0)
-
-            coroutineScope {
-                // These two immutable local snapshots are independent. Start
-                // the group read immediately so its SQLite/FFI cost overlaps
-                // the row read and the identity-only presentation work.
-                val groupsDeferred = async(Dispatchers.IO) { chatsSubscription.snapshot() }
-                val rows = withContext(Dispatchers.IO) { chatListSubscription.snapshot() }
-                ensureAccountSwitchRequestIsCurrent(generation)
-                recordAccountSwitchPreloadStage(accountRef, "cached-chat-rows-ready", rows.size)
-
-                val presentationDeferred =
-                    async {
-                        loadAccountSwitchPresentationSeeds(
-                            accountRef = accountRef,
-                            generation = generation,
-                            rows = rows,
-                            includePresentationSeeds = includePresentationSeeds,
-                        )
-                    }
-                val groups = groupsDeferred.await()
-                ensureAccountSwitchRequestIsCurrent(generation)
-                recordAccountSwitchPreloadStage(accountRef, "cached-groups-ready", groups.size)
-                val presentation = presentationDeferred.await()
-                ensureAccountSwitchRequestIsCurrent(generation)
-
-                AccountSwitchLocalSnapshot(
+            recordAccountSwitchPreloadStage(accountRef, "cached-chat-rows-ready", rows.size)
+            val presentation =
+                loadAccountSwitchPresentationSeeds(
                     accountRef = accountRef,
-                    activeAccountIdHex = presentation.activeAccountIdHex,
+                    generation = generation,
                     rows = rows,
-                    groups = groups,
-                    memberIds = presentation.memberIds,
-                    profiles = presentation.profiles,
-                ).also { snapshot ->
-                    if (includePresentationSeeds) recordAccountSwitchIdentityState(accountRef, snapshot)
-                }
+                    includePresentationSeeds = includePresentationSeeds,
+                )
+            ensureAccountSwitchRequestIsCurrent(generation)
+
+            AccountSwitchLocalSnapshot(
+                accountRef = accountRef,
+                activeAccountIdHex = presentation.activeAccountIdHex,
+                rows = rows,
+                groups = emptyList(),
+                memberIds = presentation.memberIds,
+                profiles = presentation.profiles,
+            ).also { snapshot ->
+                if (includePresentationSeeds) recordAccountSwitchIdentityState(accountRef, snapshot)
             }
         } catch (_: AccountSwitchSnapshotSuperseded) {
             null
@@ -4844,13 +4821,7 @@ class WhiteNoiseAppState private constructor(
                 "account-switch local snapshot failed: ${throwable.readableMessage()}"
             }
             null
-        } finally {
-            withContext(NonCancellable + Dispatchers.IO) {
-                runCatching { chatListSubscription?.close() }
-                runCatching { chatsSubscription?.close() }
-            }
         }
-    }
 
     private suspend fun loadAccountSwitchPresentationSeeds(
         accountRef: String,

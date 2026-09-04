@@ -535,6 +535,11 @@ internal fun nextTimelineOrder(
     pending: Sequence<ULong>,
 ): ULong = (published + pending).maxOrNull()?.plus(1uL) ?: 1uL
 
+/**
+ * Builds a conservative group seed from an authoritative chat-list row while
+ * the full group projection is unavailable. Capability-relevant lifecycle
+ * fields are retained and fields the row cannot prove default to fail-closed.
+ */
 internal fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
     AppGroupRecordFfi(
         groupIdHex = row.groupIdHex,
@@ -553,7 +558,10 @@ internal fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
         encryptedMedia = defaultEncryptedMediaComponent(),
         archived = row.archived,
         pendingConfirmation = row.pendingConfirmation,
-        unrecoverable = false,
+        // Preserve the row's terminal lifecycle while the full group record is
+        // deferred. This keeps send and management capabilities fail-closed on
+        // the account-switch first frame.
+        unrecoverable = row.lifecycleState == GroupLifecycleStateFfi.UNRECOVERABLE,
         selfMembership = row.selfMembership,
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
