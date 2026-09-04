@@ -542,7 +542,7 @@ internal fun WhiteNoiseApp(
                                         ErrorContent(
                                             title = stringResource(R.string.white_noise_couldnt_start),
                                             error = phase.error,
-                                            onRetry = { scope.launch { appState.bootstrap() } },
+                                            onRetry = { scope.launch { appState.retryBootstrap() } },
                                         )
                                     }
                                 }

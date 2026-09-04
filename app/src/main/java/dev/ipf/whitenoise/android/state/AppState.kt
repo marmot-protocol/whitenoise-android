@@ -1192,6 +1192,7 @@ class WhiteNoiseAppState private constructor(
     private val notificationDispatcher: CoroutineDispatcher,
     private val notificationCardCancellationDispatcher: CoroutineDispatcher,
     private val notificationReceiverTimeoutMillis: () -> Long,
+    private val bootstrapActionableTimeoutMillis: () -> Long,
     private val notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics,
     private val inboundShareTextStager: ((String, String, String) -> Unit)?,
     preferencesOverride: SharedPreferences?,
@@ -1214,6 +1215,7 @@ class WhiteNoiseAppState private constructor(
             notificationDispatcher = Dispatchers.IO,
             notificationCardCancellationDispatcher = processNotificationCardCancellationDispatcher,
             notificationReceiverTimeoutMillis = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
+            bootstrapActionableTimeoutMillis = { BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS },
             notificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
             inboundShareTextStager = null,
             preferencesOverride = null,
@@ -1238,6 +1240,7 @@ class WhiteNoiseAppState private constructor(
         notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
         notificationCardCancellationDispatcher: CoroutineDispatcher = processNotificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis: () -> Long = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
+        bootstrapActionableTimeoutMillis: () -> Long = { BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS },
         notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics =
             NotificationNetworkRecoveryDiagnostics(),
         inboundShareTextStager: ((String, String, String) -> Unit)? = null,
@@ -1257,6 +1260,7 @@ class WhiteNoiseAppState private constructor(
         notificationDispatcher = notificationDispatcher,
         notificationCardCancellationDispatcher = notificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis = notificationReceiverTimeoutMillis,
+        bootstrapActionableTimeoutMillis = bootstrapActionableTimeoutMillis,
         notificationNetworkRecoveryDiagnostics = notificationNetworkRecoveryDiagnostics,
         inboundShareTextStager = inboundShareTextStager,
         preferencesOverride = preferences,
@@ -3932,12 +3936,11 @@ class WhiteNoiseAppState private constructor(
     suspend fun bootstrap() {
         val attempt =
             withContext(Dispatchers.Main.immediate) {
-                if (phase is AppPhase.Failed) phase = AppPhase.Bootstrapping
                 bootstrapAttempts.currentOrStart {
                     mutationsScope.async { bootstrapLocked() }
                 }
             }
-        val completed = awaitBootstrapAttempt(attempt, BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS)
+        val completed = awaitBootstrapAttempt(attempt, bootstrapActionableTimeoutMillis())
         if (!completed) {
             withContext(Dispatchers.Main.immediate) {
                 if (attempt.isActive && phase == AppPhase.Bootstrapping) {
@@ -3954,8 +3957,21 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /**
+     * Retries bootstrap after an actionable failure was shown to the user.
+     *
+     * Only this explicit UI action restores the loading surface. Process and
+     * background callers use [bootstrap], so attaching to the same in-flight
+     * attempt cannot hide an error that the user can act on.
+     */
+    suspend fun retryBootstrap() {
+        withContext(Dispatchers.Main.immediate) {
+            if (phase is AppPhase.Failed) phase = AppPhase.Bootstrapping
+        }
+        bootstrap()
+    }
+
     private suspend fun bootstrapLocked() {
-        phase = AppPhase.Bootstrapping
         try {
             if (resumeCompletedBootstrap()) return
             startupPerformance.stage(PerformancePhase.NOTIFICATION_PLATFORM_SETUP) {

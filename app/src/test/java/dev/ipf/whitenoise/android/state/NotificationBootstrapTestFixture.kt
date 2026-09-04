@@ -46,8 +46,10 @@ internal class NotificationBootstrapTestFixture(
     initiallyFailSubscriptions: Boolean = false,
     initiallyBlockSubscriptions: Boolean = false,
     initiallyBlockSubscriptionsSynchronously: Boolean = false,
+    initiallyBlockRuntimeStartSynchronously: Boolean = false,
     delayFirstNotificationDispatchAfterRuntimeStart: Boolean = false,
     receiverTimeoutMillis: Long = 100L,
+    bootstrapActionableTimeoutMillis: Long = 15_000L,
     notificationUsersHaveDisplayNames: Boolean = true,
     private val localDisplayName: String? = "Alice",
     isDm: Boolean = false,
@@ -71,6 +73,8 @@ internal class NotificationBootstrapTestFixture(
         }
     private val synchronousSubscriptionGate =
         CountDownLatch(if (initiallyBlockSubscriptionsSynchronously) 1 else 0)
+    private val runtimeStartGate =
+        CountDownLatch(if (initiallyBlockRuntimeStartSynchronously) 1 else 0)
     private val subscriberAttached = AtomicBoolean(false)
     private val emittedPostStartUpdate = AtomicBoolean(false)
     private val runtimeStarted = AtomicBoolean(false)
@@ -143,6 +147,7 @@ internal class NotificationBootstrapTestFixture(
             when (method.name) {
                 "start" -> {
                     runtimeStartCalls.incrementAndGet()
+                    runtimeStartGate.await()
                     runtimeStarted.set(true)
                     Unit
                 }
@@ -253,6 +258,7 @@ internal class NotificationBootstrapTestFixture(
             notificationSubscriber = { subscribe() },
             notificationDispatcher = notificationDispatchGate ?: Dispatchers.IO,
             notificationReceiverTimeoutMillis = receiverTimeoutMillisState::get,
+            bootstrapActionableTimeoutMillis = { bootstrapActionableTimeoutMillis },
         )
 
     private fun emptyChatListSubscription(): ChatListSubscription =
@@ -310,8 +316,16 @@ internal class NotificationBootstrapTestFixture(
         subscriptionGate.complete(Unit)
     }
 
+    fun allowRuntimeStart() {
+        runtimeStartGate.countDown()
+    }
+
     suspend fun bootstrap() {
         runWithMainLooperPumping { appState.bootstrap() }
+    }
+
+    suspend fun retryBootstrap() {
+        runWithMainLooperPumping { appState.retryBootstrap() }
     }
 
     suspend fun ensureNotificationRuntimeStarted() {
@@ -344,6 +358,7 @@ internal class NotificationBootstrapTestFixture(
     }
 
     fun close() {
+        runtimeStartGate.countDown()
         notificationDispatchGate?.release()
         synchronousSubscriptionGate.countDown()
         subscriptionGate.complete(Unit)

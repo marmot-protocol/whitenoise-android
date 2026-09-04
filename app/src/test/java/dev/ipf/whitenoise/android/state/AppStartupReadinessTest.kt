@@ -21,13 +21,19 @@ class AppStartupReadinessTest {
     }
 
     @Test
-    fun failedRetryRestoresBootstrappingBeforeLaunchingAFullAttempt() {
-        val bootstrap = appStateSource().functionBody("bootstrap")
-        val newAttempt = bootstrap.indexOf("mutationsScope.async { bootstrapLocked() }")
-        val restorePhase = bootstrap.lastIndexOf("phase = AppPhase.Bootstrapping", startIndex = newAttempt)
+    fun onlyExplicitRetryRestoresBootstrappingBeforeAwaitingTheProcessAttempt() {
+        val source = appStateSource()
+        val bootstrap = source.functionBody("bootstrap")
+        val retry = source.functionBody("retryBootstrap")
+        val restorePhase = retry.indexOf("phase = AppPhase.Bootstrapping")
+        val awaitAttempt = retry.indexOf("bootstrap()")
 
-        assertTrue(newAttempt >= 0)
-        assertTrue(restorePhase in 0 until newAttempt)
+        assertTrue(
+            "background bootstrap must preserve an actionable failure",
+            "phase = AppPhase.Bootstrapping" !in bootstrap,
+        )
+        assertTrue(restorePhase >= 0)
+        assertTrue(awaitAttempt > restorePhase)
     }
 
     @Test
