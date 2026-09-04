@@ -192,6 +192,20 @@ if (( status == 0 )) || [[ "$output" != *"valid wss:// URI"* ]]; then
   printf 'error: malformed production push relay hint was not rejected clearly\n%s\n' "$output" >&2
   exit 1
 fi
+
+export WHITENOISE_PRODUCTION_PUSH_RELAY_HINT="wss://relay.example:not-a-port"
+set +e
+output="$({
+  cd "$FIXTURE_DIR/repo"
+  PATH="$FIXTURE_DIR/bin:$PATH" ./scripts/release.sh --abi universal
+} 2>&1)"
+status=$?
+set -e
+if (( status == 0 )) || [[ "$output" != *"valid wss:// URI"* ]]; then
+  printf 'error: non-numeric production push relay port was not rejected clearly\n%s\n' "$output" >&2
+  exit 1
+fi
+
 export WHITENOISE_PRODUCTION_PUSH_RELAY_HINT="wss://relay.example"
 
 set +e

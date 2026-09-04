@@ -368,13 +368,18 @@ import sys
 from urllib.parse import urlparse
 
 relay = urlparse(sys.argv[1])
-valid = (
-    relay.scheme.lower() == "wss"
-    and bool(relay.hostname)
-    and relay.username is None
-    and relay.password is None
-    and not relay.fragment
-)
+try:
+    relay.port
+except ValueError:
+    valid = False
+else:
+    valid = (
+        relay.scheme.lower() == "wss"
+        and bool(relay.hostname)
+        and relay.username is None
+        and relay.password is None
+        and not relay.fragment
+    )
 raise SystemExit(0 if valid else 1)
 PY
   then
