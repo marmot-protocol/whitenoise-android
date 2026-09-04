@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.os.Looper
 import dev.ipf.marmotkit.GroupSystemEventFfi
+import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import kotlinx.coroutines.runBlocking
@@ -18,6 +19,7 @@ import java.time.Duration
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationAuthoritativeTimelineOrderingTest {
+    /** A later wall-clock membership event retains MDK's position above its app row. */
     @Test
     fun snapshotKeepsMembershipBeforeTheMessageItAuthorizes() =
         runBlocking {
@@ -31,6 +33,7 @@ class ConversationAuthoritativeTimelineOrderingTest {
             }
         }
 
+    /** Equal timestamps still defer completely to the authoritative MDK ordinal. */
     @Test
     fun equalTimestampsStillKeepMembershipBeforeTheAppMessage() =
         runBlocking {
@@ -48,6 +51,30 @@ class ConversationAuthoritativeTimelineOrderingTest {
             }
         }
 
+    /** Earlier-timestamp stream rows remain chained below their MDK-ranked prompt. */
+    @Test
+    fun durableStreamChainCannotCrossPrecedingMembershipRow() =
+        runBlocking {
+            val subscription =
+                ScriptedConversationTimelineSubscription(
+                    timelinePage(
+                        membershipRecord(timelineAt = 200uL),
+                        appRecord(timelineAt = 100uL),
+                        streamStartRecord(timelineAt = 98uL),
+                        streamFinalRecord(timelineAt = 99uL),
+                    ),
+                )
+            withController(subscription) { controller, _ ->
+                awaitConversationCondition { controller.timeline.size == 4 }
+
+                assertEquals(
+                    listOf(SYSTEM_MESSAGE_ID, APP_MESSAGE_ID, STREAM_START_MESSAGE_ID, STREAM_FINAL_MESSAGE_ID),
+                    timelineMessageIds(controller),
+                )
+            }
+        }
+
+    /** An app-first live delivery settles when the next full MDK window arrives. */
     @Test
     fun liveWindowSettlesAppFirstArrivalIntoAuthoritativeOrder() =
         runBlocking {
@@ -64,6 +91,7 @@ class ConversationAuthoritativeTimelineOrderingTest {
             }
         }
 
+    /** A system-first live delivery remains stable when the app row arrives. */
     @Test
     fun liveWindowKeepsAuthoritativeOrderAfterSystemFirstArrival() =
         runBlocking {
@@ -80,6 +108,7 @@ class ConversationAuthoritativeTimelineOrderingTest {
             }
         }
 
+    /** Backward pagination renders the full order returned by the subscription. */
     @Test
     fun backwardPaginationKeepsTheReturnedWindowOrder() =
         runBlocking {
@@ -97,6 +126,7 @@ class ConversationAuthoritativeTimelineOrderingTest {
             }
         }
 
+    /** Forward pagination renders the full order returned by the subscription. */
     @Test
     fun forwardPaginationKeepsTheReturnedWindowOrder() =
         runBlocking {
@@ -114,6 +144,7 @@ class ConversationAuthoritativeTimelineOrderingTest {
             }
         }
 
+    /** Reconnecting replaces the retained window without losing authoritative order. */
     @Test
     fun replacementSubscriptionSnapshotKeepsAuthoritativeOrder() =
         runBlocking {
@@ -138,6 +169,7 @@ class ConversationAuthoritativeTimelineOrderingTest {
             }
         }
 
+    /** Builds the source-epoch membership event used as the ordering boundary. */
     private fun membershipRecord(timelineAt: ULong) =
         timelineRecord(
             messageId = SYSTEM_MESSAGE_ID,
@@ -161,12 +193,41 @@ class ConversationAuthoritativeTimelineOrderingTest {
                 ),
         )
 
+    /** Builds the authorized application message and durable stream prompt. */
     private fun appRecord(timelineAt: ULong) =
         timelineRecord(
             messageId = APP_MESSAGE_ID,
             timelineAt = timelineAt,
         ).copy(sourceEpoch = SOURCE_EPOCH)
 
+    /** Builds the durable stream start linked to the authoritative prompt. */
+    private fun streamStartRecord(timelineAt: ULong) =
+        timelineRecord(
+            messageId = STREAM_START_MESSAGE_ID,
+            timelineAt = timelineAt,
+        ).copy(
+            kind = 1200uL,
+            tags =
+                listOf(
+                    MessageTagFfi(listOf("stream", STREAM_ID)),
+                    MessageTagFfi(listOf("parent", APP_MESSAGE_ID)),
+                ),
+        )
+
+    /** Builds the durable stream final linked through the stream-start row. */
+    private fun streamFinalRecord(timelineAt: ULong) =
+        timelineRecord(
+            messageId = STREAM_FINAL_MESSAGE_ID,
+            timelineAt = timelineAt,
+        ).copy(
+            tags =
+                listOf(
+                    MessageTagFfi(listOf("stream", STREAM_ID)),
+                    MessageTagFfi(listOf("stream-start", STREAM_START_MESSAGE_ID)),
+                ),
+        )
+
+    /** Builds an authoritative page with explicit pagination flags. */
     private fun page(
         messages: List<TimelineMessageRecordFfi>,
         hasMoreBefore: Boolean = false,
@@ -177,6 +238,7 @@ class ConversationAuthoritativeTimelineOrderingTest {
         hasMoreAfter = hasMoreAfter,
     )
 
+    /** Asserts the membership/application ordering central to issue #1578. */
     private fun assertAuthoritativePair(controller: ConversationController) {
         assertEquals(
             listOf(SYSTEM_MESSAGE_ID, APP_MESSAGE_ID),
@@ -184,6 +246,7 @@ class ConversationAuthoritativeTimelineOrderingTest {
         )
     }
 
+    /** Owns a controller and closes every scripted subscription after the assertion. */
     private suspend fun withController(
         vararg subscriptions: ScriptedConversationTimelineSubscription,
         block: suspend (ConversationController, ScriptedConversationLiveSubscriptions) -> Unit,
@@ -202,6 +265,7 @@ class ConversationAuthoritativeTimelineOrderingTest {
         }
     }
 
+    /** Creates the production controller around deterministic subscription seams. */
     private fun conversationController(subscriptions: ConversationLiveSubscriptions) =
         ConversationController(
             appState = conversationTimelineTestAppState(subscriptions),
@@ -213,7 +277,10 @@ class ConversationAuthoritativeTimelineOrderingTest {
 
     private companion object {
         const val SOURCE_EPOCH = 7uL
+        const val STREAM_ID = "reply"
         val SYSTEM_MESSAGE_ID = "ff".repeat(32)
         val APP_MESSAGE_ID = "00".repeat(32)
+        val STREAM_START_MESSAGE_ID = "11".repeat(32)
+        val STREAM_FINAL_MESSAGE_ID = "22".repeat(32)
     }
 }

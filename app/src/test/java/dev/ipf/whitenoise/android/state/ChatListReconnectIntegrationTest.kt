@@ -5,6 +5,7 @@ import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
@@ -17,6 +18,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -83,6 +85,51 @@ class ChatListReconnectIntegrationTest {
             groupSubscription.close()
             bindScope.cancel()
             shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
+    /** A chat-list row refreshes the classification held by a mounted conversation. */
+    @Test
+    fun chatListRowRefreshesAttachedConversationKind() {
+        val liveSubscriptions =
+            ScriptedConversationLiveSubscriptions(
+                timelineScripts = emptyList(),
+                group = conversationTimelineTestGroup(),
+            )
+        val appState = conversationTimelineTestAppState(liveSubscriptions.subscriptions)
+        val directRow = notificationChatListRow().copy(conversationKind = ChatConversationKindFfi.DIRECT)
+        val conversation =
+            ConversationController(
+                appState = appState,
+                initialGroup = conversationTimelineTestGroup(),
+                initialMemberSnapshot = conversationTimelineMemberSnapshot(),
+                initialChatListRow = directRow,
+            )
+        val chats =
+            ChatsController(
+                appState = appState,
+                initialAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,
+                memberSnapshotLoader = { _, _ -> emptyList() },
+            )
+        appState.attachConversationController(conversation)
+        try {
+            assertTrue(conversation.isDm)
+
+            chats.applyChatListSubscriptionUpdate(
+                accountRef = ConversationTimelineTestIds.ACCOUNT_REF,
+                update =
+                    ChatListSubscriptionUpdateFfi.Row(
+                        row = directRow.copy(conversationKind = ChatConversationKindFfi.GROUP),
+                        trigger = ChatListUpdateTriggerFfi.CONVERSATION_KIND_CHANGED,
+                    ),
+            )
+
+            assertFalse(conversation.isDm)
+            assertEquals(ChatConversationKindFfi.GROUP, conversation.latestChatListRow?.conversationKind)
+        } finally {
+            appState.detachConversationController(conversation)
+            conversation.onCleared()
+            chats.onCleared()
         }
     }
 

@@ -31,6 +31,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
+/** Scriptable bounded-window subscription with observable lifecycle calls. */
 internal class ScriptedConversationTimelineSubscription(
     private val snapshotPage: TimelinePageFfi?,
     private val backwardsPage: TimelinePageFfi = emptyTimelinePage(),
@@ -51,28 +52,35 @@ internal class ScriptedConversationTimelineSubscription(
     val closeCallCount: Int
         get() = lifecycleEvents.count { it == "close" }
 
+    /** Records and returns the configured initial authoritative window. */
     override fun snapshot(): TimelinePageFfi? {
         lifecycleEvents += "snapshot"
         return snapshotPage
     }
 
+    /** Suspends until a scripted complete window arrives or the stream ends. */
     override suspend fun nextWindow(): TimelinePageFfi? {
         lifecycleEvents += "nextWindow"
         return windows.receiveCatching().getOrNull()
     }
 
+    /** Ends live delivery so controller retry paths can be exercised. */
     fun endWindows() {
         windows.close()
     }
 
+    /** Enqueues one authoritative live window for the controller pump. */
     fun emitWindow(page: TimelinePageFfi) {
         check(windows.trySend(page).isSuccess) { "timeline window channel is closed" }
     }
 
+    /** Returns the configured backward-pagination window. */
     override suspend fun paginateBackwards(count: UInt): TimelinePageFfi = backwardsPage
 
+    /** Returns the configured forward-pagination window. */
     override suspend fun paginateForwards(count: UInt): TimelinePageFfi = forwardsPage
 
+    /** Records closure and unblocks any pending live-window read. */
     override fun close() {
         lifecycleEvents += "close"
         windows.close()
@@ -401,6 +409,7 @@ internal fun conversationTimelineReconnectFixtures(): ConversationTimelineReconn
 
 internal typealias ScriptedTimelineSubscription = ScriptedConversationTimelineSubscription
 
+/** Asserts the controller consumes the snapshot before awaiting its first live window. */
 internal fun assertTimelineSubscriptionSnapshotBeforeFirstNextWindow(subscription: ScriptedTimelineSubscription) {
     assertEquals("expected exactly one snapshot read", 1, subscription.snapshotCallCount)
     assertTrue(

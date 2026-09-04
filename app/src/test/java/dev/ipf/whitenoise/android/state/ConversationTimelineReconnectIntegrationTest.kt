@@ -77,6 +77,7 @@ class ConversationTimelineReconnectIntegrationTest {
             }
         }
 
+    /** A replacement subscription snapshot closes a reconnect gap without a later window. */
     @Test
     fun replacementSubscriptionSnapshotReconcilesGapMessageWithoutLaterDelta() =
         runBlocking {
@@ -109,6 +110,7 @@ class ConversationTimelineReconnectIntegrationTest {
             }
         }
 
+    /** A null replacement snapshot retains the last authoritative window on screen. */
     @Test
     fun nullReplacementSnapshotKeepsRetainedTimelineVisible() =
         runBlocking {
@@ -155,6 +157,7 @@ class ConversationTimelineReconnectIntegrationTest {
             }
         }
 
+    /** A replacement snapshot resets pagination mode before the next live window. */
     @Test
     fun replacementSnapshotResetsPaginationModeForLaterAuthoritativeRefresh() =
         runBlocking {
@@ -212,6 +215,7 @@ class ConversationTimelineReconnectIntegrationTest {
             }
         }
 
+    /** Builds a bounded test page with explicit pagination flags. */
     private fun timelinePageWithFlags(
         messages: List<dev.ipf.marmotkit.TimelineMessageRecordFfi>,
         hasMoreBefore: Boolean = false,

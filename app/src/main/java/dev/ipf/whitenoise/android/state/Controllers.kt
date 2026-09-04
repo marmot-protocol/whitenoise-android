@@ -1004,6 +1004,11 @@ data class TimelineMessage(
     /** Position supplied by MDK's authoritative bounded timeline window. */
     val authoritativeOrder: ULong? = null,
     /**
+     * Immediate durable stream parent whose rendered row this row must follow.
+     * Null for ordinary authoritative rows and unanchored local overlays.
+     */
+    val displayAfterMessageIdHex: String? = null,
+    /**
      * Immutable retention snapshot captured when this local send was accepted.
      * It keeps the waiting timer accurate and supplies the bounded local expiry
      * fallback only until MarmotKit projects the authoritative source-epoch
@@ -1812,16 +1817,56 @@ internal fun orderTimelineMessagesForDisplay(messages: List<TimelineMessage>): L
             .filter { it.authoritativeOrder != null }
             .sortedWith(compareBy<TimelineMessage> { it.authoritativeOrder }.thenBy { it.id })
             .toMutableList()
-    val overlays = distinct.filter { it.authoritativeOrder == null }.sortedWith(::compareTimelineMessages)
-    overlays.forEach { overlay ->
-        val insertionIndex = authoritative.indexOfFirst { row -> compareTimelineMessages(overlay, row) < 0 }
-        if (insertionIndex < 0) {
-            authoritative.add(overlay)
-        } else {
-            authoritative.add(insertionIndex, overlay)
+    val overlays = distinct.filter { it.authoritativeOrder == null }
+    val messageIds = distinct.mapTo(mutableSetOf()) { it.displayMessageIdHex() }
+    val anchoredOverlays =
+        overlays.filter { overlay ->
+            overlay.displayAfterMessageIdHex?.let(messageIds::contains) == true
         }
+    val anchoredIds = anchoredOverlays.mapTo(mutableSetOf(), TimelineMessage::id)
+    overlays
+        .filterNot { it.id in anchoredIds }
+        .sortedWith(::compareTimelineMessages)
+        .forEach { overlay -> insertTimelineOverlayByFallbackOrder(authoritative, overlay) }
+
+    val childrenByParent =
+        anchoredOverlays
+            .groupBy(TimelineMessage::displayAfterMessageIdHex)
+            .mapValues { (_, children) -> children.sortedWith(::compareTimelineMessages) }
+    val ordered = ArrayList<TimelineMessage>(distinct.size)
+    val emittedIds = mutableSetOf<String>()
+
+    /** Emits a row and its durable descendants as one contiguous display chain. */
+    fun appendWithAnchoredChildren(row: TimelineMessage) {
+        if (!emittedIds.add(row.id)) return
+        ordered += row
+        childrenByParent[row.displayMessageIdHex()].orEmpty().forEach(::appendWithAnchoredChildren)
     }
-    return authoritative
+
+    authoritative.forEach(::appendWithAnchoredChildren)
+    // Malformed or cyclic durable links cannot be allowed to hide rows. Keep
+    // their deterministic fallback order if no rendered parent reached them.
+    anchoredOverlays
+        .filterNot { it.id in emittedIds }
+        .sortedWith(::compareTimelineMessages)
+        .forEach { overlay -> insertTimelineOverlayByFallbackOrder(ordered, overlay) }
+    return ordered
+}
+
+/** Source-level message identity used by durable stream parent links. */
+private fun TimelineMessage.displayMessageIdHex(): String = projected?.messageIdHex ?: record.messageIdHex
+
+/** Inserts an unanchored overlay without disturbing authoritative relative order. */
+private fun insertTimelineOverlayByFallbackOrder(
+    rows: MutableList<TimelineMessage>,
+    overlay: TimelineMessage,
+) {
+    val insertionIndex = rows.indexOfFirst { row -> compareTimelineMessages(overlay, row) < 0 }
+    if (insertionIndex < 0) {
+        rows.add(overlay)
+    } else {
+        rows.add(insertionIndex, overlay)
+    }
 }
 
 /**
@@ -4781,6 +4826,7 @@ class ChatsController private constructor(
         }
     }
 
+    /** Folds one authoritative row and mirrors it into any mounted conversation. */
     private fun foldChatRow(
         row: ChatListRowFfi,
         trigger: ChatListUpdateTriggerFfi? = null,
@@ -4804,7 +4850,10 @@ class ChatsController private constructor(
                 rejectedUnread = row.unreadCount,
             )
         }
-        if (folded == current) return
+        if (folded == current) {
+            appState.publishConversationChatListRow(accountRef, folded)
+            return
+        }
         val membershipChanged = current == null
         if (state == null) {
             chatRowsByGroup[key] = folded
@@ -4820,6 +4869,7 @@ class ChatsController private constructor(
             )
             materializeOptimisticChatListPreview(key, state)
         }
+        appState.publishConversationChatListRow(accountRef, folded)
         if (membershipChanged) noteMaterializedGroupMembershipChanged()
         scheduleRecompute()
     }
@@ -4843,6 +4893,7 @@ class ChatsController private constructor(
         foldChatRow(merged)
     }
 
+    /** Replaces the chat-list window and refreshes mounted conversation metadata. */
     private fun replaceChatRows(rows: List<ChatListRowFfi>) {
         rows.forEach {
             appState.acceptAuthoritativeMuteProjection(accountRef, it.groupIdHex, it.muted, it.mutedUntilMs)
@@ -4878,6 +4929,7 @@ class ChatsController private constructor(
                 foldOptimisticChatListBaseline(state, row, acceptBackwardActivity = true)
                 materializeOptimisticChatListPreview(key, state)
             }
+            appState.publishConversationChatListRow(accountRef, row)
         }
         optimisticChatListPreviewByGroup.keys.retainAll(chatRowsByGroup.keys)
         val liveGroupIds = rows.mapTo(mutableSetOf()) { it.groupIdHex }
@@ -6870,6 +6922,7 @@ class ConversationController(
     private val timelineItemsById = linkedMapOf<String, TimelineMessage>()
     private val timelineOrder = mutableListOf<String>()
     private val authoritativeTimelineOrderByMessageId = linkedMapOf<String, ULong>()
+    private val durableStreamDisplayParentByMessageId = mutableMapOf<String, String>()
     private val optimisticMessages = appState.optimisticMessages(conversationAccountRef, initialGroup.groupIdHex)
     private val durableAcceptanceCallbacks =
         appState.durableAcceptanceCallbacks(conversationAccountRef, initialGroup.groupIdHex)
@@ -7745,6 +7798,15 @@ class ConversationController(
         groupIdHex: String,
     ): Boolean = conversationAccountRef == accountRef && group.groupIdHex == groupIdHex
 
+    /** Applies the chat-list subscription's current row to this mounted conversation. */
+    internal fun applyAuthoritativeChatListRow(
+        accountRef: String?,
+        row: ChatListRowFfi,
+    ) {
+        if (!matchesConversation(accountRef, row.groupIdHex)) return
+        latestChatListRow = row
+    }
+
     internal fun acceptConfirmedMediaHandoff(
         confirmedId: String,
         deferredProjection: TimelineMessageRecordFfi?,
@@ -7785,6 +7847,7 @@ class ConversationController(
         }
     }
 
+    /** Consumes authoritative MDK windows and publishes only the newest coalesced window. */
     private suspend fun CoroutineScope.runTimelineSubscriptionPipeline(
         account: String,
         timelineStream: ConversationTimelineSubscriptionHandle,
@@ -11031,11 +11094,13 @@ class ConversationController(
         )
     }
 
+    /** Drops indexes owned by the previous authoritative bounded window. */
     private fun trimStateForWindowReplacement() {
         timelineRecords.clear()
         timelineItemsById.clear()
         timelineOrder.clear()
         authoritativeTimelineOrderByMessageId.clear()
+        durableStreamDisplayParentByMessageId.clear()
         projectedMessageIds.clear()
         // Drop stale projected records so messageById doesn't grow unbounded
         // as older pages are loaded; keep in-flight optimistic records so a
@@ -11599,12 +11664,14 @@ class ConversationController(
         return actionRecord
     }
 
+    /** Bridges a newly projected row through the position of its optimistic bubble. */
     private fun preserveOptimisticDisplayPosition(
         projectedId: String,
         optimisticId: String,
     ) {
         val optimistic = optimisticMessages["msg:$optimisticId"] ?: return
         durableStreamPositionOverrideIds.remove(projectedId)
+        durableStreamDisplayParentByMessageId.remove(projectedId)
         preservedTimelinePositionOverrideIds.add(projectedId)
         optimisticSendPositionPreserves.add(projectedId)
         localTimelineOrderOverrides[projectedId] = optimistic.timelineOrder
@@ -11657,21 +11724,25 @@ class ConversationController(
         return snapshot
     }
 
+    /** Rebuilds durable stream overrides and their immediate rendered-parent links. */
     private fun applyDurableStreamPositions(positions: Map<String, StreamFinalDisplayPosition>) {
-        (durableStreamPositionOverrideIds - positions.keys).forEach(::clearDurableStreamPosition)
+        val staleIds = durableStreamPositionOverrideIds + durableStreamDisplayParentByMessageId.keys - positions.keys
+        staleIds.forEach(::clearDurableStreamPosition)
         positions.forEach { (messageId, position) ->
             // A live preview is the row the user is already reading. Its
             // position wins for this controller session; the durable link is
             // the reload/cold-projection fallback.
+            val parentId = position.afterMessageId ?: return@forEach
+            val parent = timelineRecords[parentId] ?: return@forEach
             if (
                 messageId in preservedTimelinePositionOverrideIds ||
                 messageId in optimisticSendPositionPreserves
             ) {
+                durableStreamDisplayParentByMessageId[messageId] = parentId
+                refreshProjectedTimelinePosition(messageId)
                 return@forEach
             }
-            val projected = timelineRecords[messageId] ?: return@forEach
-            val parentId = position.afterMessageId ?: return@forEach
-            val parent = timelineRecords[parentId] ?: return@forEach
+            if (messageId !in timelineRecords) return@forEach
             val parentRecordedAt = localTimelineTimestampOverrides[parentId] ?: parent.timelineAt
             val effectivePosition =
                 resolvedDurableStreamDisplayPosition(
@@ -11683,6 +11754,7 @@ class ConversationController(
                     return@forEach
                 }
 
+            durableStreamDisplayParentByMessageId[messageId] = parentId
             localTimelineOrderOverrides[messageId] = effectivePosition.timelineOrder
             localTimelineTimestampOverrides[messageId] = effectivePosition.recordedAt
             durableStreamPositionOverrideIds.add(messageId)
@@ -11690,13 +11762,19 @@ class ConversationController(
         }
     }
 
+    /** Releases a durable override and any parent link used only for display ordering. */
     private fun clearDurableStreamPosition(messageId: String) {
-        if (!durableStreamPositionOverrideIds.remove(messageId)) return
-        localTimelineOrderOverrides.remove(messageId)
-        localTimelineTimestampOverrides.remove(messageId)
+        val removedOverride = durableStreamPositionOverrideIds.remove(messageId)
+        val removedParent = durableStreamDisplayParentByMessageId.remove(messageId) != null
+        if (!removedOverride && !removedParent) return
+        if (removedOverride) {
+            localTimelineOrderOverrides.remove(messageId)
+            localTimelineTimestampOverrides.remove(messageId)
+        }
         refreshProjectedTimelinePosition(messageId)
     }
 
+    /** Reprojects one indexed row after a transient display position changes. */
     private fun refreshProjectedTimelinePosition(messageId: String) {
         val projected = timelineRecords[messageId] ?: return
         val itemId = projectedItemId(projected)
@@ -11712,10 +11790,10 @@ class ConversationController(
         insertTimelineItemId(itemId)
     }
 
-    // Drop optimistic-send position overrides whose optimistic bubble is gone and
-    // whose real projection has landed, so a stale one can't keep a confirmed row
-    // pinned above a newer neighbour (#1578). The row settles to its authoritative
-    // position in MDK's current bounded window.
+    /**
+     * Drops completed optimistic-send bridges so projected rows settle back to
+     * their authoritative positions in MDK's current bounded window.
+     */
     private fun releaseOrphanedOptimisticSendPreserves(): Boolean {
         val orphaned =
             optimisticSendPositionPreserves.releaseOrphaned(
@@ -11732,10 +11810,10 @@ class ConversationController(
         return true
     }
 
-    // Field diagnostic for #1578: surface adjacent non-authoritative rows rendered
-    // out of source order, tagged with which override fed the fallback position.
-    // MDK-ranked pairs may intentionally invert wall time to preserve epoch safety.
-    // DEBUG-only; no effect on release builds.
+    /**
+     * Reports unexpected adjacent fallback-order inversions once per pair in debug
+     * builds; authoritative pairs may intentionally invert wall time for epoch safety.
+     */
     private fun logTimelineInversionsForDebug(
         rows: List<TimelineMessage>,
         expectedHandoffPreserves: Set<String>,
@@ -11758,6 +11836,7 @@ class ConversationController(
         loggedTimelineOrderingInversionPairs = inversionsByPair.keys
     }
 
+    /** Formats both rows and controller override state for an inversion diagnostic. */
     private fun describeTimelineInversion(inversion: TimelineAdjacentInversion): String {
         val aboveSource = checkNotNull(inversion.above.projected)
         val belowSource = checkNotNull(inversion.below.projected)
@@ -11767,6 +11846,7 @@ class ConversationController(
             "below[${describeTimelineInversionRow(inversion.below, belowSource)}]"
     }
 
+    /** Formats the source and effective positions of one diagnostic row. */
     private fun describeTimelineInversionRow(
         row: TimelineMessage,
         source: TimelineMessageRecordFfi,
@@ -11779,6 +11859,7 @@ class ConversationController(
             "durable=${source.messageIdHex in durableStreamPositionOverrideIds} " +
             "optimisticPreserve=${source.messageIdHex in optimisticSendPositionPreserves}"
 
+    /** Keeps a durable stream final at the position of the preview it replaces. */
     private fun preserveStreamFinalDisplayPosition(
         projectedId: String,
         actionRecord: AppMessageRecordFfi,
@@ -11799,10 +11880,12 @@ class ConversationController(
         localTimelineTimestampOverrides[projectedId] = position.recordedAt
     }
 
+    /** Removes one projection and every controller-owned index keyed to it. */
     private fun removeProjectedRecord(messageIdHex: String) {
         val itemId = timelineRecords[messageIdHex]?.let(::projectedItemId) ?: "msg:$messageIdHex"
         timelineRecords.remove(messageIdHex)
         authoritativeTimelineOrderByMessageId.remove(messageIdHex)
+        durableStreamDisplayParentByMessageId.remove(messageIdHex)
         projectedMessageIds.remove(messageIdHex)
         localTimelineOrderOverrides.remove(messageIdHex)
         localTimelineTimestampOverrides.remove(messageIdHex)
@@ -11888,6 +11971,7 @@ class ConversationController(
         optimisticReactionChanges.entries.removeAll { (_, change) -> change.targetMessageId !in retained }
     }
 
+    /** Projects one MDK row with its authoritative rank and any transient display bridge. */
     private fun timelineMessageFromProjection(
         record: TimelineMessageRecordFfi,
         actionRecord: AppMessageRecordFfi = TimelineProjector.toAppMessageRecord(record),
@@ -11922,6 +12006,7 @@ class ConversationController(
                         record.messageIdHex in localTimelineOrderOverrides ||
                             record.messageIdHex in localTimelineTimestampOverrides
                     },
+            displayAfterMessageIdHex = durableStreamDisplayParentByMessageId[record.messageIdHex],
             retentionAtSendSeconds = retentionAtSendSeconds.takeIf { actionRecord.retentionSeconds == null },
         )
     }
@@ -11932,6 +12017,7 @@ class ConversationController(
         return streamId?.let { "stream:$it" } ?: "msg:${record.messageIdHex}"
     }
 
+    /** Adds an item to the membership index; publication performs display ordering. */
     private fun insertTimelineItemId(itemId: String) {
         // Append in O(1). Position is irrelevant: publishTimelineFromIndexes
         // orders authoritative rows by MDK ordinal and merges local overlays,

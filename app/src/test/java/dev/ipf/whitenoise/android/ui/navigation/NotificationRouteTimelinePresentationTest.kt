@@ -151,6 +151,7 @@ class NotificationRouteTimelinePresentationTest {
         return appState.attachedConversationControllersForTest().single()
     }
 
+    /** Forces the mounted notification conversation through a background reconnect. */
     private fun reconnectWhileBackground(
         appState: WhiteNoiseAppState,
         firstSubscription: ScriptedConversationTimelineSubscription,
@@ -182,6 +183,7 @@ class NotificationRouteTimelinePresentationTest {
         }
     }
 
+    /** Verifies reconnect reused the mounted controller and rendered the recovered row. */
     private fun assertNotificationReconnectPresentation(
         mountedController: ConversationController,
         appState: WhiteNoiseAppState,

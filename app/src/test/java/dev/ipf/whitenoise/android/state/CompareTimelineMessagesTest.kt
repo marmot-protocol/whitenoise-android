@@ -6,11 +6,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class CompareTimelineMessagesTest {
+    /** Builds the smallest display row needed to exercise ordering policy. */
     private fun msg(
         id: String,
         recordedAt: ULong,
         order: ULong,
         authoritativeOrder: ULong? = null,
+        displayAfterMessageIdHex: String? = null,
     ) = TimelineMessage(
         id = id,
         record =
@@ -37,8 +39,10 @@ class CompareTimelineMessagesTest {
         status = MessageStatus.Received,
         timelineOrder = order,
         authoritativeOrder = authoritativeOrder,
+        displayAfterMessageIdHex = displayAfterMessageIdHex,
     )
 
+    /** A total fallback comparator produces the same result for every input permutation. */
     @Test
     fun sortResultIsIndependentOfInputOrder() {
         // compareTimelineMessages breaks every tie on the unique id, so it is a
@@ -62,6 +66,7 @@ class CompareTimelineMessagesTest {
         }
     }
 
+    /** MDK-ranked rows stay fixed while a newer optimistic send remains at the head. */
     @Test
     fun displayOrderPreservesAuthoritativeRowsAndKeepsOptimisticSendAtLiveHead() {
         val system = msg("system", recordedAt = 200uL, order = 0uL, authoritativeOrder = 0uL)
@@ -74,6 +79,7 @@ class CompareTimelineMessagesTest {
         )
     }
 
+    /** A one-frame optimistic bridge does not reorder the authoritative rows around it. */
     @Test
     fun displayOrderMergesTransientPositionBridgeWithoutReorderingAuthoritativeRows() {
         val first = msg("first", recordedAt = 100uL, order = 0uL, authoritativeOrder = 0uL)
@@ -83,6 +89,32 @@ class CompareTimelineMessagesTest {
         assertEquals(
             listOf("first", "bridge", "second"),
             orderTimelineMessagesForDisplay(listOf(second, bridge, first)).map { it.id },
+        )
+    }
+
+    /** Durable stream children stay under their prompt instead of crossing an MDK-ranked event. */
+    @Test
+    fun displayOrderAnchorsDurableStreamChainBelowAuthoritativePrompt() {
+        val membership = msg("membership", recordedAt = 200uL, order = 0uL, authoritativeOrder = 0uL)
+        val prompt = msg("prompt", recordedAt = 100uL, order = 0uL, authoritativeOrder = 1uL)
+        val start =
+            msg(
+                "start",
+                recordedAt = 100uL,
+                order = 1uL,
+                displayAfterMessageIdHex = "prompt",
+            )
+        val final =
+            msg(
+                "final",
+                recordedAt = 100uL,
+                order = 2uL,
+                displayAfterMessageIdHex = "start",
+            )
+
+        assertEquals(
+            listOf("membership", "prompt", "start", "final"),
+            orderTimelineMessagesForDisplay(listOf(final, prompt, membership, start)).map { it.id },
         )
     }
 }
