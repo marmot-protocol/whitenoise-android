@@ -22,7 +22,6 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
-import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import org.junit.Assert.assertEquals
@@ -32,12 +31,14 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
+/** Scriptable bounded-window subscription with observable lifecycle calls. */
 internal class ScriptedConversationTimelineSubscription(
     private val snapshotPage: TimelinePageFfi?,
     private val backwardsPage: TimelinePageFfi = emptyTimelinePage(),
+    private val forwardsPage: TimelinePageFfi = emptyTimelinePage(),
 ) : ConversationTimelineSubscriptionHandle {
     private val lifecycleEvents = CopyOnWriteArrayList<String>()
-    private val updates = Channel<TimelineSubscriptionUpdateFfi>(Channel.UNLIMITED)
+    private val windows = Channel<TimelinePageFfi>(Channel.UNLIMITED)
 
     val lifecycleEventOrder: List<String>
         get() = lifecycleEvents.toList()
@@ -45,37 +46,44 @@ internal class ScriptedConversationTimelineSubscription(
     val snapshotCallCount: Int
         get() = lifecycleEvents.count { it == "snapshot" }
 
-    val nextUpdateCallCount: Int
-        get() = lifecycleEvents.count { it == "nextUpdate" }
+    val nextWindowCallCount: Int
+        get() = lifecycleEvents.count { it == "nextWindow" }
 
     val closeCallCount: Int
         get() = lifecycleEvents.count { it == "close" }
 
+    /** Records and returns the configured initial authoritative window. */
     override fun snapshot(): TimelinePageFfi? {
         lifecycleEvents += "snapshot"
         return snapshotPage
     }
 
-    override suspend fun nextUpdate(): TimelineSubscriptionUpdateFfi? {
-        lifecycleEvents += "nextUpdate"
-        return updates.receiveCatching().getOrNull()
+    /** Suspends until a scripted complete window arrives or the stream ends. */
+    override suspend fun nextWindow(): TimelinePageFfi? {
+        lifecycleEvents += "nextWindow"
+        return windows.receiveCatching().getOrNull()
     }
 
-    fun endUpdates() {
-        updates.close()
+    /** Ends live delivery so controller retry paths can be exercised. */
+    fun endWindows() {
+        windows.close()
     }
 
-    fun emitUpdate(update: TimelineSubscriptionUpdateFfi) {
-        check(updates.trySend(update).isSuccess) { "timeline update channel is closed" }
+    /** Enqueues one authoritative live window for the controller pump. */
+    fun emitWindow(page: TimelinePageFfi) {
+        check(windows.trySend(page).isSuccess) { "timeline window channel is closed" }
     }
 
+    /** Returns the configured backward-pagination window. */
     override suspend fun paginateBackwards(count: UInt): TimelinePageFfi = backwardsPage
 
-    override suspend fun paginateForwards(count: UInt): TimelinePageFfi = emptyTimelinePage()
+    /** Returns the configured forward-pagination window. */
+    override suspend fun paginateForwards(count: UInt): TimelinePageFfi = forwardsPage
 
+    /** Records closure and unblocks any pending live-window read. */
     override fun close() {
         lifecycleEvents += "close"
-        updates.close()
+        windows.close()
     }
 }
 
@@ -401,18 +409,19 @@ internal fun conversationTimelineReconnectFixtures(): ConversationTimelineReconn
 
 internal typealias ScriptedTimelineSubscription = ScriptedConversationTimelineSubscription
 
-internal fun assertTimelineSubscriptionSnapshotBeforeFirstNextUpdate(subscription: ScriptedTimelineSubscription) {
+/** Asserts the controller consumes the snapshot before awaiting its first live window. */
+internal fun assertTimelineSubscriptionSnapshotBeforeFirstNextWindow(subscription: ScriptedTimelineSubscription) {
     assertEquals("expected exactly one snapshot read", 1, subscription.snapshotCallCount)
     assertTrue(
-        "expected at least one nextUpdate read, got ${subscription.nextUpdateCallCount}",
-        subscription.nextUpdateCallCount >= 1,
+        "expected at least one nextWindow read, got ${subscription.nextWindowCallCount}",
+        subscription.nextWindowCallCount >= 1,
     )
     val events = subscription.lifecycleEventOrder
     val snapshotIndex = events.indexOf("snapshot")
-    val nextUpdateIndex = events.indexOf("nextUpdate")
+    val nextWindowIndex = events.indexOf("nextWindow")
     assertTrue(
-        "snapshot must be consumed before the first nextUpdate, got $events",
-        snapshotIndex >= 0 && nextUpdateIndex > snapshotIndex,
+        "snapshot must be consumed before the first nextWindow, got $events",
+        snapshotIndex >= 0 && nextWindowIndex > snapshotIndex,
     )
 }
 

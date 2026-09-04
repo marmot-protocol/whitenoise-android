@@ -5,6 +5,8 @@ import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
@@ -17,6 +19,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -85,6 +88,135 @@ class ChatListReconnectIntegrationTest {
             shadowOf(Looper.getMainLooper()).idle()
         }
     }
+
+    /** A rejected stale replay cannot regress the row held by a mounted conversation. */
+    @Test
+    fun staleChatListReplayKeepsAttachedConversationOnTheAcceptedRow() {
+        val fixture = attachedChatListFixture()
+        fixture.appState.attachConversationController(fixture.conversation)
+        try {
+            fixture.chats.publishTestRow(fixture.directRow, ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH)
+            assertTrue(fixture.conversation.isDm)
+            val replay = advanceThroughNewerGroupRow(fixture)
+
+            assertFalse(fixture.conversation.isDm)
+            assertEquals(ChatConversationKindFfi.GROUP, fixture.conversation.latestChatListRow?.conversationKind)
+
+            fixture.chats.publishTestRow(replay.staleRow, ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE)
+
+            assertFalse(fixture.conversation.isDm)
+            assertEquals(ChatConversationKindFfi.GROUP, fixture.conversation.latestChatListRow?.conversationKind)
+            assertEquals(
+                replay.acceptedMessageId,
+                fixture.conversation.latestChatListRow
+                    ?.lastMessage
+                    ?.messageIdHex,
+            )
+        } finally {
+            fixture.appState.detachConversationController(fixture.conversation)
+            fixture.conversation.onCleared()
+            fixture.chats.onCleared()
+        }
+    }
+
+    /** Creates the attached controllers and their initial direct-conversation row. */
+    private fun attachedChatListFixture(): AttachedChatListFixture {
+        val liveSubscriptions =
+            ScriptedConversationLiveSubscriptions(
+                timelineScripts = emptyList(),
+                group = conversationTimelineTestGroup(),
+            )
+        val appState = conversationTimelineTestAppState(liveSubscriptions.subscriptions)
+        val directRow =
+            notificationChatListRow().copy(
+                conversationKind = ChatConversationKindFfi.DIRECT,
+                lastMessage =
+                    notifiedMessagePreview().copy(
+                        messageIdHex = "10".repeat(32),
+                        plaintext = "initial",
+                        timelineAt = 10uL,
+                    ),
+                activitySortAt = 10uL,
+                updatedAt = 10uL,
+            )
+        val conversation =
+            ConversationController(
+                appState = appState,
+                initialGroup = conversationTimelineTestGroup(),
+                initialMemberSnapshot = conversationTimelineMemberSnapshot(),
+                initialChatListRow = directRow,
+            )
+        val chats =
+            ChatsController(
+                appState = appState,
+                initialAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,
+                memberSnapshotLoader = { _, _ -> emptyList() },
+            )
+        return AttachedChatListFixture(appState, conversation, chats, directRow)
+    }
+
+    /** Accepts a newer group row, then returns the older confirmed row for replay. */
+    private fun advanceThroughNewerGroupRow(fixture: AttachedChatListFixture): StaleRowReplay {
+        val optimisticId = "optimistic"
+        val confirmedId = "ff".repeat(32)
+        val incomingId = "0a".repeat(32)
+        val optimistic =
+            notifiedMessagePreview().copy(
+                messageIdHex = optimisticId,
+                plaintext = "sent",
+                timelineAt = 20uL,
+                deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
+            )
+        assertTrue(fixture.chats.applyOptimisticSentPreview(fixture.directRow.groupIdHex, optimistic))
+        fixture.chats.commitOptimisticSentPreview(fixture.directRow.groupIdHex, optimisticId, confirmedId)
+        val confirmedDirectRow =
+            fixture.directRow.copy(
+                lastMessage =
+                    optimistic.copy(
+                        messageIdHex = confirmedId,
+                        deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED,
+                    ),
+                activitySortAt = 20uL,
+                updatedAt = 20uL,
+            )
+        fixture.chats.publishTestRow(confirmedDirectRow, ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE)
+        fixture.chats.publishTestRow(
+            confirmedDirectRow.copy(
+                conversationKind = ChatConversationKindFfi.GROUP,
+                lastMessage =
+                    optimistic.copy(
+                        messageIdHex = incomingId,
+                        plaintext = "incoming",
+                        deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    ),
+            ),
+            ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+        )
+        return StaleRowReplay(confirmedDirectRow, incomingId)
+    }
+
+    /** Publishes one row through the production subscription reducer. */
+    private fun ChatsController.publishTestRow(
+        row: ChatListRowFfi,
+        trigger: ChatListUpdateTriggerFfi,
+    ) {
+        applyChatListSubscriptionUpdate(
+            accountRef = ConversationTimelineTestIds.ACCOUNT_REF,
+            update = ChatListSubscriptionUpdateFfi.Row(row = row, trigger = trigger),
+        )
+    }
+
+    private data class AttachedChatListFixture(
+        val appState: WhiteNoiseAppState,
+        val conversation: ConversationController,
+        val chats: ChatsController,
+        val directRow: ChatListRowFfi,
+    )
+
+    private data class StaleRowReplay(
+        val staleRow: ChatListRowFfi,
+        val acceptedMessageId: String,
+    )
 
     /** Reopening terminated local streams does not repeat the bind's one full catch-up. */
     @Test

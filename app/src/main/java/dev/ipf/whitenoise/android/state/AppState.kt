@@ -2825,6 +2825,19 @@ class WhiteNoiseAppState private constructor(
         synchronized(conversationControllerLock) { conversationControllers.remove(controller) }
     }
 
+    /**
+     * Forwards an authoritative chat-list row to every mounted copy of its
+     * conversation so classification and details metadata stay live even when
+     * the timeline consumes window-only subscription results.
+     */
+    internal fun publishConversationChatListRow(
+        accountRef: String?,
+        row: ChatListRowFfi,
+    ) {
+        val controllers = synchronized(conversationControllerLock) { conversationControllers.toList() }
+        controllers.forEach { controller -> controller.applyAuthoritativeChatListRow(accountRef, row) }
+    }
+
     internal val liveSubscriptionOverrides = LiveSubscriptionOverrides()
 
     internal fun deliverConfirmedMediaHandoff(

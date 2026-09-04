@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.state
 
 import android.os.Looper
 import dev.ipf.marmotkit.TimelinePageFfi
-import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -46,8 +45,8 @@ class ConversationTimelineReconnectIntegrationTest {
                 awaitConversationCondition {
                     ConversationTimelineTestIds.MESSAGE_A in timelineMessageIds(controller)
                 }
-                awaitConversationCondition { fixtures.firstSubscription.nextUpdateCallCount == 1 }
-                fixtures.firstSubscription.endUpdates()
+                awaitConversationCondition { fixtures.firstSubscription.nextWindowCallCount == 1 }
+                fixtures.firstSubscription.endWindows()
                 awaitConversationCondition { fixtures.firstSubscription.closeCallCount == 1 }
 
                 diagnostics.networkRestored(9L)
@@ -78,6 +77,7 @@ class ConversationTimelineReconnectIntegrationTest {
             }
         }
 
+    /** A replacement subscription snapshot closes a reconnect gap without a later window. */
     @Test
     fun replacementSubscriptionSnapshotReconcilesGapMessageWithoutLaterDelta() =
         runBlocking {
@@ -91,10 +91,10 @@ class ConversationTimelineReconnectIntegrationTest {
                 assertEquals(1, fixtures.scriptedSubscriptions.timelineSubscriptionOpenCount)
                 assertFalse(ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(controller))
 
-                awaitConversationCondition { fixtures.firstSubscription.nextUpdateCallCount == 1 }
-                assertTimelineSubscriptionSnapshotBeforeFirstNextUpdate(fixtures.firstSubscription)
+                awaitConversationCondition { fixtures.firstSubscription.nextWindowCallCount == 1 }
+                assertTimelineSubscriptionSnapshotBeforeFirstNextWindow(fixtures.firstSubscription)
 
-                fixtures.firstSubscription.endUpdates()
+                fixtures.firstSubscription.endWindows()
                 awaitConversationCondition { fixtures.firstSubscription.closeCallCount == 1 }
                 controller.retryLoadFailure()
 
@@ -102,14 +102,15 @@ class ConversationTimelineReconnectIntegrationTest {
                     fixtures.scriptedSubscriptions.timelineSubscriptionOpenCount == 2 &&
                         ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(controller)
                 }
-                awaitConversationCondition { fixtures.replacementSubscription.nextUpdateCallCount >= 1 }
-                assertTimelineSubscriptionSnapshotBeforeFirstNextUpdate(fixtures.replacementSubscription)
+                awaitConversationCondition { fixtures.replacementSubscription.nextWindowCallCount >= 1 }
+                assertTimelineSubscriptionSnapshotBeforeFirstNextWindow(fixtures.replacementSubscription)
             } finally {
                 controller.onCleared()
                 awaitOpenedTimelineSubscriptionsClosed(fixtures.scriptedSubscriptions)
             }
         }
 
+    /** A null replacement snapshot retains the last authoritative window on screen. */
     @Test
     fun nullReplacementSnapshotKeepsRetainedTimelineVisible() =
         runBlocking {
@@ -135,17 +136,17 @@ class ConversationTimelineReconnectIntegrationTest {
                 awaitConversationCondition {
                     ConversationTimelineTestIds.MESSAGE_A in timelineMessageIds(controller)
                 }
-                awaitConversationCondition { firstSubscription.nextUpdateCallCount == 1 }
+                awaitConversationCondition { firstSubscription.nextWindowCallCount == 1 }
 
-                firstSubscription.endUpdates()
+                firstSubscription.endWindows()
                 awaitConversationCondition { firstSubscription.closeCallCount == 1 }
                 controller.retryLoadFailure()
 
                 awaitConversationCondition {
                     scriptedSubscriptions.timelineSubscriptionOpenCount == 2 &&
-                        replacementSubscription.nextUpdateCallCount >= 1
+                        replacementSubscription.nextWindowCallCount >= 1
                 }
-                assertTimelineSubscriptionSnapshotBeforeFirstNextUpdate(replacementSubscription)
+                assertTimelineSubscriptionSnapshotBeforeFirstNextWindow(replacementSubscription)
                 assertEquals(
                     listOf(ConversationTimelineTestIds.MESSAGE_A),
                     timelineMessageIds(controller),
@@ -156,6 +157,7 @@ class ConversationTimelineReconnectIntegrationTest {
             }
         }
 
+    /** A replacement snapshot resets pagination mode before the next live window. */
     @Test
     fun replacementSnapshotResetsPaginationModeForLaterAuthoritativeRefresh() =
         runBlocking {
@@ -185,8 +187,8 @@ class ConversationTimelineReconnectIntegrationTest {
                     timelineMessageIds(controller),
                 )
 
-                awaitConversationCondition { firstSubscription.nextUpdateCallCount == 1 }
-                firstSubscription.endUpdates()
+                awaitConversationCondition { firstSubscription.nextWindowCallCount == 1 }
+                firstSubscription.endWindows()
                 awaitConversationCondition { firstSubscription.closeCallCount == 1 }
                 controller.retryLoadFailure()
                 awaitConversationCondition {
@@ -194,12 +196,10 @@ class ConversationTimelineReconnectIntegrationTest {
                         ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(controller)
                 }
 
-                replacementSubscription.emitUpdate(
-                    TimelineSubscriptionUpdateFfi.Page(
-                        timelinePageWithFlags(listOf(messageB), hasMoreBefore = false),
-                    ),
+                replacementSubscription.emitWindow(
+                    timelinePageWithFlags(listOf(messageB), hasMoreBefore = false),
                 )
-                awaitConversationCondition { replacementSubscription.nextUpdateCallCount >= 2 }
+                awaitConversationCondition { replacementSubscription.nextWindowCallCount >= 2 }
                 awaitConversationCondition {
                     shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(10))
                     !controller.hasMoreBefore
@@ -215,6 +215,7 @@ class ConversationTimelineReconnectIntegrationTest {
             }
         }
 
+    /** Builds a bounded test page with explicit pagination flags. */
     private fun timelinePageWithFlags(
         messages: List<dev.ipf.marmotkit.TimelineMessageRecordFfi>,
         hasMoreBefore: Boolean = false,

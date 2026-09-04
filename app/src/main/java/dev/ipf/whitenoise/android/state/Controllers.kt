@@ -46,7 +46,6 @@ import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
-import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
@@ -948,6 +947,13 @@ data class TimelineMessage(
     val status: MessageStatus,
     val projected: TimelineMessageRecordFfi? = null,
     val timelineOrder: ULong = 0uL,
+    /** Position supplied by MDK's authoritative bounded timeline window. */
+    val authoritativeOrder: ULong? = null,
+    /**
+     * Immediate durable stream parent whose rendered row this row must follow.
+     * Null for ordinary authoritative rows and unanchored local overlays.
+     */
+    val displayAfterMessageIdHex: String? = null,
     /**
      * Immutable retention snapshot captured when this local send was accepted.
      * It keeps the waiting timer accurate and supplies the bounded local expiry
@@ -1721,27 +1727,6 @@ private fun rememberAcceptedPendingTextOptimisticId(
     if (acceptedPending && confirmedId.isNotEmpty()) {
         acceptedPendingTextOptimisticIdsByMessageId?.set(confirmedId, tempId)
     }
-}
-
-/**
- * Total order for the rendered timeline: engine timestamp, then the local
- * arrival order that breaks a same-second tie, then the message id.
- *
- * Written as an explicit chain rather than `compareValuesBy`. That helper
- * takes its selectors as `vararg (T) -> Comparable<*>?`, so each call
- * allocates a `Function1[3]` and boxes both `ULong` keys through
- * `ULong.box-impl` to satisfy the `Comparable` return type. This runs once
- * per comparison of an O(n log n) sort that re-runs on every timeline
- * publish. `ULong.compareTo` compares the underlying longs directly.
- */
-internal fun compareTimelineMessages(
-    left: TimelineMessage,
-    right: TimelineMessage,
-): Int {
-    val byRecordedAt = left.record.recordedAt.compareTo(right.record.recordedAt)
-    if (byRecordedAt != 0) return byRecordedAt
-    val byTimelineOrder = left.timelineOrder.compareTo(right.timelineOrder)
-    return if (byTimelineOrder != 0) byTimelineOrder else left.id.compareTo(right.id)
 }
 
 /**
@@ -3171,12 +3156,18 @@ class ChatsController private constructor(
         }
     }
 
+    /**
+     * Folds [row] into the optimistic baseline and returns the row that is safe
+     * to expose to conversation-scoped consumers. A pending matching echo is
+     * intentionally returned while parked; a rejected stale replay returns the
+     * already-accepted baseline instead.
+     */
     private fun foldOptimisticChatListBaseline(
         state: OptimisticChatListPreviewState,
         row: ChatListRowFfi,
         acceptBackwardActivity: Boolean = false,
         observesNewActivity: Boolean = false,
-    ) {
+    ): ChatListRowFfi {
         val activityCompare = compareChatListActivity(state.baselineRow, row)
         val match =
             matchingOptimisticPreview(state, row)
@@ -3196,7 +3187,7 @@ class ChatsController private constructor(
             // reports whether publishing succeeded. Keep it provisional so a
             // later failure still restores the pre-send baseline.
             state.entries[pendingEntryKey] = state.entries.getValue(pendingEntryKey).copy(pendingAuthoritativeRow = row)
-            return
+            return row
         }
         var acceptRow = true
         if (match != null) {
@@ -3235,6 +3226,7 @@ class ChatsController private constructor(
                 )
         }
         if (acceptRow) state.baselineRow = row
+        return if (acceptRow) row else state.baselineRow
     }
 
     /**
@@ -4701,6 +4693,7 @@ class ChatsController private constructor(
         }
     }
 
+    /** Folds one authoritative row and mirrors it into any mounted conversation. */
     private fun foldChatRow(
         row: ChatListRowFfi,
         trigger: ChatListUpdateTriggerFfi? = null,
@@ -4724,24 +4717,55 @@ class ChatsController private constructor(
                 rejectedUnread = row.unreadCount,
             )
         }
-        if (folded == current) return
-        val membershipChanged = current == null
-        if (state == null) {
-            chatRowsByGroup[key] = folded
-            if (shouldAdvanceChatActivitySequence(current, folded, observesNewActivity)) {
-                activitySequenceByGroup[key] = nextChatActivitySequence()
-            }
-        } else {
-            foldOptimisticChatListBaseline(
-                state,
-                folded,
-                acceptBackwardActivity = trigger == ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
-                observesNewActivity = observesNewActivity,
-            )
-            materializeOptimisticChatListPreview(key, state)
+        if (folded == current) {
+            appState.publishConversationChatListRow(accountRef, folded)
+            return
         }
+        val membershipChanged = current == null
+        val effectivePublicationRow =
+            if (state == null) {
+                chatRowsByGroup[key] = folded
+                if (shouldAdvanceChatActivitySequence(current, folded, observesNewActivity)) {
+                    activitySequenceByGroup[key] = nextChatActivitySequence()
+                }
+                folded
+            } else {
+                foldOptimisticChatListBaseline(
+                    state,
+                    folded,
+                    acceptBackwardActivity = trigger == ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
+                    observesNewActivity = observesNewActivity,
+                ).also {
+                    materializeOptimisticChatListPreview(key, state)
+                }
+            }
+        appState.publishConversationChatListRow(accountRef, effectivePublicationRow)
         if (membershipChanged) noteMaterializedGroupMembershipChanged()
         scheduleRecompute()
+    }
+
+    /** Replaces one snapshot row and returns the metadata row safe to publish. */
+    private fun replaceChatRow(
+        key: String,
+        row: ChatListRowFfi,
+        previous: ChatListRowFfi?,
+        previousSequence: ULong?,
+        wasMaterialized: Boolean,
+        optimisticState: OptimisticChatListPreviewState?,
+    ): ChatListRowFfi {
+        if (optimisticState != null) {
+            return foldOptimisticChatListBaseline(optimisticState, row, acceptBackwardActivity = true).also {
+                materializeOptimisticChatListPreview(key, optimisticState)
+            }
+        }
+        chatRowsByGroup[key] = row
+        activitySequenceByGroup[key] =
+            when {
+                previous == null && wasMaterialized -> nextChatActivitySequence()
+                previous != null && chatListActivityAdvanced(previous, row) -> nextChatActivitySequence()
+                else -> previousSequence ?: 0uL
+            }
+        return row
     }
 
     /**
@@ -4763,6 +4787,7 @@ class ChatsController private constructor(
         foldChatRow(merged)
     }
 
+    /** Replaces the chat-list window and refreshes mounted conversation metadata. */
     private fun replaceChatRows(rows: List<ChatListRowFfi>) {
         rows.forEach {
             appState.acceptAuthoritativeMuteProjection(accountRef, it.groupIdHex, it.muted, it.mutedUntilMs)
@@ -4784,20 +4809,16 @@ class ChatsController private constructor(
         rows.forEach { row ->
             val key = chatRowKey(row.groupIdHex)
             val previous = previousRowsByGroup[key]
-            val state = optimisticChatListPreviewByGroup[key]
-            if (state == null) {
-                chatRowsByGroup[key] = row
-                val sequence =
-                    when {
-                        previous == null && wasMaterialized -> nextChatActivitySequence()
-                        previous != null && chatListActivityAdvanced(previous, row) -> nextChatActivitySequence()
-                        else -> previousSequences[key] ?: 0uL
-                    }
-                activitySequenceByGroup[key] = sequence
-            } else {
-                foldOptimisticChatListBaseline(state, row, acceptBackwardActivity = true)
-                materializeOptimisticChatListPreview(key, state)
-            }
+            val effectivePublicationRow =
+                replaceChatRow(
+                    key = key,
+                    row = row,
+                    previous = previous,
+                    previousSequence = previousSequences[key],
+                    wasMaterialized = wasMaterialized,
+                    optimisticState = optimisticChatListPreviewByGroup[key],
+                )
+            appState.publishConversationChatListRow(accountRef, effectivePublicationRow)
         }
         optimisticChatListPreviewByGroup.keys.retainAll(chatRowsByGroup.keys)
         val liveGroupIds = rows.mapTo(mutableSetOf()) { it.groupIdHex }
@@ -6250,12 +6271,12 @@ private const val MEMBER_FETCH_MAX_BACKOFF_TIER = 11
 private const val PREVIEW_PARSE_FANOUT = 4
 private const val MEDIA_KIND_RESOLVE_FANOUT = 4
 
-// Cap on how many subscription updates one coalesced batch can absorb. A
+// Cap on how many subscription windows one coalesced batch can absorb. A
 // runaway producer shouldn't be able to wedge the UI behind an unbounded
 // drain loop; this keeps latency-to-first-paint bounded.
 private const val TIMELINE_BATCH_CAP = 32
 
-// Window to wait for additional subscription updates to coalesce into the
+// Window to wait for additional subscription windows to coalesce into the
 // current batch. 6ms is roughly the slack on a 120Hz frame budget (8.33ms)
 // minus the apply+publish work, so we soak up updates that arrive within
 // one frame without delaying the next paint.
@@ -6425,8 +6446,8 @@ internal typealias MediaPublisher =
 
 internal typealias InviteAcceptor = suspend (String, String) -> AppGroupRecordFfi
 
-private data class RecoveryStampedTimelineUpdate(
-    val update: TimelineSubscriptionUpdateFfi,
+private data class RecoveryStampedTimelineWindow(
+    val page: TimelinePageFfi,
     val recoveryGeneration: Long?,
 )
 
@@ -6789,6 +6810,8 @@ class ConversationController(
     private val timelineRecords = linkedMapOf<String, TimelineMessageRecordFfi>()
     private val timelineItemsById = linkedMapOf<String, TimelineMessage>()
     private val timelineOrder = mutableListOf<String>()
+    private val authoritativeTimelineOrderByMessageId = linkedMapOf<String, ULong>()
+    private val durableStreamDisplayParentByMessageId = mutableMapOf<String, String>()
     private val optimisticMessages = appState.optimisticMessages(conversationAccountRef, initialGroup.groupIdHex)
     private val durableAcceptanceCallbacks =
         appState.durableAcceptanceCallbacks(conversationAccountRef, initialGroup.groupIdHex)
@@ -7664,6 +7687,15 @@ class ConversationController(
         groupIdHex: String,
     ): Boolean = conversationAccountRef == accountRef && group.groupIdHex == groupIdHex
 
+    /** Applies the chat-list subscription's current row to this mounted conversation. */
+    internal fun applyAuthoritativeChatListRow(
+        accountRef: String?,
+        row: ChatListRowFfi,
+    ) {
+        if (!matchesConversation(accountRef, row.groupIdHex)) return
+        latestChatListRow = row
+    }
+
     internal fun acceptConfirmedMediaHandoff(
         confirmedId: String,
         deferredProjection: TimelineMessageRecordFfi?,
@@ -7704,86 +7736,61 @@ class ConversationController(
         }
     }
 
+    /** Consumes authoritative MDK windows and publishes only the newest coalesced window. */
     private suspend fun CoroutineScope.runTimelineSubscriptionPipeline(
         account: String,
         timelineStream: ConversationTimelineSubscriptionHandle,
     ) {
-        val timelineUpdates = Channel<RecoveryStampedTimelineUpdate>(capacity = Channel.BUFFERED)
+        val timelineWindows = Channel<RecoveryStampedTimelineWindow>(capacity = Channel.BUFFERED)
         val pump =
             async {
                 try {
                     while (isActive) {
-                        val update =
+                        val page =
                             withContext(Dispatchers.IO) {
-                                timelineStream.nextUpdate()
+                                timelineStream.nextWindow()
                             } ?: break
-                        timelineUpdates.send(
-                            RecoveryStampedTimelineUpdate(
-                                update = update,
+                        timelineWindows.send(
+                            RecoveryStampedTimelineWindow(
+                                page = page,
                                 recoveryGeneration = appState.recoveryDiagnostics.recordTimelineSubscriptionReceived(),
                             ),
                         )
                     }
                 } finally {
-                    timelineUpdates.close()
+                    timelineWindows.close()
                 }
             }
         try {
             while (isActive) {
                 val first =
-                    timelineUpdates.receiveCatching().getOrNull()
+                    timelineWindows.receiveCatching().getOrNull()
                         ?: break
-                // Drain any updates that arrived within roughly one
+                // Drain any windows that arrived within roughly one
                 // 120Hz frame budget into a single batch. The runtime
-                // can emit several updates back-to-back during a
-                // sync burst (e.g. on conversation open, a Page
-                // followed by a flurry of Projections); applying
-                // them one at a time triggers N expensive recompose
-                // passes (sort + dedup + edits aggregate). Batching
-                // collapses them into one publish at the end. The
+                // can emit several complete windows back-to-back during a
+                // sync burst; only the newest can be authoritative. Batching
+                // collapses them into one replacement publish. The
                 // timeout only wraps the local channel receive; the
-                // UniFFI nextUpdate() call above is always awaited to
+                // UniFFI next() call above is always awaited to
                 // completion so a timed-out drain can't consume and
-                // drop a Rust subscription update.
+                // drop a Rust subscription window.
                 val batch = mutableListOf(first)
                 while (batch.size < TIMELINE_BATCH_CAP) {
                     val more =
-                        timelineUpdates.tryReceive().getOrNull()
+                        timelineWindows.tryReceive().getOrNull()
                             ?: withTimeoutOrNull(TIMELINE_BATCH_DRAIN_MS) {
-                                timelineUpdates.receiveCatching().getOrNull()
+                                timelineWindows.receiveCatching().getOrNull()
                             } ?: break
                     batch += more
                 }
-                val streamIdsLaunched = mutableListOf<String>()
-                coalesceTimelinePublishes {
-                    for (stamped in batch) {
-                        val update = stamped.update
-                        val streamIds =
-                            when (update) {
-                                is TimelineSubscriptionUpdateFfi.Page -> {
-                                    val replaceWindow = !hasLoadedOlderPages
-                                    applyTimelinePage(
-                                        update.page,
-                                        replaceWindow = replaceWindow,
-                                        updatePagination = replaceWindow,
-                                    )
-                                }
-                                is TimelineSubscriptionUpdateFfi.Projection -> {
-                                    val projection = update.update.update
-                                    if (projection.groupIdHex == group.groupIdHex) {
-                                        applyChatListProjection(
-                                            projection.chatListTrigger,
-                                            projection.chatListRow,
-                                        )
-                                        applyTimelineChanges(hydrateTimelineChanges(projection.changes))
-                                    } else {
-                                        emptyList()
-                                    }
-                                }
-                            }
-                        streamIdsLaunched += streamIds
-                    }
-                }
+                val newest = batch.last()
+                val streamIdsLaunched =
+                    applyTimelinePage(
+                        newest.page,
+                        replaceWindow = true,
+                        updatePagination = true,
+                    )
                 publishRecoveryTimelineProjection(batch.mapNotNull { it.recoveryGeneration }.maxOrNull())
                 // Scroll-driven mark-read in the UI layer handles
                 // the user-visible read pointer.
@@ -10976,10 +10983,13 @@ class ConversationController(
         )
     }
 
+    /** Drops indexes owned by the previous authoritative bounded window. */
     private fun trimStateForWindowReplacement() {
         timelineRecords.clear()
         timelineItemsById.clear()
         timelineOrder.clear()
+        authoritativeTimelineOrderByMessageId.clear()
+        durableStreamDisplayParentByMessageId.clear()
         projectedMessageIds.clear()
         // Drop stale projected records so messageById doesn't grow unbounded
         // as older pages are loaded; keep in-flight optimistic records so a
@@ -11006,7 +11016,9 @@ class ConversationController(
         timelineWindowGeneration.advance()
         val pageMessages = page.messages
         if (replaceWindow) trimStateForWindowReplacement()
-        pageMessages.forEach { record ->
+        authoritativeTimelineOrderByMessageId.clear()
+        pageMessages.forEachIndexed { index, record ->
+            authoritativeTimelineOrderByMessageId[record.messageIdHex] = index.toULong()
             val actionRecord =
                 upsertProjectedRecord(
                     record,
@@ -11193,19 +11205,6 @@ class ConversationController(
         return streamIds.filterNot { it in removedStreamIds }
     }
 
-    private suspend fun hydrateTimelineChanges(changes: List<TimelineMessageChangeFfi>): List<TimelineMessageChangeFfi> {
-        val upserts = changes.filterIsInstance<TimelineMessageChangeFfi.Upsert>()
-        if (upserts.isEmpty()) return changes
-        val hydrated = hydrateTimelineMarkdown(upserts.map(TimelineMessageChangeFfi.Upsert::message)).iterator()
-        return changes.map { change ->
-            if (change is TimelineMessageChangeFfi.Upsert) {
-                change.copy(message = hydrated.next())
-            } else {
-                change
-            }
-        }
-    }
-
     private suspend fun hydrateTimelineMarkdown(records: List<TimelineMessageRecordFfi>): List<TimelineMessageRecordFfi> {
         if (records.none(::needsTimelineMarkdownHydration)) return records
         val parseGate = Semaphore(4)
@@ -11243,46 +11242,6 @@ class ConversationController(
             changed = true
         }
         if (changed) publishTimelineFromIndexes()
-    }
-
-    private fun applyChatListProjection(
-        trigger: ChatListUpdateTriggerFfi,
-        row: ChatListRowFfi?,
-    ) {
-        val projected = row ?: return
-        latestChatListRow = projected
-        when (trigger) {
-            ChatListUpdateTriggerFfi.ARCHIVE_CHANGED,
-            ChatListUpdateTriggerFfi.PENDING_CONFIRMATION_CHANGED,
-            ChatListUpdateTriggerFfi.NEW_GROUP,
-            ChatListUpdateTriggerFfi.MEMBERSHIP_CHANGED,
-            ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH,
-            -> {
-                val previousSelfMembership = group.selfMembership
-                group =
-                    reconcileTerminalSelfMembership(
-                        update =
-                            group.copy(
-                                name = projected.groupName.ifBlank { group.name },
-                                archived = projected.archived,
-                                pendingConfirmation = projected.pendingConfirmation,
-                                selfMembership = projected.selfMembership,
-                            ),
-                        previousSelfMembership = previousSelfMembership,
-                    )
-                if (group.selfMembership.isNonMember()) recordSelfLeft()
-            }
-            ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
-            ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
-            ChatListUpdateTriggerFfi.UNREAD_CHANGED,
-            ChatListUpdateTriggerFfi.MANUAL_UNREAD_CHANGED,
-            ChatListUpdateTriggerFfi.MUTE_CHANGED,
-            ChatListUpdateTriggerFfi.CONVERSATION_KIND_CHANGED,
-            ChatListUpdateTriggerFfi.LATEST_MESSAGE_DELIVERY_CHANGED,
-            ChatListUpdateTriggerFfi.PIN_ORDER_CHANGED,
-            ChatListUpdateTriggerFfi.REMOVED,
-            -> Unit
-        }
     }
 
     private suspend fun initializeReadState(account: String) {
@@ -11498,6 +11457,7 @@ class ConversationController(
             failedOptimisticMessageIdForInvalidatedProjection(optimisticMessages.values, actionRecord) != null
         ) {
             timelineRecords.remove(record.messageIdHex)
+            authoritativeTimelineOrderByMessageId.remove(record.messageIdHex)
             projectedMessageIds.remove(record.messageIdHex)
             messageById.remove(record.messageIdHex)
             if (previousItemId != null) {
@@ -11593,12 +11553,14 @@ class ConversationController(
         return actionRecord
     }
 
+    /** Bridges a newly projected row through the position of its optimistic bubble. */
     private fun preserveOptimisticDisplayPosition(
         projectedId: String,
         optimisticId: String,
     ) {
         val optimistic = optimisticMessages["msg:$optimisticId"] ?: return
         durableStreamPositionOverrideIds.remove(projectedId)
+        durableStreamDisplayParentByMessageId.remove(projectedId)
         preservedTimelinePositionOverrideIds.add(projectedId)
         optimisticSendPositionPreserves.add(projectedId)
         localTimelineOrderOverrides[projectedId] = optimistic.timelineOrder
@@ -11651,21 +11613,25 @@ class ConversationController(
         return snapshot
     }
 
+    /** Rebuilds durable stream overrides and their immediate rendered-parent links. */
     private fun applyDurableStreamPositions(positions: Map<String, StreamFinalDisplayPosition>) {
-        (durableStreamPositionOverrideIds - positions.keys).forEach(::clearDurableStreamPosition)
+        val staleIds = durableStreamPositionOverrideIds + durableStreamDisplayParentByMessageId.keys - positions.keys
+        staleIds.forEach(::clearDurableStreamPosition)
         positions.forEach { (messageId, position) ->
             // A live preview is the row the user is already reading. Its
             // position wins for this controller session; the durable link is
             // the reload/cold-projection fallback.
+            val parentId = position.afterMessageId ?: return@forEach
+            val parent = timelineRecords[parentId] ?: return@forEach
             if (
                 messageId in preservedTimelinePositionOverrideIds ||
                 messageId in optimisticSendPositionPreserves
             ) {
+                durableStreamDisplayParentByMessageId[messageId] = parentId
+                refreshProjectedTimelinePosition(messageId)
                 return@forEach
             }
-            val projected = timelineRecords[messageId] ?: return@forEach
-            val parentId = position.afterMessageId ?: return@forEach
-            val parent = timelineRecords[parentId] ?: return@forEach
+            if (messageId !in timelineRecords) return@forEach
             val parentRecordedAt = localTimelineTimestampOverrides[parentId] ?: parent.timelineAt
             val effectivePosition =
                 resolvedDurableStreamDisplayPosition(
@@ -11677,6 +11643,7 @@ class ConversationController(
                     return@forEach
                 }
 
+            durableStreamDisplayParentByMessageId[messageId] = parentId
             localTimelineOrderOverrides[messageId] = effectivePosition.timelineOrder
             localTimelineTimestampOverrides[messageId] = effectivePosition.recordedAt
             durableStreamPositionOverrideIds.add(messageId)
@@ -11684,13 +11651,19 @@ class ConversationController(
         }
     }
 
+    /** Releases a durable override and any parent link used only for display ordering. */
     private fun clearDurableStreamPosition(messageId: String) {
-        if (!durableStreamPositionOverrideIds.remove(messageId)) return
-        localTimelineOrderOverrides.remove(messageId)
-        localTimelineTimestampOverrides.remove(messageId)
+        val removedOverride = durableStreamPositionOverrideIds.remove(messageId)
+        val removedParent = durableStreamDisplayParentByMessageId.remove(messageId) != null
+        if (!removedOverride && !removedParent) return
+        if (removedOverride) {
+            localTimelineOrderOverrides.remove(messageId)
+            localTimelineTimestampOverrides.remove(messageId)
+        }
         refreshProjectedTimelinePosition(messageId)
     }
 
+    /** Reprojects one indexed row after a transient display position changes. */
     private fun refreshProjectedTimelinePosition(messageId: String) {
         val projected = timelineRecords[messageId] ?: return
         val itemId = projectedItemId(projected)
@@ -11706,10 +11679,10 @@ class ConversationController(
         insertTimelineItemId(itemId)
     }
 
-    // Drop optimistic-send position overrides whose optimistic bubble is gone and
-    // whose real projection has landed, so a stale one can't keep a confirmed row
-    // pinned above a newer neighbour (#1578). The row settles to its true projected
-    // send time, which is its correct chronological position.
+    /**
+     * Drops completed optimistic-send bridges so projected rows settle back to
+     * their authoritative positions in MDK's current bounded window.
+     */
     private fun releaseOrphanedOptimisticSendPreserves(): Boolean {
         val orphaned =
             optimisticSendPositionPreserves.releaseOrphaned(
@@ -11726,9 +11699,10 @@ class ConversationController(
         return true
     }
 
-    // Field diagnostic for #1578: surface any adjacent rows still rendered out of
-    // true send order after the sort, tagged with which override (if any) fed the
-    // comparator the stale position. DEBUG-only; no effect on release builds.
+    /**
+     * Reports unexpected adjacent fallback-order inversions once per pair in debug
+     * builds; authoritative pairs may intentionally invert wall time for epoch safety.
+     */
     private fun logTimelineInversionsForDebug(
         rows: List<TimelineMessage>,
         expectedHandoffPreserves: Set<String>,
@@ -11737,7 +11711,8 @@ class ConversationController(
         val inversionsByPair =
             adjacentTimelineInversions(rows)
                 .filterNot { inversion ->
-                    checkNotNull(inversion.above.projected).messageIdHex in expectedHandoffPreserves ||
+                    (inversion.above.authoritativeOrder != null && inversion.below.authoritativeOrder != null) ||
+                        checkNotNull(inversion.above.projected).messageIdHex in expectedHandoffPreserves ||
                         checkNotNull(inversion.below.projected).messageIdHex in expectedHandoffPreserves
                 }.associateBy { inversion ->
                     checkNotNull(inversion.above.projected).messageIdHex to
@@ -11750,6 +11725,7 @@ class ConversationController(
         loggedTimelineOrderingInversionPairs = inversionsByPair.keys
     }
 
+    /** Formats both rows and controller override state for an inversion diagnostic. */
     private fun describeTimelineInversion(inversion: TimelineAdjacentInversion): String {
         val aboveSource = checkNotNull(inversion.above.projected)
         val belowSource = checkNotNull(inversion.below.projected)
@@ -11759,18 +11735,20 @@ class ConversationController(
             "below[${describeTimelineInversionRow(inversion.below, belowSource)}]"
     }
 
+    /** Formats the source and effective positions of one diagnostic row. */
     private fun describeTimelineInversionRow(
         row: TimelineMessage,
         source: TimelineMessageRecordFfi,
     ): String =
         "id=${source.messageIdHex.take(8)} direction=${row.record.direction} " +
             "displayAt=${row.record.recordedAt} sourceAt=${source.timelineAt} " +
-            "receivedAt=${source.receivedAt} order=${row.timelineOrder} " +
+            "receivedAt=${source.receivedAt} order=${row.timelineOrder} authoritative=${row.authoritativeOrder} " +
             "timestampOverride=${source.messageIdHex in localTimelineTimestampOverrides} " +
             "orderOverride=${source.messageIdHex in localTimelineOrderOverrides} " +
             "durable=${source.messageIdHex in durableStreamPositionOverrideIds} " +
             "optimisticPreserve=${source.messageIdHex in optimisticSendPositionPreserves}"
 
+    /** Keeps a durable stream final at the position of the preview it replaces. */
     private fun preserveStreamFinalDisplayPosition(
         projectedId: String,
         actionRecord: AppMessageRecordFfi,
@@ -11791,9 +11769,12 @@ class ConversationController(
         localTimelineTimestampOverrides[projectedId] = position.recordedAt
     }
 
+    /** Removes one projection and every controller-owned index keyed to it. */
     private fun removeProjectedRecord(messageIdHex: String) {
         val itemId = timelineRecords[messageIdHex]?.let(::projectedItemId) ?: "msg:$messageIdHex"
         timelineRecords.remove(messageIdHex)
+        authoritativeTimelineOrderByMessageId.remove(messageIdHex)
+        durableStreamDisplayParentByMessageId.remove(messageIdHex)
         projectedMessageIds.remove(messageIdHex)
         localTimelineOrderOverrides.remove(messageIdHex)
         localTimelineTimestampOverrides.remove(messageIdHex)
@@ -11879,6 +11860,7 @@ class ConversationController(
         optimisticReactionChanges.entries.removeAll { (_, change) -> change.targetMessageId !in retained }
     }
 
+    /** Projects one MDK row with its authoritative rank and any transient display bridge. */
     private fun timelineMessageFromProjection(
         record: TimelineMessageRecordFfi,
         actionRecord: AppMessageRecordFfi = TimelineProjector.toAppMessageRecord(record),
@@ -11907,6 +11889,13 @@ class ConversationController(
                 },
             projected = record,
             timelineOrder = localTimelineOrderOverrides[record.messageIdHex] ?: 0uL,
+            authoritativeOrder =
+                authoritativeTimelineOrderByMessageId[record.messageIdHex]
+                    ?.takeUnless {
+                        record.messageIdHex in localTimelineOrderOverrides ||
+                            record.messageIdHex in localTimelineTimestampOverrides
+                    },
+            displayAfterMessageIdHex = durableStreamDisplayParentByMessageId[record.messageIdHex],
             retentionAtSendSeconds = retentionAtSendSeconds.takeIf { actionRecord.retentionSeconds == null },
         )
     }
@@ -11917,9 +11906,10 @@ class ConversationController(
         return streamId?.let { "stream:$it" } ?: "msg:${record.messageIdHex}"
     }
 
+    /** Adds an item to the membership index; publication performs display ordering. */
     private fun insertTimelineItemId(itemId: String) {
         // Append in O(1). Position is irrelevant: publishTimelineFromIndexes
-        // re-sorts the whole list with compareTimelineMessages (a total order),
+        // orders authoritative rows by MDK ordinal and merges local overlays,
         // so timelineOrder is only a membership set. The previous sorted insert
         // did an O(n) scan per item, making each page load O(n²). See #74.
         timelineOrder.add(itemId)
@@ -12058,10 +12048,9 @@ class ConversationController(
             .map { it.key }
             .forEach(optimisticEdits::remove)
         timeline =
-            (visible + streamDebugTimelineItems.values)
-                .map { it.withOptimisticEditStatus() }
-                .distinctBy { it.id }
-                .sortedWith(::compareTimelineMessages)
+            orderTimelineMessagesForDisplay(
+                (visible + streamDebugTimelineItems.values).map { it.withOptimisticEditStatus() },
+            )
         // The optimistic→confirmed handoff snapshot is intentionally preserved;
         // do not report it as the stale-override symptom this detector targets.
         logTimelineInversionsForDebug(timeline, optimisticSendPositionPreserves.snapshot())
