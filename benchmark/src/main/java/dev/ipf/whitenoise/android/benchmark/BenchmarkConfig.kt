@@ -30,6 +30,12 @@ internal object BenchmarkConfig {
     val notificationConversationTitles: List<String>
         get() = fixtureList("notificationConversationTitles")
 
+    val allowNetworkToggle: Boolean
+        get() = arguments.getString("allowNetworkToggle") == "true"
+
+    val originalAirplaneMode: BenchmarkAirplaneMode?
+        get() = BenchmarkAirplaneMode.fromShellValue(arguments.getString("originalAirplaneMode"))
+
     private fun fixtureList(argumentName: String): List<String> =
         arguments
             .getString(argumentName)
@@ -60,5 +66,29 @@ internal object BenchmarkConfig {
                 "after preparing the authenticated dev fixture."
         }
 
+    /** Requires host authorization plus a captured state that cleanup can restore. */
+    fun requireNetworkToggle(): BenchmarkAirplaneMode {
+        val original = originalAirplaneMode
+        assumeTrue(
+            "Run the state-preserving host script with ALLOW_NETWORK_TOGGLE=true.",
+            allowNetworkToggle && original != null,
+        )
+        return checkNotNull(original)
+    }
+
     private const val NOTIFICATION_SAMPLE_DELIMITER = ";;"
+}
+
+/** Exact airplane-mode states accepted from the guarded host runner. */
+internal enum class BenchmarkAirplaneMode(
+    val shellValue: String,
+) {
+    Enabled("enabled"),
+    Disabled("disabled"),
+    ;
+
+    companion object {
+        /** Parses only the two values emitted by Android's connectivity shell. */
+        fun fromShellValue(value: String?): BenchmarkAirplaneMode? = entries.firstOrNull { it.shellValue == value }
+    }
 }

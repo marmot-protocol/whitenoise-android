@@ -107,6 +107,36 @@ The group title argument is optional when the selected method does not use the
 existing-group fixture. Every run retains `instrumentation.log` plus before/after
 device, battery, and thermal metadata beside its JSON and traces.
 
+To capture the Android recovery resource baseline, use the guarded network
+journey on a supported physical Pixel:
+
+```bash
+ANDROID_SERIAL=<device-serial> \
+  ALLOW_NETWORK_TOGGLE=true \
+  BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.NetworkRecoveryBenchmark#validatedNetworkRecoveryPower" \
+  scripts/run-performance-benchmarks.sh
+```
+
+This explicit flag authorizes five controlled airplane-mode cycles. The runner
+captures the exact original airplane-mode state before replacing the APK and
+restores it from the exit trap on success or failure; the instrumented test has
+its own restoration fence as well. App data is preserved throughout because the
+runner continues to use only in-place APK replacement.
+
+Each iteration starts from the authenticated chat list, settles online work,
+goes offline outside the measured trace, then measures a fixed 25-second
+offline-to-online recovery window. The result includes UI frame timing, peak
+target-process heap and anonymous RSS, system CPU/network/memory energy, the
+number and summed duration of bounded recovery attempts, native catch-up time,
+and any push-wake-lock duration. The accompanying Perfetto trace exposes target
+process scheduling for CPU-time analysis.
+
+Treat the power categories as system-wide hardware energy, not app-exclusive
+attribution: the operating system and radio transition are part of the sample.
+Compare repeated runs on the same device, build, fixture, brightness, battery,
+network, and thermal state. Do not compare absolute values across devices, and
+do not set a fleet-wide threshold until representative baselines exist.
+
 To measure group creation separately, use the state-preserving runner with an
 explicit mutation argument. This creates ten persistent MLS groups:
 

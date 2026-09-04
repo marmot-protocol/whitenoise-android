@@ -53,9 +53,16 @@ class NotificationPushWakeDrainCoverageTest {
             Regex(
                 """val\s+wakeLock\s*=\s*acquirePushWakeLockIfNeeded\(trigger\).*""" +
                     """startNotificationRuntimeForTrigger\(appState,\s*trigger\).*""" +
-                    """finally\s*\{\s*releaseWakeLock\(wakeLock\)\s*\}""",
+                    """finally\s*\{\s*releaseWakeLock\(wakeLock\).*""" +
+                    """RecoveryTrace\.endPushWakeLock\(wakeLockTrace\).*""" +
+                    """wakeLockTraceTimeout\?\.cancel\(\)""",
                 RegexOption.DOT_MATCHES_ALL,
             ).containsMatchIn(attempt),
+        )
+        assertTrue(
+            "the trace must close at the platform wake-lock timeout if bootstrap outlives it",
+            "delay(pushWakeLockTimeoutMs())" in attempt &&
+                "RecoveryTrace.endPushWakeLock(token)" in attempt,
         )
     }
 
@@ -190,11 +197,20 @@ class NotificationPushWakeDrainCoverageTest {
         val clearObserved = appStateFunctionBody("clearPendingPushWakeCatchUpIfObserved")
         val reconnect = notificationNetworkRecoverySource().readText().kotlinFunctionBody("schedule")
         val schedule = appStateFunctionBody("schedulePendingPushWakeCatchUpDrain")
+        val expectedPushWakeCatchUp =
+            Regex(
+                """catchUpAfterObservedPushWake\(\s*""" +
+                    """pendingGeneration\s*=\s*pendingGeneration,\s*""" +
+                    """trigger\s*=\s*PerformanceTrigger\.PUSH_WAKE,\s*\)""",
+            )
 
         assertTrue(
             "drain must capture the durable marker generation it observed before catch-up",
-            "pendingPushWakeCatchUpGeneration()" in drain &&
-                "catchUpAfterObservedPushWake(pendingGeneration)" in drain,
+            "pendingPushWakeCatchUpGeneration()" in drain,
+        )
+        assertTrue(
+            "drain must label its catch-up with the closed push-wake trigger",
+            expectedPushWakeCatchUp.containsMatchIn(drain),
         )
         assertTrue(
             "clear helper must only clear the observed durable marker generation",

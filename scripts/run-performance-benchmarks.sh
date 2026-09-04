@@ -5,6 +5,14 @@ group_name="${1:-}"
 target_package="dev.ipf.whitenoise.android.dev"
 test_package="dev.ipf.whitenoise.android.benchmark"
 runner="$test_package/androidx.test.runner.AndroidJUnitRunner"
+allow_network_toggle="${ALLOW_NETWORK_TOGGLE:-false}"
+network_recovery_benchmark_class="dev.ipf.whitenoise.android.benchmark.NetworkRecoveryBenchmark"
+
+if [[ "${BENCHMARK_CLASS_FILTER:-}" == *"$network_recovery_benchmark_class"* &&
+  "$allow_network_toggle" != true ]]; then
+  echo "Network recovery changes connectivity. Re-run with ALLOW_NETWORK_TOGGLE=true to authorize it." >&2
+  exit 1
+fi
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -162,6 +170,8 @@ device_output_pulled=false
 heads_up_setting_captured=false
 original_heads_up_notifications_enabled=""
 target_replaced=false
+airplane_mode_captured=false
+original_airplane_mode=""
 
 capture_device_state() {
   local destination="$1"
@@ -212,9 +222,28 @@ restore_heads_up_notifications() {
   return 1
 }
 
+restore_airplane_mode() {
+  local attempt restored_value
+  for attempt in 1 2 3; do
+    adb_cmd shell cmd connectivity airplane-mode "$original_airplane_mode" >/dev/null 2>&1 || true
+    restored_value="$(adb_cmd shell cmd connectivity airplane-mode 2>/dev/null | tr -d '\r')" || restored_value=""
+    if [[ "$restored_value" == "$original_airplane_mode" ]]; then
+      return 0
+    fi
+    if ((attempt < 3)); then sleep 1; fi
+  done
+
+  echo "Failed to restore airplane mode to its original state: $original_airplane_mode." >&2
+  echo "Reconnect the device and restore that state manually before relying on network behavior." >&2
+  return 1
+}
+
 cleanup() {
   local status=$?
   trap - EXIT
+  if [[ "$airplane_mode_captured" == true ]] && ! restore_airplane_mode; then
+    if ((status == 0)); then status=1; fi
+  fi
   if [[ "$heads_up_setting_captured" == true ]] && ! restore_heads_up_notifications; then
     if ((status == 0)); then status=1; fi
   fi
@@ -231,6 +260,18 @@ cleanup() {
   exit "$status"
 }
 trap cleanup EXIT
+
+if [[ "$allow_network_toggle" == true ]]; then
+  original_airplane_mode="$(adb_cmd shell cmd connectivity airplane-mode | tr -d '\r')"
+  case "$original_airplane_mode" in
+    enabled | disabled) ;;
+    *)
+      echo "Could not capture the original airplane-mode state: $original_airplane_mode" >&2
+      exit 1
+      ;;
+  esac
+  airplane_mode_captured=true
+fi
 
 # A heads-up notification can cover a Compose target between UiAutomator
 # resolving its bounds and injecting the tap. That contaminates the sample and
@@ -319,17 +360,22 @@ for _ in {1..120}; do
   sleep 0.25
 done
 if [[ "$startup_markers_ready" != true ]]; then
-  echo "Package-replacement launch did not emit both startup milestones." >&2
-  echo "Captured log: $startup_log" >&2
-  exit 1
+  if [[ "${BENCHMARK_CLASS_FILTER:-}" == *"$network_recovery_benchmark_class"* &&
+    "${BENCHMARK_CLASS_FILTER:-}" != *"StartupBenchmark"* ]]; then
+    echo "Startup milestones unavailable; continuing the recovery-only run with the UI fixture preflight." >&2
+  else
+    echo "Package-replacement launch did not emit both startup milestones." >&2
+    echo "Captured log: $startup_log" >&2
+    exit 1
+  fi
+else
+  bash scripts/package-replacement-startup-report.sh \
+    "$local_output/package-replacement-launch.txt" \
+    "$startup_log" \
+    "$local_output/package-replacement-device.txt" \
+    "$(sha256_file "$app_apk")" \
+    "$local_output/package-replacement-startup.json"
 fi
-
-bash scripts/package-replacement-startup-report.sh \
-  "$local_output/package-replacement-launch.txt" \
-  "$startup_log" \
-  "$local_output/package-replacement-device.txt" \
-  "$(sha256_file "$app_apk")" \
-  "$local_output/package-replacement-startup.json"
 
 preflight_dump="$device_output/preflight.xml"
 preflight_ready=false
@@ -387,6 +433,11 @@ fi
 if [[ -n "${NOTIFICATION_SOURCE_ACCOUNT_REF:-}" ]]; then
   instrument_command="$instrument_command \
 -e notificationSourceAccountRef $(quote_device_shell_arg "$NOTIFICATION_SOURCE_ACCOUNT_REF")"
+fi
+if [[ "$allow_network_toggle" == true ]]; then
+  instrument_command="$instrument_command \
+-e allowNetworkToggle true \
+-e originalAirplaneMode $(quote_device_shell_arg "$original_airplane_mode")"
 fi
 instrument_command="$instrument_command \
 $(quote_device_shell_arg "$runner")"

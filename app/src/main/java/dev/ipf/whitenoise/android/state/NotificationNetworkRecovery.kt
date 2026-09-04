@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
+import dev.ipf.whitenoise.android.diagnostics.PerformanceTrigger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -139,7 +140,10 @@ internal data class NotificationNetworkRecoverySample(
 internal class NotificationNetworkRecoveryDiagnostics(
     private val nowMillis: () -> Long = SystemClock::elapsedRealtime,
     private val traceFactory: () -> PerformanceTrace? = {
-        PerformanceDiagnostics.begin(PerformanceOperation.SYNC_CATCH_UP)
+        PerformanceDiagnostics.begin(
+            operation = PerformanceOperation.SYNC_CATCH_UP,
+            trigger = PerformanceTrigger.NETWORK_RECONNECT,
+        )
     },
     private val traceRecorder: (
         PerformanceTrace?,
@@ -572,60 +576,62 @@ internal class NotificationNetworkRecoveryCoordinator(
     ): NotificationNetworkRecoveryOutcome {
         onRecoveryAttemptStarted(generation)
         recordAttemptStart(generation, attempt)
-        return runNotificationReconnectOnNetworkRestore(
-            wakeDurableOutbound = {
-                if (attempt == 1) {
-                    val succeeded = wakeDurableOutbound()
-                    diagnostics.attemptPhase(
-                        generation = generation,
-                        phase = PerformancePhase.CONNECTIVITY_WAKE_READY,
-                        result = if (succeeded) PerformanceResult.SUCCESS else PerformanceResult.FAILURE,
-                        layer = PerformanceLayer.MDK,
-                        attempt = attempt,
-                    )
-                }
-            },
-            ensureNotificationReceiverActive = {
-                val ready = ensureNotificationReceiverActive()
-                diagnostics.attemptPhase(
-                    generation = generation,
-                    phase =
-                        if (ready) {
-                            PerformancePhase.NOTIFICATION_RECEIVER_READY
-                        } else {
-                            PerformancePhase.NOTIFICATION_RECEIVER_RETRY
-                        },
-                    result = if (ready) PerformanceResult.SUCCESS else PerformanceResult.PENDING,
-                    layer = PerformanceLayer.ANDROID,
-                    attempt = attempt,
-                )
-                ready
-            },
-            catchUpAccounts = {
-                diagnostics.attemptPhase(
-                    generation = generation,
-                    phase = PerformancePhase.ACCOUNT_CATCH_UP_START,
-                    result = PerformanceResult.PENDING,
-                    layer = PerformanceLayer.MDK,
-                    attempt = attempt,
-                )
-                val result = catchUpAccounts()
-                when (result.outcome) {
-                    AccountCatchUpOutcome.Succeeded -> diagnostics.catchUpSucceeded(generation, attempt)
-                    AccountCatchUpOutcome.Failed -> {
+        return RecoveryTrace.networkRecoveryAttempt {
+            runNotificationReconnectOnNetworkRestore(
+                wakeDurableOutbound = {
+                    if (attempt == 1) {
+                        val succeeded = wakeDurableOutbound()
                         diagnostics.attemptPhase(
                             generation = generation,
-                            phase = PerformancePhase.ACCOUNT_CATCH_UP_RETRY,
-                            result = PerformanceResult.PENDING,
+                            phase = PerformancePhase.CONNECTIVITY_WAKE_READY,
+                            result = if (succeeded) PerformanceResult.SUCCESS else PerformanceResult.FAILURE,
                             layer = PerformanceLayer.MDK,
                             attempt = attempt,
                         )
                     }
-                    AccountCatchUpOutcome.Superseded -> Unit
-                }
-                result
-            },
-        )
+                },
+                ensureNotificationReceiverActive = {
+                    val ready = ensureNotificationReceiverActive()
+                    diagnostics.attemptPhase(
+                        generation = generation,
+                        phase =
+                            if (ready) {
+                                PerformancePhase.NOTIFICATION_RECEIVER_READY
+                            } else {
+                                PerformancePhase.NOTIFICATION_RECEIVER_RETRY
+                            },
+                        result = if (ready) PerformanceResult.SUCCESS else PerformanceResult.PENDING,
+                        layer = PerformanceLayer.ANDROID,
+                        attempt = attempt,
+                    )
+                    ready
+                },
+                catchUpAccounts = {
+                    diagnostics.attemptPhase(
+                        generation = generation,
+                        phase = PerformancePhase.ACCOUNT_CATCH_UP_START,
+                        result = PerformanceResult.PENDING,
+                        layer = PerformanceLayer.MDK,
+                        attempt = attempt,
+                    )
+                    val result = catchUpAccounts()
+                    when (result.outcome) {
+                        AccountCatchUpOutcome.Succeeded -> diagnostics.catchUpSucceeded(generation, attempt)
+                        AccountCatchUpOutcome.Failed -> {
+                            diagnostics.attemptPhase(
+                                generation = generation,
+                                phase = PerformancePhase.ACCOUNT_CATCH_UP_RETRY,
+                                result = PerformanceResult.PENDING,
+                                layer = PerformanceLayer.MDK,
+                                attempt = attempt,
+                            )
+                        }
+                        AccountCatchUpOutcome.Superseded -> Unit
+                    }
+                    result
+                },
+            )
+        }
     }
 
     /** Activates the generation trace before recording its next retry attempt. */

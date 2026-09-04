@@ -20,6 +20,17 @@ internal enum class PerformanceOperation(
     SYNC_CATCH_UP("sync_catch_up"),
 }
 
+/** Source-confirmed triggers accepted by recovery diagnostics. */
+internal enum class PerformanceTrigger(
+    val wireName: String,
+) {
+    FOREGROUND("foreground"),
+    NETWORK_RECONNECT("network_reconnect"),
+    PUSH_WAKE("push_wake"),
+    CHAT_LIST_READINESS("chat_list_readiness"),
+    EXPLICIT("explicit"),
+}
+
 /**
  * Closed phase vocabulary. No phase can be supplied by a caller as a String,
  * and routine spans below the phase threshold are silently ignored.
@@ -101,6 +112,7 @@ internal enum class PerformanceLayer(
 
 internal class PerformanceTrace internal constructor(
     val operation: PerformanceOperation,
+    val trigger: PerformanceTrigger? = null,
     internal val sessionGeneration: Long,
     internal val operationId: Long,
     internal val startedAtMs: Long,
@@ -167,13 +179,18 @@ internal class PerformanceDiagnosticEmitter(
         return if (available) statusAt(now) else PerformanceDiagnosticStatus.Unavailable
     }
 
+    /** Starts an active diagnostic operation with an optional closed semantic trigger. */
     @Synchronized
-    fun begin(operation: PerformanceOperation): PerformanceTrace? {
+    fun begin(
+        operation: PerformanceOperation,
+        trigger: PerformanceTrigger? = null,
+    ): PerformanceTrace? {
         val now = nowMs()
         expireIfNeeded(now)
         if (!isActiveAt(now)) return null
         return PerformanceTrace(
             operation = operation,
+            trigger = trigger,
             sessionGeneration = sessionGeneration,
             operationId = operationCounter.updateAndGet(::nextCounter),
             startedAtMs = now,
@@ -241,6 +258,10 @@ internal class PerformanceDiagnosticEmitter(
             append(trace.sessionGeneration)
             append(" op=")
             append(trace.operation.wireName)
+            trace.trigger?.let {
+                append(" trigger=")
+                append(it.wireName)
+            }
             append(" phase=")
             append(phase.wireName)
             append(" elapsed_ms=")
@@ -341,7 +362,11 @@ internal object PerformanceDiagnostics {
 
     fun isActive(): Boolean = status().active
 
-    fun begin(operation: PerformanceOperation): PerformanceTrace? = emitter.begin(operation)
+    /** Starts a trace only while the local, time-bounded diagnostics session is active. */
+    fun begin(
+        operation: PerformanceOperation,
+        trigger: PerformanceTrigger? = null,
+    ): PerformanceTrace? = emitter.begin(operation, trigger)
 
     fun record(
         trace: PerformanceTrace?,
