@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
+
 /**
  * Total fallback order for rows that do not have an MDK authoritative ordinal:
  * engine timestamp, then local arrival order, then message id.
@@ -22,10 +24,9 @@ internal fun compareTimelineMessages(
 }
 
 /**
- * Preserves MDK's relative order for authoritative rows while merging transient
- * local overlays at their timestamp position. Local rows are normally optimistic
- * sends at the live head; confirmed rows temporarily lose their ordinal only while
- * an optimistic or stream position bridge is active.
+ * Preserves MDK's relative order for authoritative rows while merging local
+ * overlays at their timestamp position. Local rows include optimistic sends,
+ * unresolved local projections, and transient position bridges.
  */
 internal fun orderTimelineMessagesForDisplay(messages: List<TimelineMessage>): List<TimelineMessage> {
     val distinct = messages.distinctBy { it.id }
@@ -69,6 +70,9 @@ internal fun orderTimelineMessagesForDisplay(messages: List<TimelineMessage>): L
         .forEach { overlay -> insertTimelineOverlayByFallbackOrder(ordered, overlay) }
     return ordered
 }
+
+/** Whether a projected row has a position derived from accepted group history. */
+internal fun TimelineMessageRecordFfi.hasHistoryPosition(): Boolean = sourceEpoch != null || sourceMessageIdHex != null
 
 /** Source-level message identity used by durable stream parent links. */
 private fun TimelineMessage.displayMessageIdHex(): String = projected?.messageIdHex ?: record.messageIdHex

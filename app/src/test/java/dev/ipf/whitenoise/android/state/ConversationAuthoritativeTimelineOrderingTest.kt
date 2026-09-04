@@ -51,6 +51,52 @@ class ConversationAuthoritativeTimelineOrderingTest {
             }
         }
 
+    /** An old unresolved local send keeps its wall-time position instead of becoming the live head. */
+    @Test
+    fun oldUnconfirmedLocalSendDoesNotOccupyTheLiveHead() =
+        runBlocking {
+            val subscription =
+                ScriptedConversationTimelineSubscription(
+                    timelinePage(
+                        membershipRecord(timelineAt = 200uL),
+                        appRecord(timelineAt = 100uL),
+                        unconfirmedLocalRecord(timelineAt = 50uL),
+                    ),
+                )
+            withController(subscription) { controller, _ ->
+                awaitConversationCondition { controller.timeline.size == 3 }
+
+                assertEquals(
+                    listOf(UNCONFIRMED_MESSAGE_ID, SYSTEM_MESSAGE_ID, APP_MESSAGE_ID),
+                    timelineMessageIds(controller),
+                )
+            }
+        }
+
+    /** A newly confirmed message stays at the live head above an older unconfirmed row. */
+    @Test
+    fun liveConfirmationDoesNotDisappearAboveAnOldUnconfirmedRow() =
+        runBlocking {
+            val oldUnconfirmed = unconfirmedLocalRecord(timelineAt = 50uL)
+            val subscription = ScriptedConversationTimelineSubscription(timelinePage(oldUnconfirmed))
+            withController(subscription) { controller, _ ->
+                awaitConversationCondition { subscription.nextWindowCallCount >= 1 }
+                subscription.emitWindow(
+                    // MDK's accepted-history class precedes its unresolved-local
+                    // class even though this accepted message is newer.
+                    timelinePage(appRecord(timelineAt = 300uL), oldUnconfirmed),
+                )
+                awaitConversationCondition { subscription.nextWindowCallCount >= 2 }
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(10))
+                awaitConversationCondition(timeoutMs = 15_000) { controller.timeline.size == 2 }
+
+                assertEquals(
+                    listOf(UNCONFIRMED_MESSAGE_ID, APP_MESSAGE_ID),
+                    timelineMessageIds(controller),
+                )
+            }
+        }
+
     /** Earlier-timestamp stream rows remain chained below their MDK-ranked prompt. */
     @Test
     fun durableStreamChainCannotCrossPrecedingMembershipRow() =
@@ -200,6 +246,19 @@ class ConversationAuthoritativeTimelineOrderingTest {
             timelineAt = timelineAt,
         ).copy(sourceEpoch = SOURCE_EPOCH)
 
+    /** Builds the persisted local-only row MDK places after accepted group history. */
+    private fun unconfirmedLocalRecord(timelineAt: ULong) =
+        timelineRecord(
+            messageId = UNCONFIRMED_MESSAGE_ID,
+            timelineAt = timelineAt,
+            plaintext = "old unconfirmed send",
+        ).copy(
+            sourceMessageIdHex = null,
+            direction = "sent",
+            sender = ConversationTimelineTestIds.ACCOUNT_ID,
+            invalidationStatus = "local_publish_failed",
+        )
+
     /** Builds the durable stream start linked to the authoritative prompt. */
     private fun streamStartRecord(timelineAt: ULong) =
         timelineRecord(
@@ -280,6 +339,7 @@ class ConversationAuthoritativeTimelineOrderingTest {
         const val STREAM_ID = "reply"
         val SYSTEM_MESSAGE_ID = "ff".repeat(32)
         val APP_MESSAGE_ID = "00".repeat(32)
+        val UNCONFIRMED_MESSAGE_ID = "33".repeat(32)
         val STREAM_START_MESSAGE_ID = "11".repeat(32)
         val STREAM_FINAL_MESSAGE_ID = "22".repeat(32)
     }
