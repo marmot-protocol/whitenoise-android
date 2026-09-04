@@ -309,8 +309,15 @@ class Nip55SignerParsingTest {
 
     @Test
     fun loginPermissionPayloadRemainsByteExact() {
+        val expected =
+            """[{"kind":450,"type":"sign_event"},{"kind":30443,"type":"sign_event"},""" +
+                """{"kind":443,"type":"sign_event"},{"kind":444,"type":"sign_event"},""" +
+                """{"kind":445,"type":"sign_event"},{"kind":1059,"type":"sign_event"},""" +
+                """{"kind":10002,"type":"sign_event"},{"kind":10050,"type":"sign_event"},""" +
+                """{"kind":10051,"type":"sign_event"},{"type":"nip44_encrypt"},""" +
+                """{"type":"nip44_decrypt"}]"""
         assertEquals(
-            """[{"kind":450,"type":"sign_event"},{"kind":30443,"type":"sign_event"},{"kind":443,"type":"sign_event"},{"kind":444,"type":"sign_event"},{"kind":445,"type":"sign_event"},{"kind":1059,"type":"sign_event"},{"kind":10002,"type":"sign_event"},{"kind":10050,"type":"sign_event"},{"kind":10051,"type":"sign_event"},{"type":"nip44_encrypt"},{"type":"nip44_decrypt"}]""",
+            expected,
             Nip55.loginPermissionsJson(),
         )
     }

@@ -410,7 +410,10 @@ class AmberActivityCoordinatorTest {
         val requestId = checkNotNull(relayLaunch.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID))
         val signerIntent =
             checkNotNull(relayLaunch.getParcelableExtra(AmberSignerRelay.EXTRA_SIGNER_INTENT, Intent::class.java))
-        assertEquals(Intent.ACTION_CHOOSER, AmberSignerRelay.prepareSignerLaunch(context, requestId, signerIntent)?.action)
+        assertEquals(
+            Intent.ACTION_CHOOSER,
+            AmberSignerRelay.prepareSignerLaunch(context, requestId, signerIntent)?.action,
+        )
         AmberActivityCoordinator.deliverResult(
             resultOk = false,
             data = AmberSignerRelay.buildResultIntent(requestId, signerData = null),
