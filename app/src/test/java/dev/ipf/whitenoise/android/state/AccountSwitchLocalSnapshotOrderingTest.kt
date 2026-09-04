@@ -313,8 +313,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertFalse("foreground recovery must not duplicate the transport wake", "notifyConnectivityRestored()" in body)
         assertTrue(
             "foreground recovery must use the post-trigger catch-up boundary",
-            "catchUpAfterObservedPushWake(" in body &&
-                "trigger = PerformanceTrigger.FOREGROUND" in body,
+            Regex(
+                """catchUpAfterObservedPushWake\(\s*""" +
+                    """pendingGeneration\s*=\s*pendingGeneration,\s*""" +
+                    """trigger\s*=\s*PerformanceTrigger\.FOREGROUND,\s*\)""",
+            ).containsMatchIn(body),
         )
     }
 
@@ -325,8 +328,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
         assertTrue(
             "push-wake recovery must use the post-trigger catch-up boundary",
-            "catchUpAfterObservedPushWake(" in body &&
-                "trigger = PerformanceTrigger.PUSH_WAKE" in body,
+            Regex(
+                """catchUpAfterObservedPushWake\(\s*""" +
+                    """pendingGeneration\s*=\s*pendingGeneration,\s*""" +
+                    """trigger\s*=\s*PerformanceTrigger\.PUSH_WAKE,\s*\)""",
+            ).containsMatchIn(body),
         )
         assertFalse("push-wake recovery must not bypass coordination", "catchUpAccountsBestEffort()" in body)
     }

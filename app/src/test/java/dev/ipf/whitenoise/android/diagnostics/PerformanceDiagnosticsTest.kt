@@ -368,6 +368,11 @@ class PerformanceDiagnosticBuildGateTest {
         assertTrue("cmd connectivity airplane-mode" in benchmark)
         assertTrue("BenchmarkAirplaneMode.Enabled" in benchmark)
         assertTrue("BenchmarkAirplaneMode.Disabled" in benchmark)
+        assertTrue(
+            "captured status must be parsed through the matching enum",
+            "BenchmarkAirplaneMode.fromStatusValue(arguments.getString(\"originalAirplaneMode\"))" in config &&
+                "entries.firstOrNull { it.statusValue == value }" in config,
+        )
         assertTrue("Enabled(\"enabled\", \"enable\")" in config)
         assertTrue("Disabled(\"disabled\", \"disable\")" in config)
         assertTrue("device.executeShellCommand(mode.command())" in benchmark)
