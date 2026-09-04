@@ -101,6 +101,22 @@ class AmberExternalSignerTest {
     }
 
     @Test
+    fun rememberedContentResolverApprovalDoesNotLaunchForegroundSigner() {
+        ShadowContentResolver.registerProviderInternal(AUTHORITY, RememberedValueProvider("ciphertext"))
+        val signer =
+            AmberExternalSigner(
+                appContext = context,
+                accountPubkey = "account-pubkey",
+                approvalTimeoutMs = 200,
+            )
+
+        val result = signer.nip44Encrypt("counterparty-pubkey", "plaintext")
+
+        assertEquals("ciphertext", result)
+        assertNull("remembered approval must not launch a signer prompt", launcher.launched.get())
+    }
+
+    @Test
     fun missingStoredSignerPackageIsClearedBeforeAnyOperation() {
         Nip55.saveSignerPackage(context, "com.missing.signer")
         val signer = AmberExternalSigner(context, accountPubkey = "account-pubkey", approvalTimeoutMs = 200)
@@ -221,6 +237,43 @@ class AmberExternalSignerTest {
         ): Cursor =
             MatrixCursor(arrayOf(Nip55.COLUMN_REJECTED, Nip55.COLUMN_RESULT)).apply {
                 addRow(arrayOf<Any?>(null, "ignored-because-rejected"))
+            }
+
+        override fun getType(uri: Uri): String? = null
+
+        override fun insert(
+            uri: Uri,
+            values: ContentValues?,
+        ): Uri? = null
+
+        override fun delete(
+            uri: Uri,
+            selection: String?,
+            selectionArgs: Array<out String>?,
+        ): Int = 0
+
+        override fun update(
+            uri: Uri,
+            values: ContentValues?,
+            selection: String?,
+            selectionArgs: Array<out String>?,
+        ): Int = 0
+    }
+
+    private class RememberedValueProvider(
+        private val value: String,
+    ) : ContentProvider() {
+        override fun onCreate(): Boolean = true
+
+        override fun query(
+            uri: Uri,
+            projection: Array<out String>?,
+            selection: String?,
+            selectionArgs: Array<out String>?,
+            sortOrder: String?,
+        ): Cursor =
+            MatrixCursor(arrayOf(Nip55.COLUMN_RESULT)).apply {
+                addRow(arrayOf(value))
             }
 
         override fun getType(uri: Uri): String? = null
