@@ -37,6 +37,7 @@ class NotificationPushWakeDrainCoverageTest {
         )
     }
 
+    /** Keeps the wake lock held until the push-triggered notification drain has completed. */
     @Test
     fun pushWakeBootstrapHoldsWakeLockAcrossDrainAwait() {
         val source = serviceSource().readText()

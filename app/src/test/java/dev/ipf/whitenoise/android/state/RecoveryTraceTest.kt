@@ -9,6 +9,7 @@ import org.junit.Test
 import java.io.File
 
 class RecoveryTraceTest {
+    /** Ensures catch-up trace names cannot contain account, relay, or message data. */
     @Test
     fun everyCatchUpTriggerMapsToOneFixedPrivacySafeSection() {
         val expected =
@@ -24,6 +25,7 @@ class RecoveryTraceTest {
         assertTrue(expected.values.all { it.matches(Regex("WhiteNoise\\.recovery\\.[A-Za-z.-]+")) })
     }
 
+    /** Keeps the remaining recovery trace sections fixed and free of runtime identifiers. */
     @Test
     fun nonCatchUpResourceSectionsAreFixed() {
         assertEquals(
@@ -36,6 +38,7 @@ class RecoveryTraceTest {
         )
     }
 
+    /** Prevents timeout and cleanup paths from ending the same async trace twice. */
     @Test
     fun timeoutAndFinallyCannotCloseTheSameSliceTwice() {
         val token = RecoveryTraceToken("WhiteNoise.recovery.push-wake-lock", 1)
@@ -44,6 +47,7 @@ class RecoveryTraceTest {
         assertFalse(token.claimEnd())
     }
 
+    /** Verifies unavailable platform tracing never prevents the recovery operation from running. */
     @Test
     fun unavailablePlatformTracingNeverBlocksRecoveryWork() =
         runBlocking {
@@ -59,6 +63,7 @@ class RecoveryTraceTest {
             assertEquals("completed", result)
         }
 
+    /** Requires every catch-up entry point to provide one of the closed trigger values. */
     @Test
     fun everyCatchUpEntryPointSuppliesASourceConfirmedTrigger() {
         val appState = source("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt")
@@ -78,6 +83,7 @@ class RecoveryTraceTest {
         assertTrue("actual native work owns the catch-up slice", "RecoveryTrace.catchUp(trigger)" in appState)
     }
 
+    /** Ensures reconnect attempts and held push wake locks own their fixed resource slices. */
     @Test
     fun reconnectAttemptsAndAcquiredPushWakeLocksOwnFixedSlices() {
         val recovery = source("src/main/java/dev/ipf/whitenoise/android/state/NotificationNetworkRecovery.kt")
@@ -92,6 +98,7 @@ class RecoveryTraceTest {
         assertTrue("RecoveryTrace.endPushWakeLock" in service)
     }
 
+    /** Loads production source from either the repository root or app module test working directory. */
     private fun source(relativePath: String): String =
         sequenceOf(File(relativePath), File("app/$relativePath"))
             .firstOrNull(File::isFile)

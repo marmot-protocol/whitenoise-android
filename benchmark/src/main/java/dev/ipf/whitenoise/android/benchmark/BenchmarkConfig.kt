@@ -34,7 +34,7 @@ internal object BenchmarkConfig {
         get() = arguments.getString("allowNetworkToggle") == "true"
 
     val originalAirplaneMode: BenchmarkAirplaneMode?
-        get() = BenchmarkAirplaneMode.fromShellValue(arguments.getString("originalAirplaneMode"))
+        get() = BenchmarkAirplaneMode.fromStatusValue(arguments.getString("originalAirplaneMode"))
 
     private fun fixtureList(argumentName: String): List<String> =
         arguments
@@ -79,16 +79,20 @@ internal object BenchmarkConfig {
     private const val NOTIFICATION_SAMPLE_DELIMITER = ";;"
 }
 
-/** Exact airplane-mode states accepted from the guarded host runner. */
+/** Exact airplane-mode status and setter values accepted by the guarded benchmark. */
 internal enum class BenchmarkAirplaneMode(
-    val shellValue: String,
+    val statusValue: String,
+    private val commandAction: String,
 ) {
-    Enabled("enabled"),
-    Disabled("disabled"),
+    Enabled("enabled", "enable"),
+    Disabled("disabled", "disable"),
     ;
+
+    /** Builds the connectivity command with an action rather than a query status. */
+    fun command(): String = "cmd connectivity airplane-mode $commandAction"
 
     companion object {
         /** Parses only the two values emitted by Android's connectivity shell. */
-        fun fromShellValue(value: String?): BenchmarkAirplaneMode? = entries.firstOrNull { it.shellValue == value }
+        fun fromStatusValue(value: String?): BenchmarkAirplaneMode? = entries.firstOrNull { it.statusValue == value }
     }
 }

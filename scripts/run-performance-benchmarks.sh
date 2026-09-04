@@ -222,10 +222,23 @@ restore_heads_up_notifications() {
   return 1
 }
 
+# Maps the query's past-tense status to the setter's imperative action.
+airplane_mode_action_for_status() {
+  case "$1" in
+    enabled) printf '%s\n' enable ;;
+    disabled) printf '%s\n' disable ;;
+    *) return 1 ;;
+  esac
+}
+
 restore_airplane_mode() {
-  local attempt restored_value
+  local attempt restore_action restored_value
+  restore_action="$(airplane_mode_action_for_status "$original_airplane_mode")" || {
+    echo "Cannot map airplane-mode state for restoration: $original_airplane_mode." >&2
+    return 1
+  }
   for attempt in 1 2 3; do
-    adb_cmd shell cmd connectivity airplane-mode "$original_airplane_mode" >/dev/null 2>&1 || true
+    adb_cmd shell cmd connectivity airplane-mode "$restore_action" >/dev/null 2>&1 || true
     restored_value="$(adb_cmd shell cmd connectivity airplane-mode 2>/dev/null | tr -d '\r')" || restored_value=""
     if [[ "$restored_value" == "$original_airplane_mode" ]]; then
       return 0

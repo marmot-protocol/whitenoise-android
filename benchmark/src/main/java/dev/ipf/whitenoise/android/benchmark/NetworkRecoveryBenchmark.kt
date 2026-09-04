@@ -59,19 +59,19 @@ class NetworkRecoveryBenchmark {
         mode: BenchmarkAirplaneMode,
         awaitState: Boolean = true,
     ) {
-        device.executeShellCommand("cmd connectivity airplane-mode ${mode.shellValue}")
+        device.executeShellCommand(mode.command())
         if (!awaitState) return
         val deadline = SystemClock.elapsedRealtime() + AIRPLANE_MODE_TRANSITION_TIMEOUT_MS
         while (SystemClock.elapsedRealtime() < deadline) {
             if (currentAirplaneMode() == mode) return
             SystemClock.sleep(AIRPLANE_MODE_POLL_MS)
         }
-        error("Timed out waiting for airplane mode ${mode.shellValue}.")
+        error("Timed out waiting for airplane mode ${mode.statusValue}.")
     }
 
     /** Reads the closed connectivity-shell state without accepting arbitrary output. */
     private fun currentAirplaneMode(): BenchmarkAirplaneMode? =
-        BenchmarkAirplaneMode.fromShellValue(
+        BenchmarkAirplaneMode.fromStatusValue(
             device.executeShellCommand("cmd connectivity airplane-mode").trim(),
         )
 

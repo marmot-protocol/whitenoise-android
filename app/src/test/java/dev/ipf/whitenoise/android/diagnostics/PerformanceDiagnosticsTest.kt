@@ -43,6 +43,7 @@ class PerformanceDiagnosticSchemaTest {
         assertSchemaAllowlists(lines.single())
     }
 
+    /** Confirms recovery diagnostics serialize only a closed trigger and no caller-provided text. */
     @Test
     fun recoveryTraceSerializesOnlyAClosedTrigger() {
         val lines = mutableListOf<String>()
@@ -344,6 +345,7 @@ class PerformanceDiagnosticBuildGateTest {
         assertTrue(runner.contains("-e notificationSourceAccountRef"))
     }
 
+    /** Guards state restoration, command semantics, and resource cleanup in the device runner. */
     @Test
     fun recoveryBenchmarkIsExplicitStatePreservingAndResourceComplete() {
         val metrics = rootSource("benchmark/src/main/java/dev/ipf/whitenoise/android/benchmark/BenchmarkMetrics.kt")
@@ -366,9 +368,18 @@ class PerformanceDiagnosticBuildGateTest {
         assertTrue("cmd connectivity airplane-mode" in benchmark)
         assertTrue("BenchmarkAirplaneMode.Enabled" in benchmark)
         assertTrue("BenchmarkAirplaneMode.Disabled" in benchmark)
+        assertTrue("Enabled(\"enabled\", \"enable\")" in config)
+        assertTrue("Disabled(\"disabled\", \"disable\")" in config)
+        assertTrue("device.executeShellCommand(mode.command())" in benchmark)
+        assertFalse("executeShellCommand(\"cmd connectivity airplane-mode " in benchmark)
         assertTrue("allowNetworkToggle" in config)
         assertTrue("ALLOW_NETWORK_TOGGLE" in runner)
         assertTrue("restore_airplane_mode" in runner)
+        assertTrue("airplane_mode_action_for_status" in runner)
+        assertTrue("enabled) printf '%s\\n' enable" in runner)
+        assertTrue("disabled) printf '%s\\n' disable" in runner)
+        assertTrue("airplane-mode \"\$restore_action\"" in runner)
+        assertFalse("airplane-mode \"\$original_airplane_mode\"" in runner)
         assertTrue("original_airplane_mode=\"\$(adb_cmd shell cmd connectivity airplane-mode" in runner)
         assertTrue("airplane_mode_captured=true" in runner)
         assertTrue("[[ \"\$airplane_mode_captured\" == true ]] && ! restore_airplane_mode" in runner)
