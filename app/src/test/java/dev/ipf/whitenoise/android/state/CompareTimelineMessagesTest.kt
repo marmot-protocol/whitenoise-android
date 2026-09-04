@@ -92,6 +92,19 @@ class CompareTimelineMessagesTest {
         )
     }
 
+    /** A wall-time inversion cannot move an unrelated overlay ahead of the MDK range. */
+    @Test
+    fun displayOrderKeepsOverlayBehindInvertedAuthoritativeRange() {
+        val mdkFirst = msg("mdk-first", recordedAt = 100uL, order = 0uL, authoritativeOrder = 0uL)
+        val mdkSecond = msg("mdk-second", recordedAt = 50uL, order = 0uL, authoritativeOrder = 1uL)
+        val overlay = msg("overlay", recordedAt = 75uL, order = 0uL)
+
+        assertEquals(
+            listOf("mdk-first", "mdk-second", "overlay"),
+            orderTimelineMessagesForDisplay(listOf(overlay, mdkSecond, mdkFirst)).map { it.id },
+        )
+    }
+
     /** Durable stream children stay under their prompt instead of crossing an MDK-ranked event. */
     @Test
     fun displayOrderAnchorsDurableStreamChainBelowAuthoritativePrompt() {

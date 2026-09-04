@@ -78,10 +78,6 @@ private fun insertTimelineOverlayByFallbackOrder(
     rows: MutableList<TimelineMessage>,
     overlay: TimelineMessage,
 ) {
-    val insertionIndex = rows.indexOfFirst { row -> compareTimelineMessages(overlay, row) < 0 }
-    if (insertionIndex < 0) {
-        rows.add(overlay)
-    } else {
-        rows.add(insertionIndex, overlay)
-    }
+    val precedingIndex = rows.indexOfLast { row -> compareTimelineMessages(row, overlay) <= 0 }
+    rows.add(precedingIndex + 1, overlay)
 }
