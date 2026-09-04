@@ -1,8 +1,13 @@
 package dev.ipf.whitenoise.android.updates
 
 /**
- * Whether the active build runs the in-app self-update flow. Builds that don't
- * (the Google Play distribution) surface no in-app update UI at all — the
- * distributing store owns updates, and off-store update redirects violate policy.
+ * Returns whether this build may install the offered version through the in-app updater.
+ *
+ * Google Play builds delegate updates to Play, while Zapstore builds must still reject
+ * equal or older versions even if stale release metadata reaches an update entry point.
  */
-fun shouldStartInAppSelfUpdate(selfUpdateEnabled: Boolean): Boolean = selfUpdateEnabled
+fun shouldStartInAppSelfUpdate(
+    selfUpdateEnabled: Boolean,
+    installedVersion: String,
+    targetVersion: String,
+): Boolean = selfUpdateEnabled && CalVer.compare(targetVersion, installedVersion) > 0

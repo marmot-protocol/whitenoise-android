@@ -4,7 +4,7 @@ import java.math.BigInteger
 
 /** Constants for White Noise's Zapstore listing and release metadata. */
 object AppUpdateConstants {
-    const val WHITENOISE_ZAPSTORE_APP_ID = "org.parres.whitenoise"
+    const val WHITENOISE_ZAPSTORE_APP_ID = "dev.ipf.whitenoise.android"
     const val ZAPSTORE_LISTING_URL = "https://zapstore.dev/apps/$WHITENOISE_ZAPSTORE_APP_ID"
     const val FAR_BEHIND_RELEASES = 3
 }

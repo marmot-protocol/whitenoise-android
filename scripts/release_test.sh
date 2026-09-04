@@ -35,6 +35,19 @@ case "$*" in
 esac
 EOF
 
+cat > "$FIXTURE_DIR/bin/unzip" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${RELEASE_TEST_INCLUDE_PUSH_CONFIG:-true}" == "true" ]]; then
+  printf '%s\n' "$WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX"
+  printf '%s\n' "$WHITENOISE_PRODUCTION_PUSH_RELAY_HINT"
+fi
+EOF
+
+cat > "$FIXTURE_DIR/bin/strings" <<'EOF'
+#!/usr/bin/env bash
+cat
+EOF
+
 cat > "$FIXTURE_DIR/repo/gradlew" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -44,11 +57,17 @@ mkdir -p \
 touch \
   app/build/outputs/apk/productionZapstore/release/app-production-zapstore-universal-release.apk
 EOF
-chmod +x "$FIXTURE_DIR/bin/java" "$FIXTURE_DIR/bin/aapt" "$FIXTURE_DIR/repo/gradlew"
+chmod +x \
+  "$FIXTURE_DIR/bin/java" \
+  "$FIXTURE_DIR/bin/aapt" \
+  "$FIXTURE_DIR/bin/unzip" \
+  "$FIXTURE_DIR/bin/strings" \
+  "$FIXTURE_DIR/repo/gradlew"
 
 export RELEASE_TEST_AAPT_LOG="$FIXTURE_DIR/aapt.log"
 export RELEASE_TEST_GRADLE_LOG="$FIXTURE_DIR/gradle.log"
 export RELEASE_TEST_INCLUDE_FIREBASE_RESOURCES="true"
+export RELEASE_TEST_INCLUDE_PUSH_CONFIG="true"
 export WHITENOISE_PRODUCTION_KEYSTORE_PATH="$FIXTURE_DIR/release.p12"
 export WHITENOISE_PRODUCTION_KEY_ALIAS="release"
 export WHITENOISE_PRODUCTION_KEYSTORE_PASSWORD="password"
@@ -129,6 +148,55 @@ EOF
 set +e
 output="$({
   cd "$FIXTURE_DIR/repo"
+  PATH="$FIXTURE_DIR/bin:$PATH" ./scripts/release.sh --abi universal
+} 2>&1)"
+status=$?
+set -e
+
+if (( status == 0 )); then
+  printf 'error: production release succeeded without a MIP-05 push server public key\n%s\n' "$output" >&2
+  exit 1
+fi
+if [[ "$output" != *"WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX"* ]]; then
+  printf 'error: missing production push-key failure was not actionable\n%s\n' "$output" >&2
+  exit 1
+fi
+if [[ -s "$RELEASE_TEST_GRADLE_LOG" ]]; then
+  echo 'error: Gradle ran before the missing production push key was rejected' >&2
+  exit 1
+fi
+
+export WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX="deadbeef"
+set +e
+output="$({
+  cd "$FIXTURE_DIR/repo"
+  PATH="$FIXTURE_DIR/bin:$PATH" ./scripts/release.sh --abi universal
+} 2>&1)"
+status=$?
+set -e
+if (( status == 0 )) || [[ "$output" != *"64 hexadecimal characters"* ]]; then
+  printf 'error: malformed production push key was not rejected clearly\n%s\n' "$output" >&2
+  exit 1
+fi
+
+export WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+export WHITENOISE_PRODUCTION_PUSH_RELAY_HINT="https://relay.example"
+set +e
+output="$({
+  cd "$FIXTURE_DIR/repo"
+  PATH="$FIXTURE_DIR/bin:$PATH" ./scripts/release.sh --abi universal
+} 2>&1)"
+status=$?
+set -e
+if (( status == 0 )) || [[ "$output" != *"valid wss:// URI"* ]]; then
+  printf 'error: malformed production push relay hint was not rejected clearly\n%s\n' "$output" >&2
+  exit 1
+fi
+export WHITENOISE_PRODUCTION_PUSH_RELAY_HINT="wss://relay.example"
+
+set +e
+output="$({
+  cd "$FIXTURE_DIR/repo"
   PATH="$FIXTURE_DIR/bin:$PATH" ./scripts/release.sh --abi universal \
     --gradle-init-script "$FIXTURE_DIR/compact.gradle"
 } 2>&1)"
@@ -195,6 +263,28 @@ if [[ "$output" != *"google_app_id"* || "$output" != *"gcm_defaultSenderId"* ]];
 fi
 if ! grep -Fq -- "dump resources $selected_apk" "$RELEASE_TEST_AAPT_LOG"; then
   echo 'error: APK resources were not inspected before rejection' >&2
+  exit 1
+fi
+
+: > "$RELEASE_TEST_AAPT_LOG"
+: > "$RELEASE_TEST_GRADLE_LOG"
+rm -f "$selected_apk"
+export RELEASE_TEST_INCLUDE_PUSH_CONFIG="false"
+set +e
+output="$({
+  cd "$FIXTURE_DIR/repo"
+  PATH="$FIXTURE_DIR/bin:$PATH" ./scripts/release.sh --abi universal
+} 2>&1)"
+status=$?
+set -e
+export RELEASE_TEST_INCLUDE_PUSH_CONFIG="true"
+
+if (( status == 0 )); then
+  printf 'error: production release accepted an APK without its configured MIP-05 values\n%s\n' "$output" >&2
+  exit 1
+fi
+if [[ "$output" != *"does not contain the configured MIP-05"* ]]; then
+  printf 'error: missing packaged MIP-05 config failure was not actionable\n%s\n' "$output" >&2
   exit 1
 fi
 
