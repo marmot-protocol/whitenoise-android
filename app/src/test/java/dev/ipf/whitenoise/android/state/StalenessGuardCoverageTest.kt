@@ -112,6 +112,8 @@ class StalenessGuardCoverageTest {
                 "AppState.kt:cancelAndJoin" to "monitor-owned single cancellation completion",
                 // BootstrapAttemptCoordinator admits only one process-owned attempt.
                 "AppState.kt:bootstrap" to "single-flight bootstrap coordinator",
+                // Explicit retry only changes presentation, then delegates to the same single-flight coordinator.
+                "AppState.kt:retryBootstrap" to "user-owned presentation transition before single-flight bootstrap",
                 // bootstrapLocked is called only by the coordinator's sole attempt.
                 "AppState.kt:bootstrapLocked" to "single-flight bootstrap body",
                 // BootstrapRuntimeCoordinator serializes construct/configure/start and terminal cleanup.

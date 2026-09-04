@@ -14,14 +14,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AgentStreamSubscription
 import dev.ipf.marmotkit.AgentStreamUpdateFfi
-import dev.ipf.marmotkit.AppBlobEndpointFfi
-import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
@@ -29,7 +26,6 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
-import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
@@ -534,56 +530,6 @@ internal fun nextTimelineOrder(
     published: Sequence<ULong>,
     pending: Sequence<ULong>,
 ): ULong = (published + pending).maxOrNull()?.plus(1uL) ?: 1uL
-
-internal fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
-    AppGroupRecordFfi(
-        groupIdHex = row.groupIdHex,
-        protocolProfile = AppProtocolProfileFfi.LEGACY,
-        endpoint = "",
-        profilePresent = false,
-        name = row.groupName,
-        description = "",
-        admins = emptyList(),
-        relays = emptyList(),
-        nostrGroupIdHex = "",
-        avatarUrl = row.avatarUrl,
-        avatarDim = null,
-        avatarThumbhash = null,
-        imageHashHex = row.avatar?.imageHashHex,
-        encryptedMedia = defaultEncryptedMediaComponent(),
-        archived = row.archived,
-        pendingConfirmation = row.pendingConfirmation,
-        unrecoverable = false,
-        selfMembership = row.selfMembership,
-        welcomerAccountIdHex = null,
-        viaWelcomeMessageIdHex = null,
-        disappearingMessageSecs = 0uL,
-        leaveRequestPending = false,
-        leaveRequestedAtMs = null,
-        // The row projects the authoritative lifecycle; a cold open of a
-        // disbanding/disbanded chat must not flash an active composer while
-        // the full group record is still loading.
-        disbanding = row.disbanding,
-        disbanded = row.lifecycleState == GroupLifecycleStateFfi.DISBANDED,
-        disbandRequest = row.disbandRequest,
-    )
-
-private fun defaultEncryptedMediaComponent(): AppGroupEncryptedMediaComponentFfi =
-    AppGroupEncryptedMediaComponentFfi(
-        componentId = 0x8008u,
-        component = "marmot.group.encrypted-media.v1",
-        required = true,
-        version = EncryptedMediaVersionFfi.V1,
-        mediaFormat = "encrypted-media-v1",
-        allowedLocatorKinds = listOf("blossom-v1"),
-        defaultBlobEndpoints =
-            listOf(
-                AppBlobEndpointFfi(
-                    locatorKind = "blossom-v1",
-                    baseUrl = "https://blossom.primal.net",
-                ),
-            ),
-    )
 
 data class GroupMemberSnapshot(
     val members: List<AppGroupMemberRecordFfi>,

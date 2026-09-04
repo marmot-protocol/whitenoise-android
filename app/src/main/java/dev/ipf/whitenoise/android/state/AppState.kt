@@ -33,8 +33,6 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
-import dev.ipf.marmotkit.ChatListSubscription
-import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
@@ -1192,6 +1190,7 @@ class WhiteNoiseAppState private constructor(
     private val notificationDispatcher: CoroutineDispatcher,
     private val notificationCardCancellationDispatcher: CoroutineDispatcher,
     private val notificationReceiverTimeoutMillis: () -> Long,
+    private val bootstrapActionableTimeoutMillis: () -> Long,
     private val notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics,
     private val inboundShareTextStager: ((String, String, String) -> Unit)?,
     preferencesOverride: SharedPreferences?,
@@ -1214,6 +1213,7 @@ class WhiteNoiseAppState private constructor(
             notificationDispatcher = Dispatchers.IO,
             notificationCardCancellationDispatcher = processNotificationCardCancellationDispatcher,
             notificationReceiverTimeoutMillis = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
+            bootstrapActionableTimeoutMillis = { BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS },
             notificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
             inboundShareTextStager = null,
             preferencesOverride = null,
@@ -1238,6 +1238,7 @@ class WhiteNoiseAppState private constructor(
         notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
         notificationCardCancellationDispatcher: CoroutineDispatcher = processNotificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis: () -> Long = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
+        bootstrapActionableTimeoutMillis: () -> Long = { BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS },
         notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics =
             NotificationNetworkRecoveryDiagnostics(),
         inboundShareTextStager: ((String, String, String) -> Unit)? = null,
@@ -1257,6 +1258,7 @@ class WhiteNoiseAppState private constructor(
         notificationDispatcher = notificationDispatcher,
         notificationCardCancellationDispatcher = notificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis = notificationReceiverTimeoutMillis,
+        bootstrapActionableTimeoutMillis = bootstrapActionableTimeoutMillis,
         notificationNetworkRecoveryDiagnostics = notificationNetworkRecoveryDiagnostics,
         inboundShareTextStager = inboundShareTextStager,
         preferencesOverride = preferences,
@@ -3932,12 +3934,11 @@ class WhiteNoiseAppState private constructor(
     suspend fun bootstrap() {
         val attempt =
             withContext(Dispatchers.Main.immediate) {
-                if (phase is AppPhase.Failed) phase = AppPhase.Bootstrapping
                 bootstrapAttempts.currentOrStart {
                     mutationsScope.async { bootstrapLocked() }
                 }
             }
-        val completed = awaitBootstrapAttempt(attempt, BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS)
+        val completed = awaitBootstrapAttempt(attempt, bootstrapActionableTimeoutMillis())
         if (!completed) {
             withContext(Dispatchers.Main.immediate) {
                 if (attempt.isActive && phase == AppPhase.Bootstrapping) {
@@ -3954,8 +3955,21 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /**
+     * Retries bootstrap after an actionable failure was shown to the user.
+     *
+     * Only this explicit UI action restores the loading surface. Process and
+     * background callers use [bootstrap], so attaching to the same in-flight
+     * attempt cannot hide an error that the user can act on.
+     */
+    suspend fun retryBootstrap() {
+        withContext(Dispatchers.Main.immediate) {
+            if (phase is AppPhase.Failed) phase = AppPhase.Bootstrapping
+        }
+        bootstrap()
+    }
+
     private suspend fun bootstrapLocked() {
-        phase = AppPhase.Bootstrapping
         try {
             if (resumeCompletedBootstrap()) return
             startupPerformance.stage(PerformancePhase.NOTIFICATION_PLATFORM_SETUP) {
@@ -4765,59 +4779,38 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Read the target account's local MDK projection before publishing the new
-     * active account. The old account remains composed behind the selector
-     * while these on-device reads run, so the first target composition can be
-     * the cached list rather than a loading placeholder.
+     * Reads the target account's authoritative local chat rows before publishing
+     * the new active account. The first target composition receives these rows
+     * instead of a loading placeholder; its controller owns full group and live
+     * subscription admission after that seeded frame is visible.
      */
     private suspend fun loadAccountSwitchLocalSnapshot(
         accountRef: String,
         generation: Long,
         includePresentationSeeds: Boolean = true,
-    ): AccountSwitchLocalSnapshot? {
-        var chatListSubscription: ChatListSubscription? = null
-        var chatsSubscription: ChatsSubscription? = null
-        return try {
-            chatListSubscription = marmotIo { subscribeChatList(accountRef, includeArchived = true) }
+    ): AccountSwitchLocalSnapshot? =
+        try {
+            val rows = marmotIo { chatList(accountRef, includeArchived = true) }
             ensureAccountSwitchRequestIsCurrent(generation)
-            chatsSubscription = marmotIo { subscribeChats(accountRef, includeArchived = true) }
-            ensureAccountSwitchRequestIsCurrent(generation)
-            recordAccountSwitchPreloadStage(accountRef, "local-subscriptions-ready", 0)
-
-            coroutineScope {
-                // These two immutable local snapshots are independent. Start
-                // the group read immediately so its SQLite/FFI cost overlaps
-                // the row read and the identity-only presentation work.
-                val groupsDeferred = async(Dispatchers.IO) { chatsSubscription.snapshot() }
-                val rows = withContext(Dispatchers.IO) { chatListSubscription.snapshot() }
-                ensureAccountSwitchRequestIsCurrent(generation)
-                recordAccountSwitchPreloadStage(accountRef, "cached-chat-rows-ready", rows.size)
-
-                val presentationDeferred =
-                    async {
-                        loadAccountSwitchPresentationSeeds(
-                            accountRef = accountRef,
-                            generation = generation,
-                            rows = rows,
-                            includePresentationSeeds = includePresentationSeeds,
-                        )
-                    }
-                val groups = groupsDeferred.await()
-                ensureAccountSwitchRequestIsCurrent(generation)
-                recordAccountSwitchPreloadStage(accountRef, "cached-groups-ready", groups.size)
-                val presentation = presentationDeferred.await()
-                ensureAccountSwitchRequestIsCurrent(generation)
-
-                AccountSwitchLocalSnapshot(
+            recordAccountSwitchPreloadStage(accountRef, "cached-chat-rows-ready", rows.size)
+            val presentation =
+                loadAccountSwitchPresentationSeeds(
                     accountRef = accountRef,
-                    activeAccountIdHex = presentation.activeAccountIdHex,
+                    generation = generation,
                     rows = rows,
-                    groups = groups,
-                    memberIds = presentation.memberIds,
-                    profiles = presentation.profiles,
-                ).also { snapshot ->
-                    if (includePresentationSeeds) recordAccountSwitchIdentityState(accountRef, snapshot)
-                }
+                    includePresentationSeeds = includePresentationSeeds,
+                )
+            ensureAccountSwitchRequestIsCurrent(generation)
+
+            AccountSwitchLocalSnapshot(
+                accountRef = accountRef,
+                activeAccountIdHex = presentation.activeAccountIdHex,
+                rows = rows,
+                groups = emptyList(),
+                memberIds = presentation.memberIds,
+                profiles = presentation.profiles,
+            ).also { snapshot ->
+                if (includePresentationSeeds) recordAccountSwitchIdentityState(accountRef, snapshot)
             }
         } catch (_: AccountSwitchSnapshotSuperseded) {
             null
@@ -4828,13 +4821,7 @@ class WhiteNoiseAppState private constructor(
                 "account-switch local snapshot failed: ${throwable.readableMessage()}"
             }
             null
-        } finally {
-            withContext(NonCancellable + Dispatchers.IO) {
-                runCatching { chatListSubscription?.close() }
-                runCatching { chatsSubscription?.close() }
-            }
         }
-    }
 
     private suspend fun loadAccountSwitchPresentationSeeds(
         accountRef: String,

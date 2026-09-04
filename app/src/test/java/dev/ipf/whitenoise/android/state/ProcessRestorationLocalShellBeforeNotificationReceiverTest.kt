@@ -142,9 +142,10 @@ class ProcessRestorationLocalShellBeforeNotificationReceiverTest {
     }
 
     private fun assertStartupCriticalPath(fixture: NotificationBootstrapTestFixture) {
-        assertEquals(1, fixture.localSnapshotSubscriptionCalls.get())
-        assertEquals(1, fixture.localSnapshotGroupSubscriptionCalls.get())
-        assertEquals(2, fixture.localSnapshotReadCalls.get())
+        assertEquals(1, fixture.directChatListCalls.get())
+        assertEquals(0, fixture.localSnapshotSubscriptionCalls.get())
+        assertEquals(0, fixture.localSnapshotGroupSubscriptionCalls.get())
+        assertEquals(0, fixture.localSnapshotReadCalls.get())
         assertEquals("the first frame must not wait for member enrichment", 0, fixture.memberProjectionCalls.get())
     }
 

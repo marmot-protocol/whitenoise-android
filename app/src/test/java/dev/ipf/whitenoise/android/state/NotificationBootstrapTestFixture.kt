@@ -4,6 +4,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Looper
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
@@ -46,8 +47,10 @@ internal class NotificationBootstrapTestFixture(
     initiallyFailSubscriptions: Boolean = false,
     initiallyBlockSubscriptions: Boolean = false,
     initiallyBlockSubscriptionsSynchronously: Boolean = false,
+    initiallyBlockRuntimeStartSynchronously: Boolean = false,
     delayFirstNotificationDispatchAfterRuntimeStart: Boolean = false,
     receiverTimeoutMillis: Long = 100L,
+    bootstrapActionableTimeoutMillis: Long = 15_000L,
     notificationUsersHaveDisplayNames: Boolean = true,
     private val localDisplayName: String? = "Alice",
     isDm: Boolean = false,
@@ -59,6 +62,7 @@ internal class NotificationBootstrapTestFixture(
     // Optional behavior hooks so worker/reconciliation tests can steer the FFI
     // boundary per call; every default preserves the fixture's original shape.
     private val onChatList: ((accountRef: String) -> List<ChatListRowFfi>)? = null,
+    private val onGroupMemberIdsPage: ((groupIds: List<String>) -> List<AppGroupMemberIdsFfi>)? = null,
     private val onMarkTimelineMessageRead: (() -> ChatListRowFfi?)? = null,
     private val onSendText: ((accountRef: String, groupIdHex: String, text: String) -> SendSummaryFfi)? = null,
     private val onReactToMessage: (() -> SendSummaryFfi)? = null,
@@ -71,6 +75,8 @@ internal class NotificationBootstrapTestFixture(
         }
     private val synchronousSubscriptionGate =
         CountDownLatch(if (initiallyBlockSubscriptionsSynchronously) 1 else 0)
+    private val runtimeStartGate =
+        CountDownLatch(if (initiallyBlockRuntimeStartSynchronously) 1 else 0)
     private val subscriberAttached = AtomicBoolean(false)
     private val emittedPostStartUpdate = AtomicBoolean(false)
     private val runtimeStarted = AtomicBoolean(false)
@@ -87,6 +93,7 @@ internal class NotificationBootstrapTestFixture(
     val localSnapshotSubscriptionCalls = AtomicInteger(0)
     val localSnapshotGroupSubscriptionCalls = AtomicInteger(0)
     val localSnapshotReadCalls = AtomicInteger(0)
+    val directChatListCalls = AtomicInteger(0)
     val memberProjectionCalls = AtomicInteger(0)
     val signerRegistrationCalls = AtomicInteger(0)
     val markReadCalls = AtomicInteger(0)
@@ -143,6 +150,7 @@ internal class NotificationBootstrapTestFixture(
             when (method.name) {
                 "start" -> {
                     runtimeStartCalls.incrementAndGet()
+                    runtimeStartGate.await()
                     runtimeStarted.set(true)
                     Unit
                 }
@@ -214,14 +222,19 @@ internal class NotificationBootstrapTestFixture(
                     localSnapshotGroupSubscriptionCalls.incrementAndGet()
                     emptyChatsSubscription()
                 }
-                "chatList" -> onChatList?.invoke(arguments?.get(0) as String) ?: emptyList<Any>()
+                "chatList" -> {
+                    directChatListCalls.incrementAndGet()
+                    onChatList?.invoke(arguments?.get(0) as String) ?: chatListRows
+                }
                 "timelineMessages" ->
                     // An exhausted, empty page: recovery probes conclude
                     // NotCommitted deterministically instead of erroring.
                     TimelinePageFfi(messages = emptyList(), hasMoreBefore = false, hasMoreAfter = false)
                 "groupMemberIdsPage" -> {
                     memberProjectionCalls.incrementAndGet()
-                    emptyList<Any>()
+                    @Suppress("UNCHECKED_CAST")
+                    val groupIds = arguments?.get(1) as List<String>
+                    onGroupMemberIdsPage?.invoke(groupIds) ?: emptyList<AppGroupMemberIdsFfi>()
                 }
                 "userProfile" -> null
                 "displayName" -> {
@@ -253,6 +266,7 @@ internal class NotificationBootstrapTestFixture(
             notificationSubscriber = { subscribe() },
             notificationDispatcher = notificationDispatchGate ?: Dispatchers.IO,
             notificationReceiverTimeoutMillis = receiverTimeoutMillisState::get,
+            bootstrapActionableTimeoutMillis = { bootstrapActionableTimeoutMillis },
         )
 
     private fun emptyChatListSubscription(): ChatListSubscription =
@@ -310,8 +324,16 @@ internal class NotificationBootstrapTestFixture(
         subscriptionGate.complete(Unit)
     }
 
+    fun allowRuntimeStart() {
+        runtimeStartGate.countDown()
+    }
+
     suspend fun bootstrap() {
         runWithMainLooperPumping { appState.bootstrap() }
+    }
+
+    suspend fun retryBootstrap() {
+        runWithMainLooperPumping { appState.retryBootstrap() }
     }
 
     suspend fun ensureNotificationRuntimeStarted() {
@@ -344,6 +366,7 @@ internal class NotificationBootstrapTestFixture(
     }
 
     fun close() {
+        runtimeStartGate.countDown()
         notificationDispatchGate?.release()
         synchronousSubscriptionGate.countDown()
         subscriptionGate.complete(Unit)

@@ -4,12 +4,15 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageInfo
 import android.content.pm.ResolveInfo
 import android.net.Uri
 import android.os.Looper
 import android.os.Parcel
 import android.service.chooser.ChooserResult
 import androidx.activity.result.contract.ActivityResultContracts
+import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
@@ -310,6 +313,145 @@ class AmberActivityCoordinatorTest {
         failure.get()?.let { throw it }
         assertEquals("npub1resolved", result.get())
         assertEquals(signerPackage, Nip55.savedSignerPackage(context))
+    }
+
+    @Test
+    fun publicKeyLoginUsesDirectGroupedPathForSoleAmber64() {
+        installAmber("6.4.0")
+        val probe = Nip55.buildGetPublicKeyIntent("probe")
+        registerSignerHandler(probe, Nip55.AMBER_PACKAGE, "${Nip55.AMBER_PACKAGE}.SignerActivity")
+        val pubkey = "ab".repeat(32)
+        val result = AtomicReference<String>()
+        val failure = AtomicReference<Throwable>()
+        val done = CountDownLatch(1)
+        Thread {
+            try {
+                result.set(AmberSignerController(context, approvalTimeoutMs = 5_000).requestPublicKey())
+            } catch (throwable: Throwable) {
+                failure.set(throwable)
+            } finally {
+                done.countDown()
+            }
+        }.start()
+
+        val signerLaunch = awaitRelayLaunch()
+        assertEquals(Nip55.AMBER_PACKAGE, signerLaunch.`package`)
+        assertFalse(signerLaunch.component?.className == AmberSignerRelayActivity::class.java.name)
+        val requestId = checkNotNull(signerLaunch.getStringExtra(Nip55.EXTRA_ID))
+        assertSignerFacingLoginIntent(signerLaunch, requestId)
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data =
+                Intent()
+                    .putExtra(Nip55.EXTRA_ID, requestId)
+                    .putExtra(Nip55.EXTRA_RESULT, pubkey)
+                    .putExtra(Nip55.EXTRA_PACKAGE, Nip55.AMBER_PACKAGE),
+        )
+
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        failure.get()?.let { throw it }
+        assertEquals(pubkey, result.get())
+        assertEquals(Nip55.AMBER_PACKAGE, Nip55.savedSignerPackage(context))
+    }
+
+    @Test
+    fun directGroupedLoginRejectsASpoofedSignerPackageEcho() {
+        installAmber("6.4.0")
+        val probe = Nip55.buildGetPublicKeyIntent("probe")
+        registerSignerHandler(probe, Nip55.AMBER_PACKAGE, "${Nip55.AMBER_PACKAGE}.SignerActivity")
+        val failure = AtomicReference<Throwable>()
+        val done = CountDownLatch(1)
+        Thread {
+            try {
+                AmberSignerController(context, approvalTimeoutMs = 5_000).requestPublicKey()
+            } catch (throwable: Throwable) {
+                failure.set(throwable)
+            } finally {
+                done.countDown()
+            }
+        }.start()
+
+        val signerLaunch = awaitRelayLaunch()
+        val requestId = checkNotNull(signerLaunch.getStringExtra(Nip55.EXTRA_ID))
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data =
+                Intent()
+                    .putExtra(Nip55.EXTRA_ID, requestId)
+                    .putExtra(Nip55.EXTRA_RESULT, "ab".repeat(32))
+                    .putExtra(Nip55.EXTRA_PACKAGE, "com.example.spoofed"),
+        )
+
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        assertTrue(failure.get() is MarmotKitException.Runtime)
+        assertNull(Nip55.savedSignerPackage(context))
+    }
+
+    @Test
+    fun publicKeyLoginKeepsSerializedChooserWhenSignerChoiceIsAmbiguous() {
+        installAmber("6.4.0")
+        val probe = Nip55.buildGetPublicKeyIntent("probe")
+        registerSignerHandler(probe, Nip55.AMBER_PACKAGE, "${Nip55.AMBER_PACKAGE}.SignerActivity")
+        registerSignerHandler(probe, "com.example.other", "com.example.other.SignerActivity")
+        val failure = AtomicReference<Throwable>()
+        val done = CountDownLatch(1)
+        Thread {
+            try {
+                AmberSignerController(context, approvalTimeoutMs = 5_000).requestPublicKey()
+            } catch (throwable: Throwable) {
+                failure.set(throwable)
+            } finally {
+                done.countDown()
+            }
+        }.start()
+
+        val relayLaunch = awaitRelayLaunch()
+        assertEquals(AmberSignerRelayActivity::class.java.name, relayLaunch.component?.className)
+        val requestId = checkNotNull(relayLaunch.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID))
+        val signerIntent =
+            checkNotNull(relayLaunch.getParcelableExtra(AmberSignerRelay.EXTRA_SIGNER_INTENT, Intent::class.java))
+        assertEquals(
+            Intent.ACTION_CHOOSER,
+            AmberSignerRelay.prepareSignerLaunch(context, requestId, signerIntent)?.action,
+        )
+        AmberActivityCoordinator.deliverResult(
+            resultOk = false,
+            data = AmberSignerRelay.buildResultIntent(requestId, signerData = null),
+        )
+
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        assertTrue(failure.get() is MarmotKitException.ExternalSignerRejected)
+        assertNull(Nip55.savedSignerPackage(context))
+    }
+
+    @Test
+    fun publicKeyLoginKeepsSerializedRelayForOlderAmber() {
+        installAmber("6.2.9")
+        val probe = Nip55.buildGetPublicKeyIntent("probe")
+        registerSignerHandler(probe, Nip55.AMBER_PACKAGE, "${Nip55.AMBER_PACKAGE}.SignerActivity")
+        val failure = AtomicReference<Throwable>()
+        val done = CountDownLatch(1)
+        Thread {
+            try {
+                AmberSignerController(context, approvalTimeoutMs = 5_000).requestPublicKey()
+            } catch (throwable: Throwable) {
+                failure.set(throwable)
+            } finally {
+                done.countDown()
+            }
+        }.start()
+
+        val relayLaunch = awaitRelayLaunch()
+        assertEquals(AmberSignerRelayActivity::class.java.name, relayLaunch.component?.className)
+        val requestId = checkNotNull(relayLaunch.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID))
+        AmberActivityCoordinator.deliverResult(
+            resultOk = false,
+            data = AmberSignerRelay.buildResultIntent(requestId, signerData = null),
+        )
+
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        assertTrue(failure.get() is MarmotKitException.ExternalSignerRejected)
+        assertNull(Nip55.savedSignerPackage(context))
     }
 
     @Test
@@ -839,6 +981,60 @@ class AmberActivityCoordinatorTest {
     }
 
     @Test
+    fun concurrentGroupedPublicKeyRequestsCannotShareAnApprovalSession() {
+        val firstId = "grouped-login-first"
+        val secondId = "grouped-login-second"
+        val first = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val second = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val done = CountDownLatch(2)
+
+        fun launchLogin(
+            id: String,
+            destination: AtomicReference<AmberActivityCoordinator.Outcome>,
+        ) = Thread {
+            destination.set(
+                AmberActivityCoordinator.awaitApproval(
+                    Nip55.buildGetPublicKeyIntent(id).setPackage(Nip55.AMBER_PACKAGE),
+                    timeoutMs = 5_000,
+                    requestId = id,
+                    allowGrouping = true,
+                ),
+            )
+            done.countDown()
+        }.apply(Thread::start)
+
+        launchLogin(firstId, first)
+        awaitLaunchCount(1)
+        launchLogin(secondId, second)
+        val admissionDeadline = System.currentTimeMillis() + 250
+        while (System.currentTimeMillis() < admissionDeadline) {
+            shadowOf(Looper.getMainLooper()).idle()
+            Thread.sleep(5)
+        }
+        assertEquals("a second login must wait for the first session", 1, launches.size)
+
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data = Intent().putExtra(Nip55.EXTRA_ID, firstId).putExtra(Nip55.EXTRA_RESULT, "first-pubkey"),
+        )
+        awaitLaunchCount(2)
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data = Intent().putExtra(Nip55.EXTRA_ID, secondId).putExtra(Nip55.EXTRA_RESULT, "second-pubkey"),
+        )
+
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        assertEquals(
+            "first-pubkey",
+            (first.get() as AmberActivityCoordinator.Outcome.Completed).data?.getStringExtra(Nip55.EXTRA_RESULT),
+        )
+        assertEquals(
+            "second-pubkey",
+            (second.get() as AmberActivityCoordinator.Outcome.Completed).data?.getStringExtra(Nip55.EXTRA_RESULT),
+        )
+    }
+
+    @Test
     fun groupedResultSurvivesForegroundLauncherRecreation() {
         val requestId = "grouped-recreated-launcher"
         val outcome = AtomicReference<AmberActivityCoordinator.Outcome>()
@@ -962,6 +1158,19 @@ class AmberActivityCoordinatorTest {
             resolveInfo,
         )
         shadowOf(context.packageManager).addResolveInfoForIntent(intent, resolveInfo)
+    }
+
+    private fun installAmber(versionName: String) {
+        shadowOf(context.packageManager).installPackage(
+            PackageInfo().apply {
+                packageName = Nip55.AMBER_PACKAGE
+                this.versionName = versionName
+                applicationInfo =
+                    ApplicationInfo().apply {
+                        packageName = Nip55.AMBER_PACKAGE
+                    }
+            },
+        )
     }
 
     private fun groupedCryptoIntent(

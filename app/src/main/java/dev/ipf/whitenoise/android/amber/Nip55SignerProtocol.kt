@@ -110,6 +110,25 @@ object Nip55 {
         return amberVersionSupportsGroupedApprovals(packageName, versionName)
     }
 
+    /**
+     * Returns the sole installed signer package only when it is a recognized
+     * grouped-capable Amber release. Ambiguous handler sets deliberately return
+     * null so login retains the existing user-owned chooser path.
+     */
+    internal fun soleGroupedLoginSignerPackage(context: Context): String? {
+        val handlers =
+            context.packageManager
+                .queryIntentActivities(Intent(Intent.ACTION_VIEW, Uri.parse("$SCHEME:")), 0)
+                .mapNotNull { resolved ->
+                    val info = resolved.activityInfo ?: return@mapNotNull null
+                    val packageName = info.packageName?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                    val className = info.name?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                    packageName to className
+                }.distinct()
+        val packageName = handlers.singleOrNull()?.first ?: return null
+        return packageName.takeIf { supportsGroupedApprovals(context, it) }
+    }
+
     fun savedSignerPackage(context: Context): String? = prefs(context).getString(PREFS_KEY_PACKAGE, null)?.takeIf { it.isNotEmpty() }
 
     fun saveSignerPackage(
@@ -125,7 +144,8 @@ object Nip55 {
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
 
-    private fun loginPermissionsJson(): String {
+    /** Canonical byte-stable NIP-55 grant payload attached to login. */
+    internal fun loginPermissionsJson(): String {
         val permissions = JSONArray()
         LOGIN_PERMISSIONS.forEach { permission ->
             val entry = JSONObject().put("type", permission.operation.intentType)
