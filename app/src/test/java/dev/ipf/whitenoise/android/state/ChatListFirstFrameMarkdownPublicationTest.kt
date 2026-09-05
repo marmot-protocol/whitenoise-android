@@ -19,6 +19,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ChatListFirstFrameMarkdownPublicationTest {
+    /** Verifies projected Markdown is attached before a hidden list publishes its first visible row. */
     @Test
     fun projectedMarkdownIsAttachedBeforeTheFirstVisiblePublication() =
         runTest {
@@ -44,6 +45,7 @@ class ChatListFirstFrameMarkdownPublicationTest {
             }
         }
 
+    /** Verifies returning to the list exposes the newest projected document without a stale frame. */
     @Test
     fun returningToTheListPublishesTheLatestProjectedDocument() =
         runTest {
@@ -82,6 +84,7 @@ class ChatListFirstFrameMarkdownPublicationTest {
             }
         }
 
+    /** Creates an account-bound controller without member-fetch side effects. */
     private fun controller() =
         ChatsController(
             appState = appState(),
@@ -89,6 +92,7 @@ class ChatListFirstFrameMarkdownPublicationTest {
             memberSnapshotLoader = { _, _ -> emptyList() },
         )
 
+    /** Creates the minimal active-account state required to project chat rows. */
     private fun appState() =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext<Context>(),
@@ -108,6 +112,7 @@ class ChatListFirstFrameMarkdownPublicationTest {
             activeAccountRef = ACCOUNT_REF,
         )
 
+    /** Wraps [text] in a non-empty projected paragraph document. */
     private fun markdown(text: String) =
         MarkdownDocumentFfi(
             truncated = false,
@@ -115,6 +120,7 @@ class ChatListFirstFrameMarkdownPublicationTest {
             blankLinesBefore = ByteArray(0),
         )
 
+    /** Builds a mixed-format document that exercises structured first-frame ownership. */
     private fun richMarkdown() =
         MarkdownDocumentFfi(
             truncated = false,
@@ -149,8 +155,10 @@ class ChatListFirstFrameMarkdownPublicationTest {
         )
 
     private object EmptyDraftPersistence : DraftPersistence {
+        /** Starts each projection test without lifecycle draft state. */
         override fun read(): Map<String, String> = emptyMap()
 
+        /** Ignores unrelated lifecycle writes during chat-list projection tests. */
         override fun write(
             key: String,
             value: String?,

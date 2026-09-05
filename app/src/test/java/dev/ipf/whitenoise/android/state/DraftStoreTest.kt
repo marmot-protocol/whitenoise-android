@@ -101,6 +101,7 @@ class DraftStoreTest {
         assertEquals(2, sortNotifications)
     }
 
+    /** Verifies an accepted MDK update rewrites both visible order and the recoverable snapshot. */
     @Test
     fun authoritativeTimestampUpdatesTheCapturedDraftSnapshot() {
         val s = DraftStore(InMemoryDraftPersistence()) { 100L }
@@ -112,6 +113,7 @@ class DraftStoreTest {
         assertEquals(250L, s.getDraft("a", "g")?.draftedAtSeconds)
     }
 
+    /** Verifies same-second and older acknowledgements neither regress order nor re-notify. */
     @Test
     fun repeatedAuthoritativeTimestampDoesNotResignalOrRegress() {
         val s = DraftStore(InMemoryDraftPersistence()) { 100L }
@@ -127,6 +129,7 @@ class DraftStoreTest {
         assertEquals(1, sortNotifications)
     }
 
+    /** Verifies identical summary metadata is quiet and account-qualified keys remain isolated. */
     @Test
     fun replacingIdenticalSummariesDoesNotResignalAndKeepsAccountsIsolated() {
         val s = store()
@@ -142,6 +145,7 @@ class DraftStoreTest {
         assertEquals(2, sortNotifications)
     }
 
+    /** Verifies a response captured before a newer save cannot overwrite its accepted timestamp. */
     @Test
     fun delayedSummaryCannotRegressANewerAcceptedSaveTimestamp() {
         val s = DraftStore(InMemoryDraftPersistence()) { 100L }
@@ -155,6 +159,7 @@ class DraftStoreTest {
         assertEquals(250L, s.getDraft("a", "g")?.draftedAtSeconds)
     }
 
+    /** Preserves locally changed keys while applying one delayed response to unchanged siblings. */
     @Test
     fun delayedSummaryPreservesANewDraftButStillUpdatesUnchangedGroups() {
         val s = store()
@@ -170,6 +175,7 @@ class DraftStoreTest {
         assertNull(s.draftedAtSecondsFor("a", "removed"))
     }
 
+    /** Verifies metadata-only refresh seeds sort time without retaining draft plaintext in Android. */
     @Test
     fun summaryRefreshSeedsSortMetadataWithoutHydratingDraftPlaintext() {
         val s = store()
@@ -181,6 +187,7 @@ class DraftStoreTest {
         assertEquals(500uL, s.draftedAtSecondsFor("a", "g"))
     }
 
+    /** Keeps a late save acknowledgement hidden, then uses it if the pending send is restored. */
     @Test
     fun lateSaveTimestampStaysHiddenAndWinsIfThePendingSendFails() {
         val s = DraftStore(InMemoryDraftPersistence()) { 100L }
@@ -200,6 +207,7 @@ class DraftStoreTest {
         assertEquals(250L, s.getDraft("a", "g")?.draftedAtSeconds)
     }
 
+    /** Verifies summary refresh cannot make a pending-send recovery draft visible again. */
     @Test
     fun summaryRefreshDoesNotResurfaceADraftHiddenForPendingSend() {
         val s = DraftStore(InMemoryDraftPersistence()) { 100L }

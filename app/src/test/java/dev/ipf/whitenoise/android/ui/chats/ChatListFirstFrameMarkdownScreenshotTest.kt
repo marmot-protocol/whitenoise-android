@@ -43,6 +43,7 @@ class ChatListFirstFrameMarkdownScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Captures the first row only after proving styled text rendered and raw Markdown never did. */
     @Test
     fun projectedMarkdownRendersWithoutAPlaintextIntermediateFrame() {
         val appState = appState()
@@ -95,6 +96,7 @@ class ChatListFirstFrameMarkdownScreenshotTest {
             .captureRoboImage("src/test/snapshots/chat_list_first_frame_markdown_light.png")
     }
 
+    /** Creates the active-account presentation dependencies used by the production chat row. */
     private fun appState() =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext<Context>(),
@@ -115,8 +117,10 @@ class ChatListFirstFrameMarkdownScreenshotTest {
         )
 
     private object EmptyDraftPersistence : DraftPersistence {
+        /** Starts the screenshot without any persisted composer drafts. */
         override fun read(): Map<String, String> = emptyMap()
 
+        /** Discards draft writes because the screenshot covers only projected preview rendering. */
         override fun write(
             key: String,
             value: String?,

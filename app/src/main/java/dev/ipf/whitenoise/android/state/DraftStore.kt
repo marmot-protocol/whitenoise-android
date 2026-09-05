@@ -418,6 +418,7 @@ class DraftStore internal constructor(
         set(accountRef, groupIdHex, TextFieldValue(merged, TextRange(merged.length)))
     }
 
+    /** Clears visible and hidden draft state for exactly one account and emits at most one re-sort. */
     fun clearAllForAccount(accountRef: String) {
         val prefix = "$accountRef "
         var sortOrderChanged = false
@@ -471,6 +472,7 @@ class DraftStore internal constructor(
         groupIdHex: String,
     ): String = "$accountRef $groupIdHex"
 
+    /** Captures every field that makes a delayed summary unsafe to apply for this key. */
     private fun summaryFingerprintLocked(k: String): DraftSummaryFingerprint =
         DraftSummaryFingerprint(
             visibleDraftedAtSeconds = draftedAtSeconds[k],
@@ -479,12 +481,14 @@ class DraftStore internal constructor(
             hiddenForPendingSend = k in hiddenForPendingSend,
         )
 
+    /** Reads draft content across resident, strongly evicted, and observer-retained storage tiers. */
     private fun storedValueLocked(k: String): String? {
         val resident = drafts[k]?.value
         val evicted = evictedDraftValues[k]
         return resident ?: evicted ?: evictedDraftStates[k]?.get()?.value
     }
 
+    /** Collects all account-prefixed keys represented by any visible or hidden draft structure. */
     private fun summaryKeysLocked(prefix: String): MutableSet<String> =
         (
             draftedAtSeconds.keys +
@@ -495,6 +499,10 @@ class DraftStore internal constructor(
                 hiddenForPendingSend
         ).filterTo(mutableSetOf()) { it.startsWith(prefix) }
 
+    /**
+     * Applies one unchanged summary fingerprint without hydrating plaintext.
+     * Local content and pending-send hiding always win over absent or older remote metadata.
+     */
     private fun applySummaryReplacementLocked(
         k: String,
         incoming: Long?,
@@ -523,6 +531,7 @@ class DraftStore internal constructor(
         }
     }
 
+    /** Stores a non-regressing accepted timestamp while keeping hidden drafts out of presentation. */
     private fun applyAcceptedAuthoritativeTimestampLocked(
         k: String,
         accepted: Long?,
@@ -545,6 +554,7 @@ class DraftStore internal constructor(
         return draftedAtSeconds[k] != oldVisible
     }
 
+    /** Recovers a state object only when content or a live observer still gives the key ownership. */
     private fun retainedDraftStateLocked(k: String): MutableState<String?>? =
         drafts[k]
             ?: if (k in evictedDraftValues || evictedDraftStates[k]?.get()?.value != null) {
@@ -553,6 +563,7 @@ class DraftStore internal constructor(
                 null
             }
 
+    /** Applies nullable timestamp semantics consistently: null removes rather than storing a sentinel. */
     private fun setTimestamp(
         timestamps: MutableMap<String, Long>,
         k: String,
@@ -561,6 +572,7 @@ class DraftStore internal constructor(
         if (value == null) timestamps.remove(k) else timestamps[k] = value
     }
 
+    /** Expands captured group ids back into account-qualified keys for union-based reconciliation. */
     private fun DraftSummaryRefreshSnapshot?.orEmptyKeys(prefix: String): Set<String> =
         this
             ?.fingerprintsByGroup

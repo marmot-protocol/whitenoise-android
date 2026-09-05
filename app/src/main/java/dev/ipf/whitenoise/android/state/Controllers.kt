@@ -481,55 +481,6 @@ internal fun foldMarkReadReturnedRow(
 }
 
 /**
- * The last-message text a chat row should run through the markdown parser,
- * or null when the row's preview line will show fallback copy instead of
- * the message body. Mirrors [ChatListItem.projectedPreviewText]'s generic
- * message-body arm exactly: a non-deleted row whose plaintext is non-blank
- * and whose kind is not one of the special-cased arms is rendered verbatim,
- * so its body — and only its body — may be parsed into preview tokens.
- * Edit (1009), agent-stream-start (1200), and group-system (1210) rows —
- * plus deleted/blank rows — surface derived copy, so their payloads must
- * never be parsed into preview tokens and styled in their place (issue #577).
- * Body kinds beyond plain chat (kind-1 legacy notes, kind-1209 agent-stream
- * finals, and any future body kind) still display their plaintext via
- * `projectedPreviewText`, so they keep markdown/mention/code rendering here.
- * Delegating the kind test to [MessageProjector.rendersRawBodyPreview] ties
- * this parse gate to the same plaintext `projectedPreviewText` would surface.
- */
-internal fun chatRowPreviewMarkdownSource(row: ChatListRowFfi): String? {
-    val preview = row.lastMessage ?: return null
-    if (preview.deleted) return null
-    if (!MessageProjector.rendersRawBodyPreview(preview.kind)) return null
-    return preview.plaintext.takeIf { it.isNotBlank() }
-}
-
-/**
- * Selects the Markdown document that describes the body a chat row will display.
- * MDK's document is available on the first projection; Android's exact-text cache
- * remains a fallback for optimistic or legacy rows whose projected AST is empty.
- */
-internal fun chatRowPreviewTokens(
-    row: ChatListRowFfi,
-    cachedTokensByText: Map<String, MarkdownDocumentFfi> = emptyMap(),
-): MarkdownDocumentFfi? {
-    val source = chatRowPreviewMarkdownSource(row) ?: return null
-    return row.lastMessage
-        ?.contentTokens
-        ?.takeIf { it.blocks.isNotEmpty() }
-        ?: cachedTokensByText[source]
-}
-
-/** Returns the exact preview source that still needs Android's parser fallback. */
-internal fun chatRowPreviewMarkdownFallbackSource(row: ChatListRowFfi): String? =
-    chatRowPreviewMarkdownSource(row)
-        ?.takeIf {
-            row.lastMessage
-                ?.contentTokens
-                ?.blocks
-                ?.isEmpty() == true
-        }
-
-/**
  * Message id of a row whose chat-list preview body is blank and must be
  * resolved from the local timeline before a typed media label can render.
  */
@@ -2802,45 +2753,6 @@ internal class RetainedMediaUpload(
     var acceptedPendingMessageIdHex: String? = null,
 )
 
-internal data class OptimisticChatListPreviewEntry(
-    val preview: ChatListMessagePreviewFfi,
-    val activitySequence: ULong,
-    val confirmedMessageIdHex: String? = null,
-    val pendingAuthoritativeRow: ChatListRowFfi? = null,
-)
-
-internal data class OptimisticChatListPreviewState(
-    var baselineRow: ChatListRowFfi,
-    var baselineActivitySequence: ULong,
-    val entries: LinkedHashMap<String, OptimisticChatListPreviewEntry> = linkedMapOf(),
-    val reservedActivitySequenceById: LinkedHashMap<String, ULong> = linkedMapOf(),
-    var failedFallbackEntry: OptimisticChatListPreviewEntry? = null,
-    val confirmedActivitySequenceById: LinkedHashMap<String, ULong> = linkedMapOf(),
-    val baselineActivitySequenceByLastMessage: LinkedHashMap<ChatListLastMessageActivity, ULong> = linkedMapOf(),
-)
-
-private fun OptimisticChatListPreviewState.snapshot(): OptimisticChatListPreviewState =
-    copy(
-        entries = LinkedHashMap(entries),
-        reservedActivitySequenceById = LinkedHashMap(reservedActivitySequenceById),
-        confirmedActivitySequenceById = LinkedHashMap(confirmedActivitySequenceById),
-        baselineActivitySequenceByLastMessage = LinkedHashMap(baselineActivitySequenceByLastMessage),
-    )
-
-internal data class OptimisticChatListPreviewHandoff(
-    val accountRef: String,
-    val rowsByGroup: Map<String, ChatListRowFfi>,
-    val activitySequenceByGroup: Map<String, ULong>,
-    val statesByGroup: Map<String, OptimisticChatListPreviewState>,
-    val nextActivitySequence: ULong,
-)
-
-internal data class ChatListLastMessageActivity(
-    val activitySortAt: ULong,
-    val timelineAt: ULong?,
-    val messageIdHex: String?,
-)
-
 private data class OptimisticChatListPreviewMatch(
     val entryKey: String?,
     val activitySequence: ULong,
@@ -3079,6 +2991,7 @@ class ChatsController private constructor(
         return true
     }
 
+    /** Rejects cleared, cross-account, and already-bound replacements before any state is copied. */
     private fun canRestoreOptimisticPreviewHandoff(
         handoff: OptimisticChatListPreviewHandoff,
         expectedAccountRef: String?,
@@ -3395,6 +3308,7 @@ class ChatsController private constructor(
         return true
     }
 
+    /** Materializes the newest visible optimistic entry without allowing sequence time to regress. */
     private fun materializeOptimisticChatListPreview(
         rowKey: String,
         state: OptimisticChatListPreviewState,
@@ -3419,12 +3333,6 @@ class ChatsController private constructor(
             optimisticChatListPreviewByGroup.remove(rowKey)
         }
     }
-
-    private fun OptimisticChatListPreviewState.hasNoOptimisticPreviewWork(): Boolean =
-        entries.isEmpty() &&
-            reservedActivitySequenceById.isEmpty() &&
-            failedFallbackEntry == null &&
-            confirmedActivitySequenceById.isEmpty()
 
     private val chatRowsByGroup = LinkedHashMap<String, ChatListRowFfi>()
     private val chatRows: Collection<ChatListRowFfi>
@@ -4256,10 +4164,11 @@ class ChatsController private constructor(
     // next account switch (issue: unarchive doesn't move chat out of archived
     // section). Callers in ConversationController forward the updated record
     // here via AppState so the chat list reflects the new archived flag.
-    // Optimistically bump a group's chat-list row to a just-sent message so
-    // returning to the list paints the new preview immediately, instead of one
-    // frame of the prior last-message before the chat-list stream catches up.
-    // The real stream update reconciles this shortly after. See #900.
+
+    /**
+     * Publishes a ready optimistic preview with publication-time activity order.
+     * Returning to the list shows it immediately while the real stream catches up (#900).
+     */
     internal fun applyOptimisticSentPreview(
         groupIdHex: String,
         preview: ChatListMessagePreviewFfi,
@@ -4343,6 +4252,7 @@ class ChatsController private constructor(
         }
     }
 
+    /** Commits the accepted optimistic entry while preserving its original list-order sequence. */
     internal fun commitOptimisticSentPreview(
         groupIdHex: String,
         optimisticMessageIdHex: String,
@@ -4415,6 +4325,7 @@ class ChatsController private constructor(
         scheduleRecompute()
     }
 
+    /** Removes a reservation or entry only when that exact optimistic id is still tracked. */
     internal fun rollbackOptimisticSentPreview(
         groupIdHex: String,
         optimisticMessageIdHex: String,
@@ -4530,6 +4441,7 @@ class ChatsController private constructor(
                 ?.let { chatListMemberPresentation(it, activeAccountIdHex) }
     }
 
+    /** Projects current rows using MDK Markdown first and the exact-text cache only as fallback. */
     private fun currentProjectedItems(activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex): List<ChatListItem> =
         chatRows.map { authoritativeRow ->
             val row = optimisticArchiveRow(authoritativeRow)

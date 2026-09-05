@@ -340,6 +340,11 @@ internal class CoalescingMessageDraftWriter(
     }
 }
 
+/**
+ * Builds the merge result from the persisted draft and the latest accepted local edit.
+ * The reported ordering time follows `updatedAtMs`, because an edit must sort by its
+ * accepted update rather than by the draft's original creation time.
+ */
 private fun mergeCompletion(
     latestResult: MessageDraftMutationResult?,
     latestContent: String?,

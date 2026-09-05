@@ -72,12 +72,15 @@ class ChatListSortingTest {
         assertEquals(listOf("drafted-in", "recent-message"), sorted.map { it.id })
     }
 
+    /** Verifies only the chat receiving a newer authoritative edit timestamp is promoted. */
     @Test
     fun authoritativeDraftEditMovesOnlyTheEditedChat() {
         val persistence =
             object : DraftPersistence {
+                /** Supplies no persisted drafts to the ordering fixture. */
                 override fun read(): Map<String, String> = emptyMap()
 
+                /** Keeps persistence outside a test concerned only with in-memory ordering. */
                 override fun write(
                     key: String,
                     value: String?,

@@ -375,6 +375,7 @@ class ChatListProjectionReducerTest {
         assertNull(item.previewTokens)
     }
 
+    /** Verifies an eligible body uses the exact Markdown document supplied by the MDK projection. */
     @Test
     fun projectedMarkdownTokensOwnTheFirstEligibleBodyProjection() {
         val tokens = markdown("rendered")
@@ -390,6 +391,7 @@ class ChatListProjectionReducerTest {
         assertSame(tokens, item.previewTokens)
     }
 
+    /** Verifies derived preview kinds cannot style their wrapper payload as a visible message body. */
     @Test
     fun projectedMarkdownTokensDoNotOverrideAFallbackPreviewKind() {
         val sourceRow =
@@ -404,6 +406,7 @@ class ChatListProjectionReducerTest {
         assertNull(item.previewTokens)
     }
 
+    /** Verifies current projected tokens take precedence over stale exact-text parser cache entries. */
     @Test
     fun projectedMarkdownWinsOverAStaleExactTextCacheEntry() {
         val projected = markdown("current")
@@ -419,6 +422,7 @@ class ChatListProjectionReducerTest {
         assertNull(chatRowPreviewMarkdownFallbackSource(sourceRow))
     }
 
+    /** Verifies legacy empty projections use the cache and remain eligible for parser fallback. */
     @Test
     fun emptyProjectedMarkdownUsesTheExactTextParserFallback() {
         val cached = markdown("fallback")
@@ -491,6 +495,7 @@ class ChatListProjectionReducerTest {
 
     // ---- fixtures -----------------------------------------------------------
 
+    /** Creates a preview whose Markdown payload can be varied independently of its plaintext. */
     private fun preview(
         messageId: String = "m-1",
         sender: String = "peer",
@@ -513,6 +518,7 @@ class ChatListProjectionReducerTest {
         deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
     )
 
+    /** Builds either an empty legacy document or one projected paragraph. */
     private fun markdown(text: String? = null) =
         MarkdownDocumentFfi(
             truncated = false,

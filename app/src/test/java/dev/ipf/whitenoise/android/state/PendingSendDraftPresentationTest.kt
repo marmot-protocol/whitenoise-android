@@ -133,6 +133,7 @@ class PendingSendDraftPresentationTest {
             )
         }
 
+    /** Verifies a failed send restores the newest accepted MDK timestamp with its captured text. */
     @Test
     fun failedSendRestoresTheCapturedAuthoritativeDraftTimestamp() =
         runTest {
@@ -251,6 +252,7 @@ class PendingSendDraftPresentationTest {
         },
     )
 
+    /** Creates account-bound state while allowing timestamp-aware tests to inject their draft store. */
     private fun appState(draftStore: DraftStore = DraftStore(TestDraftPersistence())) =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),

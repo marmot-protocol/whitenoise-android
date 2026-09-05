@@ -51,6 +51,7 @@ class MessageDraftRepositoryTest {
             assertEquals("hello", gateway.current?.content)
         }
 
+    /** Verifies a superseded save cannot publish either stale content or its stale update time. */
     @Test
     fun coalescedWriterDoesNotPublishStaleCompletionAfterNewerEditIsAccepted() =
         runTest {
@@ -338,6 +339,7 @@ class MessageDraftRepositoryTest {
             assertEquals("typed while sharing\nshared", result.contentForHydration)
         }
 
+    /** Verifies merge completion exposes the timestamp of the persisted update rather than creation. */
     @Test
     fun inboundMergeCompletionReportsThePersistedUpdateTime() =
         runTest {

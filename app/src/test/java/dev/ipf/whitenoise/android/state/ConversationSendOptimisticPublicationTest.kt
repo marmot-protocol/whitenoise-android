@@ -86,6 +86,7 @@ class ConversationSendOptimisticPublicationTest {
             assertEquals(MessageStatus.Sent, controller.timeline.single().status)
         }
 
+    /** Keeps the prior row visible until the optimistic send owns a completed Markdown document. */
     @Test
     fun chatListKeepsItsPriorPreviewUntilTheOptimisticMarkdownDocumentIsReady() =
         runBlocking {
@@ -148,6 +149,7 @@ class ConversationSendOptimisticPublicationTest {
             }
         }
 
+    /** Publishes one stable plaintext fallback only after an empty parse result is known. */
     @Test
     fun emptyMarkdownParsePublishesOnePlaintextFallbackOnlyAfterTheAttemptCompletes() =
         runBlocking {
@@ -194,6 +196,7 @@ class ConversationSendOptimisticPublicationTest {
             }
         }
 
+    /** Prevents a delayed local parse from replacing newer incoming chat-list activity. */
     @Test
     fun incomingActivityDuringParseKeepsTheNewerChatListPreview() =
         runBlocking {
@@ -232,6 +235,7 @@ class ConversationSendOptimisticPublicationTest {
             }
         }
 
+    /** Preserves acceptance order when two optimistic Markdown parses finish in reverse order. */
     @Test
     fun reverseParseCompletionKeepsTheLaterAcceptedSendOnTheChatList() =
         runBlocking {
@@ -280,6 +284,7 @@ class ConversationSendOptimisticPublicationTest {
             }
         }
 
+    /** Transfers a parsed send across live controller replacement and retains terminal failure. */
     @Test
     fun controllerReplacementDuringParseRetainsTerminalFailurePreview() =
         runBlocking {
@@ -324,6 +329,7 @@ class ConversationSendOptimisticPublicationTest {
             }
         }
 
+    /** Transfers a parsed send across live replacement while preserving ambiguous pending state. */
     @Test
     fun controllerReplacementDuringParseRetainsAmbiguousPendingPreview() =
         runBlocking {
@@ -368,6 +374,7 @@ class ConversationSendOptimisticPublicationTest {
             }
         }
 
+    /** Verifies permanent detach never hands private rows to a later unrelated controller. */
     @Test
     fun permanentDetachDuringParseDoesNotTransferPrivateRows() =
         runBlocking {
@@ -520,6 +527,7 @@ class ConversationSendOptimisticPublicationTest {
 
     private var builtController: ConversationController? = null
 
+    /** Attaches a one-row chat list so optimistic bridge behavior is observable. */
     private fun attachedChats(appState: WhiteNoiseAppState): ChatsController =
         ChatsController(
             appState = appState,
@@ -532,6 +540,7 @@ class ConversationSendOptimisticPublicationTest {
             appState.attachChatsController(chats)
         }
 
+    /** Replaces the mounted controller through the production handoff path. */
     private fun replaceChats(
         appState: WhiteNoiseAppState,
         original: ChatsController,
@@ -545,6 +554,7 @@ class ConversationSendOptimisticPublicationTest {
             original.onCleared()
         }
 
+    /** Creates a newer authoritative row for parse-versus-incoming ordering races. */
     private fun incomingRow(
         plaintext: String,
         messageIdHex: String,
@@ -585,6 +595,7 @@ class ConversationSendOptimisticPublicationTest {
             blankLinesBefore = ByteArray(1),
         )
 
+    /** Represents a completed parser attempt that produced no structured blocks. */
     private fun emptyMarkdownDocument(): MarkdownDocumentFfi {
         val emptyBlocks = emptyList<MarkdownBlockFfi>()
         return MarkdownDocumentFfi(truncated = false, blocks = emptyBlocks, blankLinesBefore = ByteArray(0))

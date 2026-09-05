@@ -41,8 +41,9 @@ internal class MainShellProcessState(
     private val conversationControllers = linkedMapOf<ConversationControllerKey, ConversationController>()
 
     /**
-     * Returns the retained controller for this account/runtime, or replaces it
-     * while carrying the process-scoped cold-start presentation claim forward.
+     * Returns the retained controller for [accountRef] and [runtimeGeneration], or replaces it
+     * while carrying the process-scoped cold-start presentation claim forward. A live same-process
+     * replacement also transfers account-scoped optimistic state before the new owner is exposed.
      */
     fun chatsController(
         accountRef: String?,

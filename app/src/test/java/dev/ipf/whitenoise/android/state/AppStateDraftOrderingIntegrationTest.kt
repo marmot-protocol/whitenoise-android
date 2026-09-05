@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class AppStateDraftOrderingIntegrationTest {
+    /** Verifies a save acknowledgement re-sorts by the accepted update time, not draft creation. */
     @Test
     fun writerAcknowledgementResortsFromUpdatedAtRatherThanCreatedAt() {
         val drafts = DraftStore(OrderingDraftPersistence, nowSeconds = { 100L })
@@ -48,6 +49,7 @@ class AppStateDraftOrderingIntegrationTest {
         chats.onCleared()
     }
 
+    /** Verifies only the newest account-fenced summary request can publish after an A-B-A race. */
     @Test
     fun latestAccountFencedSummaryRefreshWinsAcrossDelayedABACompletions() {
         val drafts = DraftStore(OrderingDraftPersistence, nowSeconds = { 100L })
@@ -77,6 +79,7 @@ class AppStateDraftOrderingIntegrationTest {
         }
     }
 
+    /** Builds a visible two-row projection whose ordering changes can be asserted synchronously. */
     private fun chats(appState: WhiteNoiseAppState): ChatsController =
         ChatsController(
             appState = appState,
@@ -90,6 +93,7 @@ class AppStateDraftOrderingIntegrationTest {
             chats.setChatListVisible(true)
         }
 
+    /** Creates a projected row with one authoritative activity timestamp. */
     private fun row(
         groupIdHex: String,
         timelineAt: ULong,
@@ -107,6 +111,7 @@ class AppStateDraftOrderingIntegrationTest {
         updatedAt = timelineAt,
     )
 
+    /** Drains Robolectric's main looper until asynchronous draft publication reaches [condition]. */
     private fun awaitCondition(condition: () -> Boolean) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
         while (!condition()) {
@@ -116,6 +121,7 @@ class AppStateDraftOrderingIntegrationTest {
         }
     }
 
+    /** Creates an app state with injectable draft storage and repository timing. */
     private fun appState(
         drafts: DraftStore,
         repository: MessageDraftRepository,
@@ -128,6 +134,7 @@ class AppStateDraftOrderingIntegrationTest {
         messageDraftRepository = repository,
     )
 
+    /** Creates a running local account fixture with a stable identity across account labels. */
     private fun account(label: String) =
         AccountSummaryFfi(
             label = label,
@@ -138,6 +145,7 @@ class AppStateDraftOrderingIntegrationTest {
             running = true,
         )
 
+    /** Wraps [gateway] with the dispatcher that controls summary completion order. */
     private fun repository(
         gateway: MessageDraftGateway,
         dispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.Unconfined,
@@ -156,14 +164,17 @@ class AppStateDraftOrderingIntegrationTest {
     }
 }
 
+/** Draft gateway whose saves deliberately distinguish creation time from update time. */
 private open class DraftOrderingGateway(
     private val saveUpdatedAtMs: Long = 250_000L,
 ) : MessageDraftGateway {
+    /** Returns no pre-existing draft so tests own all local state transitions. */
     override fun read(
         accountRef: String,
         groupIdHex: String,
     ): MessageDraftFfi? = null
 
+    /** Returns a persisted draft stamped with [saveUpdatedAtMs]. */
     override fun save(
         accountRef: String,
         groupIdHex: String,
@@ -179,20 +190,24 @@ private open class DraftOrderingGateway(
         updatedAtMs = saveUpdatedAtMs,
     )
 
+    /** Accepts cleanup because deletion behavior is outside these ordering tests. */
     override fun delete(
         accountRef: String,
         groupIdHex: String,
     ) = Unit
 
+    /** Supplies no summaries in save-acknowledgement scenarios. */
     override fun summaries(accountRef: String): List<MessageDraftSummaryFfi> = emptyList()
 }
 
+/** Three-request gateway that exposes deterministic completion order for A-B-A races. */
 private class DelayedSummaryGateway : DraftOrderingGateway() {
     private val next = AtomicInteger()
     private val started = List(3) { CountDownLatch(1) }
     private val releases = List(3) { CountDownLatch(1) }
     val completed = AtomicInteger()
 
+    /** Blocks each request independently, then returns the timestamp assigned to its start order. */
     override fun summaries(accountRef: String): List<MessageDraftSummaryFfi> {
         val index = next.getAndIncrement()
         started[index].countDown()
@@ -219,26 +234,36 @@ private class DelayedSummaryGateway : DraftOrderingGateway() {
         )
     }
 
+    /** Waits until request [index] has captured its position in the race. */
     fun awaitStarted(index: Int) = check(started[index].await(5, TimeUnit.SECONDS)) { "summary did not start" }
 
+    /** Releases exactly one delayed summary request. */
     fun release(index: Int) = releases[index].countDown()
 
+    /** Unblocks every request during cleanup so a failed assertion cannot strand worker threads. */
     fun releaseAll() = releases.forEach(CountDownLatch::countDown)
 }
 
+/** No-op lifecycle persistence used because MDK owns durable draft state in production. */
 private object OrderingDraftPersistence : DraftPersistence {
+    /** Starts each integration test without legacy lifecycle drafts. */
     override fun read(): Map<String, String> = emptyMap()
 
+    /** Ignores lifecycle writes while leaving in-memory Compose state observable. */
     override fun write(
         key: String,
         value: String?,
     ) = Unit
 }
 
+/** Empty encrypted editor-session store for metadata-only draft tests. */
 private object EmptyEditorStrings : EditorStringStore {
+    /** Returns no retained attachment sessions. */
     override fun readAll(): Map<String, String> = emptyMap()
 
+    /** Accepts replacement because no attachment session data participates in these tests. */
     override fun replaceAll(values: Map<String, String>): Boolean = true
 
+    /** Clears the already-empty fixture. */
     override fun clear() = Unit
 }
