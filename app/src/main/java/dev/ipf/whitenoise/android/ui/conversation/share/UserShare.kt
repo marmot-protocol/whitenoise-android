@@ -59,6 +59,7 @@ internal fun parseSharedUserFromText(text: String): SharedUser? {
     return SharedUser(npub = npub, name = null)
 }
 
+/** Produces a display-only identity summary without changing the actionable full npub. */
 private fun shortNpub(npub: String): String = if (npub.length > 20) "${npub.take(12)}…${npub.takeLast(5)}" else npub
 
 /** Renders one unambiguous shared-user reference as an actionable profile card. */

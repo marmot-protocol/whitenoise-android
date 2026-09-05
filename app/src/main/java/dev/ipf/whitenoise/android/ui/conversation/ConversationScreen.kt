@@ -1487,6 +1487,7 @@ internal fun ConversationScreen(
             }
         }
 
+    /** Sends the canonical bare reference so receiving clients cannot infer a title from prose. */
     fun sendSharedUser(candidate: RecipientSearch.Candidate) {
         val presentationNpub = appState.npubForDisplay(candidate.accountIdHex)
         if (presentationNpub.isBlank()) return

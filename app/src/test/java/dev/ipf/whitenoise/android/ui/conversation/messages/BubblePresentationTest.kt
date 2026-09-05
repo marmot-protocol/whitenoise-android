@@ -144,9 +144,31 @@ class BubblePresentationTest {
         )
     }
 
+    /** Keeps prose before a valid profile reference in the ordinary message presentation path. */
     @Test
     fun npubWithFreeTextKeepsTheMessageBodyVisible() {
         val body = "Please follow this profile\nnostr:$sampleNpub"
+        val sharedUser = parseSharedUserFromText(body)
+
+        assertNull(sharedUser)
+        assertEquals(
+            body,
+            messageBodyTextToRender(
+                displayedBody = body,
+                deleted = false,
+                persistedFailure = false,
+                structuredShareOwnsBody = sharedUser != null,
+                hasPendingMediaName = false,
+                hasConfirmedMedia = false,
+                mediaCaption = null,
+            ),
+        )
+    }
+
+    /** Keeps prose after a valid profile reference in the same ordinary message path. */
+    @Test
+    fun npubBeforeFreeTextKeepsTheMessageBodyVisible() {
+        val body = "nostr:$sampleNpub\nPlease follow this profile"
         val sharedUser = parseSharedUserFromText(body)
 
         assertNull(sharedUser)

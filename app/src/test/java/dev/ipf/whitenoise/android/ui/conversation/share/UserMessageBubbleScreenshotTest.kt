@@ -27,6 +27,7 @@ class UserMessageBubbleScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Captures the display-only shortened header while the full npub remains the card identity. */
     @Test
     fun bareReferenceShareUsesTheShortenedNpubHeader() {
         composeRule.setContent {
