@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.RelayEndpointClassificationFfi
 import dev.ipf.marmotkit.RelayEndpointPolicyFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.HostSafety
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -59,7 +60,10 @@ internal suspend fun deleteKeyPackageThroughSafeSourceRelays(
         }.fold(
             onSuccess = { selection -> executeSelectedKeyPackageDeletion(selection, accountStillActive, delete) },
             onFailure = { failure -> KeyPackageDeletionResult.Failed(failure) },
-        )
+        ).let { result ->
+            // A failure or unusable DNS answer can also finish after an account switch.
+            if (accountStillActive()) result else KeyPackageDeletionResult.Superseded
+        }
     }
 
 /** Executes only a fully vetted selection and suppresses stale-account presentation. */
@@ -91,6 +95,36 @@ private suspend fun executeSelectedKeyPackageDeletion(
         KeyPackageDeletionRelaySelection.Superseded -> KeyPackageDeletionResult.Superseded
     }
 
+/** Presents an acknowledged deletion or a current-account recovery result, returning whether to reload. */
+internal fun WhiteNoiseAppState.presentKeyPackageDeletionResult(
+    result: KeyPackageDeletionResult,
+    hostVerificationDetail: AppText,
+): Boolean =
+    when (result) {
+        KeyPackageDeletionResult.Deleted -> {
+            presentTransient(R.string.toast_key_package_deleted)
+            true
+        }
+        KeyPackageDeletionResult.NoUsableRelay -> {
+            present(
+                R.string.toast_couldnt_delete_key_package,
+                R.string.error_no_safe_key_package_source_relay,
+                copyable = false,
+            )
+            false
+        }
+        KeyPackageDeletionResult.HostVerificationUnavailable -> {
+            present(R.string.toast_couldnt_delete_key_package, hostVerificationDetail, copyable = false)
+            false
+        }
+        KeyPackageDeletionResult.Superseded -> false
+        is KeyPackageDeletionResult.Failed -> {
+            presentFailure(R.string.toast_couldnt_delete_key_package, "KEY_PACKAGE_DELETE", result.cause)
+            false
+        }
+    }
+
+/** Classifies bounded protocol sources off-main, then verifies only the approved hosts. */
 private suspend fun selectKeyPackageDeletionRelays(
     sourceRelays: List<String>,
     classify: suspend (List<String>) -> List<RelayEndpointClassificationFfi>,
@@ -112,6 +146,7 @@ private suspend fun selectKeyPackageDeletionRelays(
         }
     }
 
+/** Trims and bounds protocol-derived input before it crosses the classifier boundary. */
 private fun keyPackageDeletionRelayCandidates(sourceRelays: List<String>): List<String> =
     sourceRelays
         .asSequence()
@@ -121,6 +156,7 @@ private fun keyPackageDeletionRelayCandidates(sourceRelays: List<String>): List<
         .take(MAX_KEY_PACKAGE_DELETION_SOURCE_RELAYS)
         .toList()
 
+/** Retains only MDK-approved canonical endpoints, preserving their first-seen order. */
 private fun classifierAllowedDeletionRelays(classified: List<RelayEndpointClassificationFfi>): List<String> =
     classified
         .asSequence()

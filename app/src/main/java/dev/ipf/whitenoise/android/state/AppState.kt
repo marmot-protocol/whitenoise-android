@@ -5017,6 +5017,7 @@ class WhiteNoiseAppState private constructor(
             }
         }
 
+    /** Publishes a generation-fenced account switch and releases activation intent on every exit path. */
     @Suppress("ReturnCount") // Sign-in failure and supersession are distinct non-activation outcomes.
     suspend fun setActiveAccount(
         label: String,
@@ -5758,48 +5759,17 @@ class WhiteNoiseAppState private constructor(
         val account = activeAccountRef?.takeIf { it == accountRef }
         val accountSwitchGeneration = account?.let(accountSwitchHandoff::captureForAccount)
         if (account == null || accountSwitchGeneration == null) return false
-        return when (
-            val result =
-                deleteKeyPackageThroughSafeSourceRelays(
-                    sourceRelays = sourceRelays,
-                    classify = classify,
-                    resolve = resolve,
-                    accountStillActive = {
-                        activeAccountRef == account && isAccountSwitchCurrent(accountSwitchGeneration)
-                    },
-                    delete = { relays -> delete(account, eventIdHex, relays) },
-                )
-        ) {
-            KeyPackageDeletionResult.Deleted -> {
-                presentTransient(R.string.toast_key_package_deleted)
-                true
-            }
-            KeyPackageDeletionResult.NoUsableRelay -> {
-                present(
-                    R.string.toast_couldnt_delete_key_package,
-                    R.string.error_no_safe_key_package_source_relay,
-                    copyable = true,
-                )
-                false
-            }
-            KeyPackageDeletionResult.HostVerificationUnavailable -> {
-                present(
-                    R.string.toast_couldnt_delete_key_package,
-                    AppText.Plain(RELAY_HOSTS_UNAVAILABLE_MESSAGE),
-                    copyable = true,
-                )
-                false
-            }
-            KeyPackageDeletionResult.Superseded -> false
-            is KeyPackageDeletionResult.Failed -> {
-                presentFailure(
-                    R.string.toast_couldnt_delete_key_package,
-                    "KEY_PACKAGE_DELETE",
-                    result.cause,
-                )
-                false
-            }
-        }
+        val result =
+            deleteKeyPackageThroughSafeSourceRelays(
+                sourceRelays = sourceRelays,
+                classify = classify,
+                resolve = resolve,
+                accountStillActive = {
+                    activeAccountRef == account && isAccountSwitchCurrent(accountSwitchGeneration)
+                },
+                delete = { relays -> delete(account, eventIdHex, relays) },
+            )
+        return presentKeyPackageDeletionResult(result, AppText.Plain(RELAY_HOSTS_UNAVAILABLE_MESSAGE))
     }
 
     suspend fun publishNewKeyPackage(): Boolean {

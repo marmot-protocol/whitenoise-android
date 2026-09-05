@@ -21,6 +21,9 @@ import java.net.InetAddress
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class KeyPackageDeletionRelayTest {
+    /**
+     * Exercises the release regression: a public source outside the editable-relay allowlist reaches native deletion.
+     */
     @Test
     fun externalOnlyPublicSourceReachesDeletionBoundary() =
         runBlocking {
@@ -38,6 +41,7 @@ class KeyPackageDeletionRelayTest {
             assertEquals(listOf("wss://relay.example"), deletedThrough)
         }
 
+    /** Verifies that rejected peers are filtered individually while the usable external source survives. */
     @Test
     fun invalidDuplicateAndPrivatePeersCannotVetoPublicSource() =
         runBlocking {
@@ -68,6 +72,7 @@ class KeyPackageDeletionRelayTest {
             assertEquals(listOf("wss://relay.example"), deletedThrough)
         }
 
+    /** Keeps classifier-rejected sources from reaching DNS or the destructive native call. */
     @Test
     fun allMalformedOrLiteralPrivateSourcesFailBeforeResolution() =
         runBlocking {
@@ -90,6 +95,7 @@ class KeyPackageDeletionRelayTest {
             assertFalse(deleteCalled)
         }
 
+    /** Rejects a public-looking hostname whose resolved address is loopback. */
     @Test
     fun hostnameResolvingToPrivateAddressFailsBeforeDeletion() =
         runBlocking {
@@ -107,6 +113,7 @@ class KeyPackageDeletionRelayTest {
             assertFalse(deleteCalled)
         }
 
+    /** Rejects mixed DNS answers when any address belongs to a non-public or transition range. */
     @Test
     fun everyDnsAnswerMustBePublicUnicastBeforeDeletion() =
         runBlocking {
@@ -133,6 +140,7 @@ class KeyPackageDeletionRelayTest {
             }
         }
 
+    /** Preserves the recoverable DNS-unavailable result without publishing a deletion. */
     @Test
     fun unavailableResolutionRemainsDistinctAndDoesNotDelete() =
         runBlocking {
@@ -150,6 +158,7 @@ class KeyPackageDeletionRelayTest {
             assertFalse(deleteCalled)
         }
 
+    /** Allows an acknowledged route through the verified peer despite another peer's DNS outage. */
     @Test
     fun oneVerifiedSourceAllowsDeletionWhenAnotherResolverIsUnavailable() =
         runBlocking {
@@ -167,6 +176,7 @@ class KeyPackageDeletionRelayTest {
             assertEquals(listOf("wss://online.example"), deletedThrough)
         }
 
+    /** Checks repeated deletion attempts derive the same deduplicated source set independently. */
     @Test
     fun retryUsesTheSameCanonicalSourceSetWithoutAndroidOwnedState() =
         runBlocking {
@@ -189,6 +199,7 @@ class KeyPackageDeletionRelayTest {
             )
         }
 
+    /** Rejects an inventory action belonging to an account other than the active one. */
     @Test
     fun packageFromAnotherAccountCannotReachDeletionBoundary() =
         runBlocking {
@@ -212,6 +223,7 @@ class KeyPackageDeletionRelayTest {
             assertFalse(deleted)
         }
 
+    /** Checks AppState forwards the owning account, event id, and safe source before showing success. */
     @Test
     fun appStateRoutesAnExternalSourceThroughClassifierAndNativeDelete() =
         runBlocking {
@@ -245,6 +257,7 @@ class KeyPackageDeletionRelayTest {
             )
         }
 
+    /** Ensures unsafe-only inventory produces cause-specific recovery copy with no copyable sensitive detail. */
     @Test
     fun appStateExplainsWhenNoSafeSourceRelayRemains() =
         runBlocking {
@@ -277,6 +290,33 @@ class KeyPackageDeletionRelayTest {
             assertFalse(appState.toast?.copyable ?: true)
         }
 
+    /** Separates transient DNS recovery from unsafe sources without advertising an absent diagnostic report. */
+    @Test
+    fun appStateExplainsUnavailableHostVerificationWithoutCopyAction() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val appState = activeAppState(context)
+
+            val deleted =
+                appState.deleteKeyPackageWithDependencies(
+                    accountRef = ACCOUNT_A,
+                    eventIdHex = EVENT_ID,
+                    sourceRelays = listOf("wss://relay.external.example"),
+                    classify = ::allowEveryRelay,
+                    resolve = { null },
+                    delete = { _, _, _ -> error("unverified hosts must not reach deletion") },
+                )
+
+            assertFalse(deleted)
+            assertEquals(AppText.Resource(R.string.toast_couldnt_delete_key_package), appState.toast?.title)
+            assertEquals(
+                AppText.Plain("Couldn't verify relay hosts. Check your connection and try again."),
+                appState.toast?.detail,
+            )
+            assertFalse(appState.toast?.copyable ?: true)
+        }
+
+    /** Keeps cancellation observable to the caller instead of converting it into an endpoint error. */
     @Test
     fun cancellationAtDeletionBoundaryPropagates() =
         runBlocking {
@@ -296,6 +336,7 @@ class KeyPackageDeletionRelayTest {
             assertTrue(cancellationPropagated)
         }
 
+    /** Preserves the native failure so acknowledgement and publication errors retain their cause. */
     @Test
     fun deletionFailureIsReturnedWithoutChangingItsCause() =
         runBlocking {
@@ -313,6 +354,7 @@ class KeyPackageDeletionRelayTest {
             assertSame(failure, (result as KeyPackageDeletionResult.Failed).cause)
         }
 
+    /** Honors MDK's retired classification without dropping another usable source. */
     @Test
     fun nativeRetiredPeerCannotVetoAnAllowedSource() =
         runBlocking {
@@ -343,6 +385,7 @@ class KeyPackageDeletionRelayTest {
             assertEquals(listOf("wss://relay.example"), deletedThrough)
         }
 
+    /** Caps native publication fanout at sixteen vetted relays. */
     @Test
     fun deletionRouteIsBoundedBeforeTheStrictNativeDeleteCall() =
         runBlocking {
@@ -361,6 +404,7 @@ class KeyPackageDeletionRelayTest {
             assertEquals(sources.take(16), deletedThrough)
         }
 
+    /** Bounds classifier input and stops DNS work once the native relay quota is filled. */
     @Test
     fun hostileSourceFanoutIsBoundedBeforeMdkClassificationAndDns() =
         runBlocking {
@@ -387,6 +431,7 @@ class KeyPackageDeletionRelayTest {
             assertEquals(16, resolveCount)
         }
 
+    /** Applies the publication cap after DNS filtering so blocked peers cannot consume all slots. */
     @Test
     fun blockedPrefixCannotHideALaterUsableSourceFromTheNativeCap() =
         runBlocking {
@@ -408,6 +453,7 @@ class KeyPackageDeletionRelayTest {
             assertEquals(listOf(safe), deletedThrough)
         }
 
+    /** Retains a classifier-approved WSS path and port through the deletion-only boundary. */
     @Test
     fun classifierApprovedNonDefaultWssPortReachesDeletion() =
         runBlocking {
@@ -426,6 +472,7 @@ class KeyPackageDeletionRelayTest {
             assertEquals(listOf(source), deletedThrough)
         }
 
+    /** Uses one DNS verdict for distinct paths on a host within a single deletion attempt. */
     @Test
     fun oneDnsVerdictIsSharedByClassifierApprovedUrlsOnTheSameHost() =
         runBlocking {
@@ -448,6 +495,7 @@ class KeyPackageDeletionRelayTest {
             assertEquals(listOf("wss://relay.example/one", "wss://relay.example/two"), deletedThrough)
         }
 
+    /** Prevents publication when an account switch occurs during DNS verification. */
     @Test
     fun accountSwitchDuringHostVerificationSupersedesDeletion() =
         runBlocking {
@@ -470,6 +518,7 @@ class KeyPackageDeletionRelayTest {
             assertFalse(deleteCalled)
         }
 
+    /** Stops before DNS when classification completes after the account fence changes. */
     @Test
     fun accountSwitchDuringClassificationSupersedesBeforeDns() =
         runBlocking {
@@ -495,6 +544,7 @@ class KeyPackageDeletionRelayTest {
             assertFalse(resolverCalled)
         }
 
+    /** Suppresses stale success after native acknowledgement if the account changed in flight. */
     @Test
     fun accountSwitchDuringNativeCallSuppressesSuccessPresentation() =
         runBlocking {
@@ -512,10 +562,75 @@ class KeyPackageDeletionRelayTest {
             assertEquals(KeyPackageDeletionResult.Superseded, result)
         }
 
+    /** Prevents a delayed classifier failure from being presented after its account was replaced. */
+    @Test
+    fun accountSwitchDuringClassificationFailureSuppressesError() =
+        runBlocking {
+            var active = true
+            val result =
+                deleteKeyPackageThroughSafeSourceRelays(
+                    sourceRelays = listOf("wss://relay.example"),
+                    classify = {
+                        active = false
+                        error("old account classifier failure")
+                    },
+                    resolve = { error("classification failed before DNS") },
+                    accountStillActive = { active },
+                    delete = { error("classification failed before deletion") },
+                )
+
+            assertEquals(KeyPackageDeletionResult.Superseded, result)
+        }
+
+    /** Prevents a native failure from producing an old account's recovery notice in its replacement. */
+    @Test
+    fun accountSwitchDuringNativeFailureSuppressesError() =
+        runBlocking {
+            var active = true
+            val result =
+                deleteKeyPackageThroughSafeSourceRelays(
+                    sourceRelays = listOf("wss://relay.example"),
+                    classify = ::allowEveryRelay,
+                    resolve = { arrayOf(publicAddress()) },
+                    accountStillActive = { active },
+                    delete = {
+                        active = false
+                        error("old account publication failure")
+                    },
+                )
+
+            assertEquals(KeyPackageDeletionResult.Superseded, result)
+        }
+
+    /** Suppresses both blocked and unavailable DNS recovery when the owning account changes during resolution. */
+    @Test
+    fun accountSwitchDuringUnusableDnsResultSuppressesRecovery() =
+        runBlocking {
+            listOf(arrayOf(loopbackAddress()), null).forEach { answer ->
+                var active = true
+                val result =
+                    deleteKeyPackageThroughSafeSourceRelays(
+                        sourceRelays = listOf("wss://relay.example"),
+                        classify = ::allowEveryRelay,
+                        resolve = {
+                            active = false
+                            answer
+                        },
+                        accountStillActive = { active },
+                        delete = { error("no usable source remains") },
+                    )
+
+                assertEquals(KeyPackageDeletionResult.Superseded, result)
+            }
+        }
+
+    /** Returns a deterministic public address without performing a DNS lookup. */
     private fun publicAddress(): InetAddress = address(8, 8, 8, 8)
 
+    /** Supplies a forbidden DNS answer for preflight rejection scenarios. */
     private fun loopbackAddress(): InetAddress = address(127, 0, 0, 1)
 
+    /** Builds raw IPv4 address bytes so resolver tests never use the network. */
     private fun address(
         a: Int,
         b: Int,
@@ -523,8 +638,10 @@ class KeyPackageDeletionRelayTest {
         d: Int,
     ): InetAddress = InetAddress.getByAddress(byteArrayOf(a.toByte(), b.toByte(), c.toByte(), d.toByte()))
 
+    /** Builds an IPv6 DNS answer directly from the sixteen supplied octets. */
     private fun ipv6(vararg bytes: Int): InetAddress = InetAddress.getByAddress(ByteArray(16) { bytes[it].toByte() })
 
+    /** Creates AppState with account A active and no native runtime dependency. */
     private fun activeAppState(context: Context) =
         WhiteNoiseAppState(
             context = context,
@@ -534,6 +651,7 @@ class KeyPackageDeletionRelayTest {
             activeAccountRef = ACCOUNT_A,
         )
 
+    /** Models canonical classifier-approved endpoints so a test can isolate DNS and account fences. */
     private fun allowEveryRelay(endpoints: List<String>): List<RelayEndpointClassificationFfi> =
         endpoints.map { endpoint ->
             RelayEndpointClassificationFfi(
@@ -543,6 +661,7 @@ class KeyPackageDeletionRelayTest {
             )
         }
 
+    /** Models a small mixed classifier response; native endpoint parsing remains outside this test fake. */
     private fun classifyTestRelays(endpoints: List<String>): List<RelayEndpointClassificationFfi> =
         endpoints.map { endpoint ->
             val normalized = endpoint.trim().lowercase()
@@ -559,6 +678,7 @@ class KeyPackageDeletionRelayTest {
             )
         }
 
+    /** Creates a running local-signing account with the requested label. */
     private fun activeAccount(label: String) =
         AccountSummaryFfi(
             label = label,

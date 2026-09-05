@@ -8,6 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AccountSwitchLocalSnapshotHandoffTest {
+    /** Invalidates the previous account's destructive-operation fence as soon as activation intent changes. */
     @Test
     fun destructiveAccountFenceRejectsTheOldAccountAsSoonAsANewSwitchStarts() {
         val handoff = AccountSwitchLocalSnapshotHandoff()
@@ -22,6 +23,7 @@ class AccountSwitchLocalSnapshotHandoffTest {
         assertEquals(switchToB, handoff.captureForAccount("account-b"))
     }
 
+    /** Allows fresh work after a failed switch while keeping the original generation invalid. */
     @Test
     fun failedSwitchReleasesItsIntentWithoutRevivingAnOldGeneration() {
         val handoff = AccountSwitchLocalSnapshotHandoff()

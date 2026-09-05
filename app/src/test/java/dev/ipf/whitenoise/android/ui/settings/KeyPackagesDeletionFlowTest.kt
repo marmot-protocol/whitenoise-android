@@ -31,6 +31,7 @@ class KeyPackagesDeletionFlowTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    /** Drives confirmation through acknowledgement and verifies the refreshed inventory removes the event. */
     @Test
     fun acknowledgedDeletionReloadsAndRemovesRelayRecord() {
         val target = relayPackage()
@@ -62,6 +63,7 @@ class KeyPackagesDeletionFlowTest {
         assertEquals(target.sourceRelays, deletedRelays)
     }
 
+    /** Keeps the existing inventory when deletion is cancelled before acknowledgement. */
     @Test
     fun cancelledDeletionDoesNotReportSuccessOrReloadStaleInventory() {
         val target = relayPackage()
@@ -83,6 +85,7 @@ class KeyPackagesDeletionFlowTest {
         assertEquals(1, loads.get())
     }
 
+    /** Renders the production account-scoped screen with controllable MDK load and delete boundaries. */
     private fun render(
         load: suspend (Boolean) -> List<AccountKeyPackageFfi>,
         delete: suspend (String, String, List<String>) -> Boolean,
@@ -109,6 +112,7 @@ class KeyPackagesDeletionFlowTest {
         }
     }
 
+    /** Opens the selected package's confirmation and accepts the destructive action. */
     private fun confirmDeletion() {
         composeRule
             .onNodeWithContentDescription(context.getString(R.string.delete_key_package))
@@ -116,6 +120,7 @@ class KeyPackagesDeletionFlowTest {
         composeRule.onNodeWithText(context.getString(R.string.delete)).performClick()
     }
 
+    /** Waits for the injected inventory read without depending on a fixed coroutine delay. */
     private fun waitForLoads(
         expected: Int,
         loadCount: AtomicInteger,
@@ -123,6 +128,7 @@ class KeyPackagesDeletionFlowTest {
         composeRule.waitUntil(timeoutMillis = 5_000) { expected <= loadCount.get() }
     }
 
+    /** Supplies the signed-in owner used by both inventory and deletion callbacks. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACCOUNT_REF,
@@ -133,6 +139,7 @@ class KeyPackagesDeletionFlowTest {
             running = true,
         )
 
+    /** Models a relay-discovered package whose provenance is bound by the screen's account generation. */
     private fun relayPackage() =
         AccountKeyPackageFfi(
             // Relay-fetched inventory has protocol provenance but no local

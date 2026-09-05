@@ -186,6 +186,7 @@ object HostSafety {
         }?.takeIf { it >= 0 }
     }
 
+    /** Blocks private, special-use, documentation, multicast, and reserved IPv4 ranges. */
     private fun isPrivateIpv4(octets: IntArray): Boolean {
         val a = octets[0]
         val b = octets[1]
@@ -209,6 +210,7 @@ object HostSafety {
         }
     }
 
+    /** Applies the address policy to IPv6 literals, following IPv4 policy only for mapped addresses. */
     private fun isPrivateIpv6(host: String): Boolean {
         val address = host.substringBefore('%') // drop any zone id
         if (address == "::1" || address == "::") return true
@@ -228,6 +230,7 @@ object HostSafety {
         return isPrivateIpv6Groups(groups)
     }
 
+    /** Rejects non-global and special-purpose IPv6 prefixes after mapped IPv4 has been handled. */
     private fun isPrivateIpv6Groups(groups: IntArray): Boolean {
         val first = groups[0]
         val second = groups[1]
@@ -247,28 +250,36 @@ object HostSafety {
         ).any { it }
     }
 
+    /** Recognizes the private fc00::/7 prefix. */
     private fun isUniqueLocal(first: Int): Boolean = (first and IPV6_UNIQUE_LOCAL_MASK) == IPV6_UNIQUE_LOCAL_PREFIX
 
+    /** Recognizes fe80::/10 addresses scoped to the local link. */
     private fun isLinkLocal(first: Int): Boolean = (first and IPV6_LOCAL_MASK) == IPV6_LINK_LOCAL_PREFIX
 
+    /** Rejects the deprecated fec0::/10 site-local range. */
     private fun isSiteLocal(first: Int): Boolean = (first and IPV6_LOCAL_MASK) == IPV6_SITE_LOCAL_PREFIX
 
+    /** Recognizes the special-purpose 2001::/23 block excluded by the native public-address policy. */
     private fun isSpecialPurpose2001(
         first: Int,
         second: Int,
     ): Boolean = first == IPV6_SPECIAL_FIRST && second <= IPV6_SPECIAL_MAX_SECOND
 
+    /** Rejects the 2002::/16 transition range regardless of its embedded IPv4 address. */
     private fun isSixToFour(first: Int): Boolean = first == IPV6_SIX_TO_FOUR_FIRST
 
+    /** Recognizes the 100::/64 discard-only prefix. */
     private fun isDiscardOnly(groups: IntArray): Boolean =
         groups[0] == IPV6_DISCARD_ONLY_FIRST &&
             groups.sliceArray(1..3).all { it == 0 }
 
+    /** Recognizes the 2001:db8::/32 documentation prefix. */
     private fun isDocumentation(
         first: Int,
         second: Int,
     ): Boolean = first == IPV6_SPECIAL_FIRST && second == IPV6_DOCUMENTATION_SECOND
 
+    /** Recognizes the 3fff::/20 documentation prefix, including its partial second hextet. */
     private fun isDocumentation3fff(
         first: Int,
         second: Int,
@@ -276,8 +287,10 @@ object HostSafety {
         first == IPV6_DOCUMENTATION_3FFF_FIRST &&
             (second and IPV6_DOCUMENTATION_3FFF_MASK) == 0
 
+    /** Rejects multicast destinations in ff00::/8 at every scope. */
     private fun isMulticast(first: Int): Boolean = (first and IPV6_MULTICAST_MASK) == IPV6_MULTICAST_PREFIX
 
+    /** Recognizes 2000::/3 before the more-specific excluded ranges are applied. */
     private fun isGlobalUnicast(first: Int): Boolean = (first and IPV6_GLOBAL_MASK) == IPV6_GLOBAL_PREFIX
 
     private fun hextets(bytes: ByteArray): IntArray =
@@ -308,6 +321,7 @@ object HostSafety {
         return runCatching { IDN.toASCII(normalized, IDN.ALLOW_UNASSIGNED) }.getOrDefault(normalized)
     }
 
+    /** Extracts IPv4 only from ::ffff:0:0/96; other transition encodings retain the IPv6 policy. */
     private fun ipv4MappedFromGroups(groups: IntArray): IntArray? =
         // Only IPv4-mapped ::ffff:a:b follows the embedded IPv4 policy.
         // Compatible, NAT64, and 6to4 forms stay non-public transition ranges.

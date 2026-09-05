@@ -95,6 +95,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue("only a later subscription iteration may present Connecting", retryAttempt > initialValidation)
     }
 
+    /** Guards the source ordering that stages a current local snapshot before publishing the account. */
     @Test
     fun targetLocalSnapshotIsLoadedAndGenerationFencedBeforeAccountPublication() {
         val body = setActiveAccountSection()
