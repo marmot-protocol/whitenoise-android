@@ -4975,17 +4975,14 @@ class WhiteNoiseAppState private constructor(
         if (!restoreSignedOutAccountForActivation(target, label, deferUnreadRefresh)) return false
         val activationStillWanted =
             shouldActivate() && isAccountSwitchCurrent(requestGeneration)
+        val preloadPlan = accountSwitchPreloadPlan(switchingAccounts, activationStillWanted, preloadPolicy)
         val localSnapshot =
-            if (shouldLoadAccountSwitchLocalSnapshot(switchingAccounts, activationStillWanted, preloadPolicy)) {
-                if (preloadPolicy != AccountSwitchPreloadPolicy.STARTUP_RESTORATION) {
-                    loadAccountSwitchLocalSnapshot(label, requestGeneration)
-                } else {
-                    loadAccountSwitchLocalSnapshot(
-                        label,
-                        requestGeneration,
-                        includePresentationSeeds = false,
-                    )
-                }
+            if (preloadPlan.loadLocalRows) {
+                loadAccountSwitchLocalSnapshot(
+                    label,
+                    requestGeneration,
+                    includePresentationSeeds = preloadPlan.includePresentationSeeds,
+                )
             } else {
                 null
             }

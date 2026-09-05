@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.AppDivider
@@ -454,12 +455,16 @@ internal fun AccountSelectorSheet(
                 // boundary; its profile/privacy/notification/push work keeps
                 // running after the sheet is disposed (#547, #1698).
                 appState.launchMutation {
-                    appState.setActiveAccount(accountLabel) {
-                        onDismiss()
-                        // Land on the newly-active account's chat list instead of
-                        // leaving the user on Settings (#316).
-                        onAccountSwitched()
-                    }
+                    appState.setActiveAccount(
+                        label = accountLabel,
+                        preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
+                        onActivated = {
+                            onDismiss()
+                            // Land on the newly-active account's chat list instead of
+                            // leaving the user on Settings (#316).
+                            onAccountSwitched()
+                        },
+                    )
                 }
             },
             onAddAccount = onAddAccount,

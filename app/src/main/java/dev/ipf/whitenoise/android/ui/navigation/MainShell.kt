@@ -422,6 +422,7 @@ internal fun MainShell(
             val activated =
                 appState.setActiveAccount(
                     label = targetAccountRef,
+                    preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
                     shouldActivate = {
                         quickAccountSwitchRequestIsCurrent(
                             transition = quickAccountSwitchTransition,
