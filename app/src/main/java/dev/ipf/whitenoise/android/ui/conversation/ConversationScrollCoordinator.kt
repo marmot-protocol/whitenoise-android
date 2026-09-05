@@ -85,8 +85,12 @@ internal fun conversationScrollAnchor(
     renderedItemIds: List<String>,
     renderedMessageIds: List<String>,
     hasOlderHeader: Boolean,
+    hasInlineTopError: Boolean = false,
 ): ConversationScrollAnchor {
-    val firstTimelineListIndex = 1 + (if (hasOlderHeader) 1 else 0)
+    val firstTimelineListIndex =
+        1 +
+            (if (hasInlineTopError) 1 else 0) +
+            (if (hasOlderHeader) 1 else 0)
     val visibleTimelineRow =
         listState.layoutInfo.visibleItemsInfo.firstOrNull { visible ->
             val timelineIndex = visible.index - firstTimelineListIndex
@@ -136,6 +140,7 @@ internal class ConversationForegroundRestoreToken internal constructor(
 internal data class ConversationTimelineStructure(
     val rowKeys: List<Pair<String, String>>,
     val olderHeaderCount: Int,
+    val inlineTopErrorCount: Int = 0,
 )
 
 internal data class ConversationInitialAnchorLayout(
@@ -310,7 +315,7 @@ internal class ConversationScrollCoordinator(
                     resultingMode = ConversationScrollMode.FollowingTail,
                     preserveForegroundRestore = true,
                 ) {
-                    scrollToItem(resolveTailIndex())
+                    scrollToTail(resolveTailIndex())
                 }
             is ConversationScrollMode.ReadingHistory -> {
                 val bookmark = snapshot.scrollBookmark
@@ -435,6 +440,11 @@ internal class ConversationScrollCoordinator(
         }
     }
 
+    /**
+     * Repositions only while the settled user intent still follows the tail.
+     * A zero [frameCount] consumes geometry already measured by the caller;
+     * positive counts preserve the bounded post-layout frame chase.
+     */
     suspend fun followTailIfAllowed(
         resolveTailIndex: () -> Int,
         reason: ConversationScrollReason,
@@ -447,9 +457,13 @@ internal class ConversationScrollCoordinator(
             reason = reason,
             resultingMode = ConversationScrollMode.FollowingTail,
         ) {
-            repeat(frameCount.coerceAtLeast(1)) {
-                awaitFrame()
-                scrollToItem(resolveTailIndex(), 0)
+            if (frameCount <= 0) {
+                scrollToTail(resolveTailIndex())
+            } else {
+                repeat(frameCount) {
+                    awaitFrame()
+                    scrollToTail(resolveTailIndex())
+                }
             }
         }
     }
@@ -460,7 +474,7 @@ internal class ConversationScrollCoordinator(
      * Reaction projections can arrive before their chip's final Compose
      * measurement. A single next-frame scroll can therefore use the old list
      * extent. This bounded settle follows the tail until the measured row and
-     * spacer geometry remain stable, then applies one final correction. The
+     * viewport geometry remain stable, then applies one final correction. The
      * coordinator's normal command ownership makes the chase cancellable by a
      * drag, navigation, conversation replacement, or disposal.
      */
@@ -482,7 +496,7 @@ internal class ConversationScrollCoordinator(
             var observedRowHeightChange = false
             var stableFrames = 0
             var frame = 0
-            scrollToItem(resolveTailIndex(), 0)
+            scrollToTail(resolveTailIndex())
             while (frame < maxSettleFrames.coerceAtLeast(1)) {
                 awaitFrame()
                 val currentLayout = captureLayout()
@@ -499,7 +513,7 @@ internal class ConversationScrollCoordinator(
                         0
                     }
                 previousLayout = currentLayout
-                scrollToItem(resolveTailIndex(), 0)
+                scrollToTail(resolveTailIndex())
                 frame++
                 if (
                     observedRowHeightChange &&
@@ -600,6 +614,12 @@ internal class ConversationScrollCoordinator(
             writer.scrollToItem(index.coerceAtLeast(0), scrollOffset)
         }
 
+        /** Scrolls through the final row so an oversized message reaches its physical end. */
+        suspend fun scrollToTail(index: Int) {
+            ensureCurrent()
+            writer.scrollToTail(index.coerceAtLeast(0))
+        }
+
         /**
          * Keeps distance-independent navigation responsive: snap near a far target, then animate only
          * the final few rows. Message-backed callers can re-resolve after each snap because paging may
@@ -627,6 +647,32 @@ internal class ConversationScrollCoordinator(
                 writer.scrollToItem(resolvedTargetIndex, scrollOffset)
             } else {
                 writer.animateScrollToItem(resolvedTargetIndex, scrollOffset)
+            }
+            return true
+        }
+
+        /** Animates to the final row and then its measured physical end. */
+        suspend fun animateScrollToTail(
+            index: Int,
+            resolveIndex: () -> Int? = { index },
+        ): Boolean {
+            ensureCurrent()
+            var targetIndex = resolveIndex()?.coerceAtLeast(0)
+            var repositionAttempts = 0
+            while (
+                targetIndex != null &&
+                repositionAttempts < MAX_TARGET_REPOSITION_ATTEMPTS &&
+                prePositionIfFar(targetIndex)
+            ) {
+                repositionAttempts++
+                ensureCurrent()
+                targetIndex = resolveIndex()?.coerceAtLeast(0)
+            }
+            val resolvedTargetIndex = targetIndex ?: return false
+            if (isFar(resolvedTargetIndex)) {
+                writer.scrollToTail(resolvedTargetIndex)
+            } else {
+                writer.animateScrollToTail(resolvedTargetIndex)
             }
             return true
         }
@@ -665,7 +711,7 @@ internal suspend fun ConversationScrollCoordinator.jumpToNewest(targetIndex: Int
         reason = ConversationScrollReason.JumpToNewest,
         resultingMode = ConversationScrollMode.FollowingTail,
     ) {
-        animateScrollToItem(targetIndex)
+        animateScrollToTail(targetIndex)
     }
 
 /**
@@ -693,7 +739,7 @@ internal suspend fun ConversationScrollCoordinator.jumpToUnreadOrNewest(
                 if (!tailPrepared) {
                     throw CancellationException("Conversation newest edge was not available")
                 }
-                animateScrollToItem(resolveTailIndex())
+                animateScrollToTail(resolveTailIndex())
             }
         return if (completed && tailPrepared) {
             ConversationJumpToNewestOutcome.Tail
@@ -819,7 +865,7 @@ internal suspend fun ConversationScrollCoordinator.commitInitialAnchor(
 
 /**
  * Tail opens do not need the history path's two equal layout samples. Commit
- * the bottom spacer, yield one layout frame, and reveal as soon as the viewport
+ * the real final row, yield one layout frame, and reveal as soon as the viewport
  * and target are both measured.
  */
 internal suspend fun ConversationScrollCoordinator.commitInitialTailAnchor(
@@ -834,7 +880,7 @@ internal suspend fun ConversationScrollCoordinator.commitInitialTailAnchor(
             reason = ConversationScrollReason.InitialAnchor,
             resultingMode = ConversationScrollMode.FollowingTail,
         ) {
-            scrollToItem(targetIndex)
+            scrollToTail(targetIndex)
             awaitFrame()
             layoutReady = captureLayout().isReady
         }
@@ -875,6 +921,16 @@ internal interface ConversationScrollWriter {
         index: Int,
         scrollOffset: Int = 0,
     )
+
+    /** Reaches the physical end of [index], including when that item exceeds the viewport. */
+    suspend fun scrollToTail(index: Int) {
+        scrollToItem(index)
+    }
+
+    /** Animated counterpart of [scrollToTail]. */
+    suspend fun animateScrollToTail(index: Int) {
+        animateScrollToItem(index)
+    }
 }
 
 /** The only implementation that writes the Compose list state. */
@@ -897,6 +953,33 @@ internal class LazyListConversationScrollWriter(
     ) {
         listState.animateScrollToItem(index, scrollOffset)
     }
+
+    override suspend fun scrollToTail(index: Int) {
+        val visibleTailOffset = tailScrollOffset(index)
+        if (visibleTailOffset > 0) {
+            listState.scrollToItem(index, visibleTailOffset)
+        } else {
+            listState.scrollToItem(index)
+            listState.scrollToItem(index, tailScrollOffset(index))
+        }
+    }
+
+    override suspend fun animateScrollToTail(index: Int) {
+        val visibleTailOffset = tailScrollOffset(index)
+        if (visibleTailOffset > 0) {
+            listState.animateScrollToItem(index, visibleTailOffset)
+        } else {
+            listState.animateScrollToItem(index)
+            listState.animateScrollToItem(index, tailScrollOffset(index))
+        }
+    }
+
+    /** Uses the just-measured row size as a clamped request for the content end. */
+    private fun tailScrollOffset(index: Int): Int =
+        listState.layoutInfo.visibleItemsInfo
+            .firstOrNull { it.index == index }
+            ?.size
+            ?: 0
 }
 
 private fun ConversationScrollMode.requireSettled(): ConversationScrollMode {

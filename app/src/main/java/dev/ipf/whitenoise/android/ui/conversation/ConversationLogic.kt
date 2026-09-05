@@ -100,6 +100,7 @@ internal fun conversationScrollRestoreListIndex(
     renderedItemIds: List<String>,
     renderedMessageIds: List<String> = emptyList(),
     olderHeaderCount: Int,
+    inlineTopErrorCount: Int = 0,
 ): Int {
     val anchorIndex =
         snapshot.anchorMessageIdHex
@@ -111,7 +112,7 @@ internal fun conversationScrollRestoreListIndex(
                 ?.takeIf { it >= 0 }
             ?: -1
     return if (anchorIndex >= 0) {
-        1 + olderHeaderCount + anchorIndex
+        1 + olderHeaderCount + inlineTopErrorCount + anchorIndex
     } else {
         snapshot.firstVisibleItemIndex
     }
@@ -153,18 +154,25 @@ internal fun isNearBottom(
     listState: LazyListState,
     timelineSize: Int,
     hasOlderHeader: Boolean,
+    hasInlineTopError: Boolean = false,
 ): Boolean {
     if (!listState.canScrollForward) return true
-    val olderHeaderCount = if (hasOlderHeader) 1 else 0
-    val bottomTimelineIndex = timelineSize + 1 + olderHeaderCount
+    val leadingStructuralRowCount =
+        conversationTimelineLeadingStructuralRowCount(hasOlderHeader, hasInlineTopError)
+    val tailTimelineIndex =
+        conversationTimelineTailListIndex(
+            timelineSize = timelineSize,
+            leadingStructuralRowCount = leadingStructuralRowCount,
+        )
+            ?: return true
     // Check the LAST visible item, not the first — keeps "near bottom"
     // truthful when the viewport shrinks (e.g. keyboard open) and fewer
     // items fit, which pushes firstVisibleItemIndex earlier even though
     // the bottom is still on-screen.
     val layoutInfo = listState.layoutInfo
     val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull() ?: return false
-    if (lastVisible.index >= bottomTimelineIndex) return true
-    if (lastVisible.index < bottomTimelineIndex - 1) return false
+    if (lastVisible.index > tailTimelineIndex) return true
+    if (lastVisible.index < tailTimelineIndex) return false
 
     // A normal tail row counts as near-bottom as soon as any part is visible,
     // preserving the existing one-row threshold. For an oversized row, keep
@@ -199,10 +207,11 @@ internal fun rememberConversationNearBottom(
     listState: LazyListState,
     renderedTimelineSize: Int,
     hasOlderHeader: Boolean,
+    hasInlineTopError: Boolean = false,
 ): Boolean {
-    val nearBottom by remember(listState, renderedTimelineSize, hasOlderHeader) {
+    val nearBottom by remember(listState, renderedTimelineSize, hasOlderHeader, hasInlineTopError) {
         derivedStateOf {
-            isNearBottom(listState, renderedTimelineSize, hasOlderHeader)
+            isNearBottom(listState, renderedTimelineSize, hasOlderHeader, hasInlineTopError)
         }
     }
     return nearBottom

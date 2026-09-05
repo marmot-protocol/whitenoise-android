@@ -11,7 +11,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,6 +23,7 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 internal fun conversationFirstFrameSeedPresentation(
     controller: ConversationController,
@@ -41,9 +44,8 @@ internal fun conversationFirstFrameSeedPresentation(
         )
     return ConversationFirstFrameSeedPresentation(
         anchorTailImmediately = anchorTailImmediately,
-        // Even without a safe chat-list seed, start on the keyed bottom spacer.
-        // Compose then keeps that key stable while the local page inserts above
-        // it, avoiding a visible top-to-bottom jump.
+        // Start on the real keyed tail row. Compose then keeps that message key
+        // stable while the local page reconciles, without a zero-sized sentinel.
         initialListIndex = if (anchorTailImmediately) seededConversationTailListIndex(rendered.size) else 0,
         latestTimelineId = rendered.lastOrNull()?.id.takeIf { anchorTailImmediately },
         awaitingAuthoritativeTimeline = anchorTailImmediately && !controller.hasPublishedAuthoritativeTimeline,
@@ -73,26 +75,146 @@ internal fun shouldAnchorConversationTailOnFirstFrame(
         !hasFocusedDestination &&
         notificationOpenRequestId == 0L
 
-/** Index of the stable bottom spacer for a tail-seeded non-history transcript. */
-internal fun seededConversationTailListIndex(renderedTimelineSize: Int): Int = renderedTimelineSize.coerceAtLeast(0) + 1
+/** Index of the real final row for a tail-seeded transcript with one top spacer. */
+internal fun seededConversationTailListIndex(renderedTimelineSize: Int): Int = renderedTimelineSize.coerceAtLeast(0)
 
+/**
+ * Reveals the transcript only after its logical anchor and any required physical tail correction agree.
+ * Short seeded timelines are already at their physical end and may paint without waiting an extra frame.
+ */
+internal fun conversationTranscriptVisibilityCommitted(
+    initialTimelineAnchored: Boolean,
+    anchorTailImmediately: Boolean,
+    seededTailAlignmentCommitted: Boolean,
+    viewportMeasured: Boolean,
+    canScrollForward: Boolean,
+): Boolean =
+    initialTimelineAnchored &&
+        (
+            !anchorTailImmediately ||
+                seededTailAlignmentCommitted ||
+                (viewportMeasured && !canScrollForward)
+        )
+
+/**
+ * Baselines an immediately seeded transcript after its first measure. If the
+ * real final row is taller than the viewport, it is snapped to its measured
+ * physical end before [onTailAlignmentCommitted] opens the one-shot draw gate.
+ */
 @Composable
 @Suppress("FunctionNaming")
 internal fun SeededConversationAnchorBaselineEffect(
     enabled: Boolean,
     listState: LazyListState,
+    scrollCoordinator: ConversationScrollCoordinator,
+    currentTailIndex: () -> Int,
     postInitialReanchorGate: ConversationPostInitialReanchorGate,
     timelineStructure: ConversationTimelineStructure,
+    onTailAlignmentCommitted: () -> Unit,
 ) {
-    LaunchedEffect(enabled, listState, postInitialReanchorGate) {
+    val currentTailIndexProvider = rememberUpdatedState(currentTailIndex)
+    val currentTimelineStructure = rememberUpdatedState(timelineStructure)
+    val currentAlignmentCallback = rememberUpdatedState(onTailAlignmentCommitted)
+    LaunchedEffect(enabled, listState, scrollCoordinator, postInitialReanchorGate) {
         if (!enabled) return@LaunchedEffect
         withFrameNanos { }
+        // A short final row is already bottom-aligned by the LazyColumn's
+        // arrangement. An oversized final row needs its measured height before
+        // it can reach the physical end; do that before the draw gate opens.
+        val alignmentMayCommit =
+            awaitSeededTailAlignment(
+                listState = listState,
+                scrollCoordinator = scrollCoordinator,
+                currentTailIndex = { currentTailIndexProvider.value() },
+            )
+        if (!alignmentMayCommit) {
+            return@LaunchedEffect
+        }
         postInitialReanchorGate.commit(
-            structure = timelineStructure,
+            structure = currentTimelineStructure.value,
             viewportHeight = listState.layoutInfo.viewportSize.height,
         )
+        currentAlignmentCallback.value()
     }
 }
+
+/**
+ * Waits across a competing command's ownership epoch before retrying the
+ * bounded tail correction. A newer history intent may reveal at its chosen
+ * position; persistent tail intent may reveal only after a correction lands.
+ */
+private suspend fun awaitSeededTailAlignment(
+    listState: LazyListState,
+    scrollCoordinator: ConversationScrollCoordinator,
+    currentTailIndex: () -> Int,
+): Boolean =
+    awaitSeededTailAlignmentUntilCommit(
+        followTail = {
+            scrollCoordinator.followTailIfAllowed(
+                resolveTailIndex = currentTailIndex,
+                reason = ConversationScrollReason.InitialAnchor,
+                frameCount = 0,
+            )
+        },
+        isFollowingTail = { scrollCoordinator.isFollowingTail },
+        canScrollForward = { listState.canScrollForward },
+        tailWorkAvailable = { scrollCoordinator.mode is ConversationScrollMode.FollowingTail },
+        awaitFrame = { withFrameNanos { } },
+        awaitRetryOpportunity = { retryMayProceed ->
+            snapshotFlow { retryMayProceed() }.first { it }
+        },
+    )
+
+/**
+ * Runs finite alignment batches until the tail is positioned or newer intent
+ * legitimately owns the viewport. Retry waiting is level-triggered so an owner
+ * release during the final refused frame cannot be missed.
+ */
+internal suspend fun awaitSeededTailAlignmentUntilCommit(
+    followTail: suspend () -> Boolean,
+    isFollowingTail: () -> Boolean,
+    canScrollForward: () -> Boolean,
+    tailWorkAvailable: () -> Boolean,
+    awaitFrame: suspend () -> Unit,
+    awaitRetryOpportunity: suspend (retryMayProceed: () -> Boolean) -> Unit,
+): Boolean {
+    var alignmentMayCommit =
+        seededTailAlignmentMayCommit(
+            positioned = false,
+            isFollowingTail = isFollowingTail(),
+            canScrollForward = canScrollForward(),
+        )
+    while (!alignmentMayCommit) {
+        val positioned =
+            reconcileSeededTailAnchor(
+                followTail = followTail,
+                isFollowingTail = isFollowingTail,
+                awaitFrame = awaitFrame,
+            )
+        alignmentMayCommit =
+            seededTailAlignmentMayCommit(
+                positioned = positioned,
+                isFollowingTail = isFollowingTail(),
+                canScrollForward = canScrollForward(),
+            )
+        if (!alignmentMayCommit) {
+            awaitRetryOpportunity {
+                tailWorkAvailable() || !isFollowingTail() || !canScrollForward()
+            }
+        }
+    }
+    return alignmentMayCommit
+}
+
+/**
+ * Allows reveal after physical alignment or after newer history intent takes
+ * ownership, but never after a refused write leaves tail pixels unread.
+ */
+internal fun seededTailAlignmentMayCommit(
+    positioned: Boolean,
+    isFollowingTail: Boolean,
+    canScrollForward: Boolean,
+): Boolean = positioned || !isFollowingTail || !canScrollForward
 
 @Composable
 @Suppress("FunctionNaming")
@@ -135,7 +257,8 @@ internal fun SeededConversationAuthoritativeReconciliationEffect(
  * follow while the coordinator still owns the tail is a superseded command —
  * retry across frames. A refusal because tail-following ended means another
  * navigation owns the position, so reveal there instead of forcing the tail.
- * Attempts stay bounded so reconciliation can never wedge the reveal.
+ * Attempts stay bounded within an ownership epoch; the caller can then wait
+ * for the competing command to settle before starting another batch.
  */
 internal suspend fun reconcileSeededTailAnchor(
     followTail: suspend () -> Boolean,

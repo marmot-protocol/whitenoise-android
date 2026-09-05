@@ -12,7 +12,6 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -66,6 +65,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -447,21 +447,26 @@ private fun rememberConversationReadAnchor(
     renderedTimeline: List<TimelineMessage>,
     listState: LazyListState,
     hasOlderHeader: Boolean,
+    hasInlineTopError: Boolean,
     initialTimelineAnchored: Boolean,
 ): MutableState<String?> {
     val readAnchor = remember(entrySessionIdentity) { mutableStateOf(controller.lastReadMessageId) }
     val renderedSize = renderedTimeline.size
-    val currentHighestVisibleTimelineIndex by remember(listState, renderedSize, hasOlderHeader) {
-        derivedStateOf {
-            val visible = listState.layoutInfo.visibleItemsInfo
-            if (visible.isEmpty()) return@derivedStateOf -1
-            val olderHeader = if (hasOlderHeader) 1 else 0
-            // LazyColumn layout: [Spacer][maybe older-loading][timeline items][Spacer]
-            val firstTimelineListIndex = 1 + olderHeader
-            (visible.last().index - firstTimelineListIndex)
-                .coerceAtMost(renderedSize - 1)
+    val currentHighestVisibleTimelineIndex by
+        remember(listState, renderedSize, hasOlderHeader, hasInlineTopError) {
+            derivedStateOf {
+                val visible = listState.layoutInfo.visibleItemsInfo
+                if (visible.isEmpty()) return@derivedStateOf -1
+                val olderHeader = if (hasOlderHeader) 1 else 0
+                val inlineTopError = if (hasInlineTopError) 1 else 0
+                // LazyColumn layout: [top spacer][maybe top error]
+                // [maybe older-loading][timeline items].
+                // Tail clearance is content padding, not a zero-sized list item.
+                val firstTimelineListIndex = 1 + inlineTopError + olderHeader
+                (visible.last().index - firstTimelineListIndex)
+                    .coerceAtMost(renderedSize - 1)
+            }
         }
-    }
     val currentHighestVisibleMessageId =
         renderedTimeline
             .getOrNull(currentHighestVisibleTimelineIndex)
@@ -706,6 +711,8 @@ internal fun ConversationScreen(
         remember(chat.id) {
             ConversationBottomChromeHeightObserver()
         }
+    var measuredBottomChromeHeightPx by remember(controller) { mutableStateOf<Int?>(null) }
+    var bottomInputRevision by remember(controller) { mutableLongStateOf(0L) }
     var routePresentationFrozen by
         remember(controller) { mutableStateOf(routeTransitionInProgress) }
     val freezeRoutePresentation =
@@ -713,7 +720,6 @@ internal fun ConversationScreen(
             routeTransitionInProgress = routeTransitionInProgress,
             retainedPresentationFreeze = routePresentationFrozen,
         )
-    var bottomChromeReanchorPending by remember(controller) { mutableStateOf(false) }
     // Single conversation-level owner of which message's action menu is open, so
     // only one popover can be open at a time. With the keyboard up the menu is
     // non-focusable (#284), so long-pressing several bubbles would otherwise
@@ -771,14 +777,28 @@ internal fun ConversationScreen(
         remember(controller, notificationOpenRequestId) {
             mutableStateOf(firstFrameSeed.anchorTailImmediately && !firstFrameSeed.awaitingAuthoritativeTimeline)
         }
+    var seededTailAlignmentCommitted by
+        remember(controller, notificationOpenRequestId) {
+            mutableStateOf(!firstFrameSeed.anchorTailImmediately)
+        }
+    val transcriptVisibilityCommitted by
+        remember(controller, notificationOpenRequestId, listState, firstFrameSeed.anchorTailImmediately) {
+            derivedStateOf {
+                conversationTranscriptVisibilityCommitted(
+                    initialTimelineAnchored = initialTimelineAnchored,
+                    anchorTailImmediately = firstFrameSeed.anchorTailImmediately,
+                    seededTailAlignmentCommitted = seededTailAlignmentCommitted,
+                    viewportMeasured = listState.layoutInfo.viewportSize.height > 0,
+                    canScrollForward = listState.canScrollForward,
+                )
+            }
+        }
 
-    // First-frame completion waits for the initial anchor, not just one frame:
-    // until anchoring commits, the transcript is still transparent, so an
-    // earlier callback would understate readable-conversation latency. Every
-    // open eventually anchors — non-empty timelines via the anchor commit,
-    // empty ones via backfill exhaustion.
-    LaunchedEffect(chat.id, notificationOpenRequestId, initialTimelineAnchored) {
-        if (notificationOpenRequestId == 0L || !initialTimelineAnchored) return@LaunchedEffect
+    // First-frame completion waits for the same committed visibility predicate
+    // as paint, accessibility, and performance selectors. An oversized cached
+    // tail is not useful until its measured physical-end correction lands.
+    LaunchedEffect(chat.id, notificationOpenRequestId, transcriptVisibilityCommitted) {
+        if (notificationOpenRequestId == 0L || !transcriptVisibilityCommitted) return@LaunchedEffect
         withFrameNanos { }
         onFirstFrameCommitted()
     }
@@ -833,6 +853,14 @@ internal fun ConversationScreen(
         remember(controller.timeline) {
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         }
+    val hasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
+    val olderHeaderCount = if (hasOlderHeader) 1 else 0
+    val loadFailurePlacement = loadFailurePlacement(controller.error != null, renderedTimeline.isNotEmpty())
+    val hasInlineTopError =
+        loadFailurePlacement == LoadFailurePlacement.Inline &&
+            controller.errorEdge == ConversationLoadFailureEdge.TOP
+    val inlineTopErrorCount = if (hasInlineTopError) 1 else 0
+    val leadingStructuralRowCount = controller.conversationLeadingStructuralRowCount(renderedTimeline.size)
     val conversationMedia =
         rememberSharedMediaTiles(
             controller = controller,
@@ -973,6 +1001,10 @@ internal fun ConversationScreen(
             renderedItemIds = liveRenderedTimeline.map { it.id },
             renderedMessageIds = liveRenderedTimeline.map { it.record.messageIdHex },
             hasOlderHeader = liveHasOlderHeader,
+            hasInlineTopError =
+                liveRenderedTimeline.isNotEmpty() &&
+                    controller.error != null &&
+                    controller.errorEdge == ConversationLoadFailureEdge.TOP,
         )
     }
 
@@ -1112,17 +1144,16 @@ internal fun ConversationScreen(
             appState = appState,
         )
     val renderedSize = renderedTimeline.size
-    val hasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
     val nearBottom =
         rememberConversationNearBottom(
             listState = listState,
             renderedTimelineSize = renderedSize,
             hasOlderHeader = hasOlderHeader,
+            hasInlineTopError = hasInlineTopError,
         )
 
     fun resolveScrollAnchorIndex(anchor: ConversationScrollAnchor): Int? {
         val liveRenderedTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-        val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
         val timelineIndex =
             anchor.messageId
                 ?.takeIf { it.isNotBlank() }
@@ -1132,7 +1163,9 @@ internal fun ConversationScreen(
                     ?.let { itemId -> liveRenderedTimeline.indexOfFirst { it.id == itemId } }
                     ?.takeIf { it >= 0 }
                 ?: return null
-        return 1 + (if (liveHasOlderHeader) 1 else 0) + timelineIndex
+        return 1 +
+            controller.conversationLeadingStructuralRowCount(liveRenderedTimeline.size) +
+            timelineIndex
     }
 
     // Drag interactions are the authority for user intent. Programmatic list
@@ -1151,11 +1184,20 @@ internal fun ConversationScreen(
                 snapshotFlow { listState.isScrollInProgress }.filter { !it }.first()
             },
             onSettled = {
-                val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+                val liveRenderedSize =
+                    controller.timeline.count { !MessageProjector.isEdit(it.record) }
                 val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
                 scrollCoordinator.onUserGestureSettled(
                     currentScrollAnchor(),
-                    isNearBottom(listState, liveRenderedSize, liveHasOlderHeader),
+                    isNearBottom(
+                        listState = listState,
+                        timelineSize = liveRenderedSize,
+                        hasOlderHeader = liveHasOlderHeader,
+                        hasInlineTopError =
+                            liveRenderedSize > 0 &&
+                                controller.error != null &&
+                                controller.errorEdge == ConversationLoadFailureEdge.TOP,
+                    ),
                 )
             },
         )
@@ -1167,14 +1209,22 @@ internal fun ConversationScreen(
             renderedTimeline = renderedTimeline,
             listState = listState,
             hasOlderHeader = hasOlderHeader,
+            hasInlineTopError = hasInlineTopError,
             initialTimelineAnchored = initialTimelineAnchored,
         )
     DisposableEffect(controller) {
         onDispose {
             val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
             val hasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
+            val hasInlineTopError =
+                rendered.isNotEmpty() &&
+                    controller.error != null &&
+                    controller.errorEdge == ConversationLoadFailureEdge.TOP
             val firstTimelineIndex =
-                listState.firstVisibleItemIndex - 1 - (if (hasOlderHeader) 1 else 0)
+                listState.firstVisibleItemIndex -
+                    1 -
+                    (if (hasInlineTopError) 1 else 0) -
+                    (if (hasOlderHeader) 1 else 0)
             val anchor = rendered.getOrNull(firstTimelineIndex)
             onSaveScrollSnapshot(
                 conversationScrollSnapshotOnLeave(
@@ -1295,8 +1345,16 @@ internal fun ConversationScreen(
                 reason = ConversationScrollReason.Send,
                 resultingMode = ConversationScrollMode.FollowingTail,
             ) {
-                val target = targetIndex ?: (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                animateScrollToItem(target)
+                val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+                val target =
+                    targetIndex
+                        ?: conversationTimelineTailListIndex(
+                            timelineSize = liveRenderedSize,
+                            leadingStructuralRowCount =
+                                controller.conversationLeadingStructuralRowCount(liveRenderedSize),
+                        )
+                        ?: 0
+                animateScrollToTail(target)
             }
         }
     }
@@ -1642,8 +1700,11 @@ internal fun ConversationScreen(
                 .indexOfFirst { it.record.messageIdHex == messageId }
                 .takeIf { it >= 0 }
                 ?: return null
-        val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-        return 1 + olderMessagesHeaderCount + timelineIndex
+        val leadingStructuralRowCount =
+            controller.conversationLeadingStructuralRowCount(
+                controller.timeline.count { !MessageProjector.isEdit(it.record) },
+            )
+        return 1 + leadingStructuralRowCount + timelineIndex
     }
 
     ConversationTtsFollowEffects(
@@ -1695,9 +1756,9 @@ internal fun ConversationScreen(
                 if (skipIfFullyVisible && layoutInfo.isItemFullyVisible(targetIndex)) {
                     return@programmaticJump
                 }
-                val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-                val firstTimelineListIndex = 1 + olderMessagesHeaderCount
                 val renderedForHeightSample = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+                val firstTimelineListIndex =
+                    1 + controller.conversationLeadingStructuralRowCount(renderedForHeightSample.size)
                 val lastTimelineListIndex = firstTimelineListIndex + renderedForHeightSample.size - 1
                 val visibleTargetHeight = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size
                 val visibleTimelineHeights =
@@ -1793,10 +1854,13 @@ internal fun ConversationScreen(
                         return@highlightWhile false
                     }
                     if (!navigationRequest.isCurrent()) return@highlightWhile false
-                    val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+                    val leadingStructuralRowCount =
+                        controller.conversationLeadingStructuralRowCount(
+                            controller.timeline.count { !MessageProjector.isEdit(it.record) },
+                        )
                     centerTimelineItemAt(
                         targetMessageId,
-                        1 + olderMessagesHeaderCount + timelineIndex,
+                        1 + leadingStructuralRowCount + timelineIndex,
                         ConversationScrollReason.Reply,
                         skipIfFullyVisible = true,
                     )
@@ -1828,11 +1892,14 @@ internal fun ConversationScreen(
                     return@launch
                 }
                 if (!navigationRequest.isCurrent()) return@launch
-                val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+                val leadingStructuralRowCount =
+                    controller.conversationLeadingStructuralRowCount(
+                        controller.timeline.count { !MessageProjector.isEdit(it.record) },
+                    )
                 val centered =
                     centerTimelineItemAt(
                         targetMessageId,
-                        1 + olderMessagesHeaderCount + timelineIndex,
+                        1 + leadingStructuralRowCount + timelineIndex,
                         ConversationScrollReason.Mention,
                     )
                 if (!centered) return@launch
@@ -1855,23 +1922,33 @@ internal fun ConversationScreen(
     }
     val latestTimelineItemId = renderedTimeline.lastOrNull()?.id
     val currentController by rememberUpdatedState(controller)
-    val loadFailurePlacement = loadFailurePlacement(controller.error != null, renderedTimeline.isNotEmpty())
     val transcriptLocale = LocalConfiguration.current.locales[0]
-    val olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-    val bottomTimelineIndex = renderedTimeline.size + 1 + olderHeaderCount
-    val currentTailIndex by rememberUpdatedState(newValue = bottomTimelineIndex)
+    val tailTimelineIndex =
+        conversationTimelineTailListIndex(
+            timelineSize = renderedTimeline.size,
+            leadingStructuralRowCount = leadingStructuralRowCount,
+        ) ?: 0
+    val currentTailIndex by rememberUpdatedState(newValue = tailTimelineIndex)
     SeededConversationAnchorBaselineEffect(
         enabled = firstFrameSeed.anchorTailImmediately,
         listState = listState,
+        scrollCoordinator = scrollCoordinator,
+        currentTailIndex = { currentTailIndex },
         postInitialReanchorGate = postInitialReanchorGate,
-        timelineStructure = ConversationTimelineStructure(renderedTimelineAnchorKeys, olderHeaderCount),
+        timelineStructure =
+            ConversationTimelineStructure(
+                rowKeys = renderedTimelineAnchorKeys,
+                olderHeaderCount = olderHeaderCount,
+                inlineTopErrorCount = inlineTopErrorCount,
+            ),
+        onTailAlignmentCommitted = { seededTailAlignmentCommitted = true },
     )
     SeededConversationAuthoritativeReconciliationEffect(
         authoritativeTimelinePublished = controller.hasPublishedAuthoritativeTimeline,
         awaitingAuthoritativeTimeline = navigationState.seedTailAwaitingAuthoritative,
         renderedTimeline = renderedTimeline,
         scrollCoordinator = scrollCoordinator,
-        tailIndex = bottomTimelineIndex,
+        tailIndex = tailTimelineIndex,
         onReconciled = { latestId ->
             navigationState.seedTailAwaitingAuthoritative = false
             navigationState.lastFollowedLatestId = latestId
@@ -1880,6 +1957,17 @@ internal fun ConversationScreen(
             // pre-scroll oldest-rows frame.
             initialTimelineAnchored = true
         },
+    )
+    ConversationTailInsetReanchorEffect(
+        scrollCoordinator = scrollCoordinator,
+        bottomChromeHeightPx = measuredBottomChromeHeightPx,
+        snackbarContentInsetPx = with(density) { snackbarContentInset.value.roundToPx() },
+        bottomInputRevision = bottomInputRevision,
+        hasTimeline = renderedTimeline.isNotEmpty(),
+        initialTimelineAnchored = initialTimelineAnchored,
+        routePresentationFrozen = freezeRoutePresentation,
+        foregroundRestoreInProgress = scrollCoordinator.foregroundRestoreInProgress,
+        currentTailIndex = { currentTailIndex },
     )
 
     // Edit events are derived state, so a raw subscription page can be non-empty
@@ -1942,10 +2030,10 @@ internal fun ConversationScreen(
     // frame. Mirrors the nearBottom / currentHighestVisibleTimelineIndex
     // derived-state pattern above (#375).
     val stickyDayLabelState =
-        remember(renderedTimeline, transcriptLocale, olderHeaderCount) {
+        remember(renderedTimeline, transcriptLocale, leadingStructuralRowCount) {
             derivedStateOf {
                 val i =
-                    (listState.firstVisibleItemIndex - 1 - olderHeaderCount)
+                    (listState.firstVisibleItemIndex - 1 - leadingStructuralRowCount)
                         .coerceIn(0, (renderedTimeline.size - 1).coerceAtLeast(0))
                 renderedTimeline
                     .getOrNull(i)
@@ -2047,11 +2135,14 @@ internal fun ConversationScreen(
                 .filterNot { MessageProjector.isEdit(it.record) }
                 .indexOfFirst { it.record.messageIdHex == messageIdHex }
         if (timelineIndex >= 0 && navigationRequest.isCurrent()) {
-            val liveOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+            val liveLeadingStructuralRowCount =
+                controller.conversationLeadingStructuralRowCount(
+                    controller.timeline.count { !MessageProjector.isEdit(it.record) },
+                )
             val centered =
                 centerTimelineItemAt(
                     messageIdHex,
-                    1 + liveOlderHeaderCount + timelineIndex,
+                    1 + liveLeadingStructuralRowCount + timelineIndex,
                     ConversationScrollReason.Search,
                 )
             if (centered && navigationRequest.isCurrent()) {
@@ -2206,12 +2297,10 @@ internal fun ConversationScreen(
     LaunchedEffect(listState, controller) {
         snapshotFlow { listState.firstVisibleItemIndex }
             .collect { firstIndex ->
-                if (
-                    initialTimelineAnchored &&
-                    controller.hasMoreBefore &&
-                    !controller.isLoadingOlder &&
-                    firstIndex <= olderHeaderCount + OLDER_PAGE_PREFETCH_ROWS
-                ) {
+                if (!initialTimelineAnchored || !controller.hasMoreBefore || controller.isLoadingOlder) {
+                    return@collect
+                }
+                if (firstIndex <= leadingStructuralRowCount + OLDER_PAGE_PREFETCH_ROWS) {
                     controller.loadOlder()
                 }
             }
@@ -2229,13 +2318,20 @@ internal fun ConversationScreen(
                 false
             } else {
                 val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
-                val liveOlderHeaderCount = if (controller.hasMoreBefore) 1 else 0
-                val liveBottomTimelineIndex = liveRenderedSize + 1 + liveOlderHeaderCount
+                val liveLeadingStructuralRowCount =
+                    controller.conversationLeadingStructuralRowCount(liveRenderedSize)
+                val liveNewestEdgeIndex =
+                    conversationTimelineTailListIndex(liveRenderedSize, liveLeadingStructuralRowCount)
+                        // An edit-only page has no message-backed tail yet; retain
+                        // forward paging from its last structural header/spacer.
+                        ?: liveLeadingStructuralRowCount
                 val lastVisibleIndex =
                     listState.layoutInfo.visibleItemsInfo
                         .lastOrNull()
                         ?.index ?: -1
-                lastVisibleIndex >= liveBottomTimelineIndex - NEWER_PAGE_PREFETCH_ROWS
+                // The removed bottom sentinel sat one slot after the real tail.
+                // Keep the established inclusive N-row prefetch window.
+                lastVisibleIndex >= liveNewestEdgeIndex - NEWER_PAGE_PREFETCH_ROWS + 1
             }
         }.distinctUntilChanged()
             .filter { it }
@@ -2323,7 +2419,7 @@ internal fun ConversationScreen(
                         reason = ConversationScrollReason.ViewportChange,
                         resultingMode = ConversationScrollMode.FollowingTail,
                     ) {
-                        scrollToItem(currentTailIndex)
+                        scrollToTail(currentTailIndex)
                     }
                 is ConversationScrollMode.ReadingHistory ->
                     scrollCoordinator.reanchorReadingHistory(currentScrollAnchorResolver)
@@ -2352,13 +2448,26 @@ internal fun ConversationScreen(
                 } else {
                     val liveOlderHeaderCount =
                         if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-                    val liveBottomTimelineIndex = rendered.size + 1 + liveOlderHeaderCount
+                    val liveInlineTopErrorCount =
+                        if (
+                            controller.error != null &&
+                            controller.errorEdge == ConversationLoadFailureEdge.TOP
+                        ) {
+                            1
+                        } else {
+                            0
+                        }
+                    val liveLeadingStructuralRowCount = liveOlderHeaderCount + liveInlineTopErrorCount
+                    val liveTailTimelineIndex =
+                        conversationTimelineTailListIndex(rendered.size, liveLeadingStructuralRowCount)
+                            ?: return@snapshotFlow null
                     conversationScrollRestoreListIndex(
                         snapshot = restore,
                         renderedItemIds = rendered.map { it.id },
                         renderedMessageIds = rendered.map { it.record.messageIdHex },
                         olderHeaderCount = liveOlderHeaderCount,
-                    ).coerceAtMost(liveBottomTimelineIndex)
+                        inlineTopErrorCount = liveInlineTopErrorCount,
+                    ).coerceAtMost(liveTailTimelineIndex)
                 }
             }.filterNotNull()
                 .first()
@@ -2390,7 +2499,20 @@ internal fun ConversationScreen(
         val restoredRendered =
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         val restoredOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-        val restoredItem = restoredRendered.getOrNull(targetIndex - 1 - restoredOlderHeaderCount)
+        val restoredInlineTopErrorCount =
+            if (
+                restoredRendered.isNotEmpty() &&
+                controller.error != null &&
+                controller.errorEdge == ConversationLoadFailureEdge.TOP
+            ) {
+                1
+            } else {
+                0
+            }
+        val restoredItem =
+            restoredRendered.getOrNull(
+                targetIndex - 1 - restoredOlderHeaderCount - restoredInlineTopErrorCount,
+            )
         scrollCoordinator.settleReadingAt(
             ConversationScrollAnchor(
                 listIndex = targetIndex,
@@ -2404,6 +2526,7 @@ internal fun ConversationScreen(
                 ConversationTimelineStructure(
                     rowKeys = restoredRendered.map { it.id to it.record.messageIdHex },
                     olderHeaderCount = restoredOlderHeaderCount,
+                    inlineTopErrorCount = restoredInlineTopErrorCount,
                 ),
             viewportHeight = listState.layoutInfo.viewportSize.height,
         )
@@ -2444,14 +2567,30 @@ internal fun ConversationScreen(
         val anchoredTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         if (anchoredTimeline.isEmpty()) return@LaunchedEffect
         val anchoredOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-        val anchoredBottomTimelineIndex = anchoredTimeline.size + 1 + anchoredOlderHeaderCount
+        val anchoredInlineTopErrorCount =
+            if (
+                controller.error != null &&
+                controller.errorEdge == ConversationLoadFailureEdge.TOP
+            ) {
+                1
+            } else {
+                0
+            }
+        val anchoredLeadingStructuralRowCount = anchoredOlderHeaderCount + anchoredInlineTopErrorCount
+        val anchoredTailTimelineIndex =
+            requireNotNull(
+                conversationTimelineTailListIndex(
+                    anchoredTimeline.size,
+                    anchoredLeadingStructuralRowCount,
+                ),
+            )
         val renderedUnreadIndex =
             unreadId?.let { id -> anchoredTimeline.indexOfFirst { it.record.messageIdHex == id } } ?: -1
         val targetIndex =
             if (renderedUnreadIndex >= 0) {
-                1 + anchoredOlderHeaderCount + renderedUnreadIndex
+                1 + anchoredLeadingStructuralRowCount + renderedUnreadIndex
             } else {
-                anchoredBottomTimelineIndex
+                anchoredTailTimelineIndex
             }
         val resultingMode =
             if (renderedUnreadIndex >= 0) {
@@ -2508,6 +2647,7 @@ internal fun ConversationScreen(
                 ConversationTimelineStructure(
                     rowKeys = anchoredTimeline.map { it.id to it.record.messageIdHex },
                     olderHeaderCount = anchoredOlderHeaderCount,
+                    inlineTopErrorCount = anchoredInlineTopErrorCount,
                 ),
             viewportHeight = listState.layoutInfo.viewportSize.height,
         )
@@ -2541,6 +2681,7 @@ internal fun ConversationScreen(
         controller,
         renderedTimelineAnchorKeys,
         olderHeaderCount,
+        inlineTopErrorCount,
         initialTimelineAnchored,
         postInitialReanchorGate,
     ) {
@@ -2549,6 +2690,7 @@ internal fun ConversationScreen(
                 ConversationTimelineStructure(
                     rowKeys = renderedTimelineAnchorKeys,
                     olderHeaderCount = olderHeaderCount,
+                    inlineTopErrorCount = inlineTopErrorCount,
                 ),
             )
         if (initialTimelineAnchored && structureChanged) {
@@ -2590,16 +2732,6 @@ internal fun ConversationScreen(
         }
     }
 
-    fun reanchorNewestAfterBottomInputChange(frameCount: Int = 1) {
-        if (!initialTimelineAnchored) return
-        scope.launch {
-            scrollCoordinator.followTailIfAllowed(
-                resolveTailIndex = { currentTailIndex },
-                reason = ConversationScrollReason.BottomInput,
-                frameCount = frameCount,
-            )
-        }
-    }
     LaunchedEffect(routeTransitionInProgress) {
         if (routeTransitionInProgress) {
             routePresentationFrozen = true
@@ -2609,11 +2741,6 @@ internal fun ConversationScreen(
         // Keep the terminal frame and the first post-settle frame identical.
         withFrameNanos { }
         routePresentationFrozen = false
-        if (bottomChromeReanchorPending) {
-            bottomChromeReanchorPending = false
-            withFrameNanos { }
-            reanchorNewestAfterBottomInputChange(frameCount = 0)
-        }
     }
 
     // Scroll-to-message for a chat-list message-body search hit (issue #290).
@@ -2661,12 +2788,15 @@ internal fun ConversationScreen(
             appState.present(R.string.toast_original_message_unavailable)
             return@LaunchedEffect
         }
-        val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+        val leadingStructuralRowCount =
+            controller.conversationLeadingStructuralRowCount(
+                controller.timeline.count { !MessageProjector.isEdit(it.record) },
+            )
         // Center the match so prior + subsequent context is visible (#595).
         val centered =
             centerTimelineItemAt(
                 target,
-                1 + olderMessagesHeaderCount + timelineIndex,
+                1 + leadingStructuralRowCount + timelineIndex,
                 ConversationScrollReason.FocusMessage,
             )
         if (!centered) return@LaunchedEffect
@@ -3184,21 +3314,15 @@ internal fun ConversationScreen(
                         keyboardController?.hide()
                     }
                 },
-                onBottomInputChanged = { reanchorNewestAfterBottomInputChange() },
+                onBottomInputChanged = { bottomInputRevision++ },
                 onKeyboardRestoreFromCustomInput = { suppressNextImeOpenReanchor.set(true) },
                 onKeyboardRestoreFromCustomInputFailed = { suppressNextImeOpenReanchor.set(false) },
                 recentEmojis = recentEmojiRecentsOwner.recents,
                 onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
                 onBottomChromeMeasured = { heightPx, chromeBottomPx ->
-                    if (
-                        bottomChromeHeightObserver.onMeasured(heightPx) &&
-                        !scrollCoordinator.foregroundRestoreInProgress
-                    ) {
-                        if (freezeRoutePresentation) {
-                            bottomChromeReanchorPending = true
-                        } else {
-                            reanchorNewestAfterBottomInputChange(frameCount = 1)
-                        }
+                    bottomChromeHeightObserver.onMeasured(heightPx)
+                    if (measuredBottomChromeHeightPx != heightPx) {
+                        measuredBottomChromeHeightPx = heightPx
                     }
                     snackbarBottomInset.value =
                         with(density) { (heightPx - chromeBottomPx).coerceAtLeast(0).toDp() }
@@ -3284,13 +3408,19 @@ internal fun ConversationScreen(
                                 Modifier
                                     .fillMaxSize()
                                     .padding(horizontal = 12.dp)
-                                    .graphicsLayer {
-                                        alpha = if (initialTimelineAnchored) 1f else 0f
+                                    // Paint, TalkBack exposure, and first-useful-frame
+                                    // reporting share one predicate. An oversized cached
+                                    // final row therefore cannot become observable at its
+                                    // start before the physical-end correction lands.
+                                    .drawWithContent {
+                                        if (transcriptVisibilityCommitted) drawContent()
+                                    }.graphicsLayer {
+                                        alpha = if (transcriptVisibilityCommitted) 1f else 0f
                                     }.semantics {
-                                        if (!initialTimelineAnchored) hideFromAccessibility()
+                                        if (!transcriptVisibilityCommitted) hideFromAccessibility()
                                     }.performanceTestTag(
                                         PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE,
-                                        enabled = initialTimelineAnchored && renderedTimeline.isNotEmpty(),
+                                        enabled = transcriptVisibilityCommitted && renderedTimeline.isNotEmpty(),
                                     ).onGloballyPositioned { coordinates ->
                                         val position = coordinates.positionInWindow()
                                         transcriptWindowTop = position.y
@@ -3304,8 +3434,12 @@ internal fun ConversationScreen(
                                             ),
                                         )
                                     },
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(bottom = 8.dp + snackbarContentInset.value),
+                            verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
+                            // Content padding owns the final composer interval
+                            // and temporary notice clearance. Keeping spacing
+                            // out of a lazy sentinel leaves the real last row as
+                            // the stable tail anchor.
+                            contentPadding = conversationTimelineContentPadding(snackbarContentInset.value),
                         ) {
                             item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
                             conversationLoadErrorItem(
@@ -3452,13 +3586,6 @@ internal fun ConversationScreen(
                                 targetEdge = ConversationLoadFailureEdge.BOTTOM,
                                 onRetry = { scope.launch { controller.retryLoadFailure() } },
                             )
-                            // Kept minimal (matches the top-spacer) so the last
-                            // bubble sits a tight breathing-room above the
-                            // composer rather than orphaned in mid-screen; the
-                            // 8dp item spacing + 8dp content padding already
-                            // supply the gap. Retained (not removed) so the
-                            // bottom-anchor index math stays stable.
-                            item(key = "bottom-spacer") { Spacer(Modifier.height(4.dp)) }
                         }
                         ConversationInitialLoadingOverlay(
                             visible = !initialTimelineAnchored,
@@ -3719,7 +3846,7 @@ internal fun ConversationScreen(
                 locationPickerOpen = false
                 appState.launchMutation {
                     controller.send(formatLocationShareText(location)) {
-                        revealSentMessage(bottomTimelineIndex)
+                        revealSentMessage(currentTailIndex)
                     }
                 }
             },
@@ -3748,7 +3875,7 @@ internal fun ConversationScreen(
         },
         onAddDocuments = { documentPickerLauncher.launch(arrayOf("*/*")) },
         onAfterSend = {
-            revealSentMessage(bottomTimelineIndex)
+            revealSentMessage(currentTailIndex)
         },
     )
 }

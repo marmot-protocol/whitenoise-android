@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.lifecycle.LifecycleOwner
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -150,6 +151,16 @@ internal fun ConversationForegroundRestoreEffects(
                 ConversationTimelineStructure(
                     rowKeys = liveTimeline.map { it.id to it.record.messageIdHex },
                     olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0,
+                    inlineTopErrorCount =
+                        if (
+                            liveTimeline.isNotEmpty() &&
+                            controller.error != null &&
+                            controller.errorEdge == ConversationLoadFailureEdge.TOP
+                        ) {
+                            1
+                        } else {
+                            0
+                        },
                 )
             },
         )
