@@ -71,8 +71,11 @@ internal fun orderTimelineMessagesForDisplay(messages: List<TimelineMessage>): L
     return ordered
 }
 
-/** Whether a projected row has a position derived from accepted group history. */
-internal fun TimelineMessageRecordFfi.hasHistoryPosition(): Boolean = sourceEpoch != null || sourceMessageIdHex != null
+/** Whether a projection should retain its MDK page position in the display order. */
+internal fun TimelineMessageRecordFfi.usesAuthoritativePageOrder(): Boolean =
+    invalidationStatus == null ||
+        sourceEpoch != null ||
+        sourceMessageIdHex != null
 
 /** Source-level message identity used by durable stream parent links. */
 private fun TimelineMessage.displayMessageIdHex(): String = projected?.messageIdHex ?: record.messageIdHex
@@ -82,6 +85,24 @@ private fun insertTimelineOverlayByFallbackOrder(
     rows: MutableList<TimelineMessage>,
     overlay: TimelineMessage,
 ) {
-    val precedingIndex = rows.indexOfLast { row -> compareTimelineMessages(row, overlay) <= 0 }
-    rows.add(precedingIndex + 1, overlay)
+    if (overlay.projected?.usesAuthoritativePageOrder() != false) {
+        val precedingIndex = rows.indexOfLast { row -> compareTimelineMessages(row, overlay) <= 0 }
+        rows.add(precedingIndex + 1, overlay)
+        return
+    }
+    // A terminal row can fall inside an authoritative timestamp inversion.
+    // Once the authoritative prefix reaches the same or a later timestamp, a
+    // lower timestamp cannot reopen a safe gap or the stale row could become
+    // the live head again. Previously inserted overlays remain stable.
+    var authoritativePrefixMaximumAt: ULong? = null
+    var insertionIndex = 0
+    for ((index, row) in rows.withIndex()) {
+        if (row.authoritativeOrder != null) {
+            authoritativePrefixMaximumAt =
+                maxOf(authoritativePrefixMaximumAt ?: row.record.recordedAt, row.record.recordedAt)
+            if (authoritativePrefixMaximumAt >= overlay.record.recordedAt) break
+        }
+        insertionIndex = index + 1
+    }
+    rows.add(insertionIndex, overlay)
 }
