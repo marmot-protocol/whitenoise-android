@@ -57,13 +57,13 @@ class SettingsScreenScreenshotTest {
                             ),
                         appUpdateInfo =
                             AppUpdateInfo(
-                                installedVersion = "2026.8.25",
+                                installedVersion = "2026.9.5",
                                 latestVersion = null,
                                 checkedAtMillis = null,
                                 dismissedVersion = null,
                                 releasesBehind = null,
                             ),
-                        versionName = "2026.8.25",
+                        versionName = "2026.9.5",
                         mdkShortSha = "abc1234",
                         staging = false,
                         onBackToChats = {},
@@ -151,13 +151,13 @@ class SettingsScreenScreenshotTest {
                 ),
             appUpdateInfo =
                 AppUpdateInfo(
-                    installedVersion = "2026.8.25",
+                    installedVersion = "2026.9.5",
                     latestVersion = null,
                     checkedAtMillis = null,
                     dismissedVersion = null,
                     releasesBehind = null,
                 ),
-            versionName = "2026.8.25",
+            versionName = "2026.9.5",
             mdkShortSha = "abc1234",
             staging = false,
             onBackToChats = {},
