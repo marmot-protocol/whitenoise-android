@@ -1,0 +1,36 @@
+repository: https://github.com/marmot-protocol/whitenoise-android
+release_source: ./build/production-release/*.apk
+match: ".*arm64-v8a\\.apk$"
+
+name: "White Noise: Secure Chat"
+summary: "Private, end-to-end encrypted messaging built on Nostr and MLS"
+description: |
+  White Noise is a private messenger built on the open Marmot Protocol and Nostr.
+
+  Direct messages and group conversations are protected with Messaging Layer
+  Security (MLS), including forward secrecy and post-compromise security. Your
+  private key stays on your device, and White Noise does not require a phone
+  number or email address.
+
+  White Noise is non-custodial and works with independent Nostr relays and
+  Blossom media servers. Encrypted conversation media is encrypted before it is
+  uploaded. Optional push notifications route encrypted notification events,
+  and anonymous usage and crash reporting remain opt-in controls in the app.
+
+  Learn how the app handles data at https://www.whitenoise.chat/privacy.
+tags:
+  - nostr
+  - messaging
+  - privacy
+  - encrypted
+  - mls
+website: https://www.whitenoise.chat
+icon: ./fastlane/metadata/android/en-US/images/icon.png
+images:
+  - ./fastlane/metadata/android/en-US/images/phoneScreenshots/01-onboarding.png
+  - ./fastlane/metadata/android/en-US/images/phoneScreenshots/02-conversation.png
+  - ./fastlane/metadata/android/en-US/images/phoneScreenshots/03-group-details.png
+  - ./fastlane/metadata/android/en-US/images/phoneScreenshots/04-profile.png
+  - ./fastlane/metadata/android/en-US/images/phoneScreenshots/05-folders.png
+  - ./fastlane/metadata/android/en-US/images/phoneScreenshots/06-settings.png
+release_notes: ./fastlane/metadata/android/en-US/changelogs/12.txt

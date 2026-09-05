@@ -72,6 +72,9 @@ jobs:
           ./scripts/release_test.sh
           .github/scripts/test-staging-apk-transport.sh
 
+      - name: Verify Android release metadata and store assets
+        run: ./scripts/check-release-metadata.py
+
       - name: Test MarmotKit artifact preparation
         run: ./scripts/test-prepare-marmotkit-artifact.sh
 

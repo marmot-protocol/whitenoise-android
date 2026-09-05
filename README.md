@@ -171,6 +171,10 @@ that is a caught regression: fix the UI, don't re-record.
 
 ## Release Builds
 
+The complete Android release process, store metadata, required GitHub
+environments, signing-key separation, and guarded publication flow are defined
+in [docs/android-release-pipeline.md](docs/android-release-pipeline.md).
+
 Production release builds use signing values from `local.properties` or matching environment variables:
 
 - `WHITENOISE_PRODUCTION_KEYSTORE_PATH`
@@ -184,6 +188,14 @@ Production also accepts global signing values as fallbacks:
 - `WHITENOISE_KEYSTORE_PASSWORD`
 - `WHITENOISE_KEY_ALIAS`
 - `WHITENOISE_KEY_PASSWORD`
+
+Google Play release bundles use a separate upload key while Play App Signing
+retains the direct-distribution production key as the app-signing key:
+
+- `WHITENOISE_PLAY_UPLOAD_KEYSTORE_PATH`
+- `WHITENOISE_PLAY_UPLOAD_KEY_ALIAS`
+- `WHITENOISE_PLAY_UPLOAD_KEYSTORE_PASSWORD` (falls back to the production password)
+- `WHITENOISE_PLAY_UPLOAD_KEY_PASSWORD` (falls back to the production password)
 
 Staging release builds use staging-only signing values:
 
@@ -263,6 +275,18 @@ once, verifies its checksum, provenance, layout, and native architectures, and
 reuses the content-addressed cache afterward. The output filename is
 `whitenoise-production-v8a-release-YYYY-MM-DD-<sha>.apk`. The release folder is
 printed as the final line for Finder.
+
+To build the direct APK and Play AAB once, verify both signing identities and
+all ABI/version invariants, and collect the release manifest, checksums, release
+notes, and store assets together, run:
+
+```bash
+just production-release 2026.9.4
+```
+
+The verified bundle is written to `build/production-release/`. Zapstore and
+GitHub must distribute the exact APK from that directory; rebuilding or
+re-signing it per destination defeats the cross-store update contract.
 
 ```bash
 just apk-staging

@@ -175,7 +175,7 @@ fun ReleaseSigning.isConfigured(): Boolean =
         !keyPassword.isNullOrBlank() &&
         file(keystorePath!!).exists()
 
-val productionReleaseSigning =
+val directProductionReleaseSigning =
     ReleaseSigning(
         keystorePath =
             signingProperty(
@@ -198,6 +198,29 @@ val productionReleaseSigning =
                 "WHITENOISE_KEY_PASSWORD",
             ),
     )
+val playUploadSigning =
+    ReleaseSigning(
+        keystorePath = signingProperty("WHITENOISE_PLAY_UPLOAD_KEYSTORE_PATH"),
+        keystorePassword =
+            signingProperty(
+                "WHITENOISE_PLAY_UPLOAD_KEYSTORE_PASSWORD",
+                "WHITENOISE_PRODUCTION_KEYSTORE_PASSWORD",
+                "WHITENOISE_KEYSTORE_PASSWORD",
+            ),
+        keyAlias = signingProperty("WHITENOISE_PLAY_UPLOAD_KEY_ALIAS"),
+        keyPassword =
+            signingProperty(
+                "WHITENOISE_PLAY_UPLOAD_KEY_PASSWORD",
+                "WHITENOISE_PRODUCTION_KEY_PASSWORD",
+                "WHITENOISE_KEY_PASSWORD",
+            ),
+    )
+val requestedProductionPlayRelease =
+    gradle.startParameter.taskNames.any { taskName ->
+        taskName.substringAfterLast(":").contains("ProductionPlayRelease", ignoreCase = true)
+    }
+val productionReleaseSigning =
+    if (requestedProductionPlayRelease) playUploadSigning else directProductionReleaseSigning
 val stagingReleaseSigning =
     ReleaseSigning(
         keystorePath = signingProperty("WHITENOISE_STAGING_KEYSTORE_PATH"),
@@ -608,7 +631,10 @@ android {
     }
     splits {
         abi {
-            isEnable = true
+            // App bundles carry every ABI and let Play generate optimized APKs.
+            // Enabling APK splits for the same task produces multiple shrunk
+            // resource archives, which AGP cannot package into one AAB.
+            isEnable = !requestedProductionPlayRelease
             reset()
             include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
             isUniversalApk = true
@@ -1037,6 +1063,7 @@ dependencies {
     implementation(libs.play.services.base)
     implementation(libs.play.services.oss.licenses)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.tink.android)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.profileinstaller)

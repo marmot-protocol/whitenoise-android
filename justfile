@@ -26,8 +26,8 @@ DEV_PKG := "dev.ipf.whitenoise.android.dev"
 PRODUCTION_PKG := "dev.ipf.whitenoise.android"
 STAGING_PKG := "dev.ipf.whitenoise.android.staging"
 MAIN_ACTIVITY := "dev.ipf.whitenoise.android.MainActivity"
-PRODUCTION_APK_DIR := "app/build/outputs/apk/production/release"
-STAGING_APK_DIR := "app/build/outputs/apk/staging/release"
+PRODUCTION_APK_DIR := "app/build/outputs/apk/productionZapstore/release"
+STAGING_APK_DIR := "app/build/outputs/apk/stagingZapstore/release"
 
 _default:
     @just --list
@@ -84,6 +84,23 @@ apk: apk-production
 apk-production:
     ./scripts/release.sh --flavor production --abi arm64-v8a
     @printf '%s\n' "$PWD/{{ PRODUCTION_APK_DIR }}"
+
+# Build and independently verify the direct APK, Play AAB, release manifest,
+# checksums, release notes, and store-asset archive as one production bundle.
+production-release version="":
+    ./scripts/prepare-production-release.sh {{ if version == "" { "" } else { "--expected-version " + version } }}
+
+# Verify release metadata and checked-in Play/Zapstore listing assets.
+verify-release-metadata:
+    ./scripts/check-release-metadata.py
+
+# Regenerate Play/Zapstore listing images from deterministic app screenshots.
+store-assets:
+    ./scripts/generate-store-assets.sh
+
+# Install the checksum-pinned ZSP CLI version used by CI.
+install-zsp:
+    ./scripts/install-zsp.sh
 
 # Build the staging arm64-v8a APK.
 apk-staging:
