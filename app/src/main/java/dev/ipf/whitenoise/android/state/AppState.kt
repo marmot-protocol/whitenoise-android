@@ -7378,17 +7378,32 @@ class WhiteNoiseAppState private constructor(
         // Builds that don't self-update (the Google Play distribution) leave
         // updates entirely to the distributing store — no in-app flow and no
         // off-store listing redirect, which Play policy forbids.
-        if (!shouldStartInAppSelfUpdate(BuildConfig.SELF_UPDATE_ENABLED)) return
         val latest = appUpdateInfo.latestVersion
-        if (latest != null) {
+        if (
+            latest != null &&
+            shouldStartInAppSelfUpdate(
+                selfUpdateEnabled = BuildConfig.SELF_UPDATE_ENABLED,
+                installedVersion = appUpdateInfo.installedVersion,
+                targetVersion = latest,
+            )
+        ) {
             startAppSelfUpdate(latest)
             return
         }
-        openZapstoreListing(context)
+        if (BuildConfig.SELF_UPDATE_ENABLED && latest == null) openZapstoreListing(context)
     }
 
     fun startAppSelfUpdate(version: String? = appUpdateInfo.latestVersion) {
         val targetVersion = version ?: return
+        if (
+            !shouldStartInAppSelfUpdate(
+                selfUpdateEnabled = BuildConfig.SELF_UPDATE_ENABLED,
+                installedVersion = appUpdateInfo.installedVersion,
+                targetVersion = targetVersion,
+            )
+        ) {
+            return
+        }
         appSelfUpdateFlow.start(
             scope = notificationScope,
             version = targetVersion,
@@ -7409,6 +7424,15 @@ class WhiteNoiseAppState private constructor(
 
     fun retryAppSelfUpdate() {
         val version = appUpdateInfo.latestVersion ?: return
+        if (
+            !shouldStartInAppSelfUpdate(
+                selfUpdateEnabled = BuildConfig.SELF_UPDATE_ENABLED,
+                installedVersion = appUpdateInfo.installedVersion,
+                targetVersion = version,
+            )
+        ) {
+            return
+        }
         appSelfUpdateFlow.retry(
             scope = notificationScope,
             version = version,

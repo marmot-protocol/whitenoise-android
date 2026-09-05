@@ -89,6 +89,11 @@ internal class ZapstoreAppSelfUpdateFlow(
                     )
                 result
                     .onSuccess {
+                        if (!AppSelfUpdateInstaller.isTrustedUpdatePackage(appContext, destination, asset.version)) {
+                            AppSelfUpdateStorage.deleteFile(destination)
+                            fail(R.string.app_self_update_install_failed, retryable = true, onStateChanged)
+                            return@onSuccess
+                        }
                         verifiedApkFile = destination
                         val next =
                             if (AppSelfUpdateInstaller.canRequestPackageInstalls(appContext)) {
@@ -170,6 +175,12 @@ internal class ZapstoreAppSelfUpdateFlow(
                 AppSelfUpdateState.PermissionRequired(asset = asset, apkFile = apkFile),
                 onStateChanged,
             )
+            return false
+        }
+        if (!AppSelfUpdateInstaller.isTrustedUpdatePackage(appContext, apkFile, asset.version)) {
+            fail(R.string.app_self_update_install_failed, retryable = true, onStateChanged)
+            AppSelfUpdateStorage.deleteFile(apkFile)
+            verifiedApkFile = null
             return false
         }
         val launched = AppSelfUpdateInstaller.launchInstall(context, apkFile)
