@@ -36,36 +36,32 @@ internal data class SharedUser(
     val name: String?,
 )
 
-/** The `nostr:` reference we send; a peer on any Nostr client sees a profile link. */
-internal fun formatUserShareText(
-    name: String?,
-    npub: String,
-): String {
-    val ref = "nostr:$npub"
-    val cleanName = name?.trim()?.takeIf { it.isNotEmpty() && it != npub }
-    return if (cleanName != null) "$cleanName\n$ref" else ref
-}
+/**
+ * Returns the unambiguous whole-body shape used by the share-a-user flow.
+ * The reference is intentionally the only line so authored prose cannot be
+ * mistaken for a display name by the receiver.
+ */
+internal fun formatUserShareText(npub: String): String = "nostr:$npub"
 
 /**
- * Recognizes a user-share message: the whole body is just an `npub` reference
- * (optionally a name line above it), nothing else. Deliberately strict — a
- * longer message that merely mentions an npub in prose stays plain text and is
- * not hijacked into a user card.
+ * Recognizes a user-share message only when the whole body is one `npub`
+ * reference. Any additional non-empty line makes the body ordinary message
+ * text so user-authored prose cannot be relabeled as a card title.
  */
 internal fun parseSharedUserFromText(text: String): SharedUser? {
     val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
-    if (lines.isEmpty() || lines.size > 2) return null
-    val refLine =
-        lines.firstOrNull {
-            it.startsWith("npub1", ignoreCase = true) || it.startsWith("nostr:npub1", ignoreCase = true)
-        } ?: return null
+    if (lines.size != 1) return null
+    val refLine = lines.single()
+    if (!refLine.startsWith("npub1", ignoreCase = true) && !refLine.startsWith("nostr:npub1", ignoreCase = true)) {
+        return null
+    }
     val npub = ProfileLink.parse(refLine)?.npub ?: return null
-    val name = lines.firstOrNull { it != refLine }
-    return SharedUser(npub = npub, name = name)
+    return SharedUser(npub = npub, name = null)
 }
 
 private fun shortNpub(npub: String): String = if (npub.length > 20) "${npub.take(12)}…${npub.takeLast(5)}" else npub
 
+/** Renders one unambiguous shared-user reference as an actionable profile card. */
 @Composable
 internal fun UserMessageBubble(
     user: SharedUser,

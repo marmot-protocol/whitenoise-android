@@ -1490,7 +1490,7 @@ internal fun ConversationScreen(
     fun sendSharedUser(candidate: RecipientSearch.Candidate) {
         val presentationNpub = appState.npubForDisplay(candidate.accountIdHex)
         if (presentationNpub.isBlank()) return
-        val body = formatUserShareText(candidate.displayName, presentationNpub)
+        val body = formatUserShareText(presentationNpub)
         appState.launchMutation {
             controller.send(body) {
                 revealSentMessage()
