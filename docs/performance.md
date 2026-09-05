@@ -83,8 +83,15 @@ instrumentation output. The test removes its temporary native store, cache, and
 cache key after closing the runtime; the remote encrypted fixture remains
 subject to the service's retention policy. Neither package is uninstalled.
 
-The accompanying admission regression checks memory and platform-encrypted disk
-hits without permitting a remote fetch; it removes only the disk entry it creates.
+The accompanying admission regression measures twenty memory-cache admissions
+and twenty platform-encrypted disk admissions without permitting a remote fetch.
+Each disk sample uses a fresh key to exclude memory-cache reuse; cleanup removes
+only entries created by the test. Admission timing is not composed-frame timing.
+
+The encrypted-cache read/write and image-decode measurements are an independent
+test, so a failed network scenario cannot prevent their execution. To run just
+the offline local phases, append `#measureLocalImagePhasesWithoutNetwork` to the
+class selector below.
 
 ```bash
 ./gradlew --init-script scripts/media-latency.init.gradle \
@@ -116,9 +123,21 @@ Local phases use 20 new encrypted-cache entries and the production decoder.
 Report first-sample effects through the maximum as well as nearest-rank p50/p95.
 The opt-in run has a ten-minute outer guard and may take several minutes.
 
+After fixture upload, the live test snapshots the shipped native aggregate
+performance API before and after the download interval, including when a
+download fails. `media_probe_native` output contains only eleven fixed phase
+names, interval attempt/success/failure counts, duration sums, and numeric
+histogram buckets with an overflow count. It does not enable telemetry export
+or include unrelated snapshot fields. Native bucket counts are per-bucket, not
+cumulative; histogram bounds are not exact measured percentiles. Counter resets,
+saturation, or changed bucket bounds fail validation rather than producing a
+misleading interval report. A missing phase has zero observations, not a zero
+latency, and failed live runs remain failed even if the independent local tests
+pass. Do not discard failures or substitute the local timings for network timings.
+
 This probe does not measure receipt-to-visible pixels in a real chat album,
-stalled-locator failover, internal network/crypto phases or concurrency, or a signed release
-candidate. Those require their own fixtures and representative-device runs;
+stalled-locator failover, per-request native phase attribution, internal HTTP
+concurrency, or a signed release candidate. Those require their own fixtures and representative-device runs;
 passing this diagnostic must not be treated as proof that all field latency
 tails are eliminated.
 

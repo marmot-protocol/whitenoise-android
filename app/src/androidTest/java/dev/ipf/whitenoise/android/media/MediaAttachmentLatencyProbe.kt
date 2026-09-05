@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.SystemClock
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.ipf.marmotkit.AppPerformanceSnapshotFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -46,14 +47,13 @@ import kotlin.random.Random
 /** Opt-in component timings using generated images and a separate disposable native store. */
 @RunWith(AndroidJUnit4::class)
 class MediaAttachmentLatencyProbe {
-    /** Separates live native download latency from Android encrypted-cache and decode costs. */
+    /** Measures live native downloads and retains aggregate native phase evidence on failure. */
     @Test
     fun measureSyntheticImagePhases() =
         runBlocking {
             val context = isolatedContext()
             MarmotAndroid.initialize(context)
             val root = File(context.cacheDir, "media-probe-${UUID.randomUUID()}").apply { mkdirs() }
-            val keyAlias = "media.probe.${UUID.randomUUID()}"
             val marmot = Marmot(File(root, "native").absolutePath, MarmotClient.bootstrapRelays)
             try {
                 withTimeout(600_000L) {
@@ -81,11 +81,29 @@ class MediaAttachmentLatencyProbe {
                             .map { it.reference }
                     assertEquals(16, references.size)
                     assertEquals(16, references.map { it.ciphertextSha256 }.distinct().size)
-                    measureNativePhases(marmot, account.label, group, references.zip(images))
-                    measureLocalPhases(root, keyAlias, images.first())
+                    val before = marmot.appPerformanceSnapshot()
+                    try {
+                        measureNativePhases(marmot, account.label, group, references.zip(images))
+                    } finally {
+                        reportNativeInterval(before, marmot.appPerformanceSnapshot())
+                    }
                 }
             } finally {
                 marmot.shutdownAndClose()
+                root.deleteRecursively()
+            }
+        }
+
+    /** Network failures cannot suppress independent encrypted-cache and platform-decode evidence. */
+    @Test
+    fun measureLocalImagePhasesWithoutNetwork() =
+        runBlocking {
+            val context = isolatedContext()
+            val root = File(context.cacheDir, "media-probe-${UUID.randomUUID()}").apply { mkdirs() }
+            val keyAlias = "media.probe.${UUID.randomUUID()}"
+            try {
+                withTimeout(60_000L) { measureLocalPhases(root, keyAlias, syntheticImage(seed = 42)) }
+            } finally {
                 root.deleteRecursively()
                 KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(keyAlias)
             }
@@ -105,41 +123,61 @@ class MediaAttachmentLatencyProbe {
                         accounts = emptyList(),
                         activeAccountRef = "probe-account",
                     )
-                val request = AttachmentTransferRequest("probe-account", "probe-group", UUID.randomUUID().toString(), 0)
-                val bytes = byteArrayOf(1, 2, 3)
-                state.cacheMediaPlaintext(request.cacheKey(), bytes)
-                assertSame(
-                    bytes,
+                val bytes = syntheticImage(seed = 42)
+                measureMemoryAdmission(state, bytes)
+                measureDiskAdmission(state, bytes)
+            }
+        }
+
+    /** Times twenty actual warm-memory admissions and forbids invoking the native producer. */
+    private suspend fun measureMemoryAdmission(
+        state: WhiteNoiseAppState,
+        bytes: ByteArray,
+    ) {
+        val request = AttachmentTransferRequest("probe-account", "probe-group", UUID.randomUUID().toString(), 0)
+        state.cacheMediaPlaintext(request.cacheKey(), bytes)
+        val samples =
+            List(20) {
+                val started = SystemClock.elapsedRealtimeNanos()
+                val result =
                     state
                         .memoizedDownload(request.cacheKey(), request, AttachmentDownloadPriority.Interactive) {
                             error("Memory hit must not fetch")
-                        }.await(),
-                )
-                val diskRequest = request.copy(messageIdHex = UUID.randomUUID().toString())
+                        }.await()
+                assertSame(bytes, result)
+                elapsedMs(started)
+            }
+        report("memory_cache_admission_ms", samples)
+    }
+
+    /** Uses a new key per sample so each admission is a real encrypted-disk hit, never a prior L1 hit. */
+    private suspend fun measureDiskAdmission(
+        state: WhiteNoiseAppState,
+        bytes: ByteArray,
+    ) {
+        val samples =
+            List(20) {
+                val request = AttachmentTransferRequest("probe-account", "probe-group", UUID.randomUUID().toString(), 0)
                 try {
                     withContext(Dispatchers.IO) {
-                        state.diskMediaCache.put(
-                            diskRequest.cacheKey(),
-                            bytes,
-                            state.diskMediaCache.capturePublicationToken(),
-                        )
+                        val token = state.diskMediaCache.capturePublicationToken()
+                        state.diskMediaCache.put(request.cacheKey(), bytes, token)
                     }
+                    val started = SystemClock.elapsedRealtimeNanos()
                     val result =
                         state
-                            .memoizedDownload(
-                                diskRequest.cacheKey(),
-                                diskRequest,
-                                AttachmentDownloadPriority.Automatic,
-                            ) {
+                            .memoizedDownload(request.cacheKey(), request, AttachmentDownloadPriority.Automatic) {
                                 error("Encrypted disk hit must not fetch")
                             }.await()
                     assertArrayEquals(bytes, result)
-                    assertSame(result, state.cachedMediaPlaintext(diskRequest.cacheKey()))
+                    assertSame(result, state.cachedMediaPlaintext(request.cacheKey()))
+                    elapsedMs(started)
                 } finally {
-                    withContext(Dispatchers.IO) { state.diskMediaCache.remove(diskRequest.cacheKey()) }
+                    withContext(Dispatchers.IO) { state.diskMediaCache.remove(request.cacheKey()) }
                 }
             }
-        }
+        report("encrypted_cache_admission_ms", samples)
+    }
 
     /** Rejects implicit execution and every package that could hold personal app state. */
     private fun isolatedContext(): Context {
@@ -210,6 +248,38 @@ class MediaAttachmentLatencyProbe {
                     assertEquals(0, active.get())
                 }
         }
+
+    /** Reads only the existing closed aggregate media schema; never enables remote telemetry. */
+    private fun reportNativeInterval(
+        before: AppPerformanceSnapshotFfi,
+        after: AppPerformanceSnapshotFfi,
+    ) {
+        val previous = before.mediaPhases()
+        after.mediaPhases().forEach { (phase, operation) ->
+            mediaProbePhaseReport(phase, previous.getValue(phase), operation).forEach { line ->
+                InstrumentationRegistry.getInstrumentation().sendStatus(
+                    0,
+                    Bundle().apply { putString("media_probe_native", line) },
+                )
+            }
+        }
+    }
+
+    /** Explicit mapping prevents new unrelated snapshot fields or free-form labels from being exported. */
+    private fun AppPerformanceSnapshotFfi.mediaPhases() =
+        mapOf(
+            MediaProbeNativePhase.DOWNLOAD to mediaDownload,
+            MediaProbeNativePhase.QUEUE_WAIT to mediaDownloadQueueWait,
+            MediaProbeNativePhase.PREPARATION to mediaDownloadPreparation,
+            MediaProbeNativePhase.HOST_SETUP to mediaDownloadHostSetup,
+            MediaProbeNativePhase.RESPONSE_HEADERS to mediaDownloadResponseHeaders,
+            MediaProbeNativePhase.FIRST_BYTE to mediaDownloadFirstByte,
+            MediaProbeNativePhase.BODY_TRANSFER to mediaDownloadBodyTransfer,
+            MediaProbeNativePhase.LOCATOR_FAILOVER to mediaDownloadLocatorFailover,
+            MediaProbeNativePhase.CIPHERTEXT_VERIFY to mediaDownloadCiphertextVerify,
+            MediaProbeNativePhase.DECRYPT to mediaDownloadDecrypt,
+            MediaProbeNativePhase.PLAINTEXT_VERIFY to mediaDownloadPlaintextVerify,
+        )
 
     /** Measures only test-owned encrypted entries and real platform image decoding. */
     private suspend fun measureLocalPhases(
