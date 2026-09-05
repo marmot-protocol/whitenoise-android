@@ -98,9 +98,9 @@ class AccountSwitchLocalSnapshotOrderingTest {
     @Test
     fun targetLocalSnapshotIsLoadedAndGenerationFencedBeforeAccountPublication() {
         val body = setActiveAccountSection()
-        val generation = body.indexOf("val requestGeneration = accountSwitchHandoff.beginRequest()")
+        val generation = body.indexOf("val requestGeneration = accountSwitchHandoff.beginRequest(label)")
         val preload = body.indexOf("loadAccountSwitchLocalSnapshot(")
-        val preloadCall = body.substring(preload, body.indexOf("\n                )", startIndex = preload))
+        val preloadCall = body.substring(preload, body.indexOf("\n                    )", startIndex = preload))
         val finalGenerationGuard =
             body.indexOf(
                 "isAccountSwitchCurrent(requestGeneration)",

@@ -9,6 +9,33 @@ import org.junit.Test
 
 class AccountSwitchLocalSnapshotHandoffTest {
     @Test
+    fun destructiveAccountFenceRejectsTheOldAccountAsSoonAsANewSwitchStarts() {
+        val handoff = AccountSwitchLocalSnapshotHandoff()
+        val stable = handoff.beginRequest("account-a")
+        handoff.finishRequest(stable)
+        val deletionFence = requireNotNull(handoff.captureForAccount("account-a"))
+
+        val switchToB = handoff.beginRequest("account-b")
+
+        assertFalse(handoff.isCurrent(deletionFence))
+        assertNull(handoff.captureForAccount("account-a"))
+        assertEquals(switchToB, handoff.captureForAccount("account-b"))
+    }
+
+    @Test
+    fun failedSwitchReleasesItsIntentWithoutRevivingAnOldGeneration() {
+        val handoff = AccountSwitchLocalSnapshotHandoff()
+        val original = handoff.beginRequest("account-a")
+        handoff.finishRequest(original)
+        val switchToB = handoff.beginRequest("account-b")
+
+        handoff.finishRequest(switchToB)
+
+        assertFalse(handoff.isCurrent(original))
+        assertEquals(switchToB, handoff.captureForAccount("account-a"))
+    }
+
+    @Test
     fun guardedTargetZeroProjectionSupersedesAStaleUnreadIndicator() {
         val stale =
             AccountUnreadValue(

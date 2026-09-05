@@ -689,6 +689,7 @@
     <string name="toast_relay_list_updated">Relaisliste aktualisiert</string>
     <string name="toast_relay_update_failed">Das Relay-Update ist fehlgeschlagen</string>
     <string name="error_remove_invalid_relay_urls_first">Entfernen Sie zuerst ungültige Relay-URLs.</string>
+    <string name="error_no_safe_key_package_source_relay">Kein sicherer Quell-Relay ist verfügbar. Aktualisieren Sie die Schlüsselpakete und versuchen Sie es erneut.</string>
     <string name="toast_couldnt_load_key_packages">Schlüsselpakete konnten nicht geladen werden</string>
     <string name="toast_key_package_deleted">Schlüsselpaket gelöscht</string>
     <string name="toast_couldnt_delete_key_package">Schlüsselpaket konnte nicht gelöscht werden. Bitte erneut versuchen.</string>

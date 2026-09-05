@@ -44,6 +44,7 @@ import dev.ipf.marmotkit.NotificationsSubscription
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.PushRegistrationShareOutcomeFfi
 import dev.ipf.marmotkit.PushRegistrationShareStatusFfi
+import dev.ipf.marmotkit.RelayEndpointClassificationFfi
 import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
@@ -5025,69 +5026,73 @@ class WhiteNoiseAppState private constructor(
         awaitPostActivationWork: suspend () -> Unit = {},
         onActivated: () -> Unit = {},
     ): Boolean {
-        val requestGeneration = accountSwitchHandoff.beginRequest()
-        val switchingAccounts = label != activeAccountRef
-        if (switchingAccounts && BuildConfig.DEBUG) {
-            pendingAccountSwitchTrace =
-                PendingAccountSwitchTrace(
-                    accountRef = label,
-                    startedAtMs = SystemClock.elapsedRealtime(),
-                )
-        } else if (pendingAccountSwitchTrace?.accountRef != label) {
-            pendingAccountSwitchTrace = null
-        }
-        val target = accounts.firstOrNull { it.label == label }
-        if (!restoreSignedOutAccountForActivation(target, label, deferUnreadRefresh)) return false
-        val activationStillWanted =
-            shouldActivate() && isAccountSwitchCurrent(requestGeneration)
-        val preloadPlan = accountSwitchPreloadPlan(switchingAccounts, activationStillWanted, preloadPolicy)
-        val localSnapshot =
-            if (preloadPlan.loadLocalRows) {
-                loadAccountSwitchLocalSnapshot(
-                    label,
-                    requestGeneration,
-                    includePresentationSeeds = preloadPlan.includePresentationSeeds,
-                )
-            } else {
-                null
+        val requestGeneration = accountSwitchHandoff.beginRequest(label)
+        try {
+            val switchingAccounts = label != activeAccountRef
+            if (switchingAccounts && BuildConfig.DEBUG) {
+                pendingAccountSwitchTrace =
+                    PendingAccountSwitchTrace(
+                        accountRef = label,
+                        startedAtMs = SystemClock.elapsedRealtime(),
+                    )
+            } else if (pendingAccountSwitchTrace?.accountRef != label) {
+                pendingAccountSwitchTrace = null
             }
-        // A route may outlive the UI intent that requested it while a signed-out
-        // account is being restored. Let request-scoped callers reject that late
-        // activation without cancelling the process-lifetime sign-in work.
-        if (!shouldActivate() || !isAccountSwitchCurrent(requestGeneration)) return false
-        // Account switch: drop in-process plaintext so account A's bytes
-        // aren't reachable from account B's UI loops, but keep L2 (disk)
-        // intact. The disk cache key is `mediaCacheKey(account, msg)`, so
-        // switching to B can never read A's files — and switching BACK to
-        // A re-hydrates L1 from L2 with a single file read instead of a
-        // re-download. Sign-out (signOutActiveAccount) is what actually
-        // wipes disk; switching is just a UI context flip.
-        if (switchingAccounts) {
-            clearInMemoryMediaCaches()
-            clearCrossAccountCaches()
-            hideConversationShortcutsFromDirectShare()
+            val target = accounts.firstOrNull { it.label == label }
+            if (!restoreSignedOutAccountForActivation(target, label, deferUnreadRefresh)) return false
+            val activationStillWanted =
+                shouldActivate() && isAccountSwitchCurrent(requestGeneration)
+            val preloadPlan = accountSwitchPreloadPlan(switchingAccounts, activationStillWanted, preloadPolicy)
+            val localSnapshot =
+                if (preloadPlan.loadLocalRows) {
+                    loadAccountSwitchLocalSnapshot(
+                        label,
+                        requestGeneration,
+                        includePresentationSeeds = preloadPlan.includePresentationSeeds,
+                    )
+                } else {
+                    null
+                }
+            // A route may outlive the UI intent that requested it while a signed-out
+            // account is being restored. Let request-scoped callers reject that late
+            // activation without cancelling the process-lifetime sign-in work.
+            if (!shouldActivate() || !isAccountSwitchCurrent(requestGeneration)) return false
+            // Account switch: drop in-process plaintext so account A's bytes
+            // aren't reachable from account B's UI loops, but keep L2 (disk)
+            // intact. The disk cache key is `mediaCacheKey(account, msg)`, so
+            // switching to B can never read A's files — and switching BACK to
+            // A re-hydrates L1 from L2 with a single file read instead of a
+            // re-download. Sign-out (signOutActiveAccount) is what actually
+            // wipes disk; switching is just a UI context flip.
+            if (switchingAccounts) {
+                clearInMemoryMediaCaches()
+                clearCrossAccountCaches()
+                hideConversationShortcutsFromDirectShare()
+            }
+            stageAccountSwitchLocalSnapshot(label, switchingAccounts, requestGeneration, localSnapshot)
+            activeAccountRef = label
+            preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
+            reloadMediaAutoDownloadMatrix()
+            // This is the local-ready boundary for account switching. UI callers can
+            // dismiss/reset navigation now, while the process-lifetime mutation keeps
+            // the profile/privacy/notification/push work below alive in the background.
+            onActivated()
+            // An inactive-account notification already owns a precise local target.
+            // Its first readable transcript must not compete with broad profile,
+            // notification, or push refreshes. Ordinary account switches use the
+            // immediate default; the notification route releases this after the
+            // target frame, on failure, or when superseded.
+            awaitPostActivationWork()
+            if (isCurrentPostActivationAccountSwitch(label, requestGeneration)) {
+                accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
+                configurePrivacyRuntime()
+                refreshLocalNotificationSettings()
+                syncNativePushRegistrationIfEnabled()
+            }
+            return true
+        } finally {
+            accountSwitchHandoff.finishRequest(requestGeneration)
         }
-        stageAccountSwitchLocalSnapshot(label, switchingAccounts, requestGeneration, localSnapshot)
-        activeAccountRef = label
-        preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
-        reloadMediaAutoDownloadMatrix()
-        // This is the local-ready boundary for account switching. UI callers can
-        // dismiss/reset navigation now, while the process-lifetime mutation keeps
-        // the profile/privacy/notification/push work below alive in the background.
-        onActivated()
-        // An inactive-account notification already owns a precise local target.
-        // Its first readable transcript must not compete with broad profile,
-        // notification, or push refreshes. Ordinary account switches use the
-        // immediate default; the notification route releases this after the
-        // target frame, on failure, or when superseded.
-        awaitPostActivationWork()
-        if (isCurrentPostActivationAccountSwitch(label, requestGeneration)) {
-            accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
-            configurePrivacyRuntime()
-            refreshLocalNotificationSettings()
-            syncNativePushRegistrationIfEnabled()
-        }
-        return true
     }
 
     /**
@@ -5724,47 +5729,76 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Deletes a KeyPackage only for its still-active account through safe MDK-provided sources. */
     suspend fun deleteKeyPackage(
+        accountRef: String,
         eventIdHex: String,
         sourceRelays: List<String>,
+    ): Boolean =
+        deleteKeyPackageWithDependencies(
+            accountRef = accountRef,
+            eventIdHex = eventIdHex,
+            sourceRelays = sourceRelays,
+            classify = { relays -> marmotIo { classifyRelayEndpoints(relays) } },
+            resolve = ::resolveRelayHost,
+            delete = { account, eventId, relays ->
+                marmotIo { deleteAccountKeyPackage(account, eventId, relays) }
+            },
+        )
+
+    /** Runs the account-fenced deletion route with injectable native and DNS boundaries. */
+    internal suspend fun deleteKeyPackageWithDependencies(
+        accountRef: String,
+        eventIdHex: String,
+        sourceRelays: List<String>,
+        classify: suspend (List<String>) -> List<RelayEndpointClassificationFfi>,
+        resolve: RelayHostResolver,
+        delete: suspend (accountRef: String, eventIdHex: String, relays: List<String>) -> Unit,
     ): Boolean {
-        val account = activeAccountRef ?: return false
-        val relays = normalizeRelayUrls(sourceRelays)
-        if (relays.isEmpty()) {
-            present(
-                R.string.toast_couldnt_delete_key_package,
-                R.string.error_remove_invalid_relay_urls_first,
-                copyable = true,
-            )
-            return false
-        }
-        when (relayUrlsResolveTimeCheckResult(relays)) {
-            RelayResolveTimeCheckResult.Passed -> Unit
-            RelayResolveTimeCheckResult.Blocked -> {
+        val account = activeAccountRef?.takeIf { it == accountRef }
+        val accountSwitchGeneration = account?.let(accountSwitchHandoff::captureForAccount)
+        if (account == null || accountSwitchGeneration == null) return false
+        return when (
+            val result =
+                deleteKeyPackageThroughSafeSourceRelays(
+                    sourceRelays = sourceRelays,
+                    classify = classify,
+                    resolve = resolve,
+                    accountStillActive = {
+                        activeAccountRef == account && isAccountSwitchCurrent(accountSwitchGeneration)
+                    },
+                    delete = { relays -> delete(account, eventIdHex, relays) },
+                )
+        ) {
+            KeyPackageDeletionResult.Deleted -> {
+                presentTransient(R.string.toast_key_package_deleted)
+                true
+            }
+            KeyPackageDeletionResult.NoUsableRelay -> {
                 present(
                     R.string.toast_couldnt_delete_key_package,
-                    R.string.error_remove_invalid_relay_urls_first,
+                    R.string.error_no_safe_key_package_source_relay,
                     copyable = true,
                 )
-                return false
+                false
             }
-            RelayResolveTimeCheckResult.Unavailable -> {
+            KeyPackageDeletionResult.HostVerificationUnavailable -> {
                 present(
                     R.string.toast_couldnt_delete_key_package,
                     AppText.Plain(RELAY_HOSTS_UNAVAILABLE_MESSAGE),
                     copyable = true,
                 )
-                return false
+                false
             }
-        }
-        return runCatching {
-            marmotIo { deleteAccountKeyPackage(account, eventIdHex, relays) }
-            presentTransient(R.string.toast_key_package_deleted)
-            true
-        }.getOrElse {
-            if (it is CancellationException) throw it
-            presentFailure(R.string.toast_couldnt_delete_key_package, "KEY_PACKAGE_DELETE", it)
-            false
+            KeyPackageDeletionResult.Superseded -> false
+            is KeyPackageDeletionResult.Failed -> {
+                presentFailure(
+                    R.string.toast_couldnt_delete_key_package,
+                    "KEY_PACKAGE_DELETE",
+                    result.cause,
+                )
+                false
+            }
         }
     }
 
