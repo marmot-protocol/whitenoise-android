@@ -161,11 +161,11 @@ class ConversationAuthoritativeTimelineScreenshotTest {
             timelineAt = 100uL,
         ).copy(sourceEpoch = SOURCE_EPOCH)
 
-    /** Builds an old local-only failed send that MDK returns after canonical history. */
+    /** Builds a failed send inside the authoritative timestamp inversion range. */
     private fun unconfirmedLocalRecord() =
         timelineRecord(
             messageId = UNCONFIRMED_MESSAGE_ID,
-            timelineAt = 50uL,
+            timelineAt = 150uL,
             plaintext = "old unconfirmed send",
         ).copy(
             sourceMessageIdHex = null,

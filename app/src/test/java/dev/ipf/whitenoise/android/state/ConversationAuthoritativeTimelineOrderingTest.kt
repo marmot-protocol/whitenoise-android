@@ -73,6 +73,71 @@ class ConversationAuthoritativeTimelineOrderingTest {
             }
         }
 
+    /** An unresolved row inside an inverted authoritative timestamp range stays historical. */
+    @Test
+    fun intermediateUnconfirmedLocalSendDoesNotOccupyTheLiveHead() =
+        runBlocking {
+            val subscription =
+                ScriptedConversationTimelineSubscription(
+                    timelinePage(
+                        membershipRecord(timelineAt = 200uL),
+                        appRecord(timelineAt = 100uL),
+                        unconfirmedLocalRecord(timelineAt = 150uL),
+                    ),
+                )
+            withController(subscription) { controller, _ ->
+                awaitConversationCondition { controller.timeline.size == 3 }
+
+                assertEquals(
+                    listOf(UNCONFIRMED_MESSAGE_ID, SYSTEM_MESSAGE_ID, APP_MESSAGE_ID),
+                    timelineMessageIds(controller),
+                )
+            }
+        }
+
+    /** A same-second terminal row cannot win the live-head tie by message id. */
+    @Test
+    fun sameTimestampUnconfirmedLocalSendDoesNotOccupyTheLiveHead() =
+        runBlocking {
+            val subscription =
+                ScriptedConversationTimelineSubscription(
+                    timelinePage(
+                        appRecord(timelineAt = 100uL),
+                        unconfirmedLocalRecord(timelineAt = 100uL),
+                    ),
+                )
+            withController(subscription) { controller, _ ->
+                awaitConversationCondition { controller.timeline.size == 2 }
+
+                assertEquals(
+                    listOf(UNCONFIRMED_MESSAGE_ID, APP_MESSAGE_ID),
+                    timelineMessageIds(controller),
+                )
+            }
+        }
+
+    /** A fresh unresolved projection keeps MDK's optimistic-head position under clock skew. */
+    @Test
+    fun pendingLocalSendStaysAtTheLiveHeadDespiteAFutureAuthoritativeTimestamp() =
+        runBlocking {
+            val subscription =
+                ScriptedConversationTimelineSubscription(
+                    timelinePage(
+                        appRecord(timelineAt = 300uL),
+                        pendingLocalRecord(timelineAt = 100uL),
+                    ),
+                )
+            withController(subscription) { controller, _ ->
+                awaitConversationCondition { controller.timeline.size == 2 }
+
+                assertEquals(
+                    listOf(APP_MESSAGE_ID, PENDING_MESSAGE_ID),
+                    timelineMessageIds(controller),
+                )
+                assertEquals(MessageStatus.Pending, controller.timeline.last().status)
+            }
+        }
+
     /** A newly confirmed message stays at the live head above an older unconfirmed row. */
     @Test
     fun liveConfirmationDoesNotDisappearAboveAnOldUnconfirmedRow() =
@@ -259,6 +324,18 @@ class ConversationAuthoritativeTimelineOrderingTest {
             invalidationStatus = "local_publish_failed",
         )
 
+    /** Builds an accepted but not-yet-delivered local projection. */
+    private fun pendingLocalRecord(timelineAt: ULong) =
+        timelineRecord(
+            messageId = PENDING_MESSAGE_ID,
+            timelineAt = timelineAt,
+            plaintext = "pending send",
+        ).copy(
+            sourceMessageIdHex = null,
+            direction = "sent",
+            sender = ConversationTimelineTestIds.ACCOUNT_ID,
+        )
+
     /** Builds the durable stream start linked to the authoritative prompt. */
     private fun streamStartRecord(timelineAt: ULong) =
         timelineRecord(
@@ -340,6 +417,7 @@ class ConversationAuthoritativeTimelineOrderingTest {
         val SYSTEM_MESSAGE_ID = "ff".repeat(32)
         val APP_MESSAGE_ID = "00".repeat(32)
         val UNCONFIRMED_MESSAGE_ID = "33".repeat(32)
+        val PENDING_MESSAGE_ID = "44".repeat(32)
         val STREAM_START_MESSAGE_ID = "11".repeat(32)
         val STREAM_FINAL_MESSAGE_ID = "22".repeat(32)
     }
