@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -58,7 +59,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -95,6 +100,7 @@ import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 internal enum class SettingsHomeSection {
@@ -120,6 +126,67 @@ internal enum class SettingsHomeRow {
     AiAgents,
     Help,
 }
+
+/**
+ * Saveable position of the Settings home list, anchored by stable section key
+ * so optional sections can change without restoring an unrelated viewport.
+ */
+internal data class SettingsHomeViewport(
+    val section: SettingsHomeSection?,
+    val fallbackIndex: Int,
+    val scrollOffset: Int,
+) {
+    /** Resolves the saved key first and uses a clamped index only as fallback. */
+    fun resolveIndex(sections: List<SettingsHomeSection>): Int {
+        if (sections.isEmpty()) return 0
+        val keyedIndex = section?.let(sections::indexOf)?.takeIf { it >= 0 }
+        return keyedIndex ?: fallbackIndex.coerceIn(0, sections.lastIndex)
+    }
+
+    companion object {
+        val Top = SettingsHomeViewport(SettingsHomeSection.Account, fallbackIndex = 0, scrollOffset = 0)
+
+        /** Saver used only for the lifecycle-scoped Settings visit. */
+        val Saver: Saver<SettingsHomeViewport, Any> =
+            listSaver(
+                save = { listOf(it.section?.name.orEmpty(), it.fallbackIndex, it.scrollOffset) },
+                restore = { saved ->
+                    SettingsHomeViewport(
+                        section =
+                            saved[0]
+                                .toString()
+                                .takeIf(String::isNotEmpty)
+                                ?.let { name -> runCatching { SettingsHomeSection.valueOf(name) }.getOrNull() },
+                        fallbackIndex = saved[1] as Int,
+                        scrollOffset = saved[2] as Int,
+                    )
+                },
+            )
+    }
+}
+
+/** Shell-level lifecycle events that either retain or retire a Settings visit. */
+internal enum class SettingsHomeViewportEvent {
+    OpenDiagnostics,
+    OpenNewSettingsVisit,
+    ExitSettings,
+    OpenConversation,
+    ChangeAccount,
+}
+
+/** Applies the Settings-visit ownership policy to a captured home viewport. */
+internal fun reduceSettingsHomeViewport(
+    current: SettingsHomeViewport,
+    event: SettingsHomeViewportEvent,
+): SettingsHomeViewport =
+    when (event) {
+        SettingsHomeViewportEvent.OpenDiagnostics -> current
+        SettingsHomeViewportEvent.OpenNewSettingsVisit,
+        SettingsHomeViewportEvent.ExitSettings,
+        SettingsHomeViewportEvent.OpenConversation,
+        SettingsHomeViewportEvent.ChangeAccount,
+        -> SettingsHomeViewport.Top
+    }
 
 @Stable
 internal data class SettingsHomeState(
@@ -202,6 +269,8 @@ internal fun SettingsScreen(
     onOpenSupportChat: (ChatListItem) -> Unit,
     detail: SettingsDetail?,
     onDetailChange: (SettingsDetail?) -> Unit,
+    homeViewport: SettingsHomeViewport,
+    onHomeViewportChange: (SettingsHomeViewport) -> Unit,
 ) {
     // Issue #121: the prior shape only handled back from a detail
     // subscreen; when on the Settings home (detail == null) the system
@@ -263,6 +332,8 @@ internal fun SettingsScreen(
                 onBackToChats = onBackToChats,
                 onOpenDetail = { onDetailChange(it) },
                 onOpenSupportChat = onOpenSupportChat,
+                viewport = homeViewport,
+                onViewportChange = onHomeViewportChange,
             )
     }
 }
@@ -296,6 +367,8 @@ private fun SettingsHomeScreen(
     onBackToChats: () -> Unit,
     onOpenDetail: (SettingsDetail) -> Unit,
     onOpenSupportChat: (ChatListItem) -> Unit,
+    viewport: SettingsHomeViewport,
+    onViewportChange: (SettingsHomeViewport) -> Unit,
 ) {
     var qrAccountId by remember { mutableStateOf<String?>(null) }
     var showAccountSelector by remember { mutableStateOf(false) }
@@ -346,6 +419,8 @@ private fun SettingsHomeScreen(
         onOpenQr = { qrAccountId = activeAccount?.accountIdHex },
         onOpenDetail = onOpenDetail,
         onChatWithSupport = ::startSupportChat,
+        viewport = viewport,
+        onViewportChange = onViewportChange,
         onAppUpdateAction = {
             scope.launch {
                 // Await the check before acting so the first tap uses a fresh result.
@@ -396,13 +471,38 @@ internal fun SettingsHomeContent(
     onOpenDetail: (SettingsDetail) -> Unit,
     onAppUpdateAction: () -> Unit,
     onChatWithSupport: () -> Unit = {},
+    viewport: SettingsHomeViewport = SettingsHomeViewport.Top,
+    onViewportChange: (SettingsHomeViewport) -> Unit = {},
 ) {
+    val currentOnViewportChange by rememberUpdatedState(onViewportChange)
+    val listState =
+        rememberLazyListState(
+            initialFirstVisibleItemIndex = viewport.resolveIndex(state.sections),
+            initialFirstVisibleItemScrollOffset = viewport.scrollOffset.coerceAtLeast(0),
+        )
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val index = listState.firstVisibleItemIndex
+            val section =
+                listState.layoutInfo.visibleItemsInfo
+                    .firstOrNull { it.index == index }
+                    ?.key
+                    ?.toString()
+                    ?.let { key -> runCatching { SettingsHomeSection.valueOf(key) }.getOrNull() }
+            SettingsHomeViewport(
+                section = section,
+                fallbackIndex = index,
+                scrollOffset = listState.firstVisibleItemScrollOffset,
+            )
+        }.distinctUntilChanged().collect(currentOnViewportChange)
+    }
     Scaffold(
         modifier = Modifier.testTag(SETTINGS_HOME_CONTENT_TAG),
         topBar = { SettingsTopBar(onBackToChats = onBackToChats) },
     ) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding).padding(horizontal = Dimens.spaceLg),
+            state = listState,
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
         ) {
             state.sections.forEach { section ->
