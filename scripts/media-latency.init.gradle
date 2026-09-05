@@ -1,0 +1,11 @@
+// Explicitly selected diagnostic build; never replace a user's existing flavor.
+gradle.beforeProject { project ->
+    if (project.path == ':app') {
+        project.plugins.withId('com.android.application') {
+            project.androidComponents.finalizeDsl { android ->
+                android.productFlavors.getByName('dev').applicationIdSuffix = '.medialatency'
+                android.productFlavors.getByName('dev').manifestPlaceholders['appName'] = 'Media Latency Lab'
+            }
+        }
+    }
+}
