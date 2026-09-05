@@ -97,7 +97,12 @@ import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
+import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
+import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
+import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
+import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
+import dev.ipf.whitenoise.android.diagnostics.PerformanceTrigger
 import dev.ipf.whitenoise.android.diagnostics.StartupPerformanceDiagnostics
 import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
@@ -3594,7 +3599,10 @@ class WhiteNoiseAppState private constructor(
      * caller can always `await` this without it becoming a hard gate.
      */
     suspend fun catchUpAccounts() {
-        launchCatchUpAccounts().await()
+        launchAccountCatchUp(
+            mustStartAfter = null,
+            trigger = PerformanceTrigger.EXPLICIT,
+        ).await()
     }
 
     /**
@@ -3603,17 +3611,24 @@ class WhiteNoiseAppState private constructor(
      * consumers. Callers for the same account, runtime, and network share one
      * in-flight result; a newer identity waits instead of overlapping native work.
      */
-    internal fun launchCatchUpAccounts(): Deferred<AccountCatchUpResult> = launchAccountCatchUp(mustStartAfter = null)
+    internal fun launchCatchUpAccounts(): Deferred<AccountCatchUpResult> =
+        launchAccountCatchUp(
+            mustStartAfter = null,
+            trigger = PerformanceTrigger.CHAT_LIST_READINESS,
+        )
 
     /** Builds the current catch-up identity and serializes its native work process-wide. */
-    private fun launchAccountCatchUp(mustStartAfter: Long?): Deferred<AccountCatchUpResult> =
+    private fun launchAccountCatchUp(
+        mustStartAfter: Long?,
+        trigger: PerformanceTrigger,
+    ): Deferred<AccountCatchUpResult> =
         AccountCatchUpKey(
             accountRef = activeAccountRef,
             runtimeGeneration = runtimeGeneration,
             networkGeneration = connectivitySignalOwner.captureNetworkGeneration(),
         ).let { key ->
             val catchUp: suspend () -> Boolean = {
-                val succeeded = catchUpAccountsBestEffort()
+                val succeeded = instrumentedCatchUpAccounts(trigger)
                 if (succeeded) recordStartupRelayCatchUpReady()
                 succeeded &&
                     activeAccountRef == key.accountRef &&
@@ -3628,14 +3643,48 @@ class WhiteNoiseAppState private constructor(
         }
 
     /** Runs catch-up work fresh enough to acknowledge the observed push-wake marker. */
-    private suspend fun catchUpAfterObservedPushWake(pendingGeneration: Long): AccountCatchUpResult {
-        if (pendingGeneration == 0L) return launchCatchUpAccounts().await()
+    private suspend fun catchUpAfterObservedPushWake(
+        pendingGeneration: Long,
+        trigger: PerformanceTrigger,
+    ): AccountCatchUpResult {
+        if (pendingGeneration == 0L) {
+            return launchAccountCatchUp(mustStartAfter = null, trigger = trigger).await()
+        }
         val observedStartSequence = accountCatchUpCoordinator.captureStartSequence()
         return runCatchUpAfterTrigger(
             observedStartSequence = observedStartSequence,
-            launchAfter = { sequence -> launchAccountCatchUp(mustStartAfter = sequence) },
+            launchAfter = { sequence -> launchAccountCatchUp(mustStartAfter = sequence, trigger = trigger) },
             onSucceeded = { clearPendingPushWakeCatchUpIfObserved(pendingGeneration) },
         )
+    }
+
+    /** Measures only native catch-up work admitted by the single-flight coordinator. */
+    private suspend fun instrumentedCatchUpAccounts(trigger: PerformanceTrigger): Boolean {
+        val startedAtMs = SystemClock.elapsedRealtime()
+        val trace = PerformanceDiagnostics.begin(PerformanceOperation.SYNC_CATCH_UP, trigger)
+        PerformanceDiagnostics.record(
+            trace = trace,
+            phase = PerformancePhase.ACCOUNT_CATCH_UP_START,
+            elapsedMs = 0L,
+            result = PerformanceResult.PENDING,
+            layer = PerformanceLayer.MDK,
+        )
+        val succeeded = RecoveryTrace.catchUp(trigger) { catchUpAccountsBestEffort() }
+        val elapsedMs = (SystemClock.elapsedRealtime() - startedAtMs).coerceAtLeast(0L)
+        PerformanceDiagnostics.record(
+            trace = trace,
+            phase =
+                if (succeeded) {
+                    PerformancePhase.ACCOUNT_CATCH_UP_READY
+                } else {
+                    PerformancePhase.ACCOUNT_CATCH_UP_RETRY
+                },
+            elapsedMs = elapsedMs,
+            durationMs = elapsedMs,
+            result = if (succeeded) PerformanceResult.SUCCESS else PerformanceResult.FAILURE,
+            layer = PerformanceLayer.MDK,
+        )
+        return succeeded
     }
 
     private suspend fun catchUpAccountsBestEffort(): Boolean =
@@ -3664,7 +3713,10 @@ class WhiteNoiseAppState private constructor(
         isForegroundCatchUpRunning = true
         try {
             val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
-            catchUpAfterObservedPushWake(pendingGeneration)
+            catchUpAfterObservedPushWake(
+                pendingGeneration = pendingGeneration,
+                trigger = PerformanceTrigger.FOREGROUND,
+            )
         } finally {
             isForegroundCatchUpRunning = false
         }
@@ -4243,7 +4295,10 @@ class WhiteNoiseAppState private constructor(
     private suspend fun drainPendingPushWakeCatchUpIfNeeded() {
         val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
         if (pendingGeneration == 0L) return
-        catchUpAfterObservedPushWake(pendingGeneration)
+        catchUpAfterObservedPushWake(
+            pendingGeneration = pendingGeneration,
+            trigger = PerformanceTrigger.PUSH_WAKE,
+        )
     }
 
     /** Clears only the durable wake generation acknowledged by successful fresh work. */
@@ -6692,7 +6747,10 @@ class WhiteNoiseAppState private constructor(
             ensureNotificationReceiverActive = ::ensureNotificationReceiverForNetworkReconnect,
             catchUpAccounts = {
                 val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
-                catchUpAfterObservedPushWake(pendingGeneration)
+                catchUpAfterObservedPushWake(
+                    pendingGeneration = pendingGeneration,
+                    trigger = PerformanceTrigger.NETWORK_RECONNECT,
+                )
             },
             awaitRetry = { generation, attempt ->
                 appStateDebug { "notification network recovery pending attempt=$attempt" }

@@ -156,7 +156,11 @@ class NotificationNetworkReconnectCoverageTest {
                 "catchUpAccounts =" in attempt &&
                 "notifyConnectivityRestored()" in bridge &&
                 "ensureNotificationReceiverForNetworkReconnect" in bridge &&
-                "catchUpAfterObservedPushWake(pendingGeneration)" in bridge &&
+                Regex(
+                    """catchUpAfterObservedPushWake\(\s*""" +
+                        """pendingGeneration\s*=\s*pendingGeneration,\s*""" +
+                        """trigger\s*=\s*PerformanceTrigger\.NETWORK_RECONNECT,\s*\)""",
+                ).containsMatchIn(bridge) &&
                 "PerformancePhase.NOTIFICATION_RECEIVER_RETRY" in attempt &&
                 "PerformancePhase.ACCOUNT_CATCH_UP_RETRY" in attempt &&
                 "pushWakeCatchUpPending()" !in bridge,
@@ -214,7 +218,11 @@ class NotificationNetworkReconnectCoverageTest {
 
         assertTrue(
             "foreground recovery must share catch-up without sending another transport wake",
-            "catchUpAfterObservedPushWake(pendingGeneration)" in body &&
+            Regex(
+                """catchUpAfterObservedPushWake\(\s*""" +
+                    """pendingGeneration\s*=\s*pendingGeneration,\s*""" +
+                    """trigger\s*=\s*PerformanceTrigger\.FOREGROUND,\s*\)""",
+            ).containsMatchIn(body) &&
                 "notifyConnectivityRestored()" !in body,
         )
     }

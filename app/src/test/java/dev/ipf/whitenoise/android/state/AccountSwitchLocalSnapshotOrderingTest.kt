@@ -277,6 +277,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
     @Test
     fun catchUpLaunchIsProcessScopedAndDeduplicated() {
         val body = appStateSource().readText().kotlinFunctionBody("launchAccountCatchUp")
+        val instrumented = appStateSource().readText().kotlinFunctionBody("instrumentedCatchUpAccounts")
         val coordinator = connectivityRuntimeSource().readText()
 
         assertTrue(
@@ -293,7 +294,8 @@ class AccountSwitchLocalSnapshotOrderingTest {
         )
         assertTrue(
             "the background job must run the result-bearing best-effort catch-up",
-            "catchUpAccountsBestEffort()" in body,
+            "instrumentedCatchUpAccounts(trigger)" in body &&
+                "catchUpAccountsBestEffort()" in instrumented,
         )
         assertTrue(
             "completion must be fenced by account, runtime, and network generation",
@@ -311,7 +313,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertFalse("foreground recovery must not duplicate the transport wake", "notifyConnectivityRestored()" in body)
         assertTrue(
             "foreground recovery must use the post-trigger catch-up boundary",
-            "catchUpAfterObservedPushWake(pendingGeneration)" in body,
+            Regex(
+                """catchUpAfterObservedPushWake\(\s*""" +
+                    """pendingGeneration\s*=\s*pendingGeneration,\s*""" +
+                    """trigger\s*=\s*PerformanceTrigger\.FOREGROUND,\s*\)""",
+            ).containsMatchIn(body),
         )
     }
 
@@ -322,7 +328,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
         assertTrue(
             "push-wake recovery must use the post-trigger catch-up boundary",
-            "catchUpAfterObservedPushWake(pendingGeneration)" in body,
+            Regex(
+                """catchUpAfterObservedPushWake\(\s*""" +
+                    """pendingGeneration\s*=\s*pendingGeneration,\s*""" +
+                    """trigger\s*=\s*PerformanceTrigger\.PUSH_WAKE,\s*\)""",
+            ).containsMatchIn(body),
         )
         assertFalse("push-wake recovery must not bypass coordination", "catchUpAccountsBestEffort()" in body)
     }

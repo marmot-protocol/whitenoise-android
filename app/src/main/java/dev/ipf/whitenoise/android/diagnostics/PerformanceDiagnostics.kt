@@ -20,6 +20,17 @@ internal enum class PerformanceOperation(
     SYNC_CATCH_UP("sync_catch_up"),
 }
 
+/** Source-confirmed triggers accepted by recovery diagnostics. */
+internal enum class PerformanceTrigger(
+    val wireName: String,
+) {
+    FOREGROUND("foreground"),
+    NETWORK_RECONNECT("network_reconnect"),
+    PUSH_WAKE("push_wake"),
+    CHAT_LIST_READINESS("chat_list_readiness"),
+    EXPLICIT("explicit"),
+}
+
 /**
  * Closed phase vocabulary. No phase can be supplied by a caller as a String,
  * and routine spans below the phase threshold are silently ignored.
@@ -101,6 +112,7 @@ internal enum class PerformanceLayer(
 
 internal class PerformanceTrace internal constructor(
     val operation: PerformanceOperation,
+    val trigger: PerformanceTrigger? = null,
     internal val sessionGeneration: Long,
     internal val operationId: Long,
     internal val startedAtMs: Long,
@@ -137,6 +149,7 @@ internal class PerformanceDiagnosticEmitter(
     private var sessionGeneration = 0L
     private val operationCounter = AtomicLong(0L)
 
+    /** Opens a fresh bounded session, or returns the remaining state of the active session. */
     @Synchronized
     fun start(): PerformanceDiagnosticStatus {
         if (!available) return PerformanceDiagnosticStatus.Unavailable
@@ -153,6 +166,7 @@ internal class PerformanceDiagnosticEmitter(
         return statusAt(now)
     }
 
+    /** Ends the active session immediately and emits its single bounded drop summary when needed. */
     @Synchronized
     fun stop(): PerformanceDiagnosticStatus {
         if (!available) return PerformanceDiagnosticStatus.Unavailable
@@ -160,6 +174,7 @@ internal class PerformanceDiagnosticEmitter(
         return statusAt(nowMs())
     }
 
+    /** Returns the current session state after applying the process-local expiry deadline. */
     @Synchronized
     fun status(): PerformanceDiagnosticStatus {
         val now = nowMs()
@@ -167,19 +182,25 @@ internal class PerformanceDiagnosticEmitter(
         return if (available) statusAt(now) else PerformanceDiagnosticStatus.Unavailable
     }
 
+    /** Starts an active diagnostic operation with an optional closed semantic trigger. */
     @Synchronized
-    fun begin(operation: PerformanceOperation): PerformanceTrace? {
+    fun begin(
+        operation: PerformanceOperation,
+        trigger: PerformanceTrigger? = null,
+    ): PerformanceTrace? {
         val now = nowMs()
         expireIfNeeded(now)
         if (!isActiveAt(now)) return null
         return PerformanceTrace(
             operation = operation,
+            trigger = trigger,
             sessionGeneration = sessionGeneration,
             operationId = operationCounter.updateAndGet(::nextCounter),
             startedAtMs = now,
         )
     }
 
+    /** Records one schema-constrained phase when its trace belongs to the current active session. */
     @Synchronized
     fun record(
         trace: PerformanceTrace?,
@@ -225,6 +246,7 @@ internal class PerformanceDiagnosticEmitter(
         }
     }
 
+    /** Serializes only closed enum labels and clamped numeric values into the local log schema. */
     private fun formatLine(
         trace: PerformanceTrace,
         phase: PerformancePhase,
@@ -241,6 +263,10 @@ internal class PerformanceDiagnosticEmitter(
             append(trace.sessionGeneration)
             append(" op=")
             append(trace.operation.wireName)
+            trace.trigger?.let {
+                append(" trigger=")
+                append(it.wireName)
+            }
             append(" phase=")
             append(phase.wireName)
             append(" elapsed_ms=")
@@ -265,10 +291,12 @@ internal class PerformanceDiagnosticEmitter(
             }
         }
 
+    /** Closes an active session once its monotonic deadline has elapsed. */
     private fun expireIfNeeded(now: Long) {
         if (activeUntilMs != 0L && now >= activeUntilMs) finishSession()
     }
 
+    /** Finalizes session counters without retaining operation data for a later session. */
     private fun finishSession() {
         if (activeUntilMs == 0L) return
         val trace = lastTrace
@@ -295,8 +323,10 @@ internal class PerformanceDiagnosticEmitter(
         sessionStartedAtMs = 0L
     }
 
+    /** Reports whether collection is both build-enabled and inside the current session deadline. */
     private fun isActiveAt(now: Long): Boolean = available && activeUntilMs != 0L && now < activeUntilMs
 
+    /** Builds a snapshot containing bounded counters and monotonic time remaining. */
     private fun statusAt(now: Long): PerformanceDiagnosticStatus =
         PerformanceDiagnosticStatus(
             available = available,
@@ -306,6 +336,7 @@ internal class PerformanceDiagnosticEmitter(
             droppedCount = droppedCount,
         )
 
+    /** Advances a process-local identifier while preserving zero as the invalid sentinel. */
     private fun nextCounter(value: Long): Long = if (value == Long.MAX_VALUE) 1L else value + 1L
 
     internal companion object {
@@ -333,16 +364,25 @@ internal object PerformanceDiagnostics {
         if (BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) emitter.start()
     }
 
+    /** Enables one time-bounded, process-local diagnostic session when supported by the build. */
     fun start(): PerformanceDiagnosticStatus = emitter.start()
 
+    /** Stops local collection and prevents new events until the next explicit start. */
     fun stop(): PerformanceDiagnosticStatus = emitter.stop()
 
+    /** Returns availability, activity, remaining duration, and bounded event counters. */
     fun status(): PerformanceDiagnosticStatus = emitter.status()
 
+    /** Indicates whether a local diagnostic session currently accepts events. */
     fun isActive(): Boolean = status().active
 
-    fun begin(operation: PerformanceOperation): PerformanceTrace? = emitter.begin(operation)
+    /** Starts a trace only while the local, time-bounded diagnostics session is active. */
+    fun begin(
+        operation: PerformanceOperation,
+        trigger: PerformanceTrigger? = null,
+    ): PerformanceTrace? = emitter.begin(operation, trigger)
 
+    /** Emits a typed, bounded phase for a trace created in the current diagnostic session. */
     fun record(
         trace: PerformanceTrace?,
         phase: PerformancePhase,
