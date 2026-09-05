@@ -351,7 +351,7 @@ private fun mergeCompletion(
     return MessageDraftMergeCompletion(
         result = result,
         contentForHydration = savedDraft?.content ?: latestContent ?: mergedDraft?.content,
-        draftedAtMs = savedDraft?.createdAtMs ?: mergedDraft?.createdAtMs,
+        draftedAtMs = savedDraft?.updatedAtMs ?: mergedDraft?.updatedAtMs,
     )
 }
 

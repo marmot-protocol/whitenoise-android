@@ -134,6 +134,34 @@ class PendingSendDraftPresentationTest {
         }
 
     @Test
+    fun failedSendRestoresTheCapturedAuthoritativeDraftTimestamp() =
+        runTest {
+            var clock = 100L
+            val draftStore = DraftStore(TestDraftPersistence()) { clock }
+            val appState = appState(draftStore)
+            appState.setDraft(TextFieldValue("try again"))
+            clock = 999L
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        // The coalesced MDK save may acknowledge after the UI
+                        // has hidden the accepted send but before publishing
+                        // fails. Recovery must retain that newer ordering time.
+                        draftStore.applyAuthoritativeTimestamp(ACCOUNT_REF, GROUP_ID, draftedAtMs = 250_000)
+                        throw MarmotKitException.Publish("relay rejected event")
+                    },
+                )
+
+            appState.sendConversationText(controller, "try again")
+
+            assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+            assertEquals(250uL, draftStore.draftedAtSecondsFor(ACCOUNT_REF, GROUP_ID))
+        }
+
+    @Test
     fun ambiguousSendKeepsItsRecoveryDraftHiddenWhileTheBubbleRemainsPending() =
         runTest {
             val appState = appState()
@@ -223,10 +251,10 @@ class PendingSendDraftPresentationTest {
         },
     )
 
-    private fun appState() =
+    private fun appState(draftStore: DraftStore = DraftStore(TestDraftPersistence())) =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
-            draftStore = DraftStore(TestDraftPersistence()),
+            draftStore = draftStore,
             accountIdHexResolver = { ACCOUNT_ID },
             accounts =
                 listOf(

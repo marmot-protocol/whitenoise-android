@@ -52,10 +52,6 @@ internal class MainShellProcessState(
         if (current != null && current.accountRef == accountRef && current.runtimeGeneration == runtimeGeneration) {
             return current.controller
         }
-        if (current != null) {
-            appState.attachChatsController(null)
-            current.controller.onCleared()
-        }
         clearRetainedRoute()
         clearConversationControllers()
         val controller =
@@ -69,7 +65,12 @@ internal class MainShellProcessState(
                 runtimeGeneration = runtimeGeneration,
                 controller = controller,
             )
-        appState.attachChatsController(controller)
+        if (current == null) {
+            appState.attachChatsController(controller)
+        } else {
+            appState.replaceChatsController(current.controller, controller)
+            current.controller.onCleared()
+        }
         return controller
     }
 

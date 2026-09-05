@@ -9,9 +9,11 @@ import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
@@ -22,6 +24,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -81,6 +84,323 @@ class ConversationSendOptimisticPublicationTest {
                     .isNotEmpty(),
             )
             assertEquals(MessageStatus.Sent, controller.timeline.single().status)
+        }
+
+    @Test
+    fun chatListKeepsItsPriorPreviewUntilTheOptimisticMarkdownDocumentIsReady() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = attachedChats(appState)
+            val releaseParse = CompletableDeferred<MarkdownDocumentFfi>()
+            val publishStarted = CompletableDeferred<Unit>()
+            val releasePublish = CompletableDeferred<Unit>()
+            val styled = styledDocument()
+            val controller =
+                controller(
+                    appState = appState,
+                    markdownParser = { releaseParse.await() },
+                    textPublisher = { _, _, _, _ ->
+                        publishStarted.complete(Unit)
+                        releasePublish.await()
+                        sentSummary()
+                    },
+                )
+            try {
+                val send =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        controller.send("hello *world*")
+                    }
+
+                assertEquals(
+                    "a parser stall must not expose raw optimistic Markdown in the chat list",
+                    "notified body",
+                    chats.items
+                        .single()
+                        .projection
+                        ?.lastMessage
+                        ?.plaintext,
+                )
+
+                releaseParse.complete(styled)
+                publishStarted.await()
+                // The real list is hidden behind the conversation while a send
+                // starts. Returning flushes the already-folded preview into its
+                // very first frame without waiting for the network publish.
+                chats.setChatListVisible(false)
+                chats.setChatListVisible(true)
+
+                assertEquals(
+                    "hello *world*",
+                    chats.items
+                        .single()
+                        .projection
+                        ?.lastMessage
+                        ?.plaintext,
+                )
+                assertSame(styled, chats.items.single().previewTokens)
+
+                releasePublish.complete(Unit)
+                send.await()
+            } finally {
+                releasePublish.complete(Unit)
+                appState.attachChatsController(null)
+                chats.onCleared()
+            }
+        }
+
+    @Test
+    fun emptyMarkdownParsePublishesOnePlaintextFallbackOnlyAfterTheAttemptCompletes() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = attachedChats(appState)
+            val releaseParse = CompletableDeferred<MarkdownDocumentFfi>()
+            val controller =
+                controller(
+                    appState = appState,
+                    markdownParser = { releaseParse.await() },
+                    textPublisher = { _, _, _, _ -> sentSummary() },
+                )
+            try {
+                val send =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        controller.send("**stable fallback**")
+                    }
+
+                assertEquals(
+                    "notified body",
+                    chats.items
+                        .single()
+                        .projection
+                        ?.lastMessage
+                        ?.plaintext,
+                )
+
+                releaseParse.complete(emptyMarkdownDocument())
+                send.await()
+                chats.setChatListVisible(false)
+                chats.setChatListVisible(true)
+
+                assertEquals(
+                    "**stable fallback**",
+                    chats.items
+                        .single()
+                        .projection
+                        ?.lastMessage
+                        ?.plaintext,
+                )
+            } finally {
+                appState.attachChatsController(null)
+                chats.onCleared()
+            }
+        }
+
+    @Test
+    fun incomingActivityDuringParseKeepsTheNewerChatListPreview() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = attachedChats(appState)
+            val releaseParse = CompletableDeferred<MarkdownDocumentFfi>()
+            val controller =
+                controller(
+                    appState = appState,
+                    markdownParser = { releaseParse.await() },
+                    textPublisher = { _, _, _, _ -> sentSummary() },
+                )
+            try {
+                val send =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        controller.send("older local send")
+                    }
+                chats.applyChatListRow(incomingRow("newer incoming", "22".repeat(32), 50uL))
+
+                releaseParse.complete(styledDocument())
+                send.await()
+                chats.setChatListVisible(false)
+                chats.setChatListVisible(true)
+
+                assertEquals(
+                    "newer incoming",
+                    chats.items
+                        .single()
+                        .projection
+                        ?.lastMessage
+                        ?.plaintext,
+                )
+            } finally {
+                appState.attachChatsController(null)
+                chats.onCleared()
+            }
+        }
+
+    @Test
+    fun reverseParseCompletionKeepsTheLaterAcceptedSendOnTheChatList() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = attachedChats(appState)
+            val firstParse = CompletableDeferred<MarkdownDocumentFfi>()
+            val secondParse = CompletableDeferred<MarkdownDocumentFfi>()
+            val controller =
+                controller(
+                    appState = appState,
+                    markdownParser = { text ->
+                        if (text == "first") firstParse.await() else secondParse.await()
+                    },
+                    textPublisher = { _, _, _, text ->
+                        sentSummary(if (text == "first") "33".repeat(32) else "44".repeat(32))
+                    },
+                )
+            try {
+                val first = async(start = CoroutineStart.UNDISPATCHED) { controller.send("first") }
+                val second = async(start = CoroutineStart.UNDISPATCHED) { controller.send("second") }
+
+                secondParse.complete(styledDocument())
+                second.await()
+                firstParse.complete(styledDocument())
+                first.await()
+                chats.setChatListVisible(false)
+                chats.setChatListVisible(true)
+
+                assertEquals(
+                    "second",
+                    chats.items
+                        .single()
+                        .projection
+                        ?.lastMessage
+                        ?.plaintext,
+                )
+                assertEquals(
+                    setOf("33".repeat(32), "44".repeat(32)),
+                    controller.timeline.map { it.record.messageIdHex }.toSet(),
+                )
+            } finally {
+                firstParse.complete(emptyMarkdownDocument())
+                secondParse.complete(emptyMarkdownDocument())
+                appState.attachChatsController(null)
+                chats.onCleared()
+            }
+        }
+
+    @Test
+    fun controllerReplacementDuringParseRetainsTerminalFailurePreview() =
+        runBlocking {
+            val appState = testAppState()
+            val original = attachedChats(appState)
+            val releaseParse = CompletableDeferred<MarkdownDocumentFfi>()
+            val controller =
+                controller(
+                    appState = appState,
+                    markdownParser = { releaseParse.await() },
+                    textPublisher = { _, _, _, _ ->
+                        throw MarmotKitException.Publish("relay rejected event")
+                    },
+                )
+            val send = async(start = CoroutineStart.UNDISPATCHED) { controller.send("failed after replacement") }
+            val replacement = replaceChats(appState, original)
+            try {
+                releaseParse.complete(styledDocument())
+                send.await()
+                replacement.setChatListVisible(false)
+                replacement.setChatListVisible(true)
+
+                assertEquals(
+                    "failed after replacement",
+                    replacement.items
+                        .single()
+                        .projection
+                        ?.lastMessage
+                        ?.plaintext,
+                )
+                assertEquals(
+                    ChatListMessageDeliveryStateFfi.FAILED,
+                    replacement.items
+                        .single()
+                        .projection
+                        ?.lastMessage
+                        ?.deliveryState,
+                )
+            } finally {
+                appState.attachChatsController(null)
+                replacement.onCleared()
+            }
+        }
+
+    @Test
+    fun controllerReplacementDuringParseRetainsAmbiguousPendingPreview() =
+        runBlocking {
+            val appState = testAppState()
+            val original = attachedChats(appState)
+            val releaseParse = CompletableDeferred<MarkdownDocumentFfi>()
+            val controller =
+                controller(
+                    appState = appState,
+                    markdownParser = { releaseParse.await() },
+                    textPublisher = { _, _, _, _ ->
+                        throw MarmotKitException.Publish("send event timed out")
+                    },
+                )
+            val send = async(start = CoroutineStart.UNDISPATCHED) { controller.send("pending after replacement") }
+            val replacement = replaceChats(appState, original)
+            try {
+                releaseParse.complete(styledDocument())
+                send.await()
+                replacement.setChatListVisible(false)
+                replacement.setChatListVisible(true)
+
+                assertEquals(
+                    "pending after replacement",
+                    replacement.items
+                        .single()
+                        .projection
+                        ?.lastMessage
+                        ?.plaintext,
+                )
+                assertEquals(
+                    ChatListMessageDeliveryStateFfi.PENDING,
+                    replacement.items
+                        .single()
+                        .projection
+                        ?.lastMessage
+                        ?.deliveryState,
+                )
+            } finally {
+                appState.attachChatsController(null)
+                replacement.onCleared()
+            }
+        }
+
+    @Test
+    fun permanentDetachDuringParseDoesNotTransferPrivateRows() =
+        runBlocking {
+            val appState = testAppState()
+            val original = attachedChats(appState)
+            val releaseParse = CompletableDeferred<MarkdownDocumentFfi>()
+            val controller =
+                controller(
+                    appState = appState,
+                    markdownParser = { releaseParse.await() },
+                    textPublisher = { _, _, _, _ ->
+                        throw MarmotKitException.Publish("send event timed out")
+                    },
+                )
+            val send = async(start = CoroutineStart.UNDISPATCHED) { controller.send("must not survive detach") }
+
+            appState.attachChatsController(null)
+            original.onCleared()
+            val replacement =
+                ChatsController(
+                    appState = appState,
+                    initialAccountRef = ACCOUNT_REF,
+                    memberSnapshotLoader = { _, _ -> emptyList() },
+                ).also(appState::attachChatsController)
+            try {
+                releaseParse.complete(styledDocument())
+                send.await()
+
+                assertTrue("permanent detach must not retain or restore private rows", replacement.items.isEmpty())
+            } finally {
+                appState.attachChatsController(null)
+                replacement.onCleared()
+            }
         }
 
     @Test
@@ -200,6 +520,47 @@ class ConversationSendOptimisticPublicationTest {
 
     private var builtController: ConversationController? = null
 
+    private fun attachedChats(appState: WhiteNoiseAppState): ChatsController =
+        ChatsController(
+            appState = appState,
+            initialAccountRef = ACCOUNT_REF,
+            memberSnapshotLoader = { _, _ -> emptyList() },
+        ).also { chats ->
+            chats.setChatListVisible(false)
+            chats.applyChatListRow(notificationChatListRow().copy(groupIdHex = GROUP_ID))
+            chats.setChatListVisible(true)
+            appState.attachChatsController(chats)
+        }
+
+    private fun replaceChats(
+        appState: WhiteNoiseAppState,
+        original: ChatsController,
+    ): ChatsController =
+        ChatsController(
+            appState = appState,
+            initialAccountRef = ACCOUNT_REF,
+            memberSnapshotLoader = { _, _ -> emptyList() },
+        ).also { replacement ->
+            appState.replaceChatsController(original, replacement)
+            original.onCleared()
+        }
+
+    private fun incomingRow(
+        plaintext: String,
+        messageIdHex: String,
+        timelineAt: ULong,
+    ) = notificationChatListRow().copy(
+        groupIdHex = GROUP_ID,
+        lastMessage =
+            notifiedMessagePreview().copy(
+                messageIdHex = messageIdHex,
+                plaintext = plaintext,
+                timelineAt = timelineAt,
+            ),
+        activitySortAt = timelineAt,
+        updatedAt = timelineAt,
+    )
+
     private fun controller(): ConversationController = requireNotNull(builtController)
 
     private fun controller(
@@ -223,6 +584,11 @@ class ConversationSendOptimisticPublicationTest {
             blocks = listOf(MarkdownBlockFfi.Paragraph(inlines = emptyList())),
             blankLinesBefore = ByteArray(1),
         )
+
+    private fun emptyMarkdownDocument(): MarkdownDocumentFfi {
+        val emptyBlocks = emptyList<MarkdownBlockFfi>()
+        return MarkdownDocumentFfi(truncated = false, blocks = emptyBlocks, blankLinesBefore = ByteArray(0))
+    }
 
     private fun sentSummary(messageId: String = CONFIRMED_MESSAGE_ID) =
         SendSummaryFfi(
