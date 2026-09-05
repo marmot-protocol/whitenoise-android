@@ -28,8 +28,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,6 +39,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.security.KeyStore
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.ceil
 import kotlin.random.Random
 
@@ -57,25 +60,29 @@ class MediaAttachmentLatencyProbe {
                     marmot.start()
                     val account = marmot.createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)
                     val group = marmot.createGroup(account.label, "Media measurement", emptyList(), null)
-                    val bytes = syntheticImage()
-                    val attachment = MediaUploadAttachmentRequestFfi("sample.png", "image/png", bytes, "128x128", null)
-                    report("fixture_bytes", listOf(bytes.size.toDouble()))
+                    val images = List(16) { syntheticImage(seed = 42 + it) }
+                    val attachments =
+                        images.mapIndexed { index, bytes ->
+                            MediaUploadAttachmentRequestFfi("sample-$index.png", "image/png", bytes, "128x128", null)
+                        }
+                    report("fixture_bytes", images.map { it.size.toDouble() })
                     val references =
                         marmot
                             .uploadMedia(
                                 account.label,
                                 group,
                                 MediaUploadRequestFfi(
-                                    attachments = listOf(attachment),
+                                    attachments = attachments,
                                     caption = null,
                                     send = false,
                                     blossomServer = null,
                                 ),
                             ).attachments
                             .map { it.reference }
-                    val reference = references.single()
-                    measureNativePhases(marmot, account.label, group, reference, bytes)
-                    measureLocalPhases(root, keyAlias, bytes)
+                    assertEquals(16, references.size)
+                    assertEquals(16, references.map { it.ciphertextSha256 }.distinct().size)
+                    measureNativePhases(marmot, account.label, group, references.zip(images))
+                    measureLocalPhases(root, keyAlias, images.first())
                 }
             } finally {
                 marmot.shutdownAndClose()
@@ -144,14 +151,14 @@ class MediaAttachmentLatencyProbe {
         }
     }
 
-    /** Bypasses Android caches, reusing one generated reference and the native HTTP client. */
+    /** Bypasses Android caches and measures distinct references through the shipped native client. */
     private suspend fun measureNativePhases(
         marmot: Marmot,
         account: String,
         group: String,
-        reference: MediaAttachmentReferenceFfi,
-        bytes: ByteArray,
+        images: List<Pair<MediaAttachmentReferenceFfi, ByteArray>>,
     ) {
+        val (reference, bytes) = images.first()
         val downloads = mutableListOf<Double>()
         repeat(20) {
             val started = SystemClock.elapsedRealtimeNanos()
@@ -160,21 +167,49 @@ class MediaAttachmentLatencyProbe {
             assertArrayEquals(bytes, result.plaintext)
         }
         report("native_download_ms", downloads)
-        val gate = AttachmentDownloadGate()
-        val backlog =
-            coroutineScope {
-                List(16) {
+        val requests = mutableListOf<Double>()
+        val batches = mutableListOf<Double>()
+        repeat(20) {
+            val started = SystemClock.elapsedRealtimeNanos()
+            requests += measureDistinctBacklog(marmot, account, group, images)
+            batches += elapsedMs(started)
+        }
+        report("native_distinct_backlog_request_ms", requests)
+        report("native_distinct_backlog_batch_ms", batches)
+    }
+
+    /** One cold sixteen-image batch; the host cap is asserted separately from unobservable native HTTP work. */
+    private suspend fun measureDistinctBacklog(
+        marmot: Marmot,
+        account: String,
+        group: String,
+        images: List<Pair<MediaAttachmentReferenceFfi, ByteArray>>,
+    ): List<Double> =
+        coroutineScope {
+            val gate = AttachmentDownloadGate()
+            val active = AtomicInteger()
+            val peak = AtomicInteger()
+            images
+                .map { (reference, bytes) ->
                     async(Dispatchers.Default) {
                         val started = SystemClock.elapsedRealtimeNanos()
                         gate.withPermit {
-                            assertArrayEquals(bytes, marmot.downloadMedia(account, group, reference).plaintext)
+                            val now = active.incrementAndGet()
+                            peak.updateAndGet { maxOf(it, now) }
+                            try {
+                                assertArrayEquals(bytes, marmot.downloadMedia(account, group, reference).plaintext)
+                            } finally {
+                                active.decrementAndGet()
+                            }
                         }
                         elapsedMs(started)
                     }
                 }.awaitAll()
-            }
-        report("native_backlog_including_queue_ms", backlog)
-    }
+                .also {
+                    assertTrue("host attachment concurrency must remain bounded", peak.get() in 1..3)
+                    assertEquals(0, active.get())
+                }
+        }
 
     /** Measures only test-owned encrypted entries and real platform image decoding. */
     private suspend fun measureLocalPhases(
@@ -210,8 +245,8 @@ class MediaAttachmentLatencyProbe {
     }
 
     /** Generates approximately 64 KiB of valid image data without reading user media. */
-    private fun syntheticImage(): ByteArray {
-        val random = Random(42)
+    private fun syntheticImage(seed: Int): ByteArray {
+        val random = Random(seed)
         val bitmap = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888)
         return try {
             bitmap.setPixels(IntArray(128 * 128) { random.nextInt() }, 0, 128, 0, 0, 128, 128)
