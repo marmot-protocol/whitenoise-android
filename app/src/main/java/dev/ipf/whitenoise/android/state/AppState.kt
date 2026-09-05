@@ -3727,7 +3727,9 @@ class WhiteNoiseAppState private constructor(
      * the work through [mutationsScope] so it survives caller cancellation
      * (e.g. the user tapped a file and swiped away). Concurrent callers for
      * the same key share the same Deferred; the entry is dropped when the
-     * Deferred completes so a later retry can re-attempt.
+     * Deferred completes so a later retry can re-attempt. Recheck both cache
+     * tiers after admission: the caller's earlier miss can become stale while
+     * another owner publishes or this request waits for a permit.
      */
     internal fun memoizedDownload(
         cacheKey: String,
@@ -3757,7 +3759,15 @@ class WhiteNoiseAppState private constructor(
                         key = cacheKey,
                         accountRef = request.accountRef,
                         priority = priority,
-                    ) { downloadScope.block() }
+                    ) {
+                        cachedMediaPlaintext(cacheKey)
+                            ?: withContext(Dispatchers.IO) { diskMediaCache.get(cacheKey) }
+                                ?.also { cacheMediaPlaintext(cacheKey, it) }
+                            // Publication can also win while the disk lookup
+                            // is suspended. L1 remains confined to this scope.
+                            ?: cachedMediaPlaintext(cacheKey)
+                            ?: downloadScope.block()
+                    }
                 }
             inFlightDownloads[cacheKey] = deferred
             // Drop the map entry via `invokeOnCompletion` (fires AFTER the
