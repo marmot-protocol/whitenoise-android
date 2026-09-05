@@ -41,6 +41,7 @@ class SettingsScreenScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Captures the default production settings surface with the current release version. */
     @Test
     fun settingsScreenDefaultDark() {
         composeRule.setContent {
@@ -138,6 +139,7 @@ class SettingsScreenScreenshotTest {
         )
     }
 
+    /** Renders reusable settings content with the current production release metadata. */
     @Composable
     private fun settingsHomeContent() {
         SettingsHomeContent(
