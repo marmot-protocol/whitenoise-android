@@ -9848,7 +9848,7 @@ class ConversationController(
                             Log.w(
                                 "DMConversation",
                                 "invite acceptance temporarily unavailable; retrying " +
-                                    "attempt=$attempt/$IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS",
+                                    "failedAttempt=$attempt",
                             )
                         },
                     ) {

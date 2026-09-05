@@ -155,7 +155,7 @@ object DiagnosticFormatter {
             appendLine("White Noise error report")
             appendLine("operation=${stableCode(operationCode)}")
             appendLine("error=${errorCode(throwable)}")
-            (technicalDetail ?: metadata?.diagnosticTechnicalDetail)
+            (technicalDetail ?: metadata?.diagnosticTechnicalDetail ?: contentionDetail(throwable))
                 ?.trim()
                 ?.takeIf(String::isNotEmpty)
                 ?.let { appendLine("detail=${redactError(it)}") }
@@ -163,6 +163,20 @@ object DiagnosticFormatter {
             appendLine("android=${redactError(context.androidVersion)}")
             append("utc=${redactError(context.occurredAtUtc)}")
         }.take(MAX_REPORT_LEN)
+
+    /** Keeps the native busy boundary diagnosable after log rotation without copying exception text. */
+    private fun contentionDetail(throwable: Throwable): String? {
+        val code =
+            when (causeChain(throwable).filterIsInstance<MarmotKitException>().firstOrNull()) {
+                is MarmotKitException.AccountWorkerBusy -> "ACCOUNT_WORKER_BUSY"
+                is MarmotKitException.RuntimeBusy -> "RUNTIME_BUSY"
+                is MarmotKitException.AccountSessionBusy -> "ACCOUNT_SESSION_BUSY"
+                is MarmotKitException.StorageBusy -> "STORAGE_BUSY"
+                is MarmotKitException.GroupSendQueueFull -> "GROUP_SEND_QUEUE_FULL"
+                else -> return null
+            }
+        return "contention=$code"
+    }
 
     @Suppress("CyclomaticComplexMethod") // One ordered taxonomy prevents error-code precedence from drifting.
     internal fun errorCode(throwable: Throwable): String {
@@ -186,7 +200,8 @@ object DiagnosticFormatter {
                 marmotError is MarmotKitException.MissingKeyPackage ||
                 marmotError is MarmotKitException.MemberNotInGroup ||
                 marmotError is MarmotKitException.SecretNotFound -> "NOT_FOUND"
-            marmotError is MarmotKitException.RuntimeBusy ||
+            marmotError is MarmotKitException.AccountWorkerBusy ||
+                marmotError is MarmotKitException.RuntimeBusy ||
                 marmotError is MarmotKitException.AccountSessionBusy ||
                 marmotError is MarmotKitException.StorageBusy ||
                 marmotError is MarmotKitException.GroupSendQueueFull -> "RESOURCE_BUSY"
