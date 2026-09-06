@@ -95,12 +95,13 @@ class ChatListFolderFilterNavigationCoverageTest {
         )
     }
 
+    /** Proves the permanent All chip remains the sole explicit folder-filter reset action. */
     @Test
     fun explicitAllActionClearsRememberedFolderFilter() {
         val filterChips =
             chatListTopBarSource().readText().requiredSection(
                 start = "internal fun ChatListFilterChips(",
-                end = "\n}\n\n@OptIn(ExperimentalFoundationApi::class)",
+                end = "\n}",
             )
 
         assertTrue(
