@@ -329,6 +329,45 @@ class ConversationTailSpacingTest {
         assertTrue(fixture.coordinator.isFollowingTail)
     }
 
+    /** Cancels the frame-suspended inset writer once and exits when a drag claims durable history. */
+    @Test
+    fun gestureDuringInsetFrameEndsTheTailRetryWithoutAnotherWrite() {
+        val fixture = TailSpacingFixture(timelineSize = 24)
+        showFixture(fixture)
+        scrollToTail(fixture)
+
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.runOnUiThread { fixture.bottomChromeHeight.value = 180.dp }
+            repeat(3) {
+                if (fixture.coordinator.mode is ConversationScrollMode.ProgrammaticJump) return@repeat
+                composeRule.mainClock.advanceTimeByFrame()
+                composeRule.waitForIdle()
+            }
+            assertTrue(fixture.coordinator.mode is ConversationScrollMode.ProgrammaticJump)
+            assertEquals("the inset writer must still be awaiting its layout frame", 0, fixture.writer.snapCount)
+
+            composeRule.runOnUiThread {
+                fixture.coordinator.onUserGestureStarted(
+                    ConversationScrollAnchor(
+                        listIndex = 10,
+                        pixelOffset = 7,
+                        itemId = "message-9",
+                        messageId = "message-9",
+                    ),
+                )
+            }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+
+        assertEquals(0, fixture.writer.snapCount)
+        assertEquals(ConversationScrollMode.ReadingHistory("message-9", 7), fixture.coordinator.mode)
+        assertFalse(fixture.coordinator.isFollowingTail)
+    }
+
     /** Preserves a history reader's pixel anchor when a transient command settles back to history. */
     @Test
     fun insetTransitionDuringTransientHistoryCommandPreservesReaderAnchor() {

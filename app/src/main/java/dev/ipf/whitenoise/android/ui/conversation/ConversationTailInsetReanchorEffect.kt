@@ -101,8 +101,12 @@ internal fun ConversationTailInsetReanchorEffect(
         // though it remains the durable intent. Wait for that owner to settle,
         // then retry if another command wins the small gap between observation
         // and registration. Consuming the snapshot earlier would permanently
-        // lose the IME/inset transition. This effect is deliberately not keyed
-        // on `mode`, so its own ProgrammaticJump phase cannot cancel itself.
+        // lose the IME/inset transition. Each registered attempt suspends for
+        // the coordinator's layout frame; a refused command therefore cannot
+        // retry as a tight Main-thread loop. A drag also changes the durable
+        // intent to ReadingHistory before the refusal returns, ending the loop.
+        // This effect is deliberately not keyed on `mode`, so its own
+        // ProgrammaticJump phase cannot cancel itself.
         while (scrollCoordinator.isFollowingTail) {
             if (scrollCoordinator.foregroundRestoreInProgress) return@LaunchedEffect
             if (scrollCoordinator.mode !is ConversationScrollMode.FollowingTail) {

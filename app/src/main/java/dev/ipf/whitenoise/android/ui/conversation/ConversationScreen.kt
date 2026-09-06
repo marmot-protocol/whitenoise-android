@@ -1354,24 +1354,10 @@ internal fun ConversationScreen(
         onDispose(eventCardResolver::close)
     }
 
-    fun revealSentMessage(targetIndex: Int? = null) {
+    /** Reveals the optimistic row using controller state published before the acceptance callback. */
+    fun revealSentMessage() {
         scope.launch {
-            scrollCoordinator.programmaticJump(
-                targetMessageId = null,
-                reason = ConversationScrollReason.Send,
-                resultingMode = ConversationScrollMode.FollowingTail,
-            ) {
-                val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
-                val target =
-                    targetIndex
-                        ?: conversationTimelineTailListIndex(
-                            timelineSize = liveRenderedSize,
-                            leadingStructuralRowCount =
-                                controller.conversationLeadingStructuralRowCount(liveRenderedSize),
-                        )
-                        ?: 0
-                animateScrollToTail(target)
-            }
+            scrollCoordinator.revealSentAtLiveTail(controller)
         }
     }
 
@@ -3872,9 +3858,7 @@ internal fun ConversationScreen(
             onPick = { location ->
                 locationPickerOpen = false
                 appState.launchMutation {
-                    controller.send(formatLocationShareText(location)) {
-                        revealSentMessage(currentTailIndex)
-                    }
+                    controller.send(formatLocationShareText(location)) { revealSentMessage() }
                 }
             },
         )
@@ -3901,8 +3885,6 @@ internal fun ConversationScreen(
             )
         },
         onAddDocuments = { documentPickerLauncher.launch(arrayOf("*/*")) },
-        onAfterSend = {
-            revealSentMessage(currentTailIndex)
-        },
+        onAfterSend = { revealSentMessage() },
     )
 }
