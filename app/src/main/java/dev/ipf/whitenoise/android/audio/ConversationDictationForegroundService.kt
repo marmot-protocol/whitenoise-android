@@ -40,6 +40,10 @@ class ConversationDictationForegroundService : Service() {
         startId: Int,
     ): Int {
         val controller = hostResolver(this)?.conversationDictation
+        conversationDictationDiagnostic(
+            "event=foreground_service_on_start has_controller=${controller != null} " +
+                "durable=${controller?.hasDurableSession == true}",
+        )
         if (controller == null || !controller.hasDurableSession) {
             stopSelf()
         } else {
@@ -59,12 +63,17 @@ class ConversationDictationForegroundService : Service() {
     private fun promoteOrCancel(controller: ConversationDictationController): Boolean =
         try {
             foregroundPromoter(this, buildNotification())
+            conversationDictationDiagnostic("event=foreground_service_promoted")
             true
         } catch (_: SecurityException) {
+            conversationDictationDiagnostic("event=foreground_service_promotion_rejected type=SecurityException")
             cancelRejectedPromotion(controller)
             false
         } catch (error: RuntimeException) {
             if (!error.isForegroundServiceStartRejection()) throw error
+            conversationDictationDiagnostic(
+                "event=foreground_service_promotion_rejected type=${error.javaClass.simpleName}",
+            )
             cancelRejectedPromotion(controller)
             false
         }
@@ -84,6 +93,7 @@ class ConversationDictationForegroundService : Service() {
 
     /** Fails capture closed when Android removes the service that authorized background microphone use. */
     override fun onDestroy() {
+        conversationDictationDiagnostic("event=foreground_service_destroyed")
         hostResolver(this)
             ?.conversationDictation
             ?.takeIf { it.hasDurableSession }
@@ -180,6 +190,10 @@ class ConversationDictationForegroundService : Service() {
                     Intent(context, ConversationDictationForegroundService::class.java),
                 )
                 true
+            }.onFailure { error ->
+                conversationDictationDiagnostic(
+                    "event=foreground_service_enqueue_failed type=${error.javaClass.simpleName}",
+                )
             }.getOrDefault(false)
 
         /** Stops the service after the controller has released recognition ownership. */

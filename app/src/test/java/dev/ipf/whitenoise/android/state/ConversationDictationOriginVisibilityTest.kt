@@ -11,13 +11,29 @@ class ConversationDictationOriginVisibilityTest {
         assertFalse(originVisible(appLockScreenVisible = true))
     }
 
-    private fun originVisible(appLockScreenVisible: Boolean): Boolean =
+    @Test
+    fun navigationAndProfileOverlaysReleaseComposerControlOwnership() {
+        assertFalse(originVisible(appInForeground = false))
+        assertFalse(originVisible(pendingProfileNpub = "profile-overlay"))
+        assertFalse(originVisible(activeAccountRef = "account-b"))
+        assertFalse(originVisible(activeGroupIdHex = "group-b"))
+        assertFalse(originVisible(activeAccountRef = null))
+        assertFalse(originVisible(activeGroupIdHex = null))
+    }
+
+    private fun originVisible(
+        appLockScreenVisible: Boolean = false,
+        appInForeground: Boolean = true,
+        pendingProfileNpub: String? = null,
+        activeAccountRef: String? = "account-a",
+        activeGroupIdHex: String? = "group-a",
+    ): Boolean =
         conversationDictationOriginVisible(
-            appInForeground = true,
+            appInForeground = appInForeground,
             appLockScreenVisible = appLockScreenVisible,
-            pendingProfileNpub = null,
-            activeAccountRef = "account-a",
-            activeGroupIdHex = "group-a",
+            pendingProfileNpub = pendingProfileNpub,
+            activeAccountRef = activeAccountRef,
+            activeGroupIdHex = activeGroupIdHex,
             accountRef = "ACCOUNT-A",
             groupIdHex = "GROUP-A",
         )
