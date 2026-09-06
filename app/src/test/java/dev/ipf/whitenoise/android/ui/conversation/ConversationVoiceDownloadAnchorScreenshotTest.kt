@@ -88,7 +88,7 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
-internal class ConversationVoiceDownloadAnchorTest : ConversationVoiceDownloadAnchorTestBase() {
+internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoiceDownloadAnchorTestBase() {
     /**
      * Keeps a history reader fixed through materialization, waveform/duration
      * hydration, and a cache-backed chat re-entry without a second download.
