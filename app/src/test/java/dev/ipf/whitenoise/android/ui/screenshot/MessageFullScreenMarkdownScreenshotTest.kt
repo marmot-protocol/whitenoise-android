@@ -125,9 +125,8 @@ class MessageFullScreenMarkdownScreenshotTest {
 
     /** Excludes host-owned toolbar chrome while retaining the native selection session. */
     private object HiddenSelectionToolbar : TextContextMenuProvider {
-        override suspend fun showTextContextMenu(
-            dataProvider: TextContextMenuDataProvider,
-        ): Nothing = awaitCancellation()
+        override suspend fun showTextContextMenu(dataProvider: TextContextMenuDataProvider): Nothing =
+            awaitCancellation()
     }
 
     private fun richDocument() =
