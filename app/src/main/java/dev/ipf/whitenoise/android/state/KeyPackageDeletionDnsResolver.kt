@@ -4,6 +4,9 @@ import android.net.DnsResolver
 import android.net.InetAddresses
 import android.os.CancellationSignal
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.net.InetAddress
 import java.util.concurrent.Executor
@@ -12,7 +15,7 @@ import kotlin.coroutines.resume
 
 /** Starts an asynchronous platform query; the cancellation signal owns its complete lifetime. */
 internal typealias KeyPackageDeletionDnsQuery =
-    (String, CancellationSignal, DnsResolver.Callback<List<InetAddress>>) -> Unit
+    (String, Int, CancellationSignal, DnsResolver.Callback<List<InetAddress>>) -> Unit
 
 /**
  * Resolves deletion sources without blocking an IO worker in getAllByName.
@@ -26,12 +29,39 @@ internal suspend fun resolveKeyPackageDeletionHost(
     when {
         InetAddresses.isNumericAddress(host) -> arrayOf(InetAddresses.parseNumericAddress(host))
         ':' in host -> null
-        else -> awaitKeyPackageDeletionDnsAnswer(host, query)
+        else -> resolveKeyPackageDeletionAddressFamilies(host, query)
+    }
+
+/**
+ * Queries both families without the platform overload's unrelated direct-route probes.
+ * Every family must finish successfully, including empty NODATA replies, before any address is trusted.
+ * A failed family cancels its sibling; the caller's single deadline cancels both outstanding queries.
+ */
+private suspend fun resolveKeyPackageDeletionAddressFamilies(
+    host: String,
+    query: KeyPackageDeletionDnsQuery,
+): Array<InetAddress>? =
+    try {
+        coroutineScope {
+            listOf(DnsResolver.TYPE_A, DnsResolver.TYPE_AAAA)
+                .map { type ->
+                    async {
+                        awaitKeyPackageDeletionDnsAnswer(host, type, query) ?: throw DnsFamilyUnavailable()
+                    }
+                }.awaitAll()
+                .flatMap { it.toList() }
+                .distinct()
+                .takeIf { it.isNotEmpty() }
+                ?.toTypedArray()
+        }
+    } catch (_: DnsFamilyUnavailable) {
+        null
     }
 
 /** Bridges answer/error/cancellation races without accepting duplicate or late callbacks. */
 private suspend fun awaitKeyPackageDeletionDnsAnswer(
     host: String,
+    type: Int,
     query: KeyPackageDeletionDnsQuery,
 ): Array<InetAddress>? =
     suspendCancellableCoroutine { continuation ->
@@ -53,7 +83,7 @@ private suspend fun awaitKeyPackageDeletionDnsAnswer(
                     answer: List<InetAddress>,
                     rcode: Int,
                 ) {
-                    finish(answer.takeIf { rcode == 0 && it.isNotEmpty() }?.toTypedArray())
+                    finish(answer.takeIf { rcode == 0 }?.toTypedArray())
                 }
 
                 /** Platform resolution errors remain recoverable without revealing the hostname. */
@@ -62,21 +92,26 @@ private suspend fun awaitKeyPackageDeletionDnsAnswer(
                 }
             }
         try {
-            if (continuation.isActive) query(host, signal, callback)
+            if (continuation.isActive) query(host, type, signal, callback)
         } catch (failure: CancellationException) {
             continuation.cancel(failure)
         } catch (_: Exception) {
+            signal.cancel()
             finish(null)
         }
     }
 
-/** Requests both address families supported by the current default network (API29, minSdk30). */
+/** Uses the requested DNS record type on the default DNS network, without route-capability guessing. */
 private fun startKeyPackageDeletionDnsQuery(
     host: String,
+    type: Int,
     signal: CancellationSignal,
     callback: DnsResolver.Callback<List<InetAddress>>,
 ) {
-    DnsResolver.getInstance().query(null, host, DnsResolver.FLAG_EMPTY, DNS_CALLBACK_EXECUTOR, signal, callback)
+    DnsResolver.getInstance().query(null, host, type, DnsResolver.FLAG_EMPTY, DNS_CALLBACK_EXECUTOR, signal, callback)
 }
+
+/** Internal failure marker cancels sibling queries without exposing a hostname or platform error. */
+private class DnsFamilyUnavailable : Exception()
 
 private val DNS_CALLBACK_EXECUTOR = Executor { task -> task.run() }
