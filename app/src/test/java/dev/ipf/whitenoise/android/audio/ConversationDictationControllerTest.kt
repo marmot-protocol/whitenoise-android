@@ -313,6 +313,45 @@ class ConversationDictationControllerTest {
         assertFalse(platform.session.started)
     }
 
+    /** Known privacy or app-op denial must win over an otherwise available Activity-only fallback. */
+    @Test
+    fun missingSelectedServiceDoesNotBypassKnownMicrophoneDenial() {
+        listOf(
+            ConversationDictationMicrophoneAccess.MicrophoneMuted to ConversationDictationFailure.MicrophoneMuted,
+            ConversationDictationMicrophoneAccess.AppOpDenied to
+                ConversationDictationFailure.PermissionPermanentlyDenied,
+        ).forEach { (access, failure) ->
+            val platform =
+                FakePlatform(
+                    hasPermission = true,
+                    configured = false,
+                    available = false,
+                    microphoneAccessOverride = access,
+                )
+            val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+            assertEquals(failure, (fixture.controller.state as ConversationDictationState.Failed).reason)
+            assertEquals(0L, fixture.controller.providerActivityRequestId)
+            assertEquals(0L, fixture.controller.permissionRequestId)
+            assertFalse(platform.session.started)
+            assertFalse(fixture.controller.ownsMicrophone)
+            assertFalse(fixture.controller.hasDurableSession)
+            assertEquals("Keep", fixture.drafts.getValue(key()).text)
+
+            platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+            fixture.controller.retry()
+
+            assertTrue(fixture.controller.state is ConversationDictationState.ProviderActivityRequired)
+            assertEquals(1L, fixture.controller.providerActivityRequestId)
+            assertEquals(0L, fixture.controller.permissionRequestId)
+            assertFalse(platform.session.started)
+            assertFalse(fixture.controller.ownsMicrophone)
+            assertFalse(fixture.controller.hasDurableSession)
+        }
+    }
+
     /** A missing service still fails deterministically when Android has no compatible provider Activity. */
     @Test
     fun missingSelectedServiceAndProviderActivityFailsUnavailable() {
