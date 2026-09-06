@@ -589,6 +589,12 @@ android {
             @Suppress("DEPRECATION")
             jniLibs.srcDir(marmotKitPreparedDir.resolve("jniLibs"))
         }
+        getByName("test") {
+            kotlin.directories.add("src/testSupport/kotlin")
+        }
+        getByName("androidTest") {
+            kotlin.directories.add("src/testSupport/kotlin")
+        }
     }
     packaging {
         jniLibs {

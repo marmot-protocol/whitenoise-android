@@ -36,6 +36,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -160,6 +161,7 @@ internal fun rememberMediaBubbleAspectRatio(
         initialMediaBubbleAspectRatio(dim)
     }
 
+/** Renders retained image pixels immediately and materializes misses according to the user's download policy. */
 @Composable
 internal fun MediaImageBubble(
     item: TimelineMessage,
@@ -212,16 +214,21 @@ internal fun MediaImageBubble(
     var failed by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
     var viewerOpen by remember(key, attachmentIndex) { mutableStateOf(false) }
     var reloadToken by remember(key, attachmentIndex, epoch) { mutableIntStateOf(0) }
-    val cachedPlaintextOnEntry =
-        remember(controller, key, attachmentIndex, epoch) {
-            controller.hasCachedAttachment(key, attachmentIndex)
-        }
+    var cachedPlaintextOnEntry by
+        rememberImageAttachmentCacheAvailability(controller, key, attachmentIndex, epoch, presentation != null)
     val retainedPlaintextOnEntry =
         mine && controller.pendingAttachmentsList(key).getOrNull(attachmentIndex) != null
     // Auto-download gating (#10): retained/cached own bytes always render;
     // idle network fallback obeys policy. Once accepted, materialization stays
     // latched across policy recomposition so an active UI waiter is not lost.
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    val automaticNetworkAllowed by rememberUpdatedState(
+        shouldMaterializeAttachmentAutomatically(
+            mine,
+            appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
+            automaticDownloadsPaused,
+        ),
+    )
     val policyAllowsMaterialization =
         shouldMaterializeAttachmentAutomatically(
             mine = mine,
@@ -243,14 +250,23 @@ internal fun MediaImageBubble(
         failed = false
         try {
             val data =
-                attachmentBytes(
+                imageAttachmentBytes(
                     controller = controller,
                     messageIdHex = key,
                     attachmentIndex = attachmentIndex,
                     reference = reference,
                     mine = mine,
                     priority = materializationIntent.priority,
-                )
+                    allowNetwork =
+                        materializationIntent == AttachmentMaterializationIntent.Interactive || automaticNetworkAllowed,
+                ) ?: run {
+                    cachedPlaintextOnEntry = false
+                    materializationIntent =
+                        AttachmentMaterializationIntent.Idle.withPolicyAllowed(automaticNetworkAllowed)
+                    // A grant during the local read preserves the intent, so it needs a new effect key.
+                    if (automaticNetworkAllowed) reloadToken++
+                    return@LaunchedEffect
+                }
             val decoded =
                 decodeMessageAttachmentImage(
                     bytes = data,
@@ -606,10 +622,13 @@ internal fun MediaImageGridTile(
     }
     var failed by remember(decodeKey) { mutableStateOf(false) }
     var reloadToken by remember(decodeKey) { mutableIntStateOf(0) }
-    val cachedPlaintextOnEntry =
-        remember(controller, decodeKey) {
-            controller.hasCachedAttachment(messageIdHex, attachmentIndex)
-        }
+    var cachedPlaintextOnEntry by rememberImageAttachmentCacheAvailability(
+        controller,
+        messageIdHex,
+        attachmentIndex,
+        reference.sourceEpoch,
+        presentation != null,
+    )
     val retainedPlaintextOnEntry =
         mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) != null
     // Mirror the single-image bubble's auto-download gate (#10) so the
@@ -617,6 +636,13 @@ internal fun MediaImageGridTile(
     // materialize during a pause, but a cache-missing network fallback waits
     // for restart or a tap. Tightening policy never abandons accepted work.
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    val automaticNetworkAllowed by rememberUpdatedState(
+        shouldMaterializeAttachmentAutomatically(
+            mine,
+            appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
+            automaticDownloadsPaused,
+        ),
+    )
     val policyAllowsMaterialization =
         shouldMaterializeAttachmentAutomatically(
             mine = mine,
@@ -638,14 +664,23 @@ internal fun MediaImageGridTile(
         failed = false
         try {
             val data =
-                attachmentBytes(
+                imageAttachmentBytes(
                     controller = controller,
                     messageIdHex = messageIdHex,
                     attachmentIndex = attachmentIndex,
                     reference = reference,
                     mine = mine,
                     priority = materializationIntent.priority,
-                )
+                    allowNetwork =
+                        materializationIntent == AttachmentMaterializationIntent.Interactive || automaticNetworkAllowed,
+                ) ?: run {
+                    cachedPlaintextOnEntry = false
+                    materializationIntent =
+                        AttachmentMaterializationIntent.Idle.withPolicyAllowed(automaticNetworkAllowed)
+                    // A grant during the local read preserves the intent, so it needs a new effect key.
+                    if (automaticNetworkAllowed) reloadToken++
+                    return@LaunchedEffect
+                }
             val decoded =
                 decodeMessageAttachmentImage(
                     bytes = data,
