@@ -311,6 +311,8 @@ artifacts plus the recorded toolchain from
 
 ## Device Testing
 
+Release candidates are tested with the stable, numbered [manual release testing checklist](docs/manual-release-testing.md). Use its permanent test IDs in every failure report so results remain actionable across releases.
+
 For local device checks, prefer:
 
 ```bash
