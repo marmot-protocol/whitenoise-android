@@ -69,6 +69,8 @@ internal fun fileAttachmentCardTestTag(
  * Supported text and Markdown attachments open in a bounded, read-only
  * in-app reader. Other files join any automatic/durable fetch already in
  * flight and open a reusable FileProvider artifact in an external viewer.
+ * When selected as the message footer owner, the card also carries the timestamp,
+ * delivery state, retention indicator, and invalidation warning as one contract.
  */
 @Composable
 internal fun MediaFileBubble(
@@ -87,6 +89,7 @@ internal fun MediaFileBubble(
     status: MessageStatus = MessageStatus.Received,
     retention: RetentionIndicatorInput? = null,
     reserveRetentionSpace: Boolean = false,
+    footerWarningText: String? = null,
 ) {
     val context = LocalContext.current
     val openAttachment = rememberAttachmentOpener()
@@ -382,6 +385,7 @@ internal fun MediaFileBubble(
             status = status,
             retention = retention,
             reserveRetentionSpace = reserveRetentionSpace,
+            footerWarningText = footerWarningText,
             openPending = opening,
             onCancelTransfer = { controller.cancelAttachmentTransfer(messageIdHex, attachmentIndex) },
         )

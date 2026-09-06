@@ -41,6 +41,7 @@ class BubblePresentationTest {
         )
     }
 
+    /** Local publish failures retain ordinary message chrome while suppressing contradictory status. */
     @Test
     fun localPublishFailureKeepsOrdinaryChromeButNoDeliveryGlyph() {
         // #1747: the body and normal chrome are retained, and the delivery
@@ -64,6 +65,36 @@ class BubblePresentationTest {
                 deleted = false,
                 presentation = TimelineInvalidationPresentation.None,
             ),
+        )
+
+        assertEquals(
+            InvalidationWarningPlacement(
+                fileFooter = "Delivery not confirmed",
+                outerBubble = null,
+            ),
+            placeInvalidationWarning(
+                warning = "Delivery not confirmed",
+                fileCardOwnsFooter = true,
+            ),
+        )
+    }
+
+    /** Warnings remain in the outer bubble when no confirmed file card can own the footer. */
+    @Test
+    fun invalidationWarningWithoutAFileFooterKeepsItsOuterBubbleOwner() {
+        assertEquals(
+            InvalidationWarningPlacement(
+                fileFooter = null,
+                outerBubble = "Some history may be unavailable",
+            ),
+            placeInvalidationWarning(
+                warning = "Some history may be unavailable",
+                fileCardOwnsFooter = false,
+            ),
+        )
+        assertEquals(
+            InvalidationWarningPlacement(fileFooter = null, outerBubble = null),
+            placeInvalidationWarning(warning = null, fileCardOwnsFooter = true),
         )
     }
 

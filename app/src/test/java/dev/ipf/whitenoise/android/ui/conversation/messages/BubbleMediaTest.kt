@@ -104,6 +104,7 @@ class BubbleMediaTest {
                 deleted = false,
                 hasInvalidationWarning = false,
                 visualCount = 3,
+                fileCount = 0,
                 hasCaption = false,
             ),
         )
@@ -116,6 +117,7 @@ class BubbleMediaTest {
                 deleted = false,
                 hasInvalidationWarning = false,
                 visualCount = 3,
+                fileCount = 0,
                 hasCaption = true,
             ),
         )
@@ -124,6 +126,7 @@ class BubbleMediaTest {
                 deleted = false,
                 hasInvalidationWarning = true,
                 visualCount = 3,
+                fileCount = 0,
                 hasCaption = false,
             ),
         )
@@ -132,9 +135,56 @@ class BubbleMediaTest {
                 deleted = true,
                 hasInvalidationWarning = false,
                 visualCount = 3,
+                fileCount = 0,
                 hasCaption = false,
             ),
         )
+    }
+
+    /** Mixed visual/file messages must select the final file card as their sole footer owner. */
+    @Test
+    fun mixedVisualAndFileGroupDelegatesExactlyOneFooterToTheFileCard() {
+        val visualOwnsFooter =
+            visualMediaOwnsFooter(
+                deleted = false,
+                hasInvalidationWarning = false,
+                visualCount = 1,
+                fileCount = 1,
+                hasCaption = false,
+            )
+        val fileOwnsFooter =
+            fileCardOwnsFooter(
+                deleted = false,
+                fileCount = 1,
+                visualOwnsFooter = visualOwnsFooter,
+            )
+
+        assertFalse(visualOwnsFooter)
+        assertTrue(fileOwnsFooter)
+        assertEquals(1, listOf(visualOwnsFooter, fileOwnsFooter).count { it })
+    }
+
+    /** Captions and invalidation warnings must not create a second owner beside the final file card. */
+    @Test
+    fun invalidatedCaptionedFileGroupStillHasExactlyOneFileFooterOwner() {
+        val visualOwnsFooter =
+            visualMediaOwnsFooter(
+                deleted = false,
+                hasInvalidationWarning = true,
+                visualCount = 1,
+                fileCount = 2,
+                hasCaption = true,
+            )
+        val fileOwnsFooter =
+            fileCardOwnsFooter(
+                deleted = false,
+                fileCount = 2,
+                visualOwnsFooter = visualOwnsFooter,
+            )
+
+        assertFalse(visualOwnsFooter)
+        assertTrue(fileOwnsFooter)
+        assertEquals(1, listOf(visualOwnsFooter, fileOwnsFooter).count { it })
     }
 
     @Test
