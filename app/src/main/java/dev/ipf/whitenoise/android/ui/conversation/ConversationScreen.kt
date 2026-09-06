@@ -624,11 +624,10 @@ internal fun ConversationScreen(
         }
     }
     val collapseLongMessages = appState.collapseLongMessagesInGroup(chat.group.groupIdHex)
-    // When the developer streaming-debug toggle flips, re-publish the timeline.
-    // Turning it off drops the transient QUIC debug rows so they don't linger.
-    LaunchedEffect(controller, appState.streamingDebugEnabled) {
-        controller.refreshStreamingDebugPresentation()
-    }
+    ConversationStreamingDebugRefreshEffect(
+        controller = controller,
+        streamingDebugEnabled = appState.streamingDebugEnabled,
+    )
     var menuOpen by remember { mutableStateOf(false) }
     // Keyed on the controller as well as chat.id so the same shared group under
     // another account cannot inherit this account's details route.

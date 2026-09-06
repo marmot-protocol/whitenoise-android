@@ -1208,6 +1208,14 @@
         ]
       },
       {
+        "surface": "ConversationStreamingDebugRefreshEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationStreamingDebugRefreshEffect.kt",
+        "anchor": "fun ConversationStreamingDebugRefreshEffect(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
         "surface": "ConversationSeededTailAlignmentRecovery",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationSeededTailAlignmentRecovery.kt",
         "anchor": "fun ConversationSeededTailAlignmentRecovery(",
