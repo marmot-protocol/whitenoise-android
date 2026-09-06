@@ -66,6 +66,8 @@ internal class NotificationBootstrapTestFixture(
     private val onMarkTimelineMessageRead: (() -> ChatListRowFfi?)? = null,
     private val onSendText: ((accountRef: String, groupIdHex: String, text: String) -> SendSummaryFfi)? = null,
     private val onReactToMessage: (() -> SendSummaryFfi)? = null,
+    private val onCatchUpAccounts: (() -> Unit)? = null,
+    private val emitStartupNotification: Boolean = true,
 ) {
     private val appContext = context.applicationContext
     private val updates = Channel<NotificationUpdateFfi>(Channel.UNLIMITED)
@@ -153,6 +155,12 @@ internal class NotificationBootstrapTestFixture(
                     runtimeStartGate.await()
                     runtimeStarted.set(true)
                     Unit
+                }
+                "catchUpAccounts" -> {
+                    val hook =
+                        onCatchUpAccounts
+                            ?: throw UnsupportedOperationException("Unexpected Marmot call: catchUpAccounts")
+                    hook()
                 }
                 "telemetryInstallId" -> "test-install"
                 "setRelayTelemetryRuntimeConfig" -> Unit
@@ -340,6 +348,15 @@ internal class NotificationBootstrapTestFixture(
         runWithMainLooperPumping { appState.ensureNotificationRuntimeStarted() }
     }
 
+    /** Exercises the service entry point while advancing Robolectric’s main looper. */
+    suspend fun awaitPushDrain(timeoutMillis: Long): Boolean =
+        runWithMainLooperPumping { appState.ensureNotificationRuntimeStartedAndAwaitPushDrain(timeoutMillis) }
+
+    /** Delivers an engine update through the real process-owned notification listener. */
+    fun emitNotification(notification: NotificationUpdateFfi = update) {
+        check(updates.trySend(notification).isSuccess)
+    }
+
     suspend fun awaitUpdateConsumed() {
         withTimeout(5_000L) {
             while (consumedUpdates.get() == 0) delay(10L)
@@ -411,7 +428,9 @@ internal class NotificationBootstrapTestFixture(
 
     private suspend fun nextUpdate() = updates.receive().also { consumedUpdates.incrementAndGet() }
 
+    /** Emits startup traffic only when the scenario opts into the original bootstrap-race probe. */
     private fun emitAtFirstPostStartFfiBoundary() {
+        if (!emitStartupNotification) return
         if (!runtimeStarted.get() || !emittedPostStartUpdate.compareAndSet(false, true)) return
         receiverWasAttachedAtPostStartEmission = subscriberAttached.get()
         channelsWereReadyAtPostStartEmission =
