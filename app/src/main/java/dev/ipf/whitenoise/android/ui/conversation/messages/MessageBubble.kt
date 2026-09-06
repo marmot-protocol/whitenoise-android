@@ -111,6 +111,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsFollowTarget
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutReport
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutSink
+import dev.ipf.whitenoise.android.ui.conversation.InviteAcceptanceResolutionStatus
 import dev.ipf.whitenoise.android.ui.conversation.InvitePreviewActionBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -1651,17 +1652,16 @@ internal fun MessageBubble(
                 // - Non-media: render displayedBody (covers reactions,
                 //   deletions, agent streams, plain text).
                 val bodyTextToRender: String? =
-                    when {
-                        // Deleted and persisted failure tombstones show only
-                        // their copy, never an inline image/caption.
-                        deleted || persistedFailure -> displayedBody
-                        // The contact card / location bubble / user card carry
-                        // the body, so the raw caption/link/npub text is hidden.
-                        sharedContact != null || sharedLocation != null || sharedUser != null -> null
-                        mediaPendingName != null && !anyConfirmedMedia -> mediaCaption
-                        anyConfirmedMedia -> mediaCaption
-                        else -> displayedBody
-                    }
+                    messageBodyTextToRender(
+                        displayedBody = displayedBody,
+                        deleted = deleted,
+                        persistedFailure = persistedFailure,
+                        structuredShareOwnsBody =
+                            sharedContact != null || sharedLocation != null || sharedUser != null,
+                        hasPendingMediaName = mediaPendingName != null,
+                        hasConfirmedMedia = anyConfirmedMedia,
+                        mediaCaption = mediaCaption,
+                    )
                 val displayedMarkdownDocument =
                     rememberMessageMarkdownDocumentForDisplayedBody(
                         messageIdHex = record.messageIdHex,
@@ -2183,13 +2183,24 @@ internal fun MessageBubble(
                         bottomBar = {
                             when (composerGate) {
                                 ComposerGate.PENDING ->
-                                    Spacer(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .navigationBarsPadding()
-                                            .imePadding()
-                                            .height(64.dp),
-                                    )
+                                    if (controller.inviteAcceptanceResolutionPending) {
+                                        InviteAcceptanceResolutionStatus(
+                                            state = controller.memberRosterState,
+                                            onRetry = {
+                                                appState.launchMutation {
+                                                    controller.retryInviteAcceptanceAuthority()
+                                                }
+                                            },
+                                        )
+                                    } else {
+                                        Spacer(
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .navigationBarsPadding()
+                                                .imePadding()
+                                                .height(64.dp),
+                                        )
+                                    }
                                 ComposerGate.NOTICE -> RemovedMemberComposerNotice()
                                 ComposerGate.FROZEN -> FrozenGroupComposerNotice()
                                 ComposerGate.DISBANDED -> DisbandedGroupComposerNotice(disbanded = groupDisbanded)

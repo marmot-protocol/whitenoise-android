@@ -72,6 +72,7 @@ class ConversationDictationControlOwnershipTest {
         }
     }
 
+    @Suppress("MaxLineLength")
     private fun owner(route: ConversationDictationComposerRoute) = conversationDictationControlOwner(listening, route, appLockScreenVisible = false)
 
     private companion object {

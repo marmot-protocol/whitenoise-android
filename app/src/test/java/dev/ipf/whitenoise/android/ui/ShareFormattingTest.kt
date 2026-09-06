@@ -110,20 +110,20 @@ class ShareFormattingTest {
 
     private val sampleNpub = "npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6"
 
+    /** Pins the sender's canonical wire format to one identity reference and no inferred label. */
     @Test
-    fun userShareSendsNameAndNostrReference() {
+    fun userShareSendsOnlyAnUnambiguousNostrReference() {
         assertEquals(
-            "Ada Lovelace\nnostr:$sampleNpub",
-            formatUserShareText("Ada Lovelace", sampleNpub),
+            "nostr:$sampleNpub",
+            formatUserShareText(sampleNpub),
         )
-        // No usable name → the bare nostr reference.
-        assertEquals("nostr:$sampleNpub", formatUserShareText(null, sampleNpub))
     }
 
+    /** Proves the canonical send format retains identity while introducing no title ambiguity. */
     @Test
-    fun userShareRoundTripsNameAndNpub() {
-        val parsed = parseSharedUserFromText(formatUserShareText("Ada Lovelace", sampleNpub))
-        assertEquals("Ada Lovelace", parsed?.name)
+    fun userShareRoundTripsNpubWithoutAnAmbiguousNameLine() {
+        val parsed = parseSharedUserFromText(formatUserShareText(sampleNpub))
+        assertNull(parsed?.name)
         assertEquals(sampleNpub, parsed?.npub)
     }
 
@@ -133,10 +133,13 @@ class ShareFormattingTest {
         assertNull(parseSharedUserFromText(sampleNpub)?.name)
     }
 
+    /** Rejects inline and multiline prose regardless of whether it precedes or follows the npub. */
     @Test
     fun proseMentioningAnNpubIsNotHijackedIntoAUserCard() {
         // A longer message that merely contains an npub stays plain text.
         assertNull(parseSharedUserFromText("hey check out nostr:$sampleNpub they post great stuff"))
+        assertNull(parseSharedUserFromText("Ada Lovelace\nnostr:$sampleNpub"))
+        assertNull(parseSharedUserFromText("nostr:$sampleNpub\nAda Lovelace"))
         assertNull(parseSharedUserFromText("line one\nline two\nnostr:$sampleNpub"))
         assertNull(parseSharedUserFromText("no reference here at all"))
         assertNull(parseSharedUserFromText("nostr:npub1notavalidprofile"))

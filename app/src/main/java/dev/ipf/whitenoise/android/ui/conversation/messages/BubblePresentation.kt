@@ -51,6 +51,28 @@ internal data class BubblePresentationTokens(
     val mentionAccentArgb: Long,
 )
 
+/**
+ * Selects the text owned by a message bubble after media and structured-share
+ * presentation have been resolved. Tombstones keep their explanatory copy;
+ * only an actually recognized structured share may consume the raw body.
+ */
+internal fun messageBodyTextToRender(
+    displayedBody: String,
+    deleted: Boolean,
+    persistedFailure: Boolean,
+    structuredShareOwnsBody: Boolean,
+    hasPendingMediaName: Boolean,
+    hasConfirmedMedia: Boolean,
+    mediaCaption: String?,
+): String? =
+    when {
+        deleted || persistedFailure -> displayedBody
+        structuredShareOwnsBody -> null
+        hasPendingMediaName && !hasConfirmedMedia -> mediaCaption
+        hasConfirmedMedia -> mediaCaption
+        else -> displayedBody
+    }
+
 /** Keeps failure/tombstone semantics fixed while routing ordinary AMOLED
  * customization through the bubble border instead of its black fill. */
 internal fun resolveBubblePresentationArgb(

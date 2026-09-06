@@ -12,6 +12,7 @@ internal fun conversationControllerComposerGate(
 ): ComposerGate =
     conversationComposerGate(
         pendingInvite = controller.group.pendingConfirmation,
+        inviteAcceptanceResolutionPending = controller.inviteAcceptanceResolutionPending,
         membersVerified = controller.membersVerified,
         isSelfMember = controller.isSelfMember,
         seededSelfMember = controller.seededSelfMember,

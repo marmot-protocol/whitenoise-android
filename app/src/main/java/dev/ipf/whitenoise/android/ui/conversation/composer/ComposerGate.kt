@@ -66,6 +66,7 @@ internal enum class ComposerGate {
  */
 internal fun conversationComposerGate(
     pendingInvite: Boolean,
+    inviteAcceptanceResolutionPending: Boolean = false,
     membersVerified: Boolean,
     isSelfMember: Boolean,
     seededSelfMember: Boolean,
@@ -81,6 +82,7 @@ internal fun conversationComposerGate(
         disbanded || disbanding -> ComposerGate.DISBANDED
         unrecoverable -> ComposerGate.FROZEN
         pendingInvite -> ComposerGate.INVITE
+        inviteAcceptanceResolutionPending -> ComposerGate.PENDING
         isSelfMember -> ComposerGate.COMPOSER
         // Removed-member notice only once refreshMembers() has VERIFIED the
         // roster. An unverified roster that merely omits self — e.g. a stale or

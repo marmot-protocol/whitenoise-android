@@ -309,6 +309,7 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.controller.state is ConversationDictationState.ProviderActivityRequired)
         assertEquals(1L, fixture.controller.providerActivityRequestId)
         assertEquals(0L, fixture.controller.permissionRequestId)
+        assertEquals(0, platform.recognitionAvailabilityChecks)
         assertFalse(platform.session.started)
     }
 

@@ -792,6 +792,7 @@ internal fun telemetryDeploymentEnvironment(value: String): String =
     when (val normalized = value.trim().lowercase(Locale.ROOT)) {
         "production", "staging", "development", "test" -> normalized
         "android-release" -> "production"
+        "dev" -> "development"
         else -> "production"
     }
 
@@ -1183,6 +1184,7 @@ class WhiteNoiseAppState private constructor(
     private val bootstrapActionableTimeoutMillis: () -> Long,
     private val notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics,
     private val inboundShareTextStager: ((String, String, String) -> Unit)?,
+    private val messageDraftRepositoryOverride: MessageDraftRepository?,
     preferencesOverride: SharedPreferences?,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
@@ -1206,6 +1208,7 @@ class WhiteNoiseAppState private constructor(
             bootstrapActionableTimeoutMillis = { BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS },
             notificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
             inboundShareTextStager = null,
+            messageDraftRepositoryOverride = null,
             preferencesOverride = null,
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
@@ -1232,6 +1235,7 @@ class WhiteNoiseAppState private constructor(
         notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics =
             NotificationNetworkRecoveryDiagnostics(),
         inboundShareTextStager: ((String, String, String) -> Unit)? = null,
+        messageDraftRepository: MessageDraftRepository? = null,
         preferences: SharedPreferences? = null,
     ) : this(
         context = context,
@@ -1251,6 +1255,7 @@ class WhiteNoiseAppState private constructor(
         bootstrapActionableTimeoutMillis = bootstrapActionableTimeoutMillis,
         notificationNetworkRecoveryDiagnostics = notificationNetworkRecoveryDiagnostics,
         inboundShareTextStager = inboundShareTextStager,
+        messageDraftRepositoryOverride = messageDraftRepository,
         preferencesOverride = preferences,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
@@ -1331,10 +1336,11 @@ class WhiteNoiseAppState private constructor(
     internal val editorSourceStore: EditorSourceStore = EditorSourceStore.create(appContext)
     internal val editorSessionStore: EditorSessionStore = EditorSessionStore.create(appContext)
     internal val messageDraftRepository: MessageDraftRepository =
-        MessageDraftRepository(
-            gateway = MarmotMessageDraftGateway(::marmot),
-            editorSessions = editorSessionStore,
-        )
+        messageDraftRepositoryOverride
+            ?: MessageDraftRepository(
+                gateway = MarmotMessageDraftGateway(::marmot),
+                editorSessions = editorSessionStore,
+            )
     private val chatMuteRepository = ChatMuteRepository(MarmotChatMuteGateway(::marmot))
 
     // Which of the two sequential signer round-trips the Amber sign-in is
@@ -2277,7 +2283,7 @@ class WhiteNoiseAppState private constructor(
             onResult = { accountRef, groupIdHex, _, result ->
                 when (result) {
                     is MessageDraftMutationResult.Success -> {
-                        draftStore.applyAuthoritativeTimestamp(accountRef, groupIdHex, result.draft?.createdAtMs)
+                        draftStore.applyAuthoritativeTimestamp(accountRef, groupIdHex, result.draft?.updatedAtMs)
                     }
                     is MessageDraftMutationResult.Failure -> {
                         appStateDebug(result.cause) {
@@ -2288,6 +2294,7 @@ class WhiteNoiseAppState private constructor(
                 }
             },
         )
+    private val draftSummaryRefreshLifetime = StalenessGuard()
     private val notificationScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private val notificationLocalIdentityReader =
@@ -2467,7 +2474,7 @@ class WhiteNoiseAppState private constructor(
                             accountRef,
                             groupIdHex,
                             draft?.content,
-                            draft?.createdAtMs,
+                            draft?.updatedAtMs,
                         )
                         draftHydrationRevision += 1
                     }
@@ -2495,14 +2502,16 @@ class WhiteNoiseAppState private constructor(
      */
     private fun hideDraftForPendingSend(token: DraftSendClearToken): Boolean =
         draftWriter.beginPendingSendPresentation(token.accountRef, token.groupIdHex, token.generation) {
-            draftStore.set(token.accountRef, token.groupIdHex, TextFieldValue(""))
+            if (token.recoveryDraft != null) {
+                draftStore.hideForPendingSend(token.accountRef, token.groupIdHex)
+            }
         }
 
     /** Restore only the exact lifecycle draft hidden by a publish that failed. */
     private fun restoreDraftAfterFailedSend(token: DraftSendClearToken) {
         val recoveryDraft = token.recoveryDraft ?: return
         draftWriter.runIfCurrent(token.accountRef, token.groupIdHex, token.generation) {
-            draftStore.set(token.accountRef, token.groupIdHex, recoveryDraft.textFieldValue)
+            draftStore.restoreSnapshot(token.accountRef, token.groupIdHex, recoveryDraft)
         }
     }
 
@@ -2573,16 +2582,26 @@ class WhiteNoiseAppState private constructor(
         return messageDraftRepository.delete(accountRef, groupIdHex)
     }
 
+    /**
+     * Refreshes metadata-only draft summaries behind both account and request-generation fences.
+     * A delayed response may update only keys whose local fingerprint still matches the request.
+     */
     internal fun refreshDraftSummaries(accountRef: String) {
+        val refresh = draftSummaryRefreshLifetime.advance()
+        val expected = draftStore.captureSummaryRefresh(accountRef)
         mutationsScope.launch {
             messageDraftRepository
                 .summaries(accountRef)
                 .onSuccess { summaries ->
-                    if (activeAccountRef != accountRef) return@onSuccess
-                    draftStore.replaceSummaries(
-                        accountRef,
-                        summaries.associate { it.groupIdHex to it.createdAtMs },
-                    )
+                    draftSummaryRefreshLifetime.runIfCurrent(refresh) {
+                        if (activeAccountRef == accountRef) {
+                            draftStore.replaceSummaries(
+                                accountRef,
+                                summaries.associate { it.groupIdHex to it.updatedAtMs },
+                                expected = expected,
+                            )
+                        }
+                    }
                 }.onFailure { appStateDebug(it) { "draft summaries load failed account=${accountRef.take(8)}" } }
         }
     }
@@ -2801,10 +2820,28 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ): String = "${accountRef.orEmpty()}\u0000$groupIdHex"
 
+    /** Attaches or permanently detaches the chat-list projection without transferring private row state. */
     fun attachChatsController(controller: ChatsController?) {
         chatsController = controller
-        // Route draft start/clear re-sorts to whichever controller is attached;
-        // reads the field at call time so a later re-attach still resolves.
+        bindDraftSortOrderCallback()
+    }
+
+    /** Atomically transfers in-flight previews only for a live shell replacement. */
+    internal fun replaceChatsController(
+        outgoing: ChatsController,
+        replacement: ChatsController,
+    ) {
+        val handoff = outgoing.takeIf { chatsController === it }?.captureOptimisticPreviewHandoff()
+        chatsController = replacement
+        handoff?.let { replacement.restoreOptimisticPreviewHandoff(it, activeAccountRef) }
+        bindDraftSortOrderCallback()
+    }
+
+    /** Routes future draft-order invalidations to the controller that is attached at callback time. */
+    private fun bindDraftSortOrderCallback() {
+        // Route draft start/clear and coalesced authoritative-time re-sorts to
+        // whichever controller is attached; resolve the field at call time so
+        // a later re-attach still receives the callback.
         draftStore.onDraftSortOrderChanged = { chatsController?.onDraftSortOrderChanged() }
     }
 
@@ -2917,13 +2954,12 @@ class WhiteNoiseAppState private constructor(
         unreadRefreshScheduler.cancelAndClear()
     }
 
-    // TODO(marmot): remove this UI-controller backchannel once Marmot emits a
-    // ProjectionUpdated (or equivalent chat-list/group projection update) after
-    // set_group_archived / accept_group_invite. Until then, the ChatsController
-    // stream can lag behind local mutations and we forward the accepted/archived
-    // group record so rows stop rendering stale pending/archived state.
-    fun applyLocalGroupUpdate(record: AppGroupRecordFfi) {
-        chatsController?.applyLocalGroupUpdate(record)
+    /** Bridges native projection gaps for matching accounts; null retains active-controller routing. */
+    fun applyLocalGroupUpdate(
+        record: AppGroupRecordFfi,
+        accountRef: String? = null,
+    ) {
+        chatsController.applyLocalGroupUpdateForAccount(record, accountRef)
     }
 
     // Same temporary projection backchannel as [applyLocalGroupUpdate], but for
@@ -2940,10 +2976,11 @@ class WhiteNoiseAppState private constructor(
             ?.applyLocalGroupDetails(record, members)
     }
 
-    // The optimistic-preview bridge is scoped to the sending account like
-    // applyChatListRowFromMarkRead below: chatRowKey is the bare group id, so
-    // during an account-pinned conversation window an unguarded write
-    // could land on another account's row for the same group.
+    /**
+     * Publishes a materialized optimistic preview only into the sending account's controller.
+     * The row key is a bare group id, so an account-pinned conversation must never write
+     * into a different account's row for that group.
+     */
     internal fun applyOptimisticSentPreview(
         accountRef: String?,
         groupIdHex: String,
@@ -2953,6 +2990,27 @@ class WhiteNoiseAppState private constructor(
             ?.takeIf { it.boundAccountRef == accountRef }
             ?.applyOptimisticSentPreview(groupIdHex, preview) == true
 
+    /** Reserves acceptance-time chat-list order without exposing unparsed Markdown. */
+    internal fun reserveOptimisticSentPreview(
+        accountRef: String?,
+        groupIdHex: String,
+        optimisticMessageIdHex: String,
+    ): Boolean =
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.reserveOptimisticSentPreview(groupIdHex, optimisticMessageIdHex) == true
+
+    /** Publishes a parsed preview only when its account-scoped reservation still exists. */
+    internal fun applyReservedOptimisticSentPreview(
+        accountRef: String?,
+        groupIdHex: String,
+        preview: ChatListMessagePreviewFfi,
+    ): Boolean =
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.applyReservedOptimisticSentPreview(groupIdHex, preview) == true
+
+    /** Reconciles an optimistic preview to its confirmed id within the sending account. */
     internal fun commitOptimisticSentPreview(
         accountRef: String?,
         groupIdHex: String,
@@ -2962,17 +3020,6 @@ class WhiteNoiseAppState private constructor(
         chatsController
             ?.takeIf { it.boundAccountRef == accountRef }
             ?.commitOptimisticSentPreview(groupIdHex, optimisticMessageIdHex, confirmedMessageIdHex)
-    }
-
-    internal fun hydrateOptimisticSentPreviewTokens(
-        accountRef: String?,
-        groupIdHex: String,
-        messageIdHex: String,
-        tokens: MarkdownDocumentFfi,
-    ) {
-        chatsController
-            ?.takeIf { it.boundAccountRef == accountRef }
-            ?.hydrateOptimisticSentPreviewTokens(groupIdHex, messageIdHex, tokens)
     }
 
     internal fun failOptimisticSentPreview(
@@ -4214,16 +4261,18 @@ class WhiteNoiseAppState private constructor(
         )
     }
 
-    suspend fun ensureNotificationRuntimeStarted() {
+    /**
+     * Starts the receiver and returns whether any observed pending push catch-up succeeded.
+     * Ordinary startup callers may continue with local state after a failed fetch; a push-wake
+     * owner must inspect the result so its bounded supervisor can retry while still in background.
+     */
+    suspend fun ensureNotificationRuntimeStarted(): Boolean {
         if (!bootstrapCompleted) {
             bootstrap()
             val receiverReady = bootstrapCompleted && notificationReceiverActive.value
-            if (receiverReady) {
-                drainPendingNativePushRegistrationSyncIfNeeded()
-                drainPendingPushWakeCatchUpIfNeeded()
-            }
             if (!receiverReady) throw receiverUnavailable()
-            return
+            drainPendingNativePushRegistrationSyncIfNeeded()
+            return drainPendingPushWakeCatchUpIfNeeded()
         }
         localNotificationPresenter.ensureChannels()
         refreshLocalNotificationPermission()
@@ -4231,7 +4280,7 @@ class WhiteNoiseAppState private constructor(
         if (accounts.isEmpty()) refreshAccounts()
         refreshLocalNotificationSettings()
         drainPendingNativePushRegistrationSyncIfNeeded()
-        drainPendingPushWakeCatchUpIfNeeded()
+        return drainPendingPushWakeCatchUpIfNeeded()
     }
 
     /** Captures the active notification-runtime recovery lifetime. */
@@ -4241,6 +4290,7 @@ class WhiteNoiseAppState private constructor(
     internal fun notificationRuntimeRecoveryAllowed(generation: Long): Boolean =
         !networkNotificationRecoverySuppressed && notificationRuntimeRecovery.isCurrent(generation)
 
+    /** Re-establishes receiver readiness within the reconnect budget before admitting native catch-up. */
     private suspend fun ensureNotificationReceiverForNetworkReconnect(): Boolean {
         if (!bootstrapCompleted) bootstrap()
         if (!bootstrapCompleted || networkNotificationRecoverySuppressed) return false
@@ -4268,33 +4318,31 @@ class WhiteNoiseAppState private constructor(
             notificationJob.isActive()
     }
 
+    /** Starts push catch-up with the drain waiter armed before the runtime can emit an update. */
     suspend fun ensureNotificationRuntimeStartedAndAwaitPushDrain(timeoutMs: Long = NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS): Boolean =
-        coroutineScope {
-            val sequenceBeforeStart = notificationDrainSequence.get()
-            val drain =
-                async(start = CoroutineStart.UNDISPATCHED) {
-                    withTimeoutOrNull(timeoutMs) {
-                        notificationDrainSignals.first { it > sequenceBeforeStart }
-                    } != null
-                }
-            ensureNotificationRuntimeStarted()
-            drain.await()
-        }
+        awaitNotificationPushDrain(
+            sequenceBeforeStart = notificationDrainSequence.get(),
+            notificationDrainSignals = notificationDrainSignals,
+            timeoutMs = timeoutMs,
+            startRuntime = ::ensureNotificationRuntimeStarted,
+            keepConnected = { backgroundConnectionEnabled },
+        )
 
+    /** Retries a persisted token-registration obligation when notification startup reaches a usable runtime. */
     private suspend fun drainPendingNativePushRegistrationSyncIfNeeded() {
         if (pushTokenStore.nativePushRegistrationSyncPending()) {
             syncNativePushRegistrationIfEnabled()
         }
     }
 
-    /** Runs work started after the durable wake before clearing its matching generation. */
-    private suspend fun drainPendingPushWakeCatchUpIfNeeded() {
+    /** Returns fetch success, acknowledging only the matching durable wake after fresh work. */
+    private suspend fun drainPendingPushWakeCatchUpIfNeeded(): Boolean {
         val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
-        if (pendingGeneration == 0L) return
-        catchUpAfterObservedPushWake(
+        if (pendingGeneration == 0L) return true
+        return catchUpAfterObservedPushWake(
             pendingGeneration = pendingGeneration,
             trigger = PerformanceTrigger.PUSH_WAKE,
-        )
+        ).succeeded
     }
 
     /** Clears only the durable wake generation acknowledged by successful fresh work. */

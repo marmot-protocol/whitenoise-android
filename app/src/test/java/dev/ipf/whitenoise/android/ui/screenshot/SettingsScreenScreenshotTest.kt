@@ -41,6 +41,7 @@ class SettingsScreenScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Captures the default production settings surface with the current release version. */
     @Test
     fun settingsScreenDefaultDark() {
         composeRule.setContent {
@@ -57,13 +58,13 @@ class SettingsScreenScreenshotTest {
                             ),
                         appUpdateInfo =
                             AppUpdateInfo(
-                                installedVersion = "2026.8.25",
+                                installedVersion = "2026.9.5",
                                 latestVersion = null,
                                 checkedAtMillis = null,
                                 dismissedVersion = null,
                                 releasesBehind = null,
                             ),
-                        versionName = "2026.8.25",
+                        versionName = "2026.9.5",
                         mdkShortSha = "abc1234",
                         staging = false,
                         onBackToChats = {},
@@ -138,6 +139,7 @@ class SettingsScreenScreenshotTest {
         )
     }
 
+    /** Renders reusable settings content with the current production release metadata. */
     @Composable
     private fun settingsHomeContent() {
         SettingsHomeContent(
@@ -151,13 +153,13 @@ class SettingsScreenScreenshotTest {
                 ),
             appUpdateInfo =
                 AppUpdateInfo(
-                    installedVersion = "2026.8.25",
+                    installedVersion = "2026.9.5",
                     latestVersion = null,
                     checkedAtMillis = null,
                     dismissedVersion = null,
                     releasesBehind = null,
                 ),
-            versionName = "2026.8.25",
+            versionName = "2026.9.5",
             mdkShortSha = "abc1234",
             staging = false,
             onBackToChats = {},

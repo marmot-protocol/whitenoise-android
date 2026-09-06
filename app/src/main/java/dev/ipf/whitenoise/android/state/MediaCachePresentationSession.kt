@@ -19,6 +19,17 @@ internal fun ConversationController.hasCachedAttachmentInMemory(
     ) != null
 }
 
+/** Reads authenticated local bytes without allowing a missing or corrupt entry to initiate a native fetch. */
+internal suspend fun ConversationController.cachedAttachmentPlaintext(
+    messageIdHex: String,
+    attachmentIndex: Int,
+): ByteArray? {
+    val account = boundAccountRef ?: return null
+    val key = mediaCacheKey(account, group.groupIdHex, messageIdHex, attachmentIndex)
+    return withContext(Dispatchers.Main.immediate) { appState.cachedMediaPlaintext(key) }
+        ?: withContext(Dispatchers.IO) { appState.diskMediaCache.get(key) }
+}
+
 /** Reconcile presentation state with the encrypted L1/L2 cache. */
 internal suspend fun ConversationController.refreshAttachmentTransferState(
     messageIdHex: String,
