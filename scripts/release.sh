@@ -36,7 +36,7 @@ Production also accepts WHITENOISE_KEYSTORE_* names as fallbacks.
 
 Production MIP-05 push config (in local.properties or env):
   WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX  64-character server public key
-  WHITENOISE_PRODUCTION_PUSH_RELAY_HINT         Valid wss:// relay URI
+  WHITENOISE_PUSH_RELAY_HINT                    Shared valid wss:// relay URI
 
 Production also accepts WHITENOISE_PUSH_* names as fallbacks.
 
@@ -353,7 +353,7 @@ PRODUCTION_PUSH_RELAY_HINT=""
 
 require_production_push_config() {
   PRODUCTION_PUSH_SERVER_PUBKEY_HEX="$(production_push_value PUSH_SERVER_PUBKEY_HEX)"
-  PRODUCTION_PUSH_RELAY_HINT="$(production_push_value PUSH_RELAY_HINT 'wss://relay.eu.whitenoise.chat')"
+  PRODUCTION_PUSH_RELAY_HINT="$(runtime_prop_value WHITENOISE_PUSH_RELAY_HINT || printf '%s\n' 'wss://relay.eu.whitenoise.chat')"
 
   if [[ ! "$PRODUCTION_PUSH_SERVER_PUBKEY_HEX" =~ ^[[:xdigit:]]{64}$ ]]; then
     echo "error: WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX (or WHITENOISE_PUSH_SERVER_PUBKEY_HEX) must be exactly 64 hexadecimal characters" >&2
@@ -383,7 +383,7 @@ else:
 raise SystemExit(0 if valid else 1)
 PY
   then
-    echo "error: WHITENOISE_PRODUCTION_PUSH_RELAY_HINT (or WHITENOISE_PUSH_RELAY_HINT) must be a valid wss:// URI" >&2
+    echo "error: WHITENOISE_PUSH_RELAY_HINT must be a valid wss:// URI" >&2
     exit 1
   fi
 }

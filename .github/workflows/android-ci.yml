@@ -33,6 +33,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Test manual release guide validator
+        run: python3 -m unittest scripts/test_check_manual_test_guide.py
+
+      - name: Validate manual release guide
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          python3 scripts/check_manual_test_guide.py
+          if [[ -n "$PR_BASE_SHA" ]]; then
+            python3 scripts/check_manual_test_guide.py --base "$PR_BASE_SHA"
+          fi
 
       - name: Configure MarmotKit cache directory
         shell: bash

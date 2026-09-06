@@ -14,6 +14,44 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DiagnosticFormatterTest {
+    /** Copies only allowlisted busy subtypes, even when native errors contain private payloads. */
+    @Test
+    fun busyReportIdentifiesContentionWithoutCopyingNativeMessages() {
+        val failures =
+            listOf(
+                MarmotKitException.AccountWorkerBusy() to "ACCOUNT_WORKER_BUSY",
+                MarmotKitException.RuntimeBusy() to "RUNTIME_BUSY",
+                MarmotKitException.AccountSessionBusy() to "ACCOUNT_SESSION_BUSY",
+                MarmotKitException.StorageBusy("private database path") to "STORAGE_BUSY",
+                MarmotKitException.GroupSendQueueFull("private group identifier") to "GROUP_SEND_QUEUE_FULL",
+            )
+        failures.forEach { (failure, subtype) ->
+            val report =
+                DiagnosticFormatter.errorReport(
+                    "GROUP_INVITE_ACCEPT",
+                    IllegalStateException("private wrapper", failure),
+                    DiagnosticFormatter.ErrorReportContext("test", "17", "now"),
+                )
+            assertTrue(report.contains("error=RESOURCE_BUSY"))
+            assertTrue(report.contains("detail=contention=$subtype"))
+            assertFalse(report.contains("private"))
+        }
+    }
+
+    /** Caller-selected details retain precedence over the automatic contention subtype. */
+    @Test
+    fun explicitTechnicalDetailTakesPrecedenceOverContention() {
+        val report =
+            DiagnosticFormatter.errorReport(
+                "GROUP_INVITE_ACCEPT",
+                MarmotKitException.AccountWorkerBusy(),
+                DiagnosticFormatter.ErrorReportContext("test", "17", "now"),
+                technicalDetail = "stage=LOCAL_CONFIRMATION",
+            )
+        assertTrue(report.contains("detail=stage=LOCAL_CONFIRMATION"))
+        assertFalse(report.contains("contention="))
+    }
+
     private val legacyShortHexIdentity =
         DiagnosticIdentityPresentation(
             accountLabel = { label, _ -> label },

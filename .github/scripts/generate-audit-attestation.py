@@ -59,8 +59,8 @@ def build_attestation() -> dict[str, object]:
     if not HEX40.fullmatch(source_revision):
         raise ValueError("GITHUB_SHA must be a lowercase 40-character revision")
 
-    endpoint_configured = bool(require("WHITENOISE_STAGING_AUDIT_LOG_ENDPOINT").strip())
-    auth_configured = bool(require("WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN").strip())
+    endpoint_configured = bool(require("WHITENOISE_AUDIT_LOG_ENDPOINT").strip())
+    auth_configured = bool(require("WHITENOISE_AUDIT_LOG_AUTH_TOKEN").strip())
     if not endpoint_configured or not auth_configured:
         raise ValueError("authenticated staging audit upload must be configured")
 

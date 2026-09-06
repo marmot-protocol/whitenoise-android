@@ -51,11 +51,12 @@ class MessageDraftRepositoryTest {
             assertEquals("hello", gateway.current?.content)
         }
 
+    /** Verifies a superseded save cannot publish either stale content or its stale update time. */
     @Test
     fun coalescedWriterDoesNotPublishStaleCompletionAfterNewerEditIsAccepted() =
         runTest {
             val gateway = FakeDraftGateway(null)
-            val published = mutableListOf<String>()
+            val published = mutableListOf<Pair<String, Long?>>()
             lateinit var writer: CoalescingMessageDraftWriter
             gateway.onSave = { content ->
                 if (content == "first") writer.submit(ACCOUNT, GROUP, "second")
@@ -65,14 +66,17 @@ class MessageDraftRepositoryTest {
                     scope = this,
                     drafts = repository(gateway),
                     debounceMillis = 0,
-                    onResult = { _, _, content, _ -> published += content },
+                    onResult = { _, _, content, result ->
+                        val updatedAt = (result as? MessageDraftMutationResult.Success)?.draft?.updatedAtMs
+                        published += content to updatedAt
+                    },
                 )
 
             writer.submit(ACCOUNT, GROUP, "first")
             runCurrent()
             writer.flush()
 
-            assertEquals(listOf("second"), published)
+            assertEquals(listOf("second" to 2L), published)
             assertEquals("second", gateway.current?.content)
         }
 
@@ -333,6 +337,19 @@ class MessageDraftRepositoryTest {
             assertTrue(result.result is MessageDraftMutationResult.Success)
             assertEquals("typed while sharing\nshared", gateway.current?.content)
             assertEquals("typed while sharing\nshared", result.contentForHydration)
+        }
+
+    /** Verifies merge completion exposes the timestamp of the persisted update rather than creation. */
+    @Test
+    fun inboundMergeCompletionReportsThePersistedUpdateTime() =
+        runTest {
+            val gateway = FakeDraftGateway(draft(content = "existing"))
+            val writer = writer(gateway)
+
+            val completion = writer.mergeText(ACCOUNT, GROUP, "shared")
+
+            assertEquals(gateway.current?.updatedAtMs, completion.draftedAtMs)
+            assertTrue(completion.draftedAtMs != gateway.current?.createdAtMs)
         }
 
     @Test

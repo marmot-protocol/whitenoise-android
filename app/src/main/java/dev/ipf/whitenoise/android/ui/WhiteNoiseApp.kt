@@ -36,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -207,6 +209,8 @@ internal fun WhiteNoiseApp(
     val toast = appState.toast
     val transientNotice = appState.transientNotice
     val context = LocalContext.current
+    val dictationFocusManager = LocalFocusManager.current
+    val dictationKeyboard = LocalSoftwareKeyboardController.current
     val activity = remember(context) { context.findActivity() }
     val scope = rememberCoroutineScope()
     val dictation = appState.conversationDictation
@@ -362,11 +366,25 @@ internal fun WhiteNoiseApp(
     }
     LaunchedEffect(dictationPermissionRequestId) {
         if (dictationPermissionRequestId > 0L && dictation.state is ConversationDictationState.PermissionRequired) {
-            dictationPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            if (dictation.beginPermissionRequest(dictationPermissionRequestId)) {
+                runCatching {
+                    dictationPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }.onFailure {
+                    dictation.onPermissionLaunchFailed(dictationPermissionRequestId)
+                }
+            }
         }
     }
     LaunchedEffect(dictationProviderActivityRequestId, dictationImeVisible) {
-        if (dictationProviderActivityRequestId > 0L && !dictationImeVisible) {
+        if (
+            dictationProviderActivityRequestId > 0L &&
+            dictation.state is ConversationDictationState.ProviderActivityRequired
+        ) {
+            if (dictationImeVisible) {
+                dictationFocusManager.clearFocus(force = true)
+                dictationKeyboard?.hide()
+                return@LaunchedEffect
+            }
             // Let the bounded readiness state draw before provider UI backgrounds White Noise.
             withFrameNanos { }
             if (dictation.beginProviderActivityLaunch(dictationProviderActivityRequestId)) {

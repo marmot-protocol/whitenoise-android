@@ -37,6 +37,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposer
 
 private val ConversationTopInteractionClearance = 64.dp
 
+/** Renders the conversation action/composer surface from one generation-pinned state frame. */
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 internal fun ConversationBottomBar(
@@ -100,6 +101,8 @@ internal fun ConversationBottomBar(
 ) {
     val chromeInsets = WindowInsets.navigationBars.union(WindowInsets.ime)
     val density = LocalDensity.current
+    val renderedInviteGroupIdHex = controller.group.groupIdHex
+    val renderedInviteWelcomeMessageIdHex = controller.group.viaWelcomeMessageIdHex
     Box(
         Modifier
             .fillMaxWidth()
@@ -142,13 +145,22 @@ internal fun ConversationBottomBar(
             else ->
                 when (composerGate) {
                     ComposerGate.PENDING ->
-                        Spacer(
-                            Modifier
-                                .fillMaxWidth()
-                                .navigationBarsPadding()
-                                .imePadding()
-                                .height(64.dp),
-                        )
+                        if (controller.inviteAcceptanceResolutionPending) {
+                            InviteAcceptanceResolutionStatus(
+                                state = controller.memberRosterState,
+                                onRetry = {
+                                    appState.launchMutation { controller.retryInviteAcceptanceAuthority() }
+                                },
+                            )
+                        } else {
+                            Spacer(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .navigationBarsPadding()
+                                    .imePadding()
+                                    .height(64.dp),
+                            )
+                        }
                     ComposerGate.NOTICE -> RemovedMemberComposerNotice()
                     ComposerGate.FROZEN -> FrozenGroupComposerNotice()
                     ComposerGate.DISBANDED ->
@@ -156,7 +168,14 @@ internal fun ConversationBottomBar(
                     ComposerGate.INVITE ->
                         InvitePreviewActionBar(
                             mutationInFlight = controller.mutationInFlight,
-                            onJoin = { appState.launchMutation { controller.acceptInvite() } },
+                            onJoin = {
+                                appState.launchMutation {
+                                    controller.acceptInvite(
+                                        renderedGroupIdHex = renderedInviteGroupIdHex,
+                                        renderedWelcomeMessageIdHex = renderedInviteWelcomeMessageIdHex,
+                                    )
+                                }
+                            },
                             onDecline = {
                                 appState.launchMutation {
                                     if (controller.declineInvite()) onBack()

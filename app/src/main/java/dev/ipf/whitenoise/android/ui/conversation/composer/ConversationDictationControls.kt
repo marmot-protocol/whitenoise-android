@@ -128,6 +128,20 @@ internal fun ConversationDictationCompactActions(
         )
         ConversationDictationDismissAction(state, controller)
     }
+    if (state is ConversationDictationState.Failed && state.reason == ConversationDictationFailure.MicrophoneMuted) {
+        val context = LocalContext.current
+        ConversationDictationMicrophoneDialog(
+            onDismiss = controller::dismissFailure,
+            onOpenSettings = {
+                controller.dismissFailure()
+                runCatching {
+                    context.startActivity(
+                        Intent(AndroidSettings.ACTION_PRIVACY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            },
+        )
+    }
     if (reviewDialogOpen && state is ConversationDictationState.ReviewRequired) {
         ConversationDictationReviewDialog(
             transcript = state.transcript,
@@ -231,6 +245,26 @@ private fun ConversationDictationDismissAction(
     }
 }
 
+/** Explains system microphone blocking before any silent recognition session starts. */
+@Composable
+internal fun ConversationDictationMicrophoneDialog(
+    onDismiss: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("dictation-microphone-dialog"),
+        title = { Text(stringResource(R.string.dictation_microphone_muted)) },
+        text = { Text(stringResource(R.string.dictation_microphone_muted_help)) },
+        confirmButton = {
+            TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.open_settings)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        },
+    )
+}
+
 /** Preserves a failed/conflicted transcript until the user explicitly inserts, copies, or discards it. */
 @Suppress("DEPRECATION")
 @Composable
@@ -295,6 +329,7 @@ private fun dictationFailureLabel(reason: ConversationDictationFailure): String 
             ConversationDictationFailure.ProviderUnavailable -> R.string.dictation_provider_unavailable
             ConversationDictationFailure.PermissionDenied -> R.string.dictation_permission_denied
             ConversationDictationFailure.PermissionPermanentlyDenied -> R.string.dictation_permission_denied_permanently
+            ConversationDictationFailure.MicrophoneMuted -> R.string.dictation_microphone_muted
             ConversationDictationFailure.MicrophoneInUse -> R.string.dictation_microphone_in_use
             ConversationDictationFailure.NoSpeech -> R.string.dictation_no_speech
             ConversationDictationFailure.Network -> R.string.dictation_network_error

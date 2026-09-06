@@ -4,6 +4,7 @@ import android.content.Context
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
@@ -42,15 +43,20 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_INITIAL_LOADING_TEST_TAG
+import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_TIMELINE_TAIL_GAP
 import dev.ipf.whitenoise.android.ui.conversation.ConversationInitialLoadingOverlay
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -124,6 +130,7 @@ class ConversationImeCollapseFocusTest {
         }
     }
 
+    /** Captures the cached first frame with the #415 single-tail-gap contract. */
     @Test
     fun cachedConversationPaintsMessageWithoutProgressOnFirstFrameLight() {
         captureSeededConversationFirstFrame(
@@ -132,6 +139,7 @@ class ConversationImeCollapseFocusTest {
         )
     }
 
+    /** Repeats the cached #415 contract under large-font RTL rendering. */
     @Test
     fun cachedConversationPaintsMessageWithoutProgressOnFirstFrameDarkLargeFontRtl() {
         captureSeededConversationFirstFrame(
@@ -232,6 +240,56 @@ class ConversationImeCollapseFocusTest {
             .captureRoboImage("src/test/snapshots/ime_back_dismissed_composer_light.png")
     }
 
+    /** Keeps one production-screen tail interval before, during, and after IME resize. */
+    @Test
+    fun seededConversationKeepsSingleTailGapAcrossImeOpenAndClose() =
+        withUtcTimeZone {
+            val fixture = showSeededConversation()
+            val composer = composeRule.onNode(hasSetTextAction())
+            try {
+                assertSingleTailGap(CACHED_MESSAGE_ID)
+                composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_tail_gap_before_ime_light.png")
+
+                composer.performClick()
+                dispatchImeBottom(fixture.view, 300)
+                assertSingleTailGap(CACHED_MESSAGE_ID)
+                composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_tail_gap_ime_open_light.png")
+
+                dispatchImeBottom(fixture.view, 0)
+                assertSingleTailGap(CACHED_MESSAGE_ID)
+                composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_tail_gap_after_ime_light.png")
+            } finally {
+                fixture.controller.onCleared()
+            }
+        }
+
+    /** Seeds both leading structural rows and still aligns the real final message. */
+    @Test
+    fun seededConversationWithOlderHeaderAndTopErrorKeepsSingleTailGap() =
+        withUtcTimeZone {
+            val fixture =
+                showSeededConversation(
+                    hasOlderHeader = true,
+                    topError =
+                        ErrorPresentation(
+                            message = AppText.Plain(TOP_ERROR_TEXT),
+                            report = "operation=TEST",
+                        ),
+                )
+            try {
+                composeRule.onNodeWithText(TOP_ERROR_TEXT).assertIsDisplayed()
+                composeRule
+                    .onNodeWithTag(messageBubbleRowTestTag(CACHED_MESSAGE_ID), useUnmergedTree = true)
+                    .assertIsDisplayed()
+                assertSingleTailGap(CACHED_MESSAGE_ID)
+                composeRule
+                    .onRoot()
+                    .captureRoboImage("src/test/snapshots/conversation_tail_gap_seeded_older_top_error_light.png")
+            } finally {
+                fixture.controller.onCleared()
+            }
+        }
+
     private fun showConversation(onBack: () -> Unit = {}): View {
         val appState = appState()
         val group = group()
@@ -258,6 +316,49 @@ class ConversationImeCollapseFocusTest {
         }
         composeRule.waitForIdle()
         return view
+    }
+
+    /** Opens a cached production conversation with optional leading structural rows. */
+    private fun showSeededConversation(
+        hasOlderHeader: Boolean = false,
+        topError: ErrorPresentation? = null,
+    ): SeededConversationFixture {
+        val appState = appState()
+        val group = group()
+        val preview = cachedPreview()
+        val controller =
+            ConversationController(
+                appState = appState,
+                initialGroup = group,
+                initialTimelinePreview = preview,
+            )
+        controller.markAuthoritativeTimelinePublishedForTest()
+        replaceControllerState(controller, "hasMoreBefore\$delegate", hasOlderHeader)
+        replaceControllerState(controller, "subscriptionError\$delegate", topError)
+        val chat =
+            ChatListItem(
+                group = group,
+                latest = null,
+                otherMemberAccount = null,
+                memberCount = 2,
+                memberSnapshot = null,
+                projection = cachedProjection(preview),
+            )
+        lateinit var view: View
+        composeRule.setContent {
+            view = LocalView.current
+            WhiteNoiseTheme {
+                ConversationScreen(
+                    appState = appState,
+                    chat = chat,
+                    controller = controller,
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(CACHED_MESSAGE).assertIsDisplayed()
+        return SeededConversationFixture(view, controller)
     }
 
     private fun captureSeededConversationFirstFrame(
@@ -317,6 +418,7 @@ class ConversationImeCollapseFocusTest {
 
             composeRule.onNodeWithText(CACHED_MESSAGE).assertIsDisplayed()
             progressNodes().assertCountEquals(0)
+            assertSingleTailGap(CACHED_MESSAGE_ID)
             composeRule
                 .onRoot()
                 .captureRoboImage("src/test/snapshots/$snapshotName.png")
@@ -339,9 +441,39 @@ class ConversationImeCollapseFocusTest {
             SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo),
         )
 
+    /** Pins timestamp rendering to UTC for deterministic layout and screenshot assertions. */
+    private inline fun <T> withUtcTimeZone(block: () -> T): T {
+        val originalTimeZone = TimeZone.getDefault()
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        return try {
+            block()
+        } finally {
+            TimeZone.setDefault(originalTimeZone)
+        }
+    }
+
+    /** Asserts that the real cached row, rather than a sentinel, owns the tail. */
+    private fun assertSingleTailGap(messageId: String) {
+        val transcriptBottom =
+            composeRule
+                .onNodeWithTag(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE)
+                .fetchSemanticsNode()
+                .boundsInRoot.bottom
+        val tailBottom =
+            composeRule
+                .onNodeWithTag(messageBubbleRowTestTag(messageId), useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot.bottom
+        assertEquals(
+            with(composeRule.density) { CONVERSATION_TIMELINE_TAIL_GAP.toPx() },
+            transcriptBottom - tailBottom,
+            1f,
+        )
+    }
+
     private fun cachedPreview() =
         ChatListMessagePreviewFfi(
-            messageIdHex = "05" + "00".repeat(31),
+            messageIdHex = CACHED_MESSAGE_ID,
             sender = "02" + "00".repeat(31),
             senderDisplayName = "Cached sender",
             plaintext = CACHED_MESSAGE,
@@ -407,6 +539,18 @@ class ConversationImeCollapseFocusTest {
             ViewCompat.dispatchApplyWindowInsets(view.rootView, insets)
         }
         composeRule.waitForIdle()
+    }
+
+    /** Sets a private Compose state delegate needed to reproduce seeded header/error structure. */
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> replaceControllerState(
+        controller: ConversationController,
+        fieldName: String,
+        value: T,
+    ) {
+        val field = ConversationController::class.java.getDeclaredField(fieldName)
+        field.isAccessible = true
+        (field.get(controller) as MutableState<T>).value = value
     }
 
     private fun appState() =
@@ -482,10 +626,17 @@ class ConversationImeCollapseFocusTest {
         ) = Unit
     }
 
+    private data class SeededConversationFixture(
+        val view: View,
+        val controller: ConversationController,
+    )
+
     private companion object {
         const val ACCOUNT_REF = "personal"
         const val DRAFT = "draft text"
         const val CACHED_MESSAGE = "Cached hello on the first frame"
+        const val TOP_ERROR_TEXT = "Offline — showing messages on this device"
+        val CACHED_MESSAGE_ID = "05" + "00".repeat(31)
         val ACCOUNT_ID = "01" + "00".repeat(31)
         val GROUP_ID = "04" + "00".repeat(31)
     }

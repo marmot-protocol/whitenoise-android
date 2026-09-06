@@ -31,7 +31,6 @@ import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.assertTimelineSubscriptionSnapshotBeforeFirstNextWindow
-import dev.ipf.whitenoise.android.state.awaitConversationCondition
 import dev.ipf.whitenoise.android.state.awaitOpenedTimelineSubscriptionsClosed
 import dev.ipf.whitenoise.android.state.conversationTimelineReconnectFixtures
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
@@ -64,6 +63,7 @@ class NotificationRouteTimelinePresentationTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Keeps one routed controller mounted while a foreground reconnect publishes the notified row. */
     @Test
     fun notificationRoutedReconnectShowsNotifiedMessageWithoutRecreatingController() {
         val fixtures = conversationTimelineReconnectFixtures()
@@ -76,16 +76,18 @@ class NotificationRouteTimelinePresentationTest {
         val routed = routedTarget(TARGET_ACCOUNT)
         val handled = AtomicBoolean(false)
         val inboundRequestId = mutableStateOf(routed.notificationRequestId)
+        val shellMounted = mutableStateOf(true)
 
         var mountedController: ConversationController? = null
         try {
-            mountNotificationRoute(appState, routed, handled, inboundRequestId)
+            mountNotificationRoute(appState, routed, handled, inboundRequestId, shellMounted)
             mountedController = awaitMountedNotificationConversation(routeGate, handled, appState)
 
             reconnectWhileBackground(
                 appState = appState,
                 firstSubscription = fixtures.firstSubscription,
                 mountedController = mountedController,
+                scriptedSubscriptions = fixtures.scriptedSubscriptions,
             )
             resumeAfterForeground(
                 appState = appState,
@@ -102,48 +104,97 @@ class NotificationRouteTimelinePresentationTest {
         } finally {
             routeGate.releasePreload.countDown()
             routeGate.releaseActivation.countDown()
-            mountedController?.let { controller ->
-                appState.detachConversationController(controller)
-                controller.onCleared()
+            try {
+                disposeNotificationRoute(shellMounted, appState, mountedController)
+            } finally {
+                awaitOpenedTimelineSubscriptionsClosed(fixtures.scriptedSubscriptions)
             }
-            awaitOpenedTimelineSubscriptionsClosed(fixtures.scriptedSubscriptions)
         }
     }
 
+    /** Mounts the production shell with one authenticated synthetic notification route. */
     private fun mountNotificationRoute(
         appState: WhiteNoiseAppState,
         routed: InboundIntentRouting,
         handled: AtomicBoolean,
         inboundRequestId: MutableState<Long>,
+        shellMounted: MutableState<Boolean>,
     ) {
         appState.setAppInForeground(true)
         composeRule.setContent {
-            var inboundTarget by remember { mutableStateOf(routed.notificationTarget) }
-            WhiteNoiseTheme {
-                MainShell(
-                    appState = appState,
-                    inboundNotificationTarget = inboundTarget,
-                    inboundNotificationRequestId = inboundRequestId.value,
-                    onNotificationTargetHandled = { _, _ ->
-                        handled.set(true)
-                        inboundTarget = null
-                    },
-                )
+            if (shellMounted.value) {
+                var inboundTarget by remember { mutableStateOf(routed.notificationTarget) }
+                WhiteNoiseTheme {
+                    MainShell(
+                        appState = appState,
+                        inboundNotificationTarget = inboundTarget,
+                        inboundNotificationRequestId = inboundRequestId.value,
+                        onNotificationTargetHandled = { _, _ ->
+                            handled.set(true)
+                            inboundTarget = null
+                        },
+                    )
+                }
             }
         }
     }
 
+    /** Disposes the shell and clears every controller attached by this fixture's app state. */
+    private fun disposeNotificationRoute(
+        shellMounted: MutableState<Boolean>,
+        appState: WhiteNoiseAppState,
+        mountedController: ConversationController?,
+    ) {
+        val fixtureControllers = mutableListOf<ConversationController>()
+        mountedController?.let(fixtureControllers::add)
+        try {
+            composeRule.runOnIdle {
+                appState.attachedConversationControllersForTest().forEach { controller ->
+                    fixtureControllers.addIfAbsentByIdentity(controller)
+                }
+                shellMounted.value = false
+            }
+            composeRule.waitForIdle()
+        } finally {
+            appState.attachedConversationControllersForTest().forEach { controller ->
+                fixtureControllers.addIfAbsentByIdentity(controller)
+            }
+            fixtureControllers.forEach { controller ->
+                appState.detachConversationController(controller)
+                controller.onCleared()
+            }
+        }
+    }
+
+    /** Releases activation after preload and returns the sole controller with its initial row. */
     private fun awaitMountedNotificationConversation(
         routeGate: NotificationRouteGate,
         handled: AtomicBoolean,
         appState: WhiteNoiseAppState,
     ): ConversationController {
-        check(routeGate.preloadCompleted.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-            "notification preload did not complete"
+        awaitCondition(
+            failureMessage = {
+                "notification preload did not complete: ${routeState(appState, handled = handled)} " +
+                    "preloadStarted=${routeGate.preloadStarted.count} " +
+                    "preloadCompleted=${routeGate.preloadCompleted.count}"
+            },
+        ) {
+            routeGate.preloadCompleted.count == 0L
         }
         routeGate.releaseActivation.countDown()
-        awaitCondition { handled.get() }
-        awaitCondition {
+        awaitCondition(
+            failureMessage = {
+                "notification target was not handled after activation: " +
+                    routeState(appState, handled = handled)
+            },
+        ) {
+            handled.get()
+        }
+        awaitCondition(
+            failureMessage = {
+                "initial routed timeline did not mount: ${routeState(appState, handled = handled)}"
+            },
+        ) {
             appState.attachedConversationControllersForTest().singleOrNull()?.let { controller ->
                 timelineMessageIds(controller) == listOf(ConversationTimelineTestIds.MESSAGE_A)
             } == true
@@ -156,18 +207,43 @@ class NotificationRouteTimelinePresentationTest {
         appState: WhiteNoiseAppState,
         firstSubscription: ScriptedConversationTimelineSubscription,
         mountedController: ConversationController,
+        scriptedSubscriptions: ScriptedConversationLiveSubscriptions,
     ) {
         assertFalse(ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(mountedController))
         appState.setAppInForeground(false)
-        awaitCondition { firstSubscription.nextWindowCallCount == 1 }
+        awaitCondition(
+            failureMessage = {
+                "initial subscription did not enter nextWindow: ${routeState(appState, mountedController)} " +
+                    "firstNext=${firstSubscription.nextWindowCallCount} " +
+                    "firstClose=${firstSubscription.closeCallCount}"
+            },
+        ) {
+            firstSubscription.nextWindowCallCount == 1
+        }
         firstSubscription.endWindows()
-        awaitCondition { firstSubscription.closeCallCount == 1 }
+        awaitCondition(
+            failureMessage = {
+                "initial subscription did not close after its window ended: " +
+                    "${routeState(appState, mountedController)} " +
+                    "firstNext=${firstSubscription.nextWindowCallCount} " +
+                    "firstClose=${firstSubscription.closeCallCount}"
+            },
+        ) {
+            firstSubscription.closeCallCount == 1
+        }
         runBlocking { mountedController.retryLoadFailure() }
-        awaitCondition {
+        awaitCondition(
+            failureMessage = {
+                "replacement subscription did not publish the recovered row: " +
+                    "${routeState(appState, mountedController)} " +
+                    "subscriptionOpens=${scriptedSubscriptions.timelineSubscriptionOpenCount}"
+            },
+        ) {
             ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(mountedController)
         }
     }
 
+    /** Simulates foreground resume and verifies that route recomposition retains the controller. */
     private fun resumeAfterForeground(
         appState: WhiteNoiseAppState,
         inboundRequestId: MutableState<Long>,
@@ -177,7 +253,12 @@ class NotificationRouteTimelinePresentationTest {
         composeRule.runOnIdle {
             inboundRequestId.value += 1L
         }
-        awaitCondition {
+        awaitCondition(
+            failureMessage = {
+                "foreground resume did not retain the recovered controller: " +
+                    "${routeState(appState, mountedController)} requestAdvanced=${inboundRequestId.value > 0L}"
+            },
+        ) {
             appState.attachedConversationControllersForTest().singleOrNull() === mountedController &&
                 ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(mountedController)
         }
@@ -194,12 +275,22 @@ class NotificationRouteTimelinePresentationTest {
         assertEquals(1, attachedControllers.size)
         assertSame(mountedController, attachedControllers.single())
         assertEquals(2, scriptedSubscriptions.timelineSubscriptionOpenCount)
-        awaitConversationCondition { replacementSubscription.nextWindowCallCount >= 1 }
+        awaitCondition(
+            failureMessage = {
+                "replacement subscription never requested its next window: " +
+                    "${routeState(appState, mountedController)} " +
+                    "subscriptionOpens=${scriptedSubscriptions.timelineSubscriptionOpenCount} " +
+                    "replacementNext=${replacementSubscription.nextWindowCallCount}"
+            },
+        ) {
+            replacementSubscription.nextWindowCallCount >= 1
+        }
         assertTimelineSubscriptionSnapshotBeforeFirstNextWindow(replacementSubscription)
         composeRule.onNodeWithText("notified body").assertIsDisplayed()
         assertFalse(attachedControllers.any { it !== mountedController })
     }
 
+    /** Coordinates background projection and account-activation boundaries without blocking the test owner. */
     private class NotificationRouteGate(
         preloadFinishesFirst: Boolean,
     ) {
@@ -209,6 +300,7 @@ class NotificationRouteTimelinePresentationTest {
         val releaseActivation = CountDownLatch(if (preloadFinishesFirst) 1 else 0)
     }
 
+    /** Builds the two-account app state with an injected scripted conversation subscription owner. */
     private fun notificationRouteAppState(
         scriptedSubscriptions: ScriptedConversationLiveSubscriptions,
         routeGate: NotificationRouteGate,
@@ -259,6 +351,7 @@ class NotificationRouteTimelinePresentationTest {
         }
     }
 
+    /** Supplies only the projection and activation calls required by the routed-open fixture. */
     private fun notificationRouteMarmot(routeGate: NotificationRouteGate): MarmotInterface =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
@@ -294,6 +387,7 @@ class NotificationRouteTimelinePresentationTest {
             }
         } as MarmotInterface
 
+    /** Returns the cached pre-gap row that the replacement timeline must advance. */
     private fun preGapChatListRow() =
         notificationChatListRow().let { row ->
             row.copy(
@@ -311,6 +405,7 @@ class NotificationRouteTimelinePresentationTest {
             )
         }
 
+    /** Produces a notification target only after the normal tap-token validation path accepts it. */
     private fun routedTarget(accountRef: String): InboundIntentRouting {
         val target =
             NotificationTarget(
@@ -334,6 +429,7 @@ class NotificationRouteTimelinePresentationTest {
         )
     }
 
+    /** Provides stable group metadata for the synthetic target conversation. */
     private fun groupDetails() =
         GroupDetailsFfi(
             group = conversationTimelineTestGroup(),
@@ -354,18 +450,44 @@ class NotificationRouteTimelinePresentationTest {
                 ),
         )
 
+    /**
+     * Pumps Compose, Robolectric main, and real worker time until one route phase completes.
+     * The monotonic deadline keeps the original real-time bound under full-suite contention.
+     */
     private fun awaitCondition(
-        failureMessage: (() -> String)? = null,
+        failureMessage: () -> String,
         condition: () -> Boolean,
     ) {
-        awaitConversationCondition(timeoutMs = ROUTE_TIMEOUT_MILLIS, condition = condition)
-        composeRule.waitForIdle()
-        ShadowLooper.idleMainLooper()
-        if (!condition()) {
-            throw AssertionError(failureMessage?.invoke() ?: "Condition not met after idle")
+        val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(ROUTE_TIMEOUT_MILLIS)
+        while (System.nanoTime() <= deadlineNanos) {
+            composeRule.waitForIdle()
+            ShadowLooper.idleMainLooper()
+            if (condition()) return
+            Thread.sleep(POLL_INTERVAL_MILLIS)
+            ShadowLooper.idleMainLooper(POLL_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
         }
+        throw AssertionError(failureMessage())
     }
 
+    /** Summarizes synthetic route ownership without logging account or message identifiers. */
+    private fun routeState(
+        appState: WhiteNoiseAppState,
+        mountedController: ConversationController? = null,
+        handled: AtomicBoolean? = null,
+    ): String {
+        val attachedControllers = appState.attachedConversationControllersForTest()
+        val mountedMessageIds = mountedController?.let(::timelineMessageIds).orEmpty()
+        return "targetAccountActive=${appState.activeAccountRef == TARGET_ACCOUNT} " +
+            "runtimeGeneration=${appState.runtimeGeneration} " +
+            "handled=${handled?.get()} " +
+            "attachedControllerCount=${attachedControllers.size} " +
+            "sameControllerMounted=${mountedController?.let { it in attachedControllers }} " +
+            "mountedMessageCount=${mountedMessageIds.size} " +
+            "mountedHasInitial=${ConversationTimelineTestIds.MESSAGE_A in mountedMessageIds} " +
+            "mountedHasRecovered=${ConversationTimelineTestIds.MESSAGE_B in mountedMessageIds}"
+    }
+
+    /** Reads the test-only controller registry while holding its production synchronization lock. */
     @Suppress("UNCHECKED_CAST")
     private fun WhiteNoiseAppState.attachedConversationControllersForTest(): List<ConversationController> {
         val lock =
@@ -382,10 +504,16 @@ class NotificationRouteTimelinePresentationTest {
         return synchronized(lock) { controllers.toList() }
     }
 
+    /** Adds a fixture controller once using ownership identity rather than value equality. */
+    private fun MutableList<ConversationController>.addIfAbsentByIdentity(controller: ConversationController) {
+        if (none { it === controller }) add(controller)
+    }
+
     private companion object {
         const val TARGET_ACCOUNT = "bob"
         val TARGET_ACCOUNT_ID = "ee".repeat(32)
         const val TAP_TOKEN = "timeline-route-token"
         const val ROUTE_TIMEOUT_MILLIS = 10_000L
+        const val POLL_INTERVAL_MILLIS = 10L
     }
 }

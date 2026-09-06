@@ -35,6 +35,12 @@ If Android seems to need a cache for protocol data, stop and ask whether the dat
 - Prefer `rg` for searching.
 - Before editing files, check the dirty worktree and preserve changes you did not make.
 
+## Manual release testing guide
+
+[`docs/manual-release-testing.md`](docs/manual-release-testing.md) is the canonical novice-facing release checklist. Every change to a user-visible route, label, action, state, permission, notification, Android entry point, supported configuration, or failure/recovery path must update the corresponding permanent test IDs in the same pull request. Add a new ID for new behavior; never renumber or reuse an ID. When behavior is removed, move its ID to the Retired IDs table and record the pull request or commit that removed it.
+
+Keep [`docs/manual-release-testing-surfaces.json`](docs/manual-release-testing-surfaces.json) synchronized with source symbols and active test IDs. Run `python3 scripts/check_manual_test_guide.py` and `python3 -m unittest scripts/test_check_manual_test_guide.py` after modifying the guide, its inventory, or a user-facing surface. The guide's boxes stay unchecked in Git; testers copy the checklist elsewhere for a run.
+
 ## Visual Change Evidence
 
 - Every pull request that changes rendered UI must add or update a deterministic

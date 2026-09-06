@@ -1316,6 +1316,8 @@
     <string name="dictation_provider_unavailable">Speech recognition isn’t available</string>
     <string name="dictation_permission_denied">Microphone permission is needed</string>
     <string name="dictation_permission_denied_permanently">Allow microphone access in Settings</string>
+    <string name="dictation_microphone_muted">Microphone access is off</string>
+    <string name="dictation_microphone_muted_help">Turn on microphone access in Android privacy settings or Quick Settings, then try dictation again.</string>
     <string name="dictation_microphone_in_use">The microphone is already in use</string>
     <string name="dictation_no_speech">No speech was recognized</string>
     <string name="dictation_network_error">Speech service couldn’t connect</string>

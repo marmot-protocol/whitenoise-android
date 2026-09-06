@@ -45,8 +45,12 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.ChatRow
+import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_TIMELINE_TAIL_GAP
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -85,6 +89,7 @@ class WarmResumeFirstUsefulFrameScreenshotTest {
         )
     }
 
+    /** Captures a retained conversation with the #415 single-tail-gap contract. */
     @Test
     fun retainedConversationFirstFrameLight() {
         captureConversationFirstFrame(
@@ -94,6 +99,7 @@ class WarmResumeFirstUsefulFrameScreenshotTest {
         )
     }
 
+    /** Repeats the retained #415 contract under large-font RTL rendering. */
     @Test
     fun retainedConversationFirstFrameAmoledLargeFontRtl() {
         captureConversationFirstFrame(
@@ -196,6 +202,7 @@ class WarmResumeFirstUsefulFrameScreenshotTest {
                 composeRule.waitForIdle()
                 composeRule.onNodeWithText(CACHED_MESSAGE).assertIsDisplayed()
                 progressNodes().assertCountEquals(0)
+                assertSingleTailGap(CACHED_MESSAGE_ID)
                 composeRule
                     .onRoot()
                     .captureRoboImage("src/test/snapshots/$snapshotName.png")
@@ -210,6 +217,25 @@ class WarmResumeFirstUsefulFrameScreenshotTest {
         composeRule.onAllNodes(
             SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo),
         )
+
+    /** Asserts that restored geometry leaves one resting interval above the composer. */
+    private fun assertSingleTailGap(messageId: String) {
+        val transcriptBottom =
+            composeRule
+                .onNodeWithTag(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE)
+                .fetchSemanticsNode()
+                .boundsInRoot.bottom
+        val tailBottom =
+            composeRule
+                .onNodeWithTag(messageBubbleRowTestTag(messageId), useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot.bottom
+        assertEquals(
+            with(composeRule.density) { CONVERSATION_TIMELINE_TAIL_GAP.toPx() },
+            transcriptBottom - tailBottom,
+            1f,
+        )
+    }
 
     private inline fun withUtcTimeZone(block: () -> Unit) {
         val original = TimeZone.getDefault()
@@ -255,7 +281,7 @@ class WarmResumeFirstUsefulFrameScreenshotTest {
 
     private fun cachedPreview() =
         ChatListMessagePreviewFfi(
-            messageIdHex = "05" + "00".repeat(31),
+            messageIdHex = CACHED_MESSAGE_ID,
             sender = "02" + "00".repeat(31),
             senderDisplayName = "Cached sender",
             plaintext = CACHED_MESSAGE,
@@ -368,6 +394,7 @@ class WarmResumeFirstUsefulFrameScreenshotTest {
         const val ACCOUNT_REF = "personal"
         const val GROUP_NAME = "Restored project room"
         const val CACHED_MESSAGE = "Cached hello on the first frame"
+        val CACHED_MESSAGE_ID = "05" + "00".repeat(31)
         val ACCOUNT_ID = "01" + "00".repeat(31)
         val GROUP_ID = "04" + "00".repeat(31)
     }

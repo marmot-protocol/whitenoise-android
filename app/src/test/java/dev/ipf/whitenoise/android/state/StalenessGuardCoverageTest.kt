@@ -90,8 +90,18 @@ class StalenessGuardCoverageTest {
                     listOf("accountStillBound", "isActiveBindEpoch(epoch)"),
                 "Controllers.kt:refreshCurrentTimeline" to
                     listOf("timelineWindowGeneration.advance", "timelineWindowGeneration.isCurrent"),
+                "Controllers.kt:beginMemberRosterRefresh" to
+                    listOf(
+                        "accountTeardownRequested",
+                        "controllerCleared",
+                        "memberRosterRefreshGeneration.advance",
+                    ),
                 "Controllers.kt:refreshMembers" to
-                    listOf("memberRosterRefreshGeneration.advance", "memberRosterRefreshGeneration.isCurrent"),
+                    listOf(
+                        "beginMemberRosterRefresh",
+                        "memberRosterRefreshGeneration.runIfCurrent",
+                        "memberRosterRefreshGeneration.isCurrent",
+                    ),
                 "Controllers.kt:performMediaUpload" to
                     listOf("shouldAcceptMediaUploadForAccount", "mediaUploadSessionEpoch"),
                 "Controllers.kt:refreshManagementState" to

@@ -1,5 +1,35 @@
 # Composer dictation compatibility matrix
 
+## App-owned dictation update (2026-09-06)
+
+PR [2496](https://github.com/marmot-protocol/whitenoise-android/pull/2496)
+selects the app-owned recognizer from the composer. The compatibility matrix
+below records the earlier, pre-2198 provider-Activity default; statements that
+the composer does not select app-owned recognition are historical. This branch
+also carries a provider-Activity recovery path after a recognizer permission
+error with no accumulated transcript.
+
+Microphone permission and the device-wide microphone privacy switch are
+different gates. Since Android 16, the effective AppOps check can reject an app
+with a valid runtime grant while that switch is off. White Noise must not
+classify microphone mute as a permanent app-permission denial. Show an explicit
+Microphone access is off dialog with a link to Android privacy settings, without
+starting a muted recording or foreground service. Offline Voice Input can show
+Listening while globally muted on the physical GrapheneOS fixture; do not rely
+on provider UI to explain this gate. White Noise never changes the privacy
+switch. Android does not expose the software toggle's current state to ordinary
+apps, so an effective AppOps denial with a valid runtime grant uses the same
+visible privacy recovery. Without a runtime grant, request RECORD_AUDIO normally.
+
+Test both initial runtime denial and an existing while-in-use grant with the
+global switch off/on. Keep the microphone enabled throughout speech capture,
+provider decoding, and Done; then restore the fixture's original privacy state.
+Verify actual recognized text in the origin draft, and never send fixture text.
+The microphone-access regression exercises the Android platform implementation
+with an effective privacy denial, rather than only a fake controller grant.
+
+## Historical compatibility matrix (before PR 2496)
+
 This runbook is the source of truth for the Android speech contracts that White
 Noise can use for composer dictation. It covers
 [#2276](https://github.com/marmot-protocol/whitenoise-android/issues/2276) and

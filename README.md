@@ -108,13 +108,12 @@ secrets:
 - `WHITENOISE_STAGING_KEYSTORE_PASSWORD`
 - `WHITENOISE_STAGING_KEY_ALIAS`
 - `WHITENOISE_STAGING_KEY_PASSWORD`
-- `WHITENOISE_STAGING_OTLP_ENDPOINT`
+- `WHITENOISE_OTLP_ENDPOINT`
 - `WHITENOISE_STAGING_OTLP_AUTH_TOKEN`
-- `WHITENOISE_STAGING_AUDIT_LOG_ENDPOINT`
-- `WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN`
-- `WHITENOISE_STAGING_TELEMETRY_TENANT`
+- `WHITENOISE_AUDIT_LOG_ENDPOINT`
+- `WHITENOISE_AUDIT_LOG_AUTH_TOKEN`
 - `WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX`
-- `WHITENOISE_STAGING_PUSH_RELAY_HINT`
+- `WHITENOISE_PUSH_RELAY_HINT`
 
 Run the same fast checks locally before pushing:
 
@@ -200,52 +199,49 @@ non-publishable local smoke or reproducibility build, set:
 
 Runtime configuration is also read from `local.properties` or environment variables so endpoints and tokens stay out of Git.
 
-**Dev telemetry / audit:**
+**Shared runtime values:**
 
-- `WHITENOISE_DEV_OTLP_ENDPOINT`
+- `WHITENOISE_OTLP_ENDPOINT` — shared by dev, staging, and production.
+- `WHITENOISE_AUDIT_LOG_ENDPOINT` — shared by staging and production.
+- `WHITENOISE_AUDIT_LOG_AUTH_TOKEN` — shared by staging and production, separate from OTLP auth.
+- `WHITENOISE_PUSH_RELAY_HINT` — shared by staging and production (production defaults to `wss://relay.eu.whitenoise.chat`).
+
+**Flavor-specific OTLP tokens:**
+
 - `WHITENOISE_DEV_OTLP_AUTH_TOKEN`
+- `WHITENOISE_STAGING_OTLP_AUTH_TOKEN`
+- `WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN`
+
+The token selects the telemetry tenant. There is no shared token fallback.
+Legacy token aliases `OTLP_TOKEN_WHITENOISE_ANDROID_DEV`,
+`OTLP_TOKEN_WHITENOISE_ANDROID_STAGING`, and `OTLP_TOKEN_WHITENOISE_ANDROID`
+remain accepted for their respective flavors.
+
+No tenant secret is read. MarmotKit requires a nonempty tenant resource attribute,
+so Android supplies fixed compatibility values (`whitenoise-android`,
+`whitenoise-android-staging`, and `whitenoise-android-dev`). HTTP authentication
+and tenant routing use the bearer token. The separate deployment environment
+attribute remains `production`, `staging`, or `development`, respectively.
+
+**Push identities (MIP-05):**
+
+- `WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX` — staging push-server identity.
+- `WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX` — production push-server identity
+  (`WHITENOISE_PUSH_SERVER_PUBKEY_HEX` remains a production fallback).
+
+**Dev audit and push:**
+
+Dev does not inherit shared Goggles credentials or staging/production push
+identities. Explicit dev configuration remains available:
+
 - `WHITENOISE_DEV_AUDIT_LOG_ENDPOINT`
 - `WHITENOISE_DEV_AUDIT_LOG_AUTH_TOKEN`
-- `WHITENOISE_DEV_TELEMETRY_TENANT` (defaults to `whitenoise-android-dev`)
-
-Dev also accepts `OTLP_TOKEN_WHITENOISE_ANDROID_DEV` as an OTLP auth-token alias.
-
-**Dev push (MIP-05):**
-
-- `WHITENOISE_DEV_PUSH_SERVER_PUBKEY_HEX` — dev push-server identity pubkey
+- `WHITENOISE_DEV_PUSH_SERVER_PUBKEY_HEX`
 - `WHITENOISE_DEV_PUSH_RELAY_HINT`
 
-**Production telemetry / audit:**
-
-- `WHITENOISE_PRODUCTION_OTLP_ENDPOINT`
-- `WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN`
-- `WHITENOISE_PRODUCTION_AUDIT_LOG_ENDPOINT`
-- `WHITENOISE_PRODUCTION_AUDIT_LOG_AUTH_TOKEN`
-- `WHITENOISE_PRODUCTION_TELEMETRY_TENANT` (defaults to `whitenoise-android`)
-
-Production also accepts `OTLP_TOKEN_WHITENOISE_ANDROID` as an OTLP auth-token alias. Global `WHITENOISE_*` runtime names are accepted as production fallbacks.
-
-**Production push (MIP-05):**
-
-- `WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX` — push-server identity pubkey
-- `WHITENOISE_PRODUCTION_PUSH_RELAY_HINT` (defaults to `wss://relay.eu.whitenoise.chat`)
-
-**Staging telemetry / audit:**
-
-- `WHITENOISE_STAGING_OTLP_ENDPOINT`
-- `WHITENOISE_STAGING_OTLP_AUTH_TOKEN`
-- `WHITENOISE_STAGING_AUDIT_LOG_ENDPOINT`
-- `WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN`
-- `WHITENOISE_STAGING_TELEMETRY_TENANT` (defaults to `whitenoise-android-staging`)
-
-Staging also accepts `OTLP_TOKEN_WHITENOISE_ANDROID_STAGING` as an OTLP auth-token alias.
-
-**Staging push (MIP-05):**
-
-- `WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX` — staging push-server identity pubkey
-- `WHITENOISE_STAGING_PUSH_RELAY_HINT`
-
-Unset push values mean the runtime treats push as unconfigured rather than registering against a default server.
+Without these values dev uploads and push registration are unconfigured. Local
+audit recording is separate. Dev OTLP needs its own token as well as the shared
+endpoint. Preview keeps telemetry, audit, and push configuration empty.
 
 `app/google-services.json` is optional for dev, preview, and explicitly unsigned
 reproducibility builds. Signed production packaging requires the file and an
@@ -314,6 +310,8 @@ artifacts plus the recorded toolchain from
 [`.github/workflows/android-repro-verify.yml`](.github/workflows/android-repro-verify.yml).
 
 ## Device Testing
+
+Release candidates are tested with the stable, numbered [manual release testing checklist](docs/manual-release-testing.md). Use its permanent test IDs in every failure report so results remain actionable across releases.
 
 For local device checks, prefer:
 

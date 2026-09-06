@@ -140,6 +140,8 @@ fun runtimeConfigProperty(
 
 fun String.asBuildConfigString(): String = "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
+// Endpoints and Goggles credentials are shared; OTLP tokens and push identities
+// are flavor-specific. Preview deliberately receives none of these inputs.
 fun environmentRuntimeConfigProperty(
     environment: String,
     suffix: String,
@@ -223,12 +225,7 @@ val productionPushServerPubkeyHex =
         includeGlobalFallbacks = true,
     )
 val productionPushRelayHint =
-    environmentRuntimeConfigProperty(
-        environment = "production",
-        suffix = "PUSH_RELAY_HINT",
-        defaultValue = "wss://relay.eu.whitenoise.chat",
-        includeGlobalFallbacks = true,
-    )
+    runtimeConfigProperty("WHITENOISE_PUSH_RELAY_HINT", "wss://relay.eu.whitenoise.chat")
 
 // PR preview inputs. The default "stable" channel deliberately keeps one
 // applicationId so every PR preview updates the same app and retains its data.
@@ -310,7 +307,7 @@ android {
             buildConfigField(
                 "String",
                 "WHITENOISE_OTLP_ENDPOINT",
-                environmentRuntimeConfigProperty("dev", "OTLP_ENDPOINT").asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_OTLP_ENDPOINT").asBuildConfigString(),
             )
             buildConfigField(
                 "String",
@@ -333,14 +330,12 @@ android {
             )
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "dev".asBuildConfigString())
             buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "true")
+            // Compatibility metadata required by MarmotKit. Tenant routing is
+            // selected by the OTLP bearer token, not this fixed resource value.
             buildConfigField(
                 "String",
                 "WHITENOISE_TELEMETRY_TENANT",
-                environmentRuntimeConfigProperty(
-                    environment = "dev",
-                    suffix = "TELEMETRY_TENANT",
-                    defaultValue = "whitenoise-android-dev",
-                ).asBuildConfigString(),
+                "whitenoise-android-dev".asBuildConfigString(),
             )
             buildConfigField(
                 "String",
@@ -406,11 +401,7 @@ android {
             buildConfigField(
                 "String",
                 "WHITENOISE_OTLP_ENDPOINT",
-                environmentRuntimeConfigProperty(
-                    environment = "production",
-                    suffix = "OTLP_ENDPOINT",
-                    includeGlobalFallbacks = true,
-                ).asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_OTLP_ENDPOINT").asBuildConfigString(),
             )
             buildConfigField(
                 "String",
@@ -418,18 +409,13 @@ android {
                 environmentRuntimeConfigProperty(
                     environment = "production",
                     suffix = "OTLP_AUTH_TOKEN",
-                    includeGlobalFallbacks = true,
                     extraKeys = listOf("OTLP_TOKEN_WHITENOISE_ANDROID"),
                 ).asBuildConfigString(),
             )
             buildConfigField(
                 "String",
                 "WHITENOISE_AUDIT_LOG_ENDPOINT",
-                environmentRuntimeConfigProperty(
-                    environment = "production",
-                    suffix = "AUDIT_LOG_ENDPOINT",
-                    includeGlobalFallbacks = true,
-                ).asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_AUDIT_LOG_ENDPOINT").asBuildConfigString(),
             )
             // Deliberately no OTLP fallback: the audit-log tracker (Goggles) is a
             // separate service from the OTLP metrics collector. If the dedicated
@@ -438,27 +424,20 @@ android {
             buildConfigField(
                 "String",
                 "WHITENOISE_AUDIT_LOG_AUTH_TOKEN",
-                environmentRuntimeConfigProperty(
-                    environment = "production",
-                    suffix = "AUDIT_LOG_AUTH_TOKEN",
-                    includeGlobalFallbacks = true,
-                ).asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
             )
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "production".asBuildConfigString())
+            // Compatibility metadata required by MarmotKit. Tenant routing is
+            // selected by the OTLP bearer token, not this fixed resource value.
             buildConfigField(
                 "String",
                 "WHITENOISE_TELEMETRY_TENANT",
-                environmentRuntimeConfigProperty(
-                    environment = "production",
-                    suffix = "TELEMETRY_TENANT",
-                    defaultValue = "whitenoise-android",
-                    includeGlobalFallbacks = true,
-                ).asBuildConfigString(),
+                "whitenoise-android".asBuildConfigString(),
             )
             // Push gateway configuration. The pubkey identifies the MIP-05 push
             // server that takes FCM tokens, encrypts notifications, and hands them
-            // to the relay hint below for delivery. Both values are provisioned
-            // per environment via local.properties (or the environment). The
+            // to the shared relay hint below for delivery. The pubkey is
+            // provisioned per environment via local.properties (or the environment). The
             // production packaging guard rejects missing or malformed values.
             buildConfigField(
                 "String",
@@ -488,7 +467,7 @@ android {
             buildConfigField(
                 "String",
                 "WHITENOISE_OTLP_ENDPOINT",
-                environmentRuntimeConfigProperty("staging", "OTLP_ENDPOINT").asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_OTLP_ENDPOINT").asBuildConfigString(),
             )
             buildConfigField(
                 "String",
@@ -502,12 +481,12 @@ android {
             buildConfigField(
                 "String",
                 "WHITENOISE_AUDIT_LOG_ENDPOINT",
-                environmentRuntimeConfigProperty("staging", "AUDIT_LOG_ENDPOINT").asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_AUDIT_LOG_ENDPOINT").asBuildConfigString(),
             )
             buildConfigField(
                 "String",
                 "WHITENOISE_AUDIT_LOG_AUTH_TOKEN",
-                environmentRuntimeConfigProperty("staging", "AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
             )
             buildConfigField(
                 "boolean",
@@ -521,14 +500,12 @@ android {
             )
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "staging".asBuildConfigString())
             buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "true")
+            // Compatibility metadata required by MarmotKit. Tenant routing is
+            // selected by the OTLP bearer token, not this fixed resource value.
             buildConfigField(
                 "String",
                 "WHITENOISE_TELEMETRY_TENANT",
-                environmentRuntimeConfigProperty(
-                    environment = "staging",
-                    suffix = "TELEMETRY_TENANT",
-                    defaultValue = "whitenoise-android-staging",
-                ).asBuildConfigString(),
+                "whitenoise-android-staging".asBuildConfigString(),
             )
             buildConfigField(
                 "String",
@@ -538,7 +515,7 @@ android {
             buildConfigField(
                 "String",
                 "WHITENOISE_PUSH_RELAY_HINT",
-                environmentRuntimeConfigProperty("staging", "PUSH_RELAY_HINT").asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_PUSH_RELAY_HINT").asBuildConfigString(),
             )
         }
 
@@ -611,6 +588,12 @@ android {
             kotlin.srcDir(marmotKitPreparedDir.resolve("kotlin"))
             @Suppress("DEPRECATION")
             jniLibs.srcDir(marmotKitPreparedDir.resolve("jniLibs"))
+        }
+        getByName("test") {
+            kotlin.directories.add("src/testSupport/kotlin")
+        }
+        getByName("androidTest") {
+            kotlin.directories.add("src/testSupport/kotlin")
         }
     }
     packaging {
@@ -859,8 +842,7 @@ val verifyProductionPushConfig =
             if (!isValidProductionPushRelayHint(productionPushRelayHint)) {
                 throw GradleException(
                     "Production release packaging requires " +
-                        "WHITENOISE_PRODUCTION_PUSH_RELAY_HINT " +
-                        "(or WHITENOISE_PUSH_RELAY_HINT) to be a valid wss:// URI.",
+                        "WHITENOISE_PUSH_RELAY_HINT to be a valid wss:// URI.",
                 )
             }
         }

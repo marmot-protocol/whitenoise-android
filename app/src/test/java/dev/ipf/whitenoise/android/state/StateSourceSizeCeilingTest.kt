@@ -15,6 +15,7 @@ import java.io.File
  * `./gradlew :app:koverXmlReportDevZapstoreDebug`.
  */
 class StateSourceSizeCeilingTest {
+    /** Keeps both large state sources at or below their reviewed growth ratchets. */
     @Test
     fun controllersAndAppStateStayWithinGrowthCeiling() {
         assertTrue(
@@ -27,6 +28,7 @@ class StateSourceSizeCeilingTest {
         )
     }
 
+    /** Verifies the helper matches `wc -l` semantics for a trailing newline. */
     @Test
     fun lineCountHelperCountsPhysicalLinesLikeWc() {
         val temp = File.createTempFile("state-source-ceiling", ".kt")
@@ -34,6 +36,7 @@ class StateSourceSizeCeilingTest {
         assertEquals(3, sourceLineCount(temp))
     }
 
+    /** Resolves a state source by name and returns its physical line count. */
     private fun sourceLineCount(name: String): Int = sourceLineCount(sourceFile(name))
 
     internal companion object {
@@ -42,13 +45,16 @@ class StateSourceSizeCeilingTest {
         // chat-list convergence and notification-open fixes; keep this ratchet exact.
         const val CONTROLLERS_MAX_LINES = 12877
 
-        // Deliberately raised for PR #2392's covered app-owned dictation integration. Keep this exact so
-        // unrelated AppState growth remains blocked after the stacked branch is merged with current master.
-        const val APP_STATE_MAX_LINES = 10226
+        // Raised exactly for PR #2498's covered account-fenced draft refresh, live controller handoff,
+        // and optimistic-preview routing. The integration tests exercise delayed A-B-A completion,
+        // same-account replacement, permanent detach, failure, and ambiguous-pending paths. Corrected
+        // to the physical line count already present at that merged revision.
+        const val APP_STATE_MAX_LINES = 10263
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }
 
+        /** Finds a state source from either the module or repository working directory. */
         private fun sourceFile(name: String): File =
             listOf(
                 File("src/main/java/dev/ipf/whitenoise/android/state/$name"),
