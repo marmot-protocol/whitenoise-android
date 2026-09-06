@@ -4276,16 +4276,18 @@ class WhiteNoiseAppState private constructor(
         )
     }
 
-    suspend fun ensureNotificationRuntimeStarted() {
+    /**
+     * Starts the receiver and returns whether any observed pending push catch-up succeeded.
+     * Ordinary startup callers may continue with local state after a failed fetch; a push-wake
+     * owner must inspect the result so its bounded supervisor can retry while still in background.
+     */
+    suspend fun ensureNotificationRuntimeStarted(): Boolean {
         if (!bootstrapCompleted) {
             bootstrap()
             val receiverReady = bootstrapCompleted && notificationReceiverActive.value
-            if (receiverReady) {
-                drainPendingNativePushRegistrationSyncIfNeeded()
-                drainPendingPushWakeCatchUpIfNeeded()
-            }
             if (!receiverReady) throw receiverUnavailable()
-            return
+            drainPendingNativePushRegistrationSyncIfNeeded()
+            return drainPendingPushWakeCatchUpIfNeeded()
         }
         localNotificationPresenter.ensureChannels()
         refreshLocalNotificationPermission()
@@ -4293,7 +4295,7 @@ class WhiteNoiseAppState private constructor(
         if (accounts.isEmpty()) refreshAccounts()
         refreshLocalNotificationSettings()
         drainPendingNativePushRegistrationSyncIfNeeded()
-        drainPendingPushWakeCatchUpIfNeeded()
+        return drainPendingPushWakeCatchUpIfNeeded()
     }
 
     /** Captures the active notification-runtime recovery lifetime. */
@@ -4303,6 +4305,7 @@ class WhiteNoiseAppState private constructor(
     internal fun notificationRuntimeRecoveryAllowed(generation: Long): Boolean =
         !networkNotificationRecoverySuppressed && notificationRuntimeRecovery.isCurrent(generation)
 
+    /** Re-establishes receiver readiness within the reconnect budget before admitting native catch-up. */
     private suspend fun ensureNotificationReceiverForNetworkReconnect(): Boolean {
         if (!bootstrapCompleted) bootstrap()
         if (!bootstrapCompleted || networkNotificationRecoverySuppressed) return false
@@ -4330,33 +4333,31 @@ class WhiteNoiseAppState private constructor(
             notificationJob.isActive()
     }
 
+    /** Starts push catch-up with the drain waiter armed before the runtime can emit an update. */
     suspend fun ensureNotificationRuntimeStartedAndAwaitPushDrain(timeoutMs: Long = NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS): Boolean =
-        coroutineScope {
-            val sequenceBeforeStart = notificationDrainSequence.get()
-            val drain =
-                async(start = CoroutineStart.UNDISPATCHED) {
-                    withTimeoutOrNull(timeoutMs) {
-                        notificationDrainSignals.first { it > sequenceBeforeStart }
-                    } != null
-                }
-            ensureNotificationRuntimeStarted()
-            drain.await()
-        }
+        awaitNotificationPushDrain(
+            sequenceBeforeStart = notificationDrainSequence.get(),
+            notificationDrainSignals = notificationDrainSignals,
+            timeoutMs = timeoutMs,
+            startRuntime = ::ensureNotificationRuntimeStarted,
+            keepConnected = { backgroundConnectionEnabled },
+        )
 
+    /** Retries a persisted token-registration obligation when notification startup reaches a usable runtime. */
     private suspend fun drainPendingNativePushRegistrationSyncIfNeeded() {
         if (pushTokenStore.nativePushRegistrationSyncPending()) {
             syncNativePushRegistrationIfEnabled()
         }
     }
 
-    /** Runs work started after the durable wake before clearing its matching generation. */
-    private suspend fun drainPendingPushWakeCatchUpIfNeeded() {
+    /** Returns fetch success, acknowledging only the matching durable wake after fresh work. */
+    private suspend fun drainPendingPushWakeCatchUpIfNeeded(): Boolean {
         val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
-        if (pendingGeneration == 0L) return
-        catchUpAfterObservedPushWake(
+        if (pendingGeneration == 0L) return true
+        return catchUpAfterObservedPushWake(
             pendingGeneration = pendingGeneration,
             trigger = PerformanceTrigger.PUSH_WAKE,
-        )
+        ).succeeded
     }
 
     /** Clears only the durable wake generation acknowledged by successful fresh work. */
