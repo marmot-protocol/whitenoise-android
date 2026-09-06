@@ -47,6 +47,7 @@ class ConversationDictationForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     /** Promotes capture before routing metadata-free Cancel/Paste/Send actions to the process owner. */
+    @Suppress("CyclomaticComplexMethod", "ReturnCount") // Early returns reject stale ownership commands.
     override fun onStartCommand(
         intent: Intent?,
         flags: Int,

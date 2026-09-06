@@ -405,7 +405,9 @@ class ConversationDictationForegroundServiceTest {
         assertTrue(ConversationDictationForegroundService.start(context, "current-session"))
         assertEquals(
             "current-session",
-            shadowOf(context).nextStartedService.getStringExtra(ConversationDictationForegroundService.EXTRA_SESSION_TOKEN),
+            shadowOf(context)
+                .nextStartedService
+                .getStringExtra(ConversationDictationForegroundService.EXTRA_SESSION_TOKEN),
         )
     }
 

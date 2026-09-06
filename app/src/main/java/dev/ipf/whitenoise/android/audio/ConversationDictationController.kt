@@ -359,7 +359,9 @@ internal class ConversationDictationController internal constructor(
         onBeforeRecognition = onBeforeRecognition,
         tryAcquireMicrophone = tryAcquireMicrophone,
         releaseMicrophone = releaseMicrophone,
-        startDurableSession = { token, _ -> ConversationDictationForegroundService.start(context.applicationContext, token) },
+        startDurableSession = { token, _ ->
+            ConversationDictationForegroundService.start(context.applicationContext, token)
+        },
         stopDurableSession = { ConversationDictationForegroundService.stop(context.applicationContext) },
         finishAfterSilenceMillis = finishAfterSilenceMillis,
         deliveryMode = deliveryMode,
@@ -610,6 +612,8 @@ internal class ConversationDictationController internal constructor(
     /** Stops recognition and sends only after the existing origin/draft safety checks pass. */
     fun send() = stopWithDeliveryMode(ConversationDictationDeliveryMode.SendOnFinish)
 
+    // Completion ownership checks stay together so every early exit remains fail-closed.
+    @Suppress("CyclomaticComplexMethod")
     private fun stopWithDeliveryMode(deliveryMode: ConversationDictationDeliveryMode?) {
         val current = state
         if (finishRequested) return
@@ -847,10 +851,21 @@ internal class ConversationDictationController internal constructor(
     }
 
     /** Starts capture only after this session's foreground promotion and enqueue are both confirmed. */
-    @Suppress("ReturnCount") // Reject stale callbacks before touching platform or microphone state.
+    @Suppress(
+        "ComplexCondition",
+        "CyclomaticComplexMethod",
+        "ReturnCount",
+    )
     fun onDurableServiceReady(sessionToken: String) {
         val current = state as? ConversationDictationState.Starting ?: return
-        if (!durableSession || durableSessionReady || notificationSessionToken != sessionToken || finishRequested) return
+        if (
+            !durableSession ||
+            durableSessionReady ||
+            notificationSessionToken != sessionToken ||
+            finishRequested
+        ) {
+            return
+        }
         promotionReadyReceived = true
         if (!durableStartAccepted) return
         try {
@@ -1212,6 +1227,7 @@ internal class ConversationDictationController internal constructor(
     }
 
     /** Retries one code-9 denial only after fresh native-mode safety checks. */
+    @Suppress("CyclomaticComplexMethod") // Keep retry fencing and failure mapping in one decision.
     private fun recoverPermissionFailure(
         sessionId: Long,
         target: ConversationDictationTarget,
@@ -1276,6 +1292,7 @@ internal class ConversationDictationController internal constructor(
     }
 
     /** Opens a fresh provider generation after a fenced, cancellable delay. */
+    @Suppress("ComplexCondition") // All four predicates fence one immutable scheduled restart.
     private fun scheduleRestart(
         sessionId: Long,
         target: ConversationDictationTarget,
@@ -1305,6 +1322,7 @@ internal class ConversationDictationController internal constructor(
     }
 
     /** Rechecks every revocable native precondition after the delay and before reacquiring capture. */
+    @Suppress("CyclomaticComplexMethod") // Keep every revocable precondition in one fail-closed boundary.
     private fun resumeRecognitionAfterDelay(
         sessionId: Long,
         target: ConversationDictationTarget,
