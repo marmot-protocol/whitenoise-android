@@ -5741,7 +5741,7 @@ class WhiteNoiseAppState private constructor(
             eventIdHex = eventIdHex,
             sourceRelays = sourceRelays,
             classify = { relays -> marmotIo { classifyRelayEndpoints(relays) } },
-            resolve = ::resolveRelayHost,
+            resolve = { host -> resolveKeyPackageDeletionHost(host) },
             delete = { account, eventId, relays ->
                 marmotIo { deleteAccountKeyPackage(account, eventId, relays) }
             },
@@ -5753,7 +5753,7 @@ class WhiteNoiseAppState private constructor(
         eventIdHex: String,
         sourceRelays: List<String>,
         classify: suspend (List<String>) -> List<RelayEndpointClassificationFfi>,
-        resolve: RelayHostResolver,
+        resolve: KeyPackageDeletionHostResolver,
         delete: suspend (accountRef: String, eventIdHex: String, relays: List<String>) -> Unit,
     ): Boolean {
         val account = activeAccountRef?.takeIf { it == accountRef }
@@ -5769,7 +5769,7 @@ class WhiteNoiseAppState private constructor(
                 },
                 delete = { relays -> delete(account, eventIdHex, relays) },
             )
-        return presentKeyPackageDeletionResult(result, AppText.Plain(RELAY_HOSTS_UNAVAILABLE_MESSAGE))
+        return presentKeyPackageDeletionResult(result, AppText.Resource(R.string.error_couldnt_verify_relay_hosts))
     }
 
     suspend fun publishNewKeyPackage(): Boolean {

@@ -942,6 +942,7 @@
     <string name="toast_key_package_deleted">Key package deleted</string>
     <string name="toast_couldnt_delete_key_package">Couldn\'t delete key package</string>
     <string name="error_no_safe_key_package_source_relay">No safe source relay is available. Refresh key packages and try again.</string>
+    <string name="error_couldnt_verify_relay_hosts">Couldn\'t verify relay hosts. Check your connection and try again.</string>
     <string name="toast_new_key_package_published">New key package published</string>
     <string name="toast_couldnt_publish_key_package">Couldn\'t publish key package</string>
     <string name="toast_key_package_republished">Key package republished</string>

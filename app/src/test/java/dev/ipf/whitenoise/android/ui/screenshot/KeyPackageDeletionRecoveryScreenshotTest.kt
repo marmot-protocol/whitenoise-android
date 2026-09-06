@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
@@ -59,18 +60,32 @@ class KeyPackageDeletionRecoveryScreenshotTest {
     @Test
     fun noUsableRelayDarkLargeRtl() = capture(darkTheme = true, largeRtl = true, suffix = "dark_large_rtl")
 
+    /** Exercises localized DNS recovery in a long-language, narrow, doubled-font RTL snackbar. */
+    @Test
+    @Config(qualifiers = "de-w360dp-h780dp-mdpi")
+    fun unavailableHostVerificationGermanDarkLargeRtl() =
+        capture(
+            darkTheme = true,
+            largeRtl = true,
+            suffix = "dns_unavailable_german_dark_large_rtl",
+            result = KeyPackageDeletionResult.HostVerificationUnavailable,
+            detailResource = R.string.error_couldnt_verify_relay_hosts,
+        )
+
     /** Renders the actual AppState result through the same snackbar visuals used by the app shell. */
     private fun capture(
         darkTheme: Boolean,
         largeRtl: Boolean,
         suffix: String,
+        result: KeyPackageDeletionResult = KeyPackageDeletionResult.NoUsableRelay,
+        @StringRes detailResource: Int = R.string.error_no_safe_key_package_source_relay,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val toast = presentRecovery(context)
+        val toast = presentRecovery(context, result, detailResource)
         val message = listOfNotNull(toast.title.resolve(context), toast.detail?.resolve(context)).joinToString("\n")
         val expectedMessage =
             context.getString(R.string.toast_couldnt_delete_key_package) + "\n" +
-                context.getString(R.string.error_no_safe_key_package_source_relay)
+                context.getString(detailResource)
         assertEquals(expectedMessage, message)
 
         composeRule.setContent {
@@ -111,7 +126,11 @@ class KeyPackageDeletionRecoveryScreenshotTest {
     }
 
     /** Asserts the cause-specific resource contract before any snackbar fixture constructs display text. */
-    private fun presentRecovery(context: Context): ToastMessage {
+    private fun presentRecovery(
+        context: Context,
+        result: KeyPackageDeletionResult,
+        @StringRes detailResource: Int,
+    ): ToastMessage {
         val appState =
             WhiteNoiseAppState(
                 context = context,
@@ -122,13 +141,13 @@ class KeyPackageDeletionRecoveryScreenshotTest {
             )
         assertFalse(
             appState.presentKeyPackageDeletionResult(
-                result = KeyPackageDeletionResult.NoUsableRelay,
-                hostVerificationDetail = AppText.Plain("unused DNS recovery"),
+                result = result,
+                hostVerificationDetail = AppText.Resource(R.string.error_couldnt_verify_relay_hosts),
             ),
         )
         return requireNotNull(appState.toast).also { toast ->
             assertEquals(AppText.Resource(R.string.toast_couldnt_delete_key_package), toast.title)
-            assertEquals(AppText.Resource(R.string.error_no_safe_key_package_source_relay), toast.detail)
+            assertEquals(AppText.Resource(detailResource), toast.detail)
         }
     }
 

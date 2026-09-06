@@ -690,6 +690,7 @@
     <string name="toast_relay_update_failed">Aggiornamento del relè non riuscito</string>
     <string name="error_remove_invalid_relay_urls_first">Rimuovi prima gli URL relay non validi.</string>
     <string name="error_no_safe_key_package_source_relay">Non è disponibile alcun relay di origine sicuro. Aggiorna i pacchetti chiavi e riprova.</string>
+    <string name="error_couldnt_verify_relay_hosts">Impossibile verificare gli host dei relay. Controlla la connessione e riprova.</string>
     <string name="toast_couldnt_load_key_packages">Impossibile caricare i pacchetti chiavi</string>
     <string name="toast_key_package_deleted">Pacchetto chiavi eliminato</string>
     <string name="toast_couldnt_delete_key_package">Impossibile eliminare il pacchetto chiavi. Riprova.</string>

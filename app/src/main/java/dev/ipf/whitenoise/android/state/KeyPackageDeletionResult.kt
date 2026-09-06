@@ -6,8 +6,13 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.HostSafety
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import java.net.InetAddress
 import java.net.URI
 import java.util.Locale
+
+/** A cancellable, deletion-only host lookup; editable-relay validation retains its existing boundary. */
+internal typealias KeyPackageDeletionHostResolver = suspend (String) -> Array<InetAddress>?
 
 /** Result of selecting and using relay sources for one KeyPackage deletion. */
 internal sealed interface KeyPackageDeletionResult {
@@ -48,7 +53,7 @@ private sealed interface KeyPackageDeletionRelaySelection {
 internal suspend fun deleteKeyPackageThroughSafeSourceRelays(
     sourceRelays: List<String>,
     classify: suspend (List<String>) -> List<RelayEndpointClassificationFfi>,
-    resolve: RelayHostResolver,
+    resolve: KeyPackageDeletionHostResolver,
     accountStillActive: () -> Boolean = { true },
     delete: suspend (List<String>) -> Unit,
 ): KeyPackageDeletionResult =
@@ -128,7 +133,7 @@ internal fun WhiteNoiseAppState.presentKeyPackageDeletionResult(
 private suspend fun selectKeyPackageDeletionRelays(
     sourceRelays: List<String>,
     classify: suspend (List<String>) -> List<RelayEndpointClassificationFfi>,
-    resolve: RelayHostResolver,
+    resolve: KeyPackageDeletionHostResolver,
     accountStillActive: () -> Boolean,
 ): KeyPackageDeletionRelaySelection =
     withContext(Dispatchers.IO) {
@@ -168,35 +173,55 @@ private fun classifierAllowedDeletionRelays(classified: List<RelayEndpointClassi
         .take(MAX_KEY_PACKAGE_DELETION_SOURCE_RELAYS)
         .toList()
 
-/** Caches one all-address DNS verdict per host and bounds the native relay fanout. */
-private fun verifyDeletionRelayHosts(
+/**
+ * Resolves one host at a time within one absolute deadline, retaining completed public answers.
+ * Only usable outputs consume the native cap: a fast blocked prefix cannot hide a later safe source.
+ * A stalled prefix can exhaust the budget; that fails closed without extending the user's wait.
+ */
+private suspend fun verifyDeletionRelayHosts(
     allowed: List<String>,
-    resolve: RelayHostResolver,
+    resolve: KeyPackageDeletionHostResolver,
     accountStillActive: () -> Boolean,
 ): KeyPackageDeletionRelaySelection {
     var verificationUnavailable = false
     val resolveResultByHost = mutableMapOf<String, RelayResolveTimeCheckResult>()
     val usable = mutableListOf<String>()
-    for (relay in allowed) {
-        if (usable.size == MAX_KEY_PACKAGE_DELETION_RELAYS) break
-        if (!accountStillActive()) return KeyPackageDeletionRelaySelection.Superseded
-        val host = relayHostForDeletionCheck(relay)
-        val result =
-            host?.let {
-                resolveResultByHost.getOrPut(it) { relayHostResolveTimeCheckResult(it, resolve) }
-            } ?: RelayResolveTimeCheckResult.Blocked
-        when (result) {
-            RelayResolveTimeCheckResult.Passed -> usable += relay
-            RelayResolveTimeCheckResult.Blocked -> Unit
-            RelayResolveTimeCheckResult.Unavailable -> verificationUnavailable = true
+    val completedWithinDeadline =
+        withTimeoutOrNull(KEY_PACKAGE_DELETION_DNS_TOTAL_TIMEOUT_MS) {
+            for (relay in allowed) {
+                if (usable.size == MAX_KEY_PACKAGE_DELETION_RELAYS || !accountStillActive()) break
+                val host = relayHostForDeletionCheck(relay)
+                val result =
+                    host?.let {
+                        resolveResultByHost.getOrPut(it) { relayHostResolveTimeCheckResult(it, resolve) }
+                    } ?: RelayResolveTimeCheckResult.Blocked
+                when (result) {
+                    RelayResolveTimeCheckResult.Passed -> usable += relay
+                    RelayResolveTimeCheckResult.Blocked -> Unit
+                    RelayResolveTimeCheckResult.Unavailable -> verificationUnavailable = true
+                }
+            }
+            true
         }
-    }
-    return when {
+    return deletionRelaySelectionAfterVerification(
+        usable = usable,
+        accountStillActive = accountStillActive(),
+        verificationUnavailable = completedWithinDeadline != true || verificationUnavailable,
+    )
+}
+
+/** Gives account invalidation precedence while preserving vetted answers from a timed-out attempt. */
+private fun deletionRelaySelectionAfterVerification(
+    usable: List<String>,
+    accountStillActive: Boolean,
+    verificationUnavailable: Boolean,
+): KeyPackageDeletionRelaySelection =
+    when {
+        !accountStillActive -> KeyPackageDeletionRelaySelection.Superseded
         usable.isNotEmpty() -> KeyPackageDeletionRelaySelection.Ready(usable)
         verificationUnavailable -> KeyPackageDeletionRelaySelection.HostVerificationUnavailable
         else -> KeyPackageDeletionRelaySelection.NoUsableRelay
     }
-}
 
 /** Extracts the classifier-normalized host without imposing Android's editable-relay policy. */
 private fun relayHostForDeletionCheck(relay: String): String? =
@@ -208,12 +233,12 @@ private fun relayHostForDeletionCheck(relay: String): String? =
             ?.takeIf(String::isNotBlank)
     }.getOrNull()
 
-/** Applies one cached DNS verdict per host before any classifier-approved endpoint is dialed. */
-private fun relayHostResolveTimeCheckResult(
+/** Bounds each cancellable query; the enclosing total deadline can cancel it sooner. */
+private suspend fun relayHostResolveTimeCheckResult(
     host: String,
-    resolve: RelayHostResolver,
+    resolve: KeyPackageDeletionHostResolver,
 ): RelayResolveTimeCheckResult {
-    val resolved = resolve(host)
+    val resolved = withTimeoutOrNull(KEY_PACKAGE_DELETION_DNS_HOST_TIMEOUT_MS) { resolve(host) }
     return when {
         resolved.isNullOrEmpty() -> RelayResolveTimeCheckResult.Unavailable
         resolved.any(HostSafety::isPrivateOrLoopbackAddress) -> RelayResolveTimeCheckResult.Blocked
@@ -224,3 +249,5 @@ private fun relayHostResolveTimeCheckResult(
 private const val MAX_KEY_PACKAGE_DELETION_RELAYS = 16
 private const val MAX_KEY_PACKAGE_DELETION_SOURCE_RELAYS = 256
 private const val MAX_KEY_PACKAGE_DELETION_RELAY_CHARS = 2_048
+internal const val KEY_PACKAGE_DELETION_DNS_HOST_TIMEOUT_MS = 2_000L
+internal const val KEY_PACKAGE_DELETION_DNS_TOTAL_TIMEOUT_MS = 8_000L

@@ -310,7 +310,7 @@ class KeyPackageDeletionRelayTest {
             assertFalse(deleted)
             assertEquals(AppText.Resource(R.string.toast_couldnt_delete_key_package), appState.toast?.title)
             assertEquals(
-                AppText.Plain("Couldn't verify relay hosts. Check your connection and try again."),
+                AppText.Resource(R.string.error_couldnt_verify_relay_hosts),
                 appState.toast?.detail,
             )
             assertFalse(appState.toast?.copyable ?: true)
