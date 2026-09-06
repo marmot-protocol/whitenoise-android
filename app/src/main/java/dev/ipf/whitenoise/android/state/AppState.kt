@@ -807,6 +807,7 @@ internal fun telemetryDeploymentEnvironment(value: String): String =
     when (val normalized = value.trim().lowercase(Locale.ROOT)) {
         "production", "staging", "development", "test" -> normalized
         "android-release" -> "production"
+        "dev" -> "development"
         else -> "production"
     }
 
