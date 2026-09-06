@@ -174,8 +174,48 @@ class ManualGuideParserTest(unittest.TestCase):
         }
         self.assertEqual(MODULE.maintenance_files_missing(changed), set())
 
+    def test_production_flavor_sources_still_require_maintenance_files(self):
+        for path in (
+            "app/src/dev/java/dev/ipf/whitenoise/android/ui/FooScreen.kt",
+            "app/src/zapstore/res/values/strings.xml",
+            "app/src/play/AndroidManifest.xml",
+            "app/src/testing/res/values/strings.xml",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(
+                    MODULE.maintenance_files_missing({path}),
+                    {MODULE.GUIDE_PATH, MODULE.INVENTORY_PATH},
+                )
+
     def test_internal_only_change_does_not_require_guide_update(self):
         self.assertEqual(MODULE.maintenance_files_missing({"gradle/libs.versions.toml"}), set())
+
+    def test_test_only_source_changes_do_not_require_guide_update(self):
+        for path in (
+            "app/src/test/java/FooTest.kt",
+            "app/src/androidTest/java/FooTest.kt",
+            "app/src/testZapstore/java/FooTest.kt",
+            "app/src/test/snapshots/foo.png",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(MODULE.maintenance_files_missing({path}), set())
+
+    def test_added_surface_tokens_ignore_test_only_source_sets(self):
+        for path in (
+            "app/src/test/java/FooTest.kt",
+            "app/src/androidTest/java/FooTest.kt",
+            "app/src/testZapstore/java/FooTest.kt",
+            "app/src/test/snapshots/Foo.kt",
+        ):
+            with self.subTest(path=path):
+                diff = "\n".join(
+                    [
+                        f"+++ b/{path}",
+                        "+fun FakeScreen(",
+                        "+    title = stringResource(R.string.fake_title)",
+                    ]
+                )
+                self.assertEqual(MODULE.added_surface_tokens(diff), [])
 
     def test_added_surface_tokens_discovers_ui_labels_and_manifest_contracts(self):
         diff = "\n".join(

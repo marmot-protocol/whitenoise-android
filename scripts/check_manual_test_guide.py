@@ -377,11 +377,23 @@ USER_FACING_SOURCE_FILES = {
 }
 
 
-def maintenance_files_missing(changed: set[str]) -> set[str]:
-    has_user_facing_change = any(
-        path in USER_FACING_SOURCE_FILES or path.startswith(USER_FACING_SOURCE_PREFIXES)
-        for path in changed
+def is_user_facing_source(path: str) -> bool:
+    """Return whether an Android source-set path can affect shipped behavior."""
+    if path in USER_FACING_SOURCE_FILES:
+        return True
+    if not path.startswith(USER_FACING_SOURCE_PREFIXES):
+        return False
+    source_set = path.removeprefix("app/src/").split("/", 1)[0]
+    is_test_source_set = any(
+        source_set == prefix
+        or (source_set.startswith(prefix) and source_set[len(prefix) : len(prefix) + 1].isupper())
+        for prefix in ("test", "androidTest")
     )
+    return not is_test_source_set
+
+
+def maintenance_files_missing(changed: set[str]) -> set[str]:
+    has_user_facing_change = any(is_user_facing_source(path) for path in changed)
     if not has_user_facing_change:
         return set()
     return {GUIDE_PATH, INVENTORY_PATH} - changed
@@ -395,7 +407,7 @@ def added_surface_tokens(diff: str) -> list[tuple[str, str]]:
         if line.startswith("+++ b/"):
             current = line[6:]
             continue
-        if not current.startswith("app/src/") or not line.startswith("+") or line.startswith("+++"):
+        if not is_user_facing_source(current) or not line.startswith("+") or line.startswith("+++"):
             continue
         added = line[1:]
         for name in re.findall(r"fun\s+([A-Z][A-Za-z0-9_]*(?:Screen|Dialog|Sheet|Picker|Viewer|Bar|Pane|Content))\s*\(", added):
