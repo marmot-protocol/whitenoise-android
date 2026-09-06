@@ -298,10 +298,31 @@ class ConversationDictationControllerTest {
         assertFalse(platform.session.started)
     }
 
-    /** A device with no selected recognizer fails before requesting unrelated microphone access. */
+    /** A device with no selected recognizer uses the provider Activity before requesting app microphone access. */
     @Test
-    fun missingProviderDoesNotRequestRuntimePermission() {
+    fun missingSelectedServiceFallsBackToProviderActivityBeforeRuntimePermission() {
         val platform = FakePlatform(hasPermission = false, configured = false, available = false)
+        val fixture = fixture(draft = TextFieldValue(""), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        assertTrue(fixture.controller.state is ConversationDictationState.ProviderActivityRequired)
+        assertEquals(1L, fixture.controller.providerActivityRequestId)
+        assertEquals(0L, fixture.controller.permissionRequestId)
+        assertEquals(0, platform.recognitionAvailabilityChecks)
+        assertFalse(platform.session.started)
+    }
+
+    /** A missing service still fails deterministically when Android has no compatible provider Activity. */
+    @Test
+    fun missingSelectedServiceAndProviderActivityFailsUnavailable() {
+        val platform =
+            FakePlatform(
+                hasPermission = false,
+                configured = false,
+                available = false,
+                activityAvailable = false,
+            )
         val fixture = fixture(draft = TextFieldValue(""), platform = platform)
 
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
@@ -438,6 +459,31 @@ class ConversationDictationControllerTest {
         assertTrue(rejectedSession.destroyed)
         assertEquals(1, microphoneReleases)
         assertEquals(1, durableStops)
+    }
+
+    /** Revoked access must never open another recording surface after recognition fails. */
+    @Test
+    fun microphoneAccessLostDuringCaptureDoesNotLaunchProviderActivity() {
+        listOf(
+            ConversationDictationMicrophoneAccess.RuntimePermissionRequired to
+                ConversationDictationFailure.PermissionDenied,
+            ConversationDictationMicrophoneAccess.AppOpDenied to
+                ConversationDictationFailure.PermissionPermanentlyDenied,
+            ConversationDictationMicrophoneAccess.MicrophoneMuted to ConversationDictationFailure.MicrophoneMuted,
+        ).forEach { (access, failure) ->
+            val fixture = fixture(draft = TextFieldValue("Keep"))
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.microphoneAccessOverride = access
+
+            fixture.platform.listener.onError(ConversationDictationFailure.PermissionDenied)
+
+            assertEquals(failure, (fixture.controller.state as ConversationDictationState.Failed).reason)
+            assertEquals(0L, fixture.controller.providerActivityRequestId)
+            assertFalse(fixture.controller.ownsMicrophone)
+            assertFalse(fixture.controller.hasDurableSession)
+            assertEquals("Keep", fixture.drafts.getValue(key()).text)
+            assertEquals(0, fixture.writes)
+        }
     }
 
     @Test

@@ -295,7 +295,14 @@ class ConversationDictationCoordinatorTest {
             (permanentlyDenied.controller.state as ConversationDictationState.Failed).reason,
         )
 
-        val unavailable = fixture(platform = MatrixPlatform(recognitionAvailable = false))
+        val activityOnly = fixture(platform = MatrixPlatform(recognitionAvailable = false))
+        activityOnly.controller.requestStart(ACCOUNT, GROUP, activityOnly.draft)
+        assertTrue(activityOnly.controller.state is ConversationDictationState.ProviderActivityRequired)
+        assertEquals(0, activityOnly.releases)
+        assertEquals(0, activityOnly.writes)
+
+        val unavailable =
+            fixture(platform = MatrixPlatform(recognitionAvailable = false, providerActivityAvailable = false))
         unavailable.controller.requestStart(ACCOUNT, GROUP, unavailable.draft)
         assertEquals(
             ConversationDictationFailure.ProviderUnavailable,
