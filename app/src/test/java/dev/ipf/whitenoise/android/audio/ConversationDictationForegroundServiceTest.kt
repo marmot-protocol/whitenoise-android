@@ -11,6 +11,7 @@ import android.content.ContextWrapper
 import android.content.Intent
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.text.input.TextFieldValue
+import dev.ipf.whitenoise.android.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
@@ -128,6 +129,7 @@ class ConversationDictationForegroundServiceTest {
         assertEquals(listOf("Cancel", "Paste", "Send"), notification.actions.map { it.title.toString() })
         assertEquals("Starting dictation…", notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
         assertTrue(notification.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE))
+        assertExplicitNotificationDestinations(service, notification)
 
         service.onStartCommand(
             shadowOf(notification.actions[1].actionIntent).savedIntent,
@@ -169,6 +171,22 @@ class ConversationDictationForegroundServiceTest {
         )
         assertTrue(sendHarness.conversationDictation.state is ConversationDictationState.Processing)
         sendServiceController.destroy()
+    }
+
+    private fun assertExplicitNotificationDestinations(
+        service: ConversationDictationForegroundService,
+        notification: Notification,
+    ) {
+        assertEquals(
+            ComponentName(service, MainActivity::class.java),
+            shadowOf(notification.contentIntent).savedIntent.component,
+        )
+        notification.actions.forEach { action ->
+            assertEquals(
+                ComponentName(service, ConversationDictationForegroundService::class.java),
+                shadowOf(action.actionIntent).savedIntent.component,
+            )
+        }
     }
 
     /** Real notification intents produce the selected outcome regardless of the stored default. */

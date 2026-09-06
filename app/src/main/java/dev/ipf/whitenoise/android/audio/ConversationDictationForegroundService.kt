@@ -205,7 +205,8 @@ class ConversationDictationForegroundService : Service() {
         PendingIntent.getService(
             this,
             action.hashCode(),
-            Intent(this, ConversationDictationForegroundService::class.java)
+            Intent()
+                .setClass(this, ConversationDictationForegroundService::class.java)
                 .setAction(action)
                 .setData(
                     Uri
@@ -224,9 +225,9 @@ class ConversationDictationForegroundService : Service() {
         PendingIntent.getActivity(
             this,
             0,
-            Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            },
+            Intent()
+                .setClass(this, MainActivity::class.java)
+                .setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 

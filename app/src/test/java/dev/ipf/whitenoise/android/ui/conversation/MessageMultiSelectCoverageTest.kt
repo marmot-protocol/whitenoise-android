@@ -35,12 +35,22 @@ class MessageMultiSelectCoverageTest {
     @Test
     fun batchSelectionStateKeysOnControllerIdentity() {
         val source = source("ConversationScreen.kt").replace(Regex("\\s+"), " ")
+        val mainShell = mainShellSource().replace(Regex("\\s+"), " ")
         // The owner account is the conversation's own ref (pinned during a
         // notification-routed early open), never the in-flight active ref.
         val chatRuntimeIdentity = "chat.id, conversationAccountRef, appState.runtimeGeneration"
         val controllerIdentity = "controller, $chatRuntimeIdentity"
 
-        assertTrue(source.contains("val selectedMessages = remember($controllerIdentity)"))
+        assertTrue(source.contains("val selectedMessages = presentationState.selectedMessages"))
+        assertTrue(source.contains("surfaceState ?: remember($controllerIdentity) { ConversationSurfaceState() }"))
+        val surfaceOwner =
+            "remember(selectedOrPendingConversationController, appState.runtimeGeneration) { " +
+                "ConversationSurfaceState() }"
+        assertTrue(mainShell.contains(surfaceOwner))
+        assertTrue(mainShell.contains("chatId = openChat.id"))
+        assertTrue(mainShell.contains("accountRef = accountRef"))
+        assertTrue(mainShell.contains("runtimeGeneration = appState.runtimeGeneration"))
+        assertTrue(mainShell.contains("surfaceState = selectedConversationSurfaceState"))
         assertTrue(source.contains("rememberConversationBatchSelectionUiState("))
         assertTrue(source.contains("chatId = chat.id"))
         assertTrue(source.contains("activeAccountRef = conversationAccountRef"))
@@ -166,4 +176,12 @@ class MessageMultiSelectCoverageTest {
         ).firstOrNull { it.exists() }
             ?.readText()
             ?: error("Missing conversation source: $relativePath")
+
+    private fun mainShellSource(): String =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),
+        ).firstOrNull { it.exists() }
+            ?.readText()
+            ?: error("Missing MainShell.kt source file")
 }
