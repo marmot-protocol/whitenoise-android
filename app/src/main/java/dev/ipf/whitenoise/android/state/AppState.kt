@@ -2968,13 +2968,12 @@ class WhiteNoiseAppState private constructor(
         unreadRefreshScheduler.cancelAndClear()
     }
 
-    // TODO(marmot): remove this UI-controller backchannel once Marmot emits a
-    // ProjectionUpdated (or equivalent chat-list/group projection update) after
-    // set_group_archived / accept_group_invite. Until then, the ChatsController
-    // stream can lag behind local mutations and we forward the accepted/archived
-    // group record so rows stop rendering stale pending/archived state.
-    fun applyLocalGroupUpdate(record: AppGroupRecordFfi) {
-        chatsController?.applyLocalGroupUpdate(record)
+    /** Bridges native projection gaps for matching accounts; null retains active-controller routing. */
+    fun applyLocalGroupUpdate(
+        record: AppGroupRecordFfi,
+        accountRef: String? = null,
+    ) {
+        chatsController.applyLocalGroupUpdateForAccount(record, accountRef)
     }
 
     // Same temporary projection backchannel as [applyLocalGroupUpdate], but for

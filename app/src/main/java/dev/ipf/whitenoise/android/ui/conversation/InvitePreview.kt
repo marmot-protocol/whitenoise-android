@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -33,6 +34,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.GroupRosterLoadState
+import dev.ipf.whitenoise.android.ui.group.GroupRosterLoadStatus
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -112,5 +115,32 @@ internal fun InvitePreviewActionBar(
                 Text(stringResource(R.string.join_group))
             }
         }
+    }
+}
+
+/**
+ * Shows progress or the existing localized roster retry when a stale Join was
+ * refused and only authoritative membership can choose member vs terminal UI.
+ */
+@Composable
+@Suppress("FunctionNaming")
+internal fun InviteAcceptanceResolutionStatus(
+    state: GroupRosterLoadState,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(vertical = 12.dp),
+    ) {
+        GroupRosterLoadStatus(
+            state = state,
+            onRetry = onRetry,
+            retryContentColor = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }

@@ -212,6 +212,7 @@ class ChatListProjectionReducerTest {
         }
     }
 
+    /** Terminal membership remains sticky across later same-generation projections. */
     @Test
     fun postOpenTerminalUpdatesVoidTheInviteAndCannotBeOverwrittenByStaleSnapshots() {
         listOf(SelfMembershipFfi.REMOVED, SelfMembershipFfi.LEFT).forEach { terminalMembership ->
@@ -223,7 +224,7 @@ class ChatListProjectionReducerTest {
                             selfMembership = terminalMembership,
                             pendingConfirmation = true,
                         ),
-                    previousSelfMembership = staleInvite.selfMembership,
+                    previous = staleInvite,
                 )
 
             assertEquals(terminalMembership, afterTerminalUpdate.selfMembership)
@@ -236,11 +237,71 @@ class ChatListProjectionReducerTest {
                             selfMembership = SelfMembershipFfi.MEMBER,
                             pendingConfirmation = true,
                         ),
-                    previousSelfMembership = afterTerminalUpdate.selfMembership,
+                    previous = afterTerminalUpdate,
                 )
 
             assertEquals(terminalMembership, afterLaterStaleUpdate.selfMembership)
             assertFalse(afterLaterStaleUpdate.pendingConfirmation)
+        }
+    }
+
+    /** A different canonical Welcome is the sole membership-terminal escape hatch. */
+    @Test
+    fun distinctWelcomeGenerationCanSurfaceAGenuineReinviteAfterRemoval() {
+        val removed =
+            group(name = "Removed", pendingConfirmation = false).copy(
+                selfMembership = SelfMembershipFfi.REMOVED,
+                viaWelcomeMessageIdHex = "old-welcome",
+            )
+
+        val sameWelcomeReplay =
+            reconcileTerminalSelfMembership(
+                update =
+                    removed.copy(
+                        selfMembership = SelfMembershipFfi.MEMBER,
+                        pendingConfirmation = true,
+                    ),
+                previous = removed,
+            )
+        val distinctWelcome =
+            reconcileTerminalSelfMembership(
+                update =
+                    removed.copy(
+                        selfMembership = SelfMembershipFfi.MEMBER,
+                        pendingConfirmation = true,
+                        viaWelcomeMessageIdHex = "new-welcome",
+                    ),
+                previous = removed,
+            )
+
+        assertEquals(SelfMembershipFfi.REMOVED, sameWelcomeReplay.selfMembership)
+        assertFalse(sameWelcomeReplay.pendingConfirmation)
+        assertEquals(SelfMembershipFfi.MEMBER, distinctWelcome.selfMembership)
+        assertTrue(distinctWelcome.pendingConfirmation)
+    }
+
+    /** Missing prior generation identity cannot prove that a later Welcome is new. */
+    @Test
+    fun nullOrBlankTerminalWelcomeKeepsANonblankReplayFailClosed() {
+        listOf(null, "").forEach { unknownPriorWelcome ->
+            val terminal =
+                group(name = "Removed", pendingConfirmation = false).copy(
+                    selfMembership = SelfMembershipFfi.REMOVED,
+                    viaWelcomeMessageIdHex = unknownPriorWelcome,
+                )
+            val replay =
+                reconcileTerminalSelfMembership(
+                    update =
+                        terminal.copy(
+                            selfMembership = SelfMembershipFfi.MEMBER,
+                            pendingConfirmation = true,
+                            viaWelcomeMessageIdHex = "unproven-welcome",
+                        ),
+                    previous = terminal,
+                )
+
+            assertEquals(SelfMembershipFfi.REMOVED, replay.selfMembership)
+            assertFalse(replay.pendingConfirmation)
         }
     }
 

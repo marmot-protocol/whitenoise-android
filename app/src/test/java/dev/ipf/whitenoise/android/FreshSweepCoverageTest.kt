@@ -119,14 +119,17 @@ class FreshSweepCoverageTest {
         assertTrue(invite.indexOf("try {") < invite.indexOf("val adminTargets"))
     }
 
+    /** Successful acceptance still settles UI state before best-effort warmup, with account fencing. */
     @Test
     fun acceptInviteAcknowledgesSuccessBeforeLifecycleScopedWarmup() {
         val body = source("state/Controllers.kt").kotlinFunctionBody("acceptInvite")
+        val resolution = source("state/Controllers.kt").kotlinFunctionBody("resolveInviteAcceptance")
         val optimisticProjection = body.indexOf("group = optimisticGroup")
-        val optimisticLocalUpdate = body.indexOf("applyLocalGroupUpdate(optimisticGroup)")
-        val accept = body.indexOf("inviteAcceptor(")
+        val optimisticLocalUpdate = body.indexOf("applyLocalGroupUpdate(optimisticGroup")
+        val accept = body.indexOf("resolveInviteAcceptance(attempt)")
+        val nativeAccept = resolution.indexOf("inviteAcceptor(")
         val confirmedProjection = body.indexOf("group = acceptedGroup")
-        val confirmedLocalUpdate = body.indexOf("applyLocalGroupUpdate(group)", confirmedProjection)
+        val confirmedLocalUpdate = body.indexOf("applyLocalGroupUpdate(group", confirmedProjection)
         val dismiss = body.indexOf("dismissConversationNotifications")
         val clearSelfLeft = body.indexOf("clearSelfLeft()")
         val toast = body.indexOf("toast_invite_accepted")
@@ -141,6 +144,7 @@ class FreshSweepCoverageTest {
             "optimistic projection must precede its local snapshot",
             optimisticProjection in 0 until optimisticLocalUpdate,
         )
+        assertTrue("native resolution must retain the fenced invite acceptor", nativeAccept >= 0)
         assertTrue("optimistic snapshot must precede the engine accept", optimisticLocalUpdate < accept)
         assertTrue("engine accept must precede the confirmed projection", accept < confirmedProjection)
         assertTrue("confirmed projection must precede its local snapshot", confirmedProjection < confirmedLocalUpdate)
