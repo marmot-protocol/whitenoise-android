@@ -300,6 +300,7 @@ private fun dictationFailureLabel(reason: ConversationDictationFailure): String 
             ConversationDictationFailure.MicrophoneInUse -> R.string.dictation_microphone_in_use
             ConversationDictationFailure.NoSpeech -> R.string.dictation_no_speech
             ConversationDictationFailure.Network -> R.string.dictation_network_error
+            ConversationDictationFailure.ProviderDisconnected -> R.string.dictation_provider_unavailable
             ConversationDictationFailure.RecognizerBusy -> R.string.dictation_recognizer_busy
             ConversationDictationFailure.TimedOut -> R.string.dictation_timed_out
             ConversationDictationFailure.Unknown -> R.string.dictation_failed

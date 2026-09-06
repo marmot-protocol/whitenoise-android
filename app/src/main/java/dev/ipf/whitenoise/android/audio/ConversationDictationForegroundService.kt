@@ -40,6 +40,8 @@ internal interface ConversationDictationServiceHost {
 class ConversationDictationForegroundService : Service() {
     private val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var notificationObserver: Job? = null
+    private var promotedController: ConversationDictationController? = null
+    private var promotedSessionToken: String? = null
 
     /** Dictation is command-only and never exposes a bound service interface. */
     override fun onBind(intent: Intent?): IBinder? = null
@@ -56,22 +58,45 @@ class ConversationDictationForegroundService : Service() {
                 "durable=${controller?.hasDurableSession == true}",
         )
         if (controller == null || !controller.hasDurableSession) {
-            stopSelf()
+            stopSelfResult(startId)
         } else {
-            if (
-                intent?.action != null &&
-                intent.getStringExtra(EXTRA_SESSION_TOKEN) != controller.notificationSessionToken
-            ) {
+            val sessionToken = intent?.getStringExtra(EXTRA_SESSION_TOKEN)
+            if (sessionToken == null || sessionToken != controller.notificationSessionToken) {
+                // An orphan queued FGS start still needs to stop before Android's promotion deadline.
+                // Never stop a service that currently authorizes a different live session.
+                val owner = promotedController
+                if (owner?.hasDurableSession != true || owner.notificationSessionToken != promotedSessionToken) {
+                    stopSelfResult(startId)
+                }
                 return START_NOT_STICKY
             }
             ensureChannel(this)
-            if (promoteOrCancel(controller)) {
-                when (intent?.action) {
+            if (promoteOrCancel(controller, sessionToken, startId)) {
+                // Promotion may synchronously cancel or replace the controller in tests or platform hooks.
+                if (!controller.hasDurableSession || controller.notificationSessionToken != sessionToken) {
+                    stopSelfResult(startId)
+                    return START_NOT_STICKY
+                }
+                when (intent.action) {
                     ACTION_CANCEL -> controller.cancel()
                     ACTION_PASTE -> controller.paste()
                     ACTION_SEND -> controller.send()
                 }
-                observeNotification(controller)
+                // A completion action received during startup must not briefly open the microphone.
+                if (!controller.hasDurableSession || controller.notificationSessionToken != sessionToken) {
+                    stopSelfResult(startId)
+                    return START_NOT_STICKY
+                }
+                promotedController = controller
+                promotedSessionToken = sessionToken
+                controller.onDurableServiceReady(sessionToken)
+                if (controller.hasDurableSession && controller.notificationSessionToken == sessionToken) {
+                    observeNotification(controller, sessionToken)
+                } else {
+                    promotedController = null
+                    promotedSessionToken = null
+                    stopSelfResult(startId)
+                }
             }
         }
         return START_NOT_STICKY
@@ -79,38 +104,45 @@ class ConversationDictationForegroundService : Service() {
 
     /** Promotes an active capture or cancels it when Android rejects foreground microphone ownership. */
     @Suppress("TooGenericExceptionCaught")
-    private fun promoteOrCancel(controller: ConversationDictationController): Boolean =
+    private fun promoteOrCancel(
+        controller: ConversationDictationController,
+        sessionToken: String,
+        startId: Int,
+    ): Boolean =
         try {
             foregroundPromoter(this, buildNotification(controller))
             conversationDictationDiagnostic("event=foreground_service_promoted")
             true
         } catch (_: SecurityException) {
             conversationDictationDiagnostic("event=foreground_service_promotion_rejected type=SecurityException")
-            cancelRejectedPromotion(controller)
+            cancelRejectedPromotion(controller, sessionToken, startId)
             false
         } catch (error: RuntimeException) {
             if (!error.isForegroundServiceStartRejection()) throw error
             conversationDictationDiagnostic(
                 "event=foreground_service_promotion_rejected type=${error.javaClass.simpleName}",
             )
-            cancelRejectedPromotion(controller)
+            cancelRejectedPromotion(controller, sessionToken, startId)
             false
         }
 
     /** Releases controller ownership and stops this service after foreground promotion is rejected. */
-    private fun cancelRejectedPromotion(controller: ConversationDictationController) {
-        controller.cancel()
-        stopSelf()
+    private fun cancelRejectedPromotion(
+        controller: ConversationDictationController,
+        sessionToken: String,
+        startId: Int,
+    ) {
+        controller.onDurableServiceStartFailed(sessionToken)
+        stopSelfResult(startId)
     }
 
     /** Fails capture closed when Android removes the service that authorized background microphone use. */
     override fun onDestroy() {
         notificationScope.cancel()
         conversationDictationDiagnostic("event=foreground_service_destroyed")
-        hostResolver(this)
-            ?.conversationDictation
-            ?.takeIf { it.hasDurableSession }
-            ?.onDurableServiceDestroyed()
+        promotedSessionToken?.let { token -> promotedController?.onDurableServiceDestroyed(token) }
+        promotedController = null
+        promotedSessionToken = null
         super.onDestroy()
     }
 
@@ -167,14 +199,17 @@ class ConversationDictationForegroundService : Service() {
         }
 
     /** Keeps system controls truthful when capture becomes finalization or an irrevocable dispatch. */
-    private fun observeNotification(controller: ConversationDictationController) {
+    private fun observeNotification(
+        controller: ConversationDictationController,
+        sessionToken: String,
+    ) {
         notificationObserver?.cancel()
         notificationObserver =
             notificationScope.launch {
                 snapshotFlow {
                     Triple(controller.state, controller.deliveryInProgress, controller.completionActionsEnabled)
                 }.collect {
-                    if (controller.hasDurableSession) {
+                    if (controller.hasDurableSession && controller.notificationSessionToken == sessionToken) {
                         getSystemService(NotificationManager::class.java)
                             .notify(NOTIFICATION_ID, buildNotification(controller))
                     }
@@ -268,11 +303,15 @@ class ConversationDictationForegroundService : Service() {
             }
 
         /** Starts the microphone service while the initiating composer is visible. */
-        fun start(context: Context): Boolean =
+        fun start(
+            context: Context,
+            sessionToken: String,
+        ): Boolean =
             runCatching {
                 ContextCompat.startForegroundService(
                     context,
-                    Intent(context, ConversationDictationForegroundService::class.java),
+                    Intent(context, ConversationDictationForegroundService::class.java)
+                        .putExtra(EXTRA_SESSION_TOKEN, sessionToken),
                 )
                 true
             }.onFailure { error ->
