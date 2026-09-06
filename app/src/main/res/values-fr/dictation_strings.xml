@@ -2,14 +2,15 @@
 <resources>
     <string name="dictation_done">Terminer</string>
     <string name="dictation_notification_title">Dictée active</string>
-    <string name="dictation_notification_text">Utilisez Terminer pour finir ou Annuler pour supprimer</string>
+    <string name="dictation_notification_text">Choisissez Annuler, Coller ou Envoyer</string>
+    <string name="dictation_notification_unavailable">Activez les notifications de dictée pour utiliser Annuler, Coller et Envoyer en dehors de l’application.</string>
     <string name="notification_channel_dictation">Dictée</string>
     <string name="notification_channel_dictation_description">Contrôle une session de dictée active dans le champ de rédaction</string>
     <string name="dictation_settings_title">Dictée</string>
     <string name="dictation_settings_subtitle">Choisissez quand la dictée se termine et ce qu’il advient de son texte</string>
-    <string name="dictation_settings_explainer">White Noise utilise exactement le service de reconnaissance vocale sélectionné dans Android. Ce service traite l’audio ; White Noise ne conserve en mémoire que le texte renvoyé, jusqu’à ce qu’il soit collé ou envoyé.</string>
+    <string name="dictation_settings_explainer">White Noise utilise un service de reconnaissance vocale installé. Ce service traite l’audio ; White Noise ne conserve en mémoire que le texte renvoyé, jusqu’à ce qu’il soit collé ou envoyé.</string>
     <string name="dictation_finish_title">Terminer la dictée</string>
-    <string name="dictation_finish_manual">Lorsque j’appuie sur Terminer</string>
+    <string name="dictation_finish_manual">Lorsque je choisis Coller ou Envoyer</string>
     <string name="dictation_finish_after_silence">Après %1$d secondes de silence</string>
     <string name="dictation_result_title">Une fois terminée</string>
     <string name="dictation_result_paste">Coller dans le brouillon</string>

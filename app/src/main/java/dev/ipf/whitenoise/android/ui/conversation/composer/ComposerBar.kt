@@ -1131,9 +1131,16 @@ internal fun ComposerBar(
                         editingMessageId == null &&
                         voiceRecordingController != null &&
                         !dictationActiveInComposer
-                val showPrimaryTrailingAction = !(showMicButton && dictationPendingElsewhere)
+                val showPrimaryTrailingAction =
+                    !dictationActiveInComposer && !(showMicButton && dictationPendingElsewhere)
                 val primaryTrailingActionWidth =
-                    if (showMicButton && voiceRecordingController.locked) 84.dp else 44.dp
+                    if (dictationActiveInComposer) {
+                        0.dp
+                    } else if (showMicButton && voiceRecordingController.locked) {
+                        84.dp
+                    } else {
+                        44.dp
+                    }
                 val trailingControlsWidth = primaryTrailingActionWidth
                 BoxWithConstraints(
                     modifier =

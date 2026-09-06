@@ -1308,7 +1308,8 @@
     <string name="dictation_done">Done</string>
     <string name="dictation_cancel">Cancel dictation</string>
     <string name="dictation_notification_title">Dictation active</string>
-    <string name="dictation_notification_text">Use Done to finish or Cancel to discard</string>
+    <string name="dictation_notification_text">Choose Cancel, Paste, or Send</string>
+    <string name="dictation_notification_unavailable">Enable dictation notifications to use Cancel, Paste and Send outside the app.</string>
     <string name="notification_channel_dictation">Dictation</string>
     <string name="notification_channel_dictation_description">Controls an active composer dictation session</string>
     <string name="dictation_provider_unavailable">Speech recognition isn’t available</string>
@@ -1334,9 +1335,9 @@
     <string name="dictation_continue">Continue</string>
     <string name="dictation_settings_title">Dictation</string>
     <string name="dictation_settings_subtitle">Choose when dictation finishes and what happens to its text</string>
-    <string name="dictation_settings_explainer">White Noise uses the exact speech recognition service selected in Android. That service owns audio processing; White Noise keeps only the returned text in memory until it is pasted or sent.</string>
+    <string name="dictation_settings_explainer">White Noise uses an installed speech recognition service. That service owns audio processing; White Noise keeps only the returned text in memory until it is pasted or sent.</string>
     <string name="dictation_finish_title">Finish dictation</string>
-    <string name="dictation_finish_manual">When I tap Done</string>
+    <string name="dictation_finish_manual">When I choose Paste or Send</string>
     <string name="dictation_finish_after_silence">After %1$d seconds of silence</string>
     <string name="dictation_result_title">When finished</string>
     <string name="dictation_result_paste">Paste into draft</string>

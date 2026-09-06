@@ -1303,7 +1303,8 @@ class WhiteNoiseAppState private constructor(
                         )
                     if (
                         current.revision != request.expectedDraftRevision ||
-                        current.value.text != request.expectedDraftText
+                        current.value.text != request.expectedDraftText ||
+                        !request.beginDispatch()
                     ) {
                         false
                     } else {

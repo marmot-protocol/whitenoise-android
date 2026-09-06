@@ -32,7 +32,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -64,7 +63,8 @@ import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.WarmResumeUsefulSurface
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
-import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationFloatingControl
+import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationNotificationNotice
+import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationPersistentControl
 import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
 import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleSharedMedia
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardOperationStatusHost
@@ -91,7 +91,7 @@ internal const val TRANSIENT_NOTICE_DURATION_MILLIS = 2_000L
 internal const val GLOBAL_TRANSIENT_NOTICE_TAG = "global-transient-notice"
 
 /** Keeps exactly one dictation control visible without duplicating the origin composer. */
-internal fun shouldShowConversationDictationFloatingControl(
+internal fun shouldShowConversationDictationPersistentControl(
     state: ConversationDictationState,
     originVisible: Boolean,
     appLockScreenVisible: Boolean,
@@ -107,6 +107,7 @@ internal fun shouldShowConversationDictationFloatingControl(
             is ConversationDictationState.ProviderActivityActive,
             is ConversationDictationState.Failed,
             is ConversationDictationState.ReviewRequired,
+            is ConversationDictationState.DeliveryUnknown,
             -> true
             ConversationDictationState.Idle,
             is ConversationDictationState.DisclosureRequired,
@@ -533,6 +534,24 @@ internal fun WhiteNoiseApp(
                                                 notice = transientNotice,
                                                 persistentTopContent = { ForwardOperationStatusHost(appState) },
                                                 persistentTopContentConsumesStatusBars = forwardOperationVisible,
+                                                persistentBottomContent = {
+                                                    if (dictation.hasDurableSession && !appState.appLockScreenVisible) {
+                                                        ConversationDictationNotificationNotice()
+                                                    }
+                                                    if (
+                                                        shouldShowConversationDictationPersistentControl(
+                                                            state = dictationState,
+                                                            originVisible = dictationOriginVisible,
+                                                            appLockScreenVisible = appState.appLockScreenVisible,
+                                                        )
+                                                    ) {
+                                                        ConversationDictationPersistentControl(
+                                                            state = dictationState,
+                                                            controller = dictation,
+                                                            modifier = Modifier.navigationBarsPadding(),
+                                                        )
+                                                    }
+                                                },
                                             ) {
                                                 MainShell(
                                                     appState = appState,
@@ -574,23 +593,6 @@ internal fun WhiteNoiseApp(
                             WipeOutcomeSheet(
                                 report = report,
                                 onDismiss = { appState.pendingWipeReport = null },
-                            )
-                        }
-                        if (
-                            shouldShowConversationDictationFloatingControl(
-                                state = dictationState,
-                                originVisible = dictationOriginVisible,
-                                appLockScreenVisible = appState.appLockScreenVisible,
-                            )
-                        ) {
-                            ConversationDictationFloatingControl(
-                                state = dictationState,
-                                controller = dictation,
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .navigationBarsPadding()
-                                        .padding(end = 16.dp, bottom = 88.dp),
                             )
                         }
                     }

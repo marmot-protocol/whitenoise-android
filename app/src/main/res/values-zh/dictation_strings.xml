@@ -2,14 +2,15 @@
 <resources>
     <string name="dictation_done">完成</string>
     <string name="dictation_notification_title">听写进行中</string>
-    <string name="dictation_notification_text">点按“完成”以结束，或点按“取消”以丢弃</string>
+    <string name="dictation_notification_text">选择“取消”、“粘贴”或“发送”</string>
+    <string name="dictation_notification_unavailable">启用听写通知，即可在应用外使用“取消”、“粘贴”和“发送”。</string>
     <string name="notification_channel_dictation">听写</string>
     <string name="notification_channel_dictation_description">控制当前的消息编辑器听写会话</string>
     <string name="dictation_settings_title">听写</string>
     <string name="dictation_settings_subtitle">选择听写何时结束以及如何处理文本</string>
-    <string name="dictation_settings_explainer">White Noise 使用 Android 中选定的语音识别服务。该服务负责音频处理；White Noise 只在内存中保留返回的文本，直到粘贴或发送。</string>
+    <string name="dictation_settings_explainer">White Noise 使用已安装的语音识别服务。该服务负责音频处理；White Noise 只在内存中保留返回的文本，直到粘贴或发送。</string>
     <string name="dictation_finish_title">结束听写</string>
-    <string name="dictation_finish_manual">点按“完成”时</string>
+    <string name="dictation_finish_manual">选择“粘贴”或“发送”时</string>
     <string name="dictation_finish_after_silence">静音 %1$d 秒后</string>
     <string name="dictation_result_title">结束后</string>
     <string name="dictation_result_paste">粘贴到草稿</string>

@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -28,9 +29,14 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
+import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -41,37 +47,51 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w320dp-h640dp-mdpi")
-class ConversationDictationFloatingControlTest {
+class ConversationDictationPersistentControlTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** Verifies listening and processing announce distinct states and expose only valid actions. */
+    /** Verifies listening and processing keep the three explicit session outcomes visible and accessible. */
     @Test
-    fun listeningAndProcessingExposeDistinctStateAndCancellationActions() {
+    fun listeningAndProcessingExposeCancelPasteAndSendActions() {
         val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
-        fixture.platform.listener.onReady()
         render(fixture)
+        composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertIsDisplayed()
+        fixture.platform.listener.onReady()
 
         composeRule
-            .onNodeWithTag(APP_DICTATION_FLOAT_TAG)
+            .onNodeWithTag(APP_DICTATION_CONTROL_TAG)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Dictating…"))
-        val stop = composeRule.onNodeWithContentDescription("Done").assertIsDisplayed()
-        val cancel = composeRule.onNodeWithContentDescription("Cancel dictation").assertIsDisplayed()
-        listOf(stop, cancel).forEach { action ->
+        val actions =
+            listOf("Cancel", "Paste", "Send").map { label ->
+                composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
+            }
+        actions.forEach { action ->
             val bounds = action.getUnclippedBoundsInRoot()
             assertTrue(bounds.right - bounds.left >= 48.dp)
             assertTrue(bounds.bottom - bounds.top >= 48.dp)
         }
         composeRule.onNodeWithContentDescription("Record voice message").assertDoesNotExist()
+        composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertDoesNotExist()
 
         fixture.platform.listener.onEndOfSpeech()
 
         composeRule
-            .onNodeWithTag(APP_DICTATION_FLOAT_TAG)
+            .onNodeWithTag(APP_DICTATION_CONTROL_TAG)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Transcribing…"))
-        composeRule.onNodeWithContentDescription("Done").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Cancel dictation").assertIsDisplayed()
+        listOf("Cancel", "Paste", "Send").forEach { label ->
+            composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
+        }
+        composeRule
+            .onNodeWithTag(DICTATION_PROGRESS_TAG)
+            .assertIsDisplayed()
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.ProgressBarRangeInfo,
+                    ProgressBarRangeInfo.Indeterminate,
+                ),
+            )
     }
 
     /** Verifies an ambiguous merge retains explicit copy, insert, and discard choices. */
@@ -91,6 +111,11 @@ class ConversationDictationFloatingControlTest {
         composeRule.onNodeWithText("dictated words").assertIsDisplayed()
         composeRule.onNodeWithText("Copy").assertIsDisplayed()
         composeRule.onNodeWithText("Discard").assertIsDisplayed()
+        composeRule.onNodeWithText("Copy").performClick()
+        assertTrue(fixture.controller.state is ConversationDictationState.ReviewRequired)
+        assertEquals("Rewritten draft", fixture.draft.text)
+        composeRule.onNodeWithContentDescription("Review dictated text").performClick()
+        composeRule.onNodeWithText("dictated words").assertIsDisplayed()
         composeRule.onNodeWithText("Insert at end").performClick()
 
         assertEquals("Rewritten draft dictated words", fixture.draft.text)
@@ -98,28 +123,28 @@ class ConversationDictationFloatingControlTest {
 
     /** Verifies navigation-owned listening remains visible and can still be cancelled. */
     @Test
-    fun rootFloatKeepsListeningSessionVisibleAndCancellable() {
+    fun rootBarKeepsListeningSessionVisibleAndCancellable() {
         val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         fixture.platform.listener.onReady()
         render(fixture)
 
         composeRule
-            .onNodeWithTag(APP_DICTATION_FLOAT_TAG)
+            .onNodeWithTag(APP_DICTATION_CONTROL_TAG)
             .assert(
                 SemanticsMatcher.expectValue(
                     SemanticsProperties.StateDescription,
                     "Dictating…",
                 ),
             ).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Cancel dictation").performClick()
+        composeRule.onNodeWithContentDescription("Cancel").performClick()
 
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 
     /** Verifies opening review from the root control never discards retained transcript text. */
     @Test
-    fun rootFloatReviewActionDoesNotDiscardTranscript() {
+    fun rootBarReviewActionDoesNotDiscardTranscript() {
         val fixture = fixture(TextFieldValue("Original anchor", TextRange(8)))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         fixture.platform.listener.onReady()
@@ -135,15 +160,48 @@ class ConversationDictationFloatingControlTest {
         assertTrue(fixture.controller.state is ConversationDictationState.ReviewRequired)
     }
 
+    /** Copying an uncertain send preserves its warning and never offers automatic insertion or retry. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun uncertainDeliveryCopyRetainsTranscriptUntilExplicitDiscard() =
+        runTest {
+            var dispatches = 0
+            val fixture =
+                fixture(
+                    TextFieldValue("Draft"),
+                    deliveryScope = this,
+                    send = { request ->
+                        if (request.beginDispatch()) dispatches += 1
+                        throw IllegalStateException("result unavailable")
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+            fixture.controller.send()
+            fixture.platform.listener.onResult("dictated words")
+            runCurrent()
+            render(fixture)
+
+            composeRule.onNodeWithContentDescription("Review dictated text").performClick()
+            composeRule.onNodeWithText("Insert at end").assertDoesNotExist()
+            composeRule.onNodeWithText("Copy").performClick()
+            assertTrue(fixture.controller.state is ConversationDictationState.DeliveryUnknown)
+            composeRule.onNodeWithContentDescription("Review dictated text").performClick()
+            composeRule.onNodeWithText("dictated words").assertIsDisplayed()
+            composeRule.onNodeWithText("Discard").performClick()
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+            assertEquals("Draft", fixture.draft.text)
+            assertEquals(1, dispatches)
+        }
+
     /** Verifies provider-readiness feedback and cancellation fit at large font in RTL. */
     @Test
-    fun readinessFeedbackFitsTheRootFloatAtLargeFontRtl() {
+    fun readinessFeedbackFitsTheRootBarAtLargeFontRtl() {
         val fixture = fixture(TextFieldValue("Keep"), deferActivityReadiness = true)
         fixture.controller.requestProviderActivityStart(ACCOUNT, GROUP, fixture.draft)
         render(fixture, fontScale = 2f, rtl = true)
 
         val root = composeRule.onNodeWithTag(ROOT_TAG).getUnclippedBoundsInRoot()
-        val control = composeRule.onNodeWithTag(APP_DICTATION_FLOAT_TAG).getUnclippedBoundsInRoot()
+        val control = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).getUnclippedBoundsInRoot()
         assertTrue(control.left >= root.left && control.right <= root.right)
         composeRule.onNodeWithContentDescription("Checking speech service…").assertIsDisplayed()
         val cancel =
@@ -157,7 +215,7 @@ class ConversationDictationFloatingControlTest {
 
     /** Verifies retry and dismiss actions remain visible and touch-accessible in compact RTL. */
     @Test
-    fun compactLargeFontRtlFloatDoesNotClipItsActions() {
+    fun compactLargeFontRtlBarDoesNotClipItsActions() {
         val fixture = fixture(TextFieldValue(""))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
@@ -187,7 +245,7 @@ class ConversationDictationFloatingControlTest {
             ) {
                 WhiteNoiseTheme {
                     Box(Modifier.width(268.dp).testTag(ROOT_TAG)) {
-                        ConversationDictationFloatingControl(
+                        ConversationDictationPersistentControl(
                             state = fixture.controller.state,
                             controller = fixture.controller,
                         )
@@ -201,6 +259,8 @@ class ConversationDictationFloatingControlTest {
     private fun fixture(
         initial: TextFieldValue,
         deferActivityReadiness: Boolean = false,
+        deliveryScope: CoroutineScope? = null,
+        send: suspend (ConversationDictationSendRequest) -> Boolean = { false },
     ): Fixture {
         val platform = FakePlatform(deferActivityReadiness)
         var draft = initial
@@ -220,6 +280,8 @@ class ConversationDictationFloatingControlTest {
                 },
                 disclosureAccepted = { true },
                 markDisclosureAccepted = {},
+                targetValidationScope = deliveryScope,
+                sendTranscriptIfOriginUnchanged = send,
                 scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
             )
         return Fixture(
