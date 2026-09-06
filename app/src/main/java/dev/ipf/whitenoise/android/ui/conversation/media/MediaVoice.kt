@@ -35,7 +35,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -85,12 +84,81 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-private val voiceMaterializations = SingleFlight<String, java.io.File>()
+private val voiceMaterializations = SingleFlight<VoiceMaterializationFlightKey, java.io.File>()
+
+/** Keeps in-flight source work isolated to the controller that authorized it. */
+private class VoiceMaterializationFlightKey(
+    private val filePath: String,
+    private val presentationOwner: Any?,
+) {
+    override fun equals(other: Any?): Boolean =
+        other is VoiceMaterializationFlightKey &&
+            filePath == other.filePath &&
+            presentationOwner == other.presentationOwner
+
+    override fun hashCode(): Int = 31 * filePath.hashCode() + presentationOwner.hashCode()
+}
+
+/** Referential screen owner plus its account/runtime generations. */
+private class VoicePresentationOwnerKey(
+    private val controller: ConversationController,
+    private val appState: WhiteNoiseAppState,
+    private val accountRef: String?,
+    private val runtimeGeneration: Int,
+) {
+    override fun equals(other: Any?): Boolean =
+        other is VoicePresentationOwnerKey &&
+            controller === other.controller &&
+            appState === other.appState &&
+            accountRef == other.accountRef &&
+            runtimeGeneration == other.runtimeGeneration
+
+    override fun hashCode(): Int {
+        var result = System.identityHashCode(controller)
+        result = 31 * result + System.identityHashCode(appState)
+        result = 31 * result + accountRef.hashCode()
+        return 31 * result + runtimeGeneration
+    }
+}
+
+/** Stable identity for one voice attachment within an owner-keyed Compose subtree. */
+internal data class VoicePresentationAttachmentKey(
+    val messageIdHex: String,
+    val attachmentIndex: Int,
+    val sourceEpoch: ULong,
+)
+
+/** Captures one exact controller/app/account/runtime generation for state and source ownership. */
+private fun voicePresentationOwnerKey(
+    controller: ConversationController,
+    appState: WhiteNoiseAppState,
+    accountRef: String?,
+    runtimeGeneration: Int,
+): Any = VoicePresentationOwnerKey(controller, appState, accountRef, runtimeGeneration)
+
+/** Remembers the exact presentation owner that must bound one voice row subtree. */
+@Composable
+internal fun rememberVoicePresentationOwner(
+    controller: ConversationController,
+    appState: WhiteNoiseAppState,
+): Any {
+    val accountRef = controller.boundAccountRef
+    val runtimeGeneration = appState.runtimeGeneration
+    return remember(controller, appState, accountRef, runtimeGeneration) {
+        voicePresentationOwnerKey(
+            controller = controller,
+            appState = appState,
+            accountRef = accountRef,
+            runtimeGeneration = runtimeGeneration,
+        )
+    }
+}
 
 /** Inputs needed to materialize one voice attachment for presentation. */
 internal data class VoiceAttachmentMaterializationRequest(
     val context: Context,
     val controller: ConversationController,
+    val presentationOwner: Any,
     val messageIdHex: String,
     val attachmentIndex: Int,
     val reference: MediaAttachmentReferenceFfi,
@@ -148,6 +216,7 @@ private object DefaultVoiceAttachmentPresentationRuntime : VoiceAttachmentPresen
             reference = request.reference,
             mine = request.mine,
             priority = request.priority,
+            materializationOwner = request.presentationOwner,
         )
 
     override suspend fun waveform(file: java.io.File): FloatArray? = AudioWaveformExtractor.decode(file)
@@ -197,6 +266,7 @@ internal fun MediaVoiceBubble(
     reference: MediaAttachmentReferenceFfi,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    presentationOwner: Any,
     mine: Boolean,
     onLongPress: () -> Unit = {},
     attachedToCaption: Boolean = false,
@@ -359,6 +429,7 @@ internal fun MediaVoiceBubble(
                 VoiceAttachmentMaterializationRequest(
                     context = context,
                     controller = controller,
+                    presentationOwner = presentationOwner,
                     messageIdHex = messageIdHex,
                     attachmentIndex = attachmentIndex,
                     reference = reference,
@@ -674,12 +745,20 @@ internal suspend fun materializeVoiceAttachment(
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
     priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
+    materializationOwner: Any =
+        voicePresentationOwnerKey(
+            controller = controller,
+            appState = controller.appState,
+            accountRef = controller.boundAccountRef,
+            runtimeGeneration = controller.appState.runtimeGeneration,
+        ),
 ): java.io.File =
     materializeVoiceAttachmentSource(
         context = context,
         messageIdHex = messageIdHex,
         attachmentIndex = attachmentIndex,
         reference = reference,
+        materializationOwner = materializationOwner,
         resolveSource = {
             val retained =
                 if (mine) {
@@ -702,11 +781,12 @@ internal suspend fun materializeVoiceAttachmentSource(
     messageIdHex: String,
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
+    materializationOwner: Any? = null,
     resolveSource: suspend () -> AttachmentPlaintext,
 ): java.io.File {
     val file = voiceAttachmentCacheFile(context, messageIdHex, attachmentIndex, reference)
     val attachmentKey = AttachmentCachePublication.attachmentKey(messageIdHex, attachmentIndex, reference.sourceEpoch)
-    return voiceMaterializations.run(file.absolutePath) {
+    return voiceMaterializations.run(VoiceMaterializationFlightKey(file.absolutePath, materializationOwner)) {
         withContext(Dispatchers.IO) {
             file.takeIf { it.isFile && it.length() > 0L }?.also(AttachmentPlaintextCache::touch)
         } ?: run {
