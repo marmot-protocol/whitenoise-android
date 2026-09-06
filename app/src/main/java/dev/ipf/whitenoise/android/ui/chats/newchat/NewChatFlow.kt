@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
@@ -30,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -357,11 +359,13 @@ private fun NewMessageScreen(
     onNewGroup: () -> Unit,
     onOpenConversation: (ChatListItem, Boolean) -> Unit,
 ) {
-    var query by rememberSaveable { mutableStateOf("") }
+    val queryState = rememberTextFieldState()
+    val query = queryState.text.toString()
     var showScanner by remember { mutableStateOf(false) }
     var showMyQr by remember { mutableStateOf(false) }
     var creatingHex by remember { mutableStateOf<String?>(null) }
     var startChatError by remember { mutableStateOf<StartChatErrorUiState?>(null) }
+    LaunchedEffect(query) { startChatError = null }
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     val showMyQrLabel = stringResource(R.string.show_my_qr_code)
@@ -483,13 +487,10 @@ private fun NewMessageScreen(
                 .padding(padding)
                 .consumeWindowInsets(padding),
         ) {
-            FlowSearchField(
-                value = query,
-                onValueChange = {
-                    query = it
-                    startChatError = null
-                },
+            RecipientSearchField(
+                state = queryState,
                 placeholder = stringResource(R.string.search_people_hint),
+                onPasteRejected = { appState.present(R.string.error_invalid_identity_reference) },
                 onScanQr = { showScanner = true },
                 modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
             )
@@ -647,11 +648,11 @@ private fun NewMessageScreen(
                 showScanner = false
                 when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.ViewProfile)) {
                     is QrScanOutcome.OpenProfileNpub -> {
-                        query = outcome.npub
+                        queryState.replaceRecipientText(outcome.npub)
                         startChatError = null
                     }
                     is QrScanOutcome.OpenProfileNprofile -> {
-                        query = outcome.accountIdHex
+                        queryState.replaceRecipientText(outcome.accountIdHex)
                         startChatError = null
                     }
                     QrScanOutcome.Invalid ->
