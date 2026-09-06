@@ -8,9 +8,11 @@ import dev.ipf.whitenoise.android.state.NotificationBootstrapTestFixture
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -24,6 +26,65 @@ import java.time.Duration
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class NotificationPushWakeCatchUpTest {
+    private var previousKeepConnected = false
+
+    /** Model the production incident explicitly; the platform preference defaults to enabled. */
+    @Before
+    fun useOneShotPushDelivery() {
+        val context: Application = RuntimeEnvironment.getApplication()
+        previousKeepConnected = BackgroundConnectionPreferences.isEnabled(context)
+        BackgroundConnectionPreferences.setEnabled(context, false)
+    }
+
+    /** Restore platform preferences so this fixture cannot change another scenario's delivery mode. */
+    @After
+    fun restoreDeliveryMode() {
+        val context: Application = RuntimeEnvironment.getApplication()
+        BackgroundConnectionPreferences.setEnabled(context, previousKeepConnected)
+    }
+
+    /** A stale FCM wake must not tear down a healthy user-enabled persistent receiver after a failed fetch. */
+    @Test
+    fun catchUpFailurePreservesKeepConnectedService() =
+        runBlocking {
+            val context: Application = RuntimeEnvironment.getApplication()
+            BackgroundConnectionPreferences.setEnabled(context, true)
+            val store = PushTokenStore.create(context)
+            var fetches = 0
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context,
+                    onCatchUpAccounts = {
+                        fetches++
+                        throw IOException("relay unavailable")
+                    },
+                    emitStartupNotification = false,
+                )
+            try {
+                fixture.bootstrap()
+                store.recordPendingPushWakeCatchUp()
+                val generation = store.pendingPushWakeCatchUpGeneration()
+                val outcome =
+                    supervisor().supervise(
+                        recoveryAllowed = { true },
+                        startRuntime = { fixture.awaitPushDrain(100L) },
+                    )
+
+                assertEquals(NotificationRuntimeSupervisionOutcome.Started(1), outcome)
+                assertEquals(1, fetches)
+                assertEquals(generation, store.pendingPushWakeCatchUpGeneration())
+                assertFalse(
+                    shouldStopAfterOneShotForegroundStart(
+                        oneShotRequested = true,
+                        backgroundConnectionEnabled = fixture.appState.backgroundConnectionEnabled,
+                    ),
+                )
+            } finally {
+                store.clearPendingPushWakeCatchUp()
+                fixture.close()
+            }
+        }
+
     /** A warm background process must recover from a relay failure before releasing its wake. */
     @Test
     fun warmWakeRetriesFailedFetchAndPostsMessageAndReaction() = runBlocking { assertTransientRecovery(warm = true) }

@@ -344,6 +344,7 @@ internal class NotificationBootstrapTestFixture(
         runWithMainLooperPumping { appState.retryBootstrap() }
     }
 
+    /** Drives warm runtime startup while allowing its main-thread receiver work to complete. */
     suspend fun ensureNotificationRuntimeStarted() {
         runWithMainLooperPumping { appState.ensureNotificationRuntimeStarted() }
     }
@@ -357,6 +358,7 @@ internal class NotificationBootstrapTestFixture(
         check(updates.trySend(notification).isSuccess)
     }
 
+    /** Waits for the fake engine update to cross the subscription boundary, before Android posting is required. */
     suspend fun awaitUpdateConsumed() {
         withTimeout(5_000L) {
             while (consumedUpdates.get() == 0) delay(10L)
@@ -426,6 +428,7 @@ internal class NotificationBootstrapTestFixture(
         }
     }
 
+    /** Counts only updates actually consumed by the process-owned notification subscription. */
     private suspend fun nextUpdate() = updates.receive().also { consumedUpdates.incrementAndGet() }
 
     /** Emits startup traffic only when the scenario opts into the original bootstrap-race probe. */

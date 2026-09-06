@@ -4257,6 +4257,7 @@ class WhiteNoiseAppState private constructor(
     internal fun notificationRuntimeRecoveryAllowed(generation: Long): Boolean =
         !networkNotificationRecoverySuppressed && notificationRuntimeRecovery.isCurrent(generation)
 
+    /** Re-establishes receiver readiness within the reconnect budget before admitting native catch-up. */
     private suspend fun ensureNotificationReceiverForNetworkReconnect(): Boolean {
         if (!bootstrapCompleted) bootstrap()
         if (!bootstrapCompleted || networkNotificationRecoverySuppressed) return false
@@ -4286,8 +4287,9 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Keeps a push wake alive through fetch and a bounded notification drain window.
-     * A failed fetch throws for service supervision; a successful quiet fetch may return false
-     * because decoy, duplicate, or suppressed events need not produce a notification update.
+     * A failed fetch throws for one-shot service supervision. With Keep connected enabled,
+     * preserve the healthy persistent receiver and retain the wake for later catch-up instead.
+     * A quiet drain may return false without indicating receiver or fetch failure.
      */
     suspend fun ensureNotificationRuntimeStartedAndAwaitPushDrain(timeoutMs: Long = NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS): Boolean =
         coroutineScope {
@@ -4298,10 +4300,12 @@ class WhiteNoiseAppState private constructor(
                         notificationDrainSignals.first { it > sequenceBeforeStart }
                     } != null
                 }
-            check(ensureNotificationRuntimeStarted()) { "push wake account catch-up incomplete" }
+            val catchUpSucceeded = ensureNotificationRuntimeStarted()
+            check(catchUpSucceeded || backgroundConnectionEnabled) { "push wake account catch-up incomplete" }
             drain.await()
         }
 
+    /** Retries a persisted token-registration obligation when notification startup reaches a usable runtime. */
     private suspend fun drainPendingNativePushRegistrationSyncIfNeeded() {
         if (pushTokenStore.nativePushRegistrationSyncPending()) {
             syncNativePushRegistrationIfEnabled()
