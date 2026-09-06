@@ -978,23 +978,25 @@ internal class LazyListConversationScrollWriter(
         listState.animateScrollToItem(index, scrollOffset)
     }
 
+    /** Reports every snap used to materialize and then reach the measured physical end of [index]. */
     override suspend fun scrollToTail(index: Int) {
         val visibleTailOffset = tailScrollOffset(index)
         if (visibleTailOffset > 0) {
-            listState.scrollToItem(index, visibleTailOffset)
+            scrollToItem(index, visibleTailOffset)
         } else {
-            listState.scrollToItem(index)
-            listState.scrollToItem(index, tailScrollOffset(index))
+            scrollToItem(index, 0)
+            scrollToItem(index, tailScrollOffset(index))
         }
     }
 
+    /** Reports every animation used to materialize and then reach the measured physical end of [index]. */
     override suspend fun animateScrollToTail(index: Int) {
         val visibleTailOffset = tailScrollOffset(index)
         if (visibleTailOffset > 0) {
-            listState.animateScrollToItem(index, visibleTailOffset)
+            animateScrollToItem(index, visibleTailOffset)
         } else {
-            listState.animateScrollToItem(index)
-            listState.animateScrollToItem(index, tailScrollOffset(index))
+            animateScrollToItem(index, 0)
+            animateScrollToItem(index, tailScrollOffset(index))
         }
     }
 
