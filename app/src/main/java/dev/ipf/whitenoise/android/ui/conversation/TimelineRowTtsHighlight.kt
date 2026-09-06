@@ -111,6 +111,8 @@ internal fun TimelineRowMessageBubble(
 ) {
     val ttsHighlightState by rememberRowScopedTtsHighlightState(messageIdHex, appState)
     val ttsRowInstance = remember(messageIdHex) { Any() }
+    val renderedInviteGroupIdHex = controller.group.groupIdHex
+    val renderedInviteWelcomeMessageIdHex = controller.group.viaWelcomeMessageIdHex
     DisposableEffect(ttsSentenceLayoutSink, messageIdHex, ttsRowInstance) {
         ttsSentenceLayoutSink?.mountRow(messageIdHex, ttsRowInstance)
         onDispose {
@@ -149,7 +151,14 @@ internal fun TimelineRowMessageBubble(
         composerGate = composerGate,
         groupDisbanded = controller.group.disbanded,
         inviteMutationInFlight = controller.mutationInFlight,
-        onJoinInvite = { appState.launchMutation { controller.acceptInvite() } },
+        onJoinInvite = {
+            appState.launchMutation {
+                controller.acceptInvite(
+                    renderedGroupIdHex = renderedInviteGroupIdHex,
+                    renderedWelcomeMessageIdHex = renderedInviteWelcomeMessageIdHex,
+                )
+            }
+        },
         onDeclineInvite = {
             appState.launchMutation {
                 if (controller.declineInvite()) onBack()

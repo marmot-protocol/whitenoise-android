@@ -137,52 +137,6 @@ data class ChatListAvatarSeed(
     val image: ImageBitmap,
 )
 
-internal data class ChatListMemberPresentation(
-    val otherMemberAccount: String?,
-    val memberCount: Int,
-    val activeAccountIsSoleMember: Boolean,
-)
-
-private fun chatListMemberPresentation(
-    members: List<AppGroupMemberRecordFfi>,
-    activeAccountIdHex: String?,
-): ChatListMemberPresentation =
-    ChatListMemberPresentation(
-        otherMemberAccount = GroupProjector.otherMemberAccount(members, activeAccountIdHex),
-        memberCount = GroupProjector.uniqueMemberCount(members),
-        activeAccountIsSoleMember = GroupProjector.isSelfSoleMember(members, activeAccountIdHex),
-    )
-
-/**
- * Group record as the chat list should display it. A row carrying any avatar
- * signal is authoritative for the whole avatar identity — a URL↔encrypted
- * switch must clear the stale half. A row with no avatar payload at all is a
- * transient projection state: keep the record's last-known identity so a
- * resolved avatar never degrades to generated initials; a genuine
- * removal still propagates through the group record itself.
- */
-private fun chatListDisplayGroup(
-    row: ChatListRowFfi,
-    baseGroup: AppGroupRecordFfi,
-): AppGroupRecordFfi {
-    val rowHasAvatarSignal = row.avatarUrl != null || row.avatar != null
-    val avatarUrl = if (rowHasAvatarSignal) row.avatarUrl else baseGroup.avatarUrl
-    return reconcileTerminalSelfMembership(
-        update =
-            baseGroup.copy(
-                name = row.groupName.ifBlank { baseGroup.name },
-                avatarUrl = avatarUrl,
-                avatarDim = baseGroup.avatarDim.takeIf { avatarUrl == baseGroup.avatarUrl },
-                avatarThumbhash = baseGroup.avatarThumbhash.takeIf { avatarUrl == baseGroup.avatarUrl },
-                imageHashHex = if (rowHasAvatarSignal) row.avatar?.imageHashHex else baseGroup.imageHashHex,
-                archived = row.archived,
-                pendingConfirmation = row.pendingConfirmation,
-                selfMembership = row.selfMembership,
-            ),
-        previousSelfMembership = baseGroup.selfMembership,
-    )
-}
-
 /**
  * Build a `ChatListItem` from the FFI projection. [members] is the current
  * authoritative roster used for membership-sensitive fields. The optional
@@ -2419,20 +2373,6 @@ internal fun cacheAppliedGroupMembers(
     appState.requestProfiles(members.map { it.memberIdHex })
 }
 
-/** Immediate invite-bar projection while the local MDK confirmation is pending. */
-internal fun optimisticAcceptedInvite(group: AppGroupRecordFfi): AppGroupRecordFfi =
-    group.copy(
-        archived = false,
-        pendingConfirmation = false,
-    )
-
-/** Roll back only if no newer authoritative group projection replaced our optimistic value. */
-internal fun rollbackOptimisticAcceptedInvite(
-    current: AppGroupRecordFfi,
-    optimistic: AppGroupRecordFfi,
-    previous: AppGroupRecordFfi,
-): AppGroupRecordFfi = if (current == optimistic) previous else current
-
 internal data class AuthoritativeChatListMembers(
     val memberCacheByGroup: Map<String, List<AppGroupMemberRecordFfi>>,
     val removedGroupIds: Set<String>,
@@ -2522,25 +2462,6 @@ internal fun duplicateSignatureKeyDisplayName(
  */
 internal fun SelfMembershipFfi.isNonMember(): Boolean = this == SelfMembershipFfi.REMOVED || this == SelfMembershipFfi.LEFT
 
-/**
- * Reconcile independently delivered group snapshots without allowing a known
- * terminal self-membership to regress to MEMBER. A stale Welcome is no longer
- * actionable once either snapshot reports LEFT or REMOVED (#1248).
- */
-internal fun reconcileTerminalSelfMembership(
-    update: AppGroupRecordFfi,
-    previousSelfMembership: SelfMembershipFfi,
-): AppGroupRecordFfi {
-    val selfMembership =
-        update.selfMembership.takeIf { it.isNonMember() }
-            ?: previousSelfMembership.takeIf { it.isNonMember() }
-            ?: update.selfMembership
-    return update.copy(
-        selfMembership = selfMembership,
-        pendingConfirmation = update.pendingConfirmation && !selfMembership.isNonMember(),
-    )
-}
-
 internal data class ConversationMembershipSeed(
     val members: List<AppGroupMemberRecordFfi>,
     val membersLoaded: Boolean,
@@ -2610,21 +2531,6 @@ internal fun agentStreamFailureText(
 ): String {
     if (throwable is CancellationException) throw throwable
     return copy.streamFailed()
-}
-
-internal suspend fun runBestEffortPostCommitSteps(
-    steps: List<Pair<String, suspend () -> Unit>>,
-    onFailure: (String, Throwable) -> Unit,
-) {
-    steps.forEach { (name, step) ->
-        try {
-            step()
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (throwable: Throwable) {
-            onFailure(name, throwable)
-        }
-    }
 }
 
 internal data class OptimisticReactionChange(
@@ -3470,6 +3376,7 @@ class ChatsController private constructor(
 
     fun invalidateConnectionReadiness() = connectionOwner.invalidate()
 
+    /** Ends account-owned streams and invalidates roster results before closing their handles. */
     suspend fun closeLiveSubscriptionsForAccountTeardown(accountRef: String) {
         val teardown =
             synchronized(liveSubscriptionLock) {
@@ -6538,7 +6445,7 @@ class ConversationController(
 ) {
     private val liveSubscriptions = appState.conversationLiveSubscriptions()
 
-    var group by mutableStateOf(initialGroup)
+    var group by mutableStateOf(reconcileTerminalSelfMembership(initialGroup, initialGroup))
         private set
 
     /** The accepted in-flight archive/restore, presentation-only; identity-compared on settle. */
@@ -6554,6 +6461,23 @@ class ConversationController(
     // count is unchanged, so a newer authoritative update always wins over a
     // late completion.
     private var groupAuthorityEpoch = 0L
+
+    // A typed native refusal proves only that this Welcome is no longer
+    // pending. Keep its action retired until an authoritative roster resolves
+    // whether the account is already a member or has left/been removed.
+    private var inviteAcceptanceAwaitingAuthority by mutableStateOf<InviteAcceptanceGeneration?>(null)
+
+    internal val inviteAcceptanceResolutionPending: Boolean
+        get() = inviteAcceptanceAwaitingAuthority != null
+
+    private val ownsInviteAcceptanceResult: Boolean
+        get() = !controllerCleared && !isAccountTeardownRequested()
+
+    /** Retains one acceptance attempt only while its owner and optimistic generation are unchanged. */
+    private fun ownsInviteAttempt(
+        authorityEpoch: Long,
+        optimisticGroup: AppGroupRecordFfi,
+    ): Boolean = ownsInviteAcceptanceResult && groupAuthorityEpoch == authorityEpoch && group == optimisticGroup
 
     /**
      * Archived state the conversation surfaces should present: the accepted
@@ -6853,7 +6777,7 @@ class ConversationController(
         initialConversationTimeline(
             preview = initialTimelinePreview,
             groupIdHex = initialGroup.groupIdHex,
-            pendingConfirmation = initialGroup.pendingConfirmation,
+            pendingConfirmation = group.pendingConfirmation,
             optimisticMessages = optimisticMessages.values,
         )
 
@@ -7131,7 +7055,9 @@ class ConversationController(
     fun isMessageMine(message: AppMessageRecordFfi): Boolean = MessageProjector.isMine(message, conversationAccountIdHex)
 
     val isSelfMember: Boolean
-        get() = selfMembership.isSelfMember(members, conversationAccountIdHex)
+        get() =
+            !inviteAcceptanceResolutionPending &&
+                selfMembership.isSelfMember(members, conversationAccountIdHex)
 
     val canSendMessages: Boolean
         // The engine gates all ordinary outbound work while a disband
@@ -7411,6 +7337,7 @@ class ConversationController(
         val teardown =
             synchronized(liveSubscriptionLock) {
                 accountTeardownRequested = true
+                memberRosterRefreshGeneration.advance()
                 val current = Triple(groupStateSubscription, timelineSubscription, startJob)
                 groupStateSubscription = null
                 startJob = null
@@ -7621,14 +7548,31 @@ class ConversationController(
     @VisibleForTesting
     internal fun applyGroupStateForTest(update: AppGroupRecordFfi) = applyGroupState(update)
 
+    /** Applies a canonical group update while retaining only a still-unresolved stale action fence. */
     private fun applyGroupState(update: AppGroupRecordFfi) {
+        val previousGroup = group
         val previousRetention = group.disappearingMessageSecs
         groupAuthorityEpoch += 1L
-        group =
+        val reconciled =
             reconcileTerminalSelfMembership(
                 update = update,
-                previousSelfMembership = group.selfMembership,
+                previous = previousGroup,
             )
+        val awaitingAuthority = inviteAcceptanceAwaitingAuthority
+        val freshTerminalReinvite = isDistinctWelcomeReinvite(previousGroup, update)
+        group =
+            if (awaitingAuthority?.matches(reconciled) == true && reconciled.pendingConfirmation) {
+                reconciled.copy(pendingConfirmation = false)
+            } else {
+                inviteAcceptanceAwaitingAuthority = null
+                reconciled
+            }
+        if (freshTerminalReinvite) {
+            memberRosterRefreshGeneration.advance()
+            selfMembership.clearSelfLeft()
+            membersVerified = false
+            memberRosterLoadTracker.transition(GroupRosterRefreshEvent.STARTED)
+        }
         if (group.selfMembership.isNonMember()) recordSelfLeft()
         if (previousRetention != update.disappearingMessageSecs) {
             publishTimelineFromIndexes()
@@ -7708,7 +7652,10 @@ class ConversationController(
      * (#279).
      */
     fun onCleared() {
-        controllerCleared = true
+        synchronized(liveSubscriptionLock) {
+            controllerCleared = true
+            memberRosterRefreshGeneration.advance()
+        }
         initialTimelineSubscriptionRead.cancel()
         initialTimelineSnapshotRead.cancel()
         controllerScope.cancel()
@@ -9878,39 +9825,46 @@ class ConversationController(
         appState.dismissConversationNotifications(account, group.groupIdHex)
     }
 
-    /** Accepts the current invitation once, retaining optimistic state across safe bounded retries. */
-    suspend fun acceptInvite(notify: Boolean = true): Boolean =
+    /**
+     * Dispatches Join only while the rendered invitation remains current to
+     * this controller, retaining optimistic state across safe bounded retries.
+     */
+    @Suppress("ComplexCondition", "ReturnCount") // Explicit fences keep stale outcomes side-effect free.
+    suspend fun acceptInvite(
+        notify: Boolean = true,
+        renderedGroupIdHex: String = group.groupIdHex,
+        renderedWelcomeMessageIdHex: String? = group.viaWelcomeMessageIdHex,
+    ): Boolean =
         withMutationLockResult(false) {
             val account = conversationAccountRef ?: return@withMutationLockResult false
             val invitePeerAccount = inviteAccount
             val previousGroup = group
+            val generation = InviteAcceptanceGeneration(renderedGroupIdHex, renderedWelcomeMessageIdHex)
+            if (!ownsInviteAcceptanceResult || !canAcceptRenderedInvite(previousGroup, generation)) {
+                return@withMutationLockResult false
+            }
+            val authorityEpochBefore = groupAuthorityEpoch
             val optimisticGroup = optimisticAcceptedInvite(previousGroup)
             group = optimisticGroup
-            appState.applyLocalGroupUpdate(optimisticGroup)
-            val acceptedGroup =
-                runCatching {
-                    retryIdempotentRuntimeMutation(
-                        onTransientFailure = { attempt ->
-                            Log.w(
-                                "DMConversation",
-                                "invite acceptance temporarily unavailable; retrying " +
-                                    "failedAttempt=$attempt",
-                            )
-                        },
-                    ) {
-                        inviteAcceptor(account, group.groupIdHex)
-                    }
-                }.getOrElse {
-                    group = rollbackOptimisticAcceptedInvite(group, optimisticGroup, previousGroup)
-                    appState.applyLocalGroupUpdate(group)
-                    it.rethrowIfCancellation()
-                    appState.presentFailure(R.string.toast_couldnt_accept_invite, "GROUP_INVITE_ACCEPT", it)
-                    return@withMutationLockResult false
+            appState.applyLocalGroupUpdate(optimisticGroup, account)
+            val attempt =
+                InviteAcceptanceAttempt(account, generation, previousGroup, optimisticGroup, authorityEpochBefore)
+            val acceptedGroup = resolveInviteAcceptance(attempt)
+            if (acceptedGroup == null) return@withMutationLockResult false
+            if (
+                !ownsInviteAttempt(authorityEpochBefore, optimisticGroup) ||
+                !acceptedInviteMatchesGeneration(acceptedGroup, generation)
+            ) {
+                if (ownsInviteAttempt(authorityEpochBefore, optimisticGroup)) {
+                    inviteAcceptanceAwaitingAuthority = generation
+                    refreshMembers()
                 }
+                return@withMutationLockResult false
+            }
             acceptedInvitePeerAccount = invitePeerAccount
             group = acceptedGroup
-            appState.applyLocalGroupUpdate(group)
-            appState.dismissConversationNotifications(account, group.groupIdHex)
+            appState.applyLocalGroupUpdate(group, account)
+            appState.dismissConversationNotifications(account, generation.groupIdHex)
             // Accepting an invite (re-)joins the group, so clear any stale
             // local self-left latch before refreshMembers() so roster application
             // is allowed to add self back to the roster (issue #787).
@@ -9936,6 +9890,47 @@ class ConversationController(
                 )
             }
             true
+        }
+
+    /**
+     * Resolves the native Join call while every retry remains fenced to the
+     * same rendered Welcome and controller owner.
+     */
+    private suspend fun resolveInviteAcceptance(attempt: InviteAcceptanceAttempt): AppGroupRecordFfi? =
+        runCatching {
+            retryIdempotentRuntimeMutation(
+                onTransientFailure = { attemptNumber ->
+                    Log.w(
+                        "DMConversation",
+                        "invite acceptance temporarily unavailable; retrying " +
+                            "failedAttempt=$attemptNumber",
+                    )
+                },
+            ) {
+                if (ownsInviteAttempt(attempt.authorityEpoch, attempt.optimisticGroup)) {
+                    inviteAcceptor(attempt.account, attempt.generation.groupIdHex)
+                } else {
+                    null
+                }
+            }
+        }.getOrElse { failure ->
+            if (failure is MarmotKitException.GroupInviteNotPending) {
+                if (ownsInviteAttempt(attempt.authorityEpoch, attempt.optimisticGroup)) {
+                    inviteAcceptanceAwaitingAuthority = attempt.generation
+                    appState.applyLocalGroupUpdate(group, attempt.account)
+                    refreshMembers()
+                }
+                return@getOrElse null
+            }
+            val currentGroup = group
+            group = rollbackOptimisticAcceptedInvite(currentGroup, attempt.optimisticGroup, attempt.previousGroup)
+            val ownsPresentation = ownsInviteAcceptanceResult
+            if (ownsPresentation && group != currentGroup) appState.applyLocalGroupUpdate(group, attempt.account)
+            failure.rethrowIfCancellation()
+            if (ownsPresentation) {
+                appState.presentFailure(R.string.toast_couldnt_accept_invite, "GROUP_INVITE_ACCEPT", failure)
+            }
+            null
         }
 
     suspend fun declineInvite(): Boolean =
@@ -12282,59 +12277,71 @@ class ConversationController(
         return result
     }
 
-    suspend fun retryMembers() {
-        refreshMembers()
+    /** Re-reads authoritative membership without replaying a pending group mutation. */
+    suspend fun retryMembers() = refreshMembers()
+
+    /** Retries only the authority read for a retired invite; it never replays Join. */
+    suspend fun retryInviteAcceptanceAuthority() {
+        if (ownsInviteAcceptanceResult) {
+            withMutationLockResult(Unit) { if (inviteAcceptanceAwaitingAuthority != null) refreshMembers() }
+        }
     }
+
+    /** Starts a roster read only while this controller still owns its account presentation. */
+    private fun beginMemberRosterRefresh(): Long? =
+        synchronized(liveSubscriptionLock) {
+            if (accountTeardownRequested || controllerCleared) null else memberRosterRefreshGeneration.advance()
+        }
 
     /** Publishes the latest authoritative roster while rejecting older refresh completions. */
     private suspend fun refreshMembers(retryOnHydrationPending: Boolean = true) {
         val account = conversationAccountRef ?: return
-        val refreshGeneration = memberRosterRefreshGeneration.advance()
+        val refreshGeneration = beginMemberRosterRefresh() ?: return
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.STARTED)
         try {
             runCatchingCancellable {
-                // One authoritative projection replaces the old serialized
-                // groupMlsState() eviction probe + groupDetails() roster load.
-                // It carries membership, admins, epoch/revision, lifecycle, and
-                // self-membership in one worker round-trip.
+                // One projection replaces the serialized groupMlsState() eviction and groupDetails() roster reads.
+                // It carries membership, admins, epoch/revision, lifecycle, and self-membership together.
                 val roster = groupRosterReader(account, group.groupIdHex)
-                if (!memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
-                    return@runCatchingCancellable
+                memberRosterRefreshGeneration.runIfCurrent(refreshGeneration) {
+                    val applied = applyGroupRoster(account, roster) ?: return@runIfCurrent
+                    appState.applyLocalGroupDetails(account, applied.group, applied.members)
                 }
-                val applied = applyGroupRoster(account, roster) ?: return@runCatchingCancellable
-                appState.applyLocalGroupDetails(account, applied.group, applied.members)
             }.onFailure { throwable ->
                 if (!memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
                     return@onFailure
                 }
-                when {
-                    throwable.isUseAfterEviction() -> markActiveAccountRemovedFromMembers(account)
-                    retryOnHydrationPending && throwable is MarmotKitException.GroupHydrationPending -> {
-                        // Deferred hydration answers early reads with a retryable
-                        // pending state — the runtime promotes the group shortly
-                        // after account readiness, so wait once instead of showing
-                        // a failed roster.
-                        delay(GROUP_HYDRATION_RETRY_DELAY_MS)
-                        if (memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
-                            refreshMembers(retryOnHydrationPending = false)
-                        }
+                if (retryOnHydrationPending && throwable is MarmotKitException.GroupHydrationPending) {
+                    // Deferred hydration answers early reads with a retryable pending state; the runtime
+                    // promotes the group shortly after account readiness, so wait once instead of showing
+                    // a failed roster.
+                    delay(GROUP_HYDRATION_RETRY_DELAY_MS)
+                    if (memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
+                        refreshMembers(retryOnHydrationPending = false)
                     }
-                    else -> {
+                    return@onFailure
+                }
+                memberRosterRefreshGeneration.runIfCurrent(refreshGeneration) {
+                    if (throwable.isUseAfterEviction()) {
+                        markActiveAccountRemovedFromMembers(account)
+                    } else {
                         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.FAILED)
                         if (BuildConfig.DEBUG) Log.w("DMConversation", "refresh members failed", throwable)
                     }
                 }
             }
         } catch (cancel: CancellationException) {
-            if (memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
+            memberRosterRefreshGeneration.runIfCurrent(refreshGeneration) {
                 memberRosterLoadTracker.restoreAfterCancellation()
             }
             throw cancel
         }
     }
 
+    /** Applies the engine's eviction proof and invalidates any in-flight group mutation result. */
     private fun markActiveAccountRemovedFromMembers(account: String) {
         val activeAccountIdHex = conversationAccountIdHex ?: return
+        groupAuthorityEpoch += 1L
         // Engine-confirmed removal (UseAfterEviction). Record the same
         // authoritative local-left marker the leaveGroup() success path sets so
         // a later authoritative roster result that races ahead of eviction can't re-add
@@ -12348,6 +12355,7 @@ class ConversationController(
         acceptedInvitePeerAccount = null
         membersLoaded = true
         membersVerified = true
+        inviteAcceptanceAwaitingAuthority = null
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
         // UseAfterEviction is the engine's authoritative signal that this
         // conversation can no longer accept composer writes. Invalidate an
@@ -12413,7 +12421,7 @@ class ConversationController(
         returnedMembership: SelfMembershipFfi,
     ): AppliedGroupDetails? {
         val previousRetention = group.disappearingMessageSecs
-        val previousSelfMembership = group.selfMembership
+        val previousGroup = group
         resolution.invariant?.let { invariant ->
             memberRosterLoadTracker.transition(GroupRosterRefreshEvent.INCONSISTENT)
             logGroupRosterInvariant(
@@ -12429,7 +12437,7 @@ class ConversationController(
         group =
             reconcileTerminalSelfMembership(
                 update = applied.group,
-                previousSelfMembership = previousSelfMembership,
+                previous = previousGroup,
             )
         if (previousRetention != group.disappearingMessageSecs) {
             publishTimelineFromIndexes()
@@ -12457,6 +12465,7 @@ class ConversationController(
         }
         membersLoaded = true
         membersVerified = true
+        inviteAcceptanceAwaitingAuthority = null
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
         cacheAppliedGroupMembers(appState, account, group.groupIdHex, members)
         return AppliedGroupDetails(group = group, members = members)
