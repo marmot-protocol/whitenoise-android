@@ -516,21 +516,6 @@ internal fun visibleConversationDismissalTarget(
     return conversationOpenDismissalTarget(activeAccountRef, groupIdHex)
 }
 
-internal fun conversationDictationOriginVisible(
-    appInForeground: Boolean,
-    appLockScreenVisible: Boolean,
-    pendingProfileNpub: String?,
-    activeAccountRef: String?,
-    activeGroupIdHex: String?,
-    accountRef: String,
-    groupIdHex: String,
-): Boolean =
-    appInForeground &&
-        !appLockScreenVisible &&
-        pendingProfileNpub == null &&
-        activeAccountRef.equals(accountRef, ignoreCase = true) &&
-        activeGroupIdHex.equals(groupIdHex, ignoreCase = true)
-
 internal suspend fun dismissConversationNotificationsOnOpen(
     activeAccountRef: String?,
     groupIdHex: String?,
