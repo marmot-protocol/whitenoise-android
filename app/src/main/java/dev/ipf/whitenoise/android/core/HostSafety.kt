@@ -11,7 +11,8 @@ import java.util.Locale
  * SSRF guard for Android-owned directory and user-initiated HTTPS fetches.
  * Protocol-owned media and profile-image fetches use Marmot's dial-safety
  * implementation instead of this Kotlin classifier. Classifies a literal host
- * as private / loopback / link-local purely from the host string (no DNS).
+ * as non-public (including private, loopback, link-local, and multicast)
+ * purely from the host string (no DNS).
  *
  * The string check ([isPrivateOrLoopbackHost]) deliberately does NOT defend
  * against DNS-rebinding (a public hostname that resolves to a private address).
@@ -25,7 +26,7 @@ import java.util.Locale
  */
 object HostSafety {
     /**
-     * True when [host] is an IP literal in a private/loopback/link-local range,
+     * True when [host] is an IP literal outside the public-unicast ranges,
      * a loopback hostname (`localhost` / `*.localhost`), or unparseable/blank.
      * Ordinary public hostnames and public IP literals return false.
      *
@@ -64,8 +65,8 @@ object HostSafety {
     }
 
     /**
-     * Resolve-time SSRF guard: true when a DNS-resolved [address] falls in a
-     * private/loopback/link-local range, so a public hostname that resolves to
+     * Resolve-time SSRF guard: true when a DNS-resolved [address] falls outside
+     * the public-unicast ranges, so a public hostname that resolves to
      * (or is rebound to) an internal IP is rejected. Reuses the same range
      * classification as the literal-host check, applied to the actual resolved
      * bytes.
@@ -80,11 +81,7 @@ object HostSafety {
         // fe80::/10), site-local (RFC-1918, fec0::/10), and the wildcard
         // (0.0.0.0, ::). They miss CGNAT (100.64/10) and unique-local
         // fc00::/7, so fall through to the byte classifier for those.
-        if (address.isLoopbackAddress ||
-            address.isLinkLocalAddress ||
-            address.isSiteLocalAddress ||
-            address.isAnyLocalAddress
-        ) {
+        if (address.isBlockedByPlatformClassification()) {
             return true
         }
         return when (address) {
@@ -92,11 +89,11 @@ object HostSafety {
             is Inet6Address -> {
                 val bytes = address.address
                 val groups = hextets(bytes)
-                embeddedIpv4FromGroups(groups)?.let { embedded ->
-                    if (isPrivateIpv4(embedded)) return true
+                ipv4MappedFromGroups(groups)?.let { embedded ->
+                    return isPrivateIpv4(embedded)
                 }
-                // fc00::/7 unique-local, documentation/discard-only, and
-                // other special-use ranges not covered by the JDK helpers.
+                // Match Marmot's canonical public-unicast predicate for every
+                // DNS answer before a hostname can cross the native boundary.
                 isPrivateIpv6Groups(groups)
             }
             else -> false
@@ -104,6 +101,16 @@ object HostSafety {
     }
 
     private fun toUnsignedOctets(raw: ByteArray): IntArray = IntArray(raw.size) { raw[it].toInt() and 0xFF }
+
+    /** Groups the platform's non-public address predicates before byte-level classification. */
+    private fun InetAddress.isBlockedByPlatformClassification(): Boolean =
+        listOf(
+            isLoopbackAddress,
+            isLinkLocalAddress,
+            isSiteLocalAddress,
+            isMulticastAddress,
+            isAnyLocalAddress,
+        ).any { it }
 
     /**
      * Strict 4-part decimal IPv4 (the only shape an IPv4-embedded IPv6 literal
@@ -179,6 +186,7 @@ object HostSafety {
         }?.takeIf { it >= 0 }
     }
 
+    /** Blocks private, special-use, documentation, multicast, and reserved IPv4 ranges. */
     private fun isPrivateIpv4(octets: IntArray): Boolean {
         val a = octets[0]
         val b = octets[1]
@@ -189,8 +197,11 @@ object HostSafety {
             a == 172 && b in 16..31 -> true // RFC 1918
             a == 192 && b == 168 -> true // RFC 1918
             a == 192 && b == 0 && octets[2] == 0 -> true // IETF protocol assignments
+            a == 192 && b == 0 && octets[2] == 2 -> true // TEST-NET-1
             a == 192 && b == 88 && octets[2] == 99 -> true // deprecated 6to4 relay anycast
             a == 198 && b in 18..19 -> true // benchmarking
+            a == 198 && b == TEST_NET_2_SECOND_OCTET && octets[2] == TEST_NET_2_THIRD_OCTET -> true
+            a == TEST_NET_3_FIRST_OCTET && b == 0 && octets[2] == TEST_NET_3_THIRD_OCTET -> true
             a == 169 && b == 254 -> true // link-local
             a == 100 && b in 64..127 -> true // RFC 6598 carrier-grade NAT
             a in 224..239 -> true // multicast
@@ -199,6 +210,7 @@ object HostSafety {
         }
     }
 
+    /** Applies the address policy to IPv6 literals, following IPv4 policy only for mapped addresses. */
     private fun isPrivateIpv6(host: String): Boolean {
         val address = host.substringBefore('%') // drop any zone id
         if (address == "::1" || address == "::") return true
@@ -212,24 +224,74 @@ object HostSafety {
             } else {
                 expandIpv6(address)
             } ?: return false
-        embeddedIpv4FromGroups(groups)?.let { embedded ->
-            if (isPrivateIpv4(embedded)) return true
+        ipv4MappedFromGroups(groups)?.let { embedded ->
+            return isPrivateIpv4(embedded)
         }
         return isPrivateIpv6Groups(groups)
     }
 
+    /** Rejects non-global and special-purpose IPv6 prefixes after mapped IPv4 has been handled. */
     private fun isPrivateIpv6Groups(groups: IntArray): Boolean {
         val first = groups[0]
-        val isDiscardOnly = first == 0x0100 && groups[1] == 0 && groups[2] == 0 && groups[3] == 0
-        val isDocumentation = first == 0x2001 && groups[1] == 0x0DB8
+        val second = groups[1]
         // fc00::/7 unique-local, fe80::/10 link-local, fec0::/10 site-local,
-        // 100::/64 discard-only, and 2001:db8::/32 documentation.
-        return (first and 0xFE00) == 0xFC00 ||
-            (first and 0xFFC0) == 0xFE80 ||
-            (first and 0xFFC0) == 0xFEC0 ||
-            isDiscardOnly ||
-            isDocumentation
+        // special-purpose, transition, multicast, and documentation ranges.
+        return listOf(
+            isUniqueLocal(first),
+            isLinkLocal(first),
+            isSiteLocal(first),
+            isSpecialPurpose2001(first, second),
+            isSixToFour(first),
+            isDiscardOnly(groups),
+            isDocumentation(first, second),
+            isDocumentation3fff(first, second),
+            isMulticast(first),
+            !isGlobalUnicast(first),
+        ).any { it }
     }
+
+    /** Recognizes the private fc00::/7 prefix. */
+    private fun isUniqueLocal(first: Int): Boolean = (first and IPV6_UNIQUE_LOCAL_MASK) == IPV6_UNIQUE_LOCAL_PREFIX
+
+    /** Recognizes fe80::/10 addresses scoped to the local link. */
+    private fun isLinkLocal(first: Int): Boolean = (first and IPV6_LOCAL_MASK) == IPV6_LINK_LOCAL_PREFIX
+
+    /** Rejects the deprecated fec0::/10 site-local range. */
+    private fun isSiteLocal(first: Int): Boolean = (first and IPV6_LOCAL_MASK) == IPV6_SITE_LOCAL_PREFIX
+
+    /** Recognizes the special-purpose 2001::/23 block excluded by the native public-address policy. */
+    private fun isSpecialPurpose2001(
+        first: Int,
+        second: Int,
+    ): Boolean = first == IPV6_SPECIAL_FIRST && second <= IPV6_SPECIAL_MAX_SECOND
+
+    /** Rejects the 2002::/16 transition range regardless of its embedded IPv4 address. */
+    private fun isSixToFour(first: Int): Boolean = first == IPV6_SIX_TO_FOUR_FIRST
+
+    /** Recognizes the 100::/64 discard-only prefix. */
+    private fun isDiscardOnly(groups: IntArray): Boolean =
+        groups[0] == IPV6_DISCARD_ONLY_FIRST &&
+            groups.sliceArray(1..3).all { it == 0 }
+
+    /** Recognizes the 2001:db8::/32 documentation prefix. */
+    private fun isDocumentation(
+        first: Int,
+        second: Int,
+    ): Boolean = first == IPV6_SPECIAL_FIRST && second == IPV6_DOCUMENTATION_SECOND
+
+    /** Recognizes the 3fff::/20 documentation prefix, including its partial second hextet. */
+    private fun isDocumentation3fff(
+        first: Int,
+        second: Int,
+    ): Boolean =
+        first == IPV6_DOCUMENTATION_3FFF_FIRST &&
+            (second and IPV6_DOCUMENTATION_3FFF_MASK) == 0
+
+    /** Rejects multicast destinations in ff00::/8 at every scope. */
+    private fun isMulticast(first: Int): Boolean = (first and IPV6_MULTICAST_MASK) == IPV6_MULTICAST_PREFIX
+
+    /** Recognizes 2000::/3 before the more-specific excluded ranges are applied. */
+    private fun isGlobalUnicast(first: Int): Boolean = (first and IPV6_GLOBAL_MASK) == IPV6_GLOBAL_PREFIX
 
     private fun hextets(bytes: ByteArray): IntArray =
         IntArray(8) { index ->
@@ -259,30 +321,15 @@ object HostSafety {
         return runCatching { IDN.toASCII(normalized, IDN.ALLOW_UNASSIGNED) }.getOrDefault(normalized)
     }
 
-    private fun embeddedIpv4FromGroups(groups: IntArray): IntArray? {
-        if (groups.size != 8) return null
-        // IPv4-mapped (::ffff:a:b) and IPv4-compatible (::a:b): the high five
-        // hextets are zero and the sixth is either ffff or zero.
-        if ((0 until 5).all { groups[it] == 0 } && (groups[5] == 0xFFFF || groups[5] == 0)) {
-            return ipv4FromHextetPair(groups[6], groups[7])
+    /** Extracts IPv4 only from ::ffff:0:0/96; other transition encodings retain the IPv6 policy. */
+    private fun ipv4MappedFromGroups(groups: IntArray): IntArray? =
+        // Only IPv4-mapped ::ffff:a:b follows the embedded IPv4 policy.
+        // Compatible, NAT64, and 6to4 forms stay non-public transition ranges.
+        if (groups.size == 8 && (0 until 5).all { groups[it] == 0 } && groups[5] == 0xFFFF) {
+            ipv4FromHextetPair(groups[6], groups[7])
+        } else {
+            null
         }
-        // 6to4 2002::/16 embeds IPv4 in bytes 2-5 (hextets 1-2).
-        if (groups[0] == 0x2002) {
-            return ipv4FromHextetPair(groups[1], groups[2])
-        }
-        // Well-known NAT64 64:ff9b::/96 embeds IPv4 in the final 32 bits.
-        if (
-            groups[0] == 0x0064 &&
-            groups[1] == 0xFF9B &&
-            groups[2] == 0 &&
-            groups[3] == 0 &&
-            groups[4] == 0 &&
-            groups[5] == 0
-        ) {
-            return ipv4FromHextetPair(groups[6], groups[7])
-        }
-        return null
-    }
 
     private fun ipv4FromHextetPair(
         high: Int,
@@ -318,4 +365,25 @@ object HostSafety {
         }
         return out
     }
+
+    private const val TEST_NET_2_SECOND_OCTET = 51
+    private const val TEST_NET_2_THIRD_OCTET = 100
+    private const val TEST_NET_3_FIRST_OCTET = 203
+    private const val TEST_NET_3_THIRD_OCTET = 113
+    private const val IPV6_UNIQUE_LOCAL_MASK = 0xFE00
+    private const val IPV6_UNIQUE_LOCAL_PREFIX = 0xFC00
+    private const val IPV6_LOCAL_MASK = 0xFFC0
+    private const val IPV6_LINK_LOCAL_PREFIX = 0xFE80
+    private const val IPV6_SITE_LOCAL_PREFIX = 0xFEC0
+    private const val IPV6_SPECIAL_FIRST = 0x2001
+    private const val IPV6_SPECIAL_MAX_SECOND = 0x01FF
+    private const val IPV6_SIX_TO_FOUR_FIRST = 0x2002
+    private const val IPV6_DISCARD_ONLY_FIRST = 0x0100
+    private const val IPV6_DOCUMENTATION_SECOND = 0x0DB8
+    private const val IPV6_DOCUMENTATION_3FFF_FIRST = 0x3FFF
+    private const val IPV6_DOCUMENTATION_3FFF_MASK = 0xF000
+    private const val IPV6_MULTICAST_MASK = 0xFF00
+    private const val IPV6_MULTICAST_PREFIX = 0xFF00
+    private const val IPV6_GLOBAL_MASK = 0xE000
+    private const val IPV6_GLOBAL_PREFIX = 0x2000
 }

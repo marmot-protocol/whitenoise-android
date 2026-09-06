@@ -277,8 +277,31 @@ internal class AccountSwitchLocalSnapshotHandoff {
     private val requests = StalenessGuard()
     private var pending: AccountSwitchLocalSnapshot? = null
 
+    @Volatile
+    private var requestedAccountRef: String? = null
+
     /** Starts a switch request and discards any snapshot from its predecessor. */
-    fun beginRequest(): Long = requests.advance { pending = null }
+    fun beginRequest(accountRef: String? = null): Long =
+        requests.advance {
+            pending = null
+            requestedAccountRef = accountRef
+        }
+
+    /**
+     * Captures a destructive-operation fence only when no different account is
+     * already being activated ahead of the still-published active label.
+     */
+    fun captureForAccount(accountRef: String): Long? {
+        val generation = requests.capture()
+        return generation.takeIf {
+            requestedAccountRef?.let { requested -> requested == accountRef } != false && requests.isCurrent(generation)
+        }
+    }
+
+    /** Clears request intent after success/failure without disturbing a published handoff. */
+    fun finishRequest(requestGeneration: Long) {
+        requests.runIfCurrent(requestGeneration) { requestedAccountRef = null }
+    }
 
     /** Reports whether [requestGeneration] still owns the pending handoff. */
     fun isCurrent(requestGeneration: Long): Boolean = requests.isCurrent(requestGeneration)

@@ -689,6 +689,8 @@
     <string name="toast_relay_list_updated">Aktarma listesi güncellendi</string>
     <string name="toast_relay_update_failed">Röle güncellemesi başarısız oldu</string>
     <string name="error_remove_invalid_relay_urls_first">Önce geçersiz röle URL\'lerini kaldırın.</string>
+    <string name="error_no_safe_key_package_source_relay">Kullanılabilir güvenli bir kaynak rölesi yok. Anahtar paketlerini yenileyip tekrar deneyin.</string>
+    <string name="error_couldnt_verify_relay_hosts">Röle sunucuları doğrulanamadı. Bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="toast_couldnt_load_key_packages">Anahtar paketleri yüklenemedi</string>
     <string name="toast_key_package_deleted">Anahtar paketi silindi</string>
     <string name="toast_couldnt_delete_key_package">Anahtar paketi silinemedi. Lütfen tekrar deneyin.</string>

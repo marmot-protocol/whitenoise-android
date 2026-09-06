@@ -1079,6 +1079,12 @@ android.sourceSets.named("test") {
     resources.directories.add(rootProject.file("fuzz/build/app-fuzz-synthetic-corpus/fuzz-synthetic-corpus").path)
 }
 
+tasks.withType<Test>().configureEach {
+    // Resource-backed Robolectric tests retain Android SDK sandboxes across the large unit suite.
+    // Double Gradle's 512 MiB worker default while keeping one bounded, non-parallel process per task.
+    maxHeapSize = "1g"
+}
+
 tasks.register<Test>("replayAppFuzzSyntheticCorpus") {
     group = "verification"
     description = "Replay checked-in synthetic fuzz corpora through named app unit suites"

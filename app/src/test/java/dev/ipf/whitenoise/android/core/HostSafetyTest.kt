@@ -28,12 +28,16 @@ class HostSafetyTest {
         assertTrue(HostSafety.isPrivateOrLoopbackHost("100.64.0.1"))
     }
 
+    /** Keeps documentation, benchmarking, multicast, and reserved literals outside the public-address policy. */
     @Test
     fun additionalSpecialUseIpv4RangesAreFlagged() {
         assertTrue(HostSafety.isPrivateOrLoopbackHost("192.0.0.9"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("192.0.2.1"))
         assertTrue(HostSafety.isPrivateOrLoopbackHost("192.88.99.1"))
         assertTrue(HostSafety.isPrivateOrLoopbackHost("198.18.0.1"))
         assertTrue(HostSafety.isPrivateOrLoopbackHost("198.19.255.255"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("198.51.100.1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("203.0.113.1"))
         assertTrue(HostSafety.isPrivateOrLoopbackHost("224.0.0.1"))
         assertTrue(HostSafety.isPrivateOrLoopbackHost("239.255.255.255"))
         assertTrue(HostSafety.isPrivateOrLoopbackHost("240.0.0.1"))
@@ -91,10 +95,20 @@ class HostSafetyTest {
         assertTrue(HostSafety.isPrivateOrLoopbackHost("fe80::1%eth0")) // zone id stripped
     }
 
+    /** Preserves support for ordinary globally routed IPv6 literals. */
     @Test
     fun publicIpv6IsAllowed() {
         assertFalse(HostSafety.isPrivateOrLoopbackHost("2001:4860:4860::8888"))
-        assertFalse(HostSafety.isPrivateOrLoopbackHost("fbff::1"))
+    }
+
+    /** Rejects non-global, multicast, special-purpose, and documentation IPv6 literals. */
+    @Test
+    fun nonGlobalIpv6AndMulticastAreFlagged() {
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("fbff::1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("ff02::1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("ff0e::1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("2001:2::1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("3fff::1"))
     }
 
     @Test
@@ -129,8 +143,8 @@ class HostSafetyTest {
         assertTrue(HostSafety.isPrivateOrLoopbackHost("2002:7f00:1::")) // 6to4 127.0.0.1
         assertTrue(HostSafety.isPrivateOrLoopbackHost("64:ff9b::7f00:1")) // NAT64 127.0.0.1
         assertTrue(HostSafety.isPrivateOrLoopbackHost("64:ff9b::a9fe:a9fe")) // NAT64 169.254.169.254
-        assertFalse(HostSafety.isPrivateOrLoopbackHost("2002:808:808::")) // 6to4 8.8.8.8
-        assertFalse(HostSafety.isPrivateOrLoopbackHost("64:ff9b::808:808")) // NAT64 8.8.8.8
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("2002:808:808::")) // all 6to4 is rejected
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("64:ff9b::808:808")) // NAT64 is not global unicast
     }
 
     @Test
@@ -210,11 +224,15 @@ class HostSafetyTest {
         assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(100, 127, 255, 255)))
     }
 
+    /** Applies the special-use IPv4 exclusions to DNS answers as well as literal hosts. */
     @Test
     fun resolvedAdditionalSpecialUseIpv4AddressesAreFlagged() {
         assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(192, 0, 0, 9)))
+        assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(192, 0, 2, 1)))
         assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(192, 88, 99, 1)))
         assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(198, 18, 0, 1)))
+        assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(198, 51, 100, 1)))
+        assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(203, 0, 113, 1)))
         assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(224, 0, 0, 1)))
         assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(240, 0, 0, 1)))
     }
@@ -288,7 +306,7 @@ class HostSafetyTest {
                 ipv6(0, 0x64, 0xFF, 0x9B, 0, 0, 0, 0, 0, 0, 0, 0, 169, 254, 169, 254),
             ),
         )
-        assertFalse(
+        assertTrue(
             HostSafety.isPrivateOrLoopbackAddress(
                 ipv6(0x20, 0x02, 8, 8, 8, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             ),
@@ -317,6 +335,19 @@ class HostSafetyTest {
                 ipv6(0x20, 0x01, 0x0D, 0xB8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1),
             ),
         )
+    }
+
+    /** Applies the IPv6 prefix exclusions to every resolved address before a connection. */
+    @Test
+    fun resolvedIpv6SpecialPurposeMulticastAndNonGlobalAreFlagged() {
+        listOf(
+            ipv6(0xFF, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1),
+            ipv6(0x20, 0x01, 0, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1),
+            ipv6(0x3F, 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1),
+            ipv6(0xFB, 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1),
+        ).forEach { address ->
+            assertTrue(HostSafety.isPrivateOrLoopbackAddress(address))
+        }
     }
 
     @Test
