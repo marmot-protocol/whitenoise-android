@@ -5,6 +5,12 @@
     <application
         android:name=".DebugWhiteNoiseApplication"
         tools:replace="android:name">
+        <!-- Keep device-only Compose fixtures resumed when test hardware is locked. -->
+        <activity
+            android:name="androidx.activity.ComponentActivity"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true" />
+
         <service
             android:name=".notifications.NotificationTimingListenerService"
             android:exported="true"

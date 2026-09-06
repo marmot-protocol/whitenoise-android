@@ -2,12 +2,15 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,6 +33,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -37,13 +42,22 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.TtsTrustWarningDialog
+import dev.ipf.whitenoise.android.audio.tts.TtsVoiceOption
+import dev.ipf.whitenoise.android.audio.tts.TtsVoiceUnavailableReason
 import dev.ipf.whitenoise.android.audio.tts.requiresTtsTrustWarning
 import dev.ipf.whitenoise.android.audio.tts.shouldReportNoTtsEngine
+import dev.ipf.whitenoise.android.state.TtsMediaMixVolume
 import dev.ipf.whitenoise.android.state.TtsRatePreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.resolvedTtsEnginePackage
+import dev.ipf.whitenoise.android.state.selectTtsVoice
+import dev.ipf.whitenoise.android.state.setTtsMediaMixEnabled
+import dev.ipf.whitenoise.android.state.setTtsMediaMixVolume
+import dev.ipf.whitenoise.android.state.ttsEngineChoice
 import dev.ipf.whitenoise.android.ui.common.SettingsGroup
 import dev.ipf.whitenoise.android.ui.group.TtsAutoReadGlobalDefaultRow
 
+/** Presents engine-scoped voices and the explicit speech-over-media policy. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TextToSpeechScreen(
@@ -52,6 +66,7 @@ internal fun TextToSpeechScreen(
 ) {
     val selectedOverride by appState.ttsEnginePreferences.selectedEnginePackage.collectAsState()
     val rateOverride by appState.ttsRatePreferences.rateOverride.collectAsState()
+    val mediaMix by appState.ttsMediaMixPreferences.state.collectAsState()
     val ttsAutoReadPrefs by appState.ttsAutoReadPreferences.state.collectAsState()
     val engineChoice = appState.ttsEngineChoice()
     val ttsResolution = appState.ttsResolution
@@ -64,6 +79,8 @@ internal fun TextToSpeechScreen(
     var rateSheetOpen by remember { mutableStateOf(false) }
     var customRateOpen by remember { mutableStateOf(false) }
     var engineSheetOpen by remember { mutableStateOf(false) }
+    var mixVolumeSheetOpen by remember { mutableStateOf(false) }
+    var voiceSheetOpen by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
         val observer =
@@ -143,11 +160,57 @@ internal fun TextToSpeechScreen(
                             )
                         }
                     }
+                    if (
+                        appState.ttsVoiceResolution.options.isNotEmpty() ||
+                        appState.ttsVoiceResolution.effectiveKey != null ||
+                        appState.ttsVoiceResolution.requestedKey != null
+                    ) {
+                        item {
+                            val voiceResolution = appState.ttsVoiceResolution
+                            val effectiveLabel =
+                                voiceResolution.options
+                                    .firstOrNull { it.key == voiceResolution.effectiveKey }
+                                    ?.label
+                                    ?: voiceResolution.effectiveKey?.voiceName
+                                    ?: stringResource(R.string.tts_voice_unavailable)
+                            val subtitle =
+                                if (
+                                    voiceResolution.requestedKey != null &&
+                                    !voiceResolution.isUsingRequestedVoice
+                                ) {
+                                    stringResource(R.string.tts_voice_effective_fallback, effectiveLabel)
+                                } else {
+                                    effectiveLabel
+                                }
+                            SettingsRow(
+                                title = stringResource(R.string.tts_voice_title),
+                                subtitle = subtitle,
+                                icon = Icons.Filled.RecordVoiceOver,
+                                onClick = { voiceSheetOpen = true },
+                            )
+                        }
+                    }
                     item {
                         TtsAutoReadGlobalDefaultRow(
                             checked = ttsAutoReadPrefs.globalDefaultEnabled,
                             onCheckedChange = { appState.setTtsAutoReadGlobalDefault(it) },
                         )
+                    }
+                    item {
+                        ttsMediaMixToggleRow(
+                            checked = mediaMix.enabled,
+                            onCheckedChange = appState::setTtsMediaMixEnabled,
+                        )
+                    }
+                    if (mediaMix.enabled) {
+                        item {
+                            SettingsRow(
+                                title = stringResource(R.string.tts_media_mix_volume_title),
+                                subtitle = stringResource(ttsMediaMixVolumeLabel(mediaMix.volume)),
+                                icon = Icons.AutoMirrored.Filled.VolumeDown,
+                                onClick = { mixVolumeSheetOpen = true },
+                            )
+                        }
                     }
                 }
             }
@@ -232,6 +295,54 @@ internal fun TextToSpeechScreen(
             }
         }
     }
+    if (mixVolumeSheetOpen) {
+        ModalBottomSheet(onDismissRequest = { mixVolumeSheetOpen = false }) {
+            Column(Modifier.selectableGroup().padding(bottom = 24.dp)) {
+                TtsMediaMixVolume.entries.forEach { volume ->
+                    SelectableSettingsRowWithSubtitle(
+                        title = stringResource(ttsMediaMixVolumeLabel(volume)),
+                        subtitle = stringResource(ttsMediaMixVolumeDescription(volume)),
+                        selected = mediaMix.volume == volume,
+                        onClick = {
+                            appState.setTtsMediaMixVolume(volume)
+                            mixVolumeSheetOpen = false
+                        },
+                    )
+                }
+            }
+        }
+    }
+    if (voiceSheetOpen) {
+        val voiceResolution = appState.ttsVoiceResolution
+        val enginePackage = appState.resolvedTtsEnginePackage()
+        val selectedVoice = enginePackage?.let(appState.ttsVoicePreferences::selectedVoice)
+        ModalBottomSheet(onDismissRequest = { voiceSheetOpen = false }) {
+            LazyColumn(Modifier.selectableGroup().padding(bottom = 24.dp)) {
+                item {
+                    SelectableSettingsRowWithSubtitle(
+                        title = stringResource(R.string.tts_voice_automatic),
+                        subtitle = stringResource(R.string.tts_voice_automatic_description),
+                        selected = selectedVoice == null,
+                        onClick = {
+                            appState.selectTtsVoice(null)
+                            voiceSheetOpen = false
+                        },
+                    )
+                }
+                items(voiceResolution.options) { voice ->
+                    ttsVoicePickerRow(
+                        voice = voice,
+                        displayLocale = locale,
+                        selected = selectedVoice == voice.key,
+                        onClick = {
+                            appState.selectTtsVoice(voice.key)
+                            voiceSheetOpen = false
+                        },
+                    )
+                }
+            }
+        }
+    }
     if (trustWarningOpen && pendingEnginePackage != null) {
         val enginePackage = pendingEnginePackage!!
         TtsTrustWarningDialog(
@@ -248,6 +359,77 @@ internal fun TextToSpeechScreen(
         )
     }
 }
+
+/** Voice picker row whose merged semantics name locale and availability. */
+@Composable
+internal fun ttsVoicePickerRow(
+    voice: TtsVoiceOption,
+    displayLocale: java.util.Locale,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val localeLabel =
+        java.util.Locale
+            .forLanguageTag(voice.localeTag)
+            .getDisplayName(displayLocale)
+            .ifBlank { voice.localeTag }
+    val reason =
+        when (voice.unavailableReason) {
+            TtsVoiceUnavailableReason.InvalidIdentity -> stringResource(R.string.tts_voice_invalid_identity)
+            TtsVoiceUnavailableReason.NotInstalled -> stringResource(R.string.tts_voice_not_installed)
+            TtsVoiceUnavailableReason.RequiresNetwork -> stringResource(R.string.tts_voice_requires_network)
+            TtsVoiceUnavailableReason.Ambiguous -> stringResource(R.string.tts_voice_ambiguous)
+            null -> stringResource(R.string.tts_voice_available_offline)
+        }
+    SelectableSettingsRowWithSubtitle(
+        title = voice.label,
+        subtitle = "$localeLabel. $reason",
+        selected = selected,
+        enabled = voice.selectable,
+        accessibilityLabel = "${voice.label}. $localeLabel. $reason",
+        onClick = onClick,
+    )
+}
+
+/** Accessible opt-in switch for the constrained active-media mode. */
+@Composable
+internal fun ttsMediaMixToggleRow(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val title = stringResource(R.string.tts_media_mix_title)
+    val subtitle = stringResource(R.string.tts_media_mix_subtitle)
+    SettingsSwitchRow(
+        title = title,
+        subtitle = subtitle,
+        checked = checked,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        contentSpacing = 16.dp,
+        switchModifier =
+            Modifier.semantics {
+                contentDescription = "$title. $subtitle"
+            },
+        onCheckedChange = onCheckedChange,
+    )
+}
+
+/** String label for one bounded speech-over-media volume preset. */
+@androidx.annotation.StringRes
+internal fun ttsMediaMixVolumeLabel(volume: TtsMediaMixVolume): Int =
+    when (volume) {
+        TtsMediaMixVolume.QUIET -> R.string.tts_media_mix_volume_quiet
+        TtsMediaMixVolume.MEDIUM -> R.string.tts_media_mix_volume_medium
+        TtsMediaMixVolume.LOUD -> R.string.tts_media_mix_volume_loud
+    }
+
+/** TalkBack-visible explanation for one mix volume preset. */
+@androidx.annotation.StringRes
+internal fun ttsMediaMixVolumeDescription(volume: TtsMediaMixVolume): Int =
+    when (volume) {
+        TtsMediaMixVolume.QUIET -> R.string.tts_media_mix_volume_quiet_description
+        TtsMediaMixVolume.MEDIUM -> R.string.tts_media_mix_volume_medium_description
+        TtsMediaMixVolume.LOUD -> R.string.tts_media_mix_volume_loud_description
+    }
 
 /**
  * Matches the voice-note speed pill's rendering so both read as one system.

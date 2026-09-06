@@ -89,6 +89,11 @@ private val documentMaterializations = SingleFlight<String, java.io.File>()
 private const val MAX_DOCUMENT_EXTENSION_LENGTH = 12
 internal const val ANDROID_PACKAGE_MIME = "application/vnd.android.package-archive"
 internal const val GENERIC_BINARY_MIME = "application/octet-stream"
+private val ANDROID_PACKAGE_CONTAINER_MIMES =
+    setOf(
+        "application/zip",
+        "application/x-zip-compressed",
+    )
 private const val MEDIA_STORE_INSERT_ATTEMPTS = 2
 private const val MEDIA_STORE_INSERT_RETRY_DELAY_MILLIS = 150L
 
@@ -123,7 +128,10 @@ internal suspend fun materializeDocumentAttachment(
     reference: dev.ipf.marmotkit.MediaAttachmentReferenceFfi,
     resolveBytes: suspend () -> ByteArray,
 ): java.io.File {
-    val file = documentAttachmentCacheFile(context, messageIdHex, attachmentIndex, reference)
+    val file =
+        withContext(Dispatchers.IO) {
+            documentAttachmentCacheFile(context, messageIdHex, attachmentIndex, reference)
+        }
     val attachmentKey =
         AttachmentCachePublication.attachmentKey(
             messageIdHex = messageIdHex,
@@ -156,7 +164,10 @@ internal suspend fun materializeDocumentAttachmentSource(
     reference: dev.ipf.marmotkit.MediaAttachmentReferenceFfi,
     resolveSource: suspend () -> AttachmentPlaintext,
 ): java.io.File {
-    val file = documentAttachmentCacheFile(context, messageIdHex, attachmentIndex, reference)
+    val file =
+        withContext(Dispatchers.IO) {
+            documentAttachmentCacheFile(context, messageIdHex, attachmentIndex, reference)
+        }
     val attachmentKey =
         AttachmentCachePublication.attachmentKey(messageIdHex, attachmentIndex, reference.sourceEpoch)
     return documentMaterializations.run(file.absolutePath) {
@@ -369,11 +380,37 @@ internal sealed interface AttachmentOpenClassification {
 }
 
 /**
+ * Identifies received attachments that may become APKs after verification.
+ * Conflicting specific MIME metadata stays on the ordinary viewer path.
+ */
+internal fun isAndroidPackageOpenCandidate(
+    mediaType: String,
+    fileName: String,
+): Boolean {
+    val normalizedMime =
+        mediaType
+            .substringBefore(';')
+            .trim()
+            .lowercase(java.util.Locale.ROOT)
+    return normalizedMime == ANDROID_PACKAGE_MIME ||
+        (
+            (
+                normalizedMime.isEmpty() ||
+                    normalizedMime == GENERIC_BINARY_MIME ||
+                    normalizedMime in ANDROID_PACKAGE_CONTAINER_MIMES
+            ) &&
+                hasAndroidPackageExtension(fileName)
+        )
+}
+
+/**
  * Resolve the MIME used for external dispatch only after the attachment has
  * been materialized and verified by the transfer pipeline. A remote filename
  * can refine blank/octet-stream metadata to APK only when its sanitized
  * basename ends in `.apk` and the artifact is an APK-shaped ZIP containing an
- * Android manifest. Conflicting non-generic metadata always wins.
+ * Android manifest. Known ZIP-container aliases are eligible because Android's
+ * document picker reports APKs with those MIME values; other specific metadata
+ * always wins.
  */
 internal fun classifyAttachmentOpen(
     mediaType: String,
@@ -388,12 +425,18 @@ internal fun classifyAttachmentOpen(
     val openMime = mediaType.trim().ifBlank { GENERIC_BINARY_MIME }
     return when {
         normalizedMime == ANDROID_PACKAGE_MIME -> AttachmentOpenClassification.Ready(ANDROID_PACKAGE_MIME)
-        normalizedMime.isNotEmpty() && normalizedMime != GENERIC_BINARY_MIME -> {
-            AttachmentOpenClassification.Ready(openMime)
-        }
-        !hasAndroidPackageExtension(fileName) -> AttachmentOpenClassification.Ready(openMime)
-        isValidAndroidPackage() -> AttachmentOpenClassification.Ready(ANDROID_PACKAGE_MIME)
-        else -> AttachmentOpenClassification.InvalidAndroidPackage
+        (
+            normalizedMime.isEmpty() ||
+                normalizedMime == GENERIC_BINARY_MIME ||
+                normalizedMime in ANDROID_PACKAGE_CONTAINER_MIMES
+        ) &&
+            hasAndroidPackageExtension(fileName) ->
+            if (isValidAndroidPackage()) {
+                AttachmentOpenClassification.Ready(ANDROID_PACKAGE_MIME)
+            } else {
+                AttachmentOpenClassification.InvalidAndroidPackage
+            }
+        else -> AttachmentOpenClassification.Ready(openMime)
     }
 }
 

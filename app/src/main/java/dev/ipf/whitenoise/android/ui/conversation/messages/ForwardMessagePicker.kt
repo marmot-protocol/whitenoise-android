@@ -37,7 +37,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,12 +60,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.text.BidiFormatter
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.isForwardOwnerSignedIn
+import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
 import dev.ipf.whitenoise.android.ui.chats.chatFolderTriState
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
@@ -78,22 +80,39 @@ import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.share.ChatPickerSendingAccountRow
+import dev.ipf.whitenoise.android.ui.share.ShareChatPickerAccountSheet
+import dev.ipf.whitenoise.android.ui.share.rememberShareChatPickerDataSource
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import java.util.Locale
 
 internal const val FORWARD_CHAT_PICKER_SCREEN_TEST_TAG = "forward_chat_picker_full_screen"
+internal const val FORWARD_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG = "forward_chat_picker_account_row"
+
+/** Mirrors the picker's live destination account, selection, and selected-chat titles. */
+internal typealias PickerStateListener =
+    (destinationAccountRef: String?, selectedGroupIds: List<String>, targetTitles: Map<String, String>) -> Unit
 
 /** Full-screen target selection keeps row taps out of a draggable sheet gesture arena. */
 @Composable
+@Suppress("LongParameterList")
 internal fun ForwardMessagePickerFullScreen(
     appState: WhiteNoiseAppState,
     messageCount: Int,
     attachmentCount: Int,
     originGroupIdHex: String,
+    sourceAccountRef: String?,
     onDismiss: () -> Unit,
-    onForward: (List<String>) -> Boolean,
+    onForward: (destinationAccountRef: String, targetGroupIds: List<String>) -> Boolean,
+    initialDestinationAccountRef: String? = null,
+    initialSelectedGroupIds: List<String> = emptyList(),
+    onPickerStateChanged: PickerStateListener = { _, _, _ -> },
+    controllerFactory: (WhiteNoiseAppState) -> ChatsController = { ChatsController(it) },
+    controllerBinder: suspend (ChatsController, String) -> Unit = { controller, accountRef ->
+        controller.bind(accountRef)
+    },
 ) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -119,48 +138,158 @@ internal fun ForwardMessagePickerFullScreen(
             messageCount = messageCount,
             attachmentCount = attachmentCount,
             originGroupIdHex = originGroupIdHex,
+            sourceAccountRef = sourceAccountRef,
             onDismiss = dismissPicker,
             onForward = onForward,
+            initialDestinationAccountRef = initialDestinationAccountRef,
+            initialSelectedGroupIds = initialSelectedGroupIds,
+            onPickerStateChanged = onPickerStateChanged,
+            controllerFactory = controllerFactory,
+            controllerBinder = controllerBinder,
         )
     }
 }
 
+/**
+ * Destination-account selection for one forwarding request. The selected
+ * account defaults to the source conversation's owner, its chat list is
+ * loaded only from that account (through a separate account-scoped controller
+ * when it is not the active account), and chat selections are keyed to the
+ * account that produced them: switching accounts always clears them.
+ */
+private class ForwardDestinationState(
+    val accounts: List<AccountSummaryFfi>,
+    val selectedAccountRef: String?,
+    val selectedAccountIdHex: String?,
+)
+
+/** Owns the saveable destination-account choice and its signed-in fallback. */
+@Composable
+private fun rememberForwardDestinationState(
+    appState: WhiteNoiseAppState,
+    originGroupIdHex: String,
+    sourceAccountRef: String?,
+    initialDestinationAccountRef: String?,
+    selectedGroups: androidx.compose.runtime.MutableState<ArrayList<String>>,
+): Pair<ForwardDestinationState, androidx.compose.runtime.MutableState<String?>> {
+    val accounts = appState.accounts.filter(AccountSummaryFfi::isSignedInSigningAccount)
+
+    /** Keeps a candidate only while it names a signed-in signing account. */
+    fun valid(candidate: String?): String? = candidate?.takeIf { ref -> accounts.any { it.label == ref } }
+    val defaultAccountRef =
+        valid(sourceAccountRef) ?: valid(appState.activeAccountRef) ?: accounts.firstOrNull()?.label
+    // Plain remember on purpose: process recreation restores through the
+    // encrypted pending-request store, and account identifiers must never be
+    // serialized into the plain saved-state Bundle.
+    val selectedAccountRefState =
+        remember(originGroupIdHex) {
+            mutableStateOf(valid(initialDestinationAccountRef) ?: defaultAccountRef)
+        }
+    val selectedAccountRef = valid(selectedAccountRefState.value) ?: defaultAccountRef
+    LaunchedEffect(selectedAccountRef, selectedAccountRefState.value) {
+        // A signed-out selection falls back to a valid owner; selections made
+        // under the vanished account can never silently transfer to it.
+        if (selectedAccountRefState.value != selectedAccountRef) {
+            selectedAccountRefState.value = selectedAccountRef
+            selectedGroups.value = arrayListOf()
+        }
+    }
+    val selectedAccount = accounts.firstOrNull { it.label == selectedAccountRef }
+    return ForwardDestinationState(
+        accounts = accounts,
+        selectedAccountRef = selectedAccountRef,
+        selectedAccountIdHex = selectedAccount?.accountIdHex,
+    ) to selectedAccountRefState
+}
+
+/**
+ * Picker body: source-message summary, the sending-account row and sheet,
+ * account-scoped search/folders/chat rows, and the confirm bar that binds the
+ * explicit destination account to the accepted selection.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("LongMethod")
+@Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod")
 internal fun ForwardMessagePickerContent(
     appState: WhiteNoiseAppState,
     messageCount: Int,
     attachmentCount: Int,
     originGroupIdHex: String,
+    sourceAccountRef: String?,
     onDismiss: () -> Unit,
-    onForward: (List<String>) -> Boolean,
+    onForward: (destinationAccountRef: String, targetGroupIds: List<String>) -> Boolean,
+    initialDestinationAccountRef: String? = null,
+    initialSelectedGroupIds: List<String> = emptyList(),
+    onPickerStateChanged: PickerStateListener = { _, _, _ -> },
+    controllerFactory: (WhiteNoiseAppState) -> ChatsController = { ChatsController(it) },
+    controllerBinder: suspend (ChatsController, String) -> Unit = { controller, accountRef ->
+        controller.bind(accountRef)
+    },
 ) {
     val titleCopy = rememberGroupTitleCopy()
-    var query by rememberSaveable(originGroupIdHex) { mutableStateOf("") }
-    var selected by rememberSaveable(originGroupIdHex) { mutableStateOf(arrayListOf<String>()) }
-    var startFailed by rememberSaveable(originGroupIdHex) { mutableStateOf(false) }
-    val targetLoading = appState.forwardTargetsLoading
-    val targetError = appState.forwardTargetsError
-    val memberRevision = appState.forwardTargetMembersRevision
-    val targetRevision = appState.forwardTargetsRevision
+    // Plain remember throughout: the encrypted pending-request store owns
+    // recreation, so chat and account identifiers stay out of the plain
+    // saved-state Bundle. Selections restored for a destination that is no
+    // longer signed in are dropped rather than re-owned by the fallback.
+    var query by remember(originGroupIdHex) { mutableStateOf("") }
+    val selectedState =
+        remember(originGroupIdHex) {
+            val seedIsSafe =
+                initialDestinationAccountRef == null ||
+                    appState.isForwardOwnerSignedIn(initialDestinationAccountRef)
+            mutableStateOf(ArrayList(if (seedIsSafe) initialSelectedGroupIds else emptyList()))
+        }
+    var selected by selectedState
+    var startFailed by remember(originGroupIdHex) { mutableStateOf(false) }
+    var accountSelectorOpen by remember(originGroupIdHex) { mutableStateOf(false) }
+    val (destination, selectedAccountRefState) =
+        rememberForwardDestinationState(
+            appState = appState,
+            originGroupIdHex = originGroupIdHex,
+            sourceAccountRef = sourceAccountRef,
+            initialDestinationAccountRef = initialDestinationAccountRef,
+            selectedGroups = selectedState,
+        )
+    val dataSource =
+        rememberShareChatPickerDataSource(
+            appState = appState,
+            selectedAccountRef = destination.selectedAccountRef,
+            controllerFactory = controllerFactory,
+            controllerBinder = controllerBinder,
+        )
+    val targetLoading = dataSource.isLoading
+    val targetError = dataSource.error
+    val memberRevision = dataSource.memberSnapshotsRevision
     val targets =
-        remember(targetRevision, originGroupIdHex) {
-            appState
-                .forwardTargets()
+        remember(dataSource.targets, originGroupIdHex) {
+            dataSource.targets
                 .filterNot { it.group.groupIdHex.equals(originGroupIdHex, ignoreCase = true) }
         }
     val targetIds = remember(targets) { targets.mapTo(hashSetOf()) { it.group.groupIdHex.lowercase(Locale.ROOT) } }
-    LaunchedEffect(targetLoading, targetIds) {
+    LaunchedEffect(destination.selectedAccountRef, targetLoading, targetIds) {
         if (!targetLoading) {
             selected = ArrayList(selected.filter(targetIds::contains))
-            appState.requestForwardTargetMembers(targetIds)
+            if (dataSource.controller != null) {
+                dataSource.controller.requestMemberSnapshots(targetIds)
+            } else {
+                appState.requestForwardTargetMembers(targetIds)
+            }
         }
     }
     val titledTargets =
         remember(targets, titleCopy, memberRevision, appState.profileRevisionForCompose) {
-            targets.map { it to chatListItemDisplayTitle(it, appState, titleCopy) }
+            targets.map {
+                it to forwardTargetDisplayTitle(it, appState, destination.selectedAccountRef, titleCopy)
+            }
         }
+    LaunchedEffect(destination.selectedAccountRef, selected, titledTargets) {
+        val selectedSet = selected.toHashSet()
+        val selectedTitles =
+            titledTargets
+                .filter { (item, _) -> item.group.groupIdHex.lowercase(Locale.ROOT) in selectedSet }
+                .associate { (item, title) -> item.group.groupIdHex.lowercase(Locale.ROOT) to title }
+        onPickerStateChanged(destination.selectedAccountRef, selected.toList(), selectedTitles)
+    }
     val filteredTargets =
         remember(titledTargets, query) {
             val needle = query.trim()
@@ -172,7 +301,16 @@ internal fun ForwardMessagePickerContent(
                 }
             }
         }
-    val folderRows = remember(targets, titleCopy) { forwardFolderBulkRows(appState, targets, titleCopy) }
+    val folderRows =
+        remember(targets, titleCopy, destination.selectedAccountRef) {
+            forwardFolderBulkRows(
+                appState = appState,
+                targets = targets,
+                groupTitleCopy = titleCopy,
+                ownerAccountRef = destination.selectedAccountRef,
+                ownerAccountIdHex = destination.selectedAccountIdHex,
+            )
+        }
     val visibleFolderRows = remember(folderRows, query) { visibleForwardFolderRows(folderRows, query) }
     val forwardTitle = stringResource(R.string.forward_to)
 
@@ -200,11 +338,14 @@ internal fun ForwardMessagePickerContent(
             StickyFormActionBar {
                 Button(
                     onClick = {
+                        val destinationAccountRef =
+                            destination.selectedAccountRef?.takeIf { appState.isForwardOwnerSignedIn(it) }
                         val recipients = forwardRecipientGroupIds(selected, originGroupIdHex)
                         startFailed =
+                            destinationAccountRef == null ||
                             !confirmForwardTargets(
                                 targets = recipients,
-                                start = onForward,
+                                start = { targetIds -> onForward(destinationAccountRef, targetIds) },
                                 dismiss = onDismiss,
                             )
                     },
@@ -237,6 +378,18 @@ internal fun ForwardMessagePickerContent(
                 attachmentCount = attachmentCount,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
             )
+            destination.accounts
+                .firstOrNull { it.label == destination.selectedAccountRef }
+                ?.let { account ->
+                    ChatPickerSendingAccountRow(
+                        appState = appState,
+                        account = account,
+                        multipleAccounts = destination.accounts.size > 1,
+                        onOpenSelector = { accountSelectorOpen = true },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+                        testTag = FORWARD_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG,
+                    )
+                }
             FlowSearchField(
                 value = query,
                 onValueChange = {
@@ -264,11 +417,31 @@ internal fun ForwardMessagePickerContent(
                 visibleFolderRows = visibleFolderRows,
                 targetLoading = targetLoading,
                 targetError = targetError,
+                retryLoad = dataSource.retryLoad,
+                ownerAccountRef = destination.selectedAccountRef,
+                ownerAccountIdHex = destination.selectedAccountIdHex,
                 selected = selected,
                 onSelectionChange = { selected = ArrayList(it) },
                 modifier = Modifier.weight(1f),
             )
         }
+    }
+    if (accountSelectorOpen) {
+        ShareChatPickerAccountSheet(
+            appState = appState,
+            accounts = destination.accounts,
+            selectedAccountRef = destination.selectedAccountRef,
+            onChooseAccount = { accountRef ->
+                if (accountRef != destination.selectedAccountRef &&
+                    destination.accounts.any { it.label == accountRef }
+                ) {
+                    selectedAccountRefState.value = accountRef
+                    selected = arrayListOf()
+                }
+                accountSelectorOpen = false
+            },
+            onDismiss = { accountSelectorOpen = false },
+        )
     }
 }
 
@@ -306,6 +479,9 @@ private fun ForwardTargetList(
     visibleFolderRows: List<Pair<ChatFolder, List<String>>>,
     targetLoading: Boolean,
     targetError: ErrorPresentation?,
+    retryLoad: () -> Unit,
+    ownerAccountRef: String?,
+    ownerAccountIdHex: String?,
     selected: List<String>,
     onSelectionChange: (List<String>) -> Unit,
     modifier: Modifier = Modifier,
@@ -323,7 +499,7 @@ private fun ForwardTargetList(
                     ErrorContent(
                         title = stringResource(R.string.couldnt_load_chats),
                         error = targetError,
-                        onRetry = appState::retryForwardTargets,
+                        onRetry = retryLoad,
                     )
                 }
             }
@@ -339,7 +515,7 @@ private fun ForwardTargetList(
         } else {
             targetError?.let { failure ->
                 item(key = "forward-picker-load-error") {
-                    InlineErrorBanner(error = failure, onRetry = appState::retryForwardTargets)
+                    InlineErrorBanner(error = failure, onRetry = retryLoad)
                 }
             }
             if (visibleFolderRows.isNotEmpty()) {
@@ -370,6 +546,8 @@ private fun ForwardTargetList(
                     appState = appState,
                     item = item,
                     title = title,
+                    ownerAccountRef = ownerAccountRef,
+                    ownerAccountIdHex = ownerAccountIdHex,
                     selected = item.group.groupIdHex.lowercase(Locale.ROOT) in selected,
                     onToggle = { groupId ->
                         onSelectionChange(toggleForwardTargetSelection(selected, groupId))
@@ -380,20 +558,23 @@ private fun ForwardTargetList(
     }
 }
 
+/** One selectable destination chat row resolved through the owning account. */
 @Composable
+@Suppress("LongParameterList")
 private fun ForwardTargetRow(
     appState: WhiteNoiseAppState,
     item: ChatListItem,
     title: String,
+    ownerAccountRef: String?,
+    ownerAccountIdHex: String?,
     selected: Boolean,
     onToggle: (String) -> Unit,
 ) {
-    val activeAccountIdHex = appState.activeAccount?.accountIdHex
     val avatarAccount = forwardTargetAvatarAccount(item)
     val membersPreview =
-        remember(item, activeAccountIdHex, appState.profileRevisionForCompose) {
-            forwardTargetMembersPreview(item, activeAccountIdHex) { memberIdHex ->
-                appState.contactDisplayNameCached(memberIdHex)
+        remember(item, ownerAccountRef, ownerAccountIdHex, appState.profileRevisionForCompose) {
+            forwardTargetMembersPreview(item, ownerAccountIdHex) { memberIdHex ->
+                appState.contactDisplayNameCached(ownerAccountRef, memberIdHex)
             }
         }
     ContactRow(
@@ -401,7 +582,7 @@ private fun ForwardTargetRow(
         subtitle = membersPreview,
         avatarSeed = avatarAccount ?: item.group.groupIdHex,
         avatarUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
-        avatarImage = rememberEncryptedGroupAvatar(appState, item.group),
+        avatarImage = rememberEncryptedGroupAvatar(appState, item.group, ownerAccountRef),
         modifier = Modifier.semantics { this.selected = selected },
         onClick = { onToggle(item.group.groupIdHex) },
         trailing = { SelectionIndicator(selected = selected) },

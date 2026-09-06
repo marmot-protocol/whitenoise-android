@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio
 
 import android.content.ComponentName
+import android.speech.RecognizerIntent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -12,6 +13,16 @@ import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 class ConversationDictationCompatibilityContractTest {
+    @Test
+    fun recognitionIntentPrefersPrivateOfflineProcessing() {
+        val intent = conversationDictationRecognitionIntent()
+
+        assertEquals(RecognizerIntent.ACTION_RECOGNIZE_SPEECH, intent.action)
+        assertTrue(intent.getBooleanExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false))
+        assertFalse(intent.getBooleanExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true))
+        assertEquals(1, intent.getIntExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 0))
+    }
+
     @Test
     fun selectedRecognitionServiceProbeRejectsMissingMalformedAndUndiscoveredProviders() {
         val selected = ComponentName("org.example.speech", "org.example.speech.Recognition")

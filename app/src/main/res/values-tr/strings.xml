@@ -359,6 +359,7 @@
     <string name="forward_partial_summary">%2$d sohbetin %1$d tanesine iletildi</string>
     <string name="forward_failed_summary">Seçilen sohbetlere iletilemedi</string>
     <string name="forward_start_failed">İletme başlatılamadı. Kapatıp tekrar deneyin.</string>
+    <string name="forward_restore_discarded">Tamamlanmamış iletme güvenli şekilde geri yüklenemediği için silindi</string>
     <string name="forward_retry_failed">Başarısız sohbetleri yeniden dene</string>
     <plurals name="forward_attachment_count">
         <item quantity="one">%1$d ek</item>
@@ -679,8 +680,8 @@
     <string name="tts_playback_action_play">Oynat</string>
     <string name="tts_playback_action_pause">Duraklat</string>
     <string name="tts_playback_action_stop">Durdur</string>
-    <string name="tts_playback_action_previous_message">Önceki mesaj</string>
-    <string name="tts_playback_action_next_message">Sonraki mesaj</string>
+    <string name="tts_playback_action_previous_sentence">Önceki cümle</string>
+    <string name="tts_playback_action_next_sentence">Sonraki cümle</string>
     <string name="toast_restarting">Yeniden başlatılıyor</string>
     <string name="toast_identity_created">Kimlik oluşturuldu</string>
     <string name="toast_couldnt_create_identity">Kimlik oluşturulamadı</string>
@@ -1307,8 +1308,8 @@
     <string name="user_search_searching">Ağda aranıyor…</string>
     <string name="user_search_incomplete">Bazı ağ sonuçları eksik olabilir.</string>
     <string name="user_search_failed">Ağda arama yapılamadı. Bağlantınızı kontrol edip tekrar deneyin.</string>
-    <string name="user_search_following">Takip ediliyor</string>
-    <string name="user_search_network">Ağdan</string>
+    <string name="user_search_you_follow">Takip ediyorsunuz</string>
+    <string name="user_search_result">Arama sonucu</string>
     <string name="paste_npub">npub yapıştır</string>
     <string name="start_chat">Sohbet başlat</string>
     <string name="name_this_group">Gruba ad verin</string>
@@ -1444,6 +1445,26 @@
     <string name="tts_settings_explainer_no_engine">Kullanılabilir bir metin okuma motoru yüklü değil. F-Droid veya Zapstore\'dan RHVoice veya eSpeak NG yükleyin ve aşağıdan seçin.</string>
     <string name="tts_settings_engine_title">Motor</string>
     <string name="tts_settings_rate_title">Konuşma hızı</string>
+    <string name="tts_media_mix_title">Çalan medyanın üzerinden konuş</string>
+    <string name="tts_media_mix_subtitle">Yalnızca başka ses çalarken başlar; White Noise diğer sesi kontrol etmez</string>
+    <string name="tts_media_mix_volume_title">Medya üzeri konuşma ses düzeyi</string>
+    <string name="tts_media_mix_volume_quiet">Düşük</string>
+    <string name="tts_media_mix_volume_medium">Orta</string>
+    <string name="tts_media_mix_volume_loud">Yüksek</string>
+    <string name="tts_media_mix_volume_quiet_description">Metin okuma motoru ses düzeyinin yüzde 35’i</string>
+    <string name="tts_media_mix_volume_medium_description">Metin okuma motoru ses düzeyinin yüzde 60’ı</string>
+    <string name="tts_media_mix_volume_loud_description">Metin okuma motoru ses düzeyinin yüzde 85’i</string>
+    <string name="tts_media_mix_no_active_media">Medya üzerinde konuşmayı kullanmadan önce müzik veya podcast başlatın</string>
+    <string name="tts_voice_title">Ses</string>
+    <string name="tts_voice_automatic">Otomatik çevrimdışı ses</string>
+    <string name="tts_voice_automatic_description">Mesaj dili için yüklü en iyi çevrimdışı sesi kullan</string>
+    <string name="tts_voice_available_offline">Çevrimdışı kullanılabilir</string>
+    <string name="tts_voice_invalid_identity">Kararlı bir ses adı yok ve seçilemez</string>
+    <string name="tts_voice_not_installed">Yüklü değil</string>
+    <string name="tts_voice_requires_network">Ağ bağlantısı gerektirir ve seçilemez</string>
+    <string name="tts_voice_ambiguous">Ses kimliği yineleniyor ve seçilemez</string>
+    <string name="tts_voice_unavailable">Çevrimdışı ses kullanılamıyor</string>
+    <string name="tts_voice_effective_fallback">Kaydedilen ses kullanılamıyor; %1$s kullanılıyor</string>
     <string name="speak_aloud">Sesli oku</string>
     <string name="tts_bar_pause">Okumayı duraklat</string>
     <string name="tts_bar_play">Okumaya devam et</string>
@@ -1592,6 +1613,7 @@
     <string name="nostr_event_failed">Bu etkinlik yüklenemedi. Bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="nostr_event_open">Etkinliği aç</string>
     <string name="nostr_event_read_article">Makaleyi oku</string>
+    <string name="nostr_event_read_note">Notun tamamını oku</string>
     <string name="nostr_event_play_video">Videoyu oynat</string>
     <string name="nostr_video_playback_failed">Bu video oynatılamadı.</string>
     <string name="nostr_event_copy">Etkinlik referansını kopyala</string>
@@ -1632,6 +1654,6 @@
     <string name="discard">Sil</string>
     <string name="open_app_settings">Uygulama ayarlarını aç</string>
     <string name="dictation_disclosure_title">Harici konuşma tanıma</string>
-    <string name="dictation_disclosure_message">Yüklü konuşma hizmetiniz dikte edilen sesi işler ve sağlayıcısına gönderebilir. White Noise, döndürülen metni gözden geçirmeniz için bu taslağa ekler ve asla otomatik olarak göndermez.</string>
+    <string name="dictation_disclosure_message">Yüklü konuşma hizmetiniz dikte edilen sesi işler ve sağlayıcısına gönderebilir. White Noise varsayılan olarak döndürülen metni taslağınıza yapıştırır; otomatik gönderme yalnızca Dikte ayarlarında açıkça etkinleştirdiğinizde kullanılabilir.</string>
     <string name="dictation_continue">Devam</string>
 </resources>

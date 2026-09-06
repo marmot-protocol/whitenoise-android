@@ -4,10 +4,13 @@ import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Rect
 import android.os.SystemClock
+import android.os.Trace
+import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import androidx.benchmark.macro.MacrobenchmarkScope
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.onElementOrNull
@@ -21,6 +24,11 @@ internal data class NotificationRouteSample(
     val succeeded: Boolean
         get() = transcriptVisible && expectedConversationVisible
 }
+
+internal data class ConversationSettingsLaunchSample(
+    val appDispatchDurationMs: Long,
+    val firstSettingsFrameDurationMs: Long,
+)
 
 internal enum class BenchmarkUsefulSurface {
     ChatList,
@@ -82,8 +90,19 @@ internal class WhiteNoiseJourneys {
      * from the measured trace.
      */
     fun MacrobenchmarkScope.resumeToChatList() {
+        device.wakeUp()
+        device.executeShellCommand("wm dismiss-keyguard")
         startActivityAndWait()
-        if (findTag(PerformanceTags.NEW_MESSAGE) == null) {
+        checkNotNull(
+            device.onElementOrNull(timeoutMs = STARTUP_TIMEOUT_MS) {
+                matchesPerformanceTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED) ||
+                    matchesPerformanceTag(PerformanceTags.CONVERSATION_ROUTE_SETTLED)
+            },
+        ) {
+            "Timed out waiting for the resumed White Noise route to settle. " +
+                "Foreground package: ${device.currentPackageName ?: "unknown"}."
+        }
+        if (findVisibleTag(PerformanceTags.NEW_MESSAGE) == null) {
             returnToChatList()
         }
         device.waitForIdle()
@@ -136,8 +155,13 @@ internal class WhiteNoiseJourneys {
         waitForUsefulSurface(expectedSurface)
     }
 
+    /** Opens the named fixture and verifies that its conversation title bar is ready. */
     fun openGroup(groupName: String) {
-        waitForText(groupName).click()
+        clickTextUntilTagPresent(
+            text = groupName,
+            destinationTag = PerformanceTags.OPEN_GROUP_DETAILS,
+            timeoutMs = NETWORK_STATE_TIMEOUT_MS,
+        )
         waitForVisibleTag(PerformanceTags.OPEN_GROUP_DETAILS)
     }
 
@@ -145,6 +169,58 @@ internal class WhiteNoiseJourneys {
         openGroup(groupName)
         waitForTag(PerformanceTags.OPEN_GROUP_DETAILS).click()
         waitForTag(PerformanceTags.MEMBER_LIST, NETWORK_STATE_TIMEOUT_MS)
+    }
+
+    /** Navigates to a group notification screen and waits until prewarming has completed. */
+    fun openGroupNotificationSettings(groupName: String) {
+        openGroup(groupName)
+        clickVisibleTagUntilPresent(
+            triggerTag = PerformanceTags.OPEN_GROUP_DETAILS,
+            destinationTag = PerformanceTags.GROUP_NOTIFICATION_SETTINGS,
+            timeoutMs = NETWORK_STATE_TIMEOUT_MS,
+        )
+        clickVisibleTagUntilPresent(
+            triggerTag = PerformanceTags.GROUP_NOTIFICATION_SETTINGS,
+            destinationTag = PerformanceTags.GROUP_MESSAGE_NOTIFICATION_SETTINGS,
+            timeoutMs = NETWORK_STATE_TIMEOUT_MS,
+            scrollToTrigger = true,
+        )
+        waitForVisibleTag(PerformanceTags.GROUP_MESSAGE_NOTIFICATION_SETTINGS, NETWORK_STATE_TIMEOUT_MS)
+        device.waitForIdle()
+    }
+
+    /** Opens the exact prepared group-message channel and records Android's first visible frame. */
+    fun openPreparedGroupMessageNotificationSettings(): ConversationSettingsLaunchSample {
+        val settingsButton = waitForTag(PerformanceTags.GROUP_MESSAGE_NOTIFICATION_SETTINGS)
+        val clickedAtMs = SystemClock.elapsedRealtime()
+        Trace.beginSection(OPEN_CONVERSATION_SETTINGS_TRACE)
+        try {
+            settingsButton.click()
+            checkNotNull(
+                device.onElementOrNull(timeoutMs = SETTINGS_TRANSITION_TIMEOUT_MS) {
+                    packageName?.toString() == ANDROID_SETTINGS_PACKAGE && isVisibleOnDisplay()
+                },
+            ) {
+                "Timed out waiting for the first visible Android Settings frame. " +
+                    "Foreground package: ${device.currentPackageName ?: "unknown"}."
+            }
+        } finally {
+            Trace.endSection()
+        }
+        val firstFrameDurationMs = SystemClock.elapsedRealtime() - clickedAtMs
+        val launchRecord = latestConversationSettingsLaunchRecord()
+        check(launchRecord.preparationSucceeded) {
+            "The measured tap did not reuse a successfully prepared conversation target."
+        }
+        Log.i(
+            CONVERSATION_SETTINGS_LOG_TAG,
+            "operation_id=${launchRecord.operationId} stage=first_settings_frame " +
+                "duration_ms=$firstFrameDurationMs outcome=ok",
+        )
+        return ConversationSettingsLaunchSample(
+            appDispatchDurationMs = launchRecord.durationMs,
+            firstSettingsFrameDurationMs = firstFrameDurationMs,
+        )
     }
 
     fun scrollConversation() {
@@ -191,12 +267,14 @@ internal class WhiteNoiseJourneys {
         waitForVisibleTag(PerformanceTags.CONVERSATION_TRANSCRIPT_VISIBLE)
     }
 
+    /** Waits for the nonvisual marker proving the destination route rendered after settling. */
     fun waitForConversationRouteSettled() {
-        waitForVisibleTag(PerformanceTags.CONVERSATION_ROUTE_SETTLED)
+        waitForTag(PerformanceTags.CONVERSATION_ROUTE_SETTLED)
     }
 
+    /** Waits for the nonvisual marker proving the outgoing conversation controller was released. */
     fun waitForConversationControllerReleased() {
-        waitForVisibleTag(PerformanceTags.CONVERSATION_CONTROLLER_RELEASED)
+        waitForTag(PerformanceTags.CONVERSATION_CONTROLLER_RELEASED)
     }
 
     fun createGroup(
@@ -232,7 +310,7 @@ internal class WhiteNoiseJourneys {
             waitForVisibleTagAbsent(otherAccountAvatarTag, NOTIFICATION_ROUTE_TIMEOUT_MS)
         }
         waitForVisibleTag(PerformanceTags.NEW_MESSAGE, NOTIFICATION_ROUTE_TIMEOUT_MS)
-        waitForVisibleTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED, NOTIFICATION_ROUTE_TIMEOUT_MS)
+        waitForTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED, NOTIFICATION_ROUTE_TIMEOUT_MS)
         device.waitForIdle()
     }
 
@@ -272,14 +350,27 @@ internal class WhiteNoiseJourneys {
         )
     }
 
+    /** Unwinds only White Noise routes until the authenticated chat list is visible. */
     fun returnToChatList() {
-        repeat(4) {
+        repeat(MAX_CHAT_LIST_UNWIND_STEPS) {
             if (
                 findVisibleTag(PerformanceTags.NEW_MESSAGE, NAVIGATION_SETTLE_TIMEOUT_MS) != null &&
-                findVisibleTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED, NAVIGATION_SETTLE_TIMEOUT_MS) != null
+                findTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED, NAVIGATION_SETTLE_TIMEOUT_MS) != null
             ) {
                 device.waitForIdle()
                 return
+            }
+            if (device.currentPackageName != BenchmarkConfig.TARGET_PACKAGE) {
+                val component = "${BenchmarkConfig.TARGET_PACKAGE}/dev.ipf.whitenoise.android.MainActivity"
+                val output = device.executeShellCommand("am start -W -n $component")
+                check(output.lineSequence().any { it.trim() == "Status: ok" }) {
+                    "Failed to resume White Noise while resetting the benchmark journey: $output"
+                }
+                checkNotNull(findTagWithPrefix(PerformanceTags.ACTIVITY_INSTANCE_PREFIX)) {
+                    "White Noise did not expose its Activity marker after journey reset."
+                }
+                device.waitForIdle()
+                return@repeat
             }
             // UiDevice returns false when no matching accessibility event is
             // observed, even when Android's predictive Back handled the key.
@@ -288,7 +379,7 @@ internal class WhiteNoiseJourneys {
             device.waitForIdle()
         }
         waitForVisibleTag(PerformanceTags.NEW_MESSAGE)
-        waitForVisibleTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED)
+        waitForTag(PerformanceTags.MAIN_SHELL_ROUTE_SETTLED)
         device.waitForIdle()
     }
 
@@ -359,18 +450,131 @@ internal class WhiteNoiseJourneys {
                 "Confirm the dev app is authenticated and the fixture is in the expected state."
         }
 
+    /** Waits for a White Noise selector while recovering setup-only foreign-app interruptions. */
     private fun waitForVisibleTag(
         tag: String,
         timeoutMs: Long = DEFAULT_TIMEOUT_MS,
-    ): UiObject2 =
-        checkNotNull(
-            device.onElementOrNull(timeoutMs = timeoutMs) {
-                matchesPerformanceTag(tag) && isVisibleOnDisplay()
-            },
-        ) {
-            "Timed out waiting for visible test tag '$tag'. " +
-                "Available performance tags: ${availablePerformanceTags()}."
+    ): UiObject2 {
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
+        while (SystemClock.uptimeMillis() < deadline) {
+            resumeTargetIfInterrupted()
+            findVisibleTag(tag, SELECTOR_POLL_INTERVAL_MS)?.let { return it }
         }
+        error(
+            "Timed out waiting for visible test tag '$tag'. " +
+                "Available performance tags: ${availablePerformanceTags()}.",
+        )
+    }
+
+    /** Restores White Noise when another local device session steals benchmark foreground. */
+    private fun resumeTargetIfInterrupted() {
+        if (device.currentPackageName == BenchmarkConfig.TARGET_PACKAGE) return
+        val component = "${BenchmarkConfig.TARGET_PACKAGE}/dev.ipf.whitenoise.android.MainActivity"
+        val output = device.executeShellCommand("am start -W -n $component")
+        check(output.lineSequence().any { it.trim() == "Status: ok" }) {
+            "Failed to restore White Noise benchmark foreground: $output"
+        }
+        device.waitForIdle()
+    }
+
+    /** Scrolls the current Compose surface until the requested benchmark control is actually on-screen. */
+    private fun scrollToVisibleTag(
+        tag: String,
+        timeoutMs: Long,
+    ): UiObject2 {
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
+        val x = device.displayWidth / 2
+        val startY = device.displayHeight * 3 / 4
+        val endY = device.displayHeight / 4
+        while (SystemClock.uptimeMillis() < deadline) {
+            findVisibleTag(tag)?.let { return it }
+            check(device.swipe(x, startY, x, endY, SETTINGS_SCROLL_STEPS)) {
+                "Failed to scroll toward visible test tag '$tag'."
+            }
+            device.waitForIdle()
+        }
+        error(
+            "Timed out scrolling to visible test tag '$tag'. " +
+                "Available performance tags: ${availablePerformanceTags()}.",
+        )
+    }
+
+    /** Re-resolves a Compose control until its click has produced the expected destination surface. */
+    private fun clickVisibleTagUntilPresent(
+        triggerTag: String,
+        destinationTag: String,
+        timeoutMs: Long,
+        scrollToTrigger: Boolean = false,
+    ) {
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
+        var lastStaleNode: StaleObjectException? = null
+        while (SystemClock.uptimeMillis() < deadline) {
+            resumeTargetIfInterrupted()
+            if (findTag(destinationTag) != null) return
+            val remainingMs = (deadline - SystemClock.uptimeMillis()).coerceAtLeast(1L)
+            try {
+                val trigger =
+                    if (scrollToTrigger) {
+                        scrollToVisibleTag(triggerTag, remainingMs)
+                    } else {
+                        waitForVisibleTag(triggerTag, remainingMs.coerceAtMost(DEFAULT_TIMEOUT_MS))
+                    }
+                trigger.click()
+            } catch (error: StaleObjectException) {
+                lastStaleNode = error
+                SystemClock.sleep(SELECTOR_POLL_INTERVAL_MS)
+                continue
+            } catch (error: IllegalStateException) {
+                if (findTag(destinationTag) != null) return
+                if (device.currentPackageName != BenchmarkConfig.TARGET_PACKAGE) continue
+                throw error
+            }
+            val settleDeadline = (SystemClock.uptimeMillis() + NAVIGATION_SETTLE_TIMEOUT_MS).coerceAtMost(deadline)
+            while (SystemClock.uptimeMillis() < settleDeadline) {
+                if (findTag(destinationTag) != null) return
+                SystemClock.sleep(SELECTOR_POLL_INTERVAL_MS)
+            }
+        }
+        throw IllegalStateException(
+            "Timed out navigating from test tag '$triggerTag' to '$destinationTag'.",
+            lastStaleNode,
+        )
+    }
+
+    /** Re-resolves a fixture row until its click has opened the expected conversation surface. */
+    private fun clickTextUntilTagPresent(
+        text: String,
+        destinationTag: String,
+        timeoutMs: Long,
+    ) {
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
+        var lastStaleNode: StaleObjectException? = null
+        while (SystemClock.uptimeMillis() < deadline) {
+            resumeTargetIfInterrupted()
+            if (findTag(destinationTag) != null) return
+            val remainingMs = (deadline - SystemClock.uptimeMillis()).coerceAtLeast(1L)
+            try {
+                waitForText(text, remainingMs.coerceAtMost(DEFAULT_TIMEOUT_MS)).click()
+            } catch (error: StaleObjectException) {
+                lastStaleNode = error
+                SystemClock.sleep(SELECTOR_POLL_INTERVAL_MS)
+                continue
+            } catch (error: IllegalStateException) {
+                if (findTag(destinationTag) != null) return
+                if (device.currentPackageName != BenchmarkConfig.TARGET_PACKAGE) continue
+                throw error
+            }
+            val settleDeadline = (SystemClock.uptimeMillis() + NAVIGATION_SETTLE_TIMEOUT_MS).coerceAtMost(deadline)
+            while (SystemClock.uptimeMillis() < settleDeadline) {
+                if (findTag(destinationTag) != null) return
+                SystemClock.sleep(SELECTOR_POLL_INTERVAL_MS)
+            }
+        }
+        throw IllegalStateException(
+            "Timed out opening fixture row '$text' to '$destinationTag'.",
+            lastStaleNode,
+        )
+    }
 
     private fun waitForVisibleTagAbsent(
         tag: String,
@@ -447,6 +651,40 @@ internal class WhiteNoiseJourneys {
             .windows
             .any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
 
+    /** Correlates the newest dispatch with its successful opaque preparation operation. */
+    private fun latestConversationSettingsLaunchRecord(): ConversationSettingsLaunchRecord {
+        val output =
+            device.executeShellCommand(
+                "logcat -d -v brief -s $CONVERSATION_SETTINGS_LOG_TAG:I '*:S'",
+            )
+        val match =
+            APP_DISPATCH_LOG_REGEX
+                .findAll(output)
+                .lastOrNull()
+                ?: error("Missing privacy-safe conversation Settings dispatch timing in logcat.")
+        val operationId = match.groupValues[1].toLong()
+        val latestPreparation =
+            output
+                .substring(0, match.range.first)
+                .lineSequence()
+                .lastOrNull { line ->
+                    "operation_id=$operationId " in line && "stage=prepare_total " in line
+                }
+        val latestPreferredReturn =
+            output
+                .lineSequence()
+                .lastOrNull { line ->
+                    "operation_id=$operationId " in line && "stage=start_activity_return " in line
+                }
+        return ConversationSettingsLaunchRecord(
+            operationId = operationId,
+            durationMs = match.groupValues[2].toLong(),
+            preparationSucceeded =
+                latestPreparation?.contains("outcome=ok") == true &&
+                    latestPreferredReturn?.contains("outcome=ok") == true,
+        )
+    }
+
     private fun availablePerformanceTags(): String {
         val tags = linkedSetOf<String>()
         InstrumentationRegistry
@@ -504,12 +742,25 @@ internal class WhiteNoiseJourneys {
         const val NETWORK_STATE_TIMEOUT_MS = 45_000L
         const val NOTIFICATION_ROUTE_TIMEOUT_MS = 10_000L
         const val NOTIFICATION_ROUTE_DIAGNOSTIC_TIMEOUT_MS = 15_000L
+        const val SETTINGS_SCROLL_STEPS = 12
+        const val MAX_CHAT_LIST_UNWIND_STEPS = 6
         const val NAVIGATION_SETTLE_TIMEOUT_MS = 2_000L
         const val INPUT_METHOD_POLL_INTERVAL_MS = 100L
+        const val SETTINGS_TRANSITION_TIMEOUT_MS = 5_000L
         const val SELECTOR_POLL_INTERVAL_MS = 50L
         const val CONVERSATION_SCROLL_PASSES = 4
         const val CONVERSATION_SCROLL_STEPS = 20
         const val CHAT_LIST_SCROLL_PASSES = 4
         const val CHAT_LIST_SCROLL_STEPS = 20
+        const val ANDROID_SETTINGS_PACKAGE = "com.android.settings"
+        const val CONVERSATION_SETTINGS_LOG_TAG = "ConversationSettings"
+        val APP_DISPATCH_LOG_REGEX =
+            Regex("operation_id=(\\d+) stage=start_activity duration_ms=(\\d+) outcome=ok")
     }
 }
+
+private data class ConversationSettingsLaunchRecord(
+    val operationId: Long,
+    val durationMs: Long,
+    val preparationSucceeded: Boolean,
+)

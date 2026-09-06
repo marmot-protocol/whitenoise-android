@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** Regression coverage for issue #1698's local-ready account-switch boundary. */
+/** Regression coverage for the local-ready account-switch boundary. */
 class AccountSwitchLocalSnapshotOrderingTest {
     @Test
     fun profileSeedSetIncludesEveryVisibleOtherAccountAndExcludesOverflow() {
@@ -41,6 +41,8 @@ class AccountSwitchLocalSnapshotOrderingTest {
     @Test
     fun bindPublishesLocalSnapshotsAndAFrameBeforeCatchUp() {
         val body = controllersSource().readText().kotlinFunctionBody("bind")
+        val retryLoop = body.indexOf("while (coroutineContext.isActive")
+        val catchUpGate = body.indexOf("val catchUpGate = ChatListCatchUpGate()")
         val seededSnapshot = body.indexOf("val seededLocalSnapshot")
         val seededRenderFrame = body.indexOf("awaitRenderedChatListFrame()", startIndex = seededSnapshot)
         val seededCatchUp = body.indexOf("appState.launchCatchUpAccounts()", startIndex = seededRenderFrame)
@@ -60,6 +62,10 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val retryAttempt = body.indexOf("connectionOwner.beginSessionAttempt", startIndex = initialValidation)
 
         assertTrue("a constructor seed must be detected before bind clears state", seededSnapshot >= 0)
+        assertTrue(
+            "the catch-up gate must be scoped to the bind rather than a retry iteration",
+            catchUpGate in 0..<retryLoop,
+        )
         assertTrue("the seeded target list must draw before its catch-up starts", seededCatchUp > seededRenderFrame)
         assertTrue(
             "deferred rosters must wait for the batched live hydration instead of starting an N-call fan-out",
@@ -76,6 +82,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
             "a retry must be able to re-prove application readiness",
             body.indexOf("pendingReadinessCatchUp", startIndex = catchUp) > catchUp,
         )
+        assertEquals(
+            "local subscription reopening must not launch another full catch-up",
+            1,
+            Regex("connectionOwner\\.launchCatchUp\\(\\)").findAll(body).count(),
+        )
         assertTrue(
             "live consumers must start after catch-up is launched",
             body.indexOf("runUntilFirstLiveSubscriptionEnds(") > catchUp,
@@ -88,7 +99,8 @@ class AccountSwitchLocalSnapshotOrderingTest {
     fun targetLocalSnapshotIsLoadedAndGenerationFencedBeforeAccountPublication() {
         val body = setActiveAccountSection()
         val generation = body.indexOf("val requestGeneration = accountSwitchHandoff.beginRequest()")
-        val preload = body.indexOf("loadAccountSwitchLocalSnapshot(label, requestGeneration)")
+        val preload = body.indexOf("loadAccountSwitchLocalSnapshot(")
+        val preloadCall = body.substring(preload, body.indexOf("\n                )", startIndex = preload))
         val finalGenerationGuard =
             body.indexOf(
                 "isAccountSwitchCurrent(requestGeneration)",
@@ -111,7 +123,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
             )
 
         assertTrue("each switch intent must capture a monotonic generation", generation >= 0)
-        assertTrue("the target MDK snapshot must load before target publication", preload > generation)
+        assertTrue("the local snapshot must be loaded before account publication", preload > generation)
+        assertTrue(
+            "the local snapshot loader must retain the request-generation fence",
+            "requestGeneration" in preloadCall,
+        )
         assertTrue("a late A→B result must be rejected after its final suspension", finalGenerationGuard > preload)
         assertTrue(
             "cross-account caches must clear only after the final generation guard",
@@ -138,29 +154,16 @@ class AccountSwitchLocalSnapshotOrderingTest {
     }
 
     @Test
-    fun localPreloadFencesEverySuspendingStageAndAlwaysClosesTemporarySubscriptions() {
+    fun localPreloadFencesEverySuspendingStageAndDefersLiveSubscriptions() {
         val source = appStateSource().readText()
         val body = source.kotlinFunctionBody("loadAccountSwitchLocalSnapshot")
         val presentation = source.kotlinFunctionBody("loadAccountSwitchPresentationSeeds")
-        val firstSubscription = body.indexOf("subscribeChatList")
-        val firstGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = firstSubscription)
-        val secondSubscription = body.indexOf("subscribeChats", startIndex = firstGuard)
-        val secondGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = secondSubscription)
-        val groupsStart = body.indexOf("val groupsDeferred = async", startIndex = secondGuard)
-        val groupsSnapshot = body.indexOf("chatsSubscription.snapshot()", startIndex = groupsStart)
-        val rows = body.indexOf("chatListSubscription.snapshot()", startIndex = groupsSnapshot)
+        val rows = body.indexOf("chatList(accountRef, includeArchived = true)")
         val rowsGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = rows)
-        val presentationStart = body.indexOf("val presentationDeferred", startIndex = rowsGuard)
-        val groupsAwait = body.indexOf("groupsDeferred.await()", startIndex = presentationStart)
-        val groupsGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = groupsAwait)
-        val groupsReadyCount =
-            body.indexOf(
-                "recordAccountSwitchPreloadStage(accountRef, \"cached-groups-ready\", groups.size)",
-                startIndex = groupsGuard,
-            )
-        val presentationAwait = body.indexOf("presentationDeferred.await()", startIndex = groupsGuard)
-        val presentationGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = presentationAwait)
-        val cleanup = body.indexOf("withContext(NonCancellable + Dispatchers.IO)", startIndex = groupsGuard)
+        val rowsReady = body.indexOf("\"cached-chat-rows-ready\"", startIndex = rowsGuard)
+        val presentationStart = body.indexOf("loadAccountSwitchPresentationSeeds", startIndex = rowsReady)
+        val presentationGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = presentationStart)
+        val snapshot = body.indexOf("AccountSwitchLocalSnapshot(", startIndex = presentationGuard)
         val topBarProfiles = presentation.indexOf("topBarProfilesDeferred = async")
         val members = presentation.indexOf("loadAccountSwitchMemberIds")
         val membersGuard = presentation.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = members)
@@ -173,21 +176,19 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val topBarAwait = presentation.indexOf("topBarProfilesDeferred.await()", startIndex = directProfilesGuard)
         val topBarGuard = presentation.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = topBarAwait)
 
-        assertTrue(firstGuard > firstSubscription)
-        assertTrue(secondGuard > secondSubscription)
-        assertTrue("the independent group snapshot must start before the row snapshot", groupsSnapshot > groupsStart)
+        assertTrue("one authoritative row read must replace temporary subscription admission", rows >= 0)
         assertTrue(rowsGuard > rows)
-        assertTrue("presentation work must overlap the already-started group snapshot", presentationStart > rowsGuard)
-        assertTrue(groupsGuard > groupsAwait)
-        assertTrue("cached-group diagnostics must report groups rather than rows", groupsReadyCount > groupsGuard)
-        assertTrue(presentationGuard > presentationAwait)
+        assertTrue("row readiness must be recorded after the generation guard", rowsReady > rowsGuard)
+        assertTrue("identity presentation must follow the authoritative rows", presentationStart > rowsReady)
+        assertTrue(presentationGuard > presentationStart)
+        assertTrue(snapshot > presentationGuard)
+        assertTrue("the pre-activation handoff must defer full groups", "groups = emptyList()" in body)
+        assertFalse("chat-list live admission belongs to the target controller", "subscribeChatList" in body)
+        assertFalse("full group projection belongs to the target controller", "subscribeChats" in body)
         assertTrue("bounded top-bar profiles must overlap member projection", topBarProfiles in 0..<members)
         assertTrue(membersGuard > members)
         assertTrue(directProfilesGuard > directProfiles)
         assertTrue(topBarGuard > topBarAwait)
-        assertTrue("temporary subscriptions must close even for stale/cancelled loads", cleanup > groupsGuard)
-        assertTrue("chat-list subscription must close", "chatListSubscription?.close()" in body)
-        assertTrue("group subscription must close", "chatsSubscription?.close()" in body)
     }
 
     @Test
@@ -277,30 +278,68 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue("member-derived readiness must precede visible publication", publishReady > readiness)
     }
 
+    /** Keeps process-scoped catch-up fenced by account, runtime, and shared network lifetime. */
     @Test
     fun catchUpLaunchIsProcessScopedAndDeduplicated() {
-        val body = appStateSource().readText().kotlinFunctionBody("launchCatchUpAccounts")
+        val body = appStateSource().readText().kotlinFunctionBody("launchAccountCatchUp")
+        val instrumented = appStateSource().readText().kotlinFunctionBody("instrumentedCatchUpAccounts")
         val coordinator = connectivityRuntimeSource().readText()
 
         assertTrue(
             "a blocked catch-up must run outside the controller bind job",
             "accountCatchUpCoordinator.launch" in body,
         )
-        assertTrue("readiness callers must be able to await the result", "scope.async" in coordinator)
+        assertTrue(
+            "readiness callers must receive a result without owning the native job",
+            "val result: CompletableDeferred<AccountCatchUpResult>" in coordinator,
+        )
         assertTrue(
             "only identity-matched callers may share an active catch-up",
-            "it.isActive && activeKey == key" in coordinator,
+            "request.key == key" in coordinator,
         )
         assertTrue(
             "the background job must run the result-bearing best-effort catch-up",
-            "catchUpAccountsBestEffort()" in body,
+            "instrumentedCatchUpAccounts(trigger)" in body &&
+                "catchUpAccountsBestEffort()" in instrumented,
         )
         assertTrue(
             "completion must be fenced by account, runtime, and network generation",
             "activeAccountRef == key.accountRef" in body &&
                 "runtimeGeneration == key.runtimeGeneration" in body &&
-                "connectivityNetworkGeneration.get() == key.networkGeneration" in body,
+                "connectivitySignalOwner.isNetworkGenerationCurrent(key.networkGeneration)" in body,
         )
+    }
+
+    /** Foreground recovery shares catch-up without issuing a second transport wake. */
+    @Test
+    fun foregroundRecoveryUsesTheSharedCatchUpOnly() {
+        val body = appStateSource().readText().kotlinFunctionBody("catchUpAfterForegroundActivation")
+
+        assertFalse("foreground recovery must not duplicate the transport wake", "notifyConnectivityRestored()" in body)
+        assertTrue(
+            "foreground recovery must use the post-trigger catch-up boundary",
+            Regex(
+                """catchUpAfterObservedPushWake\(\s*""" +
+                    """pendingGeneration\s*=\s*pendingGeneration,\s*""" +
+                    """trigger\s*=\s*PerformanceTrigger\.FOREGROUND,\s*\)""",
+            ).containsMatchIn(body),
+        )
+    }
+
+    /** Durable push recovery joins the same process-owned native call. */
+    @Test
+    fun pushWakeRecoveryUsesTheSharedCatchUp() {
+        val body = appStateSource().readText().kotlinFunctionBody("drainPendingPushWakeCatchUpIfNeeded")
+
+        assertTrue(
+            "push-wake recovery must use the post-trigger catch-up boundary",
+            Regex(
+                """catchUpAfterObservedPushWake\(\s*""" +
+                    """pendingGeneration\s*=\s*pendingGeneration,\s*""" +
+                    """trigger\s*=\s*PerformanceTrigger\.PUSH_WAKE,\s*\)""",
+            ).containsMatchIn(body),
+        )
+        assertFalse("push-wake recovery must not bypass coordination", "catchUpAccountsBestEffort()" in body)
     }
 
     @Test
@@ -341,10 +380,10 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
     @Test
     fun notificationPriorityPolicySkipsBroadPreloadAndDefersBestEffortWork() {
-        val policy = accountSwitchSnapshotSource().readText()
         val body = setActiveAccountSection()
-        val policyGate = body.indexOf("shouldLoadAccountSwitchLocalSnapshot(")
-        val broadSnapshot = body.indexOf("loadAccountSwitchLocalSnapshot(label, requestGeneration)")
+        val policyGate = body.indexOf("val preloadPlan = accountSwitchPreloadPlan(")
+        val rowGate = body.indexOf("if (preloadPlan.loadLocalRows)", startIndex = policyGate)
+        val broadSnapshot = body.indexOf("loadAccountSwitchLocalSnapshot(")
         val policyElse = body.indexOf("} else {", startIndex = policyGate)
         val activated = body.indexOf("onActivated()")
         val firstFrameGate = body.indexOf("awaitPostActivationWork()", startIndex = activated)
@@ -357,15 +396,113 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
         assertTrue(
             "only ordinary switches may load the broad local snapshot",
-            "preloadPolicy == AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT" in policy,
+            "includePresentationSeeds = preloadPlan.includePresentationSeeds" in body,
         )
         assertTrue(
             "broad account preload must be inside the policy-controlled branch",
-            policyGate >= 0 && broadSnapshot > policyGate && policyElse > broadSnapshot,
+            policyGate >= 0 && rowGate > policyGate && broadSnapshot > rowGate && policyElse > broadSnapshot,
         )
         assertTrue("the target account must activate before waiting for its readable frame", firstFrameGate > activated)
         assertTrue("superseded deferred work must be rejected after the wait", staleGuard > firstFrameGate)
         assertTrue("profile warming must stay outside the target first-frame path", profile > staleGuard)
+    }
+
+    @Test
+    fun interactiveSelectorsLoadOnlyAuthoritativeRowsBeforeActivation() {
+        val setActiveAccount = setActiveAccountSection()
+        val selector = accountSelectorSource().readText().kotlinFunctionBody("AccountSelectorSheet")
+        val mainShell = source("ui/navigation/MainShell.kt").readText()
+        val quickSwitchStart = mainShell.indexOf("fun requestQuickAccountSwitch(targetAccountRef: String)")
+        val quickSwitchEnd = mainShell.indexOf("shellStateHolder.restoreConversationIfReady", quickSwitchStart)
+        check(quickSwitchStart >= 0 && quickSwitchEnd > quickSwitchStart) {
+            "Missing requestQuickAccountSwitch section"
+        }
+        val shell = mainShell.substring(quickSwitchStart, quickSwitchEnd)
+        val interactive =
+            accountSwitchPreloadPlan(
+                switchingAccounts = true,
+                activationStillWanted = true,
+                preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
+            )
+
+        assertTrue("interactive account switches must still preload SQLite chat rows", interactive.loadLocalRows)
+        assertFalse(
+            "interactive account switches must skip member/profile presentation reads before activation",
+            interactive.includePresentationSeeds,
+        )
+        assertTrue(
+            "setActiveAccount must execute the tested preload plan",
+            "if (preloadPlan.loadLocalRows)" in setActiveAccount,
+        )
+        assertTrue(
+            "setActiveAccount must pass the tested presentation decision to the loader",
+            "includePresentationSeeds = preloadPlan.includePresentationSeeds" in setActiveAccount,
+        )
+        assertTrue(
+            "the Settings selector must use the interactive local-row boundary",
+            "preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS" in selector,
+        )
+        assertTrue(
+            "the chat-list quick selector must use the same interactive local-row boundary",
+            "preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS" in shell,
+        )
+    }
+
+    @Test
+    fun accountSwitchPreloadPlanPinsEveryPolicyBoundary() {
+        AccountSwitchPreloadPolicy.entries.forEach { policy ->
+            val inactive = accountSwitchPreloadPlan(true, false, policy)
+            assertFalse("a rejected activation must not preload rows for $policy", inactive.loadLocalRows)
+            assertFalse(
+                "a rejected activation must not preload presentation for $policy",
+                inactive.includePresentationSeeds,
+            )
+        }
+
+        val sameInteractive =
+            accountSwitchPreloadPlan(
+                switchingAccounts = false,
+                activationStillWanted = true,
+                preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
+            )
+        assertFalse(sameInteractive.loadLocalRows)
+        assertFalse(sameInteractive.includePresentationSeeds)
+
+        val sameFull =
+            accountSwitchPreloadPlan(
+                switchingAccounts = false,
+                activationStillWanted = true,
+                preloadPolicy = AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT,
+            )
+        assertFalse(sameFull.loadLocalRows)
+        assertFalse(sameFull.includePresentationSeeds)
+
+        val conversationFirst =
+            accountSwitchPreloadPlan(
+                switchingAccounts = true,
+                activationStillWanted = true,
+                preloadPolicy = AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST,
+            )
+        assertFalse(conversationFirst.loadLocalRows)
+        assertFalse(conversationFirst.includePresentationSeeds)
+
+        val startup =
+            accountSwitchPreloadPlan(
+                switchingAccounts = false,
+                activationStillWanted = true,
+                preloadPolicy = AccountSwitchPreloadPolicy.STARTUP_RESTORATION,
+            )
+        assertTrue(startup.loadLocalRows)
+        assertFalse(startup.includePresentationSeeds)
+
+        val full =
+            accountSwitchPreloadPlan(
+                switchingAccounts = true,
+                activationStillWanted = true,
+                preloadPolicy = AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT,
+            )
+        assertTrue(full.loadLocalRows)
+        assertTrue(full.includePresentationSeeds)
     }
 
     @Test
@@ -374,18 +511,15 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
         val switchCall =
             body
-                .substringAfter("appState.setActiveAccount(accountLabel) {")
-                .substringBefore("\n                    }")
+                .substringAfter("appState.setActiveAccount(")
+                .substringBefore("\n                    )")
+        val activation = switchCall.indexOf("onActivated = {")
         val dismiss = switchCall.indexOf("onDismiss()")
         val reset = switchCall.indexOf("onAccountSwitched()")
 
         assertTrue(
             "dismiss/reset must be passed into setActiveAccount's activation boundary",
-            dismiss >= 0 && reset > dismiss,
-        )
-        assertFalse(
-            "dismiss must not wait until the entire setActiveAccount call returns",
-            Regex("""setActiveAccount\(accountLabel\)\s*onDismiss\(\)""").containsMatchIn(body),
+            activation >= 0 && dismiss > activation && reset > dismiss,
         )
     }
 

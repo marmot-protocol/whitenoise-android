@@ -4,7 +4,6 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.GroupStateSubscription
 import dev.ipf.marmotkit.TimelineMessagesSubscription
 import dev.ipf.marmotkit.TimelinePageFfi
-import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
 
 /**
  * Lifecycle-shaped seam for conversation live subscriptions. Production binds
@@ -12,14 +11,19 @@ import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
  * types.
  */
 internal interface ConversationTimelineSubscriptionHandle {
+    /** Returns the initial authoritative window without waiting for a live update. */
     fun snapshot(): TimelinePageFfi?
 
-    suspend fun nextUpdate(): TimelineSubscriptionUpdateFfi?
+    /** Returns MDK's next authoritative, ordered, and bounded timeline window. */
+    suspend fun nextWindow(): TimelinePageFfi?
 
+    /** Loads the preceding bounded window while retaining the live subscription. */
     suspend fun paginateBackwards(count: UInt): TimelinePageFfi
 
+    /** Loads the following bounded window while retaining the live subscription. */
     suspend fun paginateForwards(count: UInt): TimelinePageFfi
 
+    /** Releases the underlying MDK subscription. */
     fun close()
 }
 
@@ -34,14 +38,19 @@ internal interface ConversationGroupStateSubscriptionHandle {
 internal class FfiConversationTimelineSubscriptionHandle(
     private val subscription: TimelineMessagesSubscription,
 ) : ConversationTimelineSubscriptionHandle {
+    /** Delegates the initial-window read to the UniFFI subscription. */
     override fun snapshot(): TimelinePageFfi? = subscription.snapshot()
 
-    override suspend fun nextUpdate(): TimelineSubscriptionUpdateFfi? = subscription.nextUpdate()
+    /** Delegates the next complete-window read to MDK rather than consuming deltas. */
+    override suspend fun nextWindow(): TimelinePageFfi? = subscription.next()
 
+    /** Delegates backward pagination to the active MDK subscription. */
     override suspend fun paginateBackwards(count: UInt): TimelinePageFfi = subscription.paginateBackwards(count)
 
+    /** Delegates forward pagination to the active MDK subscription. */
     override suspend fun paginateForwards(count: UInt): TimelinePageFfi = subscription.paginateForwards(count)
 
+    /** Closes the UniFFI subscription handle. */
     override fun close() = subscription.close()
 }
 
@@ -67,6 +76,7 @@ internal class ConversationLiveSubscriptions(
     ) -> ConversationGroupStateSubscriptionHandle,
 ) {
     companion object {
+        /** Binds production subscription seams to the app state's serialized MDK access. */
         fun bind(appState: WhiteNoiseAppState): ConversationLiveSubscriptions =
             ConversationLiveSubscriptions(
                 openTimeline = { account, groupIdHex, limit ->
@@ -87,5 +97,6 @@ internal class ConversationLiveSubscriptions(
     }
 }
 
+/** Returns a test override when installed, otherwise the production MDK binding. */
 internal fun WhiteNoiseAppState.conversationLiveSubscriptions(): ConversationLiveSubscriptions =
-    conversationLiveSubscriptionsOverride ?: ConversationLiveSubscriptions.bind(this)
+    liveSubscriptionOverrides.conversation ?: ConversationLiveSubscriptions.bind(this)

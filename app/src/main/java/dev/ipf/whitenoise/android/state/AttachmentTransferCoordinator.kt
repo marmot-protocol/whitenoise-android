@@ -71,10 +71,16 @@ internal class AttachmentTransferCoordinator(
     private val states = mutableMapOf<String, MutableStateFlow<AttachmentTransferState>>()
     private val availabilitySignals = AttachmentAvailabilitySignals()
     private val active = mutableMapOf<String, Deferred<ByteArray>>()
-    private val terminalGenerations = mutableMapOf<String, Long>()
-    private val refreshGenerations = mutableMapOf<String, Long>()
+    private val terminalLifetimes = mutableMapOf<String, StalenessGuard>()
+    private val refreshLifetimes = mutableMapOf<String, StalenessGuard>()
     private val observerCounts = mutableMapOf<String, Int>()
-    private var nextRefreshGeneration = 0L
+
+    private data class RefreshClaim(
+        val terminalLifetime: StalenessGuard,
+        val terminalToken: Long,
+        val refreshLifetime: StalenessGuard,
+        val refreshToken: Long,
+    )
 
     fun acquireState(
         key: String,
@@ -120,23 +126,34 @@ internal class AttachmentTransferCoordinator(
         key: String,
         probe: suspend () -> Boolean,
     ) {
-        val (terminalGeneration, refreshGeneration) =
+        val claim =
             synchronized(lock) {
-                nextRefreshGeneration += 1L
-                val refreshGeneration = nextRefreshGeneration
-                refreshGenerations[key] = refreshGeneration
-                (terminalGenerations[key] ?: 0L) to refreshGeneration
+                val terminalLifetime = terminalLifetime(key)
+                val refreshLifetime = refreshLifetime(key)
+                RefreshClaim(
+                    terminalLifetime = terminalLifetime,
+                    terminalToken = terminalLifetime.capture(),
+                    refreshLifetime = refreshLifetime,
+                    refreshToken = refreshLifetime.advance(),
+                )
             }
         val available = probeForRefresh(probe)
         synchronized(lock) {
             // A newer cache probe supersedes this result. In particular, a
             // slow cold miss must not demote a later authenticated L2 hit and
-            // transiently reopen the automatic-download path.
-            if (refreshGenerations[key] != refreshGeneration) return
+            // transiently reopen the automatic-download path. Guard identity
+            // also rejects a probe from a retired lifecycle after this key is
+            // reopened and its numeric tokens begin again.
+            if (
+                refreshLifetimes[key] !== claim.refreshLifetime ||
+                !claim.refreshLifetime.isCurrent(claim.refreshToken)
+            ) {
+                return
+            }
             // The cache probe runs outside the lock. A transfer may finish and
             // publish a newer terminal state while the probe is suspended, so
             // never let that stale result overwrite the completion state.
-            val state = currentStateForRefresh(key, terminalGeneration) ?: return
+            val state = currentStateForRefresh(key, claim.terminalLifetime, claim.terminalToken) ?: return
             state.value = refreshedState(state.value, available)
             availabilitySignals.onRefresh(key, available)
         }
@@ -243,15 +260,19 @@ internal class AttachmentTransferCoordinator(
         owner.cancel(AttachmentTransferCancelledByUserException())
     }
 
+    /** Returns mutable state only when no newer terminal publication superseded the probe. */
     private fun currentStateForRefresh(
         key: String,
-        generation: Long,
+        terminalLifetime: StalenessGuard,
+        terminalToken: Long,
     ): MutableStateFlow<AttachmentTransferState>? =
         states[key]?.takeUnless {
             active[key]?.isCompleted == false ||
-                (terminalGenerations[key] ?: 0L) != generation
+                terminalLifetimes[key] !== terminalLifetime ||
+                !terminalLifetime.isCurrent(terminalToken)
         }
 
+    /** Publishes a terminal transfer result and invalidates every suspended cache probe. */
     private fun publishTerminalState(
         key: String,
         state: MutableStateFlow<AttachmentTransferState>,
@@ -259,11 +280,12 @@ internal class AttachmentTransferCoordinator(
     ) {
         synchronized(lock) {
             state.value = value
-            terminalGenerations[key] = (terminalGenerations[key] ?: 0L) + 1L
+            terminalLifetime(key).advance()
             availabilitySignals.onTerminal(key, value)
         }
     }
 
+    /** Converts a non-cancellation cache probe failure into an unavailable result. */
     private suspend fun probeAvailability(probe: suspend () -> Boolean): Boolean =
         try {
             probe()
@@ -273,6 +295,7 @@ internal class AttachmentTransferCoordinator(
             false
         }
 
+    /** Removes per-key state and its guards after both owners and observers have departed. */
     private fun retireStateIfUnused(key: String) {
         if (
             observerCounts[key] == 0 &&
@@ -280,13 +303,14 @@ internal class AttachmentTransferCoordinator(
             !availabilitySignals.hasWaiters(key)
         ) {
             observerCounts.remove(key)
-            terminalGenerations.remove(key)
-            refreshGenerations.remove(key)
+            terminalLifetimes.remove(key)
+            refreshLifetimes.remove(key)
             states.remove(key)
             availabilitySignals.retire(key)
         }
     }
 
+    /** Returns the retained per-key state, seeding cache availability only on first access. */
     private fun stateFlow(
         key: String,
         initiallyAvailable: Boolean = false,
@@ -305,6 +329,12 @@ internal class AttachmentTransferCoordinator(
                     state.value = AttachmentTransferState.Available
                 }
             }
+
+    /** Returns the per-attachment fence for transfer terminal publications. */
+    private fun terminalLifetime(key: String): StalenessGuard = terminalLifetimes.getOrPut(key, ::StalenessGuard)
+
+    /** Returns the per-attachment fence for cache availability probes. */
+    private fun refreshLifetime(key: String): StalenessGuard = refreshLifetimes.getOrPut(key, ::StalenessGuard)
 }
 
 internal class AttachmentAvailabilitySignals {

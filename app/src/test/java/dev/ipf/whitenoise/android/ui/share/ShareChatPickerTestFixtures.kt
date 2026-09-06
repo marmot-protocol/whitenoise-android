@@ -65,6 +65,20 @@ internal fun appStateWithDirectChats(
     return appState
 }
 
+/** Seeds one resolved direct chat into a controller bound to [selfAccountIdHex]'s owner. */
+internal fun ChatsController.applyLocalDirectChat(
+    groupId: String,
+    selfAccountIdHex: String,
+    peerId: String,
+) {
+    applyChatListRow(chatRow(groupId))
+    applyLocalGroupDetails(
+        record = group(groupId),
+        members = listOf(member(selfAccountIdHex, local = true), member(peerId, local = false)),
+    )
+}
+
+/** Builds an app state whose single chat has no resolved members. */
 internal fun appStateWithUnresolvedChat(groupId: String): WhiteNoiseAppState {
     val appState = emptyAppState()
     val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }

@@ -80,7 +80,6 @@ import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableDocument
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.core.ForwardEligibility
-import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -101,6 +100,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isBlueFreeAccentVisible
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.state.withoutBlueChannel
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
@@ -957,6 +957,8 @@ internal fun MessageBubble(
     // opened from a text selection, start at the containing visible sentence.
     // The ordinary long-press action starts at the message top; only an
     // explicit text double-tap supplies a seek offset (#2136).
+
+    /** Starts from the selected sentence and preserves a specific start-gate explanation. */
     fun startSpeakAloud(
         visibleText: String? = null,
         visibleOffset: Int? = null,
@@ -992,7 +994,7 @@ internal fun MessageBubble(
                     locale,
                     startSentenceIndex,
                 )
-            if (!started) appState.present(R.string.tts_bar_error)
+            if (!started) appState.present(appState.ttsStartFailureMessage())
         }
     }
 
@@ -1196,6 +1198,7 @@ internal fun MessageBubble(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .testTag(messageBubbleRowTestTag(record.messageIdHex))
                     .messageBubbleSelectionRow(
                         selectionMode = selectionMode,
                         selected = selected,
@@ -1420,6 +1423,14 @@ internal fun MessageBubble(
                 )
             }
             Column(
+                // Swipe-to-reply translates this whole visual column — bubble or
+                // media surface plus its attached reaction summary — as one unit,
+                // while the stationary parent Row keeps gesture and hitbox
+                // ownership (#204). Applying the offset here, and only here,
+                // keeps every bubble variant from double-applying it and keeps
+                // the sender avatar and selection gutter at rest. The placement
+                // lambda shifts drawing without invalidating measurement, so
+                // row alignment and width strategy are unaffected mid-drag.
                 modifier =
                     Modifier
                         .widthIn(min = bubbleColumnMinWidth, max = bubbleColumnMaxWidth)
@@ -1430,7 +1441,7 @@ internal fun MessageBubble(
                             } else {
                                 Modifier
                             },
-                        ),
+                        ).offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) },
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
             ) {
                 // Resolved before the content column so its presence can pick
@@ -1640,17 +1651,16 @@ internal fun MessageBubble(
                 // - Non-media: render displayedBody (covers reactions,
                 //   deletions, agent streams, plain text).
                 val bodyTextToRender: String? =
-                    when {
-                        // Deleted and persisted failure tombstones show only
-                        // their copy, never an inline image/caption.
-                        deleted || persistedFailure -> displayedBody
-                        // The contact card / location bubble / user card carry
-                        // the body, so the raw caption/link/npub text is hidden.
-                        sharedContact != null || sharedLocation != null || sharedUser != null -> null
-                        mediaPendingName != null && !anyConfirmedMedia -> mediaCaption
-                        anyConfirmedMedia -> mediaCaption
-                        else -> displayedBody
-                    }
+                    messageBodyTextToRender(
+                        displayedBody = displayedBody,
+                        deleted = deleted,
+                        persistedFailure = persistedFailure,
+                        structuredShareOwnsBody =
+                            sharedContact != null || sharedLocation != null || sharedUser != null,
+                        hasPendingMediaName = mediaPendingName != null,
+                        hasConfirmedMedia = anyConfirmedMedia,
+                        mediaCaption = mediaCaption,
+                    )
                 val displayedMarkdownDocument =
                     rememberMessageMarkdownDocumentForDisplayedBody(
                         messageIdHex = record.messageIdHex,
@@ -1818,7 +1828,9 @@ internal fun MessageBubble(
                     // a caption is present; the shared frame owns the continuous
                     // outer shape, color, border, and single footer.
                     Column(
-                        modifier = Modifier.offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) },
+                        // The swipe translation lives on the enclosing bubble
+                        // column so the reaction summary moves too; applying it
+                        // here as well would double-shift media messages.
                         horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
@@ -1969,12 +1981,13 @@ internal fun MessageBubble(
                     }
                 } else {
                     MessageBubbleFrame(
-                        // Swipe-to-reply and long-press now live on the parent Row
-                        // (see #204) so the whole message row is the hitbox. The
-                        // Surface keeps only the visual slide driven by swipeDrag.
+                        // Swipe-to-reply and long-press live on the parent Row
+                        // (see #204) so the whole message row is the hitbox, and
+                        // the visual slide driven by swipeDrag lives on the
+                        // enclosing bubble column so the reaction summary
+                        // translates with this surface.
                         modifier =
                             Modifier
-                                .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) }
                                 .then(textSelectionBoundsModifier)
                                 .then(actionAnchorBoundsModifier),
                         presentation = bubblePresentation,
@@ -2291,20 +2304,14 @@ internal fun MessageBubble(
                         },
                     )
                 }
-                if (forwardSheetOpen && !deleted && forwardPayload != null) {
+                val openForwardPayload = forwardPayload
+                if (forwardSheetOpen && !deleted && openForwardPayload != null) {
                     ForwardMessageSheet(
                         appState = appState,
-                        attachmentCount =
-                            (forwardPayload as? ForwardMessagePayload.Media)?.attachments?.size ?: 0,
+                        payloads = listOf(openForwardPayload),
+                        sourceAccountRef = controller.boundAccountRef,
                         originGroupIdHex = record.groupIdHex,
                         onDismiss = { forwardSheetOpen = false },
-                        onForward = { targetGroupIds ->
-                            if (deleted) {
-                                false
-                            } else {
-                                appState.startForwardMessages(targetGroupIds, listOf(forwardPayload))
-                            }
-                        },
                     )
                 }
                 if (deleteDialogOpen) {

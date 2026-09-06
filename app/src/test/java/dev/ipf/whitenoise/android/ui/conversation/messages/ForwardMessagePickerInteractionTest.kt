@@ -44,8 +44,9 @@ class ForwardMessagePickerInteractionTest {
                         messageCount = 2,
                         attachmentCount = 1,
                         originGroupIdHex = "ff".repeat(32),
+                        sourceAccountRef = ACCOUNT_REF,
                         onDismiss = {},
-                        onForward = { true },
+                        onForward = { _, _ -> true },
                     )
                 }
             }

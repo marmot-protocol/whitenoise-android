@@ -34,6 +34,12 @@ Production signing creds (in local.properties or env):
 
 Production also accepts WHITENOISE_KEYSTORE_* names as fallbacks.
 
+Production MIP-05 push config (in local.properties or env):
+  WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX  64-character server public key
+  WHITENOISE_PRODUCTION_PUSH_RELAY_HINT         Valid wss:// relay URI
+
+Production also accepts WHITENOISE_PUSH_* names as fallbacks.
+
 Staging signing creds:
   WHITENOISE_STAGING_KEYSTORE_PATH
   WHITENOISE_STAGING_KEY_ALIAS
@@ -135,12 +141,35 @@ assert_production_firebase_resources() {
   fi
 }
 
+assert_production_push_config() {
+  local apk="$1"
+  local dex_strings
+
+  if ! command -v unzip >/dev/null 2>&1 || ! command -v strings >/dev/null 2>&1; then
+    echo "error: unzip and strings are required to verify production push configuration" >&2
+    exit 1
+  fi
+  if ! dex_strings="$(unzip -p "$apk" 'classes*.dex' | strings -a)"; then
+    echo "error: unable to inspect release APK bytecode for production push configuration: $apk" >&2
+    exit 1
+  fi
+  if ! grep -Fq -- "$PRODUCTION_PUSH_SERVER_PUBKEY_HEX" <<< "$dex_strings"; then
+    echo "error: production release APK does not contain the configured MIP-05 push server public key: $apk" >&2
+    exit 1
+  fi
+  if ! grep -Fq -- "$PRODUCTION_PUSH_RELAY_HINT" <<< "$dex_strings"; then
+    echo "error: production release APK does not contain the configured MIP-05 push relay hint: $apk" >&2
+    exit 1
+  fi
+}
+
 assert_release_apk() {
   local apk="$1"
   local flavor="$2"
   assert_not_test_only "$apk"
   if [[ "$flavor" == "production" ]]; then
     assert_production_firebase_resources "$apk"
+    assert_production_push_config "$apk"
   fi
 }
 
@@ -295,6 +324,70 @@ prop_value() {
   return 1
 }
 
+runtime_prop_value() {
+  local key value
+  for key in "$@"; do
+    if grep -q "^${key}=" "$LOCAL_PROPS" 2>/dev/null; then
+      grep "^${key}=" "$LOCAL_PROPS" | head -1 | cut -d= -f2-
+      return 0
+    fi
+    if printenv "$key" >/dev/null 2>&1; then
+      printenv "$key"
+      return 0
+    fi
+  done
+  return 1
+}
+
+production_push_value() {
+  local suffix="$1"
+  local default_value="${2:-}"
+  if runtime_prop_value "WHITENOISE_PRODUCTION_${suffix}" "WHITENOISE_${suffix}"; then
+    return 0
+  fi
+  printf '%s\n' "$default_value"
+}
+
+PRODUCTION_PUSH_SERVER_PUBKEY_HEX=""
+PRODUCTION_PUSH_RELAY_HINT=""
+
+require_production_push_config() {
+  PRODUCTION_PUSH_SERVER_PUBKEY_HEX="$(production_push_value PUSH_SERVER_PUBKEY_HEX)"
+  PRODUCTION_PUSH_RELAY_HINT="$(production_push_value PUSH_RELAY_HINT 'wss://relay.eu.whitenoise.chat')"
+
+  if [[ ! "$PRODUCTION_PUSH_SERVER_PUBKEY_HEX" =~ ^[[:xdigit:]]{64}$ ]]; then
+    echo "error: WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX (or WHITENOISE_PUSH_SERVER_PUBKEY_HEX) must be exactly 64 hexadecimal characters" >&2
+    exit 1
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "error: python3 is required to validate the production push relay hint" >&2
+    exit 1
+  fi
+  if ! python3 - "$PRODUCTION_PUSH_RELAY_HINT" <<'PY'
+import sys
+from urllib.parse import urlparse
+
+relay = urlparse(sys.argv[1])
+try:
+    relay.port
+except ValueError:
+    valid = False
+else:
+    valid = (
+        relay.scheme.lower() == "wss"
+        and bool(relay.hostname)
+        and relay.username is None
+        and relay.password is None
+        and not relay.fragment
+    )
+raise SystemExit(0 if valid else 1)
+PY
+  then
+    echo "error: WHITENOISE_PRODUCTION_PUSH_RELAY_HINT (or WHITENOISE_PUSH_RELAY_HINT) must be a valid wss:// URI" >&2
+    exit 1
+  fi
+}
+
 flavor_signing_value() {
   local flavor="$1"
   local suffix="$2"
@@ -333,6 +426,7 @@ require_flavor_signing() {
 for flavor in "${BUILD_FLAVORS[@]}"; do
   if [[ "$flavor" == "production" ]]; then
     require_production_firebase_config
+    require_production_push_config
   fi
   require_flavor_signing "$flavor"
 done

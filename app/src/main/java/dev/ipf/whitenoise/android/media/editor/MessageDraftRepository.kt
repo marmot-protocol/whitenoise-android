@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.marmotkit.MessageDraftSummaryFfi
+import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -466,31 +467,34 @@ internal class MessageDraftCoordinatedOperations(
 
 internal class MessageDraftMutationGenerations {
     private val lock = Any()
-    private val values = mutableMapOf<DraftKey, Long>()
+    private val lifetimes = mutableMapOf<DraftKey, StalenessGuard>()
 
+    /** Accepts a new mutation for [key] and returns its guarded generation. */
     fun advance(key: DraftKey): MessageDraftGeneration =
         synchronized(lock) {
-            val next = (values[key] ?: 0L) + 1L
-            values[key] = next
-            MessageDraftGeneration(next)
+            MessageDraftGeneration(lifetime(key).advance())
         }
 
+    /** Atomically accepts a mutation only while [expected] still owns [key]. */
     fun advanceIfCurrent(
         key: DraftKey,
         expected: MessageDraftGeneration,
     ): MessageDraftGeneration? =
         synchronized(lock) {
-            val current = values[key] ?: 0L
-            if (current != expected.value) return@synchronized null
-            MessageDraftGeneration(current + 1L).also { values[key] = it.value }
+            lifetime(key).advanceIfCurrent(expected.value)?.let(::MessageDraftGeneration)
         }
 
-    fun current(key: DraftKey) = synchronized(lock) { MessageDraftGeneration(values[key] ?: 0L) }
+    /** Captures the mutation generation currently visible for [key]. */
+    fun current(key: DraftKey) = synchronized(lock) { MessageDraftGeneration(lifetime(key).capture()) }
 
+    /** Reports whether [generation] remains the newest accepted mutation for [key]. */
     fun isCurrent(
         key: DraftKey,
         generation: MessageDraftGeneration,
-    ): Boolean = synchronized(lock) { (values[key] ?: 0L) == generation.value }
+    ): Boolean = synchronized(lock) { lifetime(key).isCurrent(generation.value) }
+
+    /** Returns the single staleness primitive assigned to one draft key. */
+    private fun lifetime(key: DraftKey): StalenessGuard = lifetimes.getOrPut(key, ::StalenessGuard)
 }
 
 @Suppress("TooGenericExceptionCaught") // Repository boundary converts non-cancellation gateway failures to results.

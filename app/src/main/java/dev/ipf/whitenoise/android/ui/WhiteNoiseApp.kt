@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -61,6 +62,7 @@ import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.WarmResumeUsefulSurface
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
+import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationFloatingControl
 import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
 import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleSharedMedia
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardOperationStatusHost
@@ -85,6 +87,30 @@ import kotlinx.coroutines.withContext
 
 internal const val TRANSIENT_NOTICE_DURATION_MILLIS = 2_000L
 internal const val GLOBAL_TRANSIENT_NOTICE_TAG = "global-transient-notice"
+
+/** Keeps exactly one dictation control visible without duplicating the origin composer. */
+internal fun shouldShowConversationDictationFloatingControl(
+    state: ConversationDictationState,
+    originVisible: Boolean,
+    appLockScreenVisible: Boolean,
+): Boolean =
+    !appLockScreenVisible &&
+        !originVisible &&
+        when (state) {
+            is ConversationDictationState.Starting,
+            is ConversationDictationState.CheckingProvider,
+            is ConversationDictationState.Listening,
+            is ConversationDictationState.Processing,
+            is ConversationDictationState.ProviderActivityRequired,
+            is ConversationDictationState.ProviderActivityActive,
+            is ConversationDictationState.Failed,
+            is ConversationDictationState.ReviewRequired,
+            -> true
+            ConversationDictationState.Idle,
+            is ConversationDictationState.DisclosureRequired,
+            is ConversationDictationState.PermissionRequired,
+            -> false
+        }
 
 @Composable
 @Suppress("FunctionNaming")
@@ -187,6 +213,10 @@ internal fun WhiteNoiseApp(
     val dictationState = dictation.state
     val dictationPermissionRequestId = dictation.permissionRequestId
     val dictationProviderActivityRequestId = dictation.providerActivityRequestId
+    val dictationOriginVisible =
+        dictationState.target?.let { target ->
+            appState.isConversationDictationOriginVisible(target.accountRef, target.groupIdHex)
+        } == true
     val density = LocalDensity.current
     var firstUsefulFrameRecorded by remember(warmResumeTraceToken, warmResumeEpoch) { mutableStateOf(false) }
     val visibleShareRequest = mainShellStateHolder.visibleShareRequest
@@ -512,7 +542,7 @@ internal fun WhiteNoiseApp(
                                         ErrorContent(
                                             title = stringResource(R.string.white_noise_couldnt_start),
                                             error = phase.error,
-                                            onRetry = { scope.launch { appState.bootstrap() } },
+                                            onRetry = { scope.launch { appState.retryBootstrap() } },
                                         )
                                     }
                                 }
@@ -526,6 +556,23 @@ internal fun WhiteNoiseApp(
                             WipeOutcomeSheet(
                                 report = report,
                                 onDismiss = { appState.pendingWipeReport = null },
+                            )
+                        }
+                        if (
+                            shouldShowConversationDictationFloatingControl(
+                                state = dictationState,
+                                originVisible = dictationOriginVisible,
+                                appLockScreenVisible = appState.appLockScreenVisible,
+                            )
+                        ) {
+                            ConversationDictationFloatingControl(
+                                state = dictationState,
+                                controller = dictation,
+                                modifier =
+                                    Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .navigationBarsPadding()
+                                        .padding(end = 16.dp, bottom = 88.dp),
                             )
                         }
                     }

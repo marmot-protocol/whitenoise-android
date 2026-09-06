@@ -4,6 +4,7 @@ import kotlinx.kover.gradle.plugin.dsl.AggregationType
 import kotlinx.kover.gradle.plugin.dsl.CoverageUnit
 import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.testing.Test
+import java.net.URI
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.Properties
@@ -215,6 +216,19 @@ val allowUnconfiguredProductionFirebaseForReleaseRuntimeTest =
         .gradleProperty("whitenoise.allowUnconfiguredProductionFirebaseForReleaseRuntimeTest")
         .map(String::toBooleanStrict)
         .getOrElse(false)
+val productionPushServerPubkeyHex =
+    environmentRuntimeConfigProperty(
+        environment = "production",
+        suffix = "PUSH_SERVER_PUBKEY_HEX",
+        includeGlobalFallbacks = true,
+    )
+val productionPushRelayHint =
+    environmentRuntimeConfigProperty(
+        environment = "production",
+        suffix = "PUSH_RELAY_HINT",
+        defaultValue = "wss://relay.eu.whitenoise.chat",
+        includeGlobalFallbacks = true,
+    )
 
 // PR preview inputs. The default "stable" channel deliberately keeps one
 // applicationId so every PR preview updates the same app and retains its data.
@@ -243,13 +257,15 @@ android {
         applicationId = "dev.ipf.whitenoise.android"
         minSdk = 30
         targetSdk = 36
-        versionCode = 10
-        versionName = "2026.8.25"
+        versionCode = 12
+        versionName = "2026.9.5"
         manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
         manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_round"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "false")
+        buildConfigField("boolean", "WHITENOISE_AUDIT_RUNTIME_REQUIRED", "false")
+        buildConfigField("String", "WHITENOISE_AUDIT_DATA_MODE", "".asBuildConfigString())
         // Production release must resolve the local WNPerf facility to a
         // compile-time false constant. Non-production flavors and debug builds
         // override this below; runtime collection still requires explicit opt-in.
@@ -442,27 +458,17 @@ android {
             // Push gateway configuration. The pubkey identifies the MIP-05 push
             // server that takes FCM tokens, encrypts notifications, and hands them
             // to the relay hint below for delivery. Both values are provisioned
-            // per environment via local.properties (or the environment); leave
-            // them unset and the runtime treats push as unconfigured rather than
-            // attempting to register against a default server.
+            // per environment via local.properties (or the environment). The
+            // production packaging guard rejects missing or malformed values.
             buildConfigField(
                 "String",
                 "WHITENOISE_PUSH_SERVER_PUBKEY_HEX",
-                environmentRuntimeConfigProperty(
-                    environment = "production",
-                    suffix = "PUSH_SERVER_PUBKEY_HEX",
-                    includeGlobalFallbacks = true,
-                ).asBuildConfigString(),
+                productionPushServerPubkeyHex.asBuildConfigString(),
             )
             buildConfigField(
                 "String",
                 "WHITENOISE_PUSH_RELAY_HINT",
-                environmentRuntimeConfigProperty(
-                    environment = "production",
-                    suffix = "PUSH_RELAY_HINT",
-                    defaultValue = "wss://relay.eu.whitenoise.chat",
-                    includeGlobalFallbacks = true,
-                ).asBuildConfigString(),
+                productionPushRelayHint.asBuildConfigString(),
             )
         }
 
@@ -502,6 +508,16 @@ android {
                 "String",
                 "WHITENOISE_AUDIT_LOG_AUTH_TOKEN",
                 environmentRuntimeConfigProperty("staging", "AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
+            )
+            buildConfigField(
+                "boolean",
+                "WHITENOISE_AUDIT_RUNTIME_REQUIRED",
+                (runtimeConfigProperty("WHITENOISE_AUDIT_RUNTIME_REQUIRED") == "true").toString(),
+            )
+            buildConfigField(
+                "String",
+                "WHITENOISE_AUDIT_DATA_MODE",
+                runtimeConfigProperty("WHITENOISE_AUDIT_DATA_MODE").asBuildConfigString(),
             )
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "staging".asBuildConfigString())
             buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "true")
@@ -755,6 +771,15 @@ fun releaseSigningHintForPackageTask(taskName: String): String =
     }
 
 val productionApplicationId = "dev.ipf.whitenoise.android"
+val mip05PubkeyRegex = Regex("^[0-9a-fA-F]{64}$")
+
+fun isValidProductionPushRelayHint(rawRelayHint: String): Boolean {
+    val relayUri = runCatching { URI(rawRelayHint) }.getOrNull() ?: return false
+    return relayUri.scheme.equals("wss", ignoreCase = true) &&
+        !relayUri.host.isNullOrBlank() &&
+        relayUri.userInfo == null &&
+        relayUri.fragment == null
+}
 
 fun configuredGoogleServicesPackageNames(): Set<String> {
     val root =
@@ -777,7 +802,7 @@ fun configuredGoogleServicesPackageNames(): Set<String> {
         .toSet()
 }
 
-fun mayOmitProductionFirebaseConfig(): Boolean {
+fun mayOmitProductionReleaseConfig(): Boolean {
     val isUnsignedReproducibleBuild = allowUnsignedRelease && !hasProductionReleaseSigning
     val requestedTasks = gradle.startParameter.taskNames.map { it.substringAfterLast(":") }
     val isDisposableReleaseRuntimeVerifier =
@@ -795,7 +820,7 @@ val verifyProductionFirebaseConfig =
         description = "Require Firebase resources for production release packaging"
 
         doLast {
-            if (mayOmitProductionFirebaseConfig()) {
+            if (mayOmitProductionReleaseConfig()) {
                 logger.warn("Production Firebase validation skipped for a non-publishable verification build.")
                 return@doLast
             }
@@ -809,6 +834,33 @@ val verifyProductionFirebaseConfig =
                 throw GradleException(
                     "app/google-services.json does not contain an Android client for " +
                         "$productionApplicationId; refusing production release packaging.",
+                )
+            }
+        }
+    }
+
+val verifyProductionPushConfig =
+    tasks.register("verifyProductionPushConfig") {
+        group = "verification"
+        description = "Require a valid MIP-05 server identity for production release packaging"
+
+        doLast {
+            if (mayOmitProductionReleaseConfig()) {
+                logger.warn("Production push validation skipped for a non-publishable verification build.")
+                return@doLast
+            }
+            if (!mip05PubkeyRegex.matches(productionPushServerPubkeyHex)) {
+                throw GradleException(
+                    "Production release packaging requires " +
+                        "WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX " +
+                        "(or WHITENOISE_PUSH_SERVER_PUBKEY_HEX) to be exactly 64 hexadecimal characters.",
+                )
+            }
+            if (!isValidProductionPushRelayHint(productionPushRelayHint)) {
+                throw GradleException(
+                    "Production release packaging requires " +
+                        "WHITENOISE_PRODUCTION_PUSH_RELAY_HINT " +
+                        "(or WHITENOISE_PUSH_RELAY_HINT) to be a valid wss:// URI.",
                 )
             }
         }
@@ -828,7 +880,7 @@ tasks
         ) &&
             it.name.endsWith("Release")
     }.configureEach {
-        dependsOn(verifyProductionFirebaseConfig)
+        dependsOn(verifyProductionFirebaseConfig, verifyProductionPushConfig)
     }
 tasks
     .matching {

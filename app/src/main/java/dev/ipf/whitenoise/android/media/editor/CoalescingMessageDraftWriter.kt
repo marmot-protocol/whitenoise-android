@@ -324,6 +324,7 @@ internal class CoalescingMessageDraftWriter(
 
     private class Pending(
         var content: String = "",
+        // staleness-exempt: captured accepted draft-mutation token, not a counter owner.
         var generation: Long = 0L,
         var job: Job? = null,
     )

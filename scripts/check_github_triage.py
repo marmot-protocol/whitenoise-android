@@ -13,6 +13,7 @@ from collections import Counter
 OWNER = "marmot-protocol"
 REPO = f"{OWNER}/whitenoise-android"
 PROJECT = "7"
+PROJECT_ITEM_FETCH_ATTEMPTS = 3
 LEGACY_PROJECT = "5"
 RETIRED_LABELS = {"CRITICAL", "HIGH", "MEDIUM", "LOW", "tracking"}
 REQUIRED_ITEM_FIELDS = ("priority", "area", "triage health", "status")
@@ -54,6 +55,28 @@ def gh_json(*args: str):
     return json.loads(gh(*args))
 
 
+def fetch_project_items(initial_total_count: int) -> list[dict]:
+    """Fetch every Project item, retrying if the Project grows mid-request."""
+    limit = max(initial_total_count, 1)
+    for _ in range(PROJECT_ITEM_FETCH_ATTEMPTS):
+        response = gh_json(
+            "project", "item-list", PROJECT, "--owner", OWNER,
+            "--limit", str(limit), "--format", "json",
+        )
+        items = response["items"]
+        total_count = response["totalCount"]
+        if len(items) >= total_count:
+            return items
+        if total_count <= limit:
+            raise RuntimeError(
+                f"Project item pagination stopped at {len(items)} of {total_count} items"
+            )
+        limit = total_count
+    raise RuntimeError(
+        f"Project kept growing during {PROJECT_ITEM_FETCH_ATTEMPTS} pagination attempts"
+    )
+
+
 def snapshot() -> tuple[dict, dict, list[dict], list[dict], list[dict], set[str]]:
     current = gh_json("project", "view", PROJECT, "--owner", OWNER, "--format", "json")
     legacy = gh_json(
@@ -67,10 +90,7 @@ def snapshot() -> tuple[dict, dict, list[dict], list[dict], list[dict], set[str]
         "--json", "number,url,state,issueType,labels,title",
     )
     pull_requests = gh_json("api", f"repos/{REPO}/pulls?state=open&per_page=100")
-    project = gh_json(
-        "project", "item-list", PROJECT, "--owner", OWNER, "--limit", "500",
-        "--format", "json",
-    )["items"]
+    project = fetch_project_items(current["items"]["totalCount"])
     labels = {
         item["name"]
         for item in gh_json("label", "list", "-R", REPO, "--limit", "500", "--json", "name")

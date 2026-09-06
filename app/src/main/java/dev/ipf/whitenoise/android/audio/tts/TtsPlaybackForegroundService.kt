@@ -27,17 +27,50 @@ import kotlinx.coroutines.launch
 
 /**
  * What the playback service needs from the app: the controller it mirrors and
- * the message-level transport it forwards. An interface so service behavior is
+ * the sentence-level system transport it forwards. An interface so service behavior is
  * testable with a real [TtsController] and no application singleton.
  */
 internal interface TtsPlaybackSessionHost {
     val controller: TtsController
 
-    fun nextMessage()
+    /** Advances the system-media cursor by one logical sentence. */
+    fun nextSentence()
 
-    fun previousMessage()
+    /** Moves the system-media cursor to the previous logical sentence. */
+    fun previousSentence()
 
+    /** Ends playback and clears the shared history session. */
     fun stopSession()
+}
+
+/** Platform transport callback that forwards every action to the shared app session. */
+internal class TtsPlaybackMediaSessionCallback(
+    private val host: TtsPlaybackSessionHost,
+) : MediaSession.Callback() {
+    /** Resumes the paused controller without rebuilding its queue. */
+    override fun onPlay() {
+        host.controller.resume()
+    }
+
+    /** Pauses the shared controller while retaining its sentence cursor. */
+    override fun onPause() {
+        host.controller.pause()
+    }
+
+    /** Ends both platform playback and the app-owned history session. */
+    override fun onStop() {
+        host.stopSession()
+    }
+
+    /** Advances one logical sentence, paging history at a message edge when needed. */
+    override fun onSkipToNext() {
+        host.nextSentence()
+    }
+
+    /** Moves back one logical sentence, paging history at a message edge when needed. */
+    override fun onSkipToPrevious() {
+        host.previousSentence()
+    }
 }
 
 /**
@@ -121,6 +154,7 @@ class TtsPlaybackForegroundService : Service() {
         super.onDestroy()
     }
 
+    /** Routes notification intents through the same sentence-level host as MediaSession. */
     private fun dispatchAction(
         host: TtsPlaybackSessionHost,
         action: String,
@@ -129,38 +163,17 @@ class TtsPlaybackForegroundService : Service() {
             ACTION_PLAY -> host.controller.resume()
             ACTION_PAUSE -> host.controller.pause()
             ACTION_STOP, ACTION_DISMISS -> host.stopSession()
-            ACTION_NEXT_MESSAGE -> host.nextMessage()
-            ACTION_PREVIOUS_MESSAGE -> host.previousMessage()
+            ACTION_NEXT_SENTENCE -> host.nextSentence()
+            ACTION_PREVIOUS_SENTENCE -> host.previousSentence()
         }
     }
 
+    /** Creates the single platform session that mirrors the app-owned controller. */
     private fun ensureSession(host: TtsPlaybackSessionHost) {
         if (mediaSession != null) return
         mediaSession =
             MediaSession(this, SESSION_TAG).apply {
-                setCallback(
-                    object : MediaSession.Callback() {
-                        override fun onPlay() {
-                            host.controller.resume()
-                        }
-
-                        override fun onPause() {
-                            host.controller.pause()
-                        }
-
-                        override fun onStop() {
-                            host.stopSession()
-                        }
-
-                        override fun onSkipToNext() {
-                            host.nextMessage()
-                        }
-
-                        override fun onSkipToPrevious() {
-                            host.previousMessage()
-                        }
-                    },
-                )
+                setCallback(TtsPlaybackMediaSessionCallback(host))
                 setMetadata(
                     MediaMetadata
                         .Builder()
@@ -226,6 +239,7 @@ class TtsPlaybackForegroundService : Service() {
         mediaSession?.setPlaybackState(state)
     }
 
+    /** Builds the privacy-safe system transport with sentence-level previous and next actions. */
     private fun buildNotification(model: TtsPlaybackSessionModel): Notification {
         ensureChannel(this)
         val style =
@@ -247,8 +261,8 @@ class TtsPlaybackForegroundService : Service() {
             .addAction(
                 action(
                     android.R.drawable.ic_media_previous,
-                    R.string.tts_playback_action_previous_message,
-                    ACTION_PREVIOUS_MESSAGE,
+                    R.string.tts_playback_action_previous_sentence,
+                    ACTION_PREVIOUS_SENTENCE,
                 ),
             ).addAction(
                 if (model.isPlaying) {
@@ -259,8 +273,8 @@ class TtsPlaybackForegroundService : Service() {
             ).addAction(
                 action(
                     android.R.drawable.ic_media_next,
-                    R.string.tts_playback_action_next_message,
-                    ACTION_NEXT_MESSAGE,
+                    R.string.tts_playback_action_next_sentence,
+                    ACTION_NEXT_SENTENCE,
                 ),
             ).addAction(
                 action(
@@ -309,8 +323,8 @@ class TtsPlaybackForegroundService : Service() {
         internal const val ACTION_PAUSE = "dev.ipf.whitenoise.android.tts.PAUSE"
         internal const val ACTION_STOP = "dev.ipf.whitenoise.android.tts.STOP"
         internal const val ACTION_DISMISS = "dev.ipf.whitenoise.android.tts.DISMISS"
-        internal const val ACTION_NEXT_MESSAGE = "dev.ipf.whitenoise.android.tts.NEXT_MESSAGE"
-        internal const val ACTION_PREVIOUS_MESSAGE = "dev.ipf.whitenoise.android.tts.PREVIOUS_MESSAGE"
+        internal const val ACTION_NEXT_SENTENCE = "dev.ipf.whitenoise.android.tts.NEXT_SENTENCE"
+        internal const val ACTION_PREVIOUS_SENTENCE = "dev.ipf.whitenoise.android.tts.PREVIOUS_SENTENCE"
 
         /**
          * Test seam: resolves what the service mirrors. Production reaches the
@@ -321,12 +335,12 @@ class TtsPlaybackForegroundService : Service() {
                 object : TtsPlaybackSessionHost {
                     override val controller: TtsController get() = appState.ttsController
 
-                    override fun nextMessage() {
-                        appState.ttsHistorySession.nextMessage()
+                    override fun nextSentence() {
+                        appState.ttsHistorySession.nextSentence()
                     }
 
-                    override fun previousMessage() {
-                        appState.ttsHistorySession.previousMessage()
+                    override fun previousSentence() {
+                        appState.ttsHistorySession.previousSentence()
                     }
 
                     override fun stopSession() {

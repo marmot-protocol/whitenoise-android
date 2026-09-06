@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dictation_done">Готово</string>
+    <string name="dictation_notification_title">Диктовка активна</string>
+    <string name="dictation_notification_text">Нажмите «Готово», чтобы завершить, или «Отмена», чтобы удалить</string>
+    <string name="notification_channel_dictation">Диктовка</string>
+    <string name="notification_channel_dictation_description">Управляет активной диктовкой в поле сообщения</string>
+    <string name="dictation_settings_title">Диктовка</string>
+    <string name="dictation_settings_subtitle">Выберите, когда завершать диктовку и что делать с текстом</string>
+    <string name="dictation_settings_explainer">White Noise использует именно ту службу распознавания речи, которая выбрана в Android. Эта служба обрабатывает звук; White Noise хранит в памяти только полученный текст, пока он не будет вставлен или отправлен.</string>
+    <string name="dictation_finish_title">Завершение диктовки</string>
+    <string name="dictation_finish_manual">Когда я нажму «Готово»</string>
+    <string name="dictation_finish_after_silence">После %1$d секунд тишины</string>
+    <string name="dictation_result_title">После завершения</string>
+    <string name="dictation_result_paste">Вставить в черновик</string>
+    <string name="dictation_result_paste_description">Проверить или изменить текст перед отправкой</string>
+    <string name="dictation_result_send">Отправить сообщение</string>
+    <string name="dictation_result_send_description">Отправлять, только если исходный чат и черновик не изменились</string>
+    <string name="dictation_send_safety_note">Отправка безопасно отменяется: если исходный черновик, состав участников или сеанс изменились, White Noise сохраняет расшифровку для проверки, а не отправляет её.</string>
+</resources>

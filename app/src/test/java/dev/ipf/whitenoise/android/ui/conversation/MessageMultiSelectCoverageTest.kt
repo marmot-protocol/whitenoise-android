@@ -92,9 +92,10 @@ class MessageMultiSelectCoverageTest {
         val forwardSheet = source.substringAfter("if (batchForwardSheetOpen").substringBefore("batchInfoSelection?.let")
 
         assertTrue("onDismiss = { batchForwardSheetOpen = false selectedMessages.clear() }" in forwardSheet)
-        assertTrue("onForward = { targetGroupIds -> appState.startForwardMessages" in forwardSheet)
+        assertTrue("payloads = batchSelectionUi.forwardPayloads" in forwardSheet)
+        assertTrue("sourceAccountRef = controller.boundAccountRef" in forwardSheet)
         assertFalse(
-            Regex("onForward = \\{ targetGroupIds ->.*selectedMessages\\.clear\\(\\)").containsMatchIn(forwardSheet),
+            Regex("onForward.*selectedMessages\\.clear\\(\\)").containsMatchIn(forwardSheet),
         )
     }
 

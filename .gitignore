@@ -20,6 +20,11 @@ local.properties
 # environment; provisioned out of band rather than checked in.
 app/google-services.json
 
+# Generated only by the trusted Android Staging APK workflow. Keeping this
+# untracked prevents local, preview, and pull-request builds from inheriting a
+# stale trusted-build attestation.
+app/src/staging/assets/whitenoise-audit-attestation-v1.json
+
 # Claude Code local runtime state
 .claude/
 

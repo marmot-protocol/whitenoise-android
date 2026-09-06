@@ -57,7 +57,7 @@ internal fun shouldRetryNotificationMessageLoadAfterActivation(
  *
  * The read's result is handed to [onPreload] the moment it completes — before
  * activation finishes — so a locally available conversation can open instantly
- * while the switch settles behind it (#586). Publication happens only when
+ * while the switch settles behind it. Publication happens only when
  * [isCurrent] still identifies this exact tap, preventing a late completion
  * from an older or process-recreated route. Activation is always awaited before
  * returning so the caller's post-activation reconciliation still runs.

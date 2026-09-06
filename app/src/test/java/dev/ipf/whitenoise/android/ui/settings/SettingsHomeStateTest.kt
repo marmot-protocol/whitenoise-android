@@ -6,6 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsHomeStateTest {
+    /** Verifies Dictation appears in the complete account-aware settings order. */
     @Test
     fun selfUpdatingBuildIncludesEverySettingsSectionInDisplayOrder() {
         val state = settingsHomeState(hasActiveAccount = true, selfUpdateEnabled = true)
@@ -37,6 +38,7 @@ class SettingsHomeStateTest {
                 SettingsHomeRow.DataAndStorage,
                 SettingsHomeRow.Notifications,
                 SettingsHomeRow.TextToSpeech,
+                SettingsHomeRow.Dictation,
                 SettingsHomeRow.DevicePrivacy,
                 SettingsHomeRow.AiAgents,
                 SettingsHomeRow.Help,

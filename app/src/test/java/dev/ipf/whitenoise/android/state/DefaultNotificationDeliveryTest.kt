@@ -62,35 +62,37 @@ class DefaultNotificationDeliveryTest {
             assertEquals(listOf(false), backgroundUpdates)
         }
 
-    /** Keeps the persistent relay connected when build configuration blocks native push. */
+    /** Every unavailable capability selects persistent delivery without native enablement. */
     @Test
     fun missingNativePushUsesPersistentConnection() =
         runTest {
-            var nativePushEnableCalled = false
-            var nativePushDisableCalled = false
-            val backgroundUpdates = mutableListOf<Boolean>()
+            NativePushCapability.entries.filterNot { it.isAvailable }.forEach { capability ->
+                var nativePushEnableCalled = false
+                var nativePushDisableCalled = false
+                val backgroundUpdates = mutableListOf<Boolean>()
 
-            val configured =
-                configureDefaultNotificationDelivery(
-                    nativePushCapability = NativePushCapability.MissingPushServerConfiguration,
-                    enableNativePush = {
-                        nativePushEnableCalled = true
-                        true
-                    },
-                    disableNativePush = {
-                        nativePushDisableCalled = true
-                        true
-                    },
-                    setBackgroundConnectionEnabled = {
-                        backgroundUpdates += it
-                        true
-                    },
-                )
+                val configured =
+                    configureDefaultNotificationDelivery(
+                        nativePushCapability = capability,
+                        enableNativePush = {
+                            nativePushEnableCalled = true
+                            true
+                        },
+                        disableNativePush = {
+                            nativePushDisableCalled = true
+                            true
+                        },
+                        setBackgroundConnectionEnabled = {
+                            backgroundUpdates += it
+                            true
+                        },
+                    )
 
-            assertTrue(configured)
-            assertFalse(nativePushEnableCalled)
-            assertFalse(nativePushDisableCalled)
-            assertEquals(listOf(true), backgroundUpdates)
+                assertTrue("$capability should configure persistent delivery", configured)
+                assertFalse("$capability must not enable native push", nativePushEnableCalled)
+                assertFalse("$capability must not disable native push", nativePushDisableCalled)
+                assertEquals("$capability fallback", listOf(true), backgroundUpdates)
+            }
         }
 
     /** Rolls back a failed native-push enable before restoring persistent delivery. */
@@ -120,9 +122,9 @@ class DefaultNotificationDeliveryTest {
             assertEquals(listOf("native:on", "native:off", "background:true"), updates)
         }
 
-    /** Restores persistent delivery when disabling native push during rollback fails. */
+    /** Rolls native push back when the persistent connection cannot be disabled. */
     @Test
-    fun failedNativePushShutdownRestoresPersistentConnection() =
+    fun failedPersistentConnectionShutdownRollsBackNativePush() =
         runTest {
             val updates = mutableListOf<String>()
 

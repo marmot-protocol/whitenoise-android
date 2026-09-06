@@ -20,6 +20,58 @@ internal fun hasUsableValidatedInternet(
     hasValidatedPhysicalNetwork: Boolean,
 ): Boolean = hasActiveDefaultNetwork && hasValidatedPhysicalNetwork
 
+/** Aggregate usable-internet state and whether this update restored it. */
+internal data class UsableValidatedInternetUpdate(
+    val hasUsableInternet: Boolean,
+    val restored: Boolean,
+)
+
+/**
+ * Collapses default-route and validated-upstream callbacks into one recovery
+ * edge. Either callback may arrive first or repeat during a handover; only a
+ * real aggregate offline-to-online transition emits a wake.
+ */
+internal class UsableValidatedInternetRecoveryTracker {
+    private var initialized = false
+    private var hasUsableInternet = false
+
+    /** Establish the initial state without treating process startup as recovery. */
+    @Synchronized
+    fun seed(
+        hasActiveDefaultNetwork: Boolean,
+        hasValidatedPhysicalNetwork: Boolean,
+    ): UsableValidatedInternetUpdate {
+        hasUsableInternet =
+            hasUsableValidatedInternet(
+                hasActiveDefaultNetwork = hasActiveDefaultNetwork,
+                hasValidatedPhysicalNetwork = hasValidatedPhysicalNetwork,
+            )
+        initialized = true
+        return UsableValidatedInternetUpdate(
+            hasUsableInternet = hasUsableInternet,
+            restored = false,
+        )
+    }
+
+    /** Update either aggregate input and report one recovery edge at most. */
+    @Synchronized
+    fun update(
+        hasActiveDefaultNetwork: Boolean,
+        hasValidatedPhysicalNetwork: Boolean,
+    ): UsableValidatedInternetUpdate {
+        val wasUsable = hasUsableInternet
+        hasUsableInternet =
+            hasUsableValidatedInternet(
+                hasActiveDefaultNetwork = hasActiveDefaultNetwork,
+                hasValidatedPhysicalNetwork = hasValidatedPhysicalNetwork,
+            )
+        return UsableValidatedInternetUpdate(
+            hasUsableInternet = hasUsableInternet,
+            restored = initialized && !wasUsable && hasUsableInternet,
+        )
+    }
+}
+
 /**
  * Identity-aware mirror of Android's default-network callback. During a
  * Wi-Fi/mobile handoff Android may announce the replacement before delivering

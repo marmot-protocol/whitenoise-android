@@ -72,20 +72,30 @@ class ForwardMessageSheetCoverageTest {
         val targetList = source.functionBody("ForwardTargetList")
         val targetRow = source.functionBody("ForwardTargetRow")
 
-        assertTrue("forwardTargetsLoading" in content)
-        assertTrue("forwardTargetsError" in content)
-        assertTrue("forwardTargetsRevision" in content)
-        assertTrue("remember(targetRevision, originGroupIdHex)" in content)
+        assertTrue("rememberShareChatPickerDataSource(" in content)
+        assertTrue("dataSource.isLoading" in content)
+        assertTrue("dataSource.error" in content)
+        assertTrue("dataSource.memberSnapshotsRevision" in content)
+        assertTrue("remember(dataSource.targets, originGroupIdHex)" in content)
         assertTrue("ErrorContent(" in targetList && "InlineErrorBanner(" in targetList)
-        assertTrue("appState::retryForwardTargets" in targetList)
+        assertTrue("onRetry = retryLoad" in targetList)
         assertTrue("Modifier.semantics { this.selected = selected }" in targetRow)
     }
 
+    /** Account and chat identifiers must never enter the plain saved-state Bundle. */
+    @Test
+    fun forwardPickerStateStaysOutOfTheSavedStateBundle() {
+        assertFalse("rememberSaveable" in forwardPickerSource().readText())
+        val sheet = messageActionsSource().readText().functionBody("ForwardMessageSheet")
+        assertFalse("rememberSaveable" in sheet)
+    }
+
+    /** Member previews resolve through the owner-scoped nickname cache. */
     @Test
     fun groupMemberPreviewsUsePrivateContactNicknames() {
         val body = forwardPickerSource().readText().functionBody("ForwardTargetRow")
 
-        assertTrue("appState.contactDisplayNameCached(memberIdHex)" in body)
+        assertTrue("appState.contactDisplayNameCached(ownerAccountRef, memberIdHex)" in body)
         assertFalse("appState.chatMemberTitleCached(" in body)
     }
 

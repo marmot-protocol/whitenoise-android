@@ -60,7 +60,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
-/** Full Compose-route regression coverage for the inactive-account race in #2191. */
+/** Full Compose-route coverage for inactive-account notification navigation. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class NotificationAccountIsolationNavigationTest {
@@ -108,6 +108,25 @@ class NotificationAccountIsolationNavigationTest {
         assertEquals(3uL, item.projection?.unreadCount)
         assertEquals(MESSAGE_ID, item.projection?.firstUnreadMessageIdHex)
         assertEquals(1, gate.projectionReadCount.get())
+    }
+
+    @Test
+    fun inactiveAccountPreloadOpensFromProjectionWhenRosterEnrichmentIsUnavailable() {
+        val gate =
+            RouteOrderGate(
+                preloadFinishesFirst = true,
+                rosterReadFails = true,
+            )
+        val appState = appState(fakeMarmot(gate))
+
+        val item =
+            runBlocking {
+                appState.preloadNotificationChatListItem(TARGET_ACCOUNT, SHARED_GROUP)
+            }
+
+        assertEquals(SHARED_GROUP, item.id)
+        assertEquals(3uL, item.projection?.unreadCount)
+        assertEquals(0, gate.rosterReadCount.get())
     }
 
     @Test
@@ -491,11 +510,8 @@ class NotificationAccountIsolationNavigationTest {
         ) { proxy, method, arguments ->
             when (method.name) {
                 "groupDetails" -> {
-                    gate.preloadStarted.countDown()
-                    check(gate.releasePreload.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-                        "preload gate timed out"
-                    }
-                    gate.preloadCompleted.countDown()
+                    gate.rosterReadCount.incrementAndGet()
+                    check(!gate.rosterReadFails) { "roster enrichment is unavailable" }
                     groupDetails()
                 }
                 "chatListRow" -> {
@@ -506,10 +522,15 @@ class NotificationAccountIsolationNavigationTest {
                     }
                     check(groupIdHex == SHARED_GROUP) { "projection read used the wrong group" }
                     if (accountRef == TARGET_ACCOUNT) {
+                        gate.preloadStarted.countDown()
+                        check(gate.releasePreload.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+                            "preload gate timed out"
+                        }
                         gate.projectionReadCount.incrementAndGet()
                         if (!gate.projectionAvailable) {
                             throw NoSuchElementException("notification chat-list projection unavailable")
                         }
+                        gate.preloadCompleted.countDown()
                     }
                     chatListRow(requireNotNull(groupIdHex))
                 }
@@ -699,6 +720,7 @@ class NotificationAccountIsolationNavigationTest {
         preloadFinishesFirst: Boolean,
         val projectionAvailable: Boolean = true,
         holdSourceBroadList: Boolean = false,
+        val rosterReadFails: Boolean = false,
     ) {
         val preloadStarted = CountDownLatch(1)
         val preloadCompleted = CountDownLatch(1)
@@ -707,6 +729,7 @@ class NotificationAccountIsolationNavigationTest {
         val releaseActivation = CountDownLatch(if (preloadFinishesFirst) 1 else 0)
         val releaseSourceBroadList = CountDownLatch(if (holdSourceBroadList) 1 else 0)
         val projectionReadCount = AtomicInteger()
+        val rosterReadCount = AtomicInteger()
     }
 
     private object NoopDraftPersistence : DraftPersistence {

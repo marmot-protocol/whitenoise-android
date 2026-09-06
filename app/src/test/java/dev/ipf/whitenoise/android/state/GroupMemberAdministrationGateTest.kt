@@ -39,6 +39,42 @@ class GroupMemberAdministrationGateTest {
             assertNull(controller.lastMutationError)
         }
 
+    /**
+     * The optimistic presentation path: a warm seed lets the Add member action
+     * present enabled while the roster is LOADING, but an invite tapped from
+     * it must still be rejected before reaching the runtime until the roster
+     * is READY, and must reach the runtime once it is.
+     */
+    @Test
+    fun seededAdminInviteStillWaitsForTheAuthoritativeRosterBeforeReachingRuntime() =
+        runBlocking {
+            val runtimeAccess = RuntimeAccessRecorder()
+            val appState = appState(runtimeAccess)
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot =
+                        GroupMemberSnapshot(
+                            listOf(
+                                member("alice", account = "alice", local = true),
+                                member("bob"),
+                            ),
+                        ),
+                )
+            assertTrue("the warm seed must prove membership", controller.seededSelfMember)
+            assertTrue(controller.isSelfAdmin)
+            assertEquals(GroupRosterLoadState.LOADING, controller.memberRosterState)
+
+            assertFalse(controller.inviteMembers(listOf("carol")))
+            assertEquals("no runtime call may happen before the roster is authoritative", 0, runtimeAccess.callCount)
+
+            rosterTracker(controller).transition(GroupRosterRefreshEvent.SUCCEEDED)
+            assertEquals(GroupRosterLoadState.READY, controller.memberRosterState)
+            controller.inviteMembers(listOf("carol"))
+            assertTrue("the same invite must reach the runtime once the roster is READY", runtimeAccess.callCount > 0)
+        }
+
     @Test
     fun rosterLosingAuthorityWhileInviteWaitsForCommitLockSkipsRuntime() =
         runBlocking {

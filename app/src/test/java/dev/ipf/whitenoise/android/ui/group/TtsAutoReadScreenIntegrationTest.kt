@@ -5,8 +5,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
-import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -53,6 +53,7 @@ class TtsAutoReadScreenIntegrationTest {
             .commit()
     }
 
+    /** Verifies the uniquely tagged global toggle persists through app state. */
     @Test
     fun textToSpeechScreenTogglePersistsGlobalDefaultThroughAppState() {
         val appState = appState(activeAccountRef = accountA)
@@ -64,12 +65,12 @@ class TtsAutoReadScreenIntegrationTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNode(isToggleable()).assertIsOff()
-        composeRule.onNode(isToggleable()).performClick()
+        composeRule.onNodeWithTag(TTS_AUTO_READ_GLOBAL_DEFAULT_ROW_TAG).assertIsOff()
+        composeRule.onNodeWithTag(TTS_AUTO_READ_GLOBAL_DEFAULT_ROW_TAG).performClick()
         composeRule.runOnIdle {
             assertTrue(appState.ttsAutoReadPreferences.state.value.globalDefaultEnabled)
         }
-        composeRule.onNode(isToggleable()).assertIsOn()
+        composeRule.onNodeWithTag(TTS_AUTO_READ_GLOBAL_DEFAULT_ROW_TAG).assertIsOn()
     }
 
     @Test

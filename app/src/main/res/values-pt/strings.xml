@@ -359,6 +359,7 @@
     <string name="forward_partial_summary">Encaminhado para %1$d de %2$d conversas</string>
     <string name="forward_failed_summary">Não foi possível encaminhar para as conversas selecionadas</string>
     <string name="forward_start_failed">Não foi possível iniciar o encaminhamento. Feche e tente novamente.</string>
+    <string name="forward_restore_discarded">Não foi possível restaurar com segurança o encaminhamento inacabado, por isso ele foi descartado</string>
     <string name="forward_retry_failed">Tentar novamente nas conversas com falha</string>
     <plurals name="forward_attachment_count">
         <item quantity="one">%1$d anexo</item>
@@ -679,8 +680,8 @@
     <string name="tts_playback_action_play">Reproduzir</string>
     <string name="tts_playback_action_pause">Pausar</string>
     <string name="tts_playback_action_stop">Parar</string>
-    <string name="tts_playback_action_previous_message">Mensagem anterior</string>
-    <string name="tts_playback_action_next_message">Próxima mensagem</string>
+    <string name="tts_playback_action_previous_sentence">Frase anterior</string>
+    <string name="tts_playback_action_next_sentence">Próxima frase</string>
     <string name="toast_restarting">Reiniciando</string>
     <string name="toast_identity_created">Identidade criada</string>
     <string name="toast_couldnt_create_identity">Não foi possível criar a identidade</string>
@@ -1309,8 +1310,8 @@
     <string name="user_search_searching">Pesquisando na rede…</string>
     <string name="user_search_incomplete">Alguns resultados da rede podem estar ausentes.</string>
     <string name="user_search_failed">Não foi possível pesquisar na rede. Verifique sua conexão e tente novamente.</string>
-    <string name="user_search_following">Seguindo</string>
-    <string name="user_search_network">Da rede</string>
+    <string name="user_search_you_follow">Você segue</string>
+    <string name="user_search_result">Resultado da pesquisa</string>
     <string name="paste_npub">Colar npub</string>
     <string name="start_chat">Iniciar conversa</string>
     <string name="name_this_group">Dê um nome ao grupo</string>
@@ -1446,6 +1447,26 @@
     <string name="tts_settings_explainer_no_engine">Nenhum motor de texto para fala utilizável está instalado. Instale o RHVoice ou o eSpeak NG pelo F-Droid ou Zapstore e selecione-o abaixo.</string>
     <string name="tts_settings_engine_title">Motor</string>
     <string name="tts_settings_rate_title">Velocidade da fala</string>
+    <string name="tts_media_mix_title">Falar sobre mídia em reprodução</string>
+    <string name="tts_media_mix_subtitle">Só inicia enquanto outro áudio estiver tocando; o White Noise não controla o outro áudio</string>
+    <string name="tts_media_mix_volume_title">Volume da fala sobre a mídia</string>
+    <string name="tts_media_mix_volume_quiet">Baixo</string>
+    <string name="tts_media_mix_volume_medium">Médio</string>
+    <string name="tts_media_mix_volume_loud">Alto</string>
+    <string name="tts_media_mix_volume_quiet_description">35 por cento do volume do motor de texto para fala</string>
+    <string name="tts_media_mix_volume_medium_description">60 por cento do volume do motor de texto para fala</string>
+    <string name="tts_media_mix_volume_loud_description">85 por cento do volume do motor de texto para fala</string>
+    <string name="tts_media_mix_no_active_media">Inicie uma música ou um podcast antes de usar fala sobre mídia</string>
+    <string name="tts_voice_title">Voz</string>
+    <string name="tts_voice_automatic">Voz off-line automática</string>
+    <string name="tts_voice_automatic_description">Usar a melhor voz off-line instalada para o idioma da mensagem</string>
+    <string name="tts_voice_available_offline">Disponível off-line</string>
+    <string name="tts_voice_invalid_identity">Não tem um nome de voz estável e não pode ser selecionada</string>
+    <string name="tts_voice_not_installed">Não instalada</string>
+    <string name="tts_voice_requires_network">Requer conexão de rede e não pode ser selecionada</string>
+    <string name="tts_voice_ambiguous">Identidade de voz duplicada e não pode ser selecionada</string>
+    <string name="tts_voice_unavailable">Nenhuma voz off-line disponível</string>
+    <string name="tts_voice_effective_fallback">A voz salva não está disponível; usando %1$s</string>
     <string name="speak_aloud">Ler em voz alta</string>
     <string name="tts_bar_pause">Pausar leitura</string>
     <string name="tts_bar_play">Retomar leitura</string>
@@ -1594,6 +1615,7 @@
     <string name="nostr_event_failed">Não foi possível carregar este evento. Verifique sua conexão e tente novamente.</string>
     <string name="nostr_event_open">Abrir evento</string>
     <string name="nostr_event_read_article">Ler artigo</string>
+    <string name="nostr_event_read_note">Ler nota completa</string>
     <string name="nostr_event_play_video">Reproduzir vídeo</string>
     <string name="nostr_video_playback_failed">Não foi possível reproduzir este vídeo.</string>
     <string name="nostr_event_copy">Copiar referência do evento</string>
@@ -1634,6 +1656,6 @@
     <string name="discard">Descartar</string>
     <string name="open_app_settings">Abrir configurações do aplicativo</string>
     <string name="dictation_disclosure_title">Reconhecimento de voz externo</string>
-    <string name="dictation_disclosure_message">O serviço de voz instalado processa o áudio ditado e pode enviá-lo ao provedor. White Noise insere o texto retornado neste rascunho para você revisar e nunca o envia automaticamente.</string>
+    <string name="dictation_disclosure_message">O serviço de voz instalado processa o áudio ditado e pode enviá-lo ao provedor. Por padrão, o White Noise cola o texto retornado no rascunho; o envio automático só fica disponível quando você o ativa explicitamente nas configurações de Ditado.</string>
     <string name="dictation_continue">Continuar</string>
 </resources>

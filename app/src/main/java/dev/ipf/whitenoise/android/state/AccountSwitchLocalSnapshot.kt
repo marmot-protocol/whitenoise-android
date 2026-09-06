@@ -192,20 +192,45 @@ internal fun accountSwitchIdentityStateCounts(
 
 enum class AccountSwitchPreloadPolicy {
     FULL_LOCAL_SNAPSHOT,
+    INTERACTIVE_LOCAL_ROWS,
     TARGET_CONVERSATION_FIRST,
     STARTUP_RESTORATION,
+}
+
+internal data class AccountSwitchPreloadPlan(
+    val loadLocalRows: Boolean,
+    val includePresentationSeeds: Boolean,
+)
+
+internal fun accountSwitchPreloadPlan(
+    switchingAccounts: Boolean,
+    activationStillWanted: Boolean,
+    preloadPolicy: AccountSwitchPreloadPolicy,
+): AccountSwitchPreloadPlan {
+    val loadLocalRows =
+        activationStillWanted &&
+            (
+                preloadPolicy == AccountSwitchPreloadPolicy.STARTUP_RESTORATION ||
+                    (
+                        switchingAccounts &&
+                            (
+                                preloadPolicy == AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT ||
+                                    preloadPolicy == AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS
+                            )
+                    )
+            )
+    return AccountSwitchPreloadPlan(
+        loadLocalRows = loadLocalRows,
+        includePresentationSeeds =
+            loadLocalRows && preloadPolicy == AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT,
+    )
 }
 
 internal fun shouldLoadAccountSwitchLocalSnapshot(
     switchingAccounts: Boolean,
     activationStillWanted: Boolean,
     preloadPolicy: AccountSwitchPreloadPolicy,
-): Boolean =
-    activationStillWanted &&
-        (
-            preloadPolicy == AccountSwitchPreloadPolicy.STARTUP_RESTORATION ||
-                (switchingAccounts && preloadPolicy == AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT)
-        )
+): Boolean = accountSwitchPreloadPlan(switchingAccounts, activationStillWanted, preloadPolicy).loadLocalRows
 
 /**
  * One-shot handoff of MDK's authoritative local projection across the
@@ -249,26 +274,22 @@ internal fun accountSwitchProfileSeed(
 
 /** Main-confined latest-wins owner for the one-shot account-switch handoff. */
 internal class AccountSwitchLocalSnapshotHandoff {
-    private var generation = 0L
+    private val requests = StalenessGuard()
     private var pending: AccountSwitchLocalSnapshot? = null
 
-    fun beginRequest(): Long {
-        generation += 1L
-        pending = null
-        return generation
-    }
+    /** Starts a switch request and discards any snapshot from its predecessor. */
+    fun beginRequest(): Long = requests.advance { pending = null }
 
-    fun isCurrent(requestGeneration: Long): Boolean = generation == requestGeneration
+    /** Reports whether [requestGeneration] still owns the pending handoff. */
+    fun isCurrent(requestGeneration: Long): Boolean = requests.isCurrent(requestGeneration)
 
+    /** Publishes [snapshot] only while its originating switch remains current. */
     fun publish(
         requestGeneration: Long,
         snapshot: AccountSwitchLocalSnapshot?,
-    ): Boolean {
-        if (!isCurrent(requestGeneration)) return false
-        pending = snapshot
-        return true
-    }
+    ): Boolean = requests.runIfCurrent(requestGeneration) { pending = snapshot }
 
+    /** Consumes the one-shot handoff only for its target account and always clears the slot. */
     fun consume(accountRef: String?): AccountSwitchLocalSnapshot? {
         val snapshot = pending
         pending = null

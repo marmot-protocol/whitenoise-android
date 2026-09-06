@@ -7,13 +7,16 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,6 +36,7 @@ class NotificationsScreenTest {
     /** Verifies every unsupported cause remains off, disabled, and explicitly named. */
     @Test
     fun unsupportedCapabilitiesAreDisabledAndExplainTheirSpecificCause() {
+        var toggleCalls = 0
         val cases =
             listOf(
                 NativePushCapability.MissingPushServerConfiguration to
@@ -51,7 +55,7 @@ class NotificationsScreenTest {
                             capability = capability,
                             accountReady = true,
                             checked = true,
-                            onCheckedChange = {},
+                            onCheckedChange = { toggleCalls += 1 },
                         )
                     }
                 }
@@ -62,8 +66,13 @@ class NotificationsScreenTest {
             composeRule.onNodeWithText(app.getString(subtitle)).assertIsDisplayed()
         }
         cases.indices.forEach { index ->
-            composeRule.onAllNodes(isToggleable())[index].assertIsNotEnabled().assertIsOff()
+            composeRule
+                .onAllNodes(isToggleable())[index]
+                .assertIsNotEnabled()
+                .assertIsOff()
+                .performTouchInput { click() }
         }
+        composeRule.runOnIdle { assertEquals(0, toggleCalls) }
     }
 
     /** Enables an already-selected switch only after capability and account readiness agree. */

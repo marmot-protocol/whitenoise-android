@@ -67,6 +67,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.TextRange
@@ -93,7 +94,9 @@ import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.conversation.composerMultilineControlsSuppressed
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
+import dev.ipf.whitenoise.android.ui.conversation.resolveAutomaticComposerCeiling
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -356,6 +359,7 @@ internal fun ComposerBar(
     // Defaulted to a locally-remembered requester so other call sites keep the
     // previous self-contained behavior.
     composerFocus: FocusRequester = remember { FocusRequester() },
+    softwareKeyboardController: SoftwareKeyboardController? = LocalSoftwareKeyboardController.current,
     // #589: surfaces the live focus state up to the conversation screen so the
     // resume observer can tell whether the keyboard was up when we were paused.
     onComposerFocusChanged: (Boolean) -> Unit = {},
@@ -388,12 +392,13 @@ internal fun ComposerBar(
     var composerEmojiPickerRequested by remember { mutableStateOf(false) }
     var composerEmojiSearchActive by remember { mutableStateOf(false) }
     var composerKeyboardRestorePending by remember { mutableStateOf(false) }
+    // The user-selected expansion mode survives rotation and window resizes:
+    // manual and full-screen heights re-clamp against the live post-inset
+    // maximum in composerHeightPx, so a stale pixel height cannot overflow the
+    // rotated viewport. Only a chat switch or font-scale change resets it.
     var composerExpansion by
         remember(
             draftKey,
-            configuration.orientation,
-            configuration.screenWidthDp,
-            configuration.screenHeightDp,
             configuration.fontScale,
         ) {
             mutableStateOf(ComposerExpansionState())
@@ -436,7 +441,6 @@ internal fun ComposerBar(
             dictationGroupIdHex != null &&
             dictationController?.isOwnedBy(dictationAccountRef, dictationGroupIdHex) == true
     val dictationPendingElsewhere = dictationController?.blocksNewRequest == true && !dictationOwnedByComposer
-    val dictationActiveElsewhere = dictationState !is ConversationDictationState.Idle && !dictationOwnedByComposer
     // Snapshot the in-flight composer state (full TextFieldValue — text +
     // caret) when entering edit mode so cancelling restores both. Keyed on
     // the message id so a tap-Edit on a different message snapshots a fresh
@@ -479,29 +483,22 @@ internal fun ComposerBar(
     // gated by a non-saveable flag so a direct in-place conversation switch
     // can focus the new draft without recomposition re-firing it. Skipped while
     // editing — the edit effect above already owns focus then.
-    val keyboardController = LocalSoftwareKeyboardController.current
+    val keyboardController = softwareKeyboardController
     val focusManager = LocalFocusManager.current
     val controllerForDictation = dictationController
     val accountForDictation = dictationAccountRef
     val groupForDictation = dictationGroupIdHex
-    val startProviderDictation: (() -> Unit)? =
+    val startAppOwnedDictation: (() -> Unit)? =
         if (controllerForDictation != null && accountForDictation != null && groupForDictation != null) {
             if (editingMessageId != null) {
                 null
             } else {
                 {
-                    composerEmojiPickerOpen = false
-                    composerEmojiPickerRequested = false
-                    attachmentSheetState.dismiss()
-                    composerExpansion = ComposerExpansionState()
-                    focusManager.clearFocus(force = true)
-                    keyboardController?.hide()
-                    controllerForDictation.requestProviderActivityStart(
+                    controllerForDictation.requestStart(
                         accountRef = accountForDictation,
                         groupIdHex = groupForDictation,
                         draft = textFieldValue,
                     )
-                    onBottomInputChanged()
                 }
             }
         } else {
@@ -886,10 +883,7 @@ internal fun ComposerBar(
         val maximumComposerHeight =
             (boundedHeight - statusBarTop - topInteractionClearance - bottomInset - customInputPaneHeight)
                 .coerceAtLeast(44.dp)
-        val automaticComposerCeiling =
-            (maximumComposerHeight * 0.5f)
-                .coerceAtLeast(44.dp)
-                .coerceAtMost(maximumComposerHeight)
+        val automaticComposerCeiling = resolveAutomaticComposerCeiling(maximumComposerHeight)
         val maximumComposerHeightPx = with(density) { maximumComposerHeight.toPx() }
         val minimumManualComposerHeightPx =
             with(density) {
@@ -1129,33 +1123,18 @@ internal fun ComposerBar(
                 }
                 val activeRecordingController = voiceRecordingController?.takeIf { it.isRecording }
                 val isRecordingVoice = activeRecordingController != null
-                // Provider handoff has no in-app recording phase. Keep the
-                // compact composer in place while the IME closes and Android's
-                // recognition Activity takes over; only actionable in-app
-                // results and failures replace it with the status strip.
-                val dictationVisible =
-                    dictationOwnedByComposer &&
-                        when (dictationState) {
-                            is ConversationDictationState.Idle,
-                            is ConversationDictationState.DisclosureRequired,
-                            is ConversationDictationState.ProviderActivityRequired,
-                            is ConversationDictationState.ProviderActivityActive,
-                            -> false
-                            else -> true
-                        }
+                val dictationActiveInComposer =
+                    dictationOwnedByComposer && dictationState !is ConversationDictationState.Idle
+                val activeDictationController = dictationController?.takeIf { dictationActiveInComposer }
                 val showMicButton =
                     (text.isBlank() || isRecordingVoice) &&
                         editingMessageId == null &&
-                        voiceRecordingController != null
+                        voiceRecordingController != null &&
+                        !dictationActiveInComposer
                 val showPrimaryTrailingAction = !(showMicButton && dictationPendingElsewhere)
                 val primaryTrailingActionWidth =
                     if (showMicButton && voiceRecordingController.locked) 84.dp else 44.dp
-                val trailingControlsWidth =
-                    when {
-                        dictationActiveElsewhere && showPrimaryTrailingAction -> primaryTrailingActionWidth + 52.dp
-                        dictationActiveElsewhere -> 48.dp
-                        else -> primaryTrailingActionWidth
-                    }
+                val trailingControlsWidth = primaryTrailingActionWidth
                 BoxWithConstraints(
                     modifier =
                         Modifier
@@ -1168,11 +1147,9 @@ internal fun ComposerBar(
                                 },
                             ),
                 ) {
-                    // Keep the text field composed while recording. Removing the focused
-                    // BasicTextField makes Android dismiss the IME, which then removes
-                    // imePadding and drops this whole bottom bar under the user's finger.
-                    // The recording strip is only a visual overlay; focus stays with the
-                    // hidden composer so an already-open keyboard remains open.
+                    // Keep the field composed and focusable throughout dictation. The
+                    // app-owned controls replace only the waveform slot, so an open IME
+                    // stays open and a closed IME is never raised implicitly.
                     ComposerPill(
                         textFieldValue = textFieldValue,
                         composerFocus = composerFocus,
@@ -1186,7 +1163,7 @@ internal fun ComposerBar(
                             onComposerFocusChanged(focused)
                         },
                         onValueChange = { value ->
-                            if (!isRecordingVoice && !dictationVisible) {
+                            if (!isRecordingVoice) {
                                 val applied = repairComposerMentionEdit(textFieldValue, value, mentionPickerEnabled)
                                 applyComposerFieldValue(applied)
                             }
@@ -1227,10 +1204,19 @@ internal fun ComposerBar(
                         onPickDocument = onPickDocument,
                         onPasteImageUris = onPasteImageUris?.takeIf { editingMessageId == null && !isRecordingVoice },
                         onDictation =
-                            startProviderDictation?.takeIf {
+                            startAppOwnedDictation?.takeIf {
                                 dictationState is ConversationDictationState.Idle &&
                                     !dictationPendingElsewhere &&
                                     !isRecordingVoice
+                            },
+                        dictationControls =
+                            activeDictationController?.let { activeController ->
+                                {
+                                    ConversationDictationCompactActions(
+                                        state = dictationState,
+                                        controller = activeController,
+                                    )
+                                }
                             },
                         highlightMentionChips = mentionPickerEnabled,
                         mentionCandidates = mentionCandidates,
@@ -1267,7 +1253,7 @@ internal fun ComposerBar(
                             onBottomInputChanged()
                         },
                         overlayBackRegistrar = overlayBackRegistrar,
-                        inputContentVisible = !isRecordingVoice && !dictationVisible,
+                        inputContentVisible = !isRecordingVoice,
                         inputFocusEnabled = !dismissInputAfterCollapse,
                         expandedTrailingActionInset = trailingControlsWidth,
                         compactMeasurementWidth =
@@ -1276,6 +1262,7 @@ internal fun ComposerBar(
                         compactMeasurementReservesTrailingAction = false,
                         compactOuterEndInset = trailingControlsWidth + 8.dp,
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
+                        multilineControlsSuppressed = composerMultilineControlsSuppressed(automaticComposerCeiling),
                         modifier =
                             Modifier
                                 .fillMaxWidth()
@@ -1287,64 +1274,56 @@ internal fun ComposerBar(
                                     },
                                 ),
                     )
-                    if (!dictationVisible) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier =
-                                Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .expandedComposerActionRow { expandedActionInsetProgress.value },
-                        ) {
-                            if (dictationActiveElsewhere && dictationController != null) {
-                                ConversationDictationElsewhereAction(
-                                    state = dictationState,
-                                    controller = dictationController,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier =
+                            Modifier
+                                .align(Alignment.BottomEnd)
+                                .expandedComposerActionRow { expandedActionInsetProgress.value },
+                    ) {
+                        // This call site stays shared by idle and recording states;
+                        // moving it would break the active hold gesture's identity.
+                        if (showPrimaryTrailingAction && showMicButton && voiceRecordingController.locked) {
+                            IconButton(
+                                onClick = { voiceRecordingController.cancel() },
+                                modifier = Modifier.size(40.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.voice_message_cancel),
+                                    tint = MaterialTheme.colorScheme.error,
                                 )
                             }
-                            // This call site stays shared by idle and recording states;
-                            // moving it would break the active hold gesture's identity.
-                            if (showPrimaryTrailingAction && showMicButton && voiceRecordingController.locked) {
-                                IconButton(
-                                    onClick = { voiceRecordingController.cancel() },
-                                    modifier = Modifier.size(40.dp),
-                                ) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = stringResource(R.string.voice_message_cancel),
-                                        tint = MaterialTheme.colorScheme.error,
-                                    )
-                                }
-                                FloatingActionButton(
-                                    onClick = { voiceRecordingController.stop() },
-                                    modifier = Modifier.composerActionSize { expandedActionInsetProgress.value },
-                                    containerColor = actionColors.container,
-                                    contentColor = actionColors.content,
-                                ) {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.Send,
-                                        contentDescription = stringResource(R.string.send),
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                }
-                            } else if (showPrimaryTrailingAction && showMicButton) {
-                                Box(contentAlignment = Alignment.BottomCenter) {
-                                    LockHintAbove(controller = voiceRecordingController)
-                                    MicHoldButton(controller = voiceRecordingController)
-                                }
-                            } else if (showPrimaryTrailingAction) {
-                                FloatingActionButton(
-                                    onClick = { submitMessage() },
-                                    modifier = Modifier.composerActionSize { expandedActionInsetProgress.value },
-                                    containerColor = actionColors.container,
-                                    contentColor = actionColors.content,
-                                ) {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.Send,
-                                        contentDescription = stringResource(R.string.send),
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                }
+                            FloatingActionButton(
+                                onClick = { voiceRecordingController.stop() },
+                                modifier = Modifier.composerActionSize { expandedActionInsetProgress.value },
+                                containerColor = actionColors.container,
+                                contentColor = actionColors.content,
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = stringResource(R.string.send),
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        } else if (showPrimaryTrailingAction && showMicButton) {
+                            Box(contentAlignment = Alignment.BottomCenter) {
+                                LockHintAbove(controller = voiceRecordingController)
+                                MicHoldButton(controller = voiceRecordingController)
+                            }
+                        } else if (showPrimaryTrailingAction) {
+                            FloatingActionButton(
+                                onClick = { submitMessage() },
+                                modifier = Modifier.composerActionSize { expandedActionInsetProgress.value },
+                                containerColor = actionColors.container,
+                                contentColor = actionColors.content,
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = stringResource(R.string.send),
+                                    modifier = Modifier.size(20.dp),
+                                )
                             }
                         }
                     }
@@ -1371,12 +1350,6 @@ internal fun ComposerBar(
                                             }
                                         }
                                     },
-                        )
-                    } else if (dictationVisible) {
-                        ConversationDictationStrip(
-                            state = dictationState,
-                            controller = dictationController,
-                            modifier = Modifier.matchParentSize(),
                         )
                     }
                 }

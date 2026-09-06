@@ -19,6 +19,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -308,6 +309,70 @@ class NotificationStartupOrderingTest {
                 assertEquals(1, fixture.runtimeStartCalls.get())
                 assertEquals(1, fixture.subscriptionCalls.get())
                 assertTrue(fixture.appState.phase is AppPhase.Onboarding)
+            } finally {
+                fixture.close()
+            }
+        }
+
+    @Test
+    fun backgroundRetryCannotReplaceAnActionableBootstrapFailureWithLoading() =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    initiallyBlockRuntimeStartSynchronously = true,
+                    bootstrapActionableTimeoutMillis = 100L,
+                )
+            try {
+                fixture.bootstrap()
+                assertTrue(fixture.appState.phase is AppPhase.Failed)
+
+                val retry = async { runCatching { fixture.ensureNotificationRuntimeStarted() } }
+                var reclaimedLoading = false
+                while (!retry.isCompleted) {
+                    reclaimedLoading = reclaimedLoading || fixture.appState.phase is AppPhase.Bootstrapping
+                    yield()
+                }
+                retry.await()
+
+                assertFalse("background recovery must preserve the actionable failure", reclaimedLoading)
+                assertTrue(fixture.appState.phase is AppPhase.Failed)
+                assertEquals(1, fixture.runtimeStartCalls.get())
+
+                fixture.allowRuntimeStart()
+                fixture.ensureNotificationRuntimeStarted()
+
+                assertTrue(fixture.appState.phase is AppPhase.Onboarding)
+                assertEquals(1, fixture.runtimeStartCalls.get())
+            } finally {
+                fixture.close()
+            }
+        }
+
+    @Test
+    fun explicitRetryRestoresLoadingAndReusesTheInFlightBootstrapAttempt() =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    initiallyBlockRuntimeStartSynchronously = true,
+                    bootstrapActionableTimeoutMillis = 100L,
+                )
+            try {
+                fixture.bootstrap()
+                assertTrue(fixture.appState.phase is AppPhase.Failed)
+
+                val retry = async { fixture.retryBootstrap() }
+                withTimeout(1_000L) {
+                    while (fixture.appState.phase !is AppPhase.Bootstrapping) yield()
+                }
+
+                assertEquals(1, fixture.runtimeStartCalls.get())
+                fixture.allowRuntimeStart()
+                retry.await()
+
+                assertTrue(fixture.appState.phase is AppPhase.Onboarding)
+                assertEquals(1, fixture.runtimeStartCalls.get())
             } finally {
                 fixture.close()
             }

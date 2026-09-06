@@ -34,7 +34,7 @@ jobs:
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
           distribution: temurin
           java-version: '17'
@@ -49,6 +49,7 @@ jobs:
         run: |
           ./scripts/release_test.sh
           .github/scripts/test-staging-apk-transport.sh
+          python3 .github/scripts/test-generate-audit-attestation.py
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -109,6 +110,20 @@ jobs:
             printf ' - %s\n' "${missing[@]}" >&2
             exit 1
           fi
+
+      - name: Generate trusted audit attestation
+        env:
+          WHITENOISE_STAGING_AUDIT_LOG_ENDPOINT: ${{ secrets.WHITENOISE_STAGING_AUDIT_LOG_ENDPOINT }}
+          WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN: ${{ secrets.WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          .github/scripts/generate-audit-attestation.py \
+            app/src/staging/assets/whitenoise-audit-attestation-v1.json
+          {
+            printf 'WHITENOISE_AUDIT_RUNTIME_REQUIRED=true\n'
+            printf 'WHITENOISE_AUDIT_DATA_MODE=obfuscated_sensitive_data\n'
+          } >> "$GITHUB_ENV"
 
       - name: Write Firebase config
         env:
@@ -184,6 +199,19 @@ jobs:
             -maxdepth 1 -type f -name 'whitenoise-staging-v8a-release-*.apk' -print)
           [[ ${#apks[@]} -eq 1 ]]
           .github/scripts/verify-staging-apk-transport.sh "${apks[0]}"
+          python3 - "${apks[0]}" <<'PY'
+          import json
+          import sys
+          import zipfile
+          from pathlib import Path
+
+          generated = Path("app/src/staging/assets/whitenoise-audit-attestation-v1.json").read_bytes()
+          with zipfile.ZipFile(sys.argv[1]) as apk:
+              bundled = apk.read("assets/whitenoise-audit-attestation-v1.json")
+          if bundled != generated:
+              raise SystemExit("bundled audit attestation differs from the trusted generated source")
+          json.loads(bundled)
+          PY
 
       - name: Compute short SHA
         id: sha

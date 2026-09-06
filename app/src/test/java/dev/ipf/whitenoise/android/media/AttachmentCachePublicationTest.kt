@@ -406,6 +406,51 @@ class AttachmentCachePublicationTest {
         }
     }
 
+    /** Proves a wipe cannot finish between final validation and plaintext rename. */
+    @Test
+    fun wipeWaitsForAcceptedFinalPublicationBeforeDeletingTheFile() {
+        dir = Files.createTempDirectory("attachment-cache-wipe-publication").toFile()
+        val voiceDir = File(dir, "voice_attachments").apply { mkdirs() }
+        val finalFile = File(voiceDir, "msg-wipe-publication.m4a")
+        val attachmentKey = AttachmentCachePublication.attachmentKey("msg-wipe-publication", 0, 1uL)
+        val permit = AttachmentCachePublication.capturePermit(attachmentKey)!!
+        val wipeEntered = CountDownLatch(1)
+        val wipeFinished = CountDownLatch(1)
+        val executor = Executors.newSingleThreadExecutor()
+        AttachmentCachePublication.renameFileForTests = { source, target ->
+            executor.submit {
+                wipeEntered.countDown()
+                AttachmentCachePublication.onWipeStarted()
+                try {
+                    voiceDir.deleteRecursively()
+                } finally {
+                    AttachmentCachePublication.onWipeFinished()
+                    wipeFinished.countDown()
+                }
+            }
+            assertTrue(wipeEntered.await(5, TimeUnit.SECONDS))
+            assertFalse(
+                "wipe must wait while final publication owns the generation fence",
+                wipeFinished.await(100, TimeUnit.MILLISECONDS),
+            )
+            source.renameTo(target)
+        }
+        try {
+            assertTrue(
+                AttachmentCachePublication.publishWithPermit(
+                    attachmentKey = attachmentKey,
+                    finalFile = finalFile,
+                    bytes = byteArrayOf(1, 2, 3),
+                    permit = permit,
+                ),
+            )
+            assertTrue(wipeFinished.await(5, TimeUnit.SECONDS))
+            assertFalse(finalFile.exists())
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
     @Test
     fun publishStartedDuringWipe_isRejectedUntilWipeFinishes() {
         dir = Files.createTempDirectory("attachment-cache-active-wipe").toFile()

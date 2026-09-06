@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
+import android.content.res.Configuration
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.compose.foundation.clickable
@@ -11,11 +12,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -30,6 +33,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTextReplacement
@@ -159,6 +164,51 @@ class ComposerExpansionBehaviorTest {
         )
         assertTrue("collapse should return to automatic height", abs(collapsedHeight - automaticHeight) <= 1f)
         assertEditorState(editor, draft, selection)
+    }
+
+    /**
+     * The reported one-line alternating-collapse jitter: after a full-screen
+     * collapse settles, consecutive frames must hold both the semantic scroll
+     * offset and the rendered editor top perfectly still — for a caret at the
+     * start, the middle, and the end of the draft. A measure-time caret
+     * correction that re-fires per frame surfaces here as alternation.
+     */
+    @Test
+    fun collapseSettlesWithoutAlternatingFramesForStartMiddleAndEndSelections() {
+        val draft = longDraft()
+        render(draft)
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performClick()
+        composeRule.waitForIdle()
+
+        listOf(TextRange(0), TextRange(draft.length / 2), TextRange(draft.length)).forEach { selection ->
+            editor.performTextInputSelection(selection)
+            composeRule.waitForIdle()
+            resizeHandle().performClick()
+            composeRule.waitForIdle()
+
+            withManualClock {
+                resizeHandle().performClick()
+                composeRule.runOnIdle { }
+                // Drive well past the collapse animation before judging rest.
+                sampleComposerHeights(frameCount = 30)
+                val settledFrames =
+                    buildList {
+                        repeat(8) {
+                            composeRule.mainClock.advanceTimeByFrame()
+                            composeRule.runOnIdle { }
+                            add(editorScrollValue() to composerGeometry().editor.top)
+                        }
+                    }
+                assertEquals(
+                    "the collapsed viewport must settle for selection $selection: $settledFrames",
+                    1,
+                    settledFrames.distinct().size,
+                )
+            }
+            composeRule.waitForIdle()
+            assertEquals("collapse must preserve the draft", draft, editorText(editor))
+        }
     }
 
     @Test
@@ -668,6 +718,332 @@ class ComposerExpansionBehaviorTest {
             abs(manualBounds.bottom - automaticBounds.bottom) <= 1f,
         )
         composeRule.onNodeWithText(draft).assertExists()
+    }
+
+    @Test
+    fun shrunkLongDraftCanScrollBackTowardItsFirstLine() {
+        val draft = (1..40).joinToString("\n") { "Draft line $it" }
+        render(draft)
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performClick()
+        composeRule.waitForIdle()
+
+        resizeHandle().performTouchInput {
+            val start = center
+            swipe(start, Offset(start.x, start.y + 220f), durationMillis = 320)
+        }
+        composeRule.waitForIdle()
+
+        val before = editorScrollValue()
+        assertTrue("the shrunk editor should sit at a nonzero end offset, was $before", before > 0f)
+
+        pillSurface().performTouchInput {
+            swipe(
+                start = Offset(center.x, height * 0.35f),
+                end = Offset(center.x, height * 0.8f),
+                durationMillis = 320,
+            )
+        }
+        composeRule.waitForIdle()
+
+        val after = editorScrollValue()
+        assertTrue("a downward swipe must reveal earlier draft text: before=$before after=$after", after < before)
+    }
+
+    private fun pillSurface() = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+
+    @Test
+    fun mouseWheelScrollsTheShrunkEditorWithoutResizingIt() {
+        val draft = (1..40).joinToString("\n") { "Draft line $it" }
+        render(draft)
+        composeRule.onNode(hasSetTextAction()).performClick()
+        composeRule.waitForIdle()
+        resizeHandle().performTouchInput {
+            swipe(center, Offset(center.x, center.y + 220f), durationMillis = 320)
+        }
+        composeRule.waitForIdle()
+        val shrunkHeight = composerHeight()
+        val before = editorScrollValue()
+
+        pillSurface().performMouseInput {
+            moveTo(Offset(center.x, height * 0.5f))
+            scroll(-1f)
+        }
+        composeRule.waitForIdle()
+
+        val delta = editorScrollValue() - before
+        assertTrue("a wheel tick must move the editor viewport", delta != 0f)
+        val expectedStep = with(composeRule.density) { 64.dp.toPx() }
+        assertEquals(
+            "a wheel tick must travel the density-scaled step, not raw pixels",
+            expectedStep,
+            abs(delta),
+            1f,
+        )
+        assertEquals("wheel scrolling must never resize the composer", shrunkHeight, composerHeight(), 1f)
+    }
+
+    /**
+     * Mouse and stylus drags are drag-select by platform convention: the
+     * reading-scroll owner must only arbitrate finger drags, so a vertical
+     * mouse drag over the shrunk editor reaches the text field's selection
+     * handlers instead of being consumed as a scroll.
+     */
+    @Test
+    fun aVerticalMouseDragIsLeftToDragSelectionNotConsumedAsAScroll() {
+        val draft = (1..40).joinToString("\n") { "Draft line $it" }
+        render(draft)
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performClick()
+        composeRule.waitForIdle()
+        resizeHandle().performTouchInput {
+            swipe(center, Offset(center.x, center.y + 220f), durationMillis = 320)
+        }
+        composeRule.waitForIdle()
+
+        pillSurface().performMouseInput {
+            moveTo(Offset(center.x, height * 0.35f))
+            press()
+            moveTo(Offset(center.x, height * 0.8f))
+            release()
+        }
+        composeRule.waitForIdle()
+
+        // Drag-select may legitimately scroll to follow the extending
+        // selection; the ownership contract is that the selection actually
+        // extends instead of the drag being consumed as a reading scroll.
+        val selection = editor.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange]
+        assertTrue(
+            "a mouse drag must extend the text selection, got $selection",
+            !selection.collapsed,
+        )
+        assertEquals("drag selection must not change the draft", draft, editorText(editor))
+    }
+
+    @Test
+    fun shrunkEditorScrollsBothWaysWithoutResizingOrEditingTheDraft() {
+        val draft = (1..40).joinToString("\n") { "Draft line $it" }
+        render(draft)
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performClick()
+        composeRule.waitForIdle()
+        resizeHandle().performTouchInput {
+            swipe(center, Offset(center.x, center.y + 220f), durationMillis = 320)
+        }
+        composeRule.waitForIdle()
+        val shrunkHeight = composerHeight()
+        val end = editorScrollValue()
+
+        pillSurface().performTouchInput {
+            swipe(Offset(center.x, height * 0.35f), Offset(center.x, height * 0.8f), durationMillis = 320)
+        }
+        composeRule.waitForIdle()
+        val towardStart = editorScrollValue()
+        assertTrue("a downward swipe must move toward the first line", towardStart < end)
+        // A user scroll must survive the next layout passes untouched.
+        composeRule.waitForIdle()
+        assertEquals(towardStart, editorScrollValue(), 0.5f)
+
+        pillSurface().performTouchInput {
+            swipe(Offset(center.x, height * 0.8f), Offset(center.x, height * 0.35f), durationMillis = 320)
+        }
+        composeRule.waitForIdle()
+        assertTrue("an upward swipe must move back toward the end", editorScrollValue() > towardStart)
+
+        assertEquals("editor drags must never resize the composer", shrunkHeight, composerHeight(), 1f)
+        assertEquals("user scrolling must not change the draft", draft, editorText(editor))
+    }
+
+    @Test
+    fun accessibilityScrollActionMovesTheShrunkEditorViewport() {
+        val draft = (1..40).joinToString("\n") { "Draft line $it" }
+        render(draft)
+        composeRule.onNode(hasSetTextAction()).performClick()
+        composeRule.waitForIdle()
+        resizeHandle().performTouchInput {
+            swipe(center, Offset(center.x, center.y + 220f), durationMillis = 320)
+        }
+        composeRule.waitForIdle()
+        val before = editorScrollValue()
+        assertTrue(before > 0f)
+
+        composeRule
+            .onNode(hasSetTextAction())
+            .performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, -48f) }
+        composeRule.waitForIdle()
+
+        assertTrue("ScrollBy must move the editor viewport", editorScrollValue() < before)
+    }
+
+    /**
+     * Accessibility services branch on the ScrollBy action's result: a
+     * boundary or zero-delta invocation must report failure so the service can
+     * announce the edge or move to another scroll container, instead of a
+     * false success from an unmoved viewport.
+     */
+    @Test
+    fun accessibilityScrollActionReportsFailureAtBoundariesAndForZeroDelta() {
+        val draft = (1..40).joinToString("\n") { "Draft line $it" }
+        render(draft)
+        composeRule.onNode(hasSetTextAction()).performClick()
+        composeRule.waitForIdle()
+        resizeHandle().performTouchInput {
+            swipe(center, Offset(center.x, center.y + 220f), durationMillis = 320)
+        }
+        composeRule.waitForIdle()
+
+        fun invokeScrollBy(y: Float): Boolean {
+            var handled = false
+            composeRule.runOnUiThread {
+                handled =
+                    composeRule
+                        .onNode(hasSetTextAction())
+                        .fetchSemanticsNode()
+                        .config[SemanticsActions.ScrollBy]
+                        .action
+                        ?.invoke(0f, y) == true
+            }
+            composeRule.waitForIdle()
+            return handled
+        }
+
+        // Scroll hard to the top; the final over-scroll must report failure.
+        while (editorScrollValue() > 0f) {
+            val moved = invokeScrollBy(-10_000f) || editorScrollValue() == 0f
+            assertTrue("moving toward the top must report success", moved)
+        }
+        assertEquals(0f, editorScrollValue(), 0.5f)
+        assertTrue("an over-scroll at the top boundary must report failure", !invokeScrollBy(-48f))
+        assertTrue("a zero delta must report failure", !invokeScrollBy(0f))
+
+        assertTrue("scrolling away from the boundary must report success", invokeScrollBy(96f))
+        assertTrue(editorScrollValue() > 0f)
+    }
+
+    @Test
+    fun editingAfterAReadingScrollRestoresCaretFollowing() {
+        val draft = (1..40).joinToString("\n") { "Draft line $it" }
+        render(draft)
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performClick()
+        editor.performTextInputSelection(TextRange(draft.length))
+        composeRule.waitForIdle()
+        resizeHandle().performTouchInput {
+            swipe(center, Offset(center.x, center.y + 220f), durationMillis = 320)
+        }
+        composeRule.waitForIdle()
+        val end = editorScrollValue()
+
+        pillSurface().performTouchInput {
+            swipe(Offset(center.x, height * 0.35f), Offset(center.x, height * 0.8f), durationMillis = 320)
+        }
+        composeRule.waitForIdle()
+        assertTrue(editorScrollValue() < end)
+
+        // The caret is still at the end of the draft; typing must re-expose it
+        // with the smallest necessary correction.
+        editor.performTextInput("!")
+        composeRule.waitForIdle()
+
+        val maxScroll =
+            composeRule
+                .onNode(hasSetTextAction())
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.VerticalScrollAxisRange]
+                .maxValue()
+        assertEquals("an edit must bring the active caret back into view", maxScroll, editorScrollValue(), 1f)
+        assertTrue(editorText(editor).endsWith("!"))
+    }
+
+    private fun editorText(editor: androidx.compose.ui.test.SemanticsNodeInteraction): String =
+        editor
+            .fetchSemanticsNode()
+            .config[SemanticsProperties.EditableText]
+            .text
+
+    private fun editorScrollValue(): Float =
+        composeRule
+            .onNode(hasSetTextAction())
+            .fetchSemanticsNode()
+            .config[SemanticsProperties.VerticalScrollAxisRange]
+            .value()
+
+    @Test
+    fun userSelectedExpansionModeSurvivesAnOrientationChange() {
+        val draft = longDraft()
+        var landscape by mutableStateOf(false)
+        renderRotatable(draft) { landscape }
+        composeRule.waitForIdle()
+
+        resizeHandle().performClick()
+        composeRule.waitForIdle()
+        val fullScreenHeight = composerHeight()
+        assertTrue("full-screen mode should consume most of the viewport", fullScreenHeight > 500f)
+
+        landscape = true
+        composeRule.waitForIdle()
+
+        val rotatedHeight = composerHeight()
+        val rotatedViewportPx =
+            with(composeRule.density) { 340.dp.toPx() }
+        assertTrue(
+            "the user's full-screen choice must survive rotation " +
+                "(rotated=$rotatedHeight viewport=$rotatedViewportPx)",
+            rotatedHeight > rotatedViewportPx * 0.6f,
+        )
+        composeRule.onNodeWithText(draft).assertExists()
+    }
+
+    /** Renders the composer under a configuration that flips with [landscape]. */
+    private fun renderRotatable(
+        draft: String,
+        landscape: () -> Boolean,
+    ) {
+        var value by mutableStateOf(TextFieldValue(draft))
+        composeRule.setContent {
+            val base = LocalConfiguration.current
+            val rotated = landscape()
+            val configuration =
+                remember(rotated) {
+                    Configuration(base).apply {
+                        orientation =
+                            if (rotated) {
+                                Configuration.ORIENTATION_LANDSCAPE
+                            } else {
+                                Configuration.ORIENTATION_PORTRAIT
+                            }
+                        screenWidthDp = if (rotated) 780 else 360
+                        screenHeightDp = if (rotated) 360 else 780
+                    }
+                }
+            CompositionLocalProvider(LocalConfiguration provides configuration) {
+                WhiteNoiseTheme {
+                    Surface(
+                        modifier =
+                            Modifier
+                                .width(if (rotated) 720.dp else 360.dp)
+                                .height(if (rotated) 340.dp else 720.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.BottomCenter) {
+                            ComposerBar(
+                                replyingTo = null,
+                                messageTextCopy = MessageTextCopy.Default,
+                                onCancelReply = {},
+                                onSend = { _, _ -> },
+                                onPickFromGallery = {},
+                                onPickDocument = {},
+                                dictationController = null,
+                                dictationAccountRef = null,
+                                dictationGroupIdHex = null,
+                                initialDraft = value,
+                                onDraftChange = { value = it },
+                                modifier = Modifier.testTag(TAG),
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @Test

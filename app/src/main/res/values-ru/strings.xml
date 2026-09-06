@@ -379,6 +379,7 @@
     <string name="forward_partial_summary">Переслано в %1$d из %2$d чатов</string>
     <string name="forward_failed_summary">Не удалось переслать в выбранные чаты</string>
     <string name="forward_start_failed">Не удалось начать пересылку. Закройте окно и повторите попытку.</string>
+    <string name="forward_restore_discarded">Не удалось безопасно восстановить незавершённую пересылку, поэтому она была отменена</string>
     <string name="forward_retry_failed">Повторить для чатов с ошибкой</string>
     <plurals name="forward_attachment_count">
         <item quantity="one">%1$d вложение</item>
@@ -711,8 +712,8 @@
     <string name="tts_playback_action_play">Воспроизвести</string>
     <string name="tts_playback_action_pause">Пауза</string>
     <string name="tts_playback_action_stop">Остановить</string>
-    <string name="tts_playback_action_previous_message">Предыдущее сообщение</string>
-    <string name="tts_playback_action_next_message">Следующее сообщение</string>
+    <string name="tts_playback_action_previous_sentence">Предыдущее предложение</string>
+    <string name="tts_playback_action_next_sentence">Следующее предложение</string>
     <string name="toast_restarting">Перезапуск</string>
     <string name="toast_identity_created">Идентичность создана</string>
     <string name="toast_couldnt_create_identity">Не удалось создать идентификатор</string>
@@ -1369,8 +1370,8 @@
     <string name="user_search_searching">Поиск в сети…</string>
     <string name="user_search_incomplete">Некоторые результаты сети могут отсутствовать.</string>
     <string name="user_search_failed">Не удалось выполнить поиск в сети. Проверьте подключение и повторите попытку.</string>
-    <string name="user_search_following">Вы подписаны</string>
-    <string name="user_search_network">Из сети</string>
+    <string name="user_search_you_follow">Вы подписаны</string>
+    <string name="user_search_result">Результат поиска</string>
     <string name="paste_npub">Вставить npub</string>
     <string name="start_chat">Начать чат</string>
     <string name="name_this_group">Назовите группу</string>
@@ -1508,6 +1509,26 @@
     <string name="tts_settings_explainer_no_engine">Нет установленного пригодного движка синтеза речи. Установите RHVoice или eSpeak NG из F-Droid или Zapstore и выберите его ниже.</string>
     <string name="tts_settings_engine_title">Движок</string>
     <string name="tts_settings_rate_title">Скорость речи</string>
+    <string name="tts_media_mix_title">Озвучивать поверх воспроизводимого медиа</string>
+    <string name="tts_media_mix_subtitle">Запускается только при воспроизведении другого аудио; White Noise не управляет другим аудио</string>
+    <string name="tts_media_mix_volume_title">Громкость речи поверх медиа</string>
+    <string name="tts_media_mix_volume_quiet">Тихо</string>
+    <string name="tts_media_mix_volume_medium">Средне</string>
+    <string name="tts_media_mix_volume_loud">Громко</string>
+    <string name="tts_media_mix_volume_quiet_description">35 процентов громкости движка синтеза речи</string>
+    <string name="tts_media_mix_volume_medium_description">60 процентов громкости движка синтеза речи</string>
+    <string name="tts_media_mix_volume_loud_description">85 процентов громкости движка синтеза речи</string>
+    <string name="tts_media_mix_no_active_media">Включите музыку или подкаст перед озвучиванием поверх медиа</string>
+    <string name="tts_voice_title">Голос</string>
+    <string name="tts_voice_automatic">Автоматический офлайн-голос</string>
+    <string name="tts_voice_automatic_description">Использовать лучший установленный офлайн-голос для языка сообщения</string>
+    <string name="tts_voice_available_offline">Доступен офлайн</string>
+    <string name="tts_voice_invalid_identity">Нет стабильного имени голоса; выбор невозможен</string>
+    <string name="tts_voice_not_installed">Не установлен</string>
+    <string name="tts_voice_requires_network">Требуется подключение к сети; выбор невозможен</string>
+    <string name="tts_voice_ambiguous">Идентификатор голоса дублируется; выбор невозможен</string>
+    <string name="tts_voice_unavailable">Нет доступного офлайн-голоса</string>
+    <string name="tts_voice_effective_fallback">Сохранённый голос недоступен; используется %1$s</string>
     <string name="speak_aloud">Прочитать вслух</string>
     <string name="tts_bar_pause">Приостановить чтение</string>
     <string name="tts_bar_play">Продолжить чтение</string>
@@ -1656,6 +1677,7 @@
     <string name="nostr_event_failed">Не удалось загрузить это событие. Проверьте подключение и повторите попытку.</string>
     <string name="nostr_event_open">Открыть событие</string>
     <string name="nostr_event_read_article">Читать статью</string>
+    <string name="nostr_event_read_note">Прочитать заметку полностью</string>
     <string name="nostr_event_play_video">Воспроизвести видео</string>
     <string name="nostr_video_playback_failed">Не удалось воспроизвести видео.</string>
     <string name="nostr_event_copy">Копировать ссылку на событие</string>
@@ -1696,6 +1718,6 @@
     <string name="discard">Удалить</string>
     <string name="open_app_settings">Открыть настройки приложения</string>
     <string name="dictation_disclosure_title">Внешнее распознавание речи</string>
-    <string name="dictation_disclosure_message">Установленная служба распознавания обрабатывает надиктованный звук и может отправлять его своему поставщику. White Noise вставляет возвращённый текст в этот черновик для проверки и никогда не отправляет его автоматически.</string>
+    <string name="dictation_disclosure_message">Установленная служба распознавания обрабатывает надиктованный звук и может отправлять его своему поставщику. По умолчанию White Noise вставляет полученный текст в черновик; автоматическую отправку можно использовать только после явного включения в настройках диктовки.</string>
     <string name="dictation_continue">Продолжить</string>
 </resources>

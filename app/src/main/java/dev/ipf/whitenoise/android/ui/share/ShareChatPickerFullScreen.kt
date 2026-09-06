@@ -17,16 +17,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -69,7 +66,6 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
-import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
@@ -81,7 +77,6 @@ import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.launch
 
 internal const val SHARE_CHAT_PICKER_SCREEN_TEST_TAG = PerformanceTestTags.SHARE_PICKER
@@ -538,42 +533,14 @@ private fun ShareChatPickerAccountRow(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
 ) {
-    val accountTitle = pickerState.appState.networkDisplayName(account.accountIdHex)
-    val multipleAccounts = pickerState.accounts.size > 1
-    Surface(
-        onClick = { if (multipleAccounts) pickerState.accountSelectorOpen = true },
-        enabled = multipleAccounts,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
-        border = amoledSurfaceBorderStroke(),
-        modifier = modifier.testTag(SHARE_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = if (compact) 6.dp else 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Avatar(
-                title = accountTitle,
-                seed = account.accountIdHex,
-                size = if (compact) 32.dp else 40.dp,
-                pictureUrl = pickerState.appState.avatarUrl(account.accountIdHex),
-            )
-            ShareChatPickerAccountIdentity(
-                appState = pickerState.appState,
-                account = account,
-                accountTitle = accountTitle,
-                compact = compact,
-                modifier = Modifier.weight(1f),
-            )
-            if (multipleAccounts) {
-                Icon(
-                    Icons.Default.ExpandMore,
-                    contentDescription = stringResource(R.string.share_choose_sending_account),
-                )
-            }
-        }
-    }
+    ChatPickerSendingAccountRow(
+        appState = pickerState.appState,
+        account = account,
+        multipleAccounts = pickerState.accounts.size > 1,
+        onOpenSelector = { pickerState.accountSelectorOpen = true },
+        modifier = modifier,
+        compact = compact,
+    )
 }
 
 private data class ShareChatPickerTargetPresentation(

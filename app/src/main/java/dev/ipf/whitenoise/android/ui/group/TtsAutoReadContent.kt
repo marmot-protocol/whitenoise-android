@@ -59,7 +59,8 @@ internal fun TtsAutoReadGlobalDefaultRow(
                 onValueChange = onCheckedChange,
             ).semantics(mergeDescendants = true) {
                 contentDescription = "$title. $subtitle"
-            },
+            }.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {

@@ -40,6 +40,9 @@ private val ConversationTopInteractionClearance = 64.dp
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 internal fun ConversationBottomBar(
+    // Compact-height windows shrink the top bar, so the full-screen composer
+    // reserves correspondingly less clearance below it.
+    compactHeight: Boolean = false,
     selectionMode: Boolean,
     selectionActionAvailability: BatchSelectionActionAvailability,
     selectionForwardBlockedReason: ForwardBlockedReason?,
@@ -217,7 +220,12 @@ internal fun ConversationBottomBar(
                             onKeyboardRestoreFromCustomInputFailed = onKeyboardRestoreFromCustomInputFailed,
                             recentEmojis = recentEmojis,
                             onEmojiUsed = onEmojiUsed,
-                            topInteractionClearance = ConversationTopInteractionClearance,
+                            topInteractionClearance =
+                                if (compactHeight) {
+                                    compactTopClearanceFor(LocalDensity.current.fontScale)
+                                } else {
+                                    ConversationTopInteractionClearance
+                                },
                         )
                     }
                 }

@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -83,6 +85,10 @@ internal fun ConversationTopBar(
     onToggleArchived: () -> Unit,
     onRequestLeave: () -> Unit,
     onTtsTransportBodyClick: (() -> Unit)? = null,
+    // Compact-height windows (landscape with the IME open) trade top-bar
+    // height back to the transcript and composer while keeping Back, the
+    // conversation identity, and the details/menu actions reachable.
+    compactHeight: Boolean = false,
     performanceSelectorsEnabled: Boolean = BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS,
 ) {
     val liveTitle = controller.title(groupTitleCopy)
@@ -120,6 +126,12 @@ internal fun ConversationTopBar(
         } else {
             TopAppBar(
                 modifier = Modifier.testTag(CONVERSATION_TOP_BAR_TAG),
+                expandedHeight =
+                    if (compactHeight) {
+                        compactTopBarHeightFor(LocalDensity.current.fontScale)
+                    } else {
+                        TopAppBarDefaults.TopAppBarExpandedHeight
+                    },
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -141,7 +153,7 @@ internal fun ConversationTopBar(
                             group = presentedGroup,
                             title = presentedTitle,
                             seed = presentedAvatarAccount ?: presentedGroup.groupIdHex,
-                            size = 36.dp,
+                            size = if (compactHeight) 28.dp else 36.dp,
                             fallbackPictureUrl = presentedAvatarAccount?.let(appState::avatarUrl),
                             firstFrameAvatar = firstFrameAvatar,
                         )
@@ -264,7 +276,7 @@ internal fun ConversationTopBar(
                                 text = {
                                     Text(
                                         stringResource(
-                                            if (controller.group.archived) R.string.unarchive else R.string.archive,
+                                            if (controller.presentedArchived) R.string.unarchive else R.string.archive,
                                         ),
                                         style = MaterialTheme.typography.bodyLarge,
                                     )

@@ -77,8 +77,9 @@ class ConversationDictationCoordinatorTest {
         )
     }
 
+    /** Verifies terminal callbacks racing durable-service teardown release each resource exactly once. */
     @Test
-    fun lifecycleTeardownAndTerminalCallbackRaceReleaseResourcesExactlyOnce() {
+    fun durableLifecycleAndTerminalCallbackRaceReleaseResourcesExactlyOnce() {
         val teardownFirst = fixture()
         teardownFirst.controller.requestStart(ACCOUNT, GROUP, teardownFirst.draft)
         val teardownListener = teardownFirst.platform.listener
@@ -86,6 +87,10 @@ class ConversationDictationCoordinatorTest {
         teardownListener.onReady()
 
         teardownFirst.controller.onAppBackgrounded()
+        teardownFirst.controller.onTaskRemoved()
+        assertTrue(teardownFirst.controller.state is ConversationDictationState.Listening)
+        assertEquals(0, teardownFirst.releases)
+        teardownFirst.controller.cancel()
         teardownListener.onResult("late result")
         teardownListener.onError(ConversationDictationFailure.Unknown)
         teardownFirst.controller.onAppBackgrounded()
@@ -103,6 +108,7 @@ class ConversationDictationCoordinatorTest {
         val terminalListener = terminalFirst.platform.listener
         val terminalSession = terminalFirst.platform.session
 
+        terminalFirst.controller.stop()
         terminalListener.onResult("accepted")
         terminalFirst.controller.onAppBackgrounded()
         terminalFirst.controller.cancel()
@@ -130,7 +136,11 @@ class ConversationDictationCoordinatorTest {
             listener.onError(failure)
             listener.onResult("late")
 
-            assertEquals(failure, (fixture.controller.state as ConversationDictationState.Failed).reason)
+            if (failure == ConversationDictationFailure.PermissionDenied) {
+                assertTrue(fixture.controller.state is ConversationDictationState.ProviderActivityRequired)
+            } else {
+                assertEquals(failure, (fixture.controller.state as ConversationDictationState.Failed).reason)
+            }
             assertEquals("Keep", fixture.draft.text)
             assertEquals(0, fixture.writes)
             assertEquals(1, fixture.releases)
@@ -161,6 +171,7 @@ class ConversationDictationCoordinatorTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 
+    /** Verifies legal start, listen, process, success, and empty-result transitions release ownership. */
     @Test
     fun legalRecognitionTransitionsCoverSuccessAndEmptyResult() {
         val success = fixture()
@@ -184,6 +195,7 @@ class ConversationDictationCoordinatorTest {
         empty.controller.requestStart(ACCOUNT, GROUP, empty.draft)
         empty.platform.listener.onEndOfSpeech()
         assertTrue(empty.controller.state is ConversationDictationState.Processing)
+        empty.controller.stop()
         empty.platform.listener.onResult("  ")
 
         val failure = empty.controller.state as ConversationDictationState.Failed
@@ -193,6 +205,7 @@ class ConversationDictationCoordinatorTest {
         assertEquals(1, empty.releases)
     }
 
+    /** Verifies duplicate starts are inert and replacement sessions invalidate stale provider callbacks. */
     @Test
     fun duplicateStartIsRejectedAndReplacementInvalidatesOldGeneration() {
         val fixture = fixture()
@@ -212,6 +225,7 @@ class ConversationDictationCoordinatorTest {
 
         oldListener.onResult("stale")
         assertEquals(0, fixture.writes)
+        fixture.controller.stop()
         replacementListener.onResult("replacement")
 
         assertEquals("Keep replacement", fixture.draft.text)
@@ -219,6 +233,7 @@ class ConversationDictationCoordinatorTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 
+    /** Verifies navigation retains the immutable origin while actual origin removal cancels delivery. */
     @Test
     fun navigationKeepsImmutableOriginWhileTargetDisappearanceCancelsDelivery() {
         val navigation = fixture()
@@ -229,6 +244,7 @@ class ConversationDictationCoordinatorTest {
         // remains immutable until the origin receives its result.
         assertFalse(navigation.controller.isOwnedBy(ACCOUNT, OTHER_GROUP))
         assertTrue(navigation.controller.isOwnedBy(ACCOUNT, GROUP))
+        navigation.controller.stop()
         listener.onResult("origin only")
 
         assertEquals(listOf(ACCOUNT to GROUP), navigation.writeTargets)

@@ -2,14 +2,102 @@ package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import dev.ipf.marmotkit.SearchUpdateTriggerFfi
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RecipientUserSearchTest {
+    /** Query, account, and follow revisions each replace the lifecycle-bound search producer. */
+    @Test
+    fun requestKeyChangesAcrossEveryStalenessBoundary() {
+        val request =
+            RecipientSearchRequestKey(
+                query = "alice",
+                activeAccountRef = "account-a",
+                activeAccountIdHex = "aa",
+                relationshipRevision = 7L,
+            )
+
+        assertEquals(
+            5,
+            setOf(
+                request,
+                request.copy(query = "bob"),
+                request.copy(activeAccountRef = "account-b"),
+                request.copy(activeAccountIdHex = "bb"),
+                request.copy(relationshipRevision = 8L),
+            ).size,
+        )
+    }
+
+    /** A non-cancellable native read cannot publish after its query/account owner is cancelled. */
+    @Test
+    fun cancelledOwnerRejectsLateNativeValue() =
+        runTest {
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            var published: String? = null
+            val job =
+                launch {
+                    published =
+                        awaitCurrentRecipientSearchValue {
+                            withContext(NonCancellable) {
+                                started.complete(Unit)
+                                release.await()
+                                "stale result"
+                            }
+                        }
+                }
+
+            started.await()
+            job.cancel()
+            release.complete(Unit)
+            job.join()
+
+            assertNull(published)
+        }
+
+    /** A subscription returned after cancellation is closed without consuming stale updates. */
+    @Test
+    fun cancelledOpenClosesLateSubscriptionWithoutConsumption() =
+        runTest {
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val subscription = RecordingCloseable()
+            var consumed = false
+            val job =
+                launch {
+                    withClosedRecipientSearchSubscription(
+                        open = {
+                            withContext(NonCancellable) {
+                                started.complete(Unit)
+                                release.await()
+                            }
+                            subscription
+                        },
+                        consume = {
+                            consumed = true
+                        },
+                    )
+                }
+
+            started.await()
+            job.cancel()
+            release.complete(Unit)
+            job.join()
+
+            assertTrue(subscription.closed)
+            assertFalse(consumed)
+        }
+
     @Test
     fun subscriptionClosesAfterSuccessAndFailure() =
         runTest {

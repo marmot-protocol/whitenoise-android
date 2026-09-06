@@ -55,14 +55,21 @@ import dev.ipf.whitenoise.android.notifications.ConversationNotificationCategory
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationRouting
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationScope
+import dev.ipf.whitenoise.android.notifications.ConversationNotificationSettingsLaunchAttempt
+import dev.ipf.whitenoise.android.notifications.ConversationNotificationSettingsLaunchGate
+import dev.ipf.whitenoise.android.notifications.ConversationNotificationSettingsPreparation
+import dev.ipf.whitenoise.android.notifications.ConversationNotificationSettingsPreparationRequest
+import dev.ipf.whitenoise.android.notifications.ConversationNotificationSettingsPreparer
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.EffectiveConversationVibration
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.notifications.NotificationConversationDescriptor
 import dev.ipf.whitenoise.android.notifications.OverridableConversationNotificationCategory
+import dev.ipf.whitenoise.android.notifications.PreparedConversationNotificationSettingsTarget
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
-import dev.ipf.whitenoise.android.notifications.openConversationNotificationSettings
+import dev.ipf.whitenoise.android.notifications.openConversationNotificationSettingsFallback
 import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
+import dev.ipf.whitenoise.android.notifications.openPreparedConversationNotificationSettings
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
@@ -76,6 +83,17 @@ private const val MILLIS_PER_SECOND = 1_000L
 private val MUTE_ROW_MIN_HEIGHT = 56.dp
 internal const val MUTE_SWITCH_ROW_TAG = "conversation-mute-switch-row"
 
+/** Category model paired only with its short-lived, Android-owned launch readiness. */
+private data class PreparedNotificationCategorySetting(
+    val setting: ConversationNotificationCategorySetting,
+    val preparedTarget: PreparedConversationNotificationSettingsTarget?,
+    val preparationOperationId: Long?,
+)
+
+/**
+ * Shows one conversation's notification controls and begins lifecycle-scoped
+ * Android shortcut/channel preparation before category actions become usable.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("LongMethod") // Compose screen owns one cohesive settings surface.
 @Composable
@@ -182,6 +200,7 @@ internal fun ConversationNotificationSettingsScreen(
     }
 }
 
+/** Resolves routing and Android-owned launch targets as one lifecycle-cancellable pass. */
 @Composable
 private fun NotificationCategoriesSection(
     appState: WhiteNoiseAppState,
@@ -193,6 +212,7 @@ private fun NotificationCategoriesSection(
 ) {
     val routing = appState.conversationNotificationRouting
     val routingState by routing.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val accountRef = appState.activeAccountRef
     val shortcutId = remember(accountRef, groupIdHex) { accountRef?.let { conversationShortcutId(it, groupIdHex) } }
     val descriptor =
@@ -206,13 +226,36 @@ private fun NotificationCategoriesSection(
                 )
             }
         }
-    var settings by remember(shortcutId) { mutableStateOf<List<ConversationNotificationCategorySetting>>(emptyList()) }
-    LaunchedEffect(descriptor, routingState) {
+    val preparer = remember(context.applicationContext) { ConversationNotificationSettingsPreparer() }
+    var settings by remember(shortcutId) { mutableStateOf<List<PreparedNotificationCategorySetting>>(emptyList()) }
+    LaunchedEffect(descriptor, routingState, accountRef, groupIdHex, conversationAvatarUrl) {
+        // Do not leave a stale target tappable while a scope/account change is
+        // preparing its replacement Android channel.
+        settings = emptyList()
         settings =
-            if (descriptor == null) {
+            if (descriptor == null || accountRef == null) {
                 emptyList()
             } else {
-                withContext(Dispatchers.Default) { routing.settings(descriptor) }
+                val resolved = withContext(Dispatchers.Default) { routing.settings(descriptor) }
+                val requestedParents =
+                    resolved
+                        .filter { setting -> setting.settingsTarget is AndroidNotificationSettingsTarget.Conversation }
+                        .map(ConversationNotificationCategorySetting::channel)
+                val preparation =
+                    preparer.prepare(
+                        context = context.applicationContext,
+                        request =
+                            ConversationNotificationSettingsPreparationRequest(
+                                accountRef = accountRef,
+                                groupIdHex = groupIdHex,
+                                isDm = descriptor.isDm,
+                                conversationTitle = descriptor.title.orEmpty(),
+                                conversationAvatarUrl = conversationAvatarUrl,
+                                primaryVibrationPattern = descriptor.primaryVibrationPattern,
+                                requestedParents = requestedParents,
+                            ),
+                    )
+                resolved.map { setting -> setting.withPreparation(preparation) }
             }
     }
     if (descriptor == null || accountRef == null || settings.isEmpty()) {
@@ -223,10 +266,28 @@ private fun NotificationCategoriesSection(
         appState = appState,
         routing = routing,
         descriptor = descriptor,
-        accountRef = accountRef,
-        groupIdHex = groupIdHex,
-        conversationAvatarUrl = conversationAvatarUrl,
         settings = settings,
+    )
+}
+
+/** Accepts a prepared target only when it exactly matches the routing model. */
+private fun ConversationNotificationCategorySetting.withPreparation(
+    preparation: ConversationNotificationSettingsPreparation,
+): PreparedNotificationCategorySetting {
+    val expected = settingsTarget as? AndroidNotificationSettingsTarget.Conversation
+    val prepared =
+        (preparation as? ConversationNotificationSettingsPreparation.Ready)
+            ?.targetsByParentChannelId
+            ?.get(channel.id)
+            ?.takeIf { target ->
+                expected != null &&
+                    target.channelId == expected.channelId &&
+                    target.conversationShortcutId == expected.shortcutId
+            }
+    return PreparedNotificationCategorySetting(
+        setting = this,
+        preparedTarget = prepared,
+        preparationOperationId = if (expected == null) null else preparation.operationId,
     )
 }
 
@@ -239,31 +300,36 @@ private fun NotificationCategoriesLoadingRow() {
     )
 }
 
+/** Renders prepared category rows and coalesces taps until Android returns control. */
 @Composable
 private fun LoadedNotificationCategories(
     appState: WhiteNoiseAppState,
     routing: ConversationNotificationRouting,
     descriptor: NotificationConversationDescriptor,
-    accountRef: String,
-    groupIdHex: String,
-    conversationAvatarUrl: String?,
-    settings: List<ConversationNotificationCategorySetting>,
+    settings: List<PreparedNotificationCategorySetting>,
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
     var pendingChannel by remember(descriptor.shortcutId) { mutableStateOf<NotificationChannelSpec?>(null) }
+    val launchGate = remember(descriptor.shortcutId) { ConversationNotificationSettingsLaunchGate() }
+    DisposableEffect(lifecycleOwner, launchGate) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) launchGate.onResumed()
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     ConversationNotificationCategoriesList(
-        settings = settings,
+        settings = settings.map(PreparedNotificationCategorySetting::setting),
         pendingChannel = pendingChannel,
         onOpen = { setting ->
-            openCategorySettings(
-                context,
-                setting,
-                descriptor,
-                accountRef,
-                groupIdHex,
-                conversationAvatarUrl,
-            )
+            if (launchGate.tryBegin()) {
+                val preparedSetting = settings.first { candidate -> candidate.setting == setting }
+                val launch = openCategorySettings(context, preparedSetting, appState)
+                if (!launch.opened) launchGate.onLaunchFailed()
+            }
         },
         onScopeChange = { setting, useCustom ->
             val category =
@@ -288,30 +354,33 @@ private fun LoadedNotificationCategories(
     )
 }
 
+/** Launches the exact prepared target and surfaces any broader Android fallback. */
 private fun openCategorySettings(
     context: Context,
-    setting: ConversationNotificationCategorySetting,
-    descriptor: NotificationConversationDescriptor,
-    accountRef: String,
-    groupIdHex: String,
-    conversationAvatarUrl: String?,
-) {
-    when (setting.settingsTarget) {
-        is AndroidNotificationSettingsTarget.Global ->
-            openNotificationChannelSettings(context, setting.channel)
+    preparedSetting: PreparedNotificationCategorySetting,
+    appState: WhiteNoiseAppState,
+): ConversationNotificationSettingsLaunchAttempt {
+    val setting = preparedSetting.setting
+    val launch =
+        when (setting.settingsTarget) {
+            is AndroidNotificationSettingsTarget.Global ->
+                openNotificationChannelSettings(context, setting.channel)
 
-        is AndroidNotificationSettingsTarget.Conversation ->
-            openConversationNotificationSettings(
-                context = context,
-                accountRef = accountRef,
-                groupIdHex = groupIdHex,
-                isDm = descriptor.isDm,
-                parent = setting.channel,
-                conversationTitle = descriptor.title,
-                conversationAvatarUrl = conversationAvatarUrl,
-                primaryVibrationPattern = descriptor.primaryVibrationPattern,
-            )
-    }
+            is AndroidNotificationSettingsTarget.Conversation -> {
+                val preparedTarget = preparedSetting.preparedTarget
+                if (preparedTarget != null) {
+                    openPreparedConversationNotificationSettings(context, preparedTarget)
+                } else {
+                    appState.present(R.string.toast_notification_settings_unavailable)
+                    openConversationNotificationSettingsFallback(
+                        context = context,
+                        operationId = checkNotNull(preparedSetting.preparationOperationId),
+                    )
+                }
+            }
+        }
+    if (launch.usedFallback) appState.present(R.string.toast_notification_settings_unavailable)
+    return launch
 }
 
 @Composable

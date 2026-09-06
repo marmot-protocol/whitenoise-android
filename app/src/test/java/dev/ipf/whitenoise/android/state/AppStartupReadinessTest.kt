@@ -1,17 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
 class AppStartupReadinessTest {
-    @Test
-    fun staleBackgroundUnreadFoldCannotOverwriteANewerAccountList() {
-        assertTrue(startupUnreadRefreshIsCurrent(expectedRevision = 4L, currentRevision = 4L))
-        assertFalse(startupUnreadRefreshIsCurrent(expectedRevision = 4L, currentRevision = 5L))
-    }
-
+    /** Pins every startup unread publication to the current account-list lifetime. */
     @Test
     fun staleBackgroundUnreadFoldGuardsAllStatePublication() {
         val source = appStateSource()
@@ -27,13 +21,19 @@ class AppStartupReadinessTest {
     }
 
     @Test
-    fun failedRetryRestoresBootstrappingBeforeLaunchingAFullAttempt() {
-        val bootstrap = appStateSource().functionBody("bootstrap")
-        val newAttempt = bootstrap.indexOf("mutationsScope.async { bootstrapLocked() }")
-        val restorePhase = bootstrap.lastIndexOf("phase = AppPhase.Bootstrapping", startIndex = newAttempt)
+    fun onlyExplicitRetryRestoresBootstrappingBeforeAwaitingTheProcessAttempt() {
+        val source = appStateSource()
+        val bootstrap = source.functionBody("bootstrap")
+        val retry = source.functionBody("retryBootstrap")
+        val restorePhase = retry.indexOf("phase = AppPhase.Bootstrapping")
+        val awaitAttempt = retry.indexOf("bootstrap()")
 
-        assertTrue(newAttempt >= 0)
-        assertTrue(restorePhase in 0 until newAttempt)
+        assertTrue(
+            "background bootstrap must preserve an actionable failure",
+            "phase = AppPhase.Bootstrapping" !in bootstrap,
+        )
+        assertTrue(restorePhase >= 0)
+        assertTrue(awaitAttempt > restorePhase)
     }
 
     @Test
@@ -96,8 +96,8 @@ class AppStartupReadinessTest {
                 recorder.indexOf("startupFirstLocalFrameRecorded = true"),
         )
         assertTrue("The deferred fold must survive screen disposal", recorder.contains("mutationsScope.launch"))
-        assertTrue(recorder.contains("StartupUnreadRevisionGuard"))
-        assertTrue(recorder.contains("revisionGuard::isCurrent"))
+        assertTrue(recorder.contains("accountListLifetime.isCurrent"))
+        assertTrue(recorder.contains("stillCurrent = accountListIsCurrent"))
     }
 
     private fun appStateSource(): String =

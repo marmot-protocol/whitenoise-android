@@ -2,17 +2,25 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.media.AudioManager
 import dev.ipf.whitenoise.android.audio.tts.TtsAudioFocusOwner
 import dev.ipf.whitenoise.android.audio.tts.TtsController
 import dev.ipf.whitenoise.android.audio.tts.TtsTimingStore
 
+/** Wires process-wide TTS policy to local preferences and Android media state. */
 internal fun createAppTtsController(
     context: Context,
     ratePreferences: TtsRatePreferences,
+    mediaMixPreferences: TtsMediaMixPreferences,
 ): TtsController =
     TtsController(
         audioFocus = TtsAudioFocusOwner(context),
         speechRate = { ratePreferences.resolvedRate() },
+        mediaMixEnabled = { mediaMixPreferences.state.value.enabled },
+        mediaMixVolume = { mediaMixPreferences.state.value.volume.frameworkVolume },
+        isMediaPlaybackActive = {
+            context.applicationContext.getSystemService(AudioManager::class.java)?.isMusicActive == true
+        },
         timingStore = TtsTimingPreferences(context),
     )
 

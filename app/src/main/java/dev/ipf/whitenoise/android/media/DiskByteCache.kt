@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media
 
+import dev.ipf.whitenoise.android.state.StalenessGuard
 import java.io.Closeable
 import java.io.File
 import java.io.FileInputStream
@@ -27,8 +28,8 @@ internal fun interface DiskByteCacheKeyProvider {
 
 /** Captures wipe and expiry-sweep state for a deferred cache publication. */
 internal data class DiskByteCachePublicationToken(
-    val generation: Int,
-    val expirySweepEpoch: Int,
+    val generation: Long,
+    val expirySweepEpoch: Long,
 )
 
 /** Owner-private authenticated plaintext materialization. Closing deletes it. */
@@ -137,11 +138,11 @@ internal class DiskByteCache(
     // Bumped on every clear(). A deferred put() captures this at schedule time
     // and is rejected if a wipe intervened, so decrypted plaintext from a
     // signed-out session can't be re-persisted after sign-out. See #154.
-    private var generation = 0
+    private val cacheLifetime = StalenessGuard()
 
     // Bumped at the start of every non-empty removeByCiphertextTags sweep so an
     // in-flight put cannot publish after expiry metadata was invalidated.
-    private var expirySweepEpoch = 0
+    private val expirySweeps = StalenessGuard()
     private val entryByteLimit = minOf(maxBytes, maxEntryBytes).coerceAtLeast(1L)
 
     // No directory I/O in the constructor. AppState calls prepare() on
@@ -151,6 +152,7 @@ internal class DiskByteCache(
     /** Performs deferred disk initialization. Call from an I/O dispatcher. */
     fun prepare() = ensureHydrated()
 
+    /** Installs one authenticated cold-start index unless a concurrent clear supersedes it. */
     private fun ensureHydrated() {
         if (synchronized(this) { hydrated && legacyPlaintextWiped }) return
         synchronized(hydrationLock) {
@@ -159,11 +161,11 @@ internal class DiskByteCache(
             val generationAtStart =
                 synchronized(this) {
                     if (legacyCleanupComplete) legacyPlaintextWiped = true
-                    if (hydrated) null else generation
+                    if (hydrated) null else cacheLifetime.capture()
                 } ?: return
             val snapshot = buildHydratedIndex(generationAtStart)
             synchronized(this) install@{
-                if (hydrated || generation != generationAtStart) return@install
+                if (hydrated || !cacheLifetime.isCurrent(generationAtStart)) return@install
                 index.clear()
                 index.putAll(snapshot.index)
                 unresolvedEnvelopes.clear()
@@ -210,8 +212,8 @@ internal class DiskByteCache(
     /** Returns only entries that are safe to promote into the bounded plaintext L1. */
     fun getIfSmall(key: String): ByteArray? = getInternal(key, smallOnly = true)
 
-    @Suppress("CyclomaticComplexMethod", "ReturnCount")
     /** Authenticates and reads one entry while preserving recoverable misses on resource pressure. */
+    @Suppress("CyclomaticComplexMethod", "ReturnCount")
     private fun getInternal(
         key: String,
         smallOnly: Boolean,
@@ -224,7 +226,7 @@ internal class DiskByteCache(
         ensureHydrated()
         val (entry, generationAtLookup) =
             synchronized(this) {
-                (index[hashed] ?: return null) to generation
+                (index[hashed] ?: return null) to cacheLifetime.capture()
             }
         if (smallOnly && entry.plaintextSize > maxInMemoryEntryBytes) return null
         return try {
@@ -236,7 +238,7 @@ internal class DiskByteCache(
                 // so re-check before handing back plaintext for a session that
                 // was wiped mid-read. Mirrors put()'s write-side guard (#154).
                 // See #376.
-                if (generation != generationAtLookup || index[hashed] !== entry) return null
+                if (!cacheLifetime.isCurrent(generationAtLookup) || index[hashed] !== entry) return null
             }
             // The post-restart LRU rebuild uses file lastModified as the recency
             // proxy, so a read must touch it or frequently-read entries look stale
@@ -289,7 +291,7 @@ internal class DiskByteCache(
         ensureHydrated()
         val (entry, generationAtLookup) =
             synchronized(this) {
-                (index[hashed] ?: return null) to generation
+                (index[hashed] ?: return null) to cacheLifetime.capture()
             }
         val tmp = uniqueTmpFile(hashed, "lease")
         var leased = false
@@ -313,7 +315,7 @@ internal class DiskByteCache(
             afterLeasePlaintextWritten()
             cancellationCheck()
             synchronized(this) {
-                if (generation != generationAtLookup || index[hashed] !== entry) return null
+                if (!cacheLifetime.isCurrent(generationAtLookup) || index[hashed] !== entry) return null
             }
             entry.file.setLastModified(System.currentTimeMillis())
             leased = true
@@ -359,7 +361,16 @@ internal class DiskByteCache(
 
     /** Captures the wipe and expiry generations that a deferred publication must match. */
     @Synchronized
-    fun capturePublicationToken(): DiskByteCachePublicationToken = DiskByteCachePublicationToken(generation, expirySweepEpoch)
+    fun capturePublicationToken(): DiskByteCachePublicationToken =
+        DiskByteCachePublicationToken(
+            generation = cacheLifetime.capture(),
+            expirySweepEpoch = expirySweeps.capture(),
+        )
+
+    /** Checks both invalidation dimensions carried by a deferred publication. */
+    private fun publicationTokenIsCurrent(token: DiskByteCachePublicationToken): Boolean =
+        cacheLifetime.isCurrent(token.generation) &&
+            expirySweeps.isCurrent(token.expirySweepEpoch)
 
     /** Encrypts and atomically publishes bounded plaintext under a captured invalidation token. */
     fun put(
@@ -371,7 +382,7 @@ internal class DiskByteCache(
         if (bytes.isEmpty()) return
         if (bytes.size.toLong() > entryByteLimit) return
         synchronized(this) {
-            if (token.generation != generation || token.expirySweepEpoch != expirySweepEpoch) return
+            if (!publicationTokenIsCurrent(token)) return
         }
         afterPutEpochCaptured()
         ensureHydrated()
@@ -379,7 +390,7 @@ internal class DiskByteCache(
         val file = File(cacheDir, hashed)
         val putContext =
             synchronized(this) {
-                if (token.generation != generation || token.expirySweepEpoch != expirySweepEpoch) return
+                if (!publicationTokenIsCurrent(token)) return
                 cacheDir.mkdirs()
                 val tmp = uniqueTmpFile(hashed.removeSuffix(SUFFIX), "enc")
                 val output =
@@ -423,8 +434,7 @@ internal class DiskByteCache(
             // rather than re-persisting plaintext for a wiped session. See #154,
             // #1033.
             if (
-                token.generation != generation ||
-                token.expirySweepEpoch != expirySweepEpoch ||
+                !publicationTokenIsCurrent(token) ||
                 index[hashed] !== putContext.existingSnapshot ||
                 unresolvedEnvelopes.contains(hashed) != putContext.unresolvedAtStart
             ) {
@@ -506,7 +516,7 @@ internal class DiskByteCache(
         val stale = mutableListOf<Pair<String, List<File>>>()
         val removed =
             synchronized(this) {
-                expirySweepEpoch++
+                expirySweeps.advance()
                 var removed = 0
                 val iterator = index.entries.iterator()
                 while (iterator.hasNext()) {
@@ -580,16 +590,17 @@ internal class DiskByteCache(
         return evicted
     }
 
+    /** Wipes every cache surface and invalidates reads, writes, sweeps, and filename memoization. */
     @Synchronized
     fun clear() {
         // Bump first so any put scheduled against the prior generation is
         // rejected even if it grabs this lock right after the wipe. See #154.
-        generation++
+        cacheLifetime.advance()
         // The memo retains raw cache-key strings, which can carry account and
         // blob identifiers — drop them with the rest of the account's data.
         // The epoch bump rejects re-inserts from lookups mid-hash right now.
         synchronized(fileNameMemo) {
-            fileNameMemoEpoch++
+            fileNameMemoLifetime.advance()
             fileNameMemo.clear()
         }
         // Hold the lock for the whole wipe. Deleting outside it (an earlier
@@ -672,13 +683,13 @@ internal class DiskByteCache(
 
     /** Deletes stale startup artifacts only while the observed cache generation remains current. */
     private fun deleteHydrationArtifactsIfGenerationMatches(
-        generationAtStart: Int,
+        generationAtStart: Long,
         files: List<File>,
         pauseBeforeDelete: () -> Unit = {},
     ) {
         pauseBeforeDelete()
         synchronized(this) {
-            if (generation != generationAtStart) return
+            if (!cacheLifetime.isCurrent(generationAtStart)) return
             files.forEach { file ->
                 runCatching { file.delete() }.onFailure {
                     android.util.Log.w("DiskByteCache", "failed to delete hydration artifact")
@@ -688,7 +699,7 @@ internal class DiskByteCache(
     }
 
     /** Reconstructs authenticated index metadata without exposing plaintext during startup. */
-    private fun buildHydratedIndex(generationAtStart: Int): HydratedIndex {
+    private fun buildHydratedIndex(generationAtStart: Long): HydratedIndex {
         val hydratedIndex = LinkedHashMap<String, Entry>(8, 0.75f, true)
         val unresolvedDuringHydration = mutableSetOf<String>()
         var hydratedBytes = 0L
@@ -1081,8 +1092,8 @@ internal class DiskByteCache(
             }
         }
 
-    @Throws(GeneralSecurityException::class, IOException::class)
     /** Authenticates an envelope and streams its plaintext into an owner-private file. */
+    @Throws(GeneralSecurityException::class, IOException::class)
     private fun readEncryptedTo(
         file: File,
         fileName: String,
@@ -1281,13 +1292,14 @@ internal class DiskByteCache(
             message == "invalid decrypted cache chunk length" ||
             message == "encrypted cache payload exceeds entry limit"
 
+    /** Removes a corrupt envelope only if it is still the entry that failed authentication. */
     private fun evictPoisonedEntry(
         fileName: String,
         entry: Entry,
-        generationAtLookup: Int,
+        generationAtLookup: Long,
     ) {
         synchronized(this) {
-            if (generation != generationAtLookup || index[fileName] !== entry) return
+            if (!cacheLifetime.isCurrent(generationAtLookup) || index[fileName] !== entry) return
             if (entry.file.exists() && !entry.file.delete()) return
             runCatching { legacyTagFileFor(entry.file, SUFFIX).delete() }
             index.remove(fileName)
@@ -1302,7 +1314,7 @@ internal class DiskByteCache(
     // lookup that was hashing while clear() ran must not re-insert its key,
     // or account/blob identifiers would stay reachable after a wipe.
     private val fileNameMemo = LinkedHashMap<String, String>(16, 0.75f, true)
-    private var fileNameMemoEpoch = 0L
+    private val fileNameMemoLifetime = StalenessGuard()
 
     /** Reports memo occupancy for bounded-key-retention regression tests. */
     internal fun memoizedFileNameKeyCount(): Int = synchronized(fileNameMemo) { fileNameMemo.size }
@@ -1312,7 +1324,7 @@ internal class DiskByteCache(
         val epochAtLookup =
             synchronized(fileNameMemo) {
                 fileNameMemo[key]?.let { return it }
-                fileNameMemoEpoch
+                fileNameMemoLifetime.capture()
             }
         val md = MessageDigest.getInstance("SHA-256")
         val digest = md.digest(key.toByteArray(Charsets.UTF_8))
@@ -1325,7 +1337,7 @@ internal class DiskByteCache(
         val fileName = sb.toString()
         afterFileNameHashed()
         synchronized(fileNameMemo) {
-            if (fileNameMemoEpoch == epochAtLookup) {
+            if (fileNameMemoLifetime.isCurrent(epochAtLookup)) {
                 fileNameMemo[key] = fileName
                 if (fileNameMemo.size > FILE_NAME_MEMO_MAX_KEYS) {
                     val eldest = fileNameMemo.keys.iterator()

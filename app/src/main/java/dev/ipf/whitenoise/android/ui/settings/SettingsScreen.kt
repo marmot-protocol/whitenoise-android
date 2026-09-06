@@ -6,12 +6,14 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,6 +27,7 @@ import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.KeyboardVoice
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
@@ -56,7 +59,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,8 +77,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
@@ -91,6 +100,7 @@ import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 internal enum class SettingsHomeSection {
@@ -111,10 +121,72 @@ internal enum class SettingsHomeRow {
     DataAndStorage,
     Notifications,
     TextToSpeech,
+    Dictation,
     DevicePrivacy,
     AiAgents,
     Help,
 }
+
+/**
+ * Saveable position of the Settings home list, anchored by stable section key
+ * so optional sections can change without restoring an unrelated viewport.
+ */
+internal data class SettingsHomeViewport(
+    val section: SettingsHomeSection?,
+    val fallbackIndex: Int,
+    val scrollOffset: Int,
+) {
+    /** Resolves the saved key first and uses a clamped index only as fallback. */
+    fun resolveIndex(sections: List<SettingsHomeSection>): Int {
+        if (sections.isEmpty()) return 0
+        val keyedIndex = section?.let(sections::indexOf)?.takeIf { it >= 0 }
+        return keyedIndex ?: fallbackIndex.coerceIn(0, sections.lastIndex)
+    }
+
+    companion object {
+        val Top = SettingsHomeViewport(SettingsHomeSection.Account, fallbackIndex = 0, scrollOffset = 0)
+
+        /** Saver used only for the lifecycle-scoped Settings visit. */
+        val Saver: Saver<SettingsHomeViewport, Any> =
+            listSaver(
+                save = { listOf(it.section?.name.orEmpty(), it.fallbackIndex, it.scrollOffset) },
+                restore = { saved ->
+                    SettingsHomeViewport(
+                        section =
+                            saved[0]
+                                .toString()
+                                .takeIf(String::isNotEmpty)
+                                ?.let { name -> runCatching { SettingsHomeSection.valueOf(name) }.getOrNull() },
+                        fallbackIndex = saved[1] as Int,
+                        scrollOffset = saved[2] as Int,
+                    )
+                },
+            )
+    }
+}
+
+/** Shell-level lifecycle events that either retain or retire a Settings visit. */
+internal enum class SettingsHomeViewportEvent {
+    OpenDiagnostics,
+    OpenNewSettingsVisit,
+    ExitSettings,
+    OpenConversation,
+    ChangeAccount,
+}
+
+/** Applies the Settings-visit ownership policy to a captured home viewport. */
+internal fun reduceSettingsHomeViewport(
+    current: SettingsHomeViewport,
+    event: SettingsHomeViewportEvent,
+): SettingsHomeViewport =
+    when (event) {
+        SettingsHomeViewportEvent.OpenDiagnostics -> current
+        SettingsHomeViewportEvent.OpenNewSettingsVisit,
+        SettingsHomeViewportEvent.ExitSettings,
+        SettingsHomeViewportEvent.OpenConversation,
+        SettingsHomeViewportEvent.ChangeAccount,
+        -> SettingsHomeViewport.Top
+    }
 
 @Stable
 internal data class SettingsHomeState(
@@ -152,6 +224,7 @@ internal fun settingsHomeState(
                 SettingsHomeRow.DataAndStorage,
                 SettingsHomeRow.Notifications,
                 SettingsHomeRow.TextToSpeech,
+                SettingsHomeRow.Dictation,
                 SettingsHomeRow.DevicePrivacy,
                 SettingsHomeRow.AiAgents,
                 SettingsHomeRow.Help,
@@ -196,6 +269,8 @@ internal fun SettingsScreen(
     onOpenSupportChat: (ChatListItem) -> Unit,
     detail: SettingsDetail?,
     onDetailChange: (SettingsDetail?) -> Unit,
+    homeViewport: SettingsHomeViewport,
+    onHomeViewportChange: (SettingsHomeViewport) -> Unit,
 ) {
     // Issue #121: the prior shape only handled back from a detail
     // subscreen; when on the Settings home (detail == null) the system
@@ -230,6 +305,7 @@ internal fun SettingsScreen(
         SettingsDetail.AiAgents -> AiAgentsScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Donate -> DonateScreen(onBack = { onDetailChange(null) })
         SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Dictation -> DictationSettingsScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.ChatFolders -> ChatFoldersScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Help ->
             HelpScreen(
@@ -256,6 +332,8 @@ internal fun SettingsScreen(
                 onBackToChats = onBackToChats,
                 onOpenDetail = { onDetailChange(it) },
                 onOpenSupportChat = onOpenSupportChat,
+                viewport = homeViewport,
+                onViewportChange = onHomeViewportChange,
             )
     }
 }
@@ -289,6 +367,8 @@ private fun SettingsHomeScreen(
     onBackToChats: () -> Unit,
     onOpenDetail: (SettingsDetail) -> Unit,
     onOpenSupportChat: (ChatListItem) -> Unit,
+    viewport: SettingsHomeViewport,
+    onViewportChange: (SettingsHomeViewport) -> Unit,
 ) {
     var qrAccountId by remember { mutableStateOf<String?>(null) }
     var showAccountSelector by remember { mutableStateOf(false) }
@@ -339,6 +419,8 @@ private fun SettingsHomeScreen(
         onOpenQr = { qrAccountId = activeAccount?.accountIdHex },
         onOpenDetail = onOpenDetail,
         onChatWithSupport = ::startSupportChat,
+        viewport = viewport,
+        onViewportChange = onViewportChange,
         onAppUpdateAction = {
             scope.launch {
                 // Await the check before acting so the first tap uses a fresh result.
@@ -389,13 +471,38 @@ internal fun SettingsHomeContent(
     onOpenDetail: (SettingsDetail) -> Unit,
     onAppUpdateAction: () -> Unit,
     onChatWithSupport: () -> Unit = {},
+    viewport: SettingsHomeViewport = SettingsHomeViewport.Top,
+    onViewportChange: (SettingsHomeViewport) -> Unit = {},
 ) {
+    val currentOnViewportChange by rememberUpdatedState(onViewportChange)
+    val listState =
+        rememberLazyListState(
+            initialFirstVisibleItemIndex = viewport.resolveIndex(state.sections),
+            initialFirstVisibleItemScrollOffset = viewport.scrollOffset.coerceAtLeast(0),
+        )
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val index = listState.firstVisibleItemIndex
+            val section =
+                listState.layoutInfo.visibleItemsInfo
+                    .firstOrNull { it.index == index }
+                    ?.key
+                    ?.toString()
+                    ?.let { key -> runCatching { SettingsHomeSection.valueOf(key) }.getOrNull() }
+            SettingsHomeViewport(
+                section = section,
+                fallbackIndex = index,
+                scrollOffset = listState.firstVisibleItemScrollOffset,
+            )
+        }.distinctUntilChanged().collect(currentOnViewportChange)
+    }
     Scaffold(
         modifier = Modifier.testTag(SETTINGS_HOME_CONTENT_TAG),
         topBar = { SettingsTopBar(onBackToChats = onBackToChats) },
     ) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding).padding(horizontal = Dimens.spaceLg),
+            state = listState,
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
         ) {
             state.sections.forEach { section ->
@@ -517,6 +624,7 @@ private fun SettingsGroupScope.settingsHomeRows(
                 SettingsHomeRow.DataAndStorage -> SettingsDetail.Data
                 SettingsHomeRow.Notifications -> SettingsDetail.Notifications
                 SettingsHomeRow.TextToSpeech -> SettingsDetail.TextToSpeech
+                SettingsHomeRow.Dictation -> SettingsDetail.Dictation
                 SettingsHomeRow.DevicePrivacy -> SettingsDetail.DevicePrivacy
                 SettingsHomeRow.AiAgents -> SettingsDetail.AiAgents
                 SettingsHomeRow.Help -> SettingsDetail.Help
@@ -534,6 +642,7 @@ private fun SettingsGroupScope.settingsHomeRows(
                         SettingsHomeRow.DataAndStorage -> stringResource(R.string.data_and_storage)
                         SettingsHomeRow.Notifications -> stringResource(R.string.notifications)
                         SettingsHomeRow.TextToSpeech -> stringResource(R.string.tts_settings_title)
+                        SettingsHomeRow.Dictation -> stringResource(R.string.dictation_settings_title)
                         SettingsHomeRow.DevicePrivacy -> stringResource(R.string.device_privacy)
                         SettingsHomeRow.AiAgents -> stringResource(R.string.ai_agents)
                         SettingsHomeRow.Help -> stringResource(R.string.help)
@@ -549,6 +658,7 @@ private fun SettingsGroupScope.settingsHomeRows(
                         SettingsHomeRow.DataAndStorage -> stringResource(R.string.data_and_storage_settings_subtitle)
                         SettingsHomeRow.Notifications -> stringResource(R.string.notifications_settings_subtitle)
                         SettingsHomeRow.TextToSpeech -> stringResource(R.string.tts_settings_subtitle)
+                        SettingsHomeRow.Dictation -> stringResource(R.string.dictation_settings_subtitle)
                         SettingsHomeRow.DevicePrivacy -> stringResource(R.string.device_privacy_settings_subtitle)
                         SettingsHomeRow.AiAgents -> stringResource(R.string.ai_agents_settings_subtitle)
                         SettingsHomeRow.Help -> stringResource(R.string.help_settings_subtitle)
@@ -564,6 +674,7 @@ private fun SettingsGroupScope.settingsHomeRows(
                         SettingsHomeRow.DataAndStorage -> Icons.Filled.Storage
                         SettingsHomeRow.Notifications -> Icons.Filled.Notifications
                         SettingsHomeRow.TextToSpeech -> Icons.Filled.RecordVoiceOver
+                        SettingsHomeRow.Dictation -> Icons.Filled.KeyboardVoice
                         SettingsHomeRow.DevicePrivacy -> Icons.Filled.Shield
                         SettingsHomeRow.AiAgents -> Icons.Filled.SmartToy
                         SettingsHomeRow.Help -> Icons.Filled.Help
@@ -606,23 +717,44 @@ internal fun SelectableSettingsRow(
     )
 }
 
-// A selectable row that also shows a supporting line (e.g. the approximate
-// per-photo size delta) under the title. Mirrors [SelectableSettingsRow] but
-// with a subtitle slot.
+/**
+ * Selectable row with supporting copy and optional merged accessibility text.
+ * Disabled choices remain visible so the supporting line can explain why.
+ */
 @Composable
 internal fun SelectableSettingsRowWithSubtitle(
     title: String,
     subtitle: String,
     selected: Boolean,
+    enabled: Boolean = true,
+    accessibilityLabel: String? = null,
     onClick: () -> Unit,
 ) {
+    val rowModifier =
+        Modifier
+            .settingsRowAmoledSurfaceBorder()
+            .selectable(
+                selected = selected,
+                enabled = enabled,
+                onClick = onClick,
+                role = Role.RadioButton,
+            )
     ListItem(
         modifier =
-            Modifier
-                .settingsRowAmoledSurfaceBorder()
-                .selectable(selected = selected, onClick = onClick, role = Role.RadioButton),
+            if (accessibilityLabel == null) {
+                rowModifier
+            } else {
+                rowModifier.semantics(mergeDescendants = true) {
+                    contentDescription = accessibilityLabel
+                }
+            },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        headlineContent = { Text(title) },
+        headlineContent = {
+            Text(
+                title,
+                color = if (enabled) Color.Unspecified else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
         supportingContent = {
             Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
         },
@@ -631,13 +763,19 @@ internal fun SelectableSettingsRowWithSubtitle(
                 Icon(
                     Icons.Default.Check,
                     contentDescription = stringResource(R.string.selected),
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint =
+                        if (enabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                 )
             }
         },
     )
 }
 
+/** Renders a settings toggle with optional in-row padding for segmented lists. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun SettingsSwitchRow(
@@ -647,13 +785,17 @@ internal fun SettingsSwitchRow(
     enabled: Boolean = true,
     busy: Boolean = false,
     switchModifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    contentSpacing: Dp = 0.dp,
     icon: ImageVector? = null,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
-            .settingsRowAmoledSurfaceBorder(),
+            .settingsRowAmoledSurfaceBorder()
+            .padding(contentPadding),
+        horizontalArrangement = Arrangement.spacedBy(contentSpacing),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {

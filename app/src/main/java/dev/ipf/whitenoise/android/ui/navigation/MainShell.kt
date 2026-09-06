@@ -83,9 +83,13 @@ import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.rememberConversationControllerCopy
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
+import dev.ipf.whitenoise.android.ui.conversation.media.attachmentInstallerHandoffEffect
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
+import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewport
+import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewportEvent
 import dev.ipf.whitenoise.android.ui.settings.SettingsScreen
+import dev.ipf.whitenoise.android.ui.settings.reduceSettingsHomeViewport
 import dev.ipf.whitenoise.android.ui.share.ShareChatPickerFullScreen
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -341,6 +345,7 @@ internal fun MainShell(
     inboundAppUpdateTap: Int = 0,
     onAppUpdateTapHandled: (Int) -> Unit = {},
 ) {
+    attachmentInstallerHandoffEffect(appState)
     val shellStateHolder =
         remember(appState, stateHolder) {
             stateHolder ?: MainShellStateHolder(appState, SavedStateHandle())
@@ -420,6 +425,7 @@ internal fun MainShell(
             val activated =
                 appState.setActiveAccount(
                     label = targetAccountRef,
+                    preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
                     shouldActivate = {
                         quickAccountSwitchRequestIsCurrent(
                             transition = quickAccountSwitchTransition,
@@ -436,6 +442,10 @@ internal fun MainShell(
     shellStateHolder.restoreConversationIfReady(chatsController, appState.activeAccountRef)
     var sectionName by rememberSaveable { mutableStateOf(MainSection.Chats.name) }
     var settingsDetailName by rememberSaveable { mutableStateOf<String?>(null) }
+    var settingsHomeViewport by
+        rememberSaveable(stateSaver = SettingsHomeViewport.Saver) {
+            mutableStateOf(SettingsHomeViewport.Top)
+        }
     var selectedChat by shellStateHolder.selectedChat
     // Retain the complete outgoing route for the short back-slide. Account pin,
     // controller and decrypted seed are one ownership unit; retaining only the
@@ -834,6 +844,8 @@ internal fun MainShell(
         fun commitNotificationConversationOpen(chatItem: ChatListItem) {
             sectionName = MainSection.Chats.name
             settingsDetailName = null
+            settingsHomeViewport =
+                reduceSettingsHomeViewport(settingsHomeViewport, SettingsHomeViewportEvent.OpenConversation)
             shellNavState =
                 reduceShellNavigation(
                     shellNavState,
@@ -1004,7 +1016,7 @@ internal fun MainShell(
                             loadTarget = {
                                 NotificationRouteTrace.tracePhase(
                                     requestId = routingRequestId,
-                                    sectionName = NotificationRouteTraceSection.GROUP_DETAILS,
+                                    sectionName = NotificationRouteTraceSection.TARGET_PROJECTION,
                                 ) {
                                     appState.preloadNotificationChatListItem(
                                         accountRef = preloadKey.accountRef,
@@ -1021,7 +1033,7 @@ internal fun MainShell(
                             // Published before activation completes: a ready
                             // local read re-fires the routing effect, which
                             // commits the conversation open immediately while
-                            // the switch keeps settling behind it (#586).
+                            // the switch keeps settling behind it.
                             onPreload = {
                                 notificationMessagePreload = it
                             },
@@ -1107,7 +1119,7 @@ internal fun MainShell(
                                     loadNotificationMessageDirectly {
                                         NotificationRouteTrace.tracePhase(
                                             requestId = routingRequestId,
-                                            sectionName = NotificationRouteTraceSection.GROUP_DETAILS,
+                                            sectionName = NotificationRouteTraceSection.TARGET_PROJECTION,
                                         ) {
                                             appState.loadNotificationChatListItem(
                                                 accountRef = target.accountRef,
@@ -1147,7 +1159,7 @@ internal fun MainShell(
                                 loadNotificationMessageDirectly {
                                     NotificationRouteTrace.tracePhase(
                                         requestId = routingRequestId,
-                                        sectionName = NotificationRouteTraceSection.GROUP_DETAILS,
+                                        sectionName = NotificationRouteTraceSection.TARGET_PROJECTION,
                                     ) {
                                         appState.loadNotificationChatListItem(
                                             accountRef = target.accountRef,
@@ -1520,6 +1532,8 @@ internal fun MainShell(
             selectedChatListFolderId = null
             sectionName = MainSection.Chats.name
             settingsDetailName = null
+            settingsHomeViewport =
+                reduceSettingsHomeViewport(settingsHomeViewport, SettingsHomeViewportEvent.ChangeAccount)
         }
         previousActiveAccountRef = nextNavAccountRef(previousActiveAccountRef, current)
     }
@@ -2267,6 +2281,11 @@ internal fun MainShell(
                                     supersedePendingGroupCreateOpen()
                                     sectionName = MainSection.Settings.name
                                     settingsDetailName = null
+                                    settingsHomeViewport =
+                                        reduceSettingsHomeViewport(
+                                            settingsHomeViewport,
+                                            SettingsHomeViewportEvent.OpenNewSettingsVisit,
+                                        )
                                 },
                                 onOpenGroup = { item, focusMessageId, justCreated, visibleHeadId ->
                                     commitExplicitConversationOpen(item.group.groupIdHex)
@@ -2298,12 +2317,22 @@ internal fun MainShell(
                                 onBackToChats = {
                                     sectionName = MainSection.Chats.name
                                     settingsDetailName = null
+                                    settingsHomeViewport =
+                                        reduceSettingsHomeViewport(
+                                            settingsHomeViewport,
+                                            SettingsHomeViewportEvent.ExitSettings,
+                                        )
                                 },
                                 onOpenDiagnostics = {
                                     // Preserve `settingsDetailName` so backing out of
                                     // Diagnostics returns to Developer (its only entry point)
                                     // rather than the Settings home, restoring the breadcrumb
                                     // the user walked in on (#412).
+                                    settingsHomeViewport =
+                                        reduceSettingsHomeViewport(
+                                            settingsHomeViewport,
+                                            SettingsHomeViewportEvent.OpenDiagnostics,
+                                        )
                                     sectionName = MainSection.Diagnostics.name
                                 },
                                 onOpenSupportChat = { item ->
@@ -2314,9 +2343,16 @@ internal fun MainShell(
                                     selectedChat = item
                                     sectionName = MainSection.Chats.name
                                     settingsDetailName = null
+                                    settingsHomeViewport =
+                                        reduceSettingsHomeViewport(
+                                            settingsHomeViewport,
+                                            SettingsHomeViewportEvent.OpenConversation,
+                                        )
                                 },
                                 detail = settingsDetail,
                                 onDetailChange = { settingsDetailName = it?.name },
+                                homeViewport = settingsHomeViewport,
+                                onHomeViewportChange = { settingsHomeViewport = it },
                             )
                         MainSection.Diagnostics ->
                             DiagnosticsScreen(

@@ -53,11 +53,3 @@ internal class BootstrapRuntimeCoordinator<T : Any> {
             opened
         }
 }
-
-/** Rejects deferred unread work once a newer account snapshot supersedes it. */
-internal class StartupUnreadRevisionGuard(
-    private val expectedRevision: Long,
-    private val currentRevision: () -> Long,
-) {
-    fun isCurrent(): Boolean = startupUnreadRefreshIsCurrent(expectedRevision, currentRevision())
-}

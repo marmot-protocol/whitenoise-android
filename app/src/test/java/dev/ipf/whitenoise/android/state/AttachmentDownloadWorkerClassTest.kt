@@ -239,7 +239,7 @@ class AttachmentDownloadWorkerClassTest {
     private fun testRequest(): AttachmentTransferRequest =
         AttachmentTransferRequest(
             accountRef = "account-a",
-            groupIdHex = "ab".repeat(32),
+            groupIdHex = "ab".repeat(16),
             messageIdHex = "cd".repeat(32),
             attachmentIndex = 0,
         )

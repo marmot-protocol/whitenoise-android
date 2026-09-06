@@ -3,22 +3,17 @@ package dev.ipf.whitenoise.android.notifications
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import android.util.Log
-import android.widget.Toast
 import androidx.core.app.Person
 import androidx.core.content.LocusIdCompat
 import androidx.core.content.pm.ShortcutInfoCompat
-import androidx.core.content.pm.ShortcutManagerCompat
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import java.security.MessageDigest
 
 private const val CONVERSATION_SHORTCUT_LABEL_MAX_LENGTH = 24
-private const val TAG = "ConversationSettings"
 
 internal fun notificationChannelSettingsIntent(
     context: Context,
@@ -33,17 +28,19 @@ internal fun notificationChannelSettingsIntent(
         appNotificationSettingsIntent(context)
     }
 
+/** Opens one global channel and reports whether Android required a broader fallback. */
 internal fun openNotificationChannelSettings(
     context: Context,
     channel: NotificationChannelSpec,
-) {
-    val opened =
-        context.tryStartActivity(notificationChannelSettingsIntent(context, channel.id)) ||
-            context.tryStartActivity(appNotificationSettingsIntent(context)) ||
-            context.tryStartActivity(appDetailsSettingsIntent(context))
-    if (!opened) {
-        Toast.makeText(context, R.string.toast_notification_settings_unavailable, Toast.LENGTH_SHORT).show()
-    }
+    trace: ConversationNotificationSettingsTrace = defaultConversationNotificationSettingsTrace,
+): ConversationNotificationSettingsLaunchAttempt {
+    val clickTrace = trace.clickReceived()
+    return launchNotificationSettingsIntent(
+        context = context,
+        preferred = notificationChannelSettingsIntent(context, channel.id),
+        clickTrace = clickTrace,
+        trace = trace,
+    )
 }
 
 internal fun conversationShortcutId(
@@ -75,109 +72,6 @@ internal fun conversationNotificationSettingsIntent(
     }
     return appNotificationSettingsIntent(context)
 }
-
-internal fun openConversationNotificationSettings(
-    context: Context,
-    accountRef: String,
-    groupIdHex: String,
-    isDm: Boolean,
-    parent: NotificationChannelSpec? = null,
-    conversationTitle: String? = null,
-    conversationAvatarUrl: String? = null,
-    primaryVibrationPattern: ConversationVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
-) {
-    val shortcutId = conversationShortcutId(accountRef, groupIdHex)
-    val targetParent = parent ?: ConversationNotificationChannels.primaryMessageParent(isDm)
-    var channelConversationTitle = conversationTitle
-    var activeChannelId: String? = null
-    if (shortcutId != null) {
-        channelConversationTitle =
-            conversationTitle?.trim()?.takeIf(String::isNotEmpty)?.let { title ->
-                publishConversationSettingsShortcut(
-                    context = context,
-                    shortcutId = shortcutId,
-                    accountRef = accountRef,
-                    groupIdHex = groupIdHex,
-                    title = title,
-                    avatarUrl = conversationAvatarUrl,
-                )
-            } ?: conversationTitle
-        // Keep the required message child available for Android's People UI.
-        // Optional event children are created only for the requested custom
-        // target below; merely opening an inherited row must not create them.
-        ConversationNotificationChannels.ensureConversationChannels(
-            context = context,
-            conversationShortcutId = shortcutId,
-            isDm = isDm,
-            conversationTitle = channelConversationTitle,
-            primaryVibrationPattern = primaryVibrationPattern,
-        )
-        val targetPattern =
-            if (targetParent == ConversationNotificationChannels.primaryMessageParent(isDm)) {
-                primaryVibrationPattern
-            } else {
-                ConversationVibrationPattern.SYSTEM_DEFAULT
-            }
-        activeChannelId =
-            ConversationNotificationChannels.ensureConversationChannel(
-                context = context,
-                parentChannelId = targetParent.id,
-                conversationShortcutId = shortcutId,
-                conversationTitle = channelConversationTitle,
-                vibrationPattern = targetPattern,
-            )
-    }
-    val preferred =
-        conversationNotificationSettingsIntent(
-            context = context,
-            accountRef = accountRef,
-            groupIdHex = groupIdHex,
-            // Point directly at the active child version so a custom vibration
-            // selection never opens a stale sibling channel. The conversation
-            // id remains attached for OEM settings apps that use it to render
-            // the richer per-conversation surface.
-            channelId = activeChannelId ?: targetParent.id,
-        )
-    if (context.tryStartActivity(preferred)) return
-    if (preferred.action != Settings.ACTION_APP_NOTIFICATION_SETTINGS && context.tryStartActivity(appNotificationSettingsIntent(context))) return
-
-    if (context.tryStartActivity(appDetailsSettingsIntent(context))) return
-
-    Toast.makeText(context, R.string.toast_notification_settings_unavailable, Toast.LENGTH_SHORT).show()
-}
-
-private fun publishConversationSettingsShortcut(
-    context: Context,
-    shortcutId: String,
-    accountRef: String,
-    groupIdHex: String,
-    title: String,
-    avatarUrl: String?,
-): String =
-    runCatching {
-        // The settings screen may be opened before this chat has ever posted a
-        // notification. Publish its identity before resolving the child channel.
-        val existing =
-            ShortcutManagerCompat
-                .getDynamicShortcuts(context)
-                .firstOrNull { it.id == shortcutId }
-        val shortcut =
-            conversationSettingsShortcut(
-                context = context,
-                shortcutId = shortcutId,
-                accountRef = accountRef,
-                groupIdHex = groupIdHex,
-                title = title,
-                avatarUrl = avatarUrl,
-                existing = existing,
-            )
-        ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
-        // If the UI briefly regressed to an npub fallback, preserve a
-        // previously resolved shortcut name in the channel too.
-        shortcut.longLabel.toString()
-    }.onFailure {
-        Log.w(TAG, "conversation_shortcut_publish_failed")
-    }.getOrDefault(title)
 
 internal fun conversationSettingsShortcut(
     context: Context,
@@ -232,18 +126,6 @@ internal fun conversationSettingsShortcut(
         .setExtras(checkNotNull(conversationShortcutAccountExtras(accountRef)))
         .build()
 }
-
-private fun appNotificationSettingsIntent(context: Context): Intent =
-    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-
-private fun appDetailsSettingsIntent(context: Context): Intent =
-    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-        .setData(Uri.fromParts("package", context.packageName, null))
-        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-
-private fun Context.tryStartActivity(intent: Intent): Boolean = runCatching { startActivity(intent) }.isSuccess
 
 internal fun sha256Hex(value: String): String =
     MessageDigest

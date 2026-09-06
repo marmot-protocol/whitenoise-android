@@ -20,9 +20,11 @@ class AmberSignerController(
     fun isSignerInstalled(): Boolean = Nip55.isExternalSignerInstalled(appContext)
 
     /**
-     * Login-time `get_public_key` round trip: shows Amber's foreground prompt via
-     * the coordinator, persists the chosen signer package, and returns the key
-     * Amber reported (npub or hex — the engine normalizes it).
+     * Login-time `get_public_key` round trip. A sole grouped-capable Amber is
+     * launched directly so its complete permission bundle is owned by Amber's
+     * native session; ambiguous, older, or unknown signers retain the serialized
+     * relay/chooser. The resolved package is persisted only after a trusted
+     * response, and the reported npub/hex is normalized by the engine.
      *
      * BLOCKING: run this off the main thread (it blocks on the coordinator while
      * the launcher runs on the main thread). Throws a typed [MarmotKitException]
@@ -31,8 +33,20 @@ class AmberSignerController(
     fun requestPublicKey(): String {
         if (!isSignerInstalled()) throw MarmotKitException.ExternalSignerUnavailable("")
         val requestId = UUID.randomUUID().toString()
-        val intent = Nip55.buildGetPublicKeyIntent(requestId)
-        return when (val outcome = coordinator.awaitApproval(intent, approvalTimeoutMs, requestId)) {
+        val groupedSignerPackage = Nip55.soleGroupedLoginSignerPackage(appContext)
+        val intent =
+            Nip55.buildGetPublicKeyIntent(requestId).apply {
+                groupedSignerPackage?.let(::setPackage)
+            }
+        return when (
+            val outcome =
+                coordinator.awaitApproval(
+                    intent,
+                    approvalTimeoutMs,
+                    requestId,
+                    allowGrouping = groupedSignerPackage != null,
+                )
+        ) {
             is AmberActivityCoordinator.Outcome.Completed -> parsePublicKey(outcome)
             AmberActivityCoordinator.Outcome.NoForegroundActivity ->
                 throw MarmotKitException.ExternalSignerUnavailable("")

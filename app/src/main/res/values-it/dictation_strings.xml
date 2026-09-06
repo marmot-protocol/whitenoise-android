@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dictation_done">Fine</string>
+    <string name="dictation_notification_title">Dettatura attiva</string>
+    <string name="dictation_notification_text">Usa Fine per terminare o Annulla per eliminare</string>
+    <string name="notification_channel_dictation">Dettatura</string>
+    <string name="notification_channel_dictation_description">Gestisce una sessione di dettatura attiva nel compositore</string>
+    <string name="dictation_settings_title">Dettatura</string>
+    <string name="dictation_settings_subtitle">Scegli quando termina la dettatura e cosa succede al testo</string>
+    <string name="dictation_settings_explainer">White Noise usa esattamente il servizio di riconoscimento vocale selezionato in Android. Il servizio elabora l’audio; White Noise conserva in memoria solo il testo restituito finché non viene incollato o inviato.</string>
+    <string name="dictation_finish_title">Termina dettatura</string>
+    <string name="dictation_finish_manual">Quando tocco Fine</string>
+    <string name="dictation_finish_after_silence">Dopo %1$d secondi di silenzio</string>
+    <string name="dictation_result_title">Al termine</string>
+    <string name="dictation_result_paste">Incolla nella bozza</string>
+    <string name="dictation_result_paste_description">Controlla o modifica il testo prima di inviarlo</string>
+    <string name="dictation_result_send">Invia messaggio</string>
+    <string name="dictation_result_send_description">Invia solo se la chat e la bozza originali non sono cambiate</string>
+    <string name="dictation_send_safety_note">L’invio si interrompe in sicurezza: se la bozza originale, i membri o la sessione cambiano, White Noise conserva la trascrizione per la revisione invece di inviarla.</string>
+</resources>

@@ -90,6 +90,7 @@ class MessageDraftDictationWriteTest {
             assertEquals("visible other", gateway.values.getValue(otherKey).content)
         }
 
+    /** Verifies a terminal result persists to the immutable origin and is authoritative after navigation. */
     @Test
     fun controllerResultSurvivesNavigationAndReopensFromAuthoritativeMdkDraft() =
         runTest {
@@ -116,6 +117,7 @@ class MessageDraftDictationWriteTest {
             controller.requestStart(ACCOUNT, GROUP, cache.getValue(originKey))
             // The visible account/chat can change while the immutable origin
             // remains the delivery target.
+            controller.stop()
             platform.listener.onResult("dictated")
             writer.flush()
 

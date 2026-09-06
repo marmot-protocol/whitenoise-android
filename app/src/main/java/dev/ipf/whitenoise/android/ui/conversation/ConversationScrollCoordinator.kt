@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -209,11 +210,11 @@ internal class ConversationScrollCoordinator(
 ) {
     private var settledMode = initialMode.requireSettled()
     private var readingAnchor: ConversationScrollAnchor? = null
-    private var commandSerial = 0L
-    private var intentRevision = 0L
+    private val commandLifetime = StalenessGuard()
+    private val intentLifetime = StalenessGuard()
     private var activeCommand: Job? = null
     private var userGestureInProgress = false
-    private var foregroundRestoreRevision = 0L
+    private val foregroundRestoreLifetime = StalenessGuard()
     private var foregroundSnapshot: ConversationForegroundSnapshot? = null
 
     var mode by mutableStateOf(settledMode)
@@ -225,9 +226,11 @@ internal class ConversationScrollCoordinator(
     val isFollowingTail: Boolean
         get() = settledMode is ConversationScrollMode.FollowingTail
 
+    /** Captures the current durable navigation intent for deferred restoration. */
     val intentToken: ConversationScrollIntentToken
-        get() = ConversationScrollIntentToken(intentRevision)
+        get() = ConversationScrollIntentToken(intentLifetime.capture())
 
+    /** Records the stable reading intent independently from transient list geometry. */
     fun bookmark(anchor: ConversationScrollAnchor): ConversationScrollBookmark {
         val stableAnchor =
             if (settledMode is ConversationScrollMode.ReadingHistory) {
@@ -238,22 +241,24 @@ internal class ConversationScrollCoordinator(
         return ConversationScrollBookmark(
             anchor = stableAnchor,
             settledMode = settledMode,
-            intentRevision = intentRevision,
+            intentRevision = intentLifetime.capture(),
         )
     }
 
+    /** Opens a latest-wins foreground correction transaction for [snapshot]. */
     fun beginForegroundRestore(snapshot: ConversationForegroundSnapshot): ConversationForegroundRestoreToken {
         invalidateActiveCommand()
         mode = settledMode
-        foregroundRestoreRevision++
+        val restoreRevision = foregroundRestoreLifetime.advance()
         foregroundSnapshot = snapshot
         foregroundRestoreInProgress = true
         return ConversationForegroundRestoreToken(
-            revision = foregroundRestoreRevision,
+            revision = restoreRevision,
             expectedImeVisible = snapshot.geometry.imeBottomPx > 0,
         )
     }
 
+    /** Applies a resumed layout correction only while [token] remains current. */
     suspend fun completeForegroundRestore(
         token: ConversationForegroundRestoreToken,
         resumedGeometry: ConversationForegroundGeometry,
@@ -264,7 +269,7 @@ internal class ConversationScrollCoordinator(
         resolveTailIndex: () -> Int,
     ): Boolean {
         val snapshot = foregroundSnapshot
-        return if (snapshot == null || token.revision != foregroundRestoreRevision) {
+        return if (snapshot == null || !foregroundRestoreLifetime.isCurrent(token.revision)) {
             false
         } else {
             val presentationChanged =
@@ -288,6 +293,7 @@ internal class ConversationScrollCoordinator(
         }
     }
 
+    /** Restores either tail-following or the durable reading anchor captured before backgrounding. */
     private suspend fun correctForegroundPresentation(
         snapshot: ConversationForegroundSnapshot,
         resolveAnchorIndex: (ConversationScrollAnchor) -> Int?,
@@ -308,7 +314,7 @@ internal class ConversationScrollCoordinator(
                 }
             is ConversationScrollMode.ReadingHistory -> {
                 val bookmark = snapshot.scrollBookmark
-                if (bookmark.intentRevision != intentRevision) {
+                if (!intentLifetime.isCurrent(bookmark.intentRevision)) {
                     false
                 } else {
                     val anchor = bookmark.anchor
@@ -325,8 +331,9 @@ internal class ConversationScrollCoordinator(
             else -> false
         }
 
+    /** Discards the captured foreground snapshot and invalidates deferred correction. */
     fun cancelForegroundRestore() {
-        foregroundRestoreRevision++
+        foregroundRestoreLifetime.advance()
         foregroundSnapshot = null
         foregroundRestoreInProgress = false
     }
@@ -338,16 +345,18 @@ internal class ConversationScrollCoordinator(
      * retained snapshot through the existing cancellation paths.
      */
     fun releaseForegroundRestoreGate(token: ConversationForegroundRestoreToken) {
-        if (token.revision != foregroundRestoreRevision) return
+        if (!foregroundRestoreLifetime.isCurrent(token.revision)) return
         foregroundRestoreInProgress = false
     }
 
+    /** Closes the matching restore without clearing a transaction that replaced it. */
     private fun clearForegroundRestore(token: ConversationForegroundRestoreToken) {
-        if (token.revision != foregroundRestoreRevision) return
+        if (!foregroundRestoreLifetime.isCurrent(token.revision)) return
         foregroundSnapshot = null
         foregroundRestoreInProgress = false
     }
 
+    /** Makes a user drag the newest scroll intent and cancels deferred lifecycle correction. */
     fun onUserGestureStarted(anchor: ConversationScrollAnchor) {
         cancelForegroundRestore()
         invalidateActiveCommand()
@@ -409,12 +418,13 @@ internal class ConversationScrollCoordinator(
         }
     }
 
+    /** Restores a bookmark only when its durable intent has not been superseded. */
     suspend fun restoreBookmark(
         bookmark: ConversationScrollBookmark,
         expectedIntent: ConversationScrollIntentToken = ConversationScrollIntentToken(bookmark.intentRevision),
         resolveAnchorIndex: (ConversationScrollAnchor) -> Int?,
     ): Boolean {
-        if (expectedIntent.revision != intentRevision) return false
+        if (!intentLifetime.isCurrent(expectedIntent.revision)) return false
         val anchor = bookmark.anchor
         readingAnchor = anchor.takeIf { bookmark.settledMode is ConversationScrollMode.ReadingHistory }
         return runCommand(
@@ -502,6 +512,7 @@ internal class ConversationScrollCoordinator(
         }
     }
 
+    /** Runs an explicit jump under the shared latest-wins scroll-command fence. */
     suspend fun programmaticJump(
         targetMessageId: String?,
         reason: ConversationScrollReason,
@@ -517,6 +528,7 @@ internal class ConversationScrollCoordinator(
         )
     }
 
+    /** Runs one scroll writer command and settles state only if it remains newest. */
     private suspend fun runCommand(
         transientMode: ConversationScrollMode,
         resultingMode: ConversationScrollMode,
@@ -526,7 +538,7 @@ internal class ConversationScrollCoordinator(
         if (!preserveForegroundRestore) cancelForegroundRestore()
         return supervisorScope {
             val previous = activeCommand
-            val serial = ++commandSerial
+            val serial = commandLifetime.advance()
             val command =
                 async(start = CoroutineStart.LAZY) {
                     ConversationScrollCommandScope(serial).operation()
@@ -537,7 +549,7 @@ internal class ConversationScrollCoordinator(
             command.start()
             try {
                 command.await()
-                if (serial != commandSerial) {
+                if (!commandLifetime.isCurrent(serial)) {
                     false
                 } else {
                     setSettledMode(resultingMode.requireSettled())
@@ -550,7 +562,7 @@ internal class ConversationScrollCoordinator(
                 currentCoroutineContext().ensureActive()
                 false
             } finally {
-                if (serial == commandSerial) {
+                if (commandLifetime.isCurrent(serial)) {
                     activeCommand = null
                     mode = settledMode
                 }
@@ -558,18 +570,20 @@ internal class ConversationScrollCoordinator(
         }
     }
 
+    /** Makes the active writer command stale before cancelling its coroutine. */
     private fun invalidateActiveCommand() {
-        commandSerial++
+        commandLifetime.advance()
         activeCommand?.cancel()
         activeCommand = null
     }
 
+    /** Publishes a stable mode and advances durable intent when it changes. */
     private fun setSettledMode(
         newMode: ConversationScrollMode,
         forceRevision: Boolean = false,
     ) {
         val settled = newMode.requireSettled()
-        if (forceRevision || settled != settledMode) intentRevision++
+        if (forceRevision || settled != settledMode) intentLifetime.advance()
         settledMode = settled
         mode = settled
         if (settled is ConversationScrollMode.FollowingTail) readingAnchor = null
@@ -635,9 +649,12 @@ internal class ConversationScrollCoordinator(
             return indexDistance > MAX_ANIMATED_SCROLL_ITEMS
         }
 
+        /** Rejects writer work after another command has claimed ownership. */
         private suspend fun ensureCurrent() {
             currentCoroutineContext().ensureActive()
-            if (serial != commandSerial) throw CancellationException("Superseded conversation scroll command")
+            if (!commandLifetime.isCurrent(serial)) {
+                throw CancellationException("Superseded conversation scroll command")
+            }
         }
     }
 }

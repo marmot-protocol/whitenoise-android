@@ -16,12 +16,13 @@ import kotlin.concurrent.withLock
  * App-scoped bridge between synchronous MDK signer callbacks and Android's
  * foreground activity-result launcher.
  *
- * Login and older/unknown signers retain the app-private relay's serialized,
- * cancellation-safe path. Recognized Amber versions with grouped local-intent
- * support may instead have a bounded set of explicit-package requests in
- * flight. Amber returns those as ID-addressed entries, which are dispatched to
- * the matching worker only. The two modes never overlap, so signer-controlled
- * extras cannot cross-complete a relay request.
+ * Older/unknown signers and ambiguous login choices retain the app-private
+ * relay's serialized, cancellation-safe path. Recognized Amber versions with
+ * grouped local-intent support use explicit-package requests; ordinary signer
+ * work may form a bounded same-account group, while `get_public_key` remains
+ * exclusive until its account identity is known. Amber's ID-addressed results
+ * are dispatched only to matching workers. The two modes never overlap, so
+ * signer-controlled extras cannot cross-complete a relay request.
  */
 @Suppress("TooManyFunctions") // One process-wide state machine owns prompt admission, launch, and exact-once delivery.
 object AmberActivityCoordinator {
@@ -71,6 +72,9 @@ object AmberActivityCoordinator {
     private data class GroupKey(
         val signerPackage: String,
         val currentUser: String,
+        // Login has no current_user yet. Its request id makes direct login
+        // exclusive instead of letting two account creations share one group.
+        val loginRequestId: String?,
     )
 
     fun attach(launcher: ActivityResultLauncher<Intent>) {
@@ -174,6 +178,11 @@ object AmberActivityCoordinator {
         }
     }
 
+    /**
+     * Runs one direct signer request inside a bounded same-package/account
+     * session. Login requests use their request id as an exclusive discriminator
+     * because no trustworthy account key exists until the signer answers.
+     */
     @Suppress("ReturnCount") // Each bounded-admission failure is a distinct terminal outcome with scoped cleanup.
     private fun awaitGroupedApproval(
         intent: Intent,
@@ -182,7 +191,15 @@ object AmberActivityCoordinator {
         signerPackage: String,
     ): Outcome {
         val deadline = Deadline(timeoutMs)
-        val key = GroupKey(signerPackage, intent.getStringExtra(Nip55.EXTRA_CURRENT_USER).orEmpty())
+        val key =
+            GroupKey(
+                signerPackage = signerPackage,
+                currentUser = intent.getStringExtra(Nip55.EXTRA_CURRENT_USER).orEmpty(),
+                loginRequestId =
+                    requestId.takeIf {
+                        intent.getStringExtra(Nip55.EXTRA_TYPE) == SignerOp.GetPublicKey.intentType
+                    },
+            )
         if (!approvalGate.enterGrouped(key, deadline)) return Outcome.TimedOut
         try {
             if (!deadline.tryAcquire(groupedSlots)) return Outcome.TimedOut

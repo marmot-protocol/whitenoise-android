@@ -43,6 +43,35 @@ class PerformanceDiagnosticSchemaTest {
         assertSchemaAllowlists(lines.single())
     }
 
+    /** Confirms recovery diagnostics serialize only a closed trigger and no caller-provided text. */
+    @Test
+    fun recoveryTraceSerializesOnlyAClosedTrigger() {
+        val lines = mutableListOf<String>()
+        val emitter = emitter(lines = lines)
+        emitter.start()
+        val trace =
+            assertNotNullTrace(
+                emitter.begin(
+                    operation = PerformanceOperation.SYNC_CATCH_UP,
+                    trigger = PerformanceTrigger.NETWORK_RECONNECT,
+                ),
+            )
+
+        emitter.record(
+            trace = trace,
+            phase = PerformancePhase.ACCOUNT_CATCH_UP_START,
+            elapsedMs = 0L,
+            result = PerformanceResult.PENDING,
+            layer = PerformanceLayer.MDK,
+        )
+
+        assertTrue(lines.single().contains(" trigger=network_reconnect "))
+        assertEquals(
+            setOf("foreground", "network_reconnect", "push_wake", "chat_list_readiness", "explicit"),
+            PerformanceTrigger.entries.mapTo(mutableSetOf()) { it.wireName },
+        )
+    }
+
     private fun assertSchemaAllowlists(line: String) {
         assertEquals(
             "schema=1 session=p#1 op=text_send phase=ffi_return " +
@@ -288,6 +317,82 @@ class PerformanceDiagnosticBuildGateTest {
         assertFalse(runner.contains("WNStartup"))
         assertTrue(report.contains("read_phase_value system_splash_handoff elapsed_ms"))
         assertTrue(report.contains("read_phase_value first_local_frame elapsed_ms"))
+    }
+
+    @Test
+    fun benchmarkRouteMarkersUseExistenceRatherThanVisibleBounds() {
+        val journeys =
+            rootSource(
+                "benchmark/src/main/java/dev/ipf/whitenoise/android/benchmark/WhiteNoiseJourneys.kt",
+            )
+
+        listOf(
+            "MAIN_SHELL_ROUTE_SETTLED",
+            "CONVERSATION_ROUTE_SETTLED",
+            "CONVERSATION_CONTROLLER_RELEASED",
+        ).forEach { marker ->
+            assertFalse(journeys.contains("waitForVisibleTag(PerformanceTags.$marker"))
+            assertTrue(journeys.contains("waitForTag(PerformanceTags.$marker"))
+        }
+    }
+
+    @Test
+    fun benchmarkRunnerForwardsNotificationFixtureArguments() {
+        val runner = rootSource("scripts/run-performance-benchmarks.sh")
+
+        assertTrue(runner.contains("-e notificationTexts"))
+        assertTrue(runner.contains("-e notificationConversationTitles"))
+        assertTrue(runner.contains("-e notificationSourceAccountRef"))
+    }
+
+    /** Guards state restoration, command semantics, and resource cleanup in the device runner. */
+    @Test
+    fun recoveryBenchmarkIsExplicitStatePreservingAndResourceComplete() {
+        val metrics = rootSource("benchmark/src/main/java/dev/ipf/whitenoise/android/benchmark/BenchmarkMetrics.kt")
+        val benchmark =
+            rootSource(
+                "benchmark/src/main/java/dev/ipf/whitenoise/android/benchmark/NetworkRecoveryBenchmark.kt",
+            )
+        val config = rootSource("benchmark/src/main/java/dev/ipf/whitenoise/android/benchmark/BenchmarkConfig.kt")
+        val runner = rootSource("scripts/run-performance-benchmarks.sh")
+
+        listOf("PowerCategory.CPU", "PowerCategory.NETWORK", "PowerCategory.MEMORY").forEach {
+            assertTrue("Missing energy metric $it", it in metrics)
+        }
+        assertTrue("PowerMetric.Type.Energy" in metrics)
+        assertTrue("MemoryUsageMetric.SubMetric.HeapSize" in metrics)
+        assertTrue("MemoryUsageMetric.SubMetric.RssAnon" in metrics)
+        assertTrue("FrameTimingMetric()" in metrics)
+        assertTrue("recoveryMetrics()" in benchmark)
+        assertTrue("BenchmarkConfig.requireNetworkToggle()" in benchmark)
+        assertTrue("cmd connectivity airplane-mode" in benchmark)
+        assertTrue("BenchmarkAirplaneMode.Enabled" in benchmark)
+        assertTrue("BenchmarkAirplaneMode.Disabled" in benchmark)
+        assertTrue(
+            "captured status must be parsed through the matching enum",
+            "BenchmarkAirplaneMode.fromStatusValue(arguments.getString(\"originalAirplaneMode\"))" in config &&
+                "entries.firstOrNull { it.statusValue == value }" in config,
+        )
+        assertTrue("Enabled(\"enabled\", \"enable\")" in config)
+        assertTrue("Disabled(\"disabled\", \"disable\")" in config)
+        assertTrue("device.executeShellCommand(mode.command())" in benchmark)
+        assertFalse("executeShellCommand(\"cmd connectivity airplane-mode " in benchmark)
+        assertTrue("allowNetworkToggle" in config)
+        assertTrue("ALLOW_NETWORK_TOGGLE" in runner)
+        assertTrue("restore_airplane_mode" in runner)
+        assertTrue("airplane_mode_action_for_status" in runner)
+        assertTrue("enabled) printf '%s\\n' enable" in runner)
+        assertTrue("disabled) printf '%s\\n' disable" in runner)
+        assertTrue("airplane-mode \"\$restore_action\"" in runner)
+        assertFalse("airplane-mode \"\$original_airplane_mode\"" in runner)
+        assertTrue("original_airplane_mode=\"\$(adb_cmd shell cmd connectivity airplane-mode" in runner)
+        assertTrue("airplane_mode_captured=true" in runner)
+        assertTrue("[[ \"\$airplane_mode_captured\" == true ]] && ! restore_airplane_mode" in runner)
+        assertTrue("-e allowNetworkToggle true" in runner)
+        assertTrue("\"\${BENCHMARK_CLASS_FILTER:-}\" != *\"StartupBenchmark\"*" in runner)
+        assertTrue("continuing the recovery-only run with the UI fixture preflight" in runner)
+        assertTrue("resource-id=\"performance.new_message\"" in runner)
+        assertFalse("uninstall" in benchmark.lowercase())
     }
 
     private fun source(relativePath: String): String =

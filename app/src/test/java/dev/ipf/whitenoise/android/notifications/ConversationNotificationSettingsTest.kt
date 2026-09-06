@@ -6,6 +6,8 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
@@ -105,13 +107,19 @@ class ConversationNotificationSettingsTest {
         assertEquals(context.packageName, intent.getStringExtra(Settings.EXTRA_APP_PACKAGE))
     }
 
+    /** Group preparation creates only the required message child and opens its exact ids. */
     @Test
     fun openDeepLinksWithTheGroupParentAndCreatesOnlyItsMessageChannel() {
         val app = RuntimeEnvironment.getApplication()
         val manager = app.getSystemService(NotificationManager::class.java)
         NotificationChannels.ensureChannels(app)
 
-        openConversationNotificationSettings(app, accountRef = "account-a", groupIdHex = "group-a", isDm = false)
+        prepareAndOpenConversationNotificationSettings(
+            app,
+            accountRef = "account-a",
+            groupIdHex = "group-a",
+            isDm = false,
+        )
 
         val shortcutId = conversationShortcutId("account-a", "group-a")
         val expectedChannelId = ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.GROUP_MESSAGES.id, shortcutId!!)
@@ -130,12 +138,13 @@ class ConversationNotificationSettingsTest {
         )
     }
 
+    /** DM preparation selects the direct-message parent and preserves its display title. */
     @Test
     fun openDeepLinksToTheDmConversationChannelForDms() {
         val app = RuntimeEnvironment.getApplication()
         NotificationChannels.ensureChannels(app)
 
-        openConversationNotificationSettings(
+        prepareAndOpenConversationNotificationSettings(
             app,
             accountRef = "account-a",
             groupIdHex = "group-a",
@@ -183,12 +192,13 @@ class ConversationNotificationSettingsTest {
         )
     }
 
+    /** Optional custom categories can resolve their own exact conversation child. */
     @Test
     fun openCanTargetTheAgentActivityChannelForOneConversation() {
         val app = RuntimeEnvironment.getApplication()
         NotificationChannels.ensureChannels(app)
 
-        openConversationNotificationSettings(
+        prepareAndOpenConversationNotificationSettings(
             app,
             accountRef = "account-a",
             groupIdHex = "group-a",
@@ -217,13 +227,14 @@ class ConversationNotificationSettingsTest {
         )
     }
 
+    /** Primary preparation targets the active channel version for custom vibration. */
     @Test
     fun primarySettingsDeepLinkTargetsTheSelectedVibrationChannelVersion() {
         val app = RuntimeEnvironment.getApplication()
         val manager = app.getSystemService(NotificationManager::class.java)
         NotificationChannels.ensureChannels(app)
 
-        openConversationNotificationSettings(
+        prepareAndOpenConversationNotificationSettings(
             context = app,
             accountRef = "account-vibration",
             groupIdHex = "group-vibration",
@@ -278,6 +289,7 @@ class ConversationNotificationSettingsTest {
         )
     }
 
+    /** Repeat preparation keeps the previously resolved name instead of an npub fallback. */
     @Test
     fun openingSettingsDoesNotDowngradeAResolvedChannelNameToNpub() {
         val app = RuntimeEnvironment.getApplication()
@@ -295,7 +307,7 @@ class ConversationNotificationSettingsTest {
             ),
         )
 
-        openConversationNotificationSettings(
+        prepareAndOpenConversationNotificationSettings(
             context = app,
             accountRef = "account-resolved",
             groupIdHex = "group-resolved",
@@ -311,4 +323,37 @@ class ConversationNotificationSettingsTest {
         val channel = app.getSystemService(NotificationManager::class.java).getNotificationChannel(channelId)
         assertEquals("Green Orca · Direct messages", channel.name.toString())
     }
+
+    /** Runs the same prepare-then-pure-launch boundary used by the settings screen. */
+    private fun prepareAndOpenConversationNotificationSettings(
+        context: Context,
+        accountRef: String,
+        groupIdHex: String,
+        isDm: Boolean,
+        parent: NotificationChannelSpec? = null,
+        conversationTitle: String? = null,
+        conversationAvatarUrl: String? = null,
+        primaryVibrationPattern: ConversationVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
+    ): ConversationNotificationSettingsLaunchAttempt =
+        runBlocking {
+            val targetParent = parent ?: ConversationNotificationChannels.primaryMessageParent(isDm)
+            val preparation =
+                ConversationNotificationSettingsPreparer(dispatcher = Dispatchers.Unconfined).prepare(
+                    context = context,
+                    request =
+                        ConversationNotificationSettingsPreparationRequest(
+                            accountRef = accountRef,
+                            groupIdHex = groupIdHex,
+                            isDm = isDm,
+                            conversationTitle = conversationTitle ?: "Test conversation",
+                            conversationAvatarUrl = conversationAvatarUrl,
+                            primaryVibrationPattern = primaryVibrationPattern,
+                            requestedParents = listOf(targetParent),
+                        ),
+                ) as ConversationNotificationSettingsPreparation.Ready
+            openPreparedConversationNotificationSettings(
+                context = context,
+                target = checkNotNull(preparation.targetsByParentChannelId[targetParent.id]),
+            )
+        }
 }

@@ -359,6 +359,7 @@
     <string name="forward_partial_summary">Transféré vers %1$d discussions sur %2$d</string>
     <string name="forward_failed_summary">Impossible de transférer vers les discussions sélectionnées</string>
     <string name="forward_start_failed">Impossible de démarrer le transfert. Fermez et réessayez.</string>
+    <string name="forward_restore_discarded">Impossible de restaurer en toute sécurité le transfert inachevé, il a donc été abandonné</string>
     <string name="forward_retry_failed">Réessayer pour les discussions en échec</string>
     <plurals name="forward_attachment_count">
         <item quantity="one">%1$d pièce jointe</item>
@@ -679,8 +680,8 @@
     <string name="tts_playback_action_play">Lire</string>
     <string name="tts_playback_action_pause">Mettre en pause</string>
     <string name="tts_playback_action_stop">Arrêter</string>
-    <string name="tts_playback_action_previous_message">Message précédent</string>
-    <string name="tts_playback_action_next_message">Message suivant</string>
+    <string name="tts_playback_action_previous_sentence">Phrase précédente</string>
+    <string name="tts_playback_action_next_sentence">Phrase suivante</string>
     <string name="toast_restarting">Redémarrage</string>
     <string name="toast_identity_created">Identité créée</string>
     <string name="toast_couldnt_create_identity">Impossible de créer l’identité</string>
@@ -1309,8 +1310,8 @@
     <string name="user_search_searching">Recherche sur le réseau…</string>
     <string name="user_search_incomplete">Certains résultats du réseau peuvent manquer.</string>
     <string name="user_search_failed">Impossible d’effectuer la recherche sur le réseau. Vérifiez votre connexion et réessayez.</string>
-    <string name="user_search_following">Suivi</string>
-    <string name="user_search_network">Depuis le réseau</string>
+    <string name="user_search_you_follow">Vous suivez</string>
+    <string name="user_search_result">Résultat de recherche</string>
     <string name="paste_npub">Coller le npub</string>
     <string name="start_chat">Démarrer la discussion</string>
     <string name="name_this_group">Nommez ce groupe</string>
@@ -1446,6 +1447,26 @@
     <string name="tts_settings_explainer_no_engine">Aucun moteur de synthèse vocale utilisable n\'est installé. Installez RHVoice ou eSpeak NG depuis F-Droid ou Zapstore, puis sélectionnez-le ci-dessous.</string>
     <string name="tts_settings_engine_title">Moteur</string>
     <string name="tts_settings_rate_title">Débit de parole</string>
+    <string name="tts_media_mix_title">Parler par-dessus un contenu audio en cours de lecture</string>
+    <string name="tts_media_mix_subtitle">Démarre uniquement pendant la lecture d’un autre contenu audio ; White Noise ne contrôle pas cet autre contenu audio</string>
+    <string name="tts_media_mix_volume_title">Volume de la voix sur le média</string>
+    <string name="tts_media_mix_volume_quiet">Faible</string>
+    <string name="tts_media_mix_volume_medium">Moyen</string>
+    <string name="tts_media_mix_volume_loud">Fort</string>
+    <string name="tts_media_mix_volume_quiet_description">35 pour cent du volume du moteur de synthèse vocale</string>
+    <string name="tts_media_mix_volume_medium_description">60 pour cent du volume du moteur de synthèse vocale</string>
+    <string name="tts_media_mix_volume_loud_description">85 pour cent du volume du moteur de synthèse vocale</string>
+    <string name="tts_media_mix_no_active_media">Lancez de la musique ou un podcast avant d’utiliser la lecture à voix haute avec un contenu audio en cours de lecture</string>
+    <string name="tts_voice_title">Voix</string>
+    <string name="tts_voice_automatic">Voix hors ligne automatique</string>
+    <string name="tts_voice_automatic_description">Utiliser la meilleure voix hors ligne installée pour la langue du message</string>
+    <string name="tts_voice_available_offline">Disponible hors ligne</string>
+    <string name="tts_voice_invalid_identity">Nom de voix stable manquant, sélection impossible</string>
+    <string name="tts_voice_not_installed">Non installée</string>
+    <string name="tts_voice_requires_network">Nécessite une connexion réseau, sélection impossible</string>
+    <string name="tts_voice_ambiguous">Identité de voix dupliquée, sélection impossible</string>
+    <string name="tts_voice_unavailable">Aucune voix hors ligne disponible</string>
+    <string name="tts_voice_effective_fallback">La voix enregistrée est indisponible ; utilisation de %1$s</string>
     <string name="speak_aloud">Lire à voix haute</string>
     <string name="tts_bar_pause">Suspendre la lecture</string>
     <string name="tts_bar_play">Reprendre la lecture</string>
@@ -1594,6 +1615,7 @@
     <string name="nostr_event_failed">Impossible de charger cet événement. Vérifiez votre connexion et réessayez.</string>
     <string name="nostr_event_open">Ouvrir l’événement</string>
     <string name="nostr_event_read_article">Lire l’article</string>
+    <string name="nostr_event_read_note">Lire la note complète</string>
     <string name="nostr_event_play_video">Lire la vidéo</string>
     <string name="nostr_video_playback_failed">Impossible de lire cette vidéo.</string>
     <string name="nostr_event_copy">Copier la référence de l’événement</string>
@@ -1634,6 +1656,6 @@
     <string name="discard">Supprimer</string>
     <string name="open_app_settings">Ouvrir les paramètres de l’application</string>
     <string name="dictation_disclosure_title">Reconnaissance vocale externe</string>
-    <string name="dictation_disclosure_message">Votre service vocal installé traite l’audio dicté et peut l’envoyer à son fournisseur. White Noise insère le texte renvoyé dans ce brouillon pour que vous puissiez le vérifier et ne l’envoie jamais automatiquement.</string>
+    <string name="dictation_disclosure_message">Votre service vocal installé traite l’audio dicté et peut l’envoyer à son fournisseur. Par défaut, White Noise colle le texte renvoyé dans votre brouillon ; l’envoi automatique n’est disponible que si vous l’activez explicitement dans les paramètres de Dictée.</string>
     <string name="dictation_continue">Continuer</string>
 </resources>

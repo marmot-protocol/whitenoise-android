@@ -6,12 +6,16 @@ import dev.ipf.whitenoise.android.core.timelineInvalidationPresentation
 import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
 import dev.ipf.whitenoise.android.state.WCAG_AA_NORMAL_TEXT_CONTRAST
 import dev.ipf.whitenoise.android.state.contrastRatio
+import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BubblePresentationTest {
+    private val sampleNpub =
+        "npub180cvv07t2zynsj7gmj4hu77davwc9x7kx00c7m92fw4wwjfn3z2qly42e0"
+
     private val tokens =
         BubblePresentationTokens(
             errorBackgroundArgb = 0xFFFFDAD6,
@@ -137,6 +141,48 @@ class BubblePresentationTest {
         assertEquals(
             BubblePresentation(0xFFE1E3E4, 0xFF444748, 0xFF006780),
             resolveBubblePresentationArgb(false, false, false, null, tokens),
+        )
+    }
+
+    /** Keeps prose before a valid profile reference in the ordinary message presentation path. */
+    @Test
+    fun npubWithFreeTextKeepsTheMessageBodyVisible() {
+        val body = "Please follow this profile\nnostr:$sampleNpub"
+        val sharedUser = parseSharedUserFromText(body)
+
+        assertNull(sharedUser)
+        assertEquals(
+            body,
+            messageBodyTextToRender(
+                displayedBody = body,
+                deleted = false,
+                persistedFailure = false,
+                structuredShareOwnsBody = sharedUser != null,
+                hasPendingMediaName = false,
+                hasConfirmedMedia = false,
+                mediaCaption = null,
+            ),
+        )
+    }
+
+    /** Keeps prose after a valid profile reference in the same ordinary message path. */
+    @Test
+    fun npubBeforeFreeTextKeepsTheMessageBodyVisible() {
+        val body = "nostr:$sampleNpub\nPlease follow this profile"
+        val sharedUser = parseSharedUserFromText(body)
+
+        assertNull(sharedUser)
+        assertEquals(
+            body,
+            messageBodyTextToRender(
+                displayedBody = body,
+                deleted = false,
+                persistedFailure = false,
+                structuredShareOwnsBody = sharedUser != null,
+                hasPendingMediaName = false,
+                hasConfirmedMedia = false,
+                mediaCaption = null,
+            ),
         )
     }
 }

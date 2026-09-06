@@ -16,12 +16,14 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.state.RecoveryTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -38,6 +40,9 @@ class NotificationStreamForegroundService : Service() {
     private val runtimeSupervisor = NotificationRuntimeSupervisor()
     private var bootstrapJob: Job? = null
     private var pendingNativePushRegistrationSync = false
+
+    // staleness-exempt: ordered producer/consumer watermarks require
+    // greater-than comparison and an explicit overflow reset.
     private var pendingPushWakeGeneration = 0L
     private var completedPushWakeGeneration = 0L
     private var pendingUserOwnedStart = false
@@ -244,11 +249,21 @@ class NotificationStreamForegroundService : Service() {
             recoveryAllowed = { appState.notificationRuntimeRecoveryAllowed(recoveryGeneration) },
             startRuntime = {
                 val wakeLock = acquirePushWakeLockIfNeeded(trigger)
+                val wakeLockTrace = wakeLock?.let { RecoveryTrace.beginPushWakeLock() }
+                val wakeLockTraceTimeout =
+                    wakeLockTrace?.let { token ->
+                        serviceScope.launch(Dispatchers.Default) {
+                            delay(pushWakeLockTimeoutMs())
+                            RecoveryTrace.endPushWakeLock(token)
+                        }
+                    }
                 try {
                     startNotificationRuntimeForTrigger(appState, trigger)
                     drainPendingNativePushRegistrationSync(appState)
                 } finally {
                     releaseWakeLock(wakeLock)
+                    RecoveryTrace.endPushWakeLock(wakeLockTrace)
+                    wakeLockTraceTimeout?.cancel()
                 }
             },
             onAttemptFailed = { attempt, retryDelayMillis, _ ->

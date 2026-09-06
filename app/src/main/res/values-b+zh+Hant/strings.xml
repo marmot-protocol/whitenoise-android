@@ -351,6 +351,7 @@
     <string name="forward_partial_summary">已轉發至 %1$d / %2$d 個聊天</string>
     <string name="forward_failed_summary">無法轉發至所選聊天</string>
     <string name="forward_start_failed">無法開始轉發。請關閉後重試。</string>
+    <string name="forward_restore_discarded">無法安全還原未完成的轉發，已將其捨棄</string>
     <string name="forward_retry_failed">重試失敗的聊天</string>
     <plurals name="forward_attachment_count">
         <item quantity="one">%1$d 個附件</item>
@@ -668,8 +669,8 @@
     <string name="tts_playback_action_play">播放</string>
     <string name="tts_playback_action_pause">暫停</string>
     <string name="tts_playback_action_stop">停止</string>
-    <string name="tts_playback_action_previous_message">上一則訊息</string>
-    <string name="tts_playback_action_next_message">下一則訊息</string>
+    <string name="tts_playback_action_previous_sentence">上一句</string>
+    <string name="tts_playback_action_next_sentence">下一句</string>
     <string name="toast_restarting">正在重啟</string>
     <string name="toast_identity_created">身分已建立</string>
     <string name="toast_couldnt_create_identity">無法建立身分</string>
@@ -1282,8 +1283,8 @@
     <string name="user_search_searching">正在搜尋網路…</string>
     <string name="user_search_incomplete">部分網路結果可能缺少。</string>
     <string name="user_search_failed">無法搜尋網路。請檢查網路連線後再試一次。</string>
-    <string name="user_search_following">已追蹤</string>
-    <string name="user_search_network">來自網路</string>
+    <string name="user_search_you_follow">你已追蹤</string>
+    <string name="user_search_result">搜尋結果</string>
     <string name="paste_npub">貼上 npub</string>
     <string name="start_chat">開始聊天</string>
     <string name="name_this_group">為群組命名</string>
@@ -1419,6 +1420,26 @@
     <string name="tts_settings_explainer_no_engine">未安裝可用的文字轉語音引擎。請從 F-Droid 或 Zapstore 安裝 RHVoice 或 eSpeak NG，然後在下方選擇。</string>
     <string name="tts_settings_engine_title">引擎</string>
     <string name="tts_settings_rate_title">語速</string>
+    <string name="tts_media_mix_title">在播放媒體時朗讀</string>
+    <string name="tts_media_mix_subtitle">僅在其他音訊播放時啟動；White Noise 不會控制其他音訊</string>
+    <string name="tts_media_mix_volume_title">媒體播放時的朗讀音量</string>
+    <string name="tts_media_mix_volume_quiet">低</string>
+    <string name="tts_media_mix_volume_medium">中</string>
+    <string name="tts_media_mix_volume_loud">高</string>
+    <string name="tts_media_mix_volume_quiet_description">文字轉語音引擎音量的 35%</string>
+    <string name="tts_media_mix_volume_medium_description">文字轉語音引擎音量的 60%</string>
+    <string name="tts_media_mix_volume_loud_description">文字轉語音引擎音量的 85%</string>
+    <string name="tts_media_mix_no_active_media">請先播放音樂或 Podcast，再使用媒體播放時朗讀</string>
+    <string name="tts_voice_title">語音</string>
+    <string name="tts_voice_automatic">自動離線語音</string>
+    <string name="tts_voice_automatic_description">為訊息語言使用已安裝的最佳離線語音</string>
+    <string name="tts_voice_available_offline">可離線使用</string>
+    <string name="tts_voice_invalid_identity">缺少穩定的語音名稱，無法選取</string>
+    <string name="tts_voice_not_installed">未安裝</string>
+    <string name="tts_voice_requires_network">需要網路連線，無法選取</string>
+    <string name="tts_voice_ambiguous">語音識別碼重複，無法選取</string>
+    <string name="tts_voice_unavailable">沒有可用的離線語音</string>
+    <string name="tts_voice_effective_fallback">已儲存的語音無法使用；目前使用 %1$s</string>
     <string name="speak_aloud">朗讀</string>
     <string name="tts_bar_pause">暫停朗讀</string>
     <string name="tts_bar_play">繼續朗讀</string>
@@ -1567,6 +1588,7 @@
     <string name="nostr_event_failed">無法載入此事件。請檢查網路連線後再試一次。</string>
     <string name="nostr_event_open">開啟事件</string>
     <string name="nostr_event_read_article">閱讀文章</string>
+    <string name="nostr_event_read_note">閱讀完整貼文</string>
     <string name="nostr_event_play_video">播放影片</string>
     <string name="nostr_video_playback_failed">無法播放此影片。</string>
     <string name="nostr_event_copy">複製事件參照</string>
@@ -1607,6 +1629,6 @@
     <string name="discard">捨棄</string>
     <string name="open_app_settings">開啟應用程式設定</string>
     <string name="dictation_disclosure_title">外部語音辨識</string>
-    <string name="dictation_disclosure_message">您安裝的語音服務會處理聽寫音訊，並可能將其傳送給服務供應商。White Noise 會將傳回的文字插入此草稿供您檢查，絕不會自動傳送。</string>
+    <string name="dictation_disclosure_message">您安裝的語音服務會處理聽寫音訊，並可能將其傳送給服務供應商。White Noise 預設會將傳回的文字貼到草稿；只有在「聽寫」設定中明確啟用後，才可自動傳送。</string>
     <string name="dictation_continue">繼續</string>
 </resources>

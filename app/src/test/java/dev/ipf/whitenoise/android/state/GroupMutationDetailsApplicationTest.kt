@@ -92,17 +92,18 @@ class GroupMutationDetailsApplicationTest {
         assertEquals(GroupRosterLoadState.FAILED, tracker.state)
     }
 
+    /** Retains the roster regression while exercising the shared guard used by the controller. */
     @Test
     fun newerRosterRefreshSupersedesOlderRefreshAndMutationInvalidatesBoth() {
-        val generations = GroupRosterRefreshGeneration()
-        val first = generations.begin()
-        val second = generations.begin()
+        val refreshes = StalenessGuard()
+        val first = refreshes.advance()
+        val second = refreshes.advance()
 
-        assertFalse(generations.isCurrent(first))
-        assertTrue(generations.isCurrent(second))
+        assertFalse(refreshes.isCurrent(first))
+        assertTrue(refreshes.isCurrent(second))
 
-        generations.invalidate()
-        assertFalse(generations.isCurrent(second))
+        refreshes.advance()
+        assertFalse(refreshes.isCurrent(second))
     }
 
     @Test

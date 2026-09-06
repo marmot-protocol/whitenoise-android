@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -19,14 +20,21 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
-import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrArticleReaderScreen
+import dev.ipf.marmotkit.MarkdownBlockFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
+import dev.ipf.marmotkit.MarkdownNostrEntityFfi
+import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCard
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardKind
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardModel
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardState
+import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventReaderScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -144,11 +152,12 @@ class NostrEventCardScreenshotTest {
         capture("nostr_event_cards_file_states_large_rtl")
     }
 
+    /** Protects the pre-existing article reader while the shared reader gains kind-1 support. */
     @Test
     fun articleReaderLight() {
         composeRule.setContent {
             WhiteNoiseTheme {
-                NostrArticleReaderScreen(
+                NostrEventReaderScreen(
                     card =
                         card(
                             NostrEventCardKind.Article,
@@ -172,6 +181,117 @@ class NostrEventCardScreenshotTest {
 
         capture("nostr_article_reader_light")
     }
+
+    /** Captures the complete kind-1 reader in the default light presentation. */
+    @Test
+    fun noteReaderLight() {
+        renderNoteReader(darkTheme = false)
+        capture("nostr_note_reader_light")
+    }
+
+    /** Captures note context and actions against the AMOLED surface palette. */
+    @Test
+    fun noteReaderAmoled() {
+        renderNoteReader(darkTheme = true, amoled = true)
+        capture("nostr_note_reader_amoled")
+    }
+
+    /** Captures wrapping and control layout at the supported large-font scale. */
+    @Test
+    fun noteReaderLargeFont() {
+        renderNoteReader(darkTheme = false, fontScale = 1.5f)
+        capture("nostr_note_reader_large_font")
+    }
+
+    /** Captures the reader at a narrow width where reference and Markdown wrapping are stressed. */
+    @Test
+    fun noteReaderNarrow() {
+        renderNoteReader(darkTheme = false, width = 280.dp)
+        capture("nostr_note_reader_narrow")
+    }
+
+    /** Captures mirrored Back and event actions under an RTL layout direction. */
+    @Test
+    fun noteReaderRtl() {
+        renderNoteReader(darkTheme = false, layoutDirection = LayoutDirection.Rtl)
+        capture("nostr_note_reader_rtl")
+    }
+
+    /** Renders a deterministic note-reader fixture under one requested visual configuration. */
+    private fun renderNoteReader(
+        darkTheme: Boolean,
+        amoled: Boolean = false,
+        fontScale: Float = 1f,
+        width: Dp = 360.dp,
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
+                val density = LocalDensity.current
+                CompositionLocalProvider(
+                    LocalDensity provides Density(density.density, fontScale),
+                    LocalLayoutDirection provides layoutDirection,
+                ) {
+                    Surface(
+                        modifier = Modifier.width(width).height(900.dp).testTag(TAG),
+                    ) {
+                        NostrEventReaderScreen(
+                            card =
+                                card(
+                                    kind = NostrEventCardKind.Note,
+                                    eventKind = 1,
+                                    title = null,
+                                    summary = "A compact note preview.",
+                                    readerBody = NOTE_READER_BODY,
+                                ),
+                            authoredReference = AUTHORED_REFERENCE,
+                            document = noteReaderDocument(),
+                            parsing = false,
+                            authorDisplayName = { "Alex Morgan" },
+                            mentionDisplayName = { null },
+                            onNostrProfileTap = {},
+                            onCopyReference = {},
+                            onOpenExternal = {},
+                            onDismiss = {},
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /** Builds the parsed Markdown shown in every note-reader baseline. */
+    private fun noteReaderDocument() =
+        MarkdownDocumentFfi(
+            blocks =
+                listOf(
+                    MarkdownBlockFfi.Paragraph(
+                        listOf(
+                            MarkdownInlineFfi.Text("This is the complete referenced note, including "),
+                            MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("important context"))),
+                            MarkdownInlineFfi.Text(" that the timeline preview could not show."),
+                        ),
+                    ),
+                    MarkdownBlockFfi.Paragraph(
+                        listOf(
+                            MarkdownInlineFfi.Text("Read the "),
+                            MarkdownInlineFfi.Link(
+                                dest = "https://example.com/project",
+                                title = null,
+                                children = listOf(MarkdownInlineFfi.Text("project page")),
+                                classification = MarkdownLinkDestinationKindFfi.WEB,
+                            ),
+                            MarkdownInlineFfi.Text(" or inspect "),
+                            MarkdownInlineFfi.NostrUri(
+                                MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NOTE, NESTED_NOTE),
+                            ),
+                            MarkdownInlineFfi.Text(" without recursively expanding it."),
+                        ),
+                    ),
+                ),
+            truncated = false,
+            blankLinesBefore = byteArrayOf(),
+        )
 
     private fun render(
         darkTheme: Boolean,
@@ -262,5 +382,8 @@ class NostrEventCardScreenshotTest {
 
     private companion object {
         const val TAG = "nostr-event-cards"
+        const val AUTHORED_REFERENCE = "nevent1qqs8f4r0originalreference6da8fv0"
+        const val NESTED_NOTE = "note1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsn9e8p"
+        const val NOTE_READER_BODY = "This is the complete referenced note with a link and a nested Nostr reference."
     }
 }

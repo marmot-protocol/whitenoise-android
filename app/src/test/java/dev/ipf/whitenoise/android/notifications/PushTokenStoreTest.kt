@@ -80,6 +80,20 @@ class PushTokenStoreTest {
         assertTrue(second > first)
     }
 
+    /** Cleared markers keep their sequence so a later wake is a distinct circuit trigger. */
+    @Test
+    fun pendingPushWakeCatchUpGenerationAdvancesAfterClear() {
+        val store = store()
+        store.recordPendingPushWakeCatchUp()
+        val first = store.pendingPushWakeCatchUpGeneration()
+        store.clearPendingPushWakeCatchUp()
+
+        store.recordPendingPushWakeCatchUp()
+        val second = store.pendingPushWakeCatchUpGeneration()
+
+        assertTrue(second > first)
+    }
+
     @Test
     fun clearPendingPushWakeCatchUpOnlyClearsTheObservedGeneration() {
         val store = store()

@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.Operation
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -86,32 +87,21 @@ class DisappearingMessageSweepWorker : CoroutineWorker {
 
         /**
          * Enqueue the periodic sweep, keeping any already-scheduled instance so
-         * app restarts don't reset its cadence. Safe to call from
-         * [WhiteNoiseApplication.onCreate]; WorkManager persists the schedule
-         * across process death and reboot.
-         *
-         * Best-effort: `WorkManager.getInstance` throws if the WorkManager
-         * runtime isn't initialized (e.g. under a Robolectric unit test that
-         * builds the real Application without the androidx.startup provider).
-         * A missing background sweep must never crash app startup, so swallow
-         * that — the worst case is the in-conversation sweep still enforces
-         * expiry on open, and the next launch re-attempts the schedule.
+         * app restarts don't reset its cadence. WorkManager persists the schedule
+         * across process death and reboot. Initialization and enqueue failures
+         * propagate to the application-level gate so a later handoff can retry.
          */
-        fun schedule(context: Context) {
-            runCatching {
-                val request =
-                    PeriodicWorkRequestBuilder<DisappearingMessageSweepWorker>(
-                        SWEEP_INTERVAL_HOURS,
-                        TimeUnit.HOURS,
-                    ).build()
-                WorkManager.getInstance(context.applicationContext).enqueueUniquePeriodicWork(
-                    UNIQUE_WORK_NAME,
-                    ExistingPeriodicWorkPolicy.KEEP,
-                    request,
-                )
-            }.onFailure {
-                if (BuildConfig.DEBUG) Log.w(TAG, "failed to schedule background sweep", it)
-            }
+        fun schedule(context: Context): Operation {
+            val request =
+                PeriodicWorkRequestBuilder<DisappearingMessageSweepWorker>(
+                    SWEEP_INTERVAL_HOURS,
+                    TimeUnit.HOURS,
+                ).build()
+            return WorkManager.getInstance(context.applicationContext).enqueueUniquePeriodicWork(
+                UNIQUE_WORK_NAME,
+                ExistingPeriodicWorkPolicy.KEEP,
+                request,
+            )
         }
     }
 }

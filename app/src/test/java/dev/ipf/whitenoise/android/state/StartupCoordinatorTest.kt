@@ -4,7 +4,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -174,30 +173,5 @@ class StartupCoordinatorTest {
             assertEquals(1, configurations)
             assertEquals(1, starts)
             assertEquals(1, closes)
-        }
-
-    @Test
-    fun accountRevisionChangeDuringUnreadFoldPreventsStalePublication() =
-        runTest {
-            var currentRevision = 4L
-            val guard = StartupUnreadRevisionGuard(expectedRevision = 4L) { currentRevision }
-            val foldStarted = CompletableDeferred<Unit>()
-            val releaseFold = CompletableDeferred<Unit>()
-            var published = emptyMap<String, ULong>()
-            val fold =
-                async {
-                    foldStarted.complete(Unit)
-                    releaseFold.await()
-                    val staleCounts = mapOf("old-account" to 3uL)
-                    if (guard.isCurrent()) published = staleCounts
-                }
-
-            foldStarted.await()
-            currentRevision += 1L
-            releaseFold.complete(Unit)
-            fold.await()
-
-            assertFalse(guard.isCurrent())
-            assertTrue(published.isEmpty())
         }
 }

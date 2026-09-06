@@ -134,6 +134,28 @@ class PendingSendDraftPresentationTest {
         }
 
     @Test
+    fun ambiguousSendKeepsItsRecoveryDraftHiddenWhileTheBubbleRemainsPending() =
+        runTest {
+            val appState = appState()
+            appState.setDraft(TextFieldValue("may already be delivered"))
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        throw MarmotKitException.Publish("send event timed out")
+                    },
+                )
+
+            appState.sendConversationText(controller, "may already be delivered")
+
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+            assertEquals(null, appState.draftFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(null, appState.chatRowDraftFor(ACCOUNT_REF, GROUP_ID))
+        }
+
+    @Test
     fun newerDraftRemainsVisibleWhileTheOlderSendIsPending() =
         runTest {
             val appState = appState()

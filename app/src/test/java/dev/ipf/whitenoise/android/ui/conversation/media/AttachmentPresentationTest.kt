@@ -151,10 +151,30 @@ class AttachmentPresentationTest {
             classifyAttachmentOpen(" Application/Octet-Stream ; charset=binary ", "release.apk", validArchive),
         )
         assertEquals(
+            AttachmentOpenClassification.Ready(ANDROID_PACKAGE_MIME),
+            classifyAttachmentOpen("application/zip", "release.apk", validArchive),
+        )
+        assertEquals(
+            AttachmentOpenClassification.Ready(ANDROID_PACKAGE_MIME),
+            classifyAttachmentOpen("application/x-zip-compressed", "release.apk", validArchive),
+        )
+        assertEquals(
             AttachmentOpenClassification.Ready("application/pdf"),
             classifyAttachmentOpen("application/pdf", "misleading.apk", validArchive),
         )
-        assertEquals(2, archiveChecks)
+        assertEquals(4, archiveChecks)
+    }
+
+    /** Only plausible APKs move from the route-scoped viewer to the app owner. */
+    @Test
+    fun installerHandoffCandidateHonorsSpecificMimeMetadata() {
+        assertTrue(isAndroidPackageOpenCandidate(ANDROID_PACKAGE_MIME, "payload.bin"))
+        assertTrue(isAndroidPackageOpenCandidate(GENERIC_BINARY_MIME, "release.APK"))
+        assertTrue(isAndroidPackageOpenCandidate("", "release.apk"))
+        assertTrue(isAndroidPackageOpenCandidate("application/zip", "release.apk"))
+        assertTrue(isAndroidPackageOpenCandidate("application/x-zip-compressed", "release.apk"))
+        assertFalse(isAndroidPackageOpenCandidate("application/pdf", "misleading.apk"))
+        assertFalse(isAndroidPackageOpenCandidate(GENERIC_BINARY_MIME, "notes.pdf"))
     }
 
     @Test
@@ -162,6 +182,10 @@ class AttachmentPresentationTest {
         assertEquals(
             AttachmentOpenClassification.InvalidAndroidPackage,
             classifyAttachmentOpen(GENERIC_BINARY_MIME, "release.apk") { false },
+        )
+        assertEquals(
+            AttachmentOpenClassification.InvalidAndroidPackage,
+            classifyAttachmentOpen("application/zip", "release.apk") { false },
         )
     }
 

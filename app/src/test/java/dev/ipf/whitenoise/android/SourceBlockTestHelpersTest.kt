@@ -16,4 +16,28 @@ class SourceBlockTestHelpersTest {
 
         assertEquals("{ return \"body\" }", source.functionBody("sample"))
     }
+
+    /** Ensures a property helper excludes declarations following the initializer call. */
+    @Test
+    fun propertyInitializerCallStopsAtItsBalancedArgumentList() {
+        val source =
+            """
+            private val recovery =
+                Coordinator(
+                    shouldContinue = { value != ")" },
+                    note = "ignored ) in string",
+                )
+            private val unrelated = true
+            """.trimIndent()
+
+        assertEquals(
+            """
+            (
+                    shouldContinue = { value != ")" },
+                    note = "ignored ) in string",
+                )
+            """.trimIndent(),
+            source.propertyInitializerCall("recovery"),
+        )
+    }
 }

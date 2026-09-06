@@ -66,6 +66,29 @@ class TtsReadAloudHighlightTest {
         assertEquals(listOf(boxes[1], boxes[3]), ttsSentenceMarkerBoxes(boxes))
     }
 
+    /** Merges touching cells without crossing a line, direction, or visual gap. */
+    @Test
+    fun adjacentHighlightCellsMergeOnlyInsideOneVisualRun() {
+        val boxes =
+            listOf(
+                TtsHighlightBox(Rect(0f, 0f, 10f, 20f), ResolvedTextDirection.Ltr),
+                TtsHighlightBox(Rect(10.25f, 0f, 20f, 20f), ResolvedTextDirection.Ltr),
+                TtsHighlightBox(Rect(24f, 0f, 30f, 20f), ResolvedTextDirection.Ltr),
+                TtsHighlightBox(Rect(30f, 0f, 40f, 20f), ResolvedTextDirection.Rtl),
+                TtsHighlightBox(Rect(0f, 20f, 10f, 40f), ResolvedTextDirection.Ltr),
+            )
+
+        assertEquals(
+            listOf(
+                TtsHighlightBox(Rect(0f, 0f, 20f, 20f), ResolvedTextDirection.Ltr),
+                boxes[2],
+                boxes[3],
+                boxes[4],
+            ),
+            boxes.mergeAdjacentHighlightBoxes(),
+        )
+    }
+
     @Test
     fun lockedThemeMatrixKeepsTextAndMarkersReadable() {
         val cases =

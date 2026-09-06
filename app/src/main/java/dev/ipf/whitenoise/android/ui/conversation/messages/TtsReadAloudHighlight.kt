@@ -8,7 +8,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -370,6 +370,10 @@ internal fun ttsHighlightTextRange(
     return TextRange(start, end)
 }
 
+/**
+ * Paints sentence and word progress from projection ranges using cached visual
+ * character boxes, while exposing the same ranges to placement instrumentation.
+ */
 @Suppress("ReturnCount")
 internal fun Modifier.ttsReadAloudHighlight(
     layoutResult: TextLayoutResult?,
@@ -393,16 +397,19 @@ internal fun Modifier.ttsReadAloudHighlight(
             .filterNot(TextRange::collapsed)
     val wordRange = highlight.word?.let { ttsHighlightTextRange(it, textLength) }
     if (sentenceRanges.isEmpty() && wordRange?.collapsed != false) return this.then(semanticsModifier)
-    return this.then(semanticsModifier).drawBehind {
-        sentenceRanges.forEach { range ->
-            val boxes = highlightBoundingBoxes(layoutResult, range)
-            boxes.forEach { highlightBox ->
+    return this.then(semanticsModifier).drawWithCache {
+        val sentenceBoxes = sentenceRanges.flatMap { range -> highlightBoundingBoxes(layoutResult, range) }
+        val wordBoxes =
+            wordRange
+                ?.takeUnless { it.collapsed }
+                ?.let { highlightBoundingBoxes(layoutResult, it) }
+                .orEmpty()
+        onDrawBehind {
+            sentenceBoxes.forEach { highlightBox ->
                 val box = highlightBox.bounds
                 drawRect(color = style.sentenceFill, topLeft = Offset(box.left, box.top), size = box.size)
             }
-        }
-        wordRange?.takeUnless { it.collapsed }?.let { range ->
-            highlightBoundingBoxes(layoutResult, range).forEach { highlightBox ->
+            wordBoxes.forEach { highlightBox ->
                 val box = highlightBox.bounds
                 val thickness = TTS_WORD_MARKER_WIDTH_DP.dp.toPx().coerceAtMost(box.height / 2f)
                 drawRect(
@@ -451,42 +458,65 @@ internal fun ttsSentenceMarkerBoxes(boxes: List<TtsHighlightBox>): List<TtsHighl
             }
         }
 
-private fun highlightBoundingBoxes(
+/**
+ * Converts a half-open logical range to exact visual character cells.
+ *
+ * A soft-wrap offset has two caret affinities, so deriving the rectangle from
+ * `getHorizontalPosition()` can select the previous visual line at the start
+ * of a sentence. Character bounding boxes have no caret ambiguity: each box
+ * belongs to the rendered character at that offset. Adjacent cells are merged
+ * only after they are assigned to a visual line, preserving disjoint bidi runs
+ * and omitted projection spans without allocating rectangles during drawing.
+ */
+internal fun highlightBoundingBoxes(
     layoutResult: TextLayoutResult,
     range: TextRange,
 ): List<TtsHighlightBox> {
-    val start = range.start.coerceIn(0, layoutResult.layoutInput.text.length)
-    val end = range.end.coerceIn(start, layoutResult.layoutInput.text.length)
+    val text = layoutResult.layoutInput.text.text
+    val start = range.start.coerceIn(0, text.length)
+    val end = range.end.coerceIn(start, text.length)
     if (start >= end) return emptyList()
-    val startLine = layoutResult.getLineForOffset(start)
-    val endLine = layoutResult.getLineForOffset(max(end - 1, start))
-    val boxes = ArrayList<TtsHighlightBox>()
-    for (line in startLine..endLine) {
-        val lineStart = if (line == startLine) start else layoutResult.getLineStart(line)
-        val lineEnd = if (line == endLine) end else layoutResult.getLineEnd(line)
-        if (lineStart >= lineEnd) continue
-        val top = layoutResult.getLineTop(line)
-        val bottom = layoutResult.getLineBottom(line)
-        var cursor = lineStart
-        while (cursor < lineEnd) {
-            val box = layoutResult.getBoundingBox(cursor)
-            val next = layoutResult.getOffsetForPosition(Offset(box.right + 1f, box.top))
-            val segmentEnd = if (next <= cursor) lineEnd else min(next, lineEnd)
-            val left = layoutResult.getHorizontalPosition(cursor, usePrimaryDirection = true)
-            val right = layoutResult.getHorizontalPosition(segmentEnd, usePrimaryDirection = false)
-            boxes +=
+    val characterBoxes = ArrayList<TtsHighlightBox>(end - start)
+    var offset = start
+    while (offset < end) {
+        val box = layoutResult.getBoundingBox(offset)
+        if (box.width > 0f && box.height > 0f) {
+            characterBoxes +=
                 TtsHighlightBox(
-                    bounds =
-                        Rect(
-                            left = min(left, right),
-                            top = top,
-                            right = max(left, right),
-                            bottom = bottom,
-                        ),
-                    paragraphDirection = layoutResult.getParagraphDirection(cursor),
+                    bounds = box,
+                    paragraphDirection = layoutResult.getParagraphDirection(offset),
                 )
-            cursor = segmentEnd
         }
+        offset += Character.charCount(Character.codePointAt(text, offset))
     }
-    return boxes
+    return characterBoxes.mergeAdjacentHighlightBoxes()
 }
+
+/** Coalesces touching cells on one visual line without bridging visual gaps. */
+internal fun List<TtsHighlightBox>.mergeAdjacentHighlightBoxes(): List<TtsHighlightBox> =
+    groupBy { box -> Triple(box.bounds.top, box.bounds.bottom, box.paragraphDirection) }
+        .values
+        .flatMap { lineBoxes ->
+            lineBoxes
+                .sortedBy { it.bounds.left }
+                .fold(mutableListOf()) { merged: MutableList<TtsHighlightBox>, next ->
+                    val previous = merged.lastOrNull()
+                    if (previous != null && next.bounds.left <= previous.bounds.right + TTS_BOX_JOIN_TOLERANCE_PX) {
+                        merged[merged.lastIndex] =
+                            previous.copy(
+                                bounds =
+                                    Rect(
+                                        left = min(previous.bounds.left, next.bounds.left),
+                                        top = previous.bounds.top,
+                                        right = max(previous.bounds.right, next.bounds.right),
+                                        bottom = previous.bounds.bottom,
+                                    ),
+                            )
+                    } else {
+                        merged += next
+                    }
+                    merged
+                }
+        }
+
+private const val TTS_BOX_JOIN_TOLERANCE_PX = 0.5f

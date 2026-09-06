@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.annotation.VisibleForTesting
 import androidx.core.app.RemoteInput
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
@@ -25,18 +26,41 @@ class NotificationActionReceiver : BroadcastReceiver() {
         val action = NotificationActions.parse(intent) ?: return
         val appContext = context.applicationContext
         val pending = goAsync()
+        launchActionOrchestration(appContext, action, intent, finish = pending::finish)
+    }
+
+    /**
+     * Runs one parsed action's enqueue orchestration off the main thread and
+     * guarantees [finish] is invoked exactly once — on success, on failure,
+     * and when the enqueue overruns [budgetMs] — so the broadcast's
+     * [android.content.BroadcastReceiver.PendingResult] can never leak past
+     * the receiver deadline. Exposed with an injectable [finish] and budget
+     * because [goAsync]'s framework PendingResult offers no completion
+     * observability under Robolectric.
+     */
+    @VisibleForTesting
+    internal fun launchActionOrchestration(
+        appContext: Context,
+        action: NotificationAction,
+        intent: Intent,
+        finish: () -> Unit,
+        budgetMs: Long = GO_ASYNC_BUDGET_MS,
+        dispatchAction: suspend () -> Unit = {
+            when (action.kind) {
+                NotificationActionKind.REPLY -> enqueueReplyAction(appContext, action, intent)
+                NotificationActionKind.REACT -> enqueueReactionAction(appContext, action, intent)
+                NotificationActionKind.MARK_READ -> enqueueMarkReadAction(appContext, action)
+            }
+        },
+    ) {
         // Keep receiver orchestration and WorkManager persistence off the main
         // thread; workers hop to main only for AppState mutations.
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         scope.launch {
             try {
                 val completed =
-                    withTimeoutOrNull(GO_ASYNC_BUDGET_MS) {
-                        when (action.kind) {
-                            NotificationActionKind.REPLY -> enqueueReplyAction(appContext, action, intent)
-                            NotificationActionKind.REACT -> enqueueReactionAction(appContext, action, intent)
-                            NotificationActionKind.MARK_READ -> enqueueMarkReadAction(appContext, action)
-                        }
+                    withTimeoutOrNull(budgetMs) {
+                        dispatchAction()
                         true
                     }
                 if (completed == null) {
@@ -49,7 +73,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     "group=${action.target.groupIdHex.take(8)} message=${action.target.messageIdHex.orEmpty().take(8)}"
                 }
             } finally {
-                pending.finish()
+                finish()
                 scope.cancel()
             }
         }

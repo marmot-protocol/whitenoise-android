@@ -359,6 +359,7 @@
     <string name="forward_partial_summary">Inoltrato a %1$d chat su %2$d</string>
     <string name="forward_failed_summary">Impossibile inoltrare alle chat selezionate</string>
     <string name="forward_start_failed">Impossibile avviare l’inoltro. Chiudi e riprova.</string>
+    <string name="forward_restore_discarded">Impossibile ripristinare in modo sicuro l’inoltro non completato, quindi è stato annullato</string>
     <string name="forward_retry_failed">Riprova le chat non riuscite</string>
     <plurals name="forward_attachment_count">
         <item quantity="one">%1$d allegato</item>
@@ -679,8 +680,8 @@
     <string name="tts_playback_action_play">Riproduci</string>
     <string name="tts_playback_action_pause">Metti in pausa</string>
     <string name="tts_playback_action_stop">Interrompi</string>
-    <string name="tts_playback_action_previous_message">Messaggio precedente</string>
-    <string name="tts_playback_action_next_message">Messaggio successivo</string>
+    <string name="tts_playback_action_previous_sentence">Frase precedente</string>
+    <string name="tts_playback_action_next_sentence">Frase successiva</string>
     <string name="toast_restarting">Riavvio</string>
     <string name="toast_identity_created">Identità creata</string>
     <string name="toast_couldnt_create_identity">Impossibile creare l’identità</string>
@@ -1309,8 +1310,8 @@
     <string name="user_search_searching">Ricerca nella rete…</string>
     <string name="user_search_incomplete">Alcuni risultati della rete potrebbero mancare.</string>
     <string name="user_search_failed">Impossibile cercare nella rete. Controlla la connessione e riprova.</string>
-    <string name="user_search_following">Segui già</string>
-    <string name="user_search_network">Dalla rete</string>
+    <string name="user_search_you_follow">Segui già</string>
+    <string name="user_search_result">Risultato della ricerca</string>
     <string name="paste_npub">Incolla npub</string>
     <string name="start_chat">Avvia chat</string>
     <string name="name_this_group">Dai un nome al gruppo</string>
@@ -1446,6 +1447,26 @@
     <string name="tts_settings_explainer_no_engine">Nessun motore di sintesi vocale utilizzabile installato. Installa RHVoice o eSpeak NG da F-Droid o Zapstore, poi selezionalo qui sotto.</string>
     <string name="tts_settings_engine_title">Motore</string>
     <string name="tts_settings_rate_title">Velocità del parlato</string>
+    <string name="tts_media_mix_title">Parla sopra i contenuti multimediali in riproduzione</string>
+    <string name="tts_media_mix_subtitle">Si avvia solo mentre è in riproduzione un altro audio; White Noise non controlla l’altro audio</string>
+    <string name="tts_media_mix_volume_title">Volume della voce sui contenuti multimediali</string>
+    <string name="tts_media_mix_volume_quiet">Basso</string>
+    <string name="tts_media_mix_volume_medium">Medio</string>
+    <string name="tts_media_mix_volume_loud">Alto</string>
+    <string name="tts_media_mix_volume_quiet_description">35 per cento del volume del motore di sintesi vocale</string>
+    <string name="tts_media_mix_volume_medium_description">60 per cento del volume del motore di sintesi vocale</string>
+    <string name="tts_media_mix_volume_loud_description">85 per cento del volume del motore di sintesi vocale</string>
+    <string name="tts_media_mix_no_active_media">Avvia musica o un podcast prima di usare la voce sui contenuti multimediali</string>
+    <string name="tts_voice_title">Voce</string>
+    <string name="tts_voice_automatic">Voce offline automatica</string>
+    <string name="tts_voice_automatic_description">Usa la migliore voce offline installata per la lingua del messaggio</string>
+    <string name="tts_voice_available_offline">Disponibile offline</string>
+    <string name="tts_voice_invalid_identity">Manca un nome voce stabile e non può essere selezionata</string>
+    <string name="tts_voice_not_installed">Non installata</string>
+    <string name="tts_voice_requires_network">Richiede una connessione di rete e non può essere selezionata</string>
+    <string name="tts_voice_ambiguous">Identità voce duplicata e non selezionabile</string>
+    <string name="tts_voice_unavailable">Nessuna voce offline disponibile</string>
+    <string name="tts_voice_effective_fallback">La voce salvata non è disponibile; verrà usata %1$s</string>
     <string name="speak_aloud">Leggi ad alta voce</string>
     <string name="tts_bar_pause">Sospendi lettura</string>
     <string name="tts_bar_play">Riprendi lettura</string>
@@ -1594,6 +1615,7 @@
     <string name="nostr_event_failed">Impossibile caricare questo evento. Controlla la connessione e riprova.</string>
     <string name="nostr_event_open">Apri evento</string>
     <string name="nostr_event_read_article">Leggi articolo</string>
+    <string name="nostr_event_read_note">Leggi la nota completa</string>
     <string name="nostr_event_play_video">Riproduci video</string>
     <string name="nostr_video_playback_failed">Impossibile riprodurre questo video.</string>
     <string name="nostr_event_copy">Copia riferimento evento</string>
@@ -1634,6 +1656,6 @@
     <string name="discard">Elimina</string>
     <string name="open_app_settings">Apri le impostazioni dell’app</string>
     <string name="dictation_disclosure_title">Riconoscimento vocale esterno</string>
-    <string name="dictation_disclosure_message">Il servizio vocale installato elabora l’audio dettato e può inviarlo al proprio fornitore. White Noise inserisce il testo restituito in questa bozza per consentirti di controllarlo e non lo invia mai automaticamente.</string>
+    <string name="dictation_disclosure_message">Il servizio vocale installato elabora l’audio dettato e può inviarlo al proprio fornitore. Per impostazione predefinita, White Noise incolla il testo restituito nella bozza; l’invio automatico è disponibile solo quando lo abiliti esplicitamente nelle impostazioni di Dettatura.</string>
     <string name="dictation_continue">Continua</string>
 </resources>

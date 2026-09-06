@@ -124,7 +124,7 @@ class FreshSweepCoverageTest {
         val body = source("state/Controllers.kt").kotlinFunctionBody("acceptInvite")
         val optimisticProjection = body.indexOf("group = optimisticGroup")
         val optimisticLocalUpdate = body.indexOf("applyLocalGroupUpdate(optimisticGroup)")
-        val accept = body.indexOf("acceptGroupInvite")
+        val accept = body.indexOf("inviteAcceptor(")
         val confirmedProjection = body.indexOf("group = acceptedGroup")
         val confirmedLocalUpdate = body.indexOf("applyLocalGroupUpdate(group)", confirmedProjection)
         val dismiss = body.indexOf("dismissConversationNotifications")
@@ -181,11 +181,6 @@ class FreshSweepCoverageTest {
         val markReadWorker = source("notifications/NotificationMarkReadWorker.kt")
         val replyWorker = source("notifications/NotificationReplyWorker.kt")
         val presenter = source("notifications/LocalNotificationPresenter.kt")
-        val replyLockBranch =
-            replyWorker.section(
-                "if (!application.appState.notificationActionsAllowed)",
-                "if (retryStore.operationFailureCount",
-            )
         val mainConfinedMutations =
             Regex(
                 """withContext\(Dispatchers\.Main\.immediate\) \{\s*""" +
@@ -195,18 +190,11 @@ class FreshSweepCoverageTest {
 
         assertTrue("mark-read broadcasts must only enqueue durable work", "NotificationMarkReadWorker.enqueue" in markReadEnqueue)
         assertTrue("mark-read mutations must remain main-confined", mainConfinedMutations.containsMatchIn(markReadWorker))
-        assertTrue("locked mark-read work must wait for unlock", "return Result.retry()" in markReadWorker)
-        assertTrue(
-            "mark-read work must deduplicate repeated notification actions",
-            ".enqueueUniqueWork(" in markReadWorker && "ExistingWorkPolicy.KEEP" in markReadWorker,
-        )
-        assertTrue(
-            "only encrypted replies may wait for unlock",
-            "if (containsLegacyPlaintext)" in replyLockBranch &&
-                "Result.failure()" in replyLockBranch &&
-                "retryStore.shouldDeferForLock" in replyLockBranch &&
-                "return Result.retry()" in replyLockBranch,
-        )
+        // Locked-deferral and KEEP-dedupe behavior is executed directly by
+        // NotificationMarkReadWorkerTest, replacing the former source-text pins.
+        // Encrypted-defer versus legacy-plaintext-failure behind the app lock
+        // is executed directly by NotificationReplyWorkerTest, replacing the
+        // former source-text pin of the lock branch.
         assertFalse(
             "a lock race must not terminally record a dropped reply as success",
             "markAbandoned(completionKey, NotificationReplyAbandonedOutcome.Success)" in replyWorker,

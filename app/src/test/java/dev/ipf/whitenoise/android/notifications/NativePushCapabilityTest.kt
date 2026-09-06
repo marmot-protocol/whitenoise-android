@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NativePushCapabilityTest {
-    /** Protects configuration-free builds from evaluating later runtime prerequisites. */
+    /** Gives absent build configuration precedence over unavailable runtime prerequisites. */
     @Test
     fun missingPushServerConfigurationTakesPrecedence() {
         assertEquals(

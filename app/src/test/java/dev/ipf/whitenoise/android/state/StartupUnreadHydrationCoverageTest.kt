@@ -46,6 +46,7 @@ class StartupUnreadHydrationCoverageTest {
         )
     }
 
+    /** Keeps deferred unread hydration suppression-aware and account-list scoped. */
     @Test
     fun suppressionAwareUnreadReconciliationStartsAfterTheFirstLocalFrame() {
         val source = appStateSource().readText()
@@ -65,7 +66,7 @@ class StartupUnreadHydrationCoverageTest {
         )
         assertTrue(
             "the deferred pass must reject stale account snapshots",
-            "StartupUnreadRevisionGuard" in recorder && "revisionGuard::isCurrent" in recorder,
+            "accountListLifetime.isCurrent" in recorder && "stillCurrent = accountListIsCurrent" in recorder,
         )
     }
 

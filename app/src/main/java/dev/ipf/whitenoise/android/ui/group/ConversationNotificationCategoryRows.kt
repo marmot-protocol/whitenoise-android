@@ -28,10 +28,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationCategorySetting
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationScope
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 @Composable
@@ -92,6 +94,7 @@ private fun ConversationNotificationCategoryRow(
     }
 }
 
+/** Renders the independent Android-settings action and optional inheritance switch. */
 @Composable
 private fun NotificationCategoryActions(
     setting: ConversationNotificationCategorySetting,
@@ -106,7 +109,18 @@ private fun NotificationCategoryActions(
     IconButton(
         enabled = !pending,
         onClick = { onOpen(setting) },
-        modifier = Modifier.testTag("open-conversation-notification-${setting.channel.id}"),
+        modifier =
+            Modifier
+                .testTag(
+                    if (
+                        BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS &&
+                        setting.channel == NotificationChannelSpec.GROUP_MESSAGES
+                    ) {
+                        PerformanceTestTags.GROUP_MESSAGE_NOTIFICATION_SETTINGS
+                    } else {
+                        "open-conversation-notification-${setting.channel.id}"
+                    },
+                ),
     ) {
         Icon(
             imageVector = Icons.Default.Settings,

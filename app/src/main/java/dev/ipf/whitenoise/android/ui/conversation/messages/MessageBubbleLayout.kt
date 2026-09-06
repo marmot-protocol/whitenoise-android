@@ -16,6 +16,8 @@ internal fun messageBubbleColumnMaxWidth(
 
 internal fun messageBubbleColumnTestTag(messageIdHex: String): String = "message-bubble-column:$messageIdHex"
 
+internal fun messageBubbleRowTestTag(messageIdHex: String): String = "message-bubble-row:$messageIdHex"
+
 internal fun messageBubbleColumnMinWidth(
     hasGeneralFileCard: Boolean,
     maxWidth: Dp,

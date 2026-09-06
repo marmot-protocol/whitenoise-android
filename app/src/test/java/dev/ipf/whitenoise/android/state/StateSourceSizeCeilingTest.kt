@@ -38,9 +38,13 @@ class StateSourceSizeCeilingTest {
 
     internal companion object {
         // Lowered as `ChatListItem` and then the chat-list sort moved to their own
-        // same-package files.
-        const val CONTROLLERS_MAX_LINES = 12759
-        const val APP_STATE_MAX_LINES = 10185
+        // same-package files. Raised to the exact post-#2431 size for its covered
+        // chat-list convergence and notification-open fixes; keep this ratchet exact.
+        const val CONTROLLERS_MAX_LINES = 12877
+
+        // Deliberately raised for PR #2392's covered app-owned dictation integration. Keep this exact so
+        // unrelated AppState growth remains blocked after the stacked branch is merged with current master.
+        const val APP_STATE_MAX_LINES = 10226
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }

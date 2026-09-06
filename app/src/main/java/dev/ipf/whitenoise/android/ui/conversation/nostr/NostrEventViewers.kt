@@ -3,6 +3,10 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
+import android.content.ClipData
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,12 +35,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -60,6 +69,7 @@ import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.core.HostSafety
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import okhttp3.Dns
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
@@ -67,15 +77,21 @@ import java.io.IOException
 import java.net.InetAddress
 import java.net.UnknownHostException
 
+/** Parses a verified event body and presents it without starting another event-resolution layer. */
 @Composable
-internal fun NostrArticleReaderDialog(
+internal fun NostrEventReaderDialog(
     card: NostrEventCardModel,
+    authoredReference: String?,
     authorDisplayName: (String) -> String,
     mentionDisplayName: (String) -> String?,
     onNostrProfileTap: (String) -> Unit,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
     onDismiss: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    val eventUri = authoredReference?.let(::nostrEventUri)
     var document by remember(card.eventIdHex) { mutableStateOf<MarkdownDocumentFfi?>(null) }
     var parsing by remember(card.eventIdHex) { mutableStateOf(true) }
     LaunchedEffect(card.eventIdHex, card.readerBody) {
@@ -99,26 +115,43 @@ internal fun NostrArticleReaderDialog(
                 decorFitsSystemWindows = false,
             ),
     ) {
-        NostrArticleReaderScreen(
+        NostrEventReaderScreen(
             card = card,
+            authoredReference = authoredReference,
             document = document,
             parsing = parsing,
             authorDisplayName = authorDisplayName,
             mentionDisplayName = mentionDisplayName,
             onNostrProfileTap = onNostrProfileTap,
+            onCopyReference =
+                eventUri?.let { uri ->
+                    {
+                        scope.launch {
+                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Nostr event", uri)))
+                        }
+                    }
+                },
+            onOpenExternal =
+                eventUri?.let { uri ->
+                    { openNostrEvent(context, uri) }
+                },
             onDismiss = onDismiss,
         )
     }
 }
 
+/** Renders the complete verified note or article with its immutable event context. */
 @Composable
-internal fun NostrArticleReaderScreen(
+internal fun NostrEventReaderScreen(
     card: NostrEventCardModel,
+    authoredReference: String? = null,
     document: MarkdownDocumentFfi?,
     parsing: Boolean,
     authorDisplayName: (String) -> String,
     mentionDisplayName: (String) -> String?,
     onNostrProfileTap: (String) -> Unit,
+    onCopyReference: (() -> Unit)? = null,
+    onOpenExternal: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -128,10 +161,16 @@ internal fun NostrArticleReaderScreen(
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
-            NostrArticleReaderHeader(onDismiss)
-            HorizontalDivider()
-            NostrArticleReaderBody(
+            NostrEventReaderHeader(
                 card = card,
+                onDismiss = onDismiss,
+                onCopyReference = onCopyReference,
+                onOpenExternal = onOpenExternal,
+            )
+            HorizontalDivider()
+            NostrEventReaderBody(
+                card = card,
+                authoredReference = authoredReference,
                 document = document,
                 parsing = parsing,
                 authorDisplayName = authorDisplayName,
@@ -142,8 +181,14 @@ internal fun NostrArticleReaderScreen(
     }
 }
 
+/** Keeps Back, copy, and external-open controls distinct from links in the reader body. */
 @Composable
-private fun NostrArticleReaderHeader(onDismiss: () -> Unit) {
+private fun NostrEventReaderHeader(
+    card: NostrEventCardModel,
+    onDismiss: () -> Unit,
+    onCopyReference: (() -> Unit)?,
+    onOpenExternal: (() -> Unit)?,
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -155,16 +200,28 @@ private fun NostrArticleReaderHeader(onDismiss: () -> Unit) {
             )
         }
         Text(
-            text = stringResource(R.string.nostr_event_type_article),
+            text = card.kind.label(card.eventKind),
+            modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
+        if (onCopyReference != null && onOpenExternal != null) {
+            EventCardActions(
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                copyDescription = stringResource(R.string.nostr_event_copy),
+                openDescription = stringResource(R.string.nostr_event_open),
+                onCopy = onCopyReference,
+                onOpen = onOpenExternal,
+            )
+        }
     }
 }
 
+/** Renders event metadata, the authored reference, and the bounded full Markdown body. */
 @Composable
-private fun NostrArticleReaderBody(
+private fun NostrEventReaderBody(
     card: NostrEventCardModel,
+    authoredReference: String?,
     document: MarkdownDocumentFfi?,
     parsing: Boolean,
     authorDisplayName: (String) -> String,
@@ -191,6 +248,15 @@ private fun NostrArticleReaderBody(
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        authoredReference?.takeIf(String::isNotBlank)?.let { reference ->
+            Text(
+                text = reference,
+                modifier = Modifier.fillMaxWidth().testTag(NOSTR_EVENT_READER_REFERENCE_TAG),
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         when {
             parsing ->
                 Box(
@@ -214,6 +280,24 @@ private fun NostrArticleReaderBody(
         }
     }
 }
+
+/** Normalizes a parser-authored event reference into the URI used by copy/open fallback actions. */
+private fun nostrEventUri(authoredReference: String): String =
+    if (authoredReference.startsWith("nostr:", ignoreCase = true)) authoredReference else "nostr:$authoredReference"
+
+/** Sends an event reference to an installed Nostr handler without failing the in-app reader. */
+private fun openNostrEvent(
+    context: Context,
+    eventUri: String,
+) {
+    runCatching {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(eventUri)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+}
+
+internal const val NOSTR_EVENT_READER_REFERENCE_TAG = "nostr-event-reader-reference"
 
 @Composable
 internal fun NostrVideoPlayerDialog(

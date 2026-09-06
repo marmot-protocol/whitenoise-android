@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import androidx.compose.runtime.Immutable
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -804,5 +805,62 @@ private fun updateForwardTarget(
                     if (target.groupIdHex == groupIdHex) transform(target) else target
                 },
         )
+    }
+}
+
+private const val FORWARD_CHAT_MESSAGE_KIND = 9uL
+
+/**
+ * Indexes sent timeline records matching one prepared message's content, used
+ * to recognize a forward's own publish when its result was uncertain.
+ */
+internal fun forwardProjectionRecords(
+    timeline: List<TimelineMessageRecordFfi>,
+    message: PreparedForwardMessage,
+    references: List<MediaAttachmentReferenceFfi>,
+): Map<String, TimelineMessageRecordFfi> =
+    timeline
+        .asSequence()
+        .filter { record ->
+            record.direction == "sent" &&
+                record.kind == FORWARD_CHAT_MESSAGE_KIND &&
+                when (message) {
+                    is PreparedForwardMessage.Text ->
+                        record.plaintext == message.text && record.media.isEmpty()
+                    is PreparedForwardMessage.Media ->
+                        record.plaintext == message.caption.orEmpty() &&
+                            record.media.map { it.ciphertextSha256 } ==
+                            references.map { it.ciphertextSha256 }
+                }
+        }.associateBy(TimelineMessageRecordFfi::messageIdHex)
+
+/**
+ * Auto-dismisses a forward operation's terminal Completed/Cancelled strip
+ * after a short display window, unless a newer terminal snapshot superseded
+ * it in the meantime. Failed and partial states stay for explicit action.
+ */
+internal class ForwardTerminalDismissPolicy(
+    private val scope: CoroutineScope,
+    private val displayDurationMillis: Long,
+    private val currentSnapshot: () -> ForwardOperationSnapshot?,
+    private val dismiss: () -> Unit,
+) {
+    private val dismissals = StalenessGuard()
+
+    /** Schedules the delayed dismissal for one terminal snapshot. */
+    fun onTerminal(snapshot: ForwardOperationSnapshot) {
+        if (
+            snapshot.phase != ForwardOperationPhase.Completed &&
+            snapshot.phase != ForwardOperationPhase.Cancelled
+        ) {
+            return
+        }
+        val dismissGeneration = dismissals.advance()
+        scope.launch {
+            delay(displayDurationMillis)
+            dismissals.runIfCurrent(dismissGeneration) {
+                if (currentSnapshot() == snapshot) dismiss()
+            }
+        }
     }
 }

@@ -8,6 +8,7 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.os.Looper
 import android.speech.tts.TextToSpeech
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -34,8 +35,8 @@ class TtsPlaybackForegroundServiceTest {
 
     private class ServiceHarness {
         val engine = FakeServiceEngine()
-        var nextMessages = 0
-        var previousMessages = 0
+        var nextSentences = 0
+        var previousSentences = 0
         var stops = 0
         val controller =
             TtsController(
@@ -46,12 +47,12 @@ class TtsPlaybackForegroundServiceTest {
             object : TtsPlaybackSessionHost {
                 override val controller: TtsController get() = this@ServiceHarness.controller
 
-                override fun nextMessage() {
-                    nextMessages += 1
+                override fun nextSentence() {
+                    nextSentences += 1
                 }
 
-                override fun previousMessage() {
-                    previousMessages += 1
+                override fun previousSentence() {
+                    previousSentences += 1
                 }
 
                 override fun stopSession() {
@@ -73,6 +74,11 @@ class TtsPlaybackForegroundServiceTest {
         val installed = ServiceHarness()
         TtsPlaybackForegroundService.hostResolver = { installed.host }
         return installed
+    }
+
+    /** Installs a production-shaped host while retaining Robolectric's service lifecycle. */
+    private fun installHost(host: TtsPlaybackSessionHost) {
+        TtsPlaybackForegroundService.hostResolver = { host }
     }
 
     @After
@@ -191,6 +197,7 @@ class TtsPlaybackForegroundServiceTest {
         assertFalse(TtsPlaybackForegroundService.start(rejectingContext))
     }
 
+    /** Every notification action is forwarded to the one app-owned playback session. */
     @Test
     fun notificationActionsOperateTheOneSharedSession() {
         val harness = installHost()
@@ -219,18 +226,18 @@ class TtsPlaybackForegroundServiceTest {
         assertTrue(harness.controller.state.value is TtsState.Speaking)
 
         service.onStartCommand(
-            Intent(context, service::class.java).setAction(TtsPlaybackForegroundService.ACTION_NEXT_MESSAGE),
+            Intent(context, service::class.java).setAction(TtsPlaybackForegroundService.ACTION_NEXT_SENTENCE),
             0,
             4,
         )
         service.onStartCommand(
-            Intent(context, service::class.java).setAction(TtsPlaybackForegroundService.ACTION_PREVIOUS_MESSAGE),
+            Intent(context, service::class.java).setAction(TtsPlaybackForegroundService.ACTION_PREVIOUS_SENTENCE),
             0,
             5,
         )
         shadowOf(Looper.getMainLooper()).idle()
-        assertEquals(1, harness.nextMessages)
-        assertEquals(1, harness.previousMessages)
+        assertEquals(1, harness.nextSentences)
+        assertEquals(1, harness.previousSentences)
 
         service.onStartCommand(
             Intent(context, service::class.java).setAction(TtsPlaybackForegroundService.ACTION_STOP),
@@ -242,6 +249,81 @@ class TtsPlaybackForegroundServiceTest {
         assertTrue(harness.controller.state.value is TtsState.Idle)
         assertTrue(shadowOf(service as Service).isStoppedBySelf)
         controller.destroy()
+    }
+
+    /**
+     * Proves notification and platform MediaSession actions cross the real
+     * history/session boundary at sentence granularity, including paused
+     * navigation and sender announcement on a message crossing.
+     */
+    @Test
+    fun systemMediaActionsNavigateTheRealHistorySessionBySentence() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.pager.loaded += harness.record("m1", sentences = 3)
+            harness.pager.loaded += harness.record("m2", sentences = 2)
+            harness.speakEntries(listOf(harness.entry("m1", sentences = 3), harness.entry("m2", sentences = 2)))
+            val realHost =
+                object : TtsPlaybackSessionHost {
+                    override val controller = harness.controller
+
+                    override fun nextSentence() = harness.session.nextSentence()
+
+                    override fun previousSentence() = harness.session.previousSentence()
+
+                    override fun stopSession() {
+                        harness.controller.stop()
+                        harness.session.onSessionCleared()
+                    }
+                }
+            installHost(realHost)
+
+            val serviceController = Robolectric.buildService(TtsPlaybackForegroundService::class.java).create()
+            val service = serviceController.get()
+            val context = RuntimeEnvironment.getApplication()
+            service.onStartCommand(Intent(context, service::class.java), 0, 1)
+            shadowOf(Looper.getMainLooper()).idle()
+
+            service.onStartCommand(
+                Intent(context, service::class.java).setAction(TtsPlaybackForegroundService.ACTION_NEXT_SENTENCE),
+                0,
+                2,
+            )
+            shadowOf(Looper.getMainLooper()).idle()
+            assertCursor(harness.controller.state.value, messageIndex = 0, sentenceIndex = 1)
+
+            val notification = shadowOf(service as Service).lastForegroundNotification
+            assertEquals("Previous sentence", notification.actions[0].title.toString())
+            assertEquals("Next sentence", notification.actions[2].title.toString())
+            val transport = TtsPlaybackMediaSessionCallback(realHost)
+            transport.onSkipToNext()
+            assertCursor(harness.controller.state.value, messageIndex = 0, sentenceIndex = 2)
+
+            transport.onSkipToNext()
+            assertCursor(harness.controller.state.value, messageIndex = 1, sentenceIndex = 0)
+            assertTrue(harness.spokenTexts().any { it == "Nm2: Text m2." })
+
+            harness.controller.pause()
+            val spokenBeforePausedNavigation = harness.engine.spoken.size
+            val focusAcquiresBeforePausedNavigation = harness.focus.acquires
+            transport.onSkipToPrevious()
+
+            val paused = harness.controller.state.value
+            assertTrue(paused is TtsState.Paused)
+            assertCursor(paused, messageIndex = 0, sentenceIndex = 2)
+            assertEquals(spokenBeforePausedNavigation, harness.engine.spoken.size)
+            assertEquals(focusAcquiresBeforePausedNavigation, harness.focus.acquires)
+            serviceController.destroy()
+        }
+
+    /** Asserts the public transport cursor without coupling to engine chunk indices. */
+    private fun assertCursor(
+        state: TtsState,
+        messageIndex: Int,
+        sentenceIndex: Int,
+    ) {
+        assertEquals(messageIndex, state.messageIndex)
+        assertEquals(sentenceIndex, state.sentenceIndexWithinMessage)
     }
 
     @Test

@@ -7,6 +7,7 @@ import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
 import android.util.Log
 import android.util.LruCache
+import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -97,7 +98,7 @@ object VoicePlaybackController {
     private var currentOwnerKey: String? = null
     private var tickerJob: Job? = null
     private var currentSpeed: Float = 1f
-    private var playbackGeneration: Long = 0L
+    private val playbackRequests = StalenessGuard()
 
     // play() suspends while MediaPlayer prepares on IO; serialize callers so
     // only one prepared player can ever reach start()/assignment.
@@ -215,6 +216,7 @@ object VoicePlaybackController {
         ownerKey: String? = null,
     ): PlaybackStartResult = playSerializer.withSerializedPlayback { playLocked(key, file, ownerKey) }
 
+    /** Prepares one player and publishes it only while this request remains newest. */
     private suspend fun playLocked(
         key: String,
         file: File,
@@ -277,7 +279,7 @@ object VoicePlaybackController {
                 _state.value = PlaybackState()
                 return PlaybackStartResult.PrepareFailed
             }
-        if (prepareGeneration != playbackGeneration) {
+        if (!playbackRequests.isCurrent(prepareGeneration)) {
             mp.runCatching { release() }
             return PlaybackStartResult.Superseded
         }
@@ -534,10 +536,8 @@ object VoicePlaybackController {
         _state.value = PlaybackState()
     }
 
-    private fun nextPlaybackGeneration(): Long {
-        playbackGeneration += 1L
-        return playbackGeneration
-    }
+    /** Invalidates older player preparation and returns the new request token. */
+    private fun nextPlaybackGeneration(): Long = playbackRequests.advance()
 
     private fun releasePlayerInternal() {
         stopTicker()

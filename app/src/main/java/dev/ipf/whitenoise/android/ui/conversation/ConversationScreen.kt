@@ -125,7 +125,6 @@ import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
-import dev.ipf.whitenoise.android.state.shouldFocusComposerOnDraftRestore
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.MentionDetectionCache
@@ -171,6 +170,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInfoSheet
+import dev.ipf.whitenoise.android.ui.conversation.messages.RestoredForwardRequestHost
 import dev.ipf.whitenoise.android.ui.conversation.messages.dismissTextSelectionOnOutsideTap
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
@@ -944,6 +944,13 @@ internal fun ConversationScreen(
                     selectableMessages[item.record.messageIdHex]?.let { item.id to it }
                 }.toMap()
         }
+    LaunchedEffect(controller, controller.recoveryProjectionGeneration, renderedTimeline) {
+        val generation = controller.recoveryProjectionGeneration
+        if (generation > 0L) {
+            withFrameNanos { }
+            appState.recoveryDiagnostics.recordFirstVisibleFrame(generation)
+        }
+    }
     val timelineIdSet = remember(orderedTimelineIds) { orderedTimelineIds.toSet() }
     val selectableTimelineIds = remember(timelineSelectionById) { timelineSelectionById.keys }
     val dragSelectionDensity = LocalDensity.current
@@ -1244,6 +1251,7 @@ internal fun ConversationScreen(
     val imeIsOpen by remember(imeInsets, density) {
         derivedStateOf { imeInsets.getBottom(density) > 0 }
     }
+    val compactHeightConversation by rememberConversationCompactHeight()
     // #589: composer focus is hoisted here so the resume lifecycle observer
     // below can drive it. `composerFocus` is the requester wired into the
     // composer's BasicTextField, `composerFocused` mirrors the live focus edge
@@ -1479,10 +1487,11 @@ internal fun ConversationScreen(
             }
         }
 
+    /** Sends the canonical bare reference so receiving clients cannot infer a title from prose. */
     fun sendSharedUser(candidate: RecipientSearch.Candidate) {
         val presentationNpub = appState.npubForDisplay(candidate.accountIdHex)
         if (presentationNpub.isBlank()) return
-        val body = formatUserShareText(candidate.displayName, presentationNpub)
+        val body = formatUserShareText(presentationNpub)
         appState.launchMutation {
             controller.send(body) {
                 revealSentMessage()
@@ -2791,6 +2800,15 @@ internal fun ConversationScreen(
                 groupIdHex = controller.group.groupIdHex,
             )
         } ?: 0
+    // Capture the revision for this navigation entry. A later accepted
+    // transcript must rehydrate text/selection without being mistaken for a
+    // restored draft and reopening the IME. Re-entering the conversation gets
+    // a fresh baseline, so genuine draft restoration still focuses once.
+    val composerDictationRevisionOnEntry =
+        rememberComposerDictationRevisionOnEntry(
+            groupIdHex = controller.group.groupIdHex,
+            currentRevision = composerDictationRevision,
+        )
     val composerTextState =
         rememberComposerTextState(
             draftKey = controller.group.groupIdHex,
@@ -2950,7 +2968,7 @@ internal fun ConversationScreen(
                 },
                 onToggleArchived = {
                     menuOpen = false
-                    appState.launchMutation { controller.setArchived(!controller.group.archived) }
+                    appState.launchMutation { controller.setArchived(!controller.presentedArchived) }
                 },
                 onRequestLeave = {
                     menuOpen = false
@@ -2964,10 +2982,12 @@ internal fun ConversationScreen(
                     }
                 },
                 onTtsTransportBodyClick = onTtsTransportBodyClick,
+                compactHeight = compactHeightConversation,
             )
         },
         bottomBar = {
             ConversationBottomBar(
+                compactHeight = compactHeightConversation,
                 selectionMode = selectionMode,
                 selectionActionAvailability =
                     batchSelectionUi.actionAvailability.let { availability ->
@@ -3138,7 +3158,11 @@ internal fun ConversationScreen(
                 mentionPickerEnabled = mentionPicker.enabled,
                 autoFocusOnEnter = justCreated && !freezeRoutePresentation,
                 autoFocusOnDraftRestore =
-                    shouldFocusComposerOnDraftRestore(restoredDraftSnapshot) &&
+                    shouldAutoFocusComposerOnDraftRestore(
+                        snapshot = restoredDraftSnapshot,
+                        dictationRevisionOnEntry = composerDictationRevisionOnEntry,
+                        currentDictationRevision = composerDictationRevision,
+                    ) &&
                         !freezeRoutePresentation,
                 autoFocusConsumedState = composerAutoFocusConsumed,
                 composerFocus = composerFocus,
@@ -3564,21 +3588,17 @@ internal fun ConversationScreen(
     if (batchForwardSheetOpen && batchSelectionUi.forwardPayloads.isNotEmpty()) {
         ForwardMessageSheet(
             appState = appState,
-            messageCount = batchSelectionUi.forwardPayloads.size,
-            attachmentCount =
-                batchSelectionUi.forwardPayloads.sumOf { payload ->
-                    (payload as? ForwardMessagePayload.Media)?.attachments?.size ?: 0
-                },
+            payloads = batchSelectionUi.forwardPayloads,
+            sourceAccountRef = controller.boundAccountRef,
             originGroupIdHex = controller.group.groupIdHex,
             onDismiss = {
                 batchForwardSheetOpen = false
                 selectedMessages.clear()
             },
-            onForward = { targetGroupIds ->
-                appState.startForwardMessages(targetGroupIds, batchSelectionUi.forwardPayloads)
-            },
         )
     }
+
+    RestoredForwardRequestHost(appState = appState, controller = controller)
 
     batchInfoSelection?.let { infoSelection ->
         val infoRecord = infoSelection.record

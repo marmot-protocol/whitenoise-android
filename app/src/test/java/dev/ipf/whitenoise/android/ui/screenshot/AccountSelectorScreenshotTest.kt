@@ -54,6 +54,36 @@ class AccountSelectorScreenshotTest {
             .captureRoboImage("src/test/snapshots/account_selector_multi_account_dark.png")
     }
 
+    /** Captures the populated first frame while its lifecycle-bound refresh remains in flight. */
+    @Test
+    fun populatedAccountSelectorWhileRefreshingDark() {
+        val state =
+            accountSelectorState(
+                accounts = listOf(account("personal"), account("work")),
+                activeAccountRef = "personal",
+                refreshing = true,
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    AccountSelectorContent(
+                        state = state,
+                        displayName = { accountId -> if (accountId == "hex-personal") "Personal" else "Work" },
+                        shortNpub = { accountId -> "npub1${accountId.removePrefix("hex-").padEnd(10, 'x')}" },
+                        avatarUrl = { null },
+                        unreadCountForAccount = { label -> if (label == "work") 4uL else 0uL },
+                        onSwitchAccount = {},
+                        onAddAccount = {},
+                    )
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(ACCOUNT_SELECTOR_CONTENT_TAG)
+            .captureRoboImage("src/test/snapshots/account_selector_refreshing_with_snapshot_dark.png")
+    }
+
     private fun account(label: String): AccountSummaryFfi =
         AccountSummaryFfi(
             label = label,

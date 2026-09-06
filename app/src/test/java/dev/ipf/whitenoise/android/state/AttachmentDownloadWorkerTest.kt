@@ -22,7 +22,7 @@ class AttachmentDownloadWorkerTest {
         val request =
             AttachmentTransferRequest(
                 accountRef = "account-a",
-                groupIdHex = "ab".repeat(32),
+                groupIdHex = "ab".repeat(16),
                 messageIdHex = "cd".repeat(32),
                 attachmentIndex = 3,
             )
@@ -41,7 +41,7 @@ class AttachmentDownloadWorkerTest {
         val request =
             AttachmentTransferRequest(
                 accountRef = "private-account-label",
-                groupIdHex = "ab".repeat(32),
+                groupIdHex = "ab".repeat(16),
                 messageIdHex = "cd".repeat(32),
                 attachmentIndex = 0,
             )

@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -133,8 +134,9 @@ class VoiceRecordingController internal constructor(
     private var restarting = false
     private var restartJob: Job? = null
     private var startJob: Job? = null
-    private var startGeneration = 0L
+    private val startRequests = StalenessGuard()
 
+    /** Starts or resumes the single recording request accepted by this controller. */
     fun start(): Boolean {
         if (isRecording) return true
         if (!onPermissionRequest()) return false
@@ -161,7 +163,7 @@ class VoiceRecordingController internal constructor(
                     try {
                         pending.join()
                         restarting = false
-                        if (isRecording && generation == startGeneration) beginRecording(generation)
+                        if (isRecording && startRequests.isCurrent(generation)) beginRecording(generation)
                     } finally {
                         completeRestart()
                     }
@@ -196,12 +198,14 @@ class VoiceRecordingController internal constructor(
         return true
     }
 
+    /** Clears restart bookkeeping and releases the microphone lease after a stopped restart. */
     private fun completeRestart() {
         restartJob = null
         restarting = false
         if (!isRecording && recorder == null) releaseMicrophoneLease()
     }
 
+    /** Publishes a prepared recorder only if [generation] still owns the start. */
     private suspend fun beginRecording(generation: Long): Boolean {
         val file =
             File(
@@ -211,7 +215,7 @@ class VoiceRecordingController internal constructor(
         val r = recorderFactory(context, file, bitrateProvider())
         return try {
             withContext(recorderDispatcher) { r.start() }
-            if (!isRecording || generation != startGeneration) {
+            if (!isRecording || !startRequests.isCurrent(generation)) {
                 withContext(recorderDispatcher) { r.cancel() }
                 return false
             }
@@ -256,13 +260,12 @@ class VoiceRecordingController internal constructor(
         }
     }
 
-    private fun nextStartGeneration(): Long {
-        startGeneration += 1
-        return startGeneration
-    }
+    /** Accepts a new recorder-start request and returns its token. */
+    private fun nextStartGeneration(): Long = startRequests.advance()
 
+    /** Makes any recorder still preparing in the background ineligible to publish. */
     private fun invalidatePendingStart() {
-        startGeneration += 1
+        startRequests.advance()
     }
 
     private suspend fun releaseRecorderAfterStartFailure(recorder: VoiceRecordingSession) {

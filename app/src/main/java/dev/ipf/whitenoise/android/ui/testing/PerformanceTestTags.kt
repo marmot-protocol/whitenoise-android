@@ -15,6 +15,8 @@ internal object PerformanceTestTags {
     const val CONTACT_PICKER_NEXT = "performance.contact_picker_next"
     const val CREATE_GROUP = "performance.create_group"
     const val OPEN_GROUP_DETAILS = "performance.open_group_details"
+    const val GROUP_NOTIFICATION_SETTINGS = "performance.group_notification_settings"
+    const val GROUP_MESSAGE_NOTIFICATION_SETTINGS = "performance.group_message_notification_settings"
     const val MEMBER_LIST = "performance.member_list"
     const val JOIN_INVITE = "performance.join_invite"
     const val CONVERSATION_TRANSCRIPT_VISIBLE = "performance.conversation_transcript_visible"

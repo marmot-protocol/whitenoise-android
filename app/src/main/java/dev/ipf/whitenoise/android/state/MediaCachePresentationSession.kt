@@ -5,7 +5,7 @@ import kotlinx.coroutines.withContext
 
 internal data class MediaCachePresentationSession(
     val accountRef: String,
-    val epoch: Int,
+    val epoch: Long,
 )
 
 /** Main-safe L1 probe used to seed a returning file bubble without a frame gap. */
