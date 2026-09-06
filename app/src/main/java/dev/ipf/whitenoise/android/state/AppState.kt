@@ -4286,25 +4286,15 @@ class WhiteNoiseAppState private constructor(
             notificationJob.isActive()
     }
 
-    /**
-     * Keeps a push wake alive through fetch and a bounded notification drain window.
-     * A failed fetch throws for one-shot service supervision. With Keep connected enabled,
-     * preserve the healthy persistent receiver and retain the wake for later catch-up instead.
-     * A quiet drain may return false without indicating receiver or fetch failure.
-     */
+    /** Starts push catch-up with the drain waiter armed before the runtime can emit an update. */
     suspend fun ensureNotificationRuntimeStartedAndAwaitPushDrain(timeoutMs: Long = NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS): Boolean =
-        coroutineScope {
-            val sequenceBeforeStart = notificationDrainSequence.get()
-            val drain =
-                async(start = CoroutineStart.UNDISPATCHED) {
-                    withTimeoutOrNull(timeoutMs) {
-                        notificationDrainSignals.first { it > sequenceBeforeStart }
-                    } != null
-                }
-            val catchUpSucceeded = ensureNotificationRuntimeStarted()
-            check(catchUpSucceeded || backgroundConnectionEnabled) { "push wake account catch-up incomplete" }
-            drain.await()
-        }
+        awaitNotificationPushDrain(
+            sequenceBeforeStart = notificationDrainSequence.get(),
+            notificationDrainSignals = notificationDrainSignals,
+            timeoutMs = timeoutMs,
+            startRuntime = ::ensureNotificationRuntimeStarted,
+            keepConnected = { backgroundConnectionEnabled },
+        )
 
     /** Retries a persisted token-registration obligation when notification startup reaches a usable runtime. */
     private suspend fun drainPendingNativePushRegistrationSyncIfNeeded() {
