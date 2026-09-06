@@ -25,7 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,11 +62,8 @@ import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.WarmResumeUsefulSurface
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
-import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationNotificationNotice
-import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationPersistentControl
 import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
 import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleSharedMedia
-import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardOperationStatusHost
 import dev.ipf.whitenoise.android.ui.navigation.MainShell
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.navigation.PrepareMainShellFirstFrame
@@ -82,8 +78,6 @@ import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -203,10 +197,6 @@ internal fun WhiteNoiseApp(
     // can read it; child screens mutate via [LocalSnackbarBottomInset].
     val snackbarBottomInset = remember { mutableStateOf(0.dp) }
     val snackbarContentInset = remember { mutableStateOf(0.dp) }
-    val forwardOperationVisible by
-        remember(appState) {
-            appState.activeForwardOperation.map { it != null }.distinctUntilChanged()
-        }.collectAsState(initial = false)
     val toast = appState.toast
     val transientNotice = appState.transientNotice
     val context = LocalContext.current
@@ -218,10 +208,6 @@ internal fun WhiteNoiseApp(
     val dictationState = dictation.state
     val dictationPermissionRequestId = dictation.permissionRequestId
     val dictationProviderActivityRequestId = dictation.providerActivityRequestId
-    val dictationOriginVisible =
-        dictationState.target?.let { target ->
-            appState.isConversationDictationOriginVisible(target.accountRef, target.groupIdHex)
-        } == true
     val density = LocalDensity.current
     var firstUsefulFrameRecorded by remember(warmResumeTraceToken, warmResumeEpoch) { mutableStateOf(false) }
     val visibleShareRequest = mainShellStateHolder.visibleShareRequest
@@ -530,41 +516,17 @@ internal fun WhiteNoiseApp(
                                         surface = renderedSurface,
                                     ) {
                                         WarmResumeUsefulSurface {
-                                            ShellTransientNoticeLayout(
-                                                notice = transientNotice,
-                                                persistentTopContent = { ForwardOperationStatusHost(appState) },
-                                                persistentTopContentConsumesStatusBars = forwardOperationVisible,
-                                                persistentBottomContent = {
-                                                    if (dictation.hasDurableSession && !appState.appLockScreenVisible) {
-                                                        ConversationDictationNotificationNotice()
-                                                    }
-                                                    if (
-                                                        shouldShowConversationDictationPersistentControl(
-                                                            state = dictationState,
-                                                            originVisible = dictationOriginVisible,
-                                                            appLockScreenVisible = appState.appLockScreenVisible,
-                                                        )
-                                                    ) {
-                                                        ConversationDictationPersistentControl(
-                                                            state = dictationState,
-                                                            controller = dictation,
-                                                            modifier = Modifier.navigationBarsPadding(),
-                                                        )
-                                                    }
-                                                },
-                                            ) {
-                                                MainShell(
-                                                    appState = appState,
-                                                    stateHolder = mainShellStateHolder,
-                                                    inboundNotificationTarget = inboundNotificationTarget,
-                                                    inboundNotificationRequestId = inboundNotificationRequestId,
-                                                    onNotificationTargetHandled = onNotificationTargetHandled,
-                                                    inboundShareRequest = inboundShareRequest,
-                                                    onShareRequestHandled = onShareRequestHandled,
-                                                    inboundAppUpdateTap = inboundAppUpdateTap,
-                                                    onAppUpdateTapHandled = onAppUpdateTapHandled,
-                                                )
-                                            }
+                                            MainShell(
+                                                appState = appState,
+                                                stateHolder = mainShellStateHolder,
+                                                inboundNotificationTarget = inboundNotificationTarget,
+                                                inboundNotificationRequestId = inboundNotificationRequestId,
+                                                onNotificationTargetHandled = onNotificationTargetHandled,
+                                                inboundShareRequest = inboundShareRequest,
+                                                onShareRequestHandled = onShareRequestHandled,
+                                                inboundAppUpdateTap = inboundAppUpdateTap,
+                                                onAppUpdateTapHandled = onAppUpdateTapHandled,
+                                            )
                                         }
                                     }
                                 }
