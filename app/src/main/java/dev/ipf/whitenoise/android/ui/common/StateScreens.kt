@@ -51,6 +51,7 @@ internal enum class LoadFailurePlacement {
     Inline,
 }
 
+/** Chooses full-screen startup recovery or an inline retained-content banner. */
 internal fun loadFailurePlacement(
     hasFailure: Boolean,
     hasLoadedContent: Boolean,
@@ -61,6 +62,7 @@ internal fun loadFailurePlacement(
         else -> LoadFailurePlacement.FullScreen
     }
 
+/** Fills an established destination with neutral progress feedback. */
 @Composable
 fun LoadingScreen() {
     Box(
@@ -71,6 +73,7 @@ fun LoadingScreen() {
     }
 }
 
+/** Presents branded startup progress before any interactive destination exists. */
 @Composable
 fun StartupLoadingScreen() {
     Box(
@@ -111,6 +114,7 @@ internal fun WarmResumeUsefulSurface(content: @Composable () -> Unit) {
     }
 }
 
+/** Presents a non-blocking confirmation while preserving the destination beneath it. */
 @Composable
 internal fun InlineConfirmationNotice(
     notice: TransientNotice,
@@ -191,6 +195,7 @@ internal fun ErrorContent(
     }
 }
 
+/** Keeps a loaded surface visible while exposing copy and optional retry actions. */
 @Composable
 internal fun InlineErrorBanner(
     error: ErrorPresentation,
