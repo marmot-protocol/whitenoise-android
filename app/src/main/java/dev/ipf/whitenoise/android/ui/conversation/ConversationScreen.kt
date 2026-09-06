@@ -1025,11 +1025,13 @@ internal fun ConversationScreen(
         )
     }
 
-    LaunchedEffect(listState, controller, scrollEvidenceSink) {
+    val viewportCaptureRevision = scrollEvidenceSink?.viewportCaptureRevision?.value ?: 0L
+    LaunchedEffect(listState, controller, scrollEvidenceSink, viewportCaptureRevision) {
         val sink = scrollEvidenceSink ?: return@LaunchedEffect
         snapshotFlow {
             val layoutInfo = listState.layoutInfo
             ConversationViewportEvidence(
+                captureRevision = viewportCaptureRevision,
                 accountRef = conversationAccountRef,
                 mode = scrollCoordinator.mode,
                 anchor = currentScrollAnchor(),

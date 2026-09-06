@@ -4,13 +4,16 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import dev.ipf.whitenoise.android.ui.conversation.media.VoicePresentationAttachmentKey
 import dev.ipf.whitenoise.android.ui.conversation.media.cachedVoiceAttachmentFile
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachmentSource
 import dev.ipf.whitenoise.android.ui.conversation.media.shouldInvalidateVoiceAttachmentCache
 import dev.ipf.whitenoise.android.ui.conversation.media.shouldStartVoiceAttachmentDownload
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -149,6 +152,23 @@ class VoiceAttachmentCacheStateTest {
         )
     }
 
+    /** Guards sibling Compose identity across attachment insertion, removal, and replacement. */
+    @Test
+    fun voicePresentationAttachmentIdentityDistinguishesSiblingsAndRevisions() {
+        val first = VoicePresentationAttachmentKey("message", 0, 1uL)
+        val renderer = bubbleContentBlocksSource().readText()
+
+        assertEquals(first, VoicePresentationAttachmentKey("message", 0, 1uL))
+        assertFalse(first == VoicePresentationAttachmentKey("message", 1, 1uL))
+        assertFalse(first == VoicePresentationAttachmentKey("message", 0, 2uL))
+        assertFalse(first == VoicePresentationAttachmentKey("replacement", 0, 1uL))
+        assertEquals(
+            "confirmed and pending sibling loops must both include attachment identity",
+            2,
+            Regex("""key\(presentationOwner, attachmentKey\)""").findAll(renderer).count(),
+        )
+    }
+
     /** Guards that production voice publication enters single-flight before its cache probe. */
     @Test
     fun voiceMaterializationUsesSharedSingleFlight() {
@@ -157,16 +177,107 @@ class VoiceAttachmentCacheStateTest {
         assertTrue(
             "voice materialization should use the shared single-flight utility",
             Regex(
-                """private\s+val\s+voiceMaterializations\s*=\s*SingleFlight<String,\s*java\.io\.File>\(\)""",
+                """private\s+val\s+voiceMaterializations\s*=\s*SingleFlight<VoiceMaterializationFlightKey,""" +
+                    """\s*java\.io\.File>\(\)""",
             ).containsMatchIn(source),
         )
         assertTrue(
-            "the flight must begin before the materializer checks the cache fast path",
-            "voiceMaterializations.run(file.absolutePath)" in
+            "the controller-owned flight must begin before the materializer checks the cache fast path",
+            "voiceMaterializations.run(VoiceMaterializationFlightKey(file.absolutePath, materializationOwner))" in
                 source
                     .substringAfter("internal suspend fun materializeVoiceAttachmentSource("),
         )
     }
+
+    /** Proves identical attachment ids cannot join a previous controller owner's suspended flight. */
+    @Test
+    fun samePathDifferentOwnersMaterializeIndependently() {
+        runBlocking {
+            withTimeout(TEST_HANG_GUARD_MS) {
+                val context = RuntimeEnvironment.getApplication()
+                val messageId = "voice-owner-flight-${System.nanoTime()}"
+                val attachmentIndex = 1
+                val reference = mediaReference(mediaType = "audio/mp4")
+                val firstOwner = Any()
+                val secondOwner = Any()
+                val firstEntered = CompletableDeferred<Unit>()
+                val secondEntered = CompletableDeferred<Unit>()
+                val releaseFirst = CompletableDeferred<Unit>()
+                val releaseSecond = CompletableDeferred<Unit>()
+                val attachment = OwnerFlightAttachment(context, messageId, attachmentIndex, reference)
+                val cacheFile =
+                    File(
+                        File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() },
+                        "$messageId-$attachmentIndex-${reference.sourceEpoch}.m4a",
+                    )
+                cacheFile.delete()
+
+                val first =
+                    startFailingOwnerFlight(
+                        attachment,
+                        firstOwner,
+                        firstEntered,
+                        releaseFirst,
+                        "first owner released",
+                    )
+                val second =
+                    startFailingOwnerFlight(
+                        attachment,
+                        secondOwner,
+                        secondEntered,
+                        releaseSecond,
+                        "second owner released",
+                    )
+                try {
+                    firstEntered.await()
+                    secondEntered.await()
+                    assertFalse("both owner flights must remain suspended", first.isCompleted || second.isCompleted)
+
+                    releaseFirst.complete(Unit)
+                    releaseSecond.complete(Unit)
+                    assertEquals("first owner released", first.await().exceptionOrNull()?.message)
+                    assertEquals("second owner released", second.await().exceptionOrNull()?.message)
+                } finally {
+                    releaseFirst.complete(Unit)
+                    releaseSecond.complete(Unit)
+                    cacheFile.delete()
+                }
+            }
+        }
+    }
+
+    /** Starts one owner-scoped source load that remains held until its expected failure is released. */
+    private fun CoroutineScope.startFailingOwnerFlight(
+        attachment: OwnerFlightAttachment,
+        owner: Any,
+        entered: CompletableDeferred<Unit>,
+        release: CompletableDeferred<Unit>,
+        failureMessage: String,
+    ): Deferred<Result<File>> =
+        async(start = CoroutineStart.UNDISPATCHED) {
+            runCatching {
+                materializeVoiceAttachmentSource(
+                    context = attachment.context,
+                    messageIdHex = attachment.messageId,
+                    attachmentIndex = attachment.attachmentIndex,
+                    reference = attachment.reference,
+                    materializationOwner = owner,
+                    resolveSource = {
+                        entered.complete(Unit)
+                        release.await()
+                        error(failureMessage)
+                    },
+                )
+            }
+        }
+
+    /** Stable attachment identity shared by two deliberately distinct owner flights. */
+    private data class OwnerFlightAttachment(
+        val context: android.content.Context,
+        val messageId: String,
+        val attachmentIndex: Int,
+        val reference: MediaAttachmentReferenceFfi,
+    )
 
     /** Proves a waiter cannot accept a partial file while the owner publishes the same path. */
     @Test
@@ -250,6 +361,13 @@ class VoiceAttachmentCacheStateTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing MediaVoice.kt source file")
+
+    private fun bubbleContentBlocksSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/BubbleContentBlocks.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/BubbleContentBlocks.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing BubbleContentBlocks.kt source file")
 
     private fun mediaReference(
         mediaType: String,

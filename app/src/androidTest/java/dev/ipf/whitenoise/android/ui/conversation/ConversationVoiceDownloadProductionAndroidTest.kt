@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
@@ -144,7 +146,7 @@ class ConversationVoiceDownloadProductionAndroidTest {
                 composeRule.onAllNodesWithText("59:59", substring = true).fetchSemanticsNodes().isNotEmpty()
             }
 
-            evidence.assertViewportStayedFixed(afterNewerIntent, completionCheckpoint)
+            evidence.assertViewportStayedFixed(composeRule, afterNewerIntent, completionCheckpoint)
             assertTrue(evidence.latestViewport().mode is ConversationScrollMode.ReadingHistory)
             assertEquals(emptyList<ConversationScrollWriteEvidence>(), evidence.writes)
         } finally {
@@ -197,7 +199,7 @@ class ConversationVoiceDownloadProductionAndroidTest {
             controls.values.forEach { it.awaitHydrationCompletion(composeRule) }
             composeRule.waitForIdle()
 
-            evidence.assertViewportStayedFixed(afterIncoming, completionCheckpoint)
+            evidence.assertViewportStayedFixed(composeRule, afterIncoming, completionCheckpoint)
             assertTrue(evidence.latestViewport().mode is ConversationScrollMode.FollowingTail)
             assertFalse(evidence.latestViewport().canScrollForward)
             assertEquals(emptyList<ConversationScrollWriteEvidence>(), evidence.writes)
@@ -254,7 +256,7 @@ class ConversationVoiceDownloadProductionAndroidTest {
 
             control.failMaterialization(0, IOException("controlled device voice failure"))
             assertVoiceActionTarget(voiceId, R.string.voice_message_failed)
-            evidence.assertViewportStayedFixed(downloading, failureCheckpoint)
+            evidence.assertViewportStayedFixed(composeRule, downloading, failureCheckpoint)
             assertEquals(emptyList<ConversationScrollWriteEvidence>(), evidence.writes)
 
             evidence.clearWrites()
@@ -263,7 +265,7 @@ class ConversationVoiceDownloadProductionAndroidTest {
             control.awaitMaterializationStart(composeRule, attempt = 1)
             control.failMaterialization(1, AutomaticBacklogStoppedException())
             assertVoiceActionTarget(voiceId, R.string.media_tap_to_download)
-            evidence.assertViewportStayedFixed(downloading, cancellationCheckpoint)
+            evidence.assertViewportStayedFixed(composeRule, downloading, cancellationCheckpoint)
             assertEquals(emptyList<ConversationScrollWriteEvidence>(), evidence.writes)
 
             evidence.clearWrites()
@@ -278,7 +280,7 @@ class ConversationVoiceDownloadProductionAndroidTest {
                 composeRule.onAllNodesWithText("59:59", substring = true).fetchSemanticsNodes().isNotEmpty()
             }
             assertVoiceActionTarget(voiceId, R.string.voice_message_pause)
-            evidence.assertViewportStayedFixed(downloading, retryCheckpoint)
+            evidence.assertViewportStayedFixed(composeRule, downloading, retryCheckpoint)
             assertEquals(emptyList<ConversationScrollWriteEvidence>(), evidence.writes)
             assertEquals(3, control.materializationAttempts)
 
@@ -367,7 +369,7 @@ class ConversationVoiceDownloadProductionAndroidTest {
             cacheControl.completeHydration()
             cacheControl.awaitHydrationCompletion(composeRule)
 
-            cacheEvidence.assertViewportStayedFixed(cacheAnchor, cacheCheckpoint)
+            cacheEvidence.assertViewportStayedFixed(composeRule, cacheAnchor, cacheCheckpoint)
             assertEquals(emptyList<ConversationScrollWriteEvidence>(), cacheEvidence.writes)
             assertEquals(0, cacheControl.materializationAttempts)
             assertEquals(
@@ -916,6 +918,7 @@ private class InstrumentedVoiceRuntime(
             messageIdHex = request.messageIdHex,
             attachmentIndex = request.attachmentIndex,
             reference = request.reference,
+            materializationOwner = request.presentationOwner,
             resolveSource = {
                 when (val result = controls.getValue(request.messageIdHex).awaitMaterializationOutcome()) {
                     InstrumentedMaterializationResult.Success ->
@@ -1013,7 +1016,10 @@ private sealed interface InstrumentedMaterializationResult {
 /** Thread-safe in-memory viewport/writer evidence from the production list owner. */
 private class InstrumentedConversationEvidence : ConversationScrollEvidenceSink {
     private val viewports = CopyOnWriteArrayList<ConversationViewportEvidence>()
+    private val mutableViewportCaptureRevision = mutableLongStateOf(0L)
     val writes = CopyOnWriteArrayList<ConversationScrollWriteEvidence>()
+
+    override val viewportCaptureRevision: State<Long> = mutableViewportCaptureRevision
 
     override fun onViewport(snapshot: ConversationViewportEvidence) {
         viewports += snapshot
@@ -1073,10 +1079,22 @@ private class InstrumentedConversationEvidence : ConversationScrollEvidenceSink 
 
     /** Requires every device frame after [checkpoint] to keep identical lazy geometry. */
     fun assertViewportStayedFixed(
+        composeRule: androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, *>,
         expected: ConversationViewportEvidence,
         checkpoint: Int,
     ) {
-        val observed = viewports.drop(checkpoint).ifEmpty { listOf(latestViewport()) }
+        var requestedRevision = 0L
+        composeRule.runOnIdle {
+            mutableViewportCaptureRevision.longValue += 1L
+            requestedRevision = mutableViewportCaptureRevision.longValue
+        }
+        composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MS) {
+            viewports.drop(checkpoint).any { it.captureRevision >= requestedRevision }
+        }
+        val observed = viewports.drop(checkpoint)
+        check(observed.any { it.captureRevision >= requestedRevision }) {
+            "viewport evidence did not include capture revision $requestedRevision after $checkpoint"
+        }
         observed.forEach { actual ->
             assertEquals(expected.accountRef, actual.accountRef)
             assertEquals(expected.mode, actual.mode)

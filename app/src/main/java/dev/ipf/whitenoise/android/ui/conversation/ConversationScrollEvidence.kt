@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.runtime.State
 import androidx.compose.runtime.staticCompositionLocalOf
 
 /** One measured lazy-list item in a conversation viewport evidence snapshot. */
@@ -12,6 +13,7 @@ internal data class ConversationVisibleItemEvidence(
 
 /** Immutable viewport evidence emitted only when a diagnostic sink is installed. */
 internal data class ConversationViewportEvidence(
+    val captureRevision: Long,
     val accountRef: String?,
     val mode: ConversationScrollMode,
     val anchor: ConversationScrollAnchor,
@@ -37,6 +39,10 @@ internal data class ConversationScrollWriteEvidence(
  * identifiers and must remain in-memory test evidence rather than logs.
  */
 internal interface ConversationScrollEvidenceSink {
+    /** Optional test-owned revision whose increments request a phase-bound viewport sample. */
+    val viewportCaptureRevision: State<Long>?
+        get() = null
+
     /** Receives one measured production viewport without persisting its identifiers. */
     fun onViewport(snapshot: ConversationViewportEvidence)
 

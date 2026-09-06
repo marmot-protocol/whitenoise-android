@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -64,6 +65,8 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaVideoBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVisualGridBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVoiceBubble
+import dev.ipf.whitenoise.android.ui.conversation.media.VoicePresentationAttachmentKey
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberVoicePresentationOwner
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCards
 import dev.ipf.whitenoise.android.ui.conversation.share.ContactMessageBubble
@@ -247,16 +250,22 @@ internal fun ColumnScope.BubbleMediaBlocks(
     }
     if (!deleted && bubbleMedia.audio.isNotEmpty()) {
         bubbleMedia.audio.forEach { entry ->
-            MediaVoiceBubble(
-                messageIdHex = record.messageIdHex,
-                attachmentIndex = entry.index,
-                reference = entry.value,
-                mine = mine,
-                controller = controller,
-                appState = appState,
-                onLongPress = onMediaLongPress,
-                attachedToCaption = attachedToCaption,
-            )
+            val presentationOwner = rememberVoicePresentationOwner(controller, appState)
+            val attachmentKey =
+                VoicePresentationAttachmentKey(record.messageIdHex, entry.index, entry.value.sourceEpoch)
+            key(presentationOwner, attachmentKey) {
+                MediaVoiceBubble(
+                    messageIdHex = record.messageIdHex,
+                    attachmentIndex = entry.index,
+                    reference = entry.value,
+                    mine = mine,
+                    controller = controller,
+                    appState = appState,
+                    presentationOwner = presentationOwner,
+                    onLongPress = onMediaLongPress,
+                    attachedToCaption = attachedToCaption,
+                )
+            }
         }
     }
     if (!deleted && bubbleMedia.files.isNotEmpty()) {
@@ -290,30 +299,35 @@ internal fun ColumnScope.BubbleMediaBlocks(
     }
     if (!deleted && !bubbleMedia.hasConfirmedMedia && bubbleMedia.pendingAudio.isNotEmpty()) {
         bubbleMedia.pendingAudio.forEach { (index, pending) ->
-            MediaVoiceBubble(
-                messageIdHex = record.messageIdHex,
-                attachmentIndex = index,
-                reference =
-                    remember(record.messageIdHex, index, pending) {
-                        MediaAttachmentReferenceFfi(
-                            locators = emptyList(),
-                            ciphertextSha256 = "",
-                            plaintextSha256 = "",
-                            nonceHex = "",
-                            fileName = pending.fileName,
-                            mediaType = pending.mediaType,
-                            version = EncryptedMediaVersionFfi.V1,
-                            sourceEpoch = 0uL,
-                            dim = null,
-                            thumbhash = null,
-                        )
-                    },
-                mine = true,
-                controller = controller,
-                appState = appState,
-                onLongPress = onMediaLongPress,
-                attachedToCaption = attachedToCaption,
-            )
+            val presentationOwner = rememberVoicePresentationOwner(controller, appState)
+            val attachmentKey = VoicePresentationAttachmentKey(record.messageIdHex, index, 0uL)
+            key(presentationOwner, attachmentKey) {
+                MediaVoiceBubble(
+                    messageIdHex = record.messageIdHex,
+                    attachmentIndex = index,
+                    reference =
+                        remember(record.messageIdHex, index, pending) {
+                            MediaAttachmentReferenceFfi(
+                                locators = emptyList(),
+                                ciphertextSha256 = "",
+                                plaintextSha256 = "",
+                                nonceHex = "",
+                                fileName = pending.fileName,
+                                mediaType = pending.mediaType,
+                                version = EncryptedMediaVersionFfi.V1,
+                                sourceEpoch = 0uL,
+                                dim = null,
+                                thumbhash = null,
+                            )
+                        },
+                    mine = true,
+                    controller = controller,
+                    appState = appState,
+                    presentationOwner = presentationOwner,
+                    onLongPress = onMediaLongPress,
+                    attachedToCaption = attachedToCaption,
+                )
+            }
         }
     }
     if (!deleted && !bubbleMedia.hasConfirmedMedia && bubbleMedia.pendingVisuals.isNotEmpty()) {

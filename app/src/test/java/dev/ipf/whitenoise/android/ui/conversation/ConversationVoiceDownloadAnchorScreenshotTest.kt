@@ -4,9 +4,12 @@ import android.content.Context
 import android.os.Looper
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -18,6 +21,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -182,11 +186,10 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             evidence.awaitAnchor(precedingId)
             assertVoiceBubbleFullyVisible(voiceId)
 
-            clickVoiceAction(voiceId, R.string.media_tap_to_download)
+            activateVoiceActionForScreenshot(voiceId, R.string.media_tap_to_download)
             awaitAttachmentOpenIntent(fixture.controller, voiceId)
             control.awaitMaterializationAttempt(0)
             assertVoiceActionTarget(voiceId, R.string.media_downloading)
-            settleVoiceActionIndication()
             assertVoiceBubbleFullyVisible(voiceId)
             composeRule
                 .onNodeWithTag(messageBubbleColumnTestTag(voiceId))
@@ -199,7 +202,6 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             }
             awaitVoiceAction(voiceId, R.string.voice_message_pause)
             assertVoiceActionTarget(voiceId, R.string.voice_message_pause)
-            settleVoiceActionIndication()
             assertVoiceBubbleFullyVisible(voiceId)
             composeRule
                 .onNodeWithTag(messageBubbleColumnTestTag(voiceId))
@@ -450,7 +452,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             evidence.awaitAnchor(precedingId)
             assertVoiceBubbleFullyVisible(voiceId)
 
-            clickVoiceAction(voiceId, R.string.media_tap_to_download)
+            activateVoiceActionForScreenshot(voiceId, R.string.media_tap_to_download)
             awaitAttachmentOpenIntent(fixture.controller, voiceId)
             control.awaitMaterializationAttempt(0)
             control.succeedMaterialization(0)
@@ -462,7 +464,6 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             }
             awaitVoiceAction(voiceId, R.string.voice_message_pause)
             assertVoiceActionTarget(voiceId, R.string.voice_message_pause)
-            settleVoiceActionIndication()
             assertVoiceBubbleFullyVisible(voiceId)
             composeRule
                 .onNodeWithTag(messageBubbleColumnTestTag(voiceId))
@@ -472,9 +473,16 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
         }
     }
 
-    /** Advances beyond the finite click indication so screenshots do not race its fade-out. */
-    private fun settleVoiceActionIndication() {
-        composeRule.mainClock.advanceTimeBy(VOICE_ACTION_INDICATION_SETTLE_MILLIS)
+    /** Invokes the real accessible action without a transient pointer indication in static captures. */
+    private fun activateVoiceActionForScreenshot(
+        messageId: String,
+        descriptionResource: Int,
+    ) {
+        composeRule
+            .onNode(voiceActionMatcher(messageId, descriptionResource), useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.OnClick) { click ->
+                assertTrue("the voice action must accept the accessible click", click())
+            }
         composeRule.waitForIdle()
     }
 
@@ -536,61 +544,6 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             )
         } finally {
             closeFixture(fixture, runtime)
-        }
-    }
-
-    /** Keeps a new account isolated when an old account's suspended download completes. */
-    @Test
-    fun staleCompletionAfterAccountSwitchCannotMoveTheNewAccountAnchor() {
-        val oldFixture =
-            conversationFixture(
-                voiceIndices = setOf(HISTORY_VOICE_INDEX),
-                idOffset = 400,
-                accountRef = "account-a",
-            )
-        val newFixture =
-            conversationFixture(
-                voiceIndices = setOf(HISTORY_VOICE_INDEX),
-                idOffset = 500,
-                accountRef = "account-b",
-            )
-        val oldVoiceId = oldFixture.voiceMessageIds.single()
-        val newVoiceId = newFixture.voiceMessageIds.single()
-        val oldControl = VoiceControl(oldVoiceId, materializationAttemptCount = 1)
-        val newControl = VoiceControl(newVoiceId, materializationAttemptCount = 1)
-        val oldRuntime = ControlledVoicePresentationRuntime(mapOf(oldVoiceId to oldControl))
-        val newRuntime = ControlledVoicePresentationRuntime(mapOf(newVoiceId to newControl))
-        val oldEvidence = RecordingConversationScrollEvidenceSink()
-        val newEvidence = RecordingConversationScrollEvidenceSink()
-        try {
-            awaitConversationCondition { oldFixture.controller.timeline.size == oldFixture.records.size }
-            awaitConversationCondition { newFixture.controller.timeline.size == newFixture.records.size }
-            val host = showConversation(oldFixture, oldRuntime, oldEvidence, oldVoiceId)
-            clickVoiceAction(oldVoiceId, R.string.media_tap_to_download)
-            awaitAttachmentOpenIntent(oldFixture.controller, oldVoiceId)
-            oldControl.awaitMaterializationAttempt(0)
-
-            host.replaceWith(newFixture, newRuntime, newEvidence, historySnapshot(newFixture, newVoiceId))
-            val newAccountAnchor = newEvidence.awaitAnchor(newVoiceId)
-            assertEquals("account-b", newAccountAnchor.accountRef)
-            assertTrue(newAccountAnchor.mode is ConversationScrollMode.ReadingHistory)
-            newEvidence.clearWrites()
-            val staleCompletionStart = newEvidence.checkpoint()
-
-            oldControl.succeedMaterialization(0)
-            composeRule.waitForIdle()
-
-            assertViewportStayedFixed(
-                "old-account stale completion",
-                newAccountAnchor,
-                newEvidence,
-                staleCompletionStart,
-            )
-            assertNoScrollWrites("old-account stale completion", newEvidence)
-            assertEquals("account-b", newEvidence.latestViewport().accountRef)
-        } finally {
-            closeFixture(oldFixture, oldRuntime)
-            closeFixture(newFixture, newRuntime)
         }
     }
 
@@ -942,7 +895,7 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
         evidence: RecordingConversationScrollEvidenceSink,
         checkpoint: Int,
     ) {
-        val observed = evidence.viewportsSince(checkpoint).ifEmpty { listOf(evidence.latestViewport()) }
+        val observed = evidence.requestPhaseBoundViewports(checkpoint)
         observed.forEachIndexed { index, actual ->
             assertSameViewport("$phase frame $index", expected, actual)
         }
@@ -1064,6 +1017,31 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
             composeRule.waitForIdle()
         }
 
+        /** Rebinds the mounted real screen without an outer disposal key masking row ownership. */
+        fun replaceOwnerInPlace(
+            fixture: VoiceConversationFixture,
+            runtime: VoiceAttachmentPresentationRuntime,
+            evidence: RecordingConversationScrollEvidenceSink,
+            restoredSnapshot: ConversationScrollSnapshot,
+        ) {
+            check(mounted.value) { "the production screen must remain mounted across owner replacement" }
+            evidence.clearViewports()
+            evidence.clearWrites()
+            composeRule.runOnUiThread {
+                focusMessageId.value = null
+                focusMessageRequestId.value = 0L
+                activeMount.value =
+                    ConversationMount(
+                        fixture = fixture,
+                        runtime = runtime,
+                        evidence = evidence,
+                        savedScrollSnapshot = mutableStateOf(restoredSnapshot),
+                        onSaveScrollSnapshot = {},
+                    )
+            }
+            composeRule.waitForIdle()
+        }
+
         /** Issues a newer explicit message-focus intent and waits for history ownership to settle. */
         fun focus(
             messageId: String,
@@ -1125,6 +1103,7 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
         val durationStarted = CompletableDeferred<Unit>()
         val durationReleased = CompletableDeferred<Unit>()
         val durationCompleted = CompletableDeferred<Unit>()
+        val successfulMaterializationReturned = CompletableDeferred<Unit>()
         private val nextAttempt = AtomicInteger(0)
 
         val materializationAttempts: Int
@@ -1146,6 +1125,13 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
         /** Releases one controlled attempt into the real cache-publication boundary. */
         fun succeedMaterialization(index: Int) {
             attemptResults[index].complete(MaterializationResult.Success)
+        }
+
+        /** Waits until the runtime has returned this successful publication to its Compose caller. */
+        fun awaitSuccessfulMaterializationReturn() {
+            composeRule.waitUntil(timeoutMillis = PHASE_TIMEOUT_MILLIS) {
+                successfulMaterializationReturned.isCompleted
+            }
         }
 
         /** Releases one controlled attempt with a failure or explicit cancellation. */
@@ -1190,7 +1176,10 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
     /** Thread-safe recorder shared by Compose callbacks and Robolectric's test thread. */
     protected inner class RecordingConversationScrollEvidenceSink : ConversationScrollEvidenceSink {
         private val viewports = CopyOnWriteArrayList<ConversationViewportEvidence>()
+        private val mutableViewportCaptureRevision = mutableLongStateOf(0L)
         val writes = CopyOnWriteArrayList<ConversationScrollWriteEvidence>()
+
+        override val viewportCaptureRevision: State<Long> = mutableViewportCaptureRevision
 
         override fun onViewport(snapshot: ConversationViewportEvidence) {
             viewports += snapshot
@@ -1205,6 +1194,30 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
 
         /** Returns every viewport emitted after [checkpoint]. */
         fun viewportsSince(checkpoint: Int): List<ConversationViewportEvidence> = viewports.drop(checkpoint)
+
+        /** Requests and requires a fresh post-transition viewport even when its geometry is unchanged. */
+        fun requestPhaseBoundViewports(checkpoint: Int): List<ConversationViewportEvidence> {
+            var requestedRevision = 0L
+            composeRule.runOnIdle {
+                mutableViewportCaptureRevision.longValue += 1L
+                requestedRevision = mutableViewportCaptureRevision.longValue
+            }
+            awaitMountedConversationCondition("phase-bound viewport capture") {
+                viewports.drop(checkpoint).any { it.captureRevision >= requestedRevision }
+            }
+            return requirePhaseBoundViewports(checkpoint, requestedRevision)
+        }
+
+        /** Fails when a caller attempts to validate against only pre-transition evidence. */
+        fun requirePhaseBoundViewports(
+            checkpoint: Int,
+            requestedRevision: Long,
+        ): List<ConversationViewportEvidence> =
+            viewports.drop(checkpoint).also { observed ->
+                check(observed.any { it.captureRevision >= requestedRevision }) {
+                    "viewport evidence did not include capture revision $requestedRevision after $checkpoint"
+                }
+            }
 
         /** Clears only command evidence after an intentional initial or incoming anchor write. */
         fun clearWrites() {
@@ -1258,7 +1271,6 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
         const val MESSAGE_COUNT = 36
         const val HISTORY_VOICE_INDEX = 18
         const val HISTORY_OFFSET_PX = 17
-        const val VOICE_ACTION_INDICATION_SETTLE_MILLIS = 500L
         const val PHASE_TIMEOUT_MILLIS = 5_000L
         const val HYDRATED_DURATION_MS = 12_345
         const val LONG_DURATION_MS = 3_599_000
@@ -1291,8 +1303,10 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
 /** Routes each message to independent gates while publishing bytes through the real cache. */
 internal class ControlledVoicePresentationRuntime(
     private val controls: Map<String, ConversationVoiceDownloadAnchorTestBase.VoiceControl>,
+    private val controllerControls: Map<ConversationController, ConversationVoiceDownloadAnchorTestBase.VoiceControl> =
+        emptyMap(),
 ) : VoiceAttachmentPresentationRuntime {
-    private val fileOwners = ConcurrentHashMap<String, String>()
+    private val fileOwners = ConcurrentHashMap<String, ConversationVoiceDownloadAnchorTestBase.VoiceControl>()
     private val publishedFiles = CopyOnWriteArrayList<File>()
     private val mutablePlaybackState = MutableStateFlow(VoicePlaybackController.PlaybackState())
     private val mutablePlaybackFailures = MutableSharedFlow<VoicePlaybackController.PlaybackFailure>()
@@ -1300,26 +1314,30 @@ internal class ControlledVoicePresentationRuntime(
     override val playbackState: StateFlow<VoicePlaybackController.PlaybackState> = mutablePlaybackState
     override val playbackFailures: SharedFlow<VoicePlaybackController.PlaybackFailure> = mutablePlaybackFailures
 
-    override suspend fun materialize(request: VoiceAttachmentMaterializationRequest): File =
-        materializeVoiceAttachmentSource(
+    override suspend fun materialize(request: VoiceAttachmentMaterializationRequest): File {
+        val control = controllerControls[request.controller] ?: controls.getValue(request.messageIdHex)
+        return materializeVoiceAttachmentSource(
             context = request.context,
             messageIdHex = request.messageIdHex,
             attachmentIndex = request.attachmentIndex,
             reference = request.reference,
+            materializationOwner = request.presentationOwner,
             resolveSource = {
-                when (val result = controls.getValue(request.messageIdHex).awaitMaterializationOutcome()) {
+                when (val result = control.awaitMaterializationOutcome()) {
                     ConversationVoiceDownloadAnchorTestBase.MaterializationResult.Success ->
                         AttachmentPlaintext.Bytes(MINIMAL_VOICE_AUDIO_BYTES.copyOf())
                     is ConversationVoiceDownloadAnchorTestBase.MaterializationResult.Failure -> throw result.failure
                 }
             },
         ).also { file ->
-            fileOwners[file.absolutePath] = request.messageIdHex
+            fileOwners[file.absolutePath] = control
             publishedFiles += file
+            control.successfulMaterializationReturned.complete(Unit)
         }
+    }
 
     override suspend fun waveform(file: File): FloatArray {
-        val control = controls.getValue(requireNotNull(fileOwners[file.absolutePath]))
+        val control = requireNotNull(fileOwners[file.absolutePath])
         control.waveformStarted.complete(Unit)
         control.waveformReleased.await()
         control.waveformCompleted.complete(Unit)
@@ -1327,7 +1345,7 @@ internal class ControlledVoicePresentationRuntime(
     }
 
     override suspend fun durationMs(file: File): Int {
-        val control = controls.getValue(requireNotNull(fileOwners[file.absolutePath]))
+        val control = requireNotNull(fileOwners[file.absolutePath])
         control.durationStarted.complete(Unit)
         control.durationReleased.await()
         control.durationCompleted.complete(Unit)
@@ -1339,7 +1357,7 @@ internal class ControlledVoicePresentationRuntime(
         file: File,
         ownerKey: String,
     ): VoicePlaybackController.PlaybackStartResult {
-        val control = controls.getValue(requireNotNull(fileOwners[file.absolutePath]))
+        val control = requireNotNull(fileOwners[file.absolutePath])
         mutablePlaybackState.value =
             VoicePlaybackController.PlaybackState(
                 key = key,
@@ -1375,7 +1393,7 @@ internal class ControlledVoicePresentationRuntime(
 
     /** Releases controlled producers and resets the process-scoped fake playback state. */
     fun releaseForCleanup() {
-        controls.values.forEach { it.releaseForCleanup() }
+        (controls.values + controllerControls.values).distinct().forEach { it.releaseForCleanup() }
         stopPlayback()
     }
 
