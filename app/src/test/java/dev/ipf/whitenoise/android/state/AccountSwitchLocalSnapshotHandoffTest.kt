@@ -54,6 +54,18 @@ class AccountSwitchLocalSnapshotHandoffTest {
         assertNull("a mismatched handoff must be destroyed", handoff.consume("account-b"))
     }
 
+    /** A captured owner cannot become current again after an A-to-B-to-A switch sequence. */
+    @Test
+    fun capturedGenerationRejectsRapidReturnToTheSameAccount() {
+        val handoff = AccountSwitchLocalSnapshotHandoff()
+        val originalAccountGeneration = handoff.capture()
+
+        handoff.beginRequest()
+        handoff.beginRequest()
+
+        assertFalse(handoff.isCurrent(originalAccountGeneration))
+    }
+
     private fun snapshot(accountRef: String) =
         AccountSwitchLocalSnapshot(
             accountRef = accountRef,

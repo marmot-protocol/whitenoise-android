@@ -283,6 +283,9 @@ internal class AccountSwitchLocalSnapshotHandoff {
     /** Reports whether [requestGeneration] still owns the pending handoff. */
     fun isCurrent(requestGeneration: Long): Boolean = requests.isCurrent(requestGeneration)
 
+    /** Captures the current switch generation for account-scoped suspended work. */
+    fun capture(): Long = requests.capture()
+
     /** Publishes [snapshot] only while its originating switch remains current. */
     fun publish(
         requestGeneration: Long,

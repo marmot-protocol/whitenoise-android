@@ -471,7 +471,9 @@
     <string name="keep_connected_subtitle">White Noise arka planda çalışırken mesajları al.</string>
     <string name="native_push">Anlık bildirimler</string>
     <string name="native_push_subtitle">Röledeki yeni olayları teslim etmek için uygulamayı uyandırır.</string>
-    <string name="native_push_unavailable_subtitle">Google Play hizmetleri ve push sunucusu yapılandırılmış bir derleme gerektirir.</string>
+    <string name="native_push_missing_server_subtitle">Bu derlemede push sunucusu yapılandırılmadığı için anlık bildirimler kullanılamıyor.</string>
+    <string name="native_push_google_play_unavailable_subtitle">Anlık bildirimler için bu cihazda uyumlu Google Play hizmetleri gerekir.</string>
+    <string name="native_push_firebase_unavailable_subtitle">Firebase yapılandırılmadığı veya başlatılamadığı için anlık bildirimler kullanılamıyor.</string>
     <string name="notification_categories">Bildirim kategorileri</string>
     <string name="notification_categories_subtitle">Android her kategori için ses, titreşim, önem ve Rahatsız Etmeyin ayarlarını yönetir.</string>
     <string name="notification_defaults">Tüm sohbetler için varsayılanlar</string>

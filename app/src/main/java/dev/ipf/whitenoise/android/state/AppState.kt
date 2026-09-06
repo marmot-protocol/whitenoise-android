@@ -19,9 +19,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.input.TextFieldValue
-import com.google.android.gms.common.ConnectionResult
-import com.google.android.gms.common.GoogleApiAvailability
-import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
@@ -42,8 +39,6 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationsSubscription
 import dev.ipf.marmotkit.PushPlatformFfi
-import dev.ipf.marmotkit.PushRegistrationShareOutcomeFfi
-import dev.ipf.marmotkit.PushRegistrationShareStatusFfi
 import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
@@ -125,6 +120,7 @@ import dev.ipf.whitenoise.android.notifications.ConversationVibrationPreferences
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPolicy
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
+import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationChannels
 import dev.ipf.whitenoise.android.notifications.NotificationReactionSendOutcome
 import dev.ipf.whitenoise.android.notifications.NotificationReplyCommitProbe
@@ -525,51 +521,6 @@ internal suspend fun dismissConversationNotificationsOnOpen(
         dismissConversationNotifications(target.accountRef, target.groupIdHex)
     }
 }
-
-/**
- * Prefer the battery-efficient native-push wake path when this build/device
- * supports it. If enabling push fails, retain the persistent relay connection
- * so first-run setup never silently leaves the account without background
- * delivery. Any partial native-push enablement is rolled back before the
- * persistent fallback is restored, keeping the two delivery modes exclusive.
- */
-internal suspend fun configureDefaultNotificationDelivery(
-    nativePushAvailable: Boolean,
-    enableNativePush: suspend () -> Boolean,
-    disableNativePush: suspend () -> Boolean,
-    setBackgroundConnectionEnabled: suspend (Boolean) -> Boolean,
-): Boolean {
-    val configured =
-        if (!nativePushAvailable) {
-            setBackgroundConnectionEnabled(true)
-        } else {
-            val nativePushReady = enableNativePush()
-            if (nativePushReady && setBackgroundConnectionEnabled(false)) {
-                true
-            } else {
-                val nativePushDisabled = disableNativePush()
-                val backgroundConnectionEnabled = setBackgroundConnectionEnabled(true)
-                nativePushDisabled && backgroundConnectionEnabled
-            }
-        }
-    return configured
-}
-
-internal fun nativePushEnablementConfirmed(
-    allAccountsReady: Boolean,
-    activeAccountRegistered: Boolean,
-): Boolean = allAccountsReady && activeAccountRegistered
-
-internal enum class PushRegistrationSharingState {
-    Complete,
-    PendingDurableRetry,
-}
-
-internal fun pushRegistrationSharingState(outcome: PushRegistrationShareOutcomeFfi): PushRegistrationSharingState =
-    when (outcome.status) {
-        PushRegistrationShareStatusFfi.COMPLETE -> PushRegistrationSharingState.Complete
-        PushRegistrationShareStatusFfi.PENDING -> PushRegistrationSharingState.PendingDurableRetry
-    }
 
 /**
  * A live notification subscription is a healthy local broadcast receiver and
@@ -1185,6 +1136,7 @@ class WhiteNoiseAppState private constructor(
     private val notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics,
     private val inboundShareTextStager: ((String, String, String) -> Unit)?,
     private val messageDraftRepositoryOverride: MessageDraftRepository?,
+    private val nativePushFallbackPlatform: NativePushFallbackPlatform,
     preferencesOverride: SharedPreferences?,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
@@ -1209,6 +1161,7 @@ class WhiteNoiseAppState private constructor(
             notificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
             inboundShareTextStager = null,
             messageDraftRepositoryOverride = null,
+            nativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
             preferencesOverride = null,
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
@@ -1236,6 +1189,7 @@ class WhiteNoiseAppState private constructor(
             NotificationNetworkRecoveryDiagnostics(),
         inboundShareTextStager: ((String, String, String) -> Unit)? = null,
         messageDraftRepository: MessageDraftRepository? = null,
+        nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
         preferences: SharedPreferences? = null,
     ) : this(
         context = context,
@@ -1256,6 +1210,7 @@ class WhiteNoiseAppState private constructor(
         notificationNetworkRecoveryDiagnostics = notificationNetworkRecoveryDiagnostics,
         inboundShareTextStager = inboundShareTextStager,
         messageDraftRepositoryOverride = messageDraftRepository,
+        nativePushFallbackPlatform = nativePushFallbackPlatform,
         preferencesOverride = preferences,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
@@ -1477,6 +1432,7 @@ class WhiteNoiseAppState private constructor(
     @Volatile
     private var bootstrapCompleted = false
     private val nativePushSyncMutex = Mutex()
+    private val nativePushFallback = NativePushFallbackCoordinator(nativePushFallbackPlatform)
     private val ttsRefreshMutex = Mutex()
     private val auditLogSettingsMutex = Mutex()
     private val conversationVibrationChannelMutex = Mutex()
@@ -1755,14 +1711,6 @@ class WhiteNoiseAppState private constructor(
     // native push, signs out, or hits a sync failure that may indicate the
     // registration is stale.
     private val perAccountSyncedFingerprints = mutableMapOf<String, PushFingerprint>()
-
-    /** Structural cache key for the push-registration dedupe map. */
-    private data class PushFingerprint(
-        val platform: PushPlatformFfi,
-        val token: String,
-        val serverPubkeyHex: String,
-        val relayHint: String?,
-    )
 
     var phase by mutableStateOf<AppPhase>(AppPhase.Bootstrapping)
         private set
@@ -2581,10 +2529,7 @@ class WhiteNoiseAppState private constructor(
         return messageDraftRepository.delete(accountRef, groupIdHex)
     }
 
-    /**
-     * Refreshes metadata-only draft summaries behind both account and request-generation fences.
-     * A delayed response may update only keys whose local fingerprint still matches the request.
-     */
+    /** Refreshes draft summaries behind account, request, and local-fingerprint fences. */
     internal fun refreshDraftSummaries(accountRef: String) {
         val refresh = draftSummaryRefreshLifetime.advance()
         val expected = draftStore.captureSummaryRefresh(accountRef)
@@ -2894,6 +2839,7 @@ class WhiteNoiseAppState private constructor(
         )
 
     private fun applyDestructiveWipeRuntimeState(state: DestructiveAccountWipeRuntimeState) {
+        if (runtimeGeneration != state.runtimeGeneration) nativePushFallback.invalidateAll()
         activeAccountRef = state.activeAccountRef
         updateNotificationSuppression(
             suppression.copy(
@@ -7783,6 +7729,7 @@ class WhiteNoiseAppState private constructor(
 
     suspend fun setLocalNotificationsEnabled(enabled: Boolean): Boolean {
         val account = activeAccountRef ?: return false
+        if (!enabled) nativePushFallback.invalidateAll()
         refreshLocalNotificationPermission()
         if (enabled && !localNotificationPermissionGranted) {
             present(R.string.toast_notification_permission_needed)
@@ -7791,7 +7738,7 @@ class WhiteNoiseAppState private constructor(
         return runCatching {
             val settings = marmotIo { setLocalNotificationsEnabled(account, enabled) }
             localNotificationSettings = settings
-            if (!enabled && backgroundConnectionEnabled) {
+            if (!enabled) {
                 updateBackgroundConnectionPreference(false)
                 NotificationStreamForegroundService.stop(appContext)
             }
@@ -7884,25 +7831,9 @@ class WhiteNoiseAppState private constructor(
         appStateDebug { "background connection runtime retries exhausted" }
     }
 
-    /**
-     * Whether real push notifications can run on this device + build. True
-     * only if (1) the build is configured with a MIP-05 push server pubkey,
-     * (2) Google Play Services is available on the device, AND (3) the
-     * Firebase app has actually been initialized at process start. Without
-     * (3), `FirebaseMessaging.getInstance()` throws `IllegalStateException`
-     * deep in the FCM SDK; the gate keeps that exception out of the
-     * foreground / account-switch / token-rotation paths that would
-     * otherwise crash the process. False on F-Droid/Zapstore installs
-     * lacking GMS, on builds without
-     * [BuildConfig.WHITENOISE_PUSH_SERVER_PUBKEY_HEX], on emulators without
-     * Play Services, and on builds where Firebase isn't initialized.
-     */
-    fun isNativePushAvailable(config: PushServerConfig? = PushServerConfig.current()): Boolean {
-        if (config == null) return false
-        val status = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(appContext)
-        if (status != ConnectionResult.SUCCESS) return false
-        return FirebaseApp.getApps(appContext).isNotEmpty()
-    }
+    /** Returns the first unmet native-push prerequisite without reaching later SDKs. */
+    internal fun nativePushCapability(config: PushServerConfig? = PushServerConfig.current()): NativePushCapability =
+        nativePushCapabilityForContext(appContext, config)
 
     /**
      * Persist the FCM token and trigger a re-sync against the runtime. Called
@@ -7918,10 +7849,9 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Push the current FCM token to the runtime for every signed-in account
-     * that has `nativePushEnabled = true`. Multi-account devices keep a
-     * working registration on every account, not just the active one — a
-     * push for account A still wakes the device when account B is in
-     * focus. Idempotent per account: a successful sync caches the
+     * that requires native delivery, including background accounts so their
+     * pushes can wake the device while another account is active.
+     * Idempotent per account: a successful sync caches the
      * (token, server, relay) fingerprint and skips on the next call until
      * something changes. Returns true only when every account that currently
      * requires native push is registered (or does not require registration).
@@ -7931,6 +7861,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun hasConfirmedNativePushRegistration(account: String): Boolean =
         nativePushSyncMutex.withLock { perAccountSyncedFingerprints.containsKey(account) }
 
+    /** Replays pending cleanup before registration and gates token acquisition on capability. */
     @Suppress("ReturnCount")
     private suspend fun syncNativePushRegistrationIfEnabledLocked(): Boolean {
         // Drain before resolving the push-server config so a clear that
@@ -7940,9 +7871,7 @@ class WhiteNoiseAppState private constructor(
         // receive them. Only the upsert path is gated on config + GMS.
         drainPendingPushClears()
         drainPendingPushDisables()
-        val config = PushServerConfig.current() ?: return false
-        if (!isNativePushAvailable(config)) return false
-        var accountRefs = accounts.map { it.label }
+        var accountRefs = accounts.filter { it.isSignedInSigningAccount() }.map { it.label }
         if (accountRefs.isEmpty()) {
             // Only clear the durable #755 retry flag when the account list is
             // authoritative. setAppInForeground() can trigger this before
@@ -7950,12 +7879,16 @@ class WhiteNoiseAppState private constructor(
             // would strand a signed-in device on a stale push token.
             if (marmotRuntime == null) return false
             refreshAccounts()
-            accountRefs = accounts.map { it.label }
+            accountRefs = accounts.filter { it.isSignedInSigningAccount() }.map { it.label }
             if (accountRefs.isEmpty()) {
                 pushTokenStore.clearPendingNativePushRegistrationSync()
                 return true
             }
         }
+        val config = PushServerConfig.current()
+        val capability = nativePushCapability(config)
+        if (!capability.isAvailable) return reconcileUnavailableNativePushFallback(capability, accountRefs)
+        config ?: return false
         val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return false
         for (account in accountRefs) {
             val synced = syncPushForAccount(account, config, token)
@@ -7963,6 +7896,73 @@ class WhiteNoiseAppState private constructor(
         }
         pushTokenStore.clearPendingNativePushRegistrationSync()
         return true
+    }
+
+    /** Migrates the active account while reporting unknown or background-owned state as incomplete. */
+    private suspend fun reconcileUnavailableNativePushFallback(
+        capability: NativePushCapability,
+        accountRefs: List<String>,
+    ): Boolean {
+        val reconciled =
+            nativePushFallback.reconcile(
+                capability = capability,
+                owner = captureNativePushFallbackOwner() ?: return false,
+                accountRefs = accountRefs,
+                bindings =
+                    NativePushFallbackBindings(
+                        ownerIsCurrent = ::ownsNativePushFallback,
+                        readSettings = { request, account -> request.runtime.marmot.notificationSettings(account) },
+                        publishActiveSettings = { localNotificationSettings = it },
+                        publishPersistentConnectionEnabled = { backgroundConnectionEnabled = true },
+                        publishComplete = pushTokenStore::clearPendingNativePushRegistrationSync,
+                        removeFingerprint = { perAccountSyncedFingerprints.remove(it.accountRef) },
+                        setNativePushDisabled = { it.runtime.marmot.setNativePushEnabled(it.accountRef, false) },
+                        clearRegistration = ::clearPushRegistrationForOwnerLocked,
+                        onFailure = { message -> appStateDebug { message } },
+                    ),
+            )
+        return reconciled
+    }
+
+    /** Captures the exact active account/runtime lifetime used by service readiness callbacks. */
+    private fun captureNativePushFallbackOwner(): NativePushFallbackOwner? =
+        nativePushFallback.owner(
+            activeAccountRef,
+            marmotRuntime,
+            runtimeGeneration,
+            accountSwitchHandoff.capture(),
+        )
+
+    /** Rejects suspended fallback work after an account switch or runtime replacement. */
+    private fun ownsNativePushFallback(owner: NativePushFallbackOwner): Boolean = captureNativePushFallbackOwner()?.matches(owner) == true
+
+    /** Accepts only the exact service generation that reached a successful supervised runtime boundary. */
+    internal fun onNativePushFallbackRuntimeStarted(generation: Long): Job? {
+        assertMainThread { "onNativePushFallbackRuntimeStarted" }
+        val owner = nativePushFallback.acknowledge(generation, ::ownsNativePushFallback) ?: return null
+        return notificationScope.launch {
+            if (ownsNativePushFallback(owner)) syncNativePushRegistrationIfEnabled()
+        }
+    }
+
+    /** Drops a rejected, exhausted, recovery-fenced, or destroyed service generation. */
+    internal fun onNativePushFallbackRuntimeUnavailable(generation: Long) {
+        assertMainThread { "onNativePushFallbackRuntimeUnavailable" }
+        nativePushFallback.invalidate(generation)
+    }
+
+    /** Clears only [owner]'s registration on its captured runtime and retains failed cleanup for retry. */
+    private suspend fun clearPushRegistrationForOwnerLocked(owner: NativePushFallbackOwner) {
+        if (!ownsNativePushFallback(owner)) return
+        currentCoroutineContext().ensureActive()
+        runCatchingCancellable {
+            withContext(Dispatchers.IO) { owner.runtime.marmot.clearPushRegistration(owner.accountRef) }
+        }.onSuccess { outcome ->
+            logPushRegistrationShareOutcome("capability fallback clear", owner.accountRef, outcome)
+            if (ownsNativePushFallback(owner)) pushTokenStore.clearPending(owner.accountRef)
+        }.onFailure { failure ->
+            appStateDebug { "capability fallback clear failed (queued for retry): ${failure.readableMessage()}" }
+        }
     }
 
     /**
@@ -8087,7 +8087,7 @@ class WhiteNoiseAppState private constructor(
                 present(R.string.toast_no_active_account)
                 return false
             }
-        if (enabled && !isNativePushAvailable()) return false
+        if (enabled && !nativePushCapability().isAvailable) return false
         return runCatching {
             val settings = marmotIo { setNativePushEnabled(account, enabled) }
             localNotificationSettings = settings
@@ -8139,34 +8139,25 @@ class WhiteNoiseAppState private constructor(
 
     private suspend fun clearPushRegistrationForAccountLocked(account: String) {
         perAccountSyncedFingerprints.remove(account)
-        runCatchingCancellable { marmotIo { clearPushRegistration(account) } }
-            .onSuccess { outcome ->
-                // PENDING means MarmotKit durably retained the clear and will
-                // retry group sharing; it is a successful local clear, not a
-                // reason to restore or roll back the registration.
-                logPushRegistrationShareOutcome("clear", account, outcome)
-                pushTokenStore.clearPending(account)
-            }.onFailure {
-                pushTokenStore.recordPendingClear(account)
-                appStateDebug { "clearPushRegistration failed (queued for retry): ${it.readableMessage()}" }
+        val result = runCatchingCancellable { marmotIo { clearPushRegistration(account) } }
+        result.onSuccess { outcome ->
+            // PENDING means MarmotKit durably retained the clear and will
+            // retry group sharing; it is a successful local clear, not a
+            // reason to restore or roll back the registration.
+            logPushRegistrationShareOutcome("clear", account, outcome)
+            pushTokenStore.clearPending(account)
+        }
+        result.exceptionOrNull()?.let { failure ->
+            val queued = withContext(Dispatchers.IO) { pushTokenStore.recordPendingClear(account) }
+            appStateDebug {
+                "clearPushRegistration failed cleanupQueued=$queued: ${failure.readableMessage()}"
             }
-    }
-
-    private fun logPushRegistrationShareOutcome(
-        operation: String,
-        account: String,
-        outcome: PushRegistrationShareOutcomeFfi,
-    ) {
-        val state = pushRegistrationSharingState(outcome)
-        appStateDebug {
-            "push registration $operation sharing=$state account=${account.take(8)} " +
-                "attempted=${outcome.attemptedGroups} succeeded=${outcome.succeededGroups} " +
-                "failed=${outcome.failedGroups} pending=${outcome.pendingGroups}"
         }
     }
 
+    /** Fetches and retains a non-blank FCM token only when every push prerequisite is available. */
     private suspend fun fetchFcmTokenOrNull(): String? {
-        if (!isNativePushAvailable()) return null
+        if (!nativePushCapability().isAvailable) return null
         val token =
             runCatchingCancellable {
                 suspendCancellableCoroutine<String?> { continuation ->
@@ -8224,6 +8215,10 @@ class WhiteNoiseAppState private constructor(
         preferences.edit().putBoolean(DISAPPEARING_TOOLTIP_SHOWN_KEY, true).commit()
     }
 
+    /**
+     * Performs the one-time default delivery setup, falling back to the
+     * persistent connection whenever native push cannot be used or enabled.
+     */
     suspend fun enableDefaultNotificationsIfReady(): Boolean {
         if (defaultNotificationsEnableAttempted) return false
         val account = activeAccountRef ?: return false
@@ -8234,7 +8229,7 @@ class WhiteNoiseAppState private constructor(
         localNotificationSettings = settings
         if (!settings.localNotificationsEnabled) return false
         return configureDefaultNotificationDelivery(
-            nativePushAvailable = isNativePushAvailable(),
+            nativePushCapability = nativePushCapability(),
             enableNativePush = { setNativePushEnabled(true) },
             disableNativePush = { setNativePushEnabled(false) },
             setBackgroundConnectionEnabled = ::setBackgroundConnectionEnabled,
@@ -9863,6 +9858,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     private fun updateBackgroundConnectionPreference(enabled: Boolean) {
+        if (!enabled) nativePushFallback.invalidateAll()
         backgroundConnectionEnabled = enabled
         BackgroundConnectionPreferences.setEnabled(appContext, enabled)
         appStateDebug { "background connection enabled=$enabled" }
@@ -10151,7 +10147,8 @@ class WhiteNoiseAppState private constructor(
     }
 }
 
-private inline fun appStateDebug(message: () -> String) {
+/** Emits operational detail only from debug builds so release logs remain privacy-bounded. */
+internal inline fun appStateDebug(message: () -> String) {
     // Debug-only: these INFO lines are operational/diagnostic and some carry
     // sender/group context, so they must not ship in release logcat. See #39.
     if (BuildConfig.DEBUG) Log.i("DMAppState", message())
