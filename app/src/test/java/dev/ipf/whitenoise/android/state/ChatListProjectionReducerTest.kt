@@ -375,6 +375,63 @@ class ChatListProjectionReducerTest {
         assertNull(item.previewTokens)
     }
 
+    /** Verifies an eligible body uses the exact Markdown document supplied by the MDK projection. */
+    @Test
+    fun projectedMarkdownTokensOwnTheFirstEligibleBodyProjection() {
+        val tokens = markdown("rendered")
+        val sourceRow =
+            row(
+                groupId = "g1",
+                rawTitle = "Marmot Lab",
+                preview = preview(plaintext = "**rendered**", contentTokens = tokens),
+            )
+
+        val item = chatListItemFromProjection(sourceRow)
+
+        assertSame(tokens, item.previewTokens)
+    }
+
+    /** Verifies derived preview kinds cannot style their wrapper payload as a visible message body. */
+    @Test
+    fun projectedMarkdownTokensDoNotOverrideAFallbackPreviewKind() {
+        val sourceRow =
+            row(
+                groupId = "g1",
+                rawTitle = "Marmot Lab",
+                preview = preview(plaintext = "edit wrapper", kind = 1009uL, contentTokens = markdown("wrong body")),
+            )
+
+        val item = chatListItemFromProjection(sourceRow)
+
+        assertNull(item.previewTokens)
+    }
+
+    /** Verifies current projected tokens take precedence over stale exact-text parser cache entries. */
+    @Test
+    fun projectedMarkdownWinsOverAStaleExactTextCacheEntry() {
+        val projected = markdown("current")
+        val cached = markdown("stale")
+        val sourceRow =
+            row(
+                groupId = "g1",
+                rawTitle = "Marmot Lab",
+                preview = preview(plaintext = "same source", contentTokens = projected),
+            )
+
+        assertSame(projected, chatRowPreviewTokens(sourceRow, mapOf("same source" to cached)))
+        assertNull(chatRowPreviewMarkdownFallbackSource(sourceRow))
+    }
+
+    /** Verifies legacy empty projections use the cache and remain eligible for parser fallback. */
+    @Test
+    fun emptyProjectedMarkdownUsesTheExactTextParserFallback() {
+        val cached = markdown("fallback")
+        val sourceRow = row(groupId = "g1", rawTitle = "Marmot Lab", preview = preview(plaintext = "source"))
+
+        assertSame(cached, chatRowPreviewTokens(sourceRow, mapOf("source" to cached)))
+        assertEquals("source", chatRowPreviewMarkdownFallbackSource(sourceRow))
+    }
+
     @Test
     fun emptyGroupFallbackKeepsGroupIdAndRowFlagsWhenNoBaseGroupSupplied() {
         // group = null path: the reducer synthesizes a placeholder group from the
@@ -438,6 +495,7 @@ class ChatListProjectionReducerTest {
 
     // ---- fixtures -----------------------------------------------------------
 
+    /** Creates a preview whose Markdown payload can be varied independently of its plaintext. */
     private fun preview(
         messageId: String = "m-1",
         sender: String = "peer",
@@ -445,12 +503,13 @@ class ChatListProjectionReducerTest {
         kind: ULong = 9uL,
         timelineAt: ULong = 1uL,
         deleted: Boolean = false,
+        contentTokens: MarkdownDocumentFfi = markdown(),
     ) = ChatListMessagePreviewFfi(
         messageIdHex = messageId,
         sender = sender,
         senderDisplayName = null,
         plaintext = plaintext,
-        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0)),
+        contentTokens = contentTokens,
         kind = kind,
         timelineAt = timelineAt,
         deleted = deleted,
@@ -458,6 +517,14 @@ class ChatListProjectionReducerTest {
         attachmentCount = 0u,
         deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
     )
+
+    /** Builds either an empty legacy document or one projected paragraph. */
+    private fun markdown(text: String? = null) =
+        MarkdownDocumentFfi(
+            truncated = false,
+            blocks = text?.let { listOf(MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text(it)))) }.orEmpty(),
+            blankLinesBefore = ByteArray(0),
+        )
 
     private fun row(
         groupId: String,

@@ -196,7 +196,7 @@ internal fun chatListItemFromProjection(
     activeAccountIdHex: String? = null,
     members: List<AppGroupMemberRecordFfi>? = null,
     presentationMembers: ChatListMemberPresentation? = null,
-    previewTokens: MarkdownDocumentFfi? = null,
+    previewTokens: MarkdownDocumentFfi? = chatRowPreviewTokens(row),
     resolvedMediaPreviewFallback: MediaPreviewFallback? = null,
     removed: Boolean = false,
     activitySequence: ULong = 0uL,
@@ -214,11 +214,10 @@ internal fun chatListItemFromProjection(
                     groupIdHex = row.groupIdHex,
                     sender = preview.sender,
                     plaintext = preview.plaintext,
-                    // Deliberately empty: the chat-list preview's markdown
-                    // rides [ChatListItem.previewTokens] (parsed async by
-                    // ChatsController), not this synthesized record. Parsing
-                    // here would force an FFI hop into a pure projection
-                    // helper.
+                    // Deliberately empty: the projected Markdown document rides
+                    // [ChatListItem.previewTokens], not this synthesized record.
+                    // Legacy projections with an empty document use the
+                    // controller's bounded asynchronous fallback parser.
                     contentTokens = EMPTY_MARKDOWN_DOCUMENT,
                     kind = preview.kind,
                     tags = emptyList(),
@@ -479,29 +478,6 @@ internal fun foldMarkReadReturnedRow(
 ): ULong? {
     applyChatListRow(row)
     return monotonicMaxTimelineAt(persistedLastReadTimelineAt, row.lastReadTimelineAt)
-}
-
-/**
- * The last-message text a chat row should run through the markdown parser,
- * or null when the row's preview line will show fallback copy instead of
- * the message body. Mirrors [ChatListItem.projectedPreviewText]'s generic
- * message-body arm exactly: a non-deleted row whose plaintext is non-blank
- * and whose kind is not one of the special-cased arms is rendered verbatim,
- * so its body — and only its body — may be parsed into preview tokens.
- * Edit (1009), agent-stream-start (1200), and group-system (1210) rows —
- * plus deleted/blank rows — surface derived copy, so their payloads must
- * never be parsed into preview tokens and styled in their place (issue #577).
- * Body kinds beyond plain chat (kind-1 legacy notes, kind-1209 agent-stream
- * finals, and any future body kind) still display their plaintext via
- * `projectedPreviewText`, so they keep markdown/mention/code rendering here.
- * Delegating the kind test to [MessageProjector.rendersRawBodyPreview] ties
- * this parse gate to the same plaintext `projectedPreviewText` would surface.
- */
-internal fun chatRowPreviewMarkdownSource(row: ChatListRowFfi): String? {
-    val preview = row.lastMessage ?: return null
-    if (preview.deleted) return null
-    if (!MessageProjector.rendersRawBodyPreview(preview.kind)) return null
-    return preview.plaintext.takeIf { it.isNotBlank() }
 }
 
 /**
@@ -2777,35 +2753,6 @@ internal class RetainedMediaUpload(
     var acceptedPendingMessageIdHex: String? = null,
 )
 
-private data class OptimisticChatListPreviewEntry(
-    val preview: ChatListMessagePreviewFfi,
-    val activitySequence: ULong,
-    val confirmedMessageIdHex: String? = null,
-    val pendingAuthoritativeRow: ChatListRowFfi? = null,
-)
-
-private data class OptimisticChatListPreviewState(
-    var baselineRow: ChatListRowFfi,
-    var baselineActivitySequence: ULong,
-    val entries: LinkedHashMap<String, OptimisticChatListPreviewEntry> = linkedMapOf(),
-    var failedFallbackEntry: OptimisticChatListPreviewEntry? = null,
-    val confirmedActivitySequenceById: LinkedHashMap<String, ULong> = linkedMapOf(),
-    val baselineActivitySequenceByLastMessage: LinkedHashMap<ChatListLastMessageActivity, ULong> = linkedMapOf(),
-)
-
-private fun OptimisticChatListPreviewState.snapshot(): OptimisticChatListPreviewState =
-    copy(
-        entries = LinkedHashMap(entries),
-        confirmedActivitySequenceById = LinkedHashMap(confirmedActivitySequenceById),
-        baselineActivitySequenceByLastMessage = LinkedHashMap(baselineActivitySequenceByLastMessage),
-    )
-
-private data class ChatListLastMessageActivity(
-    val activitySortAt: ULong,
-    val timelineAt: ULong?,
-    val messageIdHex: String?,
-)
-
 private data class OptimisticChatListPreviewMatch(
     val entryKey: String?,
     val activitySequence: ULong,
@@ -3000,6 +2947,59 @@ class ChatsController private constructor(
         if (nextActivitySequence != ULong.MAX_VALUE) nextActivitySequence += 1uL
         return nextActivitySequence
     }
+
+    /** Captures in-flight previews before a same-process controller replacement. */
+    internal fun captureOptimisticPreviewHandoff(): OptimisticChatListPreviewHandoff? {
+        val owner = accountRef
+        return if (owner == null || optimisticChatListPreviewByGroup.isEmpty()) {
+            null
+        } else {
+            OptimisticChatListPreviewHandoff(
+                accountRef = owner,
+                rowsByGroup = LinkedHashMap(chatRowsByGroup),
+                activitySequenceByGroup = LinkedHashMap(activitySequenceByGroup),
+                statesByGroup = optimisticChatListPreviewByGroup.mapValues { (_, state) -> state.snapshot() },
+                nextActivitySequence = nextActivitySequence,
+            )
+        }
+    }
+
+    /** Restores only a same-account handoff before the replacement is exposed. */
+    internal fun restoreOptimisticPreviewHandoff(
+        handoff: OptimisticChatListPreviewHandoff,
+        expectedAccountRef: String?,
+    ): Boolean {
+        if (!canRestoreOptimisticPreviewHandoff(handoff, expectedAccountRef)) return false
+        val restoredAccountRef = requireNotNull(expectedAccountRef)
+        accountRef = restoredAccountRef
+        boundAccountRef = restoredAccountRef
+        chatRowsByGroup.clear()
+        chatRowsByGroup.putAll(handoff.rowsByGroup)
+        activitySequenceByGroup.clear()
+        activitySequenceByGroup.putAll(handoff.activitySequenceByGroup)
+        optimisticChatListPreviewByGroup.clear()
+        optimisticChatListPreviewByGroup.putAll(
+            handoff.statesByGroup.mapValues { (_, state) -> state.snapshot() },
+        )
+        nextActivitySequence = handoff.nextActivitySequence
+        optimisticChatListPreviewByGroup.forEach { (rowKey, state) ->
+            materializeOptimisticChatListPreview(rowKey, state)
+        }
+        hasLoadedLocalSnapshot = true
+        isLoading = false
+        recompute(scheduleBackgroundEnrichment = false)
+        return true
+    }
+
+    /** Rejects cleared, cross-account, and already-bound replacements before any state is copied. */
+    private fun canRestoreOptimisticPreviewHandoff(
+        handoff: OptimisticChatListPreviewHandoff,
+        expectedAccountRef: String?,
+    ): Boolean =
+        !isCleared &&
+            expectedAccountRef != null &&
+            handoff.accountRef == expectedAccountRef &&
+            (boundAccountRef == null || boundAccountRef == expectedAccountRef)
 
     private fun chatListActivityAdvanced(
         previous: ChatListRowFfi,
@@ -3308,6 +3308,7 @@ class ChatsController private constructor(
         return true
     }
 
+    /** Materializes the newest visible optimistic entry without allowing sequence time to regress. */
     private fun materializeOptimisticChatListPreview(
         rowKey: String,
         state: OptimisticChatListPreviewState,
@@ -3328,11 +3329,7 @@ class ChatsController private constructor(
                 )
             } ?: state.baselineRow
         activitySequenceByGroup[rowKey] = visibleEntry?.activitySequence ?: state.baselineActivitySequence
-        if (
-            state.entries.isEmpty() &&
-            state.failedFallbackEntry == null &&
-            state.confirmedActivitySequenceById.isEmpty()
-        ) {
+        if (state.hasNoOptimisticPreviewWork()) {
             optimisticChatListPreviewByGroup.remove(rowKey)
         }
     }
@@ -4167,10 +4164,11 @@ class ChatsController private constructor(
     // next account switch (issue: unarchive doesn't move chat out of archived
     // section). Callers in ConversationController forward the updated record
     // here via AppState so the chat list reflects the new archived flag.
-    // Optimistically bump a group's chat-list row to a just-sent message so
-    // returning to the list paints the new preview immediately, instead of one
-    // frame of the prior last-message before the chat-list stream catches up.
-    // The real stream update reconciles this shortly after. See #900.
+
+    /**
+     * Publishes a ready optimistic preview with publication-time activity order.
+     * Returning to the list shows it immediately while the real stream catches up (#900).
+     */
     internal fun applyOptimisticSentPreview(
         groupIdHex: String,
         preview: ChatListMessagePreviewFfi,
@@ -4201,25 +4199,60 @@ class ChatsController private constructor(
     }
 
     /**
-     * Rebind a pending optimistic preview's parsed Markdown once the async
-     * hydration lands, keeping the preview's tokens equal to what a projected
-     * echo of the same message will carry. Deliberately narrower than
-     * [applyOptimisticSentPreview]: no activity bump, and an entry already
-     * confirmed or retired keeps its authoritative state.
+     * Reserves a text send's chat-list order at acceptance without publishing
+     * its raw Markdown. Parsing may complete after newer list activity, so the
+     * later styled/fallback publication must reuse this order rather than gain
+     * a fresh sequence merely because its parser was slower.
      */
-    internal fun hydrateOptimisticSentPreviewTokens(
+    internal fun reserveOptimisticSentPreview(
         groupIdHex: String,
-        messageIdHex: String,
-        tokens: MarkdownDocumentFfi,
-    ) {
+        optimisticMessageIdHex: String,
+    ): Boolean {
         val rowKey = chatRowKey(groupIdHex)
-        val state = optimisticChatListPreviewByGroup[rowKey].takeIf { accountRef != null } ?: return
-        val entry = state.entries[messageIdHex]?.takeIf { it.confirmedMessageIdHex == null } ?: return
-        state.entries[messageIdHex] = entry.copy(preview = entry.preview.copy(contentTokens = tokens))
-        materializeOptimisticChatListPreview(rowKey, state)
-        scheduleRecompute()
+        val row = chatRowsByGroup[rowKey].takeIf { accountRef != null } ?: return false
+        val state =
+            optimisticChatListPreviewByGroup.getOrPut(rowKey) {
+                val baselineActivitySequence = activitySequenceByGroup[rowKey] ?: 0uL
+                OptimisticChatListPreviewState(
+                    baselineRow = row,
+                    baselineActivitySequence = baselineActivitySequence,
+                ).also { newState ->
+                    rememberBaselineActivitySequence(newState, row, baselineActivitySequence)
+                }
+            }
+        state.reservedActivitySequenceById[optimisticMessageIdHex] = nextChatActivitySequence()
+        while (state.reservedActivitySequenceById.size > MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY) {
+            state.reservedActivitySequenceById.remove(state.reservedActivitySequenceById.keys.first())
+        }
+        return true
     }
 
+    /** Publishes a parsed text preview using its acceptance-time order. */
+    internal fun applyReservedOptimisticSentPreview(
+        groupIdHex: String,
+        preview: ChatListMessagePreviewFfi,
+    ): Boolean {
+        val rowKey = chatRowKey(groupIdHex)
+        val state = optimisticChatListPreviewByGroup[rowKey].takeIf { accountRef != null } ?: return false
+        val activitySequence = state.reservedActivitySequenceById.remove(preview.messageIdHex)
+        return if (activitySequence == null) {
+            false
+        } else {
+            if (state.failedFallbackEntry?.preview?.messageIdHex == preview.messageIdHex) {
+                state.failedFallbackEntry = null
+            }
+            state.entries[preview.messageIdHex] =
+                OptimisticChatListPreviewEntry(
+                    preview = preview,
+                    activitySequence = activitySequence,
+                )
+            materializeOptimisticChatListPreview(rowKey, state)
+            scheduleRecompute()
+            true
+        }
+    }
+
+    /** Commits the accepted optimistic entry while preserving its original list-order sequence. */
     internal fun commitOptimisticSentPreview(
         groupIdHex: String,
         optimisticMessageIdHex: String,
@@ -4292,16 +4325,18 @@ class ChatsController private constructor(
         scheduleRecompute()
     }
 
+    /** Removes a reservation or entry only when that exact optimistic id is still tracked. */
     internal fun rollbackOptimisticSentPreview(
         groupIdHex: String,
         optimisticMessageIdHex: String,
     ) {
         val rowKey = chatRowKey(groupIdHex)
         val state = optimisticChatListPreviewByGroup[rowKey].takeIf { accountRef != null } ?: return
+        val removedReservation = state.reservedActivitySequenceById.remove(optimisticMessageIdHex) != null
         val removedEntry = state.entries.remove(optimisticMessageIdHex) != null
         val removedFallback = state.failedFallbackEntry?.preview?.messageIdHex == optimisticMessageIdHex
         if (removedFallback) state.failedFallbackEntry = null
-        if (!removedEntry && !removedFallback) return
+        if (!removedReservation && !removedEntry && !removedFallback) return
         materializeOptimisticChatListPreview(rowKey, state)
         scheduleRecompute()
     }
@@ -4406,6 +4441,7 @@ class ChatsController private constructor(
                 ?.let { chatListMemberPresentation(it, activeAccountIdHex) }
     }
 
+    /** Projects current rows using MDK Markdown first and the exact-text cache only as fallback. */
     private fun currentProjectedItems(activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex): List<ChatListItem> =
         chatRows.map { authoritativeRow ->
             val row = optimisticArchiveRow(authoritativeRow)
@@ -4415,7 +4451,7 @@ class ChatsController private constructor(
                 activeAccountIdHex = activeAccountIdHex,
                 members = memberCacheByGroup[row.groupIdHex],
                 presentationMembers = lastKnownPresentation(row.groupIdHex, activeAccountIdHex),
-                previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
+                previewTokens = chatRowPreviewTokens(row, previewTokensByText),
                 resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
                 removed = row.groupIdHex in removedGroupIds,
                 activitySequence = activitySequenceByGroup[chatRowKey(row.groupIdHex)] ?: 0uL,
@@ -4438,7 +4474,7 @@ class ChatsController private constructor(
             activeAccountIdHex = activeAccountIdHex,
             members = memberCacheByGroup[row.groupIdHex],
             presentationMembers = lastKnownPresentation(row.groupIdHex, activeAccountIdHex),
-            previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
+            previewTokens = chatRowPreviewTokens(row, previewTokensByText),
             resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
             removed = row.groupIdHex in removedGroupIds,
             activitySequence = activitySequenceByGroup[chatRowKey(row.groupIdHex)] ?: 0uL,
@@ -5604,9 +5640,9 @@ class ChatsController private constructor(
     }
 
     /**
-     * A draft started or cleared, so the chat's effective sort time changed.
-     * Re-sort — deferred while the list is hidden (you are in the conversation
-     * drafting), and flushed when the list returns, like every other recompute.
+     * A draft started, cleared, or received a newer coalesced MDK updatedAtMs,
+     * so the chat's effective sort time changed. Re-sort — deferred while the
+     * list is hidden and flushed when it returns, like every other recompute.
      */
     fun onDraftSortOrderChanged() {
         if (isCleared) return
@@ -5969,20 +6005,18 @@ class ChatsController private constructor(
     }
 
     /**
-     * Walk the current chat rows and, for any preview plaintext without
-     * cached tokens or an in-flight parse, kick off the `parseMarkdown` FFI
-     * call off-main. On completion the cache updates and `scheduleRecompute()`
-     * runs so the row re-emits with its styled preview (a burst of completions
-     * coalescing into one rebuild). List emission never
-     * waits on a parse: rows surface immediately with plaintext and upgrade
-     * when the tokens land. Failures cache the empty document (renders as
-     * plaintext, no retry storm). The cache is pruned to the texts still on
-     * screen so live-update churn can't grow it without bound.
+     * Walk legacy chat rows whose MDK projection did not include a Markdown
+     * document and start the `parseMarkdown` fallback off-main. Current MDK
+     * rows bypass this path and publish their projected document on the first
+     * frame. A legacy row stays responsive with plaintext until its fallback
+     * parse completes; failures cache an empty document to avoid retry storms.
+     * The cache is pruned to texts still on screen so live-update churn cannot
+     * grow it without bound.
      */
     private fun schedulePendingPreviewParses() {
         if (accountRef == null) return
         val epoch = bindEpoch
-        val liveTexts = chatRows.mapNotNullTo(mutableSetOf(), ::chatRowPreviewMarkdownSource)
+        val liveTexts = chatRows.mapNotNullTo(mutableSetOf(), ::chatRowPreviewMarkdownFallbackSource)
         if (previewTokensByText.keys.any { it !in liveTexts }) {
             previewTokensByText = previewTokensByText.filterKeys { it in liveTexts }
         }
@@ -7810,12 +7844,16 @@ class ConversationController(
 
     /**
      * Parse the sent text into the same Markdown AST projected records carry
-     * and rebind it onto the already-published optimistic bubble and chat-list
-     * preview. Only the bubble's first paint is decoupled from this FFI hop —
+     * and rebind it onto the already-published optimistic bubble. The chat-list
+     * preview is not published until this attempt finishes, so it never exposes
+     * a raw-Markdown intermediate frame. Only the bubble's first paint is
+     * decoupled from this FFI hop —
      * an accepted Send must paint on the next frame even when the IO lane is
      * congested — while the network publish still runs after the parse, so the
      * send's total latency matches the previous parse-first ordering.
-     * A parse failure keeps the plain-text presentation, and
+     * A parse failure keeps the plain-text presentation. The chat list publishes
+     * that fallback only after the parse attempt completes, so it cannot flash a
+     * raw frame before replacing it with styled content. In either case,
      * a bubble already reconciled or rolled back is left alone. Returns the
      * record now backing the bubble so later reconciliation and failure
      * retention keep the styled document instead of the pre-parse snapshot.
@@ -7835,7 +7873,6 @@ class ConversationController(
         optimisticMessages[optimisticKey] = pending.copy(record = hydrated)
         messageById[tempId] = hydrated
         publishTimelineFromIndexes()
-        appState.hydrateOptimisticSentPreviewTokens(conversationAccountRef, group.groupIdHex, tempId, tokens)
         return hydrated
     }
 
@@ -7946,35 +7983,13 @@ class ConversationController(
             )
         durableAcceptanceCallbacks[optimisticKey] = onDurablyAccepted
         messageById[tempId] = optimistic
-        publishTimelineFromIndexes()
-        // Bump the chat-list row's preview in the same synchronous block as the
-        // bubble, so a back-navigation to the list paints the new last-message
-        // instead of a one-frame flash of the prior one (#900). Reuses the
-        // already-parsed markdown from the optimistic record.
-        val previewApplied =
-            appState.applyOptimisticSentPreview(
+        val chatListPreviewReserved =
+            appState.reserveOptimisticSentPreview(
                 conversationAccountRef,
                 group.groupIdHex,
-                ChatListMessagePreviewFfi(
-                    messageIdHex = tempId,
-                    sender = conversationAccountIdHex ?: "",
-                    senderDisplayName = null,
-                    plaintext = trimmed,
-                    contentTokens = optimistic.contentTokens,
-                    kind = 9uL,
-                    timelineAt = now,
-                    deleted = false,
-                    attachmentKind = null,
-                    attachmentCount = 0u,
-                    deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
-                ),
+                tempId,
             )
-        if (!previewApplied) {
-            // No bound row to bump (pre-first-frame open, brand-new group,
-            // account-pinned window) — the engine echo will still update the
-            // list, but keep the drop visible in the send trace.
-            sendTrace(trace, PerformancePhase.CHAT_LIST_PREVIEW_DROPPED, result = PerformanceResult.FAILURE)
-        }
+        publishTimelineFromIndexes()
         replyingTo = null
         // The optimistic bubble is now in the projection and published — the
         // send has visibly started. Only now is it safe to clear the input and
@@ -7982,9 +7997,9 @@ class ConversationController(
         // mere act of dispatching this coroutine, lost the text whenever a
         // guard above bailed before this point.
         onAccepted()
-        // Optimistic bubble + chat-list preview are now published: the pending
-        // clock is on screen. Everything after this is the "clock lingers"
-        // window the issue is about.
+        // The optimistic bubble is now published: the pending clock is on
+        // screen. The chat-list order is reserved, but its preview waits for
+        // the parser so raw Markdown never flashes there.
         sendTrace(trace, PerformancePhase.OPTIMISTIC_SHOWN, result = PerformanceResult.PENDING)
         // Starts as the plain-rendered record so every failure path below has a
         // valid record even if hydration is cut short; the styled rebind lands
@@ -7992,6 +8007,37 @@ class ConversationController(
         var publishedRecord = optimistic
         try {
             publishedRecord = hydrateOptimisticSendMarkdown(optimisticKey, tempId, trimmed) ?: optimistic
+            // Keep the prior chat-list row while the parser is in flight. The
+            // optimistic preview is published only with a completed document,
+            // never as a raw frame followed by a styled replacement (#2411).
+            // An empty/failed parse publishes one stable plaintext fallback only
+            // after the attempt completes. The bubble and composer acceptance
+            // remain independent of this hop.
+            val previewApplied =
+                chatListPreviewReserved &&
+                    appState.applyReservedOptimisticSentPreview(
+                        conversationAccountRef,
+                        group.groupIdHex,
+                        ChatListMessagePreviewFfi(
+                            messageIdHex = tempId,
+                            sender = conversationAccountIdHex ?: "",
+                            senderDisplayName = null,
+                            plaintext = trimmed,
+                            contentTokens = publishedRecord.contentTokens,
+                            kind = 9uL,
+                            timelineAt = now,
+                            deleted = false,
+                            attachmentKind = null,
+                            attachmentCount = 0u,
+                            deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
+                        ),
+                    )
+            if (previewApplied == false) {
+                // No bound row to bump (pre-first-frame open, brand-new group,
+                // account-pinned window) — the engine echo will still update the
+                // list, but keep the drop visible in the send trace.
+                sendTrace(trace, PerformancePhase.CHAT_LIST_PREVIEW_DROPPED, result = PerformanceResult.FAILURE)
+            }
             // Publish with a retry sweep so a *transient* relay-pool gap
             // (socket teardown mid-reconnect, doze wake, network change) doesn't
             // surface as a user-visible "send failed" the instant the pool looks

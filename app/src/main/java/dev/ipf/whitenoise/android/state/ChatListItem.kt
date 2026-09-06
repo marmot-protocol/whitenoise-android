@@ -39,10 +39,10 @@ data class ChatListItem(
      */
     val firstFrameAvatar: ChatListAvatarSeed? = null,
     /**
-     * Markdown AST for the last-message preview line, parsed off-main by
-     * [ChatsController] from the same plaintext [projectedPreviewText]
-     * returns. Null (or an empty document) while the parse is in flight or
-     * failed — the row then renders the raw plaintext exactly as before.
+     * Markdown AST for the last-message preview line. [ChatsController]
+     * prefers MDK's projected document on the first frame and parses off-main
+     * only when that AST is empty. Null (or an empty document) means the row
+     * renders the raw plaintext fallback.
      * Only attached when the preview would show the message body itself
      * (non-deleted, non-blank), so fallback copy is never styled.
      */
