@@ -1656,4 +1656,6 @@
     <string name="dictation_disclosure_title">Riconoscimento vocale esterno</string>
     <string name="dictation_disclosure_message">Il servizio vocale installato elabora l’audio dettato e può inviarlo al proprio fornitore. Per impostazione predefinita, White Noise incolla il testo restituito nella bozza; l’invio automatico è disponibile solo quando lo abiliti esplicitamente nelle impostazioni di Dettatura.</string>
     <string name="dictation_continue">Continua</string>
+    <string name="dictation_microphone_muted">L’accesso al microfono è disattivato</string>
+    <string name="dictation_microphone_muted_help">Attiva l’accesso al microfono nelle impostazioni sulla privacy di Android o nelle Impostazioni rapide, poi riprova la dettatura.</string>
 </resources>

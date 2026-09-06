@@ -1654,4 +1654,6 @@
     <string name="dictation_disclosure_title">Harici konuşma tanıma</string>
     <string name="dictation_disclosure_message">Yüklü konuşma hizmetiniz dikte edilen sesi işler ve sağlayıcısına gönderebilir. White Noise varsayılan olarak döndürülen metni taslağınıza yapıştırır; otomatik gönderme yalnızca Dikte ayarlarında açıkça etkinleştirdiğinizde kullanılabilir.</string>
     <string name="dictation_continue">Devam</string>
+    <string name="dictation_microphone_muted">Mikrofon erişimi kapalı</string>
+    <string name="dictation_microphone_muted_help">Android gizlilik ayarlarından veya Hızlı Ayarlar’dan mikrofon erişimini açın, ardından dikteyi tekrar deneyin.</string>
 </resources>

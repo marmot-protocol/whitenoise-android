@@ -1629,4 +1629,6 @@
     <string name="dictation_disclosure_title">外部语音识别</string>
     <string name="dictation_disclosure_message">您安装的语音服务会处理听写音频，并可能将其发送给服务提供商。White Noise 默认会将返回的文本粘贴到草稿；只有在“听写”设置中明确启用后，才可自动发送。</string>
     <string name="dictation_continue">继续</string>
+    <string name="dictation_microphone_muted">麦克风访问已关闭</string>
+    <string name="dictation_microphone_muted_help">请在 Android 隐私设置或快捷设置中开启麦克风访问，然后重试听写。</string>
 </resources>

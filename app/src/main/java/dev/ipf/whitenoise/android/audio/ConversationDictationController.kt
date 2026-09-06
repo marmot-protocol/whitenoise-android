@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.core.content.ContextCompat
+import androidx.core.content.PermissionChecker
 import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrAfter
 import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrBefore
 import kotlinx.coroutines.CancellationException
@@ -77,6 +78,7 @@ internal enum class ConversationDictationFailure {
     ProviderUnavailable,
     PermissionDenied,
     PermissionPermanentlyDenied,
+    MicrophoneMuted,
     MicrophoneInUse,
     NoSpeech,
     Network,
@@ -205,9 +207,28 @@ internal interface ConversationDictationRecognitionSession {
 
 internal class ConversationDictationProviderUnavailableException : IllegalStateException()
 
+/** Effective microphone access after combining the runtime grant with Android's app-op policy. */
+internal enum class ConversationDictationMicrophoneAccess {
+    Granted,
+    RuntimePermissionRequired,
+    AppOpDenied,
+    MicrophoneMuted,
+}
+
 internal interface ConversationDictationPlatform {
     /** Whether White Noise currently has permission to capture microphone audio. */
     fun hasRecordAudioPermission(): Boolean
+
+    /** Distinguishes a requestable runtime denial from a settings-owned app-op denial. */
+    fun microphoneAccess(): ConversationDictationMicrophoneAccess =
+        if (hasRecordAudioPermission()) {
+            ConversationDictationMicrophoneAccess.Granted
+        } else {
+            ConversationDictationMicrophoneAccess.RuntimePermissionRequired
+        }
+
+    /** Whether Android has an explicit selected recognition service to validate after permission. */
+    fun recognitionConfigured(): Boolean = recognitionAvailable()
 
     /** Whether an in-process recognition service can be created. */
     fun recognitionAvailable(): Boolean
@@ -357,6 +378,7 @@ internal class ConversationDictationController internal constructor(
     private val _permissionRequestId = mutableLongStateOf(0L)
     val permissionRequestId: Long
         get() = _permissionRequestId.longValue
+    private var claimedPermissionRequestId = 0L
 
     private val _providerActivityRequestId = mutableLongStateOf(0L)
     val providerActivityRequestId: Long
@@ -495,7 +517,31 @@ internal class ConversationDictationController internal constructor(
                 )
             return
         }
-        startRecognition(pending.sessionId, pending.target)
+        when (platform.microphoneAccess()) {
+            ConversationDictationMicrophoneAccess.Granted ->
+                startWhenProviderAvailable(pending.sessionId, pending.target)
+            ConversationDictationMicrophoneAccess.RuntimePermissionRequired ->
+                fail(pending.sessionId, pending.target, ConversationDictationFailure.PermissionDenied)
+            ConversationDictationMicrophoneAccess.AppOpDenied ->
+                fail(pending.sessionId, pending.target, ConversationDictationFailure.PermissionPermanentlyDenied)
+            ConversationDictationMicrophoneAccess.MicrophoneMuted ->
+                fail(pending.sessionId, pending.target, ConversationDictationFailure.MicrophoneMuted)
+        }
+    }
+
+    /** Claims one permission request so recomposition or Activity recreation cannot launch it twice. */
+    fun beginPermissionRequest(requestId: Long): Boolean {
+        if (requestId != permissionRequestId || requestId == claimedPermissionRequestId) return false
+        if (state !is ConversationDictationState.PermissionRequired) return false
+        claimedPermissionRequestId = requestId
+        return true
+    }
+
+    /** Converts an Android permission-contract launch failure into a retryable terminal state. */
+    fun onPermissionLaunchFailed(requestId: Long) {
+        if (requestId != claimedPermissionRequestId) return
+        val pending = state as? ConversationDictationState.PermissionRequired ?: return
+        fail(pending.sessionId, pending.target, ConversationDictationFailure.Unknown)
     }
 
     /** Requests terminal provider output, or immediately commits segments already accumulated. */
@@ -741,8 +787,31 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
-    /** Verifies provider and permission prerequisites before creating a recognizer generation. */
+    /** Checks provider, runtime permission, and app-op before creating a recognizer generation. */
     private fun startOrRequestPermission(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+    ) {
+        state = ConversationDictationState.Starting(sessionId, target)
+        if (!platform.recognitionConfigured()) {
+            fail(sessionId, target, ConversationDictationFailure.ProviderUnavailable)
+            return
+        }
+        when (platform.microphoneAccess()) {
+            ConversationDictationMicrophoneAccess.Granted -> startWhenProviderAvailable(sessionId, target)
+            ConversationDictationMicrophoneAccess.RuntimePermissionRequired -> {
+                state = ConversationDictationState.PermissionRequired(sessionId, target)
+                _permissionRequestId.longValue += 1L
+            }
+            ConversationDictationMicrophoneAccess.AppOpDenied ->
+                fail(sessionId, target, ConversationDictationFailure.PermissionPermanentlyDenied)
+            ConversationDictationMicrophoneAccess.MicrophoneMuted ->
+                fail(sessionId, target, ConversationDictationFailure.MicrophoneMuted)
+        }
+    }
+
+    /** Re-checks the selected provider after permission is known before opening the microphone. */
+    private fun startWhenProviderAvailable(
         sessionId: Long,
         target: ConversationDictationTarget,
     ) {
@@ -751,12 +820,20 @@ internal class ConversationDictationController internal constructor(
             fail(sessionId, target, ConversationDictationFailure.ProviderUnavailable)
             return
         }
-        if (!platform.hasRecordAudioPermission()) {
-            state = ConversationDictationState.PermissionRequired(sessionId, target)
-            _permissionRequestId.longValue += 1L
-            return
-        }
         startRecognition(sessionId, target)
+    }
+
+    /** Publishes foreground-service ownership before Android can dispatch its queued start. */
+    private fun ensureDurableSession(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+    ): Boolean {
+        if (durableSession) return true
+        durableSession = true
+        if (runCatching(startDurableSession).getOrDefault(false)) return true
+        durableSession = false
+        fail(sessionId, target, ConversationDictationFailure.Unknown)
+        return false
     }
 
     /** Starts one bounded recognizer generation while retaining logical-session ownership. */
@@ -766,13 +843,7 @@ internal class ConversationDictationController internal constructor(
     ) {
         if (state.sessionId != sessionId) return
         clearRecognitionGeneration(cancel = false)
-        if (!durableSession) {
-            if (!startDurableSession()) {
-                fail(sessionId, target, ConversationDictationFailure.Unknown)
-                return
-            }
-            durableSession = true
-        }
+        if (!ensureDurableSession(sessionId, target)) return
         if (!microphoneHeld) {
             if (!tryAcquireMicrophone()) {
                 fail(sessionId, target, ConversationDictationFailure.MicrophoneInUse)
@@ -1479,7 +1550,7 @@ private const val EMPTY_SELECTION_SCAN_RADIUS = 1_024
 private const val READINESS_UI_FRAME_MILLIS = 16L
 
 @Suppress("MaxLineLength")
-private class AndroidConversationDictationPlatform(
+internal class AndroidConversationDictationPlatform(
     private val context: Context,
 ) : ConversationDictationPlatform {
     /** Reports the runtime microphone grant required before creating an app-owned recognizer. */
@@ -1488,6 +1559,27 @@ private class AndroidConversationDictationPlatform(
             context,
             Manifest.permission.RECORD_AUDIO,
         ) == PackageManager.PERMISSION_GRANTED
+
+    /** Includes the RECORD_AUDIO app-op so privacy-policy denial cannot masquerade as a usable grant. */
+    override fun microphoneAccess(): ConversationDictationMicrophoneAccess {
+        if (!hasRecordAudioPermission()) return ConversationDictationMicrophoneAccess.RuntimePermissionRequired
+        // Android folds device-wide microphone privacy into this effective permission check,
+        // but does not expose the current software-toggle state to ordinary apps. A real app
+        // permission revocation was already handled above, so route any remaining effective
+        // denial to visible privacy recovery without starting a silent recording or changing
+        // the user's privacy toggle.
+        return if (
+            PermissionChecker.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PermissionChecker.PERMISSION_GRANTED
+        ) {
+            ConversationDictationMicrophoneAccess.Granted
+        } else {
+            ConversationDictationMicrophoneAccess.MicrophoneMuted
+        }
+    }
+
+    /** A selected component is the stable pre-permission prerequisite; visibility is re-checked afterwards. */
+    override fun recognitionConfigured(): Boolean = selectedRecognitionService() != null
 
     /** Checks that Android's exact selected recognition service is still installed. */
     override fun recognitionAvailable(): Boolean {

@@ -284,6 +284,103 @@ class ConversationDictationControllerTest {
         assertTrue(platform.session.started)
     }
 
+    /** A missing runtime grant must reach Android before provider discovery can fail closed. */
+    @Test
+    fun runtimePermissionRequestPrecedesProviderDiscovery() {
+        val platform = FakePlatform(hasPermission = false, configured = true, available = false)
+        val fixture = fixture(draft = TextFieldValue(""), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        assertTrue(fixture.controller.state is ConversationDictationState.PermissionRequired)
+        assertEquals(1L, fixture.controller.permissionRequestId)
+        assertEquals(0, platform.recognitionAvailabilityChecks)
+        assertFalse(platform.session.started)
+    }
+
+    /** A device with no selected recognizer fails before requesting unrelated microphone access. */
+    @Test
+    fun missingProviderDoesNotRequestRuntimePermission() {
+        val platform = FakePlatform(hasPermission = false, configured = false, available = false)
+        val fixture = fixture(draft = TextFieldValue(""), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        assertEquals(
+            ConversationDictationFailure.ProviderUnavailable,
+            (fixture.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertEquals(0L, fixture.controller.permissionRequestId)
+        assertEquals(0, platform.recognitionAvailabilityChecks)
+        assertFalse(platform.session.started)
+    }
+
+    /** Permission launch ownership is one-shot and stale callbacks cannot revive a cancelled request. */
+    @Test
+    fun permissionLaunchIsClaimedOnceAndCancelledCallbacksAreIgnored() {
+        val platform = FakePlatform(hasPermission = false)
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val requestId = fixture.controller.permissionRequestId
+
+        assertTrue(fixture.controller.beginPermissionRequest(requestId))
+        assertFalse(fixture.controller.beginPermissionRequest(requestId))
+        fixture.controller.cancel()
+        platform.hasPermission = true
+        fixture.controller.onPermissionResult(true)
+
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertFalse(platform.session.started)
+    }
+
+    /** A settings-owned app-op denial fails closed instead of looping the runtime permission dialog. */
+    @Test
+    fun appOpDenialIsActionableWithoutRequestingRuntimePermission() {
+        val platform =
+            FakePlatform(
+                hasPermission = true,
+                microphoneAccessOverride = ConversationDictationMicrophoneAccess.AppOpDenied,
+            )
+        val fixture = fixture(draft = TextFieldValue(""), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        assertEquals(
+            ConversationDictationFailure.PermissionPermanentlyDenied,
+            (fixture.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertEquals(0L, fixture.controller.permissionRequestId)
+        assertEquals(0, platform.recognitionAvailabilityChecks)
+        assertFalse(platform.session.started)
+    }
+
+    @Test
+    fun mutedMicrophoneExplainsSystemPrivacyWithoutStartingSilentCapture() {
+        val platform =
+            FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+        val fixture = fixture(draft = TextFieldValue("Keep ", TextRange(5)), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        assertEquals(
+            ConversationDictationFailure.MicrophoneMuted,
+            (fixture.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertEquals(0L, fixture.controller.permissionRequestId)
+        assertEquals(0L, fixture.controller.providerActivityRequestId)
+        assertFalse(platform.session.started)
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertFalse(fixture.controller.hasDurableSession)
+        assertEquals("Keep ", fixture.drafts.getValue(key()).text)
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        fixture.controller.retry()
+        assertTrue(platform.session.started)
+        fixture.controller.stop()
+        platform.listener.onResult("recovered words")
+        assertEquals("Keep recovered words", fixture.drafts.getValue(key()).text)
+        assertEquals(1, fixture.writes)
+    }
+
     @Test
     fun providerActivityPathUsesProviderUiWithoutAppPermissionOrMicrophoneLease() {
         var microphoneAcquireCalls = 0
@@ -1044,6 +1141,32 @@ class ConversationDictationControllerTest {
         assertTrue(destroyed.platform.session.cancelled)
     }
 
+    /** The queued service must observe ownership even when Android dispatches it synchronously. */
+    @Test
+    fun durableOwnershipIsPublishedBeforeServiceStartCanObserveIt() {
+        lateinit var controller: ConversationDictationController
+        var ownershipObservedByServiceStart = false
+        val platform = FakePlatform()
+        controller =
+            ConversationDictationController(
+                platform = platform,
+                readDraft = { _, _ -> ConversationDictationDraftSnapshot(TextFieldValue(""), 0L) },
+                writeDraft = { _, _, _, _ -> true },
+                startDurableSession = {
+                    ownershipObservedByServiceStart = controller.hasDurableSession
+                    true
+                },
+                disclosureAccepted = { true },
+                markDisclosureAccepted = {},
+            )
+
+        controller.requestStart(ACCOUNT, GROUP, TextFieldValue(""))
+
+        assertTrue(ownershipObservedByServiceStart)
+        assertTrue(controller.hasDurableSession)
+        assertTrue(platform.session.started)
+    }
+
     @Test
     fun duplicateStartForTheSameTargetAndModeIsRejectedWithoutRestarting() {
         val fixture = fixture(draft = TextFieldValue("Source", TextRange(6)))
@@ -1273,10 +1396,12 @@ class ConversationDictationControllerTest {
     @Suppress("MaxLineLength")
     private class FakePlatform(
         var hasPermission: Boolean = true,
+        var configured: Boolean = true,
         var available: Boolean = true,
         var activityAvailable: Boolean = true,
         private val deferActivityReadiness: Boolean = false,
         var createFailure: Throwable? = null,
+        var microphoneAccessOverride: ConversationDictationMicrophoneAccess? = null,
     ) : ConversationDictationPlatform {
         lateinit var listener: ConversationDictationRecognitionListener
         var session = FakeSession()
@@ -1284,12 +1409,21 @@ class ConversationDictationControllerTest {
         val sessions = mutableListOf<FakeSession>()
         var readinessCancelled = false
             private set
+        var recognitionAvailabilityChecks = 0
+            private set
         lateinit var activityReadinessCallback: (Boolean) -> Unit
             private set
 
         override fun hasRecordAudioPermission(): Boolean = hasPermission
 
-        override fun recognitionAvailable(): Boolean = available
+        override fun microphoneAccess(): ConversationDictationMicrophoneAccess = microphoneAccessOverride ?: super.microphoneAccess()
+
+        override fun recognitionConfigured(): Boolean = configured
+
+        override fun recognitionAvailable(): Boolean {
+            recognitionAvailabilityChecks += 1
+            return available
+        }
 
         override fun recognitionActivityAvailable(): Boolean = activityAvailable
 
