@@ -632,7 +632,7 @@
     <string name="native_push_subtitle">Wake the app when the relay has new events to deliver.</string>
     <string name="native_push_missing_server_subtitle">Push is unavailable because this build has no push server configured.</string>
     <string name="native_push_google_play_unavailable_subtitle">Push requires compatible Google Play services on this device.</string>
-    <string name="native_push_firebase_unavailable_subtitle">Push is unavailable because this build has no Firebase configuration.</string>
+    <string name="native_push_firebase_unavailable_subtitle">Push is unavailable because Firebase is not configured or could not initialize.</string>
     <string name="notification_categories">Notification categories</string>
     <string name="notification_categories_subtitle">Android controls sound, vibration, importance, and Do Not Disturb for each category.</string>
     <string name="notification_defaults">Defaults for all chats</string>

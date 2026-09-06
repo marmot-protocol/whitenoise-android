@@ -50,11 +50,19 @@ class NativePushSettingScreenshotTest {
         capture("native_push_google_play_unavailable_dark_large_rtl.png")
     }
 
-    /** Records the distinct missing-Firebase explanation for configured Play devices. */
+    /** Records both missing-configuration and failed-initialization causes for unavailable Firebase. */
     @Test
     fun missingFirebaseLight() {
         render(NativePushCapability.FirebaseUnavailable)
         capture("native_push_firebase_unavailable_light.png")
+    }
+
+    /** Verifies Italian Firebase recovery copy remains readable with enlarged text. */
+    @Test
+    @Config(qualifiers = "it-w360dp-h780dp-mdpi")
+    fun unavailableFirebaseItalianLarge() {
+        render(NativePushCapability.FirebaseUnavailable, fontScale = 1.4f)
+        capture("native_push_firebase_unavailable_italian_large_light.png")
     }
 
     /** Renders the production setting row under the requested accessibility conditions. */

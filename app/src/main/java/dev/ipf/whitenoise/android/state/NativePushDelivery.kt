@@ -4,7 +4,6 @@ import android.content.Context
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.firebase.FirebaseApp
-import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.PushRegistrationShareOutcomeFfi
 import dev.ipf.marmotkit.PushRegistrationShareStatusFfi
@@ -104,12 +103,6 @@ internal suspend fun reconcileUnavailableNativePushDelivery(
             coroutineContext.ensureActive()
             persistentConnectionEnabled && ownerIsCurrent() && disableNativePush() && ownerIsCurrent()
         }
-    }
-
-/** Detects native-enabled background accounts that the active-account UI cannot safely mutate. */
-internal fun Map<String, NotificationSettingsFfi>.hasUnreconciledNativePushOutside(activeAccountRef: String): Boolean =
-    any { (accountRef, settings) ->
-        accountRef != activeAccountRef && settings.localNotificationsEnabled && settings.nativePushEnabled
     }
 
 /** Whether native registration sharing completed now or entered Marmot's durable retry queue. */

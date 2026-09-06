@@ -353,8 +353,15 @@ class DefaultNotificationDeliveryTest {
                 "account-b" to notificationSettings("account-b", nativePushEnabled = true),
             )
 
-        assertTrue(settings.hasUnreconciledNativePushOutside("account-a"))
-        assertFalse(settings.hasUnreconciledNativePushOutside("account-b"))
+        val snapshot =
+            NativePushFallbackSettingsSnapshot(
+                active = settings.getValue("account-a"),
+                knownByAccount = settings,
+                allAccountsRead = true,
+            )
+
+        assertTrue(snapshot.hasUnreconciledAccountOutside("account-a"))
+        assertFalse(snapshot.hasUnreconciledAccountOutside("account-b"))
     }
 
     /** Builds one local-notification setting for active/background readiness tests. */

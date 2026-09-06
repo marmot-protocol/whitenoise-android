@@ -462,7 +462,7 @@
     <string name="native_push_subtitle">中继有新事件需要送达时唤醒应用。</string>
     <string name="native_push_missing_server_subtitle">此构建版本未配置推送服务器，因此无法使用推送通知。</string>
     <string name="native_push_google_play_unavailable_subtitle">推送通知需要此设备提供兼容的 Google Play 服务。</string>
-    <string name="native_push_firebase_unavailable_subtitle">此构建版本未配置 Firebase，因此无法使用推送通知。</string>
+    <string name="native_push_firebase_unavailable_subtitle">Firebase 未配置或无法初始化，因此无法使用推送通知。</string>
     <string name="notification_categories">通知类别</string>
     <string name="notification_categories_subtitle">Android 控制每个类别的声音、振动、重要性和勿扰模式。</string>
     <string name="notification_defaults">所有聊天的默认设置</string>

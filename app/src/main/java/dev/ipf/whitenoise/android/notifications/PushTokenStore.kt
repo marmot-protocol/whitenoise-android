@@ -40,14 +40,17 @@ private const val LEGACY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION = 1L
 class PushTokenStore(
     private val preferences: SharedPreferences,
 ) {
+    /** Returns only a non-blank cached FCM token; absence requires fresh token acquisition. */
     fun lastToken(): String? = preferences.getString(KEY_FCM_TOKEN, null)?.takeIf { it.isNotBlank() }
 
+    /** Serializes token rotation with cleanup across every store instance in this process. */
     fun setToken(token: String) {
         synchronized(LOCK) {
             preferences.edit().putString(KEY_FCM_TOKEN, token).apply()
         }
     }
 
+    /** Removes only the token, retaining outstanding registration and push-wake retry obligations. */
     fun clear() {
         synchronized(LOCK) {
             preferences.edit().remove(KEY_FCM_TOKEN).apply()
@@ -64,9 +67,7 @@ class PushTokenStore(
      */
     fun nativePushRegistrationSyncPending(): Boolean = preferences.getBoolean(KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC, false)
 
-    // commit() (not apply()) so the #755 retry marker is durable before the
-    // token-rotation fallback starts a foreground service that may itself be
-    // killed/rejected — an async apply() could lose the flag on process death.
+    /** Commits the retry marker before a token-rotation service nudge can be rejected or killed. */
     @SuppressLint("ApplySharedPref")
     fun recordPendingNativePushRegistrationSync() {
         synchronized(LOCK) {
@@ -74,6 +75,7 @@ class PushTokenStore(
         }
     }
 
+    /** Acknowledges a completed all-account registration sync without clearing unrelated push state. */
     fun clearPendingNativePushRegistrationSync() {
         synchronized(LOCK) {
             preferences.edit().remove(KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC).apply()
@@ -118,12 +120,14 @@ class PushTokenStore(
         }
     }
 
+    /** Clears the current pending wake while retaining its sequence for future distinct wake identities. */
     fun clearPendingPushWakeCatchUp() {
         synchronized(LOCK) {
             clearPendingPushWakeCatchUpLocked()
         }
     }
 
+    /** Clears only the observed wake generation so a later wake cannot be acknowledged by stale work. */
     fun clearPendingPushWakeCatchUp(generation: Long): Boolean {
         if (generation == NO_PENDING_PUSH_WAKE_CATCH_UP) return false
         synchronized(LOCK) {
@@ -133,6 +137,7 @@ class PushTokenStore(
         }
     }
 
+    /** Removes both legacy and generation-based markers while the caller holds the process-wide lock. */
     private fun clearPendingPushWakeCatchUpLocked() {
         // apply() is intentionally enough for clears: losing a clear only causes
         // a redundant catch-up retry, while losing a record would lose a wake.
@@ -143,6 +148,7 @@ class PushTokenStore(
             .apply()
     }
 
+    /** Interprets a legacy pending Boolean as the first generation until a newer durable wake is recorded. */
     private fun pendingPushWakeCatchUpGenerationLocked(): Long {
         val generation = preferences.getLong(KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION, NO_PENDING_PUSH_WAKE_CATCH_UP)
         if (generation > NO_PENDING_PUSH_WAKE_CATCH_UP) return generation
@@ -187,6 +193,7 @@ class PushTokenStore(
         }
     }
 
+    /** Acknowledges one account's registration cleanup without removing another account's retry. */
     fun clearPending(account: String) {
         if (account.isBlank()) return
         synchronized(LOCK) {
@@ -196,9 +203,10 @@ class PushTokenStore(
         }
     }
 
-    // Accounts whose sign-out `setNativePushEnabled(false)` failed: the sync skips them and retries the disable.
+    /** Returns account refs whose failed sign-out disable must be retried before registration is allowed. */
     fun pendingDisables(): Set<String> = preferences.getStringSet(KEY_PENDING_DISABLES, emptySet())?.toSet() ?: emptySet()
 
+    /** Idempotently queues an account's failed native-push disable for the next synchronization. */
     fun recordPendingDisable(account: String) {
         if (account.isBlank()) return
         synchronized(LOCK) {
@@ -208,6 +216,7 @@ class PushTokenStore(
         }
     }
 
+    /** Clears only the matching account's disable obligation after completion or an explicit re-enable. */
     fun clearPendingDisable(account: String) {
         if (account.isBlank()) return
         synchronized(LOCK) {
@@ -225,6 +234,7 @@ class PushTokenStore(
         // an instance lock would serialize nothing across them. See #167.
         private val LOCK = Any()
 
+        /** Opens the existing secure-or-fallback store and best-effort migrates legacy push state. */
         fun create(context: Context): PushTokenStore {
             val appContext = context.applicationContext
             val secure = openSecure(appContext)
