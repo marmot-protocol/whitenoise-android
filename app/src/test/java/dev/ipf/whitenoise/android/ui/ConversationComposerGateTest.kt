@@ -116,6 +116,7 @@ class ConversationComposerGateTest {
         )
     }
 
+    /** A terminal disband also outranks an unresolved invite authority read. */
     @Test
     fun disbandTerminalityOutranksEveryOtherGate() {
         // Converging and landed disbands both yield the notice, and the
@@ -130,6 +131,7 @@ class ConversationComposerGateTest {
                 ComposerGate.DISBANDED,
                 conversationComposerGate(
                     pendingInvite = true,
+                    inviteAcceptanceResolutionPending = true,
                     membersVerified = true,
                     isSelfMember = true,
                     seededSelfMember = true,
