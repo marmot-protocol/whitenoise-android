@@ -7855,9 +7855,8 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Returns the first unmet native-push prerequisite for this build and
-     * device. Later checks are skipped when an earlier prerequisite is absent,
-     * which keeps configuration-free builds away from Firebase token work.
+     * Returns the first unmet native-push prerequisite. Later checks are skipped
+     * to keep configuration-free builds away from Firebase token work.
      */
     internal fun nativePushCapability(config: PushServerConfig? = PushServerConfig.current()): NativePushCapability {
         val pushServerConfigured = config != null
