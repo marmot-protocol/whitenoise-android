@@ -47,8 +47,9 @@ class StateSourceSizeCeilingTest {
 
         // Raised exactly for PR #2498's covered account-fenced draft refresh, live controller handoff,
         // and optimistic-preview routing. The integration tests exercise delayed A-B-A completion,
-        // same-account replacement, permanent detach, failure, and ambiguous-pending paths.
-        const val APP_STATE_MAX_LINES = 10262
+        // same-account replacement, permanent detach, failure, and ambiguous-pending paths. Corrected
+        // to the physical line count already present at that merged revision.
+        const val APP_STATE_MAX_LINES = 10263
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }

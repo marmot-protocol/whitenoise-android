@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,6 +33,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -49,6 +51,7 @@ internal enum class LoadFailurePlacement {
     Inline,
 }
 
+/** Chooses full-screen startup recovery or an inline retained-content banner. */
 internal fun loadFailurePlacement(
     hasFailure: Boolean,
     hasLoadedContent: Boolean,
@@ -59,6 +62,7 @@ internal fun loadFailurePlacement(
         else -> LoadFailurePlacement.FullScreen
     }
 
+/** Fills an established destination with neutral progress feedback. */
 @Composable
 fun LoadingScreen() {
     Box(
@@ -69,6 +73,7 @@ fun LoadingScreen() {
     }
 }
 
+/** Presents branded startup progress before any interactive destination exists. */
 @Composable
 fun StartupLoadingScreen() {
     Box(
@@ -109,6 +114,7 @@ internal fun WarmResumeUsefulSurface(content: @Composable () -> Unit) {
     }
 }
 
+/** Presents a non-blocking confirmation while preserving the destination beneath it. */
 @Composable
 internal fun InlineConfirmationNotice(
     notice: TransientNotice,
@@ -140,11 +146,18 @@ internal fun InlineConfirmationNotice(
     }
 }
 
+/**
+ * Presents a retryable failure with copyable diagnostics.
+ *
+ * [copyActionColor] lets a caller provide a foreground with sufficient contrast for its local
+ * recovery surface while the default preserves the existing Material text-button treatment.
+ */
 @Composable
 internal fun ErrorContent(
     title: String,
     error: ErrorPresentation,
     onRetry: () -> Unit,
+    copyActionColor: Color? = null,
 ) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
@@ -163,7 +176,13 @@ internal fun ErrorContent(
                     Text(stringResource(R.string.retry))
                 }
             }
-            TextButton(onClick = { clipboard.setText(AnnotatedString(error.report)) }) {
+            TextButton(
+                onClick = { clipboard.setText(AnnotatedString(error.report)) },
+                colors =
+                    ButtonDefaults.textButtonColors(
+                        contentColor = copyActionColor ?: MaterialTheme.colorScheme.primary,
+                    ),
+            ) {
                 Icon(
                     Icons.Default.ContentCopy,
                     contentDescription = null,
@@ -176,6 +195,7 @@ internal fun ErrorContent(
     }
 }
 
+/** Keeps a loaded surface visible while exposing copy and optional retry actions. */
 @Composable
 internal fun InlineErrorBanner(
     error: ErrorPresentation,

@@ -310,6 +310,7 @@ class AppStateSendLockCoverageTest {
         )
     }
 
+    /** Keeps read-watermark math tied to the edit-filtered timeline and every structural prefix row. */
     @Test
     fun conversationReadAnchorUsesHoistedRenderedTimelineAndCandidateIdentity() {
         val source = conversationScreenSource().readText()
@@ -328,7 +329,7 @@ class AppStateSendLockCoverageTest {
             renderedTimelineIndex >= 0 &&
                 renderedTimelineIndex < readAnchorCallIndex &&
                 "renderedTimeline = renderedTimeline" in readAnchorCall &&
-                "remember(listState, renderedSize, hasOlderHeader)" in readAnchorHelper &&
+                "remember(listState, renderedSize, hasOlderHeader, hasInlineTopError)" in readAnchorHelper &&
                 "currentHighestVisibleMessageId," in readAnchorHelper &&
                 "advanceConversationReadAnchor(" in readAnchorHelper &&
                 "durableAnchorId = controller.lastReadMessageId" in readAnchorHelper &&
