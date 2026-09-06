@@ -166,34 +166,71 @@ class ConversationInitialPresentationTest {
         runTest {
             var attempts = 0
             var frames = 0
-            var retryWaits = 0
-            var tailWorkAvailable = false
+            var ownerReleased = false
 
             val alignmentMayCommit =
                 awaitSeededTailAlignmentUntilCommit(
                     followTail = {
                         attempts++
-                        tailWorkAvailable
+                        ownerReleased
                     },
                     isFollowingTail = { true },
                     canScrollForward = { true },
-                    tailWorkAvailable = { tailWorkAvailable },
                     awaitFrame = {
                         frames++
                         if (frames == SEEDED_TAIL_ANCHOR_MAX_ATTEMPTS) {
-                            tailWorkAvailable = true
+                            ownerReleased = true
                         }
-                    },
-                    awaitRetryOpportunity = { retryMayProceed ->
-                        retryWaits++
-                        assertTrue(retryMayProceed())
                     },
                 )
 
             assertTrue(alignmentMayCommit)
             assertEquals(SEEDED_TAIL_ANCHOR_MAX_ATTEMPTS + 1, attempts)
             assertEquals(SEEDED_TAIL_ANCHOR_MAX_ATTEMPTS, frames)
-            assertEquals(1, retryWaits)
+        }
+
+    /** Exhausts one aggregate budget instead of restarting batches under persistent supersession. */
+    @Test
+    fun persistentTailSupersessionStopsAtTheAggregateRecoveryBudget() =
+        runTest {
+            var attempts = 0
+            var frames = 0
+
+            val alignmentMayCommit =
+                awaitSeededTailAlignmentUntilCommit(
+                    followTail = {
+                        attempts++
+                        false
+                    },
+                    isFollowingTail = { true },
+                    canScrollForward = { true },
+                    awaitFrame = { frames++ },
+                )
+
+            assertFalse(alignmentMayCommit)
+            assertEquals(SEEDED_TAIL_ALIGNMENT_MAX_ATTEMPTS, attempts)
+            assertEquals(SEEDED_TAIL_ALIGNMENT_MAX_ATTEMPTS, frames)
+        }
+
+    /** Lets newer history ownership dismiss visible recovery without another tail attempt. */
+    @Test
+    fun newerHistoryIntentSafelyDismissesExhaustedTailRecovery() =
+        runTest {
+            var followingTail = true
+            var safeStateWaits = 0
+
+            awaitSeededTailAlignmentSafeFallback(
+                isFollowingTail = { followingTail },
+                canScrollForward = { true },
+                awaitSafeState = { safeToReveal ->
+                    safeStateWaits++
+                    assertFalse(safeToReveal())
+                    followingTail = false
+                    assertTrue(safeToReveal())
+                },
+            )
+
+            assertEquals(1, safeStateWaits)
         }
 
     /** Evaluates whether a first-frame path may own the tail under one supplied routing constraint. */

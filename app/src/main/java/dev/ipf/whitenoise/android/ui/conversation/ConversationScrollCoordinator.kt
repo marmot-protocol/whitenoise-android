@@ -80,6 +80,7 @@ internal data class ConversationScrollAnchor(
     val messageId: String?,
 )
 
+/** Captures the first visible logical message while excluding non-message structural rows. */
 internal fun conversationScrollAnchor(
     listState: LazyListState,
     renderedItemIds: List<String>,
@@ -174,6 +175,7 @@ internal class ConversationPostInitialReanchorGate {
     private var structure: ConversationTimelineStructure? = null
     private var viewportHeight: Int? = null
 
+    /** Records the hidden initial structure and viewport as the first stable baseline. */
     fun commit(
         structure: ConversationTimelineStructure,
         viewportHeight: Int,
@@ -182,12 +184,14 @@ internal class ConversationPostInitialReanchorGate {
         this.viewportHeight = viewportHeight
     }
 
+    /** Returns whether the latest row structure differs from the previously observed structure. */
     fun onStructure(structure: ConversationTimelineStructure): Boolean {
         val previous = this.structure ?: return false
         this.structure = structure
         return structure != previous
     }
 
+    /** Returns whether the usable viewport height differs from the previously observed height. */
     fun onViewportHeight(viewportHeight: Int): Boolean {
         val previous = this.viewportHeight ?: return false
         this.viewportHeight = viewportHeight
@@ -376,6 +380,7 @@ internal class ConversationScrollCoordinator(
         )
     }
 
+    /** Commits the durable tail or history intent selected by a completed user gesture. */
     fun onUserGestureSettled(
         anchor: ConversationScrollAnchor,
         nearBottom: Boolean,
@@ -394,6 +399,7 @@ internal class ConversationScrollCoordinator(
         }
     }
 
+    /** Replaces transient command ownership with a durable logical history anchor. */
     fun settleReadingAt(anchor: ConversationScrollAnchor) {
         invalidateActiveCommand()
         userGestureInProgress = false
@@ -404,6 +410,7 @@ internal class ConversationScrollCoordinator(
         )
     }
 
+    /** Reapplies the current history bookmark only while no newer gesture or command owns it. */
     suspend fun reanchorReadingHistory(resolveAnchorIndex: (ConversationScrollAnchor) -> Int?): Boolean {
         if (foregroundRestoreInProgress) return false
         val anchor = readingAnchor
@@ -705,6 +712,7 @@ internal class ConversationScrollCoordinator(
     }
 }
 
+/** Performs the explicit newest-message action without bypassing coordinator ownership. */
 internal suspend fun ConversationScrollCoordinator.jumpToNewest(targetIndex: Int): Boolean =
     programmaticJump(
         targetMessageId = null,
@@ -887,6 +895,7 @@ internal suspend fun ConversationScrollCoordinator.commitInitialTailAnchor(
     return commandCompleted && layoutReady
 }
 
+/** Waits a bounded number of frames for the target row and viewport to remain measured. */
 private suspend fun awaitStableInitialAnchorLayout(
     captureLayout: () -> ConversationInitialAnchorLayout,
     maxFrames: Int,
@@ -982,6 +991,7 @@ internal class LazyListConversationScrollWriter(
             ?: 0
 }
 
+/** Rejects transient command modes where a durable post-command intent is required. */
 private fun ConversationScrollMode.requireSettled(): ConversationScrollMode {
     require(this is ConversationScrollMode.FollowingTail || this is ConversationScrollMode.ReadingHistory) {
         "Transient scroll mode cannot be persisted: $this"

@@ -78,38 +78,16 @@ class ConversationTailSpacingTest {
         val listState = LazyListState(firstVisibleItemIndex = tailIndex)
         val writer = CountingLazyListScrollWriter(listState)
         var tailAlignmentCommitted = false
+        var tailAlignmentExhausted = false
 
         composeRule.setContent {
-            val coordinator =
-                remember(listState) {
-                    ConversationScrollCoordinator(writer = writer)
-                }
-            val reanchorGate = remember(listState) { ConversationPostInitialReanchorGate() }
-            SeededConversationAnchorBaselineEffect(
-                enabled = true,
+            OversizedSeededTailHarness(
                 listState = listState,
-                scrollCoordinator = coordinator,
-                currentTailIndex = { tailIndex },
-                postInitialReanchorGate = reanchorGate,
-                timelineStructure =
-                    ConversationTimelineStructure(
-                        rowKeys = listOf("tail" to "message-tail"),
-                        olderHeaderCount = 1,
-                        inlineTopErrorCount = 1,
-                    ),
-                onTailAlignmentCommitted = { tailAlignmentCommitted = true },
+                writer = writer,
+                tailIndex = tailIndex,
+                onCommitted = { tailAlignmentCommitted = true },
+                onExhausted = { tailAlignmentExhausted = true },
             )
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.size(width = 320.dp, height = 100.dp),
-                verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
-                contentPadding = conversationTimelineContentPadding(0.dp),
-            ) {
-                item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
-                item(key = "top-error") { Spacer(Modifier.fillMaxWidth().height(44.dp)) }
-                item(key = "older-header") { Spacer(Modifier.fillMaxWidth().height(40.dp)) }
-                item(key = "tail") { Spacer(Modifier.fillMaxWidth().height(400.dp)) }
-            }
         }
         composeRule.waitForIdle()
 
@@ -117,6 +95,7 @@ class ConversationTailSpacingTest {
         assertFalse("the seeded final row must reach its physical end", listState.canScrollForward)
         assertTrue(listState.firstVisibleItemScrollOffset > 0)
         assertEquals(1, writer.snapCount)
+        assertFalse("the available tail writer must not exhaust", tailAlignmentExhausted)
         assertTrue("the seeded tail alignment callback must commit", tailAlignmentCommitted)
         assertTrue(
             "the corrected oversized row must be eligible for paint, TalkBack, and useful-frame telemetry",
@@ -128,6 +107,46 @@ class ConversationTailSpacingTest {
                 canScrollForward = listState.canScrollForward,
             ),
         )
+    }
+
+    /** Mounts the real structural rows and bounded seeded-tail owner for the oversized-row regression. */
+    @Composable
+    private fun OversizedSeededTailHarness(
+        listState: LazyListState,
+        writer: ConversationScrollWriter,
+        tailIndex: Int,
+        onCommitted: () -> Unit,
+        onExhausted: () -> Unit,
+    ) {
+        val coordinator = remember(listState) { ConversationScrollCoordinator(writer = writer) }
+        val reanchorGate = remember(listState) { ConversationPostInitialReanchorGate() }
+        SeededConversationAnchorBaselineEffect(
+            enabled = true,
+            retryGeneration = 0L,
+            listState = listState,
+            scrollCoordinator = coordinator,
+            currentTailIndex = { tailIndex },
+            postInitialReanchorGate = reanchorGate,
+            timelineStructure =
+                ConversationTimelineStructure(
+                    rowKeys = listOf("tail" to "message-tail"),
+                    olderHeaderCount = 1,
+                    inlineTopErrorCount = 1,
+                ),
+            onTailAlignmentCommitted = onCommitted,
+            onTailAlignmentExhausted = onExhausted,
+        )
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.size(width = 320.dp, height = 100.dp),
+            verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
+            contentPadding = conversationTimelineContentPadding(0.dp),
+        ) {
+            item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
+            item(key = "top-error") { Spacer(Modifier.fillMaxWidth().height(44.dp)) }
+            item(key = "older-header") { Spacer(Modifier.fillMaxWidth().height(40.dp)) }
+            item(key = "tail") { Spacer(Modifier.fillMaxWidth().height(400.dp)) }
+        }
     }
 
     /** Includes the top error and older-page header when judging distance from an oversized tail. */

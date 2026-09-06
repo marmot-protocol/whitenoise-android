@@ -233,6 +233,7 @@ private class ConversationNavigationState(
     val timelineItemHeightsPx = mutableStateMapOf<String, Int>()
     val searchFocusRequester = FocusRequester()
 
+    /** Cancels navigation work whose lifetime is owned by this remembered route state. */
     fun cancelJobs() {
         searchJob?.cancel()
         navigateReplyJob?.cancel()
@@ -241,11 +242,13 @@ private class ConversationNavigationState(
     }
 }
 
+/** Checks the complete measured row against the usable lazy-list viewport. */
 private fun LazyListLayoutInfo.isItemFullyVisible(index: Int): Boolean {
     val item = visibleItemsInfo.firstOrNull { it.index == index } ?: return false
     return item.offset >= viewportStartOffset && item.offset + item.size <= viewportEndOffset
 }
 
+/** Captures only the bounded state needed to decide whether startup backfill can progress. */
 private fun ConversationController.initialTimelineBackfillSnapshot() =
     ConversationInitialTimelineBackfillSnapshot(
         hasRenderableRows = timeline.any { !MessageProjector.isEdit(it.record) },
@@ -263,6 +266,7 @@ private val InitialTimelineBackfillNoProgressError =
                 "No backward timeline progress was observed.",
     )
 
+/** Remembers navigation state per controller and cancels all controller-owned jobs on disposal. */
 @Composable
 private fun rememberConversationNavigationState(
     controller: ConversationController,
@@ -297,6 +301,7 @@ private val COMPOSER_SNACKBAR_INSET = 72.dp
 
 private const val MEDIA_PICKER_MAX_ITEMS = 10
 
+/** Maps recorder failures to localized, privacy-safe user presentation. */
 private fun presentVoiceRecordingFailure(
     appState: WhiteNoiseAppState,
     throwable: Throwable,
@@ -321,6 +326,7 @@ private fun presentVoiceRecordingFailure(
     }
 }
 
+/** Renders the shared retryable conversation-load error surface. */
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 @Composable
 private fun ConversationLoadErrorContent(
@@ -334,6 +340,7 @@ private fun ConversationLoadErrorContent(
     )
 }
 
+/** Inserts an inline load error only at the failing timeline edge. */
 private fun LazyListScope.conversationLoadErrorItem(
     key: String,
     error: ErrorPresentation?,
@@ -368,6 +375,7 @@ internal fun conversationBubbleRowsShareSenderRun(
             sameDay = !differentDay(first.record.recordedAt, second.record.recordedAt),
         )
 
+/** Classifies rows that participate in adjacent sender grouping as message bubbles. */
 private fun timelineItemRendersAsConversationBubble(
     item: TimelineMessage,
     streamingDebugEnabled: Boolean,
@@ -397,6 +405,7 @@ private data class ConversationBatchSelectionUiState(
     val actionAvailability: BatchSelectionActionAvailability,
 )
 
+/** Derives stable batch actions from the current account-scoped message selection. */
 @Composable
 private fun rememberConversationBatchSelectionUiState(
     selectedMessages: Map<String, BatchMessageSelection>,
@@ -734,6 +743,7 @@ internal fun ConversationScreen(
     var textSelectionMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
     var textSelectionBubbleBounds by remember(chat.id) { mutableStateOf<Rect?>(null) }
 
+    /** Clears the single conversation-owned native text selection. */
     fun clearTextSelection() {
         textSelectionMessageId = null
         textSelectionBubbleBounds = null
@@ -781,6 +791,10 @@ internal fun ConversationScreen(
         remember(controller, notificationOpenRequestId) {
             mutableStateOf(!firstFrameSeed.anchorTailImmediately)
         }
+    var seededTailAlignmentRecoveryVisible by
+        remember(controller, notificationOpenRequestId) { mutableStateOf(false) }
+    var seededTailAlignmentRetryGeneration by
+        remember(controller, notificationOpenRequestId) { mutableLongStateOf(0L) }
     val transcriptVisibilityCommitted by
         remember(controller, notificationOpenRequestId, listState, firstFrameSeed.anchorTailImmediately) {
             derivedStateOf {
@@ -993,6 +1007,7 @@ internal fun ConversationScreen(
     var dragPointerWindowY by
         remember(controller, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf<Float?>(null) }
 
+    /** Captures the logical first visible message against the latest filtered timeline. */
     fun currentScrollAnchor(): ConversationScrollAnchor {
         val liveRenderedTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
@@ -1152,6 +1167,7 @@ internal fun ConversationScreen(
             hasInlineTopError = hasInlineTopError,
         )
 
+    /** Resolves a saved logical anchor after current header and error rows. */
     fun resolveScrollAnchorIndex(anchor: ConversationScrollAnchor): Int? {
         val liveRenderedTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         val timelineIndex =
@@ -1929,8 +1945,12 @@ internal fun ConversationScreen(
             leadingStructuralRowCount = leadingStructuralRowCount,
         ) ?: 0
     val currentTailIndex by rememberUpdatedState(newValue = tailTimelineIndex)
+    val seededTailAlignmentReady =
+        firstFrameSeed.anchorTailImmediately &&
+            (!navigationState.seedTailAwaitingAuthoritative || controller.hasPublishedAuthoritativeTimeline)
     SeededConversationAnchorBaselineEffect(
-        enabled = firstFrameSeed.anchorTailImmediately,
+        enabled = seededTailAlignmentReady,
+        retryGeneration = seededTailAlignmentRetryGeneration,
         listState = listState,
         scrollCoordinator = scrollCoordinator,
         currentTailIndex = { currentTailIndex },
@@ -1941,22 +1961,16 @@ internal fun ConversationScreen(
                 olderHeaderCount = olderHeaderCount,
                 inlineTopErrorCount = inlineTopErrorCount,
             ),
-        onTailAlignmentCommitted = { seededTailAlignmentCommitted = true },
-    )
-    SeededConversationAuthoritativeReconciliationEffect(
-        authoritativeTimelinePublished = controller.hasPublishedAuthoritativeTimeline,
-        awaitingAuthoritativeTimeline = navigationState.seedTailAwaitingAuthoritative,
-        renderedTimeline = renderedTimeline,
-        scrollCoordinator = scrollCoordinator,
-        tailIndex = tailTimelineIndex,
-        onReconciled = { latestId ->
-            navigationState.seedTailAwaitingAuthoritative = false
-            navigationState.lastFollowedLatestId = latestId
-            // The list is positioned — at the tail, or wherever a superseding
-            // navigation moved it — so the reveal no longer risks the
-            // pre-scroll oldest-rows frame.
-            initialTimelineAnchored = true
+        onTailAlignmentCommitted = {
+            seededTailAlignmentRecoveryVisible = false
+            seededTailAlignmentCommitted = true
+            if (navigationState.seedTailAwaitingAuthoritative) {
+                navigationState.seedTailAwaitingAuthoritative = false
+                navigationState.lastFollowedLatestId = renderedTimeline.lastOrNull()?.id
+                initialTimelineAnchored = true
+            }
         },
+        onTailAlignmentExhausted = { seededTailAlignmentRecoveryVisible = true },
     )
     ConversationTailInsetReanchorEffect(
         scrollCoordinator = scrollCoordinator,
@@ -3588,8 +3602,15 @@ internal fun ConversationScreen(
                             )
                         }
                         ConversationInitialLoadingOverlay(
-                            visible = !initialTimelineAnchored,
+                            visible = !transcriptVisibilityCommitted && !seededTailAlignmentRecoveryVisible,
                             graceMillis = CONVERSATION_ANCHORED_LOADING_GRACE_MILLIS,
+                        )
+                        ConversationSeededTailAlignmentRecovery(
+                            visible = seededTailAlignmentRecoveryVisible,
+                            onRetry = {
+                                seededTailAlignmentRecoveryVisible = false
+                                seededTailAlignmentRetryGeneration++
+                            },
                         )
                         // Day of the topmost visible message, shown only while
                         // scrolling — the inline separators carry it at rest.

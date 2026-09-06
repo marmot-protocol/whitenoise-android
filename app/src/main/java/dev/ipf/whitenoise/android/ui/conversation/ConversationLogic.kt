@@ -68,6 +68,7 @@ internal fun shouldRestoreConversationScrollSnapshot(
         notificationOpenRequestId == 0L &&
         entryUnreadCount <= 0
 
+/** Names a saved scroll position by both account and conversation to prevent cross-account reuse. */
 internal fun conversationScrollKey(
     accountRef: String?,
     groupIdHex: String,
@@ -95,6 +96,7 @@ internal fun conversationScrollSnapshotOnLeave(
         )
     }
 
+/** Resolves a saved logical row after current structural headers, falling back to its legacy index. */
 internal fun conversationScrollRestoreListIndex(
     snapshot: ConversationScrollSnapshot,
     renderedItemIds: List<String>,

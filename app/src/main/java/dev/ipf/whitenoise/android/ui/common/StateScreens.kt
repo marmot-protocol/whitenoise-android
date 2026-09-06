@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,6 +33,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -140,11 +142,18 @@ internal fun InlineConfirmationNotice(
     }
 }
 
+/**
+ * Presents a retryable failure with copyable diagnostics.
+ *
+ * [copyActionColor] lets a caller provide a foreground with sufficient contrast for its local
+ * recovery surface while the default preserves the existing Material text-button treatment.
+ */
 @Composable
 internal fun ErrorContent(
     title: String,
     error: ErrorPresentation,
     onRetry: () -> Unit,
+    copyActionColor: Color? = null,
 ) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
@@ -163,7 +172,13 @@ internal fun ErrorContent(
                     Text(stringResource(R.string.retry))
                 }
             }
-            TextButton(onClick = { clipboard.setText(AnnotatedString(error.report)) }) {
+            TextButton(
+                onClick = { clipboard.setText(AnnotatedString(error.report)) },
+                colors =
+                    ButtonDefaults.textButtonColors(
+                        contentColor = copyActionColor ?: MaterialTheme.colorScheme.primary,
+                    ),
+            ) {
                 Icon(
                     Icons.Default.ContentCopy,
                     contentDescription = null,
