@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
+import android.app.Application
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -31,13 +32,17 @@ private const val ACTION_START = "dev.ipf.whitenoise.android.notifications.START
 private const val ACTION_SYNC_NATIVE_PUSH_REGISTRATION =
     "dev.ipf.whitenoise.android.notifications.SYNC_NATIVE_PUSH_REGISTRATION"
 private const val EXTRA_START_TRIGGER = "dev.ipf.whitenoise.android.notifications.EXTRA_START_TRIGGER"
+private const val EXTRA_CAPABILITY_FALLBACK_GENERATION =
+    "dev.ipf.whitenoise.android.notifications.EXTRA_CAPABILITY_FALLBACK_GENERATION"
 private const val START_TRIGGER_USER_TOGGLE = "user_toggle"
 private const val START_TRIGGER_PUSH_WAKE = "push_wake"
 private const val START_TRIGGER_SYSTEM_WAKE = "system_wake"
+private const val START_TRIGGER_CAPABILITY_FALLBACK = "capability_fallback"
 
 class NotificationStreamForegroundService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val runtimeSupervisor = NotificationRuntimeSupervisor()
+    private val capabilityFallbackRequests = CapabilityFallbackServiceRequests()
     private var bootstrapJob: Job? = null
     private var pendingNativePushRegistrationSync = false
 
@@ -54,6 +59,8 @@ class NotificationStreamForegroundService : Service() {
         startId: Int,
     ): Int {
         val trigger = foregroundStartTrigger(intent)
+        val capabilityFallbackGeneration = capabilityFallbackGeneration(intent)
+        val readyCapabilityFallbacks = capabilityFallbackRequests.register(capabilityFallbackGeneration)
         latestStartId = startId
         if (trigger == ForegroundStartTrigger.UserToggle) pendingUserOwnedStart = true
         if (trigger == ForegroundStartTrigger.PushWake) {
@@ -83,6 +90,13 @@ class NotificationStreamForegroundService : Service() {
         val syncNativePushRegistration = shouldSyncNativePushRegistration(intent?.action)
         if (syncNativePushRegistration) pendingNativePushRegistrationSync = true
         val recordPendingPushWakeCatchUp = shouldRecordPendingPushWakeCatchUp(trigger, startedForeground)
+        if (startedForeground) {
+            application.notifyCapabilityFallbackStarted(readyCapabilityFallbacks)
+        } else {
+            application.notifyCapabilityFallbackUnavailable(
+                capabilityFallbackRequests.reject(capabilityFallbackGeneration),
+            )
+        }
         when (
             decideForegroundStart(
                 startForegroundSucceeded = startedForeground,
@@ -214,17 +228,21 @@ class NotificationStreamForegroundService : Service() {
         completedPushWakeGeneration = decision.completedPushWakeGeneration
         pendingUserOwnedStart = decision.pendingUserOwnedStart
         when (outcome) {
-            is NotificationRuntimeSupervisionOutcome.Started ->
+            is NotificationRuntimeSupervisionOutcome.Started -> {
+                application.notifyCapabilityFallbackStarted(capabilityFallbackRequests.onRuntimeStarted())
                 if (outcome.attempts > 1) {
                     foregroundServiceDiagnostic(NotificationServiceDiagnostic.RUNTIME_RECOVERED, outcome.attempts)
                 }
+            }
             is NotificationRuntimeSupervisionOutcome.RecoveryBoundaryChanged -> {
+                application.notifyCapabilityFallbackUnavailable(capabilityFallbackRequests.onRuntimeUnavailable())
                 foregroundServiceDiagnostic(
                     NotificationServiceDiagnostic.RETRY_BOUNDARY_CHANGED,
                     outcome.attempts,
                 )
             }
             is NotificationRuntimeSupervisionOutcome.Exhausted -> {
+                application.notifyCapabilityFallbackUnavailable(capabilityFallbackRequests.onRuntimeUnavailable())
                 foregroundServiceDiagnostic(
                     NotificationServiceDiagnostic.RETRIES_EXHAUSTED,
                     outcome.attempts,
@@ -312,6 +330,7 @@ class NotificationStreamForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        application.notifyCapabilityFallbackUnavailable(capabilityFallbackRequests.onRuntimeUnavailable())
         serviceScope.cancel()
         foregroundServiceDebug { "destroyed" }
         super.onDestroy()
@@ -346,14 +365,21 @@ class NotificationStreamForegroundService : Service() {
     companion object {
         private const val NOTIFICATION_ID = 1001
 
+        /** Queues one typed foreground start and optionally carries an opaque fallback generation. */
         internal fun start(
             context: Context,
             trigger: ForegroundStartTrigger = ForegroundStartTrigger.UserToggle,
+            capabilityFallbackGeneration: Long? = null,
         ): Boolean =
             startForegroundServiceSafely(context) { appContext ->
                 Intent(appContext, NotificationStreamForegroundService::class.java)
                     .setAction(ACTION_START)
                     .putExtra(EXTRA_START_TRIGGER, trigger.extraValue)
+                    .apply {
+                        capabilityFallbackGeneration?.let {
+                            putExtra(EXTRA_CAPABILITY_FALLBACK_GENERATION, it)
+                        }
+                    }
             }
 
         // #755 fallback: record the durable pending-sync flag, then nudge this
@@ -395,6 +421,18 @@ class NotificationStreamForegroundService : Service() {
     }
 }
 
+/** Acknowledges only request generations owned by this supervised service instance. */
+private fun Application.notifyCapabilityFallbackStarted(generations: Set<Long>) {
+    val appState = (this as? WhiteNoiseApplication)?.appState ?: return
+    generations.forEach { appState.onNativePushFallbackRuntimeStarted(it) }
+}
+
+/** Invalidates only service generations retained by this concrete instance. */
+private fun Application.notifyCapabilityFallbackUnavailable(generations: Set<Long>) {
+    val appState = (this as? WhiteNoiseApplication)?.appState ?: return
+    generations.forEach { appState.onNativePushFallbackRuntimeUnavailable(it) }
+}
+
 private suspend fun backgroundConnectionEnabledOffMain(context: Context): Boolean =
     withContext(Dispatchers.Default) {
         BackgroundConnectionPreferences.isEnabled(context)
@@ -417,6 +455,7 @@ internal enum class ForegroundStartTrigger(
     UserToggle(START_TRIGGER_USER_TOGGLE),
     PushWake(START_TRIGGER_PUSH_WAKE),
     SystemWake(START_TRIGGER_SYSTEM_WAKE),
+    CapabilityFallback(START_TRIGGER_CAPABILITY_FALLBACK),
 }
 
 /** True only for a one-shot native-push registration sync start (#755). */
@@ -512,20 +551,30 @@ internal fun foregroundServiceTypeForTrigger(trigger: ForegroundStartTrigger): I
         ForegroundStartTrigger.SystemWake -> ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
         ForegroundStartTrigger.UserToggle,
         ForegroundStartTrigger.PushWake,
+        ForegroundStartTrigger.CapabilityFallback,
         -> ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
     }
 
+/** Classifies null, legacy, and current service intents without trusting an unknown trigger. */
 private fun foregroundStartTrigger(intent: Intent?): ForegroundStartTrigger {
     val raw = intent?.getStringExtra(EXTRA_START_TRIGGER)
     return when (raw) {
         START_TRIGGER_USER_TOGGLE -> ForegroundStartTrigger.UserToggle
         START_TRIGGER_PUSH_WAKE -> ForegroundStartTrigger.PushWake
         START_TRIGGER_SYSTEM_WAKE -> ForegroundStartTrigger.SystemWake
+        START_TRIGGER_CAPABILITY_FALLBACK -> ForegroundStartTrigger.CapabilityFallback
         // Older ACTION_START intents were the explicit user-toggle/app path.
         null -> if (intent?.action == ACTION_START) ForegroundStartTrigger.UserToggle else ForegroundStartTrigger.SystemWake
         else -> ForegroundStartTrigger.SystemWake
     }
 }
+
+/** Returns the opaque positive generation carried only by capability-fallback starts. */
+internal fun capabilityFallbackGeneration(intent: Intent?): Long? =
+    intent
+        ?.takeIf { foregroundStartTrigger(it) == ForegroundStartTrigger.CapabilityFallback }
+        ?.getLongExtra(EXTRA_CAPABILITY_FALLBACK_GENERATION, 0L)
+        ?.takeIf { it > 0L }
 
 internal fun pushWakeLockTimeoutMs(
     pushDrainTimeoutMs: Long = PUSH_WAKE_DRAIN_TIMEOUT_MS,

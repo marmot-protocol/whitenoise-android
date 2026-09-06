@@ -84,17 +84,27 @@ class NotificationPushWakeDrainCoverageTest {
         assertEquals(35_000L, pushWakeLockTimeoutMs(pushDrainTimeoutMs = 10_000L, bootstrapBudgetMs = 5_000L, nativePushSyncBudgetMs = 20_000L))
     }
 
+    /** Verifies AppState delegates to the helper that arms the drain before starting the runtime. */
     @Test
     fun appStateDrainWaiterStartsBeforeRuntimeBootstrap() {
         val appState = appStateSource().readText()
-        val wait = appStateFunctionBody("ensureNotificationRuntimeStartedAndAwaitPushDrain")
+        val wait =
+            appState
+                .substringAfter("suspend fun ensureNotificationRuntimeStartedAndAwaitPushDrain(")
+                .substringBefore("\n\n")
+        val drain = File(appStateSource().parentFile, "NotificationPushDrain.kt").readText()
         val postMaintenance = appStateFunctionBody("schedulePostNotificationMaintenance")
 
         assertTrue(
             "drain waiter must be active before ensureNotificationRuntimeStarted can process a fast update",
-            "async(start = CoroutineStart.UNDISPATCHED)" in wait &&
-                wait.indexOf("async(start = CoroutineStart.UNDISPATCHED)") < wait.indexOf("ensureNotificationRuntimeStarted()") &&
-                "notificationDrainSignals.first" in wait,
+            "awaitNotificationPushDrain(" in wait &&
+                "startRuntime = ::ensureNotificationRuntimeStarted" in wait &&
+                "sequenceBeforeStart = notificationDrainSequence.get()" in wait &&
+                "notificationDrainSignals = notificationDrainSignals" in wait &&
+                "async(start = CoroutineStart.UNDISPATCHED)" in drain &&
+                drain.indexOf("async(start = CoroutineStart.UNDISPATCHED)") <
+                drain.indexOf("val catchUpSucceeded = startRuntime()") &&
+                "notificationDrainSignals.first" in drain,
         )
         assertTrue(
             "notification update processing must signal push-wake drain completion",

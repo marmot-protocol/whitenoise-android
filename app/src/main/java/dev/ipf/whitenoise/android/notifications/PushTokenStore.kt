@@ -172,15 +172,18 @@ class PushTokenStore(
     fun pendingClears(): Set<String> = preferences.getStringSet(KEY_PENDING_CLEARS, emptySet())?.toSet() ?: emptySet()
 
     /**
-     * Mark [account] as needing a deferred `clearPushRegistration` retry.
-     * Idempotent — re-recording an already-pending ref is a no-op.
+     * Durably marks [account] before native delivery is disabled.
+     *
+     * Re-recording intentionally commits again: a failed commit can update the
+     * in-memory preference view, so skipping an already-present value would
+     * incorrectly treat the cleanup marker as process-durable.
      */
-    fun recordPendingClear(account: String) {
-        if (account.isBlank()) return
-        synchronized(LOCK) {
+    @SuppressLint("ApplySharedPref")
+    fun recordPendingClear(account: String): Boolean {
+        if (account.isBlank()) return false
+        return synchronized(LOCK) {
             val current = pendingClears()
-            if (account in current) return
-            preferences.edit().putStringSet(KEY_PENDING_CLEARS, current + account).apply()
+            preferences.edit().putStringSet(KEY_PENDING_CLEARS, current + account).commit()
         }
     }
 

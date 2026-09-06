@@ -19,6 +19,8 @@ import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.marmotkit.PushRegistrationShareOutcomeFfi
+import dev.ipf.marmotkit.PushRegistrationShareStatusFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
@@ -31,10 +33,13 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.robolectric.Shadows.shadowOf
 import java.lang.reflect.Proxy
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -59,6 +64,7 @@ internal class NotificationBootstrapTestFixture(
     private val chatGroups: List<AppGroupRecordFfi> = emptyList(),
     private val markReadRow: ChatListRowFfi? = null,
     private val signInFailure: Throwable? = null,
+    initialNotificationSettings: NotificationSettingsFfi? = null,
     // Optional behavior hooks so worker/reconciliation tests can steer the FFI
     // boundary per call; every default preserves the fixture's original shape.
     private val onChatList: ((accountRef: String) -> List<ChatListRowFfi>)? = null,
@@ -66,6 +72,12 @@ internal class NotificationBootstrapTestFixture(
     private val onMarkTimelineMessageRead: (() -> ChatListRowFfi?)? = null,
     private val onSendText: ((accountRef: String, groupIdHex: String, text: String) -> SendSummaryFfi)? = null,
     private val onReactToMessage: (() -> SendSummaryFfi)? = null,
+    private val onCatchUpAccounts: (() -> Unit)? = null,
+    private val emitStartupNotification: Boolean = true,
+    private val onSetNativePushEnabled: ((accountRef: String, enabled: Boolean) -> NotificationSettingsFfi)? = null,
+    private val onClearPushRegistration: ((accountRef: String) -> PushRegistrationShareOutcomeFfi)? = null,
+    private val onNotificationSettings: ((accountRef: String) -> NotificationSettingsFfi)? = null,
+    nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
 ) {
     private val appContext = context.applicationContext
     private val updates = Channel<NotificationUpdateFfi>(Channel.UNLIMITED)
@@ -87,6 +99,11 @@ internal class NotificationBootstrapTestFixture(
     private val subscriptionFailures = AtomicBoolean(initiallyFailSubscriptions)
     private val consumedUpdates = AtomicInteger(0)
     private val receiverTimeoutMillisState = AtomicLong(receiverTimeoutMillis)
+    private val notificationSettingsState =
+        ConcurrentHashMap<String, NotificationSettingsFfi>().apply {
+            accounts.forEach { account -> put(account.label, defaultNotificationSettings(account.label)) }
+            initialNotificationSettings?.let { settings -> put(settings.accountRef, settings) }
+        }
 
     val runtimeStartCalls = AtomicInteger(0)
     val subscriptionCalls = AtomicInteger(0)
@@ -101,6 +118,8 @@ internal class NotificationBootstrapTestFixture(
     val reactToMessageCalls = AtomicInteger(0)
     val npubCalls = AtomicInteger(0)
     val senderDisplayNameCalls = AtomicInteger(0)
+    val nativePushSettingWrites = CopyOnWriteArrayList<Pair<String, Boolean>>()
+    val clearedPushRegistrations = CopyOnWriteArrayList<String>()
 
     @Volatile
     var receiverWasAttachedAtPostStartEmission = false
@@ -154,6 +173,12 @@ internal class NotificationBootstrapTestFixture(
                     runtimeStarted.set(true)
                     Unit
                 }
+                "catchUpAccounts" -> {
+                    val hook =
+                        onCatchUpAccounts
+                            ?: throw UnsupportedOperationException("Unexpected Marmot call: catchUpAccounts")
+                    hook()
+                }
                 "telemetryInstallId" -> "test-install"
                 "setRelayTelemetryRuntimeConfig" -> Unit
                 "setAuditLogTrackerConfig" -> arguments?.first()
@@ -172,13 +197,43 @@ internal class NotificationBootstrapTestFixture(
                         mutedUntilMs = null,
                         updatedAtMs = 0L,
                     )
-                "notificationSettings" ->
+                "notificationSettings" -> {
+                    val accountRef = arguments?.get(0) as String
+                    onNotificationSettings?.invoke(accountRef)
+                        ?: notificationSettingsState.computeIfAbsent(accountRef, ::defaultNotificationSettings)
+                }
+                "setLocalNotificationsEnabled" -> {
+                    val accountRef = arguments?.get(0) as String
+                    val enabled = arguments[1] as Boolean
+                    val current = notificationSettingsState.computeIfAbsent(accountRef, ::defaultNotificationSettings)
                     NotificationSettingsFfi(
-                        accountRef = arguments?.get(0) as String,
-                        accountIdHex = "account-a",
-                        localNotificationsEnabled = true,
-                        nativePushEnabled = false,
-                    )
+                        accountRef = accountRef,
+                        accountIdHex = current.accountIdHex,
+                        localNotificationsEnabled = enabled,
+                        nativePushEnabled = current.nativePushEnabled,
+                    ).also { notificationSettingsState[accountRef] = it }
+                }
+                "setNativePushEnabled" -> {
+                    val accountRef = arguments?.get(0) as String
+                    val enabled = arguments[1] as Boolean
+                    nativePushSettingWrites += accountRef to enabled
+                    val current = notificationSettingsState.computeIfAbsent(accountRef, ::defaultNotificationSettings)
+                    val updated =
+                        onSetNativePushEnabled?.invoke(accountRef, enabled)
+                            ?: NotificationSettingsFfi(
+                                accountRef = accountRef,
+                                accountIdHex = current.accountIdHex,
+                                localNotificationsEnabled = current.localNotificationsEnabled,
+                                nativePushEnabled = enabled,
+                            )
+                    notificationSettingsState[accountRef] = updated
+                    updated
+                }
+                "clearPushRegistration" -> {
+                    val accountRef = arguments?.get(0) as String
+                    clearedPushRegistrations += accountRef
+                    onClearPushRegistration?.invoke(accountRef) ?: completePushRegistrationClear()
+                }
                 "markTimelineMessageRead" -> {
                     markReadCalls.incrementAndGet()
                     onMarkTimelineMessageRead?.invoke() ?: markReadRow
@@ -267,6 +322,7 @@ internal class NotificationBootstrapTestFixture(
             notificationDispatcher = notificationDispatchGate ?: Dispatchers.IO,
             notificationReceiverTimeoutMillis = receiverTimeoutMillisState::get,
             bootstrapActionableTimeoutMillis = { bootstrapActionableTimeoutMillis },
+            nativePushFallbackPlatform = nativePushFallbackPlatform,
         )
 
     private fun emptyChatListSubscription(): ChatListSubscription =
@@ -280,6 +336,35 @@ internal class NotificationBootstrapTestFixture(
             onSnapshot = localSnapshotReadCalls::incrementAndGet
             groups = chatGroups
         }
+
+    /** Keeps existing bootstrap tests on locally enabled notifications with native push off. */
+    private fun defaultNotificationSettings(accountRef: String) =
+        NotificationSettingsFfi(
+            accountRef = accountRef,
+            accountIdHex = "account-a",
+            localNotificationsEnabled = true,
+            nativePushEnabled = false,
+        )
+
+    /** Returns the fixture's authoritative per-account notification state. */
+    fun notificationSettings(accountRef: String): NotificationSettingsFfi =
+        notificationSettingsState
+            .computeIfAbsent(accountRef, ::defaultNotificationSettings)
+
+    /** Replaces one account's authoritative settings without affecting another fixture account. */
+    fun replaceNotificationSettings(settings: NotificationSettingsFfi) {
+        notificationSettingsState[settings.accountRef] = settings
+    }
+
+    /** Builds the successful empty sharing result used by uncustomized registration clears. */
+    private fun completePushRegistrationClear() =
+        PushRegistrationShareOutcomeFfi(
+            status = PushRegistrationShareStatusFfi.COMPLETE,
+            attemptedGroups = 0u,
+            succeededGroups = 0u,
+            failedGroups = 0u,
+            pendingGroups = 0u,
+        )
 
     /** UniFFI's no-pointer constructor registers Android's cleaner, which the
      * Robolectric JVM module boundary cannot access. These inert subclasses
@@ -336,10 +421,47 @@ internal class NotificationBootstrapTestFixture(
         runWithMainLooperPumping { appState.retryBootstrap() }
     }
 
+    /** Drives warm runtime startup while allowing its main-thread receiver work to complete. */
     suspend fun ensureNotificationRuntimeStarted() {
         runWithMainLooperPumping { appState.ensureNotificationRuntimeStarted() }
     }
 
+    /** Exercises the service entry point while advancing Robolectric’s main looper. */
+    suspend fun awaitPushDrain(timeoutMillis: Long): Boolean =
+        runWithMainLooperPumping { appState.ensureNotificationRuntimeStartedAndAwaitPushDrain(timeoutMillis) }
+
+    /** Delivers an engine update through the real process-owned notification listener. */
+    fun emitNotification(notification: NotificationUpdateFfi = update) {
+        check(updates.trySend(notification).isSuccess)
+    }
+
+    /** Delivers one service-supervisor acknowledgement and waits for its scheduled sync. */
+    suspend fun acknowledgeNativePushFallbackRuntime(generation: Long) {
+        runWithMainLooperPumping {
+            withContext(Dispatchers.Main.immediate) {
+                appState.onNativePushFallbackRuntimeStarted(generation)
+            }?.join()
+        }
+    }
+
+    /** Starts one acknowledged fallback sync without waiting, for held-FFI lifecycle tests. */
+    suspend fun beginNativePushFallbackRuntimeAcknowledgement(generation: Long) =
+        runWithMainLooperPumping {
+            withContext(Dispatchers.Main.immediate) {
+                appState.onNativePushFallbackRuntimeStarted(generation)
+            }
+        }
+
+    /** Delivers one service-unavailable callback on the same Main-owned boundary as production. */
+    suspend fun rejectNativePushFallbackRuntime(generation: Long) {
+        runWithMainLooperPumping {
+            withContext(Dispatchers.Main.immediate) {
+                appState.onNativePushFallbackRuntimeUnavailable(generation)
+            }
+        }
+    }
+
+    /** Waits for the fake engine update to cross the subscription boundary, before Android posting is required. */
     suspend fun awaitUpdateConsumed() {
         withTimeout(5_000L) {
             while (consumedUpdates.get() == 0) delay(10L)
@@ -378,8 +500,9 @@ internal class NotificationBootstrapTestFixture(
      * caller timeout. Robolectric's paused main looper does not advance while a
      * runBlocking test awaits that process-owned job, so pump it explicitly
      * while the real production call runs from a background caller.
+     * Use the same boundary when joining Main-owned service acknowledgement jobs.
      */
-    private suspend fun <T> runWithMainLooperPumping(block: suspend () -> T): T =
+    suspend fun <T> runWithMainLooperPumping(block: suspend () -> T): T =
         coroutineScope {
             val call = async(Dispatchers.Default) { block() }
             try {
@@ -409,9 +532,12 @@ internal class NotificationBootstrapTestFixture(
         }
     }
 
+    /** Counts only updates actually consumed by the process-owned notification subscription. */
     private suspend fun nextUpdate() = updates.receive().also { consumedUpdates.incrementAndGet() }
 
+    /** Emits startup traffic only when the scenario opts into the original bootstrap-race probe. */
     private fun emitAtFirstPostStartFfiBoundary() {
+        if (!emitStartupNotification) return
         if (!runtimeStarted.get() || !emittedPostStartUpdate.compareAndSet(false, true)) return
         receiverWasAttachedAtPostStartEmission = subscriberAttached.get()
         channelsWereReadyAtPostStartEmission =

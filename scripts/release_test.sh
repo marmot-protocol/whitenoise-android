@@ -39,7 +39,7 @@ cat > "$FIXTURE_DIR/bin/unzip" <<'EOF'
 #!/usr/bin/env bash
 if [[ "${RELEASE_TEST_INCLUDE_PUSH_CONFIG:-true}" == "true" ]]; then
   printf '%s\n' "$WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX"
-  printf '%s\n' "$WHITENOISE_PRODUCTION_PUSH_RELAY_HINT"
+  printf '%s\n' "$WHITENOISE_PUSH_RELAY_HINT"
 fi
 EOF
 
@@ -180,7 +180,7 @@ if (( status == 0 )) || [[ "$output" != *"64 hexadecimal characters"* ]]; then
 fi
 
 export WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-export WHITENOISE_PRODUCTION_PUSH_RELAY_HINT="https://relay.example"
+export WHITENOISE_PUSH_RELAY_HINT="https://relay.example"
 set +e
 output="$({
   cd "$FIXTURE_DIR/repo"
@@ -193,7 +193,7 @@ if (( status == 0 )) || [[ "$output" != *"valid wss:// URI"* ]]; then
   exit 1
 fi
 
-export WHITENOISE_PRODUCTION_PUSH_RELAY_HINT="wss://relay.example:not-a-port"
+export WHITENOISE_PUSH_RELAY_HINT="wss://relay.example:not-a-port"
 set +e
 output="$({
   cd "$FIXTURE_DIR/repo"
@@ -206,7 +206,7 @@ if (( status == 0 )) || [[ "$output" != *"valid wss:// URI"* ]]; then
   exit 1
 fi
 
-export WHITENOISE_PRODUCTION_PUSH_RELAY_HINT="wss://relay.example"
+export WHITENOISE_PUSH_RELAY_HINT="wss://relay.example"
 
 set +e
 output="$({

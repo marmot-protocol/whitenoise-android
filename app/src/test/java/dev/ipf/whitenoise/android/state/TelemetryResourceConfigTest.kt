@@ -15,6 +15,7 @@ class TelemetryResourceConfigTest {
         assertEquals("production", telemetryDeploymentEnvironment("production"))
         assertEquals("staging", telemetryDeploymentEnvironment(" Staging "))
         assertEquals("development", telemetryDeploymentEnvironment("development"))
+        assertEquals("development", telemetryDeploymentEnvironment("dev"))
         assertEquals("test", telemetryDeploymentEnvironment("test"))
     }
 

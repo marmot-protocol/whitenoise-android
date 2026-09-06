@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import androidx.compose.foundation.text.contextmenu.provider.LocalTextContextMenuToolbarProvider
+import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuDataProvider
+import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuProvider
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
@@ -25,6 +27,8 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MessageFullScreenView
 import dev.ipf.whitenoise.android.ui.conversation.messages.ReaderTextSelectionController
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberReaderTextSelectionController
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.awaitCancellation
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,7 +44,9 @@ class MessageFullScreenMarkdownScreenshotTest {
     val composeRule = createComposeRule()
 
     private lateinit var selectionController: ReaderTextSelectionController
+    private val selectionToolbar = SelectionScreenshotToolbarProvider()
 
+    /** Captures structured reader content at the default light-theme density. */
     @Test
     fun richReaderLight() {
         render(darkTheme = false, fontScale = 1f, layoutDirection = LayoutDirection.Ltr)
@@ -50,6 +56,7 @@ class MessageFullScreenMarkdownScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_full_screen_markdown_light.png")
     }
 
+    /** Exercises wrapping and directionality with large text in the dark reader. */
     @Test
     fun richReaderDarkLargeRtl() {
         render(darkTheme = true, fontScale = 1.6f, layoutDirection = LayoutDirection.Rtl)
@@ -65,7 +72,10 @@ class MessageFullScreenMarkdownScreenshotTest {
         render(darkTheme = false, fontScale = 1f, layoutDirection = LayoutDirection.Ltr)
 
         composeRule.onNodeWithText("Release notes").performTouchInput { longClick() }
-        composeRule.runOnIdle(::hideSelectionToolbar)
+        composeRule.waitUntil(timeoutMillis = 5_000) { selectionToolbar.requested }
+        composeRule.runOnIdle {
+            assertEquals("Release", selectionController.selectedText(RAW_MARKDOWN))
+        }
         composeRule
             .onNodeWithTag(MESSAGE_FULL_SCREEN_TAG)
             .captureRoboImage("src/test/snapshots/message_full_screen_markdown_selection.png")
@@ -82,6 +92,7 @@ class MessageFullScreenMarkdownScreenshotTest {
             CompositionLocalProvider(
                 LocalDensity provides Density(density.density, fontScale),
                 LocalLayoutDirection provides layoutDirection,
+                LocalTextContextMenuToolbarProvider provides selectionToolbar,
             ) {
                 WhiteNoiseTheme(darkTheme = darkTheme) {
                     val controller = rememberReaderTextSelectionController(RAW_MARKDOWN)
@@ -116,19 +127,19 @@ class MessageFullScreenMarkdownScreenshotTest {
         composeRule.waitForIdle()
     }
 
-    /** Hides host-owned contextual chrome so the baseline keeps only app-owned selection paint. */
-    private fun hideSelectionToolbar() {
-        val selectionState = selectionController.selectionState
-        val manager =
-            selectionState.javaClass
-                .getMethod("getManager\$foundation")
-                .invoke(selectionState) ?: return
-        manager.javaClass
-            .getMethod("setShowToolbar\$foundation", Boolean::class.javaPrimitiveType)
-            .invoke(manager, false)
-        (manager.javaClass.getMethod("getTextToolbar").invoke(manager) as? TextToolbar)?.hide()
+    /** Keeps native selection active without introducing a host-owned toolbar window into the baseline. */
+    private class SelectionScreenshotToolbarProvider : TextContextMenuProvider {
+        var requested = false
+            private set
+
+        /** Records the real menu request and stays open until selection or composition cancels it. */
+        override suspend fun showTextContextMenu(dataProvider: TextContextMenuDataProvider): Nothing {
+            requested = true
+            awaitCancellation()
+        }
     }
 
+    /** Supplies headings, inline formatting, a quote, a list, and code without native parsing work. */
     private fun richDocument() =
         MarkdownDocumentFfi(
             truncated = false,
@@ -179,6 +190,7 @@ class MessageFullScreenMarkdownScreenshotTest {
                 ),
         )
 
+    /** Builds one ordinary paragraph item in the structured Markdown fixture. */
     private fun listItem(text: String) =
         MarkdownListItemFfi(
             blocks = listOf(MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text(text)))),

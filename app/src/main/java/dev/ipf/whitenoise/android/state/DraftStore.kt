@@ -35,6 +35,20 @@ private class EvictedDraftStateReference(
     queue: ReferenceQueue<MutableState<String?>>,
 ) : WeakReference<MutableState<String?>>(state, queue)
 
+/** Immutable per-account fence captured before an asynchronous MDK summary read. */
+internal data class DraftSummaryRefreshSnapshot(
+    val accountRef: String,
+    internal val fingerprintsByGroup: Map<String, DraftSummaryFingerprint>,
+)
+
+/** State that determines whether a summary result is still safe to apply for one draft. */
+internal data class DraftSummaryFingerprint(
+    val visibleDraftedAtSeconds: Long?,
+    val authoritativeDraftedAtSeconds: Long?,
+    val hasLocalContent: Boolean,
+    val hiddenForPendingSend: Boolean,
+)
+
 /**
  * Lifecycle cache for MDK-owned drafts per `(accountRef, groupIdHex)`.
  * Production uses a no-op persistence; the injectable persistence remains for
@@ -57,16 +71,23 @@ class DraftStore internal constructor(
     private val evictedDraftStates = mutableMapOf<String, EvictedDraftStateReference>()
     private val evictedDraftValues = mutableMapOf<String, String>()
 
-    // Unix-seconds "drafted-at" per key, updated only when a draft starts
-    // (empty→non-empty) or clears — never on an ordinary keystroke — so the
-    // chat list re-sorts on those transitions alone, not on every character.
+    // Unix-seconds "drafted-at" per key. Local edits stamp only start/clear
+    // transitions; coalesced MDK acknowledgements can later advance the value
+    // from authoritative updatedAtMs without sorting on every keystroke.
     // Kept off the per-key draft [MutableState]s deliberately: routing it
     // through those would either recompose every row per keystroke or need a
     // shared revision the store was built to avoid.
     private val draftedAtSeconds = HashMap<String, Long>()
 
-    /** Fired after a draft's sort timestamp changes (start or clear), outside
-     *  the lock, so the chat list can re-sort. Never fired per keystroke. */
+    // Newer MDK acknowledgements can arrive while an accepted send is hidden
+    // from lifecycle UI. Keep that ordering metadata separately so a failed
+    // send restores with the newest accepted timestamp without surfacing the
+    // hidden draft back into the chat list.
+    private val authoritativeDraftedAtSeconds = HashMap<String, Long>()
+    private val hiddenForPendingSend = HashSet<String>()
+
+    /** Fired after start, clear, or an authoritative updatedAtMs change, outside
+     *  the lock, so the chat list can re-sort without firing per keystroke. */
     var onDraftSortOrderChanged: (() -> Unit)? = null
 
     init {
@@ -75,7 +96,10 @@ class DraftStore internal constructor(
             // Restore the persisted drafted-at so a draft written before a
             // process restart still promotes its chat. v1/legacy blobs carry
             // none; those get stamped on the next edit (see set).
-            decodeComposerDraftStored(value).draftedAtSeconds?.let { draftedAtSeconds[k] = it }
+            decodeComposerDraftStored(value).draftedAtSeconds?.let {
+                draftedAtSeconds[k] = it
+                authoritativeDraftedAtSeconds[k] = it
+            }
         }
     }
 
@@ -140,14 +164,16 @@ class DraftStore internal constructor(
                         ?: if (k in evictedDraftValues || evictedDraftStates[k]?.get()?.value != null) {
                             stateForLocked(k)
                         } else {
-                            return@synchronized
+                            null
                         }
-                if (state.value != null) {
+                if (state?.value != null) {
                     state.value = null
                     persistence.write(k, null)
-                    if (draftedAtSeconds.remove(k) != null) sortOrderChanged = true
-                    pruneDraftStatesLocked()
                 }
+                if (draftedAtSeconds.remove(k) != null) sortOrderChanged = true
+                authoritativeDraftedAtSeconds.remove(k)
+                hiddenForPendingSend.remove(k)
+                pruneDraftStatesLocked()
                 return@synchronized
             }
 
@@ -158,8 +184,10 @@ class DraftStore internal constructor(
             // already-stamped draft leaves the stamp and sort order untouched.
             if (state.value == null || draftedAtSeconds[k] == null) {
                 draftedAtSeconds[k] = nowSeconds()
+                authoritativeDraftedAtSeconds[k] = draftedAtSeconds.getValue(k)
                 sortOrderChanged = true
             }
+            hiddenForPendingSend.remove(k)
             val encoded = encodeComposerDraft(value, draftedAtSeconds[k])
             if (state.value != encoded) {
                 state.value = encoded
@@ -176,19 +204,57 @@ class DraftStore internal constructor(
         groupIdHex: String,
     ): ULong? = synchronized(lock) { draftedAtSeconds[key(accountRef, groupIdHex)]?.toULong() }
 
+    /** Captures the exact per-key state an asynchronous summary request is allowed to replace. */
+    internal fun captureSummaryRefresh(accountRef: String): DraftSummaryRefreshSnapshot =
+        synchronized(lock) {
+            val prefix = "$accountRef "
+            val keys =
+                (
+                    draftedAtSeconds.keys +
+                        authoritativeDraftedAtSeconds.keys +
+                        drafts.keys +
+                        evictedDraftStates.keys +
+                        evictedDraftValues.keys +
+                        hiddenForPendingSend
+                ).asSequence()
+                    .filter { it.startsWith(prefix) }
+                    .toSet()
+            DraftSummaryRefreshSnapshot(
+                accountRef = accountRef,
+                fingerprintsByGroup =
+                    keys.associate { k ->
+                        k.removePrefix(prefix) to summaryFingerprintLocked(k)
+                    },
+            )
+        }
+
     /** Seeds authoritative MDK metadata without hydrating attachment plaintext. */
-    fun replaceSummaries(
+    internal fun replaceSummaries(
         accountRef: String,
         draftedAtMillisByGroup: Map<String, Long>,
+        expected: DraftSummaryRefreshSnapshot? = null,
     ) {
+        require(expected == null || expected.accountRef == accountRef)
         val prefix = "$accountRef "
+        var sortOrderChanged = false
         synchronized(lock) {
-            draftedAtSeconds.keys.removeAll { it.startsWith(prefix) }
-            draftedAtMillisByGroup.forEach { (groupIdHex, draftedAtMs) ->
-                draftedAtSeconds[key(accountRef, groupIdHex)] = draftedAtMs / MILLIS_PER_SECOND
+            val replacement =
+                draftedAtMillisByGroup
+                    .mapKeys { (groupIdHex, _) -> key(accountRef, groupIdHex) }
+                    .mapValues { (_, draftedAtMs) -> draftedAtMs / MILLIS_PER_SECOND }
+            val currentKeys = summaryKeysLocked(prefix)
+            val allKeys = currentKeys + replacement.keys + expected.orEmptyKeys(prefix)
+            allKeys.forEach { k ->
+                val groupIdHex = k.removePrefix(prefix)
+                val currentFingerprint = summaryFingerprintLocked(k)
+                val capturedFingerprint = expected?.fingerprintsByGroup?.get(groupIdHex) ?: EMPTY_SUMMARY_FINGERPRINT
+                if (expected != null && currentFingerprint != capturedFingerprint) return@forEach
+                val oldVisible = draftedAtSeconds[k]
+                applySummaryReplacementLocked(k, replacement[k], currentFingerprint)
+                if (draftedAtSeconds[k] != oldVisible) sortOrderChanged = true
             }
         }
-        onDraftSortOrderChanged?.invoke()
+        if (sortOrderChanged) onDraftSortOrderChanged?.invoke()
     }
 
     /** Hydrates content once; a local edit that already exists always wins. */
@@ -208,6 +274,8 @@ class DraftStore internal constructor(
                 val draftedAt = draftedAtMs / MILLIS_PER_SECOND
                 sortOrderChanged = draftedAtSeconds[k] != draftedAt
                 draftedAtSeconds[k] = draftedAt
+                authoritativeDraftedAtSeconds[k] = draftedAt
+                hiddenForPendingSend.remove(k)
                 state.value = encodeComposerDraft(TextFieldValue(content, selection), draftedAt)
             }
             pruneDraftStatesLocked(retainedState = state)
@@ -228,9 +296,15 @@ class DraftStore internal constructor(
             if (content.isNullOrBlank()) {
                 state.value = null
                 draftedAtSeconds.remove(k)
+                authoritativeDraftedAtSeconds.remove(k)
+                hiddenForPendingSend.remove(k)
             } else {
                 val draftedAt = draftedAtMs?.div(MILLIS_PER_SECOND)
-                if (draftedAt != null) draftedAtSeconds[k] = draftedAt
+                if (draftedAt != null) {
+                    draftedAtSeconds[k] = draftedAt
+                    authoritativeDraftedAtSeconds[k] = draftedAt
+                }
+                hiddenForPendingSend.remove(k)
                 state.value =
                     encodeComposerDraft(
                         TextFieldValue(content, TextRange(content.length)),
@@ -242,20 +316,84 @@ class DraftStore internal constructor(
         onDraftSortOrderChanged?.invoke()
     }
 
+    /** Applies a non-regressing MDK update timestamp and keeps the stored snapshot in sync. */
     fun applyAuthoritativeTimestamp(
         accountRef: String,
         groupIdHex: String,
         draftedAtMs: Long?,
     ) {
+        var sortOrderChanged = false
         synchronized(lock) {
             val k = key(accountRef, groupIdHex)
-            if (draftedAtMs == null) {
+            val currentAuthoritative = authoritativeDraftedAtSeconds[k]
+            val authoritative = draftedAtMs?.div(MILLIS_PER_SECOND)
+            if (authoritative != null && currentAuthoritative != null && authoritative < currentAuthoritative) {
+                return@synchronized
+            }
+            sortOrderChanged = applyAcceptedAuthoritativeTimestampLocked(k, authoritative)
+        }
+        if (sortOrderChanged) onDraftSortOrderChanged?.invoke()
+    }
+
+    /** Restores captured content/caret with the newest MDK timestamp accepted while it was hidden. */
+    fun restoreSnapshot(
+        accountRef: String,
+        groupIdHex: String,
+        snapshot: ComposerDraftSnapshot,
+    ) {
+        val k = key(accountRef, groupIdHex)
+        var sortOrderChanged = false
+        synchronized(lock) {
+            val state = stateForLocked(k)
+            val restoredTimestamp =
+                listOfNotNull(snapshot.draftedAtSeconds, authoritativeDraftedAtSeconds[k]).maxOrNull()
+            sortOrderChanged = draftedAtSeconds[k] != restoredTimestamp
+            if (restoredTimestamp == null) {
                 draftedAtSeconds.remove(k)
             } else {
-                draftedAtSeconds[k] = draftedAtMs / MILLIS_PER_SECOND
+                draftedAtSeconds[k] = restoredTimestamp
+                authoritativeDraftedAtSeconds[k] = restoredTimestamp
             }
+            hiddenForPendingSend.remove(k)
+            val encoded = encodeComposerDraft(snapshot.textFieldValue, restoredTimestamp)
+            if (state.value != encoded) {
+                state.value = encoded
+                persistence.write(k, encoded)
+            }
+            pruneDraftStatesLocked(retainedState = state)
         }
-        onDraftSortOrderChanged?.invoke()
+        if (sortOrderChanged) onDraftSortOrderChanged?.invoke()
+    }
+
+    /** Hides a captured pending-send draft while retaining late MDK ordering metadata for recovery. */
+    fun hideForPendingSend(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
+        val k = key(accountRef, groupIdHex)
+        var sortOrderChanged = false
+        synchronized(lock) {
+            val state =
+                drafts[k]
+                    ?: if (k in evictedDraftValues || evictedDraftStates[k]?.get()?.value != null) {
+                        stateForLocked(k)
+                    } else {
+                        null
+                    }
+            state?.value?.let {
+                state.value = null
+                persistence.write(k, null)
+            }
+            draftedAtSeconds[k]?.let { visible ->
+                authoritativeDraftedAtSeconds[k] =
+                    maxOf(authoritativeDraftedAtSeconds[k] ?: visible, visible)
+                sortOrderChanged = true
+            }
+            draftedAtSeconds.remove(k)
+            hiddenForPendingSend.add(k)
+            pruneDraftStatesLocked(retainedState = state)
+        }
+        if (sortOrderChanged) onDraftSortOrderChanged?.invoke()
     }
 
     /**
@@ -280,6 +418,7 @@ class DraftStore internal constructor(
         set(accountRef, groupIdHex, TextFieldValue(merged, TextRange(merged.length)))
     }
 
+    /** Clears visible and hidden draft state for exactly one account and emits at most one re-sort. */
     fun clearAllForAccount(accountRef: String) {
         val prefix = "$accountRef "
         var sortOrderChanged = false
@@ -297,9 +436,13 @@ class DraftStore internal constructor(
                 if (state.value == snapshottedValue) {
                     state.value = null
                     persistence.write(k, null)
-                    if (draftedAtSeconds.remove(k) != null) sortOrderChanged = true
+                    authoritativeDraftedAtSeconds.remove(k)
+                    hiddenForPendingSend.remove(k)
                 }
             }
+            if (draftedAtSeconds.keys.removeAll { it.startsWith(prefix) }) sortOrderChanged = true
+            authoritativeDraftedAtSeconds.keys.removeAll { it.startsWith(prefix) }
+            hiddenForPendingSend.removeAll { it.startsWith(prefix) }
             pruneDraftStatesLocked()
         }
         if (sortOrderChanged) onDraftSortOrderChanged?.invoke()
@@ -329,9 +472,124 @@ class DraftStore internal constructor(
         groupIdHex: String,
     ): String = "$accountRef $groupIdHex"
 
+    /** Captures every field that makes a delayed summary unsafe to apply for this key. */
+    private fun summaryFingerprintLocked(k: String): DraftSummaryFingerprint =
+        DraftSummaryFingerprint(
+            visibleDraftedAtSeconds = draftedAtSeconds[k],
+            authoritativeDraftedAtSeconds = authoritativeDraftedAtSeconds[k],
+            hasLocalContent = storedValueLocked(k) != null,
+            hiddenForPendingSend = k in hiddenForPendingSend,
+        )
+
+    /** Reads draft content across resident, strongly evicted, and observer-retained storage tiers. */
+    private fun storedValueLocked(k: String): String? {
+        val resident = drafts[k]?.value
+        val evicted = evictedDraftValues[k]
+        return resident ?: evicted ?: evictedDraftStates[k]?.get()?.value
+    }
+
+    /** Collects all account-prefixed keys represented by any visible or hidden draft structure. */
+    private fun summaryKeysLocked(prefix: String): MutableSet<String> =
+        (
+            draftedAtSeconds.keys +
+                authoritativeDraftedAtSeconds.keys +
+                drafts.keys +
+                evictedDraftStates.keys +
+                evictedDraftValues.keys +
+                hiddenForPendingSend
+        ).filterTo(mutableSetOf()) { it.startsWith(prefix) }
+
+    /**
+     * Applies one unchanged summary fingerprint without hydrating plaintext.
+     * Local content and pending-send hiding always win over absent or older remote metadata.
+     */
+    private fun applySummaryReplacementLocked(
+        k: String,
+        incoming: Long?,
+        fingerprint: DraftSummaryFingerprint,
+    ) {
+        when {
+            fingerprint.hiddenForPendingSend && incoming != null -> {
+                authoritativeDraftedAtSeconds[k] =
+                    maxOf(authoritativeDraftedAtSeconds[k] ?: incoming, incoming)
+            }
+            fingerprint.hasLocalContent && incoming != null -> {
+                val merged = maxOf(draftedAtSeconds[k] ?: incoming, incoming)
+                draftedAtSeconds[k] = merged
+                authoritativeDraftedAtSeconds[k] =
+                    maxOf(authoritativeDraftedAtSeconds[k] ?: merged, merged)
+            }
+            fingerprint.hiddenForPendingSend || fingerprint.hasLocalContent -> Unit
+            incoming != null -> {
+                draftedAtSeconds[k] = incoming
+                authoritativeDraftedAtSeconds[k] = incoming
+            }
+            else -> {
+                draftedAtSeconds.remove(k)
+                authoritativeDraftedAtSeconds.remove(k)
+            }
+        }
+    }
+
+    /** Stores a non-regressing accepted timestamp while keeping hidden drafts out of presentation. */
+    private fun applyAcceptedAuthoritativeTimestampLocked(
+        k: String,
+        accepted: Long?,
+    ): Boolean {
+        setTimestamp(authoritativeDraftedAtSeconds, k, accepted)
+        val state = retainedDraftStateLocked(k)
+        val oldVisible = draftedAtSeconds[k]
+        if (state?.value != null || (oldVisible != null && k !in hiddenForPendingSend)) {
+            setTimestamp(draftedAtSeconds, k, accepted)
+        }
+        state?.value?.let { stored ->
+            val snapshot = decodeComposerDraftStored(stored)
+            val encoded = encodeComposerDraft(snapshot.textFieldValue, accepted)
+            if (encoded != stored) {
+                state.value = encoded
+                persistence.write(k, encoded)
+            }
+        }
+        pruneDraftStatesLocked(retainedState = state)
+        return draftedAtSeconds[k] != oldVisible
+    }
+
+    /** Recovers a state object only when content or a live observer still gives the key ownership. */
+    private fun retainedDraftStateLocked(k: String): MutableState<String?>? =
+        drafts[k]
+            ?: if (k in evictedDraftValues || evictedDraftStates[k]?.get()?.value != null) {
+                stateForLocked(k)
+            } else {
+                null
+            }
+
+    /** Applies nullable timestamp semantics consistently: null removes rather than storing a sentinel. */
+    private fun setTimestamp(
+        timestamps: MutableMap<String, Long>,
+        k: String,
+        value: Long?,
+    ) {
+        if (value == null) timestamps.remove(k) else timestamps[k] = value
+    }
+
+    /** Expands captured group ids back into account-qualified keys for union-based reconciliation. */
+    private fun DraftSummaryRefreshSnapshot?.orEmptyKeys(prefix: String): Set<String> =
+        this
+            ?.fingerprintsByGroup
+            ?.keys
+            ?.mapTo(mutableSetOf()) { "$prefix$it" }
+            .orEmpty()
+
     companion object {
         internal const val MAX_IN_MEMORY_DRAFT_STATES = 512
         private const val MILLIS_PER_SECOND = 1_000L
+        private val EMPTY_SUMMARY_FINGERPRINT =
+            DraftSummaryFingerprint(
+                visibleDraftedAtSeconds = null,
+                authoritativeDraftedAtSeconds = null,
+                hasLocalContent = false,
+                hiddenForPendingSend = false,
+            )
 
         fun forContext(
             @Suppress("UNUSED_PARAMETER") context: Context,

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -29,7 +30,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
@@ -78,7 +78,8 @@ internal fun ContactPickerScreen(
     excludeAccountIdHexes: Set<String> = emptySet(),
     footer: (@Composable () -> Unit)? = null,
 ) {
-    var query by rememberSaveable { mutableStateOf("") }
+    val queryState = rememberTextFieldState()
+    val query = queryState.text.toString()
     var showScanner by remember { mutableStateOf(false) }
     // The selection itself is owned by the caller and is not saveable. Keep
     // this transient navigation state in the same lifetime so process
@@ -144,7 +145,7 @@ internal fun ContactPickerScreen(
             selected.removeAll { it.accountIdHex.lowercase(Locale.ROOT) == hex }
         } else {
             selected.add(candidate)
-            query = ""
+            queryState.replaceRecipientText("")
         }
     }
 
@@ -209,10 +210,10 @@ internal fun ContactPickerScreen(
                 .padding(padding)
                 .consumeWindowInsets(padding),
         ) {
-            FlowSearchField(
-                value = query,
-                onValueChange = { query = it },
+            RecipientSearchField(
+                state = queryState,
                 placeholder = stringResource(R.string.search_people_hint),
+                onPasteRejected = { appState.present(R.string.error_invalid_identity_reference) },
                 onScanQr = { showScanner = true },
                 modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
             )
@@ -350,7 +351,8 @@ internal fun ContactPickerScreen(
             onScan = { raw ->
                 showScanner = false
                 when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.PickRecipient)) {
-                    is QrScanOutcome.FillRecipientQuery -> query = outcome.reference
+                    is QrScanOutcome.FillRecipientQuery ->
+                        queryState.replaceRecipientText(outcome.reference)
                     QrScanOutcome.Invalid ->
                         appState.present(R.string.error_qr_not_valid_npub_or_public_key, copyable = true)
                     is QrScanOutcome.OpenProfileNpub, is QrScanOutcome.OpenProfileNprofile ->

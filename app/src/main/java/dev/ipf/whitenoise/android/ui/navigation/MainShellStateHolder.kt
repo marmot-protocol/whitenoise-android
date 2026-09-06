@@ -41,8 +41,9 @@ internal class MainShellProcessState(
     private val conversationControllers = linkedMapOf<ConversationControllerKey, ConversationController>()
 
     /**
-     * Returns the retained controller for this account/runtime, or replaces it
-     * while carrying the process-scoped cold-start presentation claim forward.
+     * Returns the retained controller for [accountRef] and [runtimeGeneration], or replaces it
+     * while carrying the process-scoped cold-start presentation claim forward. A live same-process
+     * replacement also transfers account-scoped optimistic state before the new owner is exposed.
      */
     fun chatsController(
         accountRef: String?,
@@ -51,10 +52,6 @@ internal class MainShellProcessState(
         val current = chatsEntry
         if (current != null && current.accountRef == accountRef && current.runtimeGeneration == runtimeGeneration) {
             return current.controller
-        }
-        if (current != null) {
-            appState.attachChatsController(null)
-            current.controller.onCleared()
         }
         clearRetainedRoute()
         clearConversationControllers()
@@ -69,7 +66,12 @@ internal class MainShellProcessState(
                 runtimeGeneration = runtimeGeneration,
                 controller = controller,
             )
-        appState.attachChatsController(controller)
+        if (current == null) {
+            appState.attachChatsController(controller)
+        } else {
+            appState.replaceChatsController(current.controller, controller)
+            current.controller.onCleared()
+        }
         return controller
     }
 

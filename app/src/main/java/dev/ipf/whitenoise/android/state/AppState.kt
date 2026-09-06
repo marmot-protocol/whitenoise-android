@@ -19,9 +19,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.input.TextFieldValue
-import com.google.android.gms.common.ConnectionResult
-import com.google.android.gms.common.GoogleApiAvailability
-import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
@@ -42,8 +39,6 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationsSubscription
 import dev.ipf.marmotkit.PushPlatformFfi
-import dev.ipf.marmotkit.PushRegistrationShareOutcomeFfi
-import dev.ipf.marmotkit.PushRegistrationShareStatusFfi
 import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
@@ -208,7 +203,6 @@ import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
-import dev.ipf.whitenoise.android.notifications.nativePushCapability as resolveNativePushCapability
 import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
 
 internal suspend fun resolveNotificationMentionDisplayName(
@@ -544,51 +538,6 @@ internal suspend fun dismissConversationNotificationsOnOpen(
 }
 
 /**
- * Prefer the battery-efficient native-push wake path when this build/device
- * supports it. If enabling push fails, retain the persistent relay connection
- * so first-run setup never silently leaves the account without background
- * delivery. Any partial native-push enablement is rolled back before the
- * persistent fallback is restored, keeping the two delivery modes exclusive.
- */
-internal suspend fun configureDefaultNotificationDelivery(
-    nativePushCapability: NativePushCapability,
-    enableNativePush: suspend () -> Boolean,
-    disableNativePush: suspend () -> Boolean,
-    setBackgroundConnectionEnabled: suspend (Boolean) -> Boolean,
-): Boolean {
-    val configured =
-        if (!nativePushCapability.isAvailable) {
-            setBackgroundConnectionEnabled(true)
-        } else {
-            val nativePushReady = enableNativePush()
-            if (nativePushReady && setBackgroundConnectionEnabled(false)) {
-                true
-            } else {
-                val nativePushDisabled = disableNativePush()
-                val backgroundConnectionEnabled = setBackgroundConnectionEnabled(true)
-                nativePushDisabled && backgroundConnectionEnabled
-            }
-        }
-    return configured
-}
-
-internal fun nativePushEnablementConfirmed(
-    allAccountsReady: Boolean,
-    activeAccountRegistered: Boolean,
-): Boolean = allAccountsReady && activeAccountRegistered
-
-internal enum class PushRegistrationSharingState {
-    Complete,
-    PendingDurableRetry,
-}
-
-internal fun pushRegistrationSharingState(outcome: PushRegistrationShareOutcomeFfi): PushRegistrationSharingState =
-    when (outcome.status) {
-        PushRegistrationShareStatusFfi.COMPLETE -> PushRegistrationSharingState.Complete
-        PushRegistrationShareStatusFfi.PENDING -> PushRegistrationSharingState.PendingDurableRetry
-    }
-
-/**
  * A live notification subscription is a healthy local broadcast receiver and
  * survives relay connectivity changes. Reuse the listener job so queued or
  * in-flight updates are never destroyed; if it is backing off, reconnect wakes
@@ -809,6 +758,7 @@ internal fun telemetryDeploymentEnvironment(value: String): String =
     when (val normalized = value.trim().lowercase(Locale.ROOT)) {
         "production", "staging", "development", "test" -> normalized
         "android-release" -> "production"
+        "dev" -> "development"
         else -> "production"
     }
 
@@ -1200,6 +1150,8 @@ class WhiteNoiseAppState private constructor(
     private val bootstrapActionableTimeoutMillis: () -> Long,
     private val notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics,
     private val inboundShareTextStager: ((String, String, String) -> Unit)?,
+    private val messageDraftRepositoryOverride: MessageDraftRepository?,
+    private val nativePushFallbackPlatform: NativePushFallbackPlatform,
     preferencesOverride: SharedPreferences?,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
@@ -1223,6 +1175,8 @@ class WhiteNoiseAppState private constructor(
             bootstrapActionableTimeoutMillis = { BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS },
             notificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
             inboundShareTextStager = null,
+            messageDraftRepositoryOverride = null,
+            nativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
             preferencesOverride = null,
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
@@ -1249,6 +1203,8 @@ class WhiteNoiseAppState private constructor(
         notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics =
             NotificationNetworkRecoveryDiagnostics(),
         inboundShareTextStager: ((String, String, String) -> Unit)? = null,
+        messageDraftRepository: MessageDraftRepository? = null,
+        nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
         preferences: SharedPreferences? = null,
     ) : this(
         context = context,
@@ -1268,6 +1224,8 @@ class WhiteNoiseAppState private constructor(
         bootstrapActionableTimeoutMillis = bootstrapActionableTimeoutMillis,
         notificationNetworkRecoveryDiagnostics = notificationNetworkRecoveryDiagnostics,
         inboundShareTextStager = inboundShareTextStager,
+        messageDraftRepositoryOverride = messageDraftRepository,
+        nativePushFallbackPlatform = nativePushFallbackPlatform,
         preferencesOverride = preferences,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
@@ -1347,10 +1305,11 @@ class WhiteNoiseAppState private constructor(
     internal val editorSourceStore: EditorSourceStore = EditorSourceStore.create(appContext)
     internal val editorSessionStore: EditorSessionStore = EditorSessionStore.create(appContext)
     internal val messageDraftRepository: MessageDraftRepository =
-        MessageDraftRepository(
-            gateway = MarmotMessageDraftGateway(::marmot),
-            editorSessions = editorSessionStore,
-        )
+        messageDraftRepositoryOverride
+            ?: MessageDraftRepository(
+                gateway = MarmotMessageDraftGateway(::marmot),
+                editorSessions = editorSessionStore,
+            )
     private val chatMuteRepository = ChatMuteRepository(MarmotChatMuteGateway(::marmot))
 
     // Which of the two sequential signer round-trips the Amber sign-in is
@@ -1488,6 +1447,7 @@ class WhiteNoiseAppState private constructor(
     @Volatile
     private var bootstrapCompleted = false
     private val nativePushSyncMutex = Mutex()
+    private val nativePushFallback = NativePushFallbackCoordinator(nativePushFallbackPlatform)
     private val ttsRefreshMutex = Mutex()
     private val auditLogSettingsMutex = Mutex()
     private val conversationVibrationChannelMutex = Mutex()
@@ -1766,14 +1726,6 @@ class WhiteNoiseAppState private constructor(
     // native push, signs out, or hits a sync failure that may indicate the
     // registration is stale.
     private val perAccountSyncedFingerprints = mutableMapOf<String, PushFingerprint>()
-
-    /** Structural cache key for the push-registration dedupe map. */
-    private data class PushFingerprint(
-        val platform: PushPlatformFfi,
-        val token: String,
-        val serverPubkeyHex: String,
-        val relayHint: String?,
-    )
 
     var phase by mutableStateOf<AppPhase>(AppPhase.Bootstrapping)
         private set
@@ -2293,7 +2245,7 @@ class WhiteNoiseAppState private constructor(
             onResult = { accountRef, groupIdHex, _, result ->
                 when (result) {
                     is MessageDraftMutationResult.Success -> {
-                        draftStore.applyAuthoritativeTimestamp(accountRef, groupIdHex, result.draft?.createdAtMs)
+                        draftStore.applyAuthoritativeTimestamp(accountRef, groupIdHex, result.draft?.updatedAtMs)
                     }
                     is MessageDraftMutationResult.Failure -> {
                         appStateDebug(result.cause) {
@@ -2304,6 +2256,7 @@ class WhiteNoiseAppState private constructor(
                 }
             },
         )
+    private val draftSummaryRefreshLifetime = StalenessGuard()
     private val notificationScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private val notificationLocalIdentityReader =
@@ -2483,7 +2436,7 @@ class WhiteNoiseAppState private constructor(
                             accountRef,
                             groupIdHex,
                             draft?.content,
-                            draft?.createdAtMs,
+                            draft?.updatedAtMs,
                         )
                         draftHydrationRevision += 1
                     }
@@ -2511,14 +2464,16 @@ class WhiteNoiseAppState private constructor(
      */
     private fun hideDraftForPendingSend(token: DraftSendClearToken): Boolean =
         draftWriter.beginPendingSendPresentation(token.accountRef, token.groupIdHex, token.generation) {
-            draftStore.set(token.accountRef, token.groupIdHex, TextFieldValue(""))
+            if (token.recoveryDraft != null) {
+                draftStore.hideForPendingSend(token.accountRef, token.groupIdHex)
+            }
         }
 
     /** Restore only the exact lifecycle draft hidden by a publish that failed. */
     private fun restoreDraftAfterFailedSend(token: DraftSendClearToken) {
         val recoveryDraft = token.recoveryDraft ?: return
         draftWriter.runIfCurrent(token.accountRef, token.groupIdHex, token.generation) {
-            draftStore.set(token.accountRef, token.groupIdHex, recoveryDraft.textFieldValue)
+            draftStore.restoreSnapshot(token.accountRef, token.groupIdHex, recoveryDraft)
         }
     }
 
@@ -2589,16 +2544,23 @@ class WhiteNoiseAppState private constructor(
         return messageDraftRepository.delete(accountRef, groupIdHex)
     }
 
+    /** Refreshes draft summaries behind account, request, and local-fingerprint fences. */
     internal fun refreshDraftSummaries(accountRef: String) {
+        val refresh = draftSummaryRefreshLifetime.advance()
+        val expected = draftStore.captureSummaryRefresh(accountRef)
         mutationsScope.launch {
             messageDraftRepository
                 .summaries(accountRef)
                 .onSuccess { summaries ->
-                    if (activeAccountRef != accountRef) return@onSuccess
-                    draftStore.replaceSummaries(
-                        accountRef,
-                        summaries.associate { it.groupIdHex to it.createdAtMs },
-                    )
+                    draftSummaryRefreshLifetime.runIfCurrent(refresh) {
+                        if (activeAccountRef == accountRef) {
+                            draftStore.replaceSummaries(
+                                accountRef,
+                                summaries.associate { it.groupIdHex to it.updatedAtMs },
+                                expected = expected,
+                            )
+                        }
+                    }
                 }.onFailure { appStateDebug(it) { "draft summaries load failed account=${accountRef.take(8)}" } }
         }
     }
@@ -2817,10 +2779,28 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ): String = "${accountRef.orEmpty()}\u0000$groupIdHex"
 
+    /** Attaches or permanently detaches the chat-list projection without transferring private row state. */
     fun attachChatsController(controller: ChatsController?) {
         chatsController = controller
-        // Route draft start/clear re-sorts to whichever controller is attached;
-        // reads the field at call time so a later re-attach still resolves.
+        bindDraftSortOrderCallback()
+    }
+
+    /** Atomically transfers in-flight previews only for a live shell replacement. */
+    internal fun replaceChatsController(
+        outgoing: ChatsController,
+        replacement: ChatsController,
+    ) {
+        val handoff = outgoing.takeIf { chatsController === it }?.captureOptimisticPreviewHandoff()
+        chatsController = replacement
+        handoff?.let { replacement.restoreOptimisticPreviewHandoff(it, activeAccountRef) }
+        bindDraftSortOrderCallback()
+    }
+
+    /** Routes future draft-order invalidations to the controller that is attached at callback time. */
+    private fun bindDraftSortOrderCallback() {
+        // Route draft start/clear and coalesced authoritative-time re-sorts to
+        // whichever controller is attached; resolve the field at call time so
+        // a later re-attach still receives the callback.
         draftStore.onDraftSortOrderChanged = { chatsController?.onDraftSortOrderChanged() }
     }
 
@@ -2874,6 +2854,7 @@ class WhiteNoiseAppState private constructor(
         )
 
     private fun applyDestructiveWipeRuntimeState(state: DestructiveAccountWipeRuntimeState) {
+        if (runtimeGeneration != state.runtimeGeneration) nativePushFallback.invalidateAll()
         activeAccountRef = state.activeAccountRef
         updateNotificationSuppression(
             suppression.copy(
@@ -2933,13 +2914,12 @@ class WhiteNoiseAppState private constructor(
         unreadRefreshScheduler.cancelAndClear()
     }
 
-    // TODO(marmot): remove this UI-controller backchannel once Marmot emits a
-    // ProjectionUpdated (or equivalent chat-list/group projection update) after
-    // set_group_archived / accept_group_invite. Until then, the ChatsController
-    // stream can lag behind local mutations and we forward the accepted/archived
-    // group record so rows stop rendering stale pending/archived state.
-    fun applyLocalGroupUpdate(record: AppGroupRecordFfi) {
-        chatsController?.applyLocalGroupUpdate(record)
+    /** Bridges native projection gaps for matching accounts; null retains active-controller routing. */
+    fun applyLocalGroupUpdate(
+        record: AppGroupRecordFfi,
+        accountRef: String? = null,
+    ) {
+        chatsController.applyLocalGroupUpdateForAccount(record, accountRef)
     }
 
     // Same temporary projection backchannel as [applyLocalGroupUpdate], but for
@@ -2956,10 +2936,11 @@ class WhiteNoiseAppState private constructor(
             ?.applyLocalGroupDetails(record, members)
     }
 
-    // The optimistic-preview bridge is scoped to the sending account like
-    // applyChatListRowFromMarkRead below: chatRowKey is the bare group id, so
-    // during an account-pinned conversation window an unguarded write
-    // could land on another account's row for the same group.
+    /**
+     * Publishes a materialized optimistic preview only into the sending account's controller.
+     * The row key is a bare group id, so an account-pinned conversation must never write
+     * into a different account's row for that group.
+     */
     internal fun applyOptimisticSentPreview(
         accountRef: String?,
         groupIdHex: String,
@@ -2969,6 +2950,27 @@ class WhiteNoiseAppState private constructor(
             ?.takeIf { it.boundAccountRef == accountRef }
             ?.applyOptimisticSentPreview(groupIdHex, preview) == true
 
+    /** Reserves acceptance-time chat-list order without exposing unparsed Markdown. */
+    internal fun reserveOptimisticSentPreview(
+        accountRef: String?,
+        groupIdHex: String,
+        optimisticMessageIdHex: String,
+    ): Boolean =
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.reserveOptimisticSentPreview(groupIdHex, optimisticMessageIdHex) == true
+
+    /** Publishes a parsed preview only when its account-scoped reservation still exists. */
+    internal fun applyReservedOptimisticSentPreview(
+        accountRef: String?,
+        groupIdHex: String,
+        preview: ChatListMessagePreviewFfi,
+    ): Boolean =
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.applyReservedOptimisticSentPreview(groupIdHex, preview) == true
+
+    /** Reconciles an optimistic preview to its confirmed id within the sending account. */
     internal fun commitOptimisticSentPreview(
         accountRef: String?,
         groupIdHex: String,
@@ -2978,17 +2980,6 @@ class WhiteNoiseAppState private constructor(
         chatsController
             ?.takeIf { it.boundAccountRef == accountRef }
             ?.commitOptimisticSentPreview(groupIdHex, optimisticMessageIdHex, confirmedMessageIdHex)
-    }
-
-    internal fun hydrateOptimisticSentPreviewTokens(
-        accountRef: String?,
-        groupIdHex: String,
-        messageIdHex: String,
-        tokens: MarkdownDocumentFfi,
-    ) {
-        chatsController
-            ?.takeIf { it.boundAccountRef == accountRef }
-            ?.hydrateOptimisticSentPreviewTokens(groupIdHex, messageIdHex, tokens)
     }
 
     internal fun failOptimisticSentPreview(
@@ -4230,16 +4221,18 @@ class WhiteNoiseAppState private constructor(
         )
     }
 
-    suspend fun ensureNotificationRuntimeStarted() {
+    /**
+     * Starts the receiver and returns whether any observed pending push catch-up succeeded.
+     * Ordinary startup callers may continue with local state after a failed fetch; a push-wake
+     * owner must inspect the result so its bounded supervisor can retry while still in background.
+     */
+    suspend fun ensureNotificationRuntimeStarted(): Boolean {
         if (!bootstrapCompleted) {
             bootstrap()
             val receiverReady = bootstrapCompleted && notificationReceiverActive.value
-            if (receiverReady) {
-                drainPendingNativePushRegistrationSyncIfNeeded()
-                drainPendingPushWakeCatchUpIfNeeded()
-            }
             if (!receiverReady) throw receiverUnavailable()
-            return
+            drainPendingNativePushRegistrationSyncIfNeeded()
+            return drainPendingPushWakeCatchUpIfNeeded()
         }
         localNotificationPresenter.ensureChannels()
         refreshLocalNotificationPermission()
@@ -4247,7 +4240,7 @@ class WhiteNoiseAppState private constructor(
         if (accounts.isEmpty()) refreshAccounts()
         refreshLocalNotificationSettings()
         drainPendingNativePushRegistrationSyncIfNeeded()
-        drainPendingPushWakeCatchUpIfNeeded()
+        return drainPendingPushWakeCatchUpIfNeeded()
     }
 
     /** Captures the active notification-runtime recovery lifetime. */
@@ -4257,6 +4250,7 @@ class WhiteNoiseAppState private constructor(
     internal fun notificationRuntimeRecoveryAllowed(generation: Long): Boolean =
         !networkNotificationRecoverySuppressed && notificationRuntimeRecovery.isCurrent(generation)
 
+    /** Re-establishes receiver readiness within the reconnect budget before admitting native catch-up. */
     private suspend fun ensureNotificationReceiverForNetworkReconnect(): Boolean {
         if (!bootstrapCompleted) bootstrap()
         if (!bootstrapCompleted || networkNotificationRecoverySuppressed) return false
@@ -4284,33 +4278,31 @@ class WhiteNoiseAppState private constructor(
             notificationJob.isActive()
     }
 
+    /** Starts push catch-up with the drain waiter armed before the runtime can emit an update. */
     suspend fun ensureNotificationRuntimeStartedAndAwaitPushDrain(timeoutMs: Long = NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS): Boolean =
-        coroutineScope {
-            val sequenceBeforeStart = notificationDrainSequence.get()
-            val drain =
-                async(start = CoroutineStart.UNDISPATCHED) {
-                    withTimeoutOrNull(timeoutMs) {
-                        notificationDrainSignals.first { it > sequenceBeforeStart }
-                    } != null
-                }
-            ensureNotificationRuntimeStarted()
-            drain.await()
-        }
+        awaitNotificationPushDrain(
+            sequenceBeforeStart = notificationDrainSequence.get(),
+            notificationDrainSignals = notificationDrainSignals,
+            timeoutMs = timeoutMs,
+            startRuntime = ::ensureNotificationRuntimeStarted,
+            keepConnected = { backgroundConnectionEnabled },
+        )
 
+    /** Retries a persisted token-registration obligation when notification startup reaches a usable runtime. */
     private suspend fun drainPendingNativePushRegistrationSyncIfNeeded() {
         if (pushTokenStore.nativePushRegistrationSyncPending()) {
             syncNativePushRegistrationIfEnabled()
         }
     }
 
-    /** Runs work started after the durable wake before clearing its matching generation. */
-    private suspend fun drainPendingPushWakeCatchUpIfNeeded() {
+    /** Returns fetch success, acknowledging only the matching durable wake after fresh work. */
+    private suspend fun drainPendingPushWakeCatchUpIfNeeded(): Boolean {
         val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
-        if (pendingGeneration == 0L) return
-        catchUpAfterObservedPushWake(
+        if (pendingGeneration == 0L) return true
+        return catchUpAfterObservedPushWake(
             pendingGeneration = pendingGeneration,
             trigger = PerformanceTrigger.PUSH_WAKE,
-        )
+        ).succeeded
     }
 
     /** Clears only the durable wake generation acknowledged by successful fresh work. */
@@ -7753,6 +7745,7 @@ class WhiteNoiseAppState private constructor(
 
     suspend fun setLocalNotificationsEnabled(enabled: Boolean): Boolean {
         val account = activeAccountRef ?: return false
+        if (!enabled) nativePushFallback.invalidateAll()
         refreshLocalNotificationPermission()
         if (enabled && !localNotificationPermissionGranted) {
             present(R.string.toast_notification_permission_needed)
@@ -7761,7 +7754,7 @@ class WhiteNoiseAppState private constructor(
         return runCatching {
             val settings = marmotIo { setLocalNotificationsEnabled(account, enabled) }
             localNotificationSettings = settings
-            if (!enabled && backgroundConnectionEnabled) {
+            if (!enabled) {
                 updateBackgroundConnectionPreference(false)
                 NotificationStreamForegroundService.stop(appContext)
             }
@@ -7854,24 +7847,9 @@ class WhiteNoiseAppState private constructor(
         appStateDebug { "background connection runtime retries exhausted" }
     }
 
-    /**
-     * Returns the first unmet native-push prerequisite. Later checks are skipped
-     * to keep configuration-free builds away from Firebase token work.
-     */
-    internal fun nativePushCapability(config: PushServerConfig? = PushServerConfig.current()): NativePushCapability {
-        val pushServerConfigured = config != null
-        val googlePlayServicesAvailable =
-            pushServerConfigured &&
-                GoogleApiAvailability
-                    .getInstance()
-                    .isGooglePlayServicesAvailable(appContext) == ConnectionResult.SUCCESS
-        val firebaseInitialized = googlePlayServicesAvailable && FirebaseApp.getApps(appContext).isNotEmpty()
-        return resolveNativePushCapability(
-            pushServerConfigured = pushServerConfigured,
-            googlePlayServicesAvailable = googlePlayServicesAvailable,
-            firebaseInitialized = firebaseInitialized,
-        )
-    }
+    /** Returns the first unmet native-push prerequisite without reaching later SDKs. */
+    internal fun nativePushCapability(config: PushServerConfig? = PushServerConfig.current()): NativePushCapability =
+        nativePushCapabilityForContext(appContext, config)
 
     /**
      * Persist the FCM token and trigger a re-sync against the runtime. Called
@@ -7887,10 +7865,9 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Push the current FCM token to the runtime for every signed-in account
-     * that has `nativePushEnabled = true`. Multi-account devices keep a
-     * working registration on every account, not just the active one — a
-     * push for account A still wakes the device when account B is in
-     * focus. Idempotent per account: a successful sync caches the
+     * that requires native delivery, including background accounts so their
+     * pushes can wake the device while another account is active.
+     * Idempotent per account: a successful sync caches the
      * (token, server, relay) fingerprint and skips on the next call until
      * something changes. Returns true only when every account that currently
      * requires native push is registered (or does not require registration).
@@ -7900,10 +7877,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun hasConfirmedNativePushRegistration(account: String): Boolean =
         nativePushSyncMutex.withLock { perAccountSyncedFingerprints.containsKey(account) }
 
-    /**
-     * Replays pending server-side cleanup before registering every enabled
-     * account, and never reaches token acquisition unless capability is available.
-     */
+    /** Replays pending cleanup before registration and gates token acquisition on capability. */
     @Suppress("ReturnCount")
     private suspend fun syncNativePushRegistrationIfEnabledLocked(): Boolean {
         // Drain before resolving the push-server config so a clear that
@@ -7913,9 +7887,7 @@ class WhiteNoiseAppState private constructor(
         // receive them. Only the upsert path is gated on config + GMS.
         drainPendingPushClears()
         drainPendingPushDisables()
-        val config = PushServerConfig.current() ?: return false
-        if (!nativePushCapability(config).isAvailable) return false
-        var accountRefs = accounts.map { it.label }
+        var accountRefs = accounts.filter { it.isSignedInSigningAccount() }.map { it.label }
         if (accountRefs.isEmpty()) {
             // Only clear the durable #755 retry flag when the account list is
             // authoritative. setAppInForeground() can trigger this before
@@ -7923,12 +7895,16 @@ class WhiteNoiseAppState private constructor(
             // would strand a signed-in device on a stale push token.
             if (marmotRuntime == null) return false
             refreshAccounts()
-            accountRefs = accounts.map { it.label }
+            accountRefs = accounts.filter { it.isSignedInSigningAccount() }.map { it.label }
             if (accountRefs.isEmpty()) {
                 pushTokenStore.clearPendingNativePushRegistrationSync()
                 return true
             }
         }
+        val config = PushServerConfig.current()
+        val capability = nativePushCapability(config)
+        if (!capability.isAvailable) return reconcileUnavailableNativePushFallback(capability, accountRefs)
+        config ?: return false
         val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return false
         for (account in accountRefs) {
             val synced = syncPushForAccount(account, config, token)
@@ -7936,6 +7912,73 @@ class WhiteNoiseAppState private constructor(
         }
         pushTokenStore.clearPendingNativePushRegistrationSync()
         return true
+    }
+
+    /** Migrates the active account while reporting unknown or background-owned state as incomplete. */
+    private suspend fun reconcileUnavailableNativePushFallback(
+        capability: NativePushCapability,
+        accountRefs: List<String>,
+    ): Boolean {
+        val reconciled =
+            nativePushFallback.reconcile(
+                capability = capability,
+                owner = captureNativePushFallbackOwner() ?: return false,
+                accountRefs = accountRefs,
+                bindings =
+                    NativePushFallbackBindings(
+                        ownerIsCurrent = ::ownsNativePushFallback,
+                        readSettings = { request, account -> request.runtime.marmot.notificationSettings(account) },
+                        publishActiveSettings = { localNotificationSettings = it },
+                        publishPersistentConnectionEnabled = { backgroundConnectionEnabled = true },
+                        publishComplete = pushTokenStore::clearPendingNativePushRegistrationSync,
+                        removeFingerprint = { perAccountSyncedFingerprints.remove(it.accountRef) },
+                        setNativePushDisabled = { it.runtime.marmot.setNativePushEnabled(it.accountRef, false) },
+                        clearRegistration = ::clearPushRegistrationForOwnerLocked,
+                        onFailure = { message -> appStateDebug { message } },
+                    ),
+            )
+        return reconciled
+    }
+
+    /** Captures the exact active account/runtime lifetime used by service readiness callbacks. */
+    private fun captureNativePushFallbackOwner(): NativePushFallbackOwner? =
+        nativePushFallback.owner(
+            activeAccountRef,
+            marmotRuntime,
+            runtimeGeneration,
+            accountSwitchHandoff.capture(),
+        )
+
+    /** Rejects suspended fallback work after an account switch or runtime replacement. */
+    private fun ownsNativePushFallback(owner: NativePushFallbackOwner): Boolean = captureNativePushFallbackOwner()?.matches(owner) == true
+
+    /** Accepts only the exact service generation that reached a successful supervised runtime boundary. */
+    internal fun onNativePushFallbackRuntimeStarted(generation: Long): Job? {
+        assertMainThread { "onNativePushFallbackRuntimeStarted" }
+        val owner = nativePushFallback.acknowledge(generation, ::ownsNativePushFallback) ?: return null
+        return notificationScope.launch {
+            if (ownsNativePushFallback(owner)) syncNativePushRegistrationIfEnabled()
+        }
+    }
+
+    /** Drops a rejected, exhausted, recovery-fenced, or destroyed service generation. */
+    internal fun onNativePushFallbackRuntimeUnavailable(generation: Long) {
+        assertMainThread { "onNativePushFallbackRuntimeUnavailable" }
+        nativePushFallback.invalidate(generation)
+    }
+
+    /** Clears only [owner]'s registration on its captured runtime and retains failed cleanup for retry. */
+    private suspend fun clearPushRegistrationForOwnerLocked(owner: NativePushFallbackOwner) {
+        if (!ownsNativePushFallback(owner)) return
+        currentCoroutineContext().ensureActive()
+        runCatchingCancellable {
+            withContext(Dispatchers.IO) { owner.runtime.marmot.clearPushRegistration(owner.accountRef) }
+        }.onSuccess { outcome ->
+            logPushRegistrationShareOutcome("capability fallback clear", owner.accountRef, outcome)
+            if (ownsNativePushFallback(owner)) pushTokenStore.clearPending(owner.accountRef)
+        }.onFailure { failure ->
+            appStateDebug { "capability fallback clear failed (queued for retry): ${failure.readableMessage()}" }
+        }
     }
 
     /**
@@ -8112,29 +8155,19 @@ class WhiteNoiseAppState private constructor(
 
     private suspend fun clearPushRegistrationForAccountLocked(account: String) {
         perAccountSyncedFingerprints.remove(account)
-        runCatchingCancellable { marmotIo { clearPushRegistration(account) } }
-            .onSuccess { outcome ->
-                // PENDING means MarmotKit durably retained the clear and will
-                // retry group sharing; it is a successful local clear, not a
-                // reason to restore or roll back the registration.
-                logPushRegistrationShareOutcome("clear", account, outcome)
-                pushTokenStore.clearPending(account)
-            }.onFailure {
-                pushTokenStore.recordPendingClear(account)
-                appStateDebug { "clearPushRegistration failed (queued for retry): ${it.readableMessage()}" }
+        val result = runCatchingCancellable { marmotIo { clearPushRegistration(account) } }
+        result.onSuccess { outcome ->
+            // PENDING means MarmotKit durably retained the clear and will
+            // retry group sharing; it is a successful local clear, not a
+            // reason to restore or roll back the registration.
+            logPushRegistrationShareOutcome("clear", account, outcome)
+            pushTokenStore.clearPending(account)
+        }
+        result.exceptionOrNull()?.let { failure ->
+            val queued = withContext(Dispatchers.IO) { pushTokenStore.recordPendingClear(account) }
+            appStateDebug {
+                "clearPushRegistration failed cleanupQueued=$queued: ${failure.readableMessage()}"
             }
-    }
-
-    private fun logPushRegistrationShareOutcome(
-        operation: String,
-        account: String,
-        outcome: PushRegistrationShareOutcomeFfi,
-    ) {
-        val state = pushRegistrationSharingState(outcome)
-        appStateDebug {
-            "push registration $operation sharing=$state account=${account.take(8)} " +
-                "attempted=${outcome.attemptedGroups} succeeded=${outcome.succeededGroups} " +
-                "failed=${outcome.failedGroups} pending=${outcome.pendingGroups}"
         }
     }
 
@@ -9841,6 +9874,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     private fun updateBackgroundConnectionPreference(enabled: Boolean) {
+        if (!enabled) nativePushFallback.invalidateAll()
         backgroundConnectionEnabled = enabled
         BackgroundConnectionPreferences.setEnabled(appContext, enabled)
         appStateDebug { "background connection enabled=$enabled" }
@@ -10129,7 +10163,8 @@ class WhiteNoiseAppState private constructor(
     }
 }
 
-private inline fun appStateDebug(message: () -> String) {
+/** Emits operational detail only from debug builds so release logs remain privacy-bounded. */
+internal inline fun appStateDebug(message: () -> String) {
     // Debug-only: these INFO lines are operational/diagnostic and some carry
     // sender/group context, so they must not ship in release logcat. See #39.
     if (BuildConfig.DEBUG) Log.i("DMAppState", message())

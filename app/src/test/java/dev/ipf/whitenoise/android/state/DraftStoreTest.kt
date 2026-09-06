@@ -101,6 +101,126 @@ class DraftStoreTest {
         assertEquals(2, sortNotifications)
     }
 
+    /** Verifies an accepted MDK update rewrites both visible order and the recoverable snapshot. */
+    @Test
+    fun authoritativeTimestampUpdatesTheCapturedDraftSnapshot() {
+        val s = DraftStore(InMemoryDraftPersistence()) { 100L }
+        s.set("a", "g", TextFieldValue("draft"))
+
+        s.applyAuthoritativeTimestamp("a", "g", draftedAtMs = 250_000)
+
+        assertEquals(250uL, s.draftedAtSecondsFor("a", "g"))
+        assertEquals(250L, s.getDraft("a", "g")?.draftedAtSeconds)
+    }
+
+    /** Verifies same-second and older acknowledgements neither regress order nor re-notify. */
+    @Test
+    fun repeatedAuthoritativeTimestampDoesNotResignalOrRegress() {
+        val s = DraftStore(InMemoryDraftPersistence()) { 100L }
+        s.set("a", "g", TextFieldValue("draft"))
+        var sortNotifications = 0
+        s.onDraftSortOrderChanged = { sortNotifications += 1 }
+
+        s.applyAuthoritativeTimestamp("a", "g", draftedAtMs = 250_000)
+        s.applyAuthoritativeTimestamp("a", "g", draftedAtMs = 250_999)
+        s.applyAuthoritativeTimestamp("a", "g", draftedAtMs = 200_000)
+
+        assertEquals(250uL, s.draftedAtSecondsFor("a", "g"))
+        assertEquals(1, sortNotifications)
+    }
+
+    /** Verifies identical summary metadata is quiet and account-qualified keys remain isolated. */
+    @Test
+    fun replacingIdenticalSummariesDoesNotResignalAndKeepsAccountsIsolated() {
+        val s = store()
+        var sortNotifications = 0
+        s.onDraftSortOrderChanged = { sortNotifications += 1 }
+
+        s.replaceSummaries("a", mapOf("g" to 500_000L))
+        s.replaceSummaries("a", mapOf("g" to 500_999L))
+        s.replaceSummaries("b", mapOf("g" to 900_000L))
+
+        assertEquals(500uL, s.draftedAtSecondsFor("a", "g"))
+        assertEquals(900uL, s.draftedAtSecondsFor("b", "g"))
+        assertEquals(2, sortNotifications)
+    }
+
+    /** Verifies a response captured before a newer save cannot overwrite its accepted timestamp. */
+    @Test
+    fun delayedSummaryCannotRegressANewerAcceptedSaveTimestamp() {
+        val s = DraftStore(InMemoryDraftPersistence()) { 100L }
+        s.set("a", "g", TextFieldValue("draft"))
+        val request = s.captureSummaryRefresh("a")
+
+        s.applyAuthoritativeTimestamp("a", "g", draftedAtMs = 250_000)
+        s.replaceSummaries("a", mapOf("g" to 125_000L), expected = request)
+
+        assertEquals(250uL, s.draftedAtSecondsFor("a", "g"))
+        assertEquals(250L, s.getDraft("a", "g")?.draftedAtSeconds)
+    }
+
+    /** Preserves locally changed keys while applying one delayed response to unchanged siblings. */
+    @Test
+    fun delayedSummaryPreservesANewDraftButStillUpdatesUnchangedGroups() {
+        val s = store()
+        s.replaceSummaries("a", mapOf("unchanged" to 100_000L, "removed" to 200_000L))
+        val request = s.captureSummaryRefresh("a")
+
+        s.set("a", "new", TextFieldValue("typed after request"))
+        s.replaceSummaries("a", mapOf("unchanged" to 300_000L), expected = request)
+
+        assertEquals("typed after request", s.get("a", "new"))
+        assertTrue(s.draftedAtSecondsFor("a", "new") != null)
+        assertEquals(300uL, s.draftedAtSecondsFor("a", "unchanged"))
+        assertNull(s.draftedAtSecondsFor("a", "removed"))
+    }
+
+    /** Verifies metadata-only refresh seeds sort time without retaining draft plaintext in Android. */
+    @Test
+    fun summaryRefreshSeedsSortMetadataWithoutHydratingDraftPlaintext() {
+        val s = store()
+        val request = s.captureSummaryRefresh("a")
+
+        s.replaceSummaries("a", mapOf("g" to 500_000L), expected = request)
+
+        assertNull(s.get("a", "g"))
+        assertEquals(500uL, s.draftedAtSecondsFor("a", "g"))
+    }
+
+    /** Keeps a late save acknowledgement hidden, then uses it if the pending send is restored. */
+    @Test
+    fun lateSaveTimestampStaysHiddenAndWinsIfThePendingSendFails() {
+        val s = DraftStore(InMemoryDraftPersistence()) { 100L }
+        s.set("a", "g", TextFieldValue("try again"))
+        val recovery = requireNotNull(s.getDraft("a", "g"))
+
+        s.hideForPendingSend("a", "g")
+        s.applyAuthoritativeTimestamp("a", "g", draftedAtMs = 250_000)
+
+        assertNull(s.get("a", "g"))
+        assertNull(s.draftedAtSecondsFor("a", "g"))
+
+        s.restoreSnapshot("a", "g", recovery)
+
+        assertEquals("try again", s.get("a", "g"))
+        assertEquals(250uL, s.draftedAtSecondsFor("a", "g"))
+        assertEquals(250L, s.getDraft("a", "g")?.draftedAtSeconds)
+    }
+
+    /** Verifies summary refresh cannot make a pending-send recovery draft visible again. */
+    @Test
+    fun summaryRefreshDoesNotResurfaceADraftHiddenForPendingSend() {
+        val s = DraftStore(InMemoryDraftPersistence()) { 100L }
+        s.set("a", "g", TextFieldValue("sending"))
+        s.hideForPendingSend("a", "g")
+        val request = s.captureSummaryRefresh("a")
+
+        s.replaceSummaries("a", mapOf("g" to 250_000L), expected = request)
+
+        assertNull(s.get("a", "g"))
+        assertNull(s.draftedAtSecondsFor("a", "g"))
+    }
+
     @Test
     fun settingEvictedObservedEmptyDraftUpdatesOriginalState() {
         val s = store()

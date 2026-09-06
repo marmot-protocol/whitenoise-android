@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
@@ -69,6 +70,40 @@ class ChatListSortingTest {
             }
 
         assertEquals(listOf("drafted-in", "recent-message"), sorted.map { it.id })
+    }
+
+    /** Verifies only the chat receiving a newer authoritative edit timestamp is promoted. */
+    @Test
+    fun authoritativeDraftEditMovesOnlyTheEditedChat() {
+        val persistence =
+            object : DraftPersistence {
+                /** Supplies no persisted drafts to the ordering fixture. */
+                override fun read(): Map<String, String> = emptyMap()
+
+                /** Keeps persistence outside a test concerned only with in-memory ordering. */
+                override fun write(
+                    key: String,
+                    value: String?,
+                ) = Unit
+            }
+        val drafts = DraftStore(persistence) { 20L }
+        val edited = item("edited", latestAt = 10uL)
+        val other = item("other", latestAt = 50uL)
+        drafts.set("account", edited.id, TextFieldValue("draft"))
+
+        assertEquals(
+            listOf("other", "edited"),
+            sortChatListItems(listOf(edited, other)) { drafts.draftedAtSecondsFor("account", it.id) }
+                .map { it.id },
+        )
+
+        drafts.applyAuthoritativeTimestamp("account", edited.id, draftedAtMs = 90_000)
+
+        assertEquals(
+            listOf("edited", "other"),
+            sortChatListItems(listOf(edited, other)) { drafts.draftedAtSecondsFor("account", it.id) }
+                .map { it.id },
+        )
     }
 
     @Test
