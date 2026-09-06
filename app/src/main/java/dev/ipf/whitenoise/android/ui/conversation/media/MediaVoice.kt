@@ -42,6 +42,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -56,10 +57,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.AudioWaveformExtractor
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.audio.VoicePlaybackController.PlaybackStartResult
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
@@ -82,12 +87,109 @@ import java.util.Locale
 
 private val voiceMaterializations = SingleFlight<String, java.io.File>()
 
+/** Inputs needed to materialize one voice attachment for presentation. */
+internal data class VoiceAttachmentMaterializationRequest(
+    val context: Context,
+    val controller: ConversationController,
+    val messageIdHex: String,
+    val attachmentIndex: Int,
+    val reference: MediaAttachmentReferenceFfi,
+    val mine: Boolean,
+    val priority: AttachmentDownloadPriority,
+)
+
+/** External file, codec, and platform-playback boundary used by voice-note presentation. */
+internal interface VoiceAttachmentPresentationRuntime {
+    /** Process-wide playback state observed by voice rows. */
+    val playbackState: kotlinx.coroutines.flow.StateFlow<VoicePlaybackController.PlaybackState>
+
+    /** Playback failures that require a corrupt cache entry to be invalidated. */
+    val playbackFailures: kotlinx.coroutines.flow.SharedFlow<VoicePlaybackController.PlaybackFailure>
+
+    /** Resolves or publishes the stable local file for one attachment. */
+    suspend fun materialize(request: VoiceAttachmentMaterializationRequest): java.io.File
+
+    /** Decodes normalized waveform bars from [file], if supported. */
+    suspend fun waveform(file: java.io.File): FloatArray?
+
+    /** Probes the playable duration of [file] in milliseconds. */
+    suspend fun durationMs(file: java.io.File): Int
+
+    /** Starts or resumes the keyed voice clip. */
+    suspend fun play(
+        key: String,
+        file: java.io.File,
+        ownerKey: String,
+    ): VoicePlaybackController.PlaybackStartResult
+
+    /** Pauses the active voice clip. */
+    fun pause()
+
+    /** Seeks the keyed voice clip to [positionMs]. */
+    fun seekTo(
+        key: String,
+        positionMs: Int,
+    )
+
+    /** Advances the process-wide voice speed preference. */
+    fun cycleSpeed()
+}
+
+private object DefaultVoiceAttachmentPresentationRuntime : VoiceAttachmentPresentationRuntime {
+    override val playbackState = VoicePlaybackController.state
+    override val playbackFailures = VoicePlaybackController.failures
+
+    override suspend fun materialize(request: VoiceAttachmentMaterializationRequest): java.io.File =
+        materializeVoiceAttachment(
+            context = request.context,
+            controller = request.controller,
+            messageIdHex = request.messageIdHex,
+            attachmentIndex = request.attachmentIndex,
+            reference = request.reference,
+            mine = request.mine,
+            priority = request.priority,
+        )
+
+    override suspend fun waveform(file: java.io.File): FloatArray? = AudioWaveformExtractor.decode(file)
+
+    override suspend fun durationMs(file: java.io.File): Int = VoicePlaybackController.probeDuration(file)
+
+    override suspend fun play(
+        key: String,
+        file: java.io.File,
+        ownerKey: String,
+    ): VoicePlaybackController.PlaybackStartResult = VoicePlaybackController.play(key, file, ownerKey)
+
+    override fun pause() {
+        VoicePlaybackController.pause()
+    }
+
+    override fun seekTo(
+        key: String,
+        positionMs: Int,
+    ) {
+        VoicePlaybackController.seekTo(key, positionMs)
+    }
+
+    override fun cycleSpeed() {
+        VoicePlaybackController.cycleSpeed()
+    }
+}
+
+/** Test-injectable external-work boundary; production always uses the default runtime. */
+internal val LocalVoiceAttachmentPresentationRuntime =
+    staticCompositionLocalOf<VoiceAttachmentPresentationRuntime> { DefaultVoiceAttachmentPresentationRuntime }
+
 internal fun voicePlaybackKey(
     messageIdHex: String,
     attachmentIndex: Int,
     sourceEpoch: ULong,
 ): String = AttachmentCachePublication.attachmentKey(messageIdHex, attachmentIndex, sourceEpoch)
 
+/**
+ * Renders one stable-size voice attachment row whose download and playback
+ * state changes must not alter its outer lazy-list geometry.
+ */
 @Composable
 internal fun MediaVoiceBubble(
     messageIdHex: String,
@@ -101,6 +203,7 @@ internal fun MediaVoiceBubble(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val presentationRuntime = LocalVoiceAttachmentPresentationRuntime.current
     val epoch = reference.sourceEpoch
     val pillKey = voicePlaybackKey(messageIdHex, attachmentIndex, epoch)
 
@@ -146,8 +249,8 @@ internal fun MediaVoiceBubble(
     val startDownload = materializationIntent.shouldMaterialize
     var reloadToken by remember(pillKey, epoch) { mutableIntStateOf(0) }
 
-    val playback by remember(pillKey) {
-        dev.ipf.whitenoise.android.audio.VoicePlaybackController.state
+    val playback by remember(pillKey, presentationRuntime) {
+        presentationRuntime.playbackState
             .map { state -> state.takeIf { it.key == pillKey } }
             .distinctUntilChanged()
     }.collectAsState(null)
@@ -176,12 +279,10 @@ internal fun MediaVoiceBubble(
             }
         }
     var realWaveform by remember(pillKey, epoch) { mutableStateOf<FloatArray?>(null) }
-    LaunchedEffect(localFile, pillKey, epoch) {
+    LaunchedEffect(localFile, pillKey, epoch, presentationRuntime) {
         val file = localFile ?: return@LaunchedEffect
         if (realWaveform != null) return@LaunchedEffect
-        realWaveform =
-            dev.ipf.whitenoise.android.audio.AudioWaveformExtractor
-                .decode(file)
+        realWaveform = presentationRuntime.waveform(file)
     }
     val waveform: FloatArray = realWaveform ?: pseudoWaveform
 
@@ -224,23 +325,21 @@ internal fun MediaVoiceBubble(
             return
         }
         localFile = playableFile
-        val playbackResult =
-            dev.ipf.whitenoise.android.audio.VoicePlaybackController
-                .play(pillKey, playableFile, ownerKey = controller.group.groupIdHex)
+        val playbackResult = presentationRuntime.play(pillKey, playableFile, controller.group.groupIdHex)
         if (shouldInvalidateVoiceAttachmentCache(playbackResult)) {
             clearBadVoiceCache("playback start failed")
         }
     }
 
-    LaunchedEffect(pillKey, epoch, reference.mediaType) {
-        VoicePlaybackController.failures.collect { failure ->
+    LaunchedEffect(pillKey, epoch, reference.mediaType, presentationRuntime) {
+        presentationRuntime.playbackFailures.collect { failure ->
             if (failure.key == pillKey && failure.invalidatesCache) {
                 clearBadVoiceCache("playback error")
             }
         }
     }
 
-    LaunchedEffect(pillKey, epoch, materializationIntent, reloadToken) {
+    LaunchedEffect(pillKey, epoch, materializationIntent, reloadToken, presentationRuntime) {
         if (localFile != null) return@LaunchedEffect
         // Honor the auto-download gate: when Audio is off for the active
         // connection the clip waits behind a Download affordance until the
@@ -256,14 +355,16 @@ internal fun MediaVoiceBubble(
         val instant = retainedPlaintextOnEntry || controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         if (!instant) loading = true
         runCatching {
-            materializeVoiceAttachment(
-                context = context,
-                controller = controller,
-                messageIdHex = messageIdHex,
-                attachmentIndex = attachmentIndex,
-                reference = reference,
-                mine = mine,
-                priority = materializationIntent.priority,
+            presentationRuntime.materialize(
+                VoiceAttachmentMaterializationRequest(
+                    context = context,
+                    controller = controller,
+                    messageIdHex = messageIdHex,
+                    attachmentIndex = attachmentIndex,
+                    reference = reference,
+                    mine = mine,
+                    priority = materializationIntent.priority,
+                ),
             )
         }.onSuccess { file ->
             localFile = file
@@ -305,100 +406,157 @@ internal fun MediaVoiceBubble(
 
     // Surface a cached duration as soon as the file is materialized so the
     // bubble shows "0:12" instead of "0:00" before the user taps Play.
-    LaunchedEffect(pillKey, epoch, localFile) {
+    LaunchedEffect(pillKey, epoch, localFile, presentationRuntime) {
         val file = localFile ?: return@LaunchedEffect
         if (totalDurationMs == 0) {
-            val probed =
-                dev.ipf.whitenoise.android.audio.VoicePlaybackController
-                    .probeDuration(file)
+            val probed = presentationRuntime.durationMs(file)
             if (probed > 0) totalDurationMs = probed
         }
     }
 
+    VoiceAttachmentContent(
+        loading = loading,
+        failed = failed,
+        startDownload = startDownload,
+        localFileAvailable = localFile != null,
+        isPlaying = isPlayingThis,
+        isPaused = isPausedThis,
+        activePositionMs = activePositionMs,
+        activeDurationMs = activeDurationMs,
+        totalDurationMs = totalDurationMs,
+        waveform = waveform,
+        progressFraction = progressFraction,
+        playbackSpeed = playback?.speed,
+        attachedToCaption = attachedToCaption,
+        onLongPress = onLongPress,
+        onActionClick = {
+            when {
+                loading || localFile == null ->
+                    controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                isPlayingThis -> {
+                    failed = false
+                    presentationRuntime.pause()
+                }
+                else -> {
+                    failed = false
+                    scope.launch {
+                        val readyFile = localFile ?: return@launch
+                        playReadyVoice(readyFile)
+                    }
+                }
+            }
+        },
+        onSeek =
+            if (isThis && activeDurationMs > 0) {
+                { fraction ->
+                    presentationRuntime.seekTo(pillKey, (fraction * activeDurationMs).toInt())
+                }
+            } else {
+                null
+            },
+        onCycleSpeed = presentationRuntime::cycleSpeed,
+    )
+}
+
+/**
+ * Stable voice-row presentation shared by production materialization and the
+ * real-device LazyColumn geometry regression.
+ */
+@Composable
+// Compose naming and one stateless layout keep every visual phase geometry-identical.
+@Suppress(
+    "FunctionNaming", // Jetpack Compose functions use UpperCamelCase.
+    "LongMethod",
+    "LongParameterList",
+)
+internal fun VoiceAttachmentContent(
+    loading: Boolean,
+    failed: Boolean,
+    startDownload: Boolean,
+    localFileAvailable: Boolean,
+    isPlaying: Boolean,
+    isPaused: Boolean,
+    activePositionMs: Int,
+    activeDurationMs: Int,
+    totalDurationMs: Int,
+    waveform: FloatArray,
+    progressFraction: Float,
+    playbackSpeed: Float?,
+    attachedToCaption: Boolean,
+    onLongPress: () -> Unit,
+    onActionClick: () -> Unit,
+    onSeek: ((Float) -> Unit)?,
+    onCycleSpeed: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val onSurfaceMuted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
     val accent = MaterialTheme.colorScheme.primary
     val onAccent = MaterialTheme.colorScheme.onPrimary
-
+    val actionVisual = voiceActionVisual(loading, failed, startDownload, localFileAvailable, isPlaying)
+    val actionDescription = stringResource(actionVisual.descriptionResource)
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = if (attachedToCaption) RectangleShape else RoundedCornerShape(18.dp),
         border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
         ) {
-            // Circular play/pause button. Anchors the bubble and is the
-            // primary tap target — sized generously (48dp) so it reads as
-            // the focal control.
             Surface(
                 color = accent,
-                shape = androidx.compose.foundation.shape.CircleShape,
+                shape = CircleShape,
                 modifier =
                     Modifier
                         .size(48.dp)
-                        .combinedClickable(
+                        .semantics(mergeDescendants = true) {
+                            contentDescription = actionDescription
+                        }.combinedClickable(
                             onLongClick = onLongPress,
-                            onClick = {
-                                if (loading || localFile == null) {
-                                    controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
-                                    return@combinedClickable
-                                }
-                                failed = false
-                                if (isPlayingThis) {
-                                    dev.ipf.whitenoise.android.audio.VoicePlaybackController
-                                        .pause()
-                                    return@combinedClickable
-                                }
-                                scope.launch {
-                                    val readyFile = localFile ?: return@launch
-                                    playReadyVoice(readyFile)
-                                }
-                            },
+                            onClick = onActionClick,
                         ),
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    when {
-                        loading ->
+                    when (actionVisual) {
+                        VoiceActionVisual.LOADING ->
                             CircularProgressIndicator(
                                 modifier = Modifier.size(22.dp),
                                 strokeWidth = 2.dp,
                                 color = onAccent,
                             )
-                        failed ->
+                        VoiceActionVisual.FAILED ->
                             Icon(
                                 imageVector = Icons.Default.Refresh,
-                                contentDescription = stringResource(R.string.voice_message_failed),
+                                contentDescription = null,
                                 tint = onAccent,
                                 modifier = Modifier.size(26.dp),
                             )
-                        !startDownload && localFile == null ->
+                        VoiceActionVisual.DOWNLOAD ->
                             Icon(
                                 imageVector = Icons.Default.ArrowDownward,
-                                contentDescription = stringResource(R.string.media_tap_to_download),
+                                contentDescription = null,
                                 tint = onAccent,
                                 modifier = Modifier.size(26.dp),
                             )
-                        isPlayingThis ->
+                        VoiceActionVisual.PAUSE ->
                             Icon(
                                 imageVector = Icons.Default.Pause,
-                                contentDescription = stringResource(R.string.voice_message_pause),
+                                contentDescription = null,
                                 tint = onAccent,
                                 modifier = Modifier.size(28.dp),
                             )
-                        else ->
+                        VoiceActionVisual.PLAY ->
                             Icon(
                                 imageVector = Icons.Default.PlayArrow,
-                                contentDescription = stringResource(R.string.voice_message_play),
+                                contentDescription = null,
                                 tint = onAccent,
                                 modifier = Modifier.size(28.dp),
                             )
                     }
                 }
             }
-
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -408,41 +566,26 @@ internal fun MediaVoiceBubble(
                     progress = progressFraction,
                     playedColor = accent,
                     remainingColor = onSurfaceMuted,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(28.dp),
-                    onSeek =
-                        if (isThis && activeDurationMs > 0) {
-                            { fraction ->
-                                dev.ipf.whitenoise.android.audio.VoicePlaybackController
-                                    .seekTo(pillKey, (fraction * activeDurationMs).toInt())
-                            }
-                        } else {
-                            null
-                        },
+                    modifier = Modifier.fillMaxWidth().height(28.dp),
+                    onSeek = onSeek,
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    val timeText =
-                        when {
-                            isPlayingThis || isPausedThis ->
-                                "${formatVoiceTime(activePositionMs)} / ${formatVoiceTime(activeDurationMs)}"
-                            totalDurationMs > 0 -> formatVoiceTime(totalDurationMs)
-                            else -> "0:00"
-                        }
                     Text(
-                        timeText,
+                        text = voiceTimeText(isPlaying, isPaused, activePositionMs, activeDurationMs, totalDurationMs),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(vertical = 2.dp),
                     )
-                    // Speed pill: only shown once playback has been engaged
-                    // for this clip, so an unplayed bubble stays uncluttered.
-                    playback?.let { activePlayback ->
-                        VoiceSpeedPill(currentSpeed = activePlayback.speed)
+                    playbackSpeed?.let { speed ->
+                        VoiceSpeedPill(
+                            currentSpeed = speed,
+                            onCycleSpeed = onCycleSpeed,
+                        )
                     }
                 }
             }
@@ -450,8 +593,52 @@ internal fun MediaVoiceBubble(
     }
 }
 
+/** Stable action variants keep accessibility copy and glyph selection in lockstep. */
+private enum class VoiceActionVisual(
+    val descriptionResource: Int,
+) {
+    LOADING(R.string.media_downloading),
+    FAILED(R.string.voice_message_failed),
+    DOWNLOAD(R.string.media_tap_to_download),
+    PAUSE(R.string.voice_message_pause),
+    PLAY(R.string.voice_message_play),
+}
+
+/** Resolves one action variant without coupling presentation to materialization owners. */
+private fun voiceActionVisual(
+    loading: Boolean,
+    failed: Boolean,
+    startDownload: Boolean,
+    localFileAvailable: Boolean,
+    isPlaying: Boolean,
+): VoiceActionVisual =
+    when {
+        loading -> VoiceActionVisual.LOADING
+        failed -> VoiceActionVisual.FAILED
+        !startDownload && !localFileAvailable -> VoiceActionVisual.DOWNLOAD
+        isPlaying -> VoiceActionVisual.PAUSE
+        else -> VoiceActionVisual.PLAY
+    }
+
+/** Formats the fixed-height time label for download, ready, and active playback phases. */
+private fun voiceTimeText(
+    isPlaying: Boolean,
+    isPaused: Boolean,
+    activePositionMs: Int,
+    activeDurationMs: Int,
+    totalDurationMs: Int,
+): String =
+    when {
+        isPlaying || isPaused -> "${formatVoiceTime(activePositionMs)} / ${formatVoiceTime(activeDurationMs)}"
+        totalDurationMs > 0 -> formatVoiceTime(totalDurationMs)
+        else -> "0:00"
+    }
+
 @Composable
-private fun VoiceSpeedPill(currentSpeed: Float) {
+private fun VoiceSpeedPill(
+    currentSpeed: Float,
+    onCycleSpeed: () -> Unit,
+) {
     val label =
         when {
             currentSpeed >= 1.95f -> "2×"
@@ -461,11 +648,7 @@ private fun VoiceSpeedPill(currentSpeed: Float) {
     Surface(
         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
         shape = RoundedCornerShape(10.dp),
-        modifier =
-            Modifier.clickable {
-                dev.ipf.whitenoise.android.audio.VoicePlaybackController
-                    .cycleSpeed()
-            },
+        modifier = Modifier.clickable(onClick = onCycleSpeed),
     ) {
         Text(
             label,
@@ -592,7 +775,7 @@ internal fun shouldStartVoiceAttachmentDownload(
         hasRetainedPlaintext = hasRetainedPlaintext,
     )
 
-internal fun shouldInvalidateVoiceAttachmentCache(playbackResult: VoicePlaybackController.PlaybackStartResult): Boolean =
+internal fun shouldInvalidateVoiceAttachmentCache(playbackResult: PlaybackStartResult): Boolean =
     playbackResult == VoicePlaybackController.PlaybackStartResult.PrepareFailed ||
         playbackResult == VoicePlaybackController.PlaybackStartResult.StartFailed
 
