@@ -1927,7 +1927,16 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
         "anchor": "fun MediaVoiceBubble(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "VoiceAttachmentContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "fun VoiceAttachmentContent(",
+        "test_ids": [
+          "MED-008"
         ]
       },
       {
@@ -4818,6 +4827,46 @@
         "test_ids": [
           "ACC-016",
           "ACC-018"
+        ]
+      },
+      {
+        "surface": "voice-action:media-downloading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.media_downloading",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice-action:media-download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.media_tap_to_download",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice-action:failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.voice_message_failed",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice-action:pause",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.voice_message_pause",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice-action:play",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.voice_message_play",
+        "test_ids": [
+          "MED-008"
         ]
       },
       {
