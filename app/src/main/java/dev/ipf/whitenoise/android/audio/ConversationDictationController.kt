@@ -873,13 +873,20 @@ internal class ConversationDictationController internal constructor(
         state = ConversationDictationState.Starting(sessionId, target)
         val configured = platform.recognitionConfigured()
         conversationDictationDiagnostic("event=recognition_configured configured=$configured")
-        if (!configured) {
+        val microphoneAccess = platform.microphoneAccess()
+        conversationDictationDiagnostic("event=microphone_preflight access=${microphoneAccess.name}")
+        // Provider-owned capture needs no app grant, but must not bypass a known privacy denial.
+        if (
+            !configured &&
+            (
+                microphoneAccess == ConversationDictationMicrophoneAccess.Granted ||
+                    microphoneAccess == ConversationDictationMicrophoneAccess.RuntimePermissionRequired
+            )
+        ) {
             conversationDictationDiagnostic("event=provider_activity_fallback reason=service_not_configured")
             prepareProviderActivity(sessionId, target)
             return
         }
-        val microphoneAccess = platform.microphoneAccess()
-        conversationDictationDiagnostic("event=microphone_preflight access=${microphoneAccess.name}")
         when (microphoneAccess) {
             ConversationDictationMicrophoneAccess.Granted -> startWhenProviderAvailable(sessionId, target)
             ConversationDictationMicrophoneAccess.RuntimePermissionRequired -> {
