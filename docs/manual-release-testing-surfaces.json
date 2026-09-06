@@ -1259,6 +1259,15 @@
         ]
       },
       {
+        "surface": "InviteAcceptanceResolutionStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "fun InviteAcceptanceResolutionStatus(",
+        "test_ids": [
+          "GRP-012",
+          "GRP-014"
+        ]
+      },
+      {
         "surface": "InvitePreviewActionBar",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
         "anchor": "fun InvitePreviewActionBar(",
