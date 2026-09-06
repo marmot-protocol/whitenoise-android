@@ -60,9 +60,11 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -72,6 +74,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import java.io.IOException
+import java.util.TimeZone
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
@@ -122,6 +125,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             composeRule.waitUntil(timeoutMillis = PHASE_TIMEOUT_MILLIS) {
                 composeRule.onAllNodesWithText("1×").fetchSemanticsNodes().isNotEmpty()
             }
+            awaitVoiceAction(voiceId, R.string.voice_message_pause)
             assertVoiceActionTarget(voiceId, R.string.voice_message_pause)
             assertViewportStayedFixed("materialization", downloading, evidence, transitionStart)
             assertNoScrollWrites("materialization", evidence)
@@ -193,6 +197,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             composeRule.waitUntil(timeoutMillis = PHASE_TIMEOUT_MILLIS) {
                 composeRule.onAllNodesWithText("1×").fetchSemanticsNodes().isNotEmpty()
             }
+            awaitVoiceAction(voiceId, R.string.voice_message_pause)
             assertVoiceActionTarget(voiceId, R.string.voice_message_pause)
             settleVoiceActionIndication()
             assertVoiceBubbleFullyVisible(voiceId)
@@ -403,6 +408,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             composeRule.waitUntil(timeoutMillis = PHASE_TIMEOUT_MILLIS) {
                 composeRule.onAllNodesWithText("59:59", substring = true).fetchSemanticsNodes().isNotEmpty()
             }
+            awaitVoiceAction(voiceId, R.string.voice_message_pause)
             assertVoiceActionTarget(voiceId, R.string.voice_message_pause)
             assertViewportStayedFixed("retry and hydration", downloading, evidence, retryStart)
             assertNoScrollWrites("retry and hydration", evidence)
@@ -454,6 +460,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             composeRule.waitUntil(timeoutMillis = PHASE_TIMEOUT_MILLIS) {
                 composeRule.onAllNodesWithText("59:59", substring = true).fetchSemanticsNodes().isNotEmpty()
             }
+            awaitVoiceAction(voiceId, R.string.voice_message_pause)
             assertVoiceActionTarget(voiceId, R.string.voice_message_pause)
             settleVoiceActionIndication()
             assertVoiceBubbleFullyVisible(voiceId)
@@ -676,6 +683,20 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
     val composeRule = createComposeRule()
 
     protected val context: Context = ApplicationProvider.getApplicationContext()
+
+    private val originalTimeZone: TimeZone = TimeZone.getDefault()
+
+    /** Keeps production message timestamps independent of the workstation and CI runner timezone. */
+    @Before
+    fun pinVoiceFixtureTimeZone() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
+    /** Restores the process timezone so this fixture cannot alter later screenshot classes. */
+    @After
+    fun restoreVoiceFixtureTimeZone() {
+        TimeZone.setDefault(originalTimeZone)
+    }
 
     /** Renders the production conversation and retains the shell-owned saved history anchor. */
     @Suppress("LongMethod") // The composition host intentionally wires every real screen owner in one place.
