@@ -945,6 +945,7 @@ internal interface ConversationScrollWriter {
 /** The only implementation that writes the Compose list state. */
 internal class LazyListConversationScrollWriter(
     private val listState: LazyListState,
+    private val evidenceSink: ConversationScrollEvidenceSink? = null,
 ) : ConversationScrollWriter {
     override val firstVisibleItemIndex: Int
         get() = listState.firstVisibleItemIndex
@@ -953,6 +954,13 @@ internal class LazyListConversationScrollWriter(
         index: Int,
         scrollOffset: Int,
     ) {
+        evidenceSink?.onWrite(
+            ConversationScrollWriteEvidence(
+                animated = false,
+                index = index,
+                offsetPx = scrollOffset,
+            ),
+        )
         listState.scrollToItem(index, scrollOffset)
     }
 
@@ -960,6 +968,13 @@ internal class LazyListConversationScrollWriter(
         index: Int,
         scrollOffset: Int,
     ) {
+        evidenceSink?.onWrite(
+            ConversationScrollWriteEvidence(
+                animated = true,
+                index = index,
+                offsetPx = scrollOffset,
+            ),
+        )
         listState.animateScrollToItem(index, scrollOffset)
     }
 

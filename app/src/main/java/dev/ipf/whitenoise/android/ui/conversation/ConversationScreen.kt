@@ -686,6 +686,7 @@ internal fun ConversationScreen(
                 initialFirstVisibleItemScrollOffset = positionalScrollRestore?.firstVisibleItemScrollOffset ?: 0,
             )
         }
+    val scrollEvidenceSink = LocalConversationScrollEvidenceSink.current
     val ttsQuickTransportViewportLock = rememberTtsQuickTransportViewportLock(listState)
     var unreadJumpState by
         remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) {
@@ -698,9 +699,10 @@ internal fun ConversationScreen(
             chat.id,
             conversationAccountRef,
             appState.runtimeGeneration,
+            scrollEvidenceSink,
         ) {
             ConversationScrollCoordinator(
-                writer = LazyListConversationScrollWriter(listState),
+                writer = LazyListConversationScrollWriter(listState, scrollEvidenceSink),
                 initialMode =
                     if (scrollRestore != null) {
                         ConversationScrollMode.ReadingHistory(
@@ -1026,6 +1028,31 @@ internal fun ConversationScreen(
                     controller.error != null &&
                     controller.errorEdge == ConversationLoadFailureEdge.TOP,
         )
+    }
+
+    LaunchedEffect(listState, controller, scrollEvidenceSink) {
+        val sink = scrollEvidenceSink ?: return@LaunchedEffect
+        snapshotFlow {
+            val layoutInfo = listState.layoutInfo
+            ConversationViewportEvidence(
+                accountRef = conversationAccountRef,
+                mode = scrollCoordinator.mode,
+                anchor = currentScrollAnchor(),
+                viewportStartOffsetPx = layoutInfo.viewportStartOffset,
+                viewportEndOffsetPx = layoutInfo.viewportEndOffset,
+                viewportHeightPx = layoutInfo.viewportSize.height,
+                canScrollForward = listState.canScrollForward,
+                visibleItems =
+                    layoutInfo.visibleItemsInfo.map { visible ->
+                        ConversationVisibleItemEvidence(
+                            index = visible.index,
+                            key = visible.key.toString(),
+                            offsetPx = visible.offset,
+                            sizePx = visible.size,
+                        )
+                    },
+            )
+        }.collect(sink::onViewport)
     }
 
     @Suppress("ReturnCount") // Guard clauses keep invalid live-timeline gesture state explicit.
