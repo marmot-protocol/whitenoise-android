@@ -61,6 +61,7 @@ class LoadFailurePlacementTest {
         assertTrue("preserveLoadedContent = chatsController.retryGeneration > 0L" in shell)
     }
 
+    /** Keeps startup-failure completion behind the shared paint, accessibility, and telemetry reveal owner. */
     @Test
     fun optimisticRowStartupFailureCompletesTheAccessibilityRevealBarrier() {
         val sourceCandidates =
@@ -79,12 +80,18 @@ class LoadFailurePlacementTest {
             screen
                 .substringAfter("SeededConversationAuthoritativeReconciliationEffect(")
                 .substringBefore("// Edit events are derived state")
+        val transcriptVisibilityOwner =
+            screen
+                .substringAfter("val transcriptVisibilityCommitted by")
+                .substringBefore("// First-frame completion waits")
 
         assertTrue("publishTimelineFromIndexes()" in failureResolution)
         assertTrue("hasPublishedAuthoritativeTimeline = true" in failureResolution)
         assertTrue("hasPreparedInitialPresentation = true" in failureResolution)
         assertTrue("initialTimelineAnchored = true" in seededReconciliation)
-        assertTrue("if (!initialTimelineAnchored) hideFromAccessibility()" in screen)
+        assertTrue("initialTimelineAnchored = initialTimelineAnchored" in transcriptVisibilityOwner)
+        assertTrue("seededTailAlignmentCommitted = seededTailAlignmentCommitted" in transcriptVisibilityOwner)
+        assertTrue("if (!transcriptVisibilityCommitted) hideFromAccessibility()" in screen)
     }
 
     @Test
