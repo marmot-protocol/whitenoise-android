@@ -3,14 +3,18 @@ package dev.ipf.whitenoise.android.state
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollTo
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.GroupSystemEventFfi
+import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_TIMELINE_TAIL_GAP
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -28,9 +32,9 @@ class ConversationAuthoritativeTimelineScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** Keeps an old unconfirmed row chronological without breaking the membership boundary. */
+    /** Keeps the projected order and one tail interval above the composer. */
     @Test
-    fun oldUnconfirmedRowRendersBeforeTheAuthoritativePair() {
+    fun oldUnconfirmedRowRendersBeforeTheAuthoritativePairWithATightTailGap() {
         val fixture = screenshotFixture()
         val originalTimeZone = TimeZone.getDefault()
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
@@ -125,6 +129,22 @@ class ConversationAuthoritativeTimelineScreenshotTest {
         val appTop = appRow.fetchSemanticsNode().boundsInRoot.top
         assertTrue("old unconfirmed row must not occupy the live head", unconfirmedTop < systemTop)
         assertTrue("membership row must render above the authorized app message", systemTop < appTop)
+        val transcriptBottom =
+            composeRule
+                .onNodeWithTag(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE)
+                .fetchSemanticsNode()
+                .boundsInRoot.bottom
+        val tailBottom =
+            composeRule
+                .onNodeWithTag(messageBubbleRowTestTag(APP_MESSAGE_ID), useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot.bottom
+        assertEquals(
+            "the final message must have exactly one 8dp interval above the composer",
+            with(composeRule.density) { CONVERSATION_TIMELINE_TAIL_GAP.toPx() },
+            transcriptBottom - tailBottom,
+            1f,
+        )
         composeRule
             .onRoot()
             .captureRoboImage("src/test/snapshots/conversation_authoritative_timeline_order_light.png")
