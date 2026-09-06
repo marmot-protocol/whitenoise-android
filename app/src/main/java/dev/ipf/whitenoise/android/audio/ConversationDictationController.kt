@@ -1614,6 +1614,8 @@ private const val READINESS_UI_FRAME_MILLIS = 16L
 internal class AndroidConversationDictationPlatform(
     private val context: Context,
 ) : ConversationDictationPlatform {
+    private var sessionRecognitionService: ComponentName? = null
+
     /** Reports the runtime microphone grant required before creating an app-owned recognizer. */
     override fun hasRecordAudioPermission(): Boolean {
         val granted =
@@ -1646,24 +1648,19 @@ internal class AndroidConversationDictationPlatform(
         return access
     }
 
-    /** A selected component is the stable pre-permission prerequisite; visibility is re-checked afterwards. */
+    /** Resolves one explicit or unambiguous installed service before requesting app microphone access. */
     override fun recognitionConfigured(): Boolean {
         val selected = selectedRecognitionService()
         conversationDictationDiagnostic("event=selected_service ${selected.describeProvider()}")
-        return selected != null
+        sessionRecognitionService = resolvedRecognitionService(selected)
+        return sessionRecognitionService != null
     }
 
-    /** Checks that Android's exact selected recognition service is still installed. */
+    /** Checks the pinned service again without switching providers during a session. */
     override fun recognitionAvailable(): Boolean {
-        val selected = selectedRecognitionService() ?: return false
-        val discovered =
-            context.packageManager
-                .queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), PackageManager.MATCH_ALL)
-                .map { ComponentName(it.serviceInfo.packageName, it.serviceInfo.name) }
-        val available = conversationDictationRecognitionServiceAvailable(selected, discovered)
-        conversationDictationDiagnostic(
-            "event=selected_service_discovery ${selected.describeProvider()} discovered=${discovered.size} matched=$available",
-        )
+        val available =
+            conversationDictationRecognitionServiceAvailable(sessionRecognitionService, eligibleRecognitionServices())
+        conversationDictationDiagnostic("event=recognition_service_available available=$available")
         return available
     }
 
@@ -1694,9 +1691,11 @@ internal class AndroidConversationDictationPlatform(
         }
     }
 
-    /** Creates one recognizer session pinned to Android's currently selected service. */
+    /** Creates one recognizer session pinned to Android's explicit or unambiguous installed service. */
     override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
-        val selected = selectedRecognitionService() ?: throw ConversationDictationProviderUnavailableException()
+        val selected =
+            sessionRecognitionService?.takeIf { recognitionAvailable() }
+                ?: throw ConversationDictationProviderUnavailableException()
         conversationDictationDiagnostic("event=create_recognizer ${selected.describeProvider()}")
         return AndroidConversationDictationRecognitionSession(
             context = context,
@@ -1713,6 +1712,32 @@ internal class AndroidConversationDictationPlatform(
                 VOICE_RECOGNITION_SERVICE_SETTING,
             ),
         )
+
+    /** Keeps the UI inside White Noise when Android leaves the selected-service setting empty. */
+    private fun resolvedRecognitionService(selected: ComponentName?): ComponentName? {
+        val discovered = eligibleRecognitionServices()
+        val activity = conversationDictationRecognitionActivityIntent().resolveActivity(context.packageManager)
+        val resolved = conversationDictationRecognitionService(selected, activity, discovered)
+        val source =
+            when {
+                resolved == null -> "none"
+                resolved == selected -> "setting"
+                activity != null && resolved.packageName == activity.packageName -> "activity_package"
+                else -> "unique_discovered"
+            }
+        conversationDictationDiagnostic(
+            "event=recognition_service_resolved source=$source ${resolved.describeProvider()} " +
+                "discovered=${discovered.size}",
+        )
+        return resolved
+    }
+
+    private fun eligibleRecognitionServices(): List<ComponentName> =
+        context.packageManager
+            .queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0)
+            .mapNotNull { it.serviceInfo }
+            .filter { it.enabled && it.exported && it.applicationInfo.enabled }
+            .map { ComponentName(it.packageName, it.name) }
 
     private fun ComponentName?.describeProvider(): String {
         if (this == null) return "component=none"

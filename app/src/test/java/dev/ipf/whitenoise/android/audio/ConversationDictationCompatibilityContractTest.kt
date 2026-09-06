@@ -47,6 +47,36 @@ class ConversationDictationCompatibilityContractTest {
     }
 
     @Test
+    fun recognitionServiceFallsBackOnlyToAnUnambiguousInstalledProvider() {
+        val configured = ComponentName("org.configured", "org.configured.Recognition")
+        val activity = ComponentName("org.offline", "org.offline.RecognizeActivity")
+        val matchingService = ComponentName("org.offline", "org.offline.Recognition")
+        val unrelatedService = ComponentName("org.other", "org.other.Recognition")
+
+        assertEquals(
+            configured,
+            conversationDictationRecognitionService(configured, activity, listOf(configured, matchingService)),
+        )
+        assertEquals(
+            matchingService,
+            conversationDictationRecognitionService(null, activity, listOf(matchingService, unrelatedService)),
+        )
+        assertEquals(
+            matchingService,
+            conversationDictationRecognitionService(null, null, listOf(matchingService)),
+        )
+        assertNull(conversationDictationRecognitionService(null, null, listOf(matchingService, unrelatedService)))
+        assertNull(conversationDictationRecognitionService(configured, activity, listOf(matchingService)))
+        assertNull(
+            conversationDictationRecognitionService(
+                null,
+                activity,
+                listOf(matchingService, ComponentName("org.offline", "org.offline.SecondRecognition")),
+            ),
+        )
+    }
+
+    @Test
     fun manifestAndRunbookKeepBothAndroidSpeechContractsDiscoverable() {
         val manifest = projectFile("app/src/main/AndroidManifest.xml").readText()
         val matrix = projectFile("docs/composer-dictation-device-matrix.md").readText()
