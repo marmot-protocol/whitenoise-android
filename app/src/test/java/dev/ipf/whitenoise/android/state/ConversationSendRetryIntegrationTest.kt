@@ -33,6 +33,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
@@ -161,7 +162,7 @@ class ConversationSendRetryIntegrationTest {
 
             assertFalse(controller.acceptInvite(notify = false))
 
-            assertEquals(IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS, attempts)
+            assertEquals(IDEMPOTENT_CONTENTION_RETRY_ATTEMPTS, attempts)
             assertTrue(controller.group.pendingConfirmation)
             assertTrue(appState.toast?.diagnosticReport?.contains("operation=GROUP_INVITE_ACCEPT") == true)
             assertTrue(appState.toast?.diagnosticReport?.contains("error=RESOURCE_BUSY") == true)
@@ -186,13 +187,47 @@ class ConversationSendRetryIntegrationTest {
                 )
             val acceptance = async { controller.acceptInvite(notify = false) }
 
+            advanceTimeBy(10_000L)
             runCurrent()
-            assertEquals(1, attempts)
+            assertEquals(5, attempts)
             assertFalse(controller.group.pendingConfirmation)
 
             acceptance.cancelAndJoin()
 
             assertTrue(controller.group.pendingConfirmation)
+            assertEquals(null, appState.toast)
+        }
+
+    /** A catch-up longer than the original retry budget retains one optimistic acceptance. */
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun acceptsInviteAfterTenSecondsOfWorkerContention() =
+        runTest {
+            val appState = appState()
+            var attempts = 0
+            lateinit var controller: ConversationController
+            controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(pendingConfirmation = true),
+                    initialMemberSnapshot = memberSnapshot(),
+                    inviteAcceptor = { _, _ ->
+                        attempts += 1
+                        assertFalse(controller.group.pendingConfirmation)
+                        assertEquals(null, appState.toast)
+                        if (testScheduler.currentTime < 10_000L) throw MarmotKitException.AccountWorkerBusy()
+                        group(pendingConfirmation = false)
+                    },
+                )
+            val acceptance = async { controller.acceptInvite(notify = false) }
+
+            advanceTimeBy(10_000L)
+            assertFalse(acceptance.isCompleted)
+            assertFalse(controller.acceptInvite(notify = false))
+            assertEquals(5, attempts)
+            assertTrue(acceptance.await())
+            assertEquals(6, attempts)
+            assertFalse(controller.group.pendingConfirmation)
             assertEquals(null, appState.toast)
         }
 

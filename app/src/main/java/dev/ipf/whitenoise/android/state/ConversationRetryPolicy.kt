@@ -9,10 +9,6 @@ internal const val SEND_RETRY_BACKOFF_MS: Long = 700L
 internal const val PENDING_SEND_RETRY_MAX_BACKOFF_MS: Long = 60_000L
 private const val PENDING_SEND_MAX_BACKOFF_DOUBLINGS: Int = 16
 
-/** Bounded retry window for idempotent account-runtime mutations. */
-internal const val IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS: Int = 3
-internal const val IDEMPOTENT_RUNTIME_MUTATION_RETRY_BACKOFF_MS: Long = 700L
-
 /**
  * True only when a transport failure proves the event was never sent to a
  * relay. Re-entering `sendText` creates a new inner event, so any failure that
@@ -145,36 +141,17 @@ internal fun isTransientRuntimeWorkerError(throwable: Throwable): Boolean =
  */
 internal fun isRetryableIdempotentMutationError(throwable: Throwable): Boolean =
     isTransientRuntimeWorkerError(throwable) ||
-        throwable.causeChain().any { cause ->
-            cause is MarmotKitException.AccountWorkerBusy ||
-                cause is MarmotKitException.RuntimeBusy ||
-                cause is MarmotKitException.AccountSessionBusy ||
-                cause is MarmotKitException.StorageBusy
-        } ||
+        isTypedMutationContention(throwable) ||
         isTransientRelaySendError(throwable)
 
-/** Retry an idempotent mutation across typed transient contention or a proven connection gap. */
-@Suppress("TooGenericExceptionCaught") // FFI/runtime failures are classified; cancellation is always rethrown.
-internal suspend fun <T> retryIdempotentRuntimeMutation(
-    onTransientFailure: suspend (attempt: Int) -> Unit = {},
-    mutation: suspend () -> T,
-): T {
-    var lastTransient: Throwable? = null
-    for (attempt in 1..IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS) {
-        try {
-            return mutation()
-        } catch (throwable: Throwable) {
-            rethrowIfCancellation(throwable)
-            if (!isRetryableIdempotentMutationError(throwable)) throw throwable
-            lastTransient = throwable
-            onTransientFailure(attempt)
-            if (attempt < IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS) {
-                kotlinx.coroutines.delay(IDEMPOTENT_RUNTIME_MUTATION_RETRY_BACKOFF_MS)
-            }
-        }
+/** Native ownership/storage contention is distinct from transport failures and ambiguous queue pressure. */
+internal fun isTypedMutationContention(throwable: Throwable): Boolean =
+    throwable.causeChain().any { cause ->
+        cause is MarmotKitException.AccountWorkerBusy ||
+            cause is MarmotKitException.RuntimeBusy ||
+            cause is MarmotKitException.AccountSessionBusy ||
+            cause is MarmotKitException.StorageBusy
     }
-    throw lastTransient ?: IllegalStateException("runtime mutation retry budget exhausted")
-}
 
 private fun Throwable.causeChain(): List<Throwable> =
     generateSequence(this) { current ->
