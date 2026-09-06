@@ -44,6 +44,9 @@ class NotificationMarkReadAccountUnreadReconciliationTest {
     private var backgroundRows: List<ChatListRowFfi> = listOf(unreadRow())
 
     @Volatile
+    private var activeRows: List<ChatListRowFfi> = emptyList()
+
+    @Volatile
     private var backgroundChatListFailure: Throwable? = null
 
     @Volatile
@@ -69,7 +72,7 @@ class NotificationMarkReadAccountUnreadReconciliationTest {
                     }
                     ACTIVE_ACCOUNT -> {
                         activeChatListCalls.incrementAndGet()
-                        emptyList()
+                        activeRows
                     }
                     else -> emptyList()
                 }
@@ -223,6 +226,7 @@ class NotificationMarkReadAccountUnreadReconciliationTest {
     @Test
     fun activeAccountMarkReadFoldsTheRowOnceWithoutASecondScheduledRefresh() =
         runTest {
+            activeRows = listOf(unreadRow())
             withFixture { fixture ->
                 val appState = fixture.appState
                 fixture.bootstrapAndRefresh()
@@ -234,10 +238,15 @@ class NotificationMarkReadAccountUnreadReconciliationTest {
                     )
                 appState.attachChatsController(controller)
                 try {
-                    // Let any controller-owned initial load settle first so the counter
-                    // isolates the mark-read path from unrelated startup reads.
+                    controller.applyChatListRow(unreadRow())
+                    awaitCondition("the active controller projects the seeded unread row") {
+                        controller.items.singleOrNull()?.unreadCount == 2uL
+                    }
+                    // This controller has no bind/subscription writer. Drain the seeded
+                    // projection before measuring the returned mark-read row's fold.
                     pumpingMainLooper { delay(200L) }
                     val refreshesBefore = activeChatListCalls.get()
+                    val projectionBefore = controller.forwardTargetsRevision
 
                     val markedRead =
                         pumpingMainLooper {
@@ -245,9 +254,18 @@ class NotificationMarkReadAccountUnreadReconciliationTest {
                         }
 
                     assertTrue(markedRead)
+                    awaitCondition("the returned read row replaces the active unread row") {
+                        controller.items.singleOrNull()?.unreadCount == 0uL
+                    }
                     // Give the coalesced refresh scheduler several drain windows: a
                     // second refresh for the folded account would surface here.
                     pumpingMainLooper { delay(200L) }
+                    assertEquals(
+                        "the returned row produces one controller projection",
+                        projectionBefore + 1L,
+                        controller.forwardTargetsRevision,
+                    )
+                    assertEquals(0uL, appState.confirmedUnreadCountForAccount(ACTIVE_ACCOUNT))
                     assertEquals(
                         "a bound-controller fold must not also schedule a per-account refresh",
                         refreshesBefore,
