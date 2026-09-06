@@ -35,6 +35,23 @@ import org.junit.Test
  * composer immediately.
  */
 class ConversationComposerGateTest {
+    /** Native refusal retires Join without flashing member or removed chrome before roster authority. */
+    @Test
+    fun unresolvedInviteAcceptanceWaitsForAuthoritativeMembership() {
+        assertEquals(
+            ComposerGate.PENDING,
+            conversationComposerGate(
+                pendingInvite = false,
+                inviteAcceptanceResolutionPending = true,
+                membersVerified = true,
+                isSelfMember = true,
+                seededSelfMember = true,
+                seededMembershipKnown = true,
+                assumeMemberUntilVerified = true,
+            ),
+        )
+    }
+
     @Test
     fun conversationFrameReadyCanBeRecordedBeforeComposerReady() {
         var state = ChatCreateOpenConversationTimingState()

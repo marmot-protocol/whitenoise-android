@@ -1092,6 +1092,7 @@ internal fun ConversationScreen(
     val composerGate =
         conversationComposerGate(
             pendingInvite = controller.group.pendingConfirmation,
+            inviteAcceptanceResolutionPending = controller.inviteAcceptanceResolutionPending,
             membersVerified = controller.membersVerified,
             isSelfMember = controller.isSelfMember,
             seededSelfMember = controller.seededSelfMember,

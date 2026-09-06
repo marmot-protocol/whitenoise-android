@@ -111,6 +111,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsFollowTarget
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutReport
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutSink
+import dev.ipf.whitenoise.android.ui.conversation.InviteAcceptanceResolutionStatus
 import dev.ipf.whitenoise.android.ui.conversation.InvitePreviewActionBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -2182,13 +2183,24 @@ internal fun MessageBubble(
                         bottomBar = {
                             when (composerGate) {
                                 ComposerGate.PENDING ->
-                                    Spacer(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .navigationBarsPadding()
-                                            .imePadding()
-                                            .height(64.dp),
-                                    )
+                                    if (controller.inviteAcceptanceResolutionPending) {
+                                        InviteAcceptanceResolutionStatus(
+                                            state = controller.memberRosterState,
+                                            onRetry = {
+                                                appState.launchMutation {
+                                                    controller.retryInviteAcceptanceAuthority()
+                                                }
+                                            },
+                                        )
+                                    } else {
+                                        Spacer(
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .navigationBarsPadding()
+                                                .imePadding()
+                                                .height(64.dp),
+                                        )
+                                    }
                                 ComposerGate.NOTICE -> RemovedMemberComposerNotice()
                                 ComposerGate.FROZEN -> FrozenGroupComposerNotice()
                                 ComposerGate.DISBANDED -> DisbandedGroupComposerNotice(disbanded = groupDisbanded)
