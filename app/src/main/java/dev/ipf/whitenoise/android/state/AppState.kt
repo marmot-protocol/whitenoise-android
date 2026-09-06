@@ -4276,9 +4276,8 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Starts the receiver and returns whether any observed pending push catch-up succeeded.
-     * Ordinary startup callers may continue with local state after a failed fetch; a push-wake
-     * owner must inspect the result so its bounded supervisor can retry while still in background.
+     * Starts the receiver and reports pending push catch-up success; ordinary startup can use local state on failure.
+     * Push-wake owners must inspect the result and retry within their bounded background supervisor.
      */
     suspend fun ensureNotificationRuntimeStarted(): Boolean {
         if (!bootstrapCompleted) {
