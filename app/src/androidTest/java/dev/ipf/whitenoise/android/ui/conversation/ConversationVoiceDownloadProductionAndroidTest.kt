@@ -756,10 +756,13 @@ private class InstrumentedTimelineSubscription(
 ) : ConversationTimelineSubscriptionHandle {
     private val windows = Channel<TimelinePageFfi>(Channel.UNLIMITED)
 
+    /** Supplies the controller's synchronous first window before its live pump starts. */
     override fun snapshot(): TimelinePageFfi = initial
 
+    /** Suspends the live pump until the fixture emits a full window or closes the source. */
     override suspend fun nextWindow(): TimelinePageFfi? = windows.receiveCatching().getOrNull()
 
+    /** Returns an empty terminal page so backward pagination cannot add fixture rows. */
     override suspend fun paginateBackwards(count: UInt): TimelinePageFfi =
         TimelinePageFfi(
             messages = emptyList(),
@@ -767,6 +770,7 @@ private class InstrumentedTimelineSubscription(
             hasMoreAfter = false,
         )
 
+    /** Keeps forward pagination terminal so tail assertions cannot consume synthetic pages. */
     override suspend fun paginateForwards(count: UInt): TimelinePageFfi =
         TimelinePageFfi(
             messages = emptyList(),
@@ -774,6 +778,7 @@ private class InstrumentedTimelineSubscription(
             hasMoreAfter = false,
         )
 
+    /** Ends the live stream and unblocks a controller pump waiting in [nextWindow]. */
     override fun close() {
         windows.close()
     }
@@ -790,13 +795,16 @@ private class InstrumentedGroupSubscription(
 ) : ConversationGroupStateSubscriptionHandle {
     private val closed = CompletableDeferred<Unit>()
 
+    /** Supplies the stable group generation used for the fixture controller's initial projection. */
     override fun snapshot(): AppGroupRecordFfi = group
 
+    /** Keeps the group-update pump suspended until the fixture closes its subscription. */
     override suspend fun next(): AppGroupRecordFfi? {
         closed.await()
         return null
     }
 
+    /** Releases the suspended group pump without publishing a replacement generation. */
     override fun close() {
         closed.complete(Unit)
     }
@@ -901,6 +909,7 @@ private class InstrumentedVoiceRuntime(
     override val playbackState: StateFlow<VoicePlaybackController.PlaybackState> = mutablePlaybackState
     override val playbackFailures: SharedFlow<VoicePlaybackController.PlaybackFailure> = mutablePlaybackFailures
 
+    /** Resolves the controlled attempt, then publishes its bytes through the production cache writer. */
     override suspend fun materialize(request: VoiceAttachmentMaterializationRequest): File =
         materializeVoiceAttachmentSource(
             context = request.context,
@@ -919,6 +928,7 @@ private class InstrumentedVoiceRuntime(
             publishedFiles += file
         }
 
+    /** Records waveform work on the owning message and holds publication at the shared hydration gate. */
     override suspend fun waveform(file: File): FloatArray {
         val control = controlFor(file)
         control.waveformStarted.complete(Unit)
@@ -927,6 +937,7 @@ private class InstrumentedVoiceRuntime(
         return FloatArray(64) { index -> 0.2f + (index % 5) * 0.1f }
     }
 
+    /** Records duration work on the owning message and publishes only after hydration is released. */
     override suspend fun durationMs(file: File): Int {
         val control = controlFor(file)
         control.durationStarted.complete(Unit)
@@ -935,6 +946,7 @@ private class InstrumentedVoiceRuntime(
         return DEVICE_LONG_DURATION_MS
     }
 
+    /** Publishes a deterministic playing state without starting platform audio playback. */
     override suspend fun play(
         key: String,
         file: File,
