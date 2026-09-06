@@ -8,7 +8,15 @@
 
 The test provisions its debug-only `NotificationListenerService`, posts a real
 message notification, reports preparation and notify-to-listener durations, and
-revokes listener access afterward. It records no sender, group, or message text.
+revokes only listener access granted by the fixture afterward, preserving any
+pre-existing grant. Listener setup allows Android's delayed rebinding after
+instrumentation restarts an already-bound process; this allowance does not
+extend the content-stage or notify-to-listener ceilings. The #2453 companion reads only its synthetic
+fixture body transiently to assert the resolved content, then classifies each
+callback as `Fallback`, `Resolved`, or `Other`; timing reports contain no sender,
+group, identity, or message text. The listener also accepts only the test's exact
+package, notification tag, and notification ID, so unrelated notifications cannot enter the
+evidence stream.
 
 These markers establish app preparation and Android listener-delivery timing.
 They do **not** establish when vibration physically starts or when heads-up pixels
@@ -19,6 +27,9 @@ device's physical movement in frame.
 ## Run
 
 Use a debug build on a test account/device. Do not uninstall the existing app:
+
+On Android 13+, grant notification permission on the selected test device before
+running. The fixture requires that permission and never grants or revokes it.
 
 ```sh
 ./gradlew :app:connectedDevPlayDebugAndroidTest \
@@ -40,6 +51,25 @@ Run warm- and cold-avatar cases on:
 - screen on/unlocked, screen off/locked, and notification shade already open;
 - sound + vibration, vibration-only, sound-only, silent, and custom vibration;
 - direct message, group message, and mention channels.
+
+Run the first-draw content companion on API 30 and API 36 with notification
+history enabled where available. Record listener payload callbacks separately
+from a Perfetto/SystemUI frame trace: the listener proves same-key content and
+`onlyAlertOnce`, while only the frame trace or an external recording can show
+whether the platform exposed both revisions to the user.
+
+The timeout scenario holds one synchronous local identity read until the first
+fallback callback is delivered, then releases it and requires exactly one silent
+same-key correction. The caller starts one absolute 75 ms local-resolution
+deadline, and coordinator admission and setup consume that same budget. This
+leaves 25 ms nominal caller-return headroom inside the unchanged measured 100 ms
+content-stage ceiling; it does not guarantee Android scheduling latency. Work
+finishing at or after 75 ms uses the fallback and matching silent correction.
+Deterministic unit
+tests advance an injected monotonic clock to its exact boundary. Resolver
+completion before that boundary does not prove when the caller resumed, when
+`ContentComplete` was sampled, when `notify` returned, or when pixels rendered;
+those later observations retain their real scheduling overhead.
 
 Verify the first card is immediately useful and correctly redacted. When an
 avatar later enriches it, verify the same card updates without another sound,

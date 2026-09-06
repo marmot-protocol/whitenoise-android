@@ -393,6 +393,55 @@ class LocalNotificationPresenterConversationTest {
         )
     }
 
+    /** Carries proven avatar bitmaps across cache eviction with one write callback. */
+    @Test
+    fun carriedReadyAvatarsSurviveCacheEvictionWithoutAHiddenSecondWrite() {
+        val posts = mutableListOf<Notification>()
+        var successfulWriteCallbacks = 0
+        val readyAvatar = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        val presenterWithCarriedAvatars =
+            LocalNotificationPresenter(
+                context = context,
+                shortcutPublisher = { shortcut -> publishedShortcut = shortcut },
+                notificationPoster = { notificationManager, tag, id, notification ->
+                    posts += notification
+                    notificationManager.notify(tag, id, notification)
+                },
+                cachedAvatarBitmap = { null },
+                avatarBitmapResolver = { error("a carried bitmap must not be re-fetched") },
+                enrichmentLauncher = { error("a carried bitmap must not launch detached work") },
+            )
+        presenterWithCarriedAvatars.ensureChannels()
+
+        assertTrue(
+            runBlocking {
+                presenterWithCarriedAvatars.show(
+                    update(isMention = false),
+                    conversationAvatarUrl = "https://example.com/group.png",
+                    conversationAvatarBitmap = readyAvatar,
+                    senderAvatarUrl = "https://example.com/alice.png",
+                    senderAvatarBitmap = readyAvatar,
+                    silentUpdate = true,
+                    replaceCurrentMessage = true,
+                    onNotificationWritten = { successfulWriteCallbacks += 1 },
+                    shortNpub = { "npub1test" },
+                )
+            },
+        )
+
+        assertEquals(1, posts.size)
+        assertEquals(1, successfulWriteCallbacks)
+        assertNotNull(publishedShortcut)
+        assertNotNull(
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(posts.single())
+                ?.messages
+                ?.single()
+                ?.person
+                ?.icon,
+        )
+    }
+
     @Test
     fun olderAvatarEnrichmentCannotOverwriteANewerMessageGeneration() {
         val posts = mutableListOf<Notification>()

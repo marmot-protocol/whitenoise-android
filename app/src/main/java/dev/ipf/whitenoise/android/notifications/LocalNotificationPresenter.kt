@@ -293,6 +293,14 @@ class LocalNotificationPresenter(
         return true
     }
 
+    /**
+     * Formats and publishes one notification under the caller's live eligibility gate.
+     * Matching-message replacements also require newest-show ownership, and every
+     * path rechecks both gates at the final serialized write boundary. A supplied
+     * avatar bitmap is authoritative for this write; the matching URL is metadata
+     * only and never causes a second fetch when its bitmap is present. The optional
+     * write observer runs after the first successful platform notification write.
+     */
     @SuppressLint("MissingPermission")
     suspend fun show(
         update: NotificationUpdateFfi,
@@ -305,9 +313,12 @@ class LocalNotificationPresenter(
         redactContent: Boolean = false,
         directShareEligible: Boolean = false,
         conversationAvatarUrl: String? = null,
+        conversationAvatarBitmap: Bitmap? = null,
         senderAvatarUrl: String? = null,
+        senderAvatarBitmap: Bitmap? = null,
         silentUpdate: Boolean = false,
         replaceCurrentMessage: Boolean = false,
+        onNotificationWritten: (() -> Unit)? = null,
         isPostStillAllowed: () -> Boolean = { true },
         shortNpub: (String) -> String,
     ): Boolean {
@@ -358,13 +369,20 @@ class LocalNotificationPresenter(
             notificationContent.notificationTag,
             notificationContent.notificationId,
         ) { showToken ->
+            val showGenerationAllowsPost = {
+                if (replaceCurrentMessage) {
+                    ConversationCardPostSynchronizer.isShowCurrent(showToken)
+                } else {
+                    ConversationCardPostSynchronizer.isShowNotDismissed(showToken)
+                }
+            }
             ConversationCardPostSynchronizer.awaitTestBarrier(
                 ConversationCardOp.SHOW_NOTIFY,
                 ConversationCardBarrier.AFTER_REGISTER,
                 notificationContent.notificationTag,
                 notificationContent.notificationId,
             )
-            if (!isPostStillAllowed()) return@withRegisteredShow false
+            if (!isPostStillAllowed() || !showGenerationAllowsPost()) return@withRegisteredShow false
             // Ordinary messages keep their required People/conversation child.
             // Other event types inherit the stable global channel until this
             // chat has an explicit or legacy custom override.
@@ -438,16 +456,17 @@ class LocalNotificationPresenter(
                 // Messages stack into one per-conversation card; invites are
                 // one-off events, so keep them as a plain expandable notification.
                 NotificationStyleChoice.Messaging -> {
-                    val (conversationAvatarBitmap, senderAvatarBitmap) =
+                    val (resolvedConversationAvatarBitmap, resolvedSenderAvatarBitmap) =
                         if (redactContent) {
                             null to null
                         } else {
-                            cachedAvatarBitmap(conversationAvatarUrl) to cachedAvatarBitmap(senderAvatarUrl)
+                            (conversationAvatarBitmap ?: cachedAvatarBitmap(conversationAvatarUrl)) to
+                                (senderAvatarBitmap ?: cachedAvatarBitmap(senderAvatarUrl))
                         }
                     val sender =
                         notificationSenderPerson(
                             notificationContent,
-                            senderAvatarBitmap
+                            resolvedSenderAvatarBitmap
                                 ?: if (redactContent) {
                                     null
                                 } else {
@@ -497,9 +516,9 @@ class LocalNotificationPresenter(
                             conversationTitleOverride = if (redactContent) null else conversationTitleOverride,
                             shortcutId = messagingShortcutId,
                             conversationAvatarUrl = conversationAvatarUrl,
-                            conversationAvatarBitmap = conversationAvatarBitmap,
+                            conversationAvatarBitmap = resolvedConversationAvatarBitmap,
                             senderAvatarUrl = senderAvatarUrl,
-                            senderAvatarBitmap = senderAvatarBitmap,
+                            senderAvatarBitmap = resolvedSenderAvatarBitmap,
                         )
                 }
 
@@ -532,7 +551,7 @@ class LocalNotificationPresenter(
                         ) {
                             if (
                                 !isPostStillAllowed() ||
-                                !ConversationCardPostSynchronizer.isShowNotDismissed(showToken)
+                                !showGenerationAllowsPost()
                             ) {
                                 return@withLock false
                             }
@@ -597,20 +616,36 @@ class LocalNotificationPresenter(
                                 notificationContent.notificationTag,
                                 notificationContent.notificationId,
                             )
+                            if (
+                                !isPostStillAllowed() ||
+                                !showGenerationAllowsPost()
+                            ) {
+                                return@withLock false
+                            }
                             val firstPostSucceeded =
                                 postNotificationSafely(
                                     notificationManager,
                                     notificationContent.notificationTag,
                                     notificationContent.notificationId,
                                     notification,
+                                    onNotificationWritten,
                                 )
                             if (firstPostSucceeded) {
+                                ConversationCardPostSynchronizer.awaitTestBarrier(
+                                    ConversationCardOp.SHOW_NOTIFY,
+                                    ConversationCardBarrier.AFTER_WRITE,
+                                    notificationContent.notificationTag,
+                                    notificationContent.notificationId,
+                                )
                                 true
                             } else {
                                 notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
                                 if (carried.isNullOrEmpty()) {
                                     false
                                 } else {
+                                    if (!isPostStillAllowed() || !showGenerationAllowsPost()) {
+                                        return@withLock false
+                                    }
                                     builder.setStyle(
                                         messagingStyle(
                                             notificationContent,
@@ -628,7 +663,16 @@ class LocalNotificationPresenter(
                                             notificationContent.notificationTag,
                                             notificationContent.notificationId,
                                             cleanNotification,
+                                            onNotificationWritten,
                                         )
+                                    if (retrySucceeded) {
+                                        ConversationCardPostSynchronizer.awaitTestBarrier(
+                                            ConversationCardOp.SHOW_NOTIFY,
+                                            ConversationCardBarrier.AFTER_WRITE,
+                                            notificationContent.notificationTag,
+                                            notificationContent.notificationId,
+                                        )
+                                    }
                                     if (!retrySucceeded) {
                                         notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
                                     }
@@ -644,20 +688,41 @@ class LocalNotificationPresenter(
                         ) {
                             if (
                                 !isPostStillAllowed() ||
-                                !ConversationCardPostSynchronizer.isShowNotDismissed(showToken)
+                                !showGenerationAllowsPost()
                             ) {
                                 return@withLock false
                             }
                             val presentationTimestampMs = nowMillis()
                             stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
                             val notification = builder.build()
+                            ConversationCardPostSynchronizer.awaitTestBarrier(
+                                ConversationCardOp.SHOW_NOTIFY,
+                                ConversationCardBarrier.BEFORE_WRITE,
+                                notificationContent.notificationTag,
+                                notificationContent.notificationId,
+                            )
+                            if (
+                                !isPostStillAllowed() ||
+                                !showGenerationAllowsPost()
+                            ) {
+                                return@withLock false
+                            }
                             val succeeded =
                                 postNotificationSafely(
                                     notificationManager,
                                     notificationContent.notificationTag,
                                     notificationContent.notificationId,
                                     notification,
+                                    onNotificationWritten,
                                 )
+                            if (succeeded) {
+                                ConversationCardPostSynchronizer.awaitTestBarrier(
+                                    ConversationCardOp.SHOW_NOTIFY,
+                                    ConversationCardBarrier.AFTER_WRITE,
+                                    notificationContent.notificationTag,
+                                    notificationContent.notificationId,
+                                )
+                            }
                             if (!succeeded) {
                                 notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
                             }
@@ -891,14 +956,17 @@ class LocalNotificationPresenter(
         return enriched
     }
 
+    /** Writes one card and reports success without allowing observer failures to alter delivery. */
     private fun postNotificationSafely(
         manager: NotificationManagerCompat,
         tag: String,
         id: Int,
         notification: Notification,
+        onNotificationWritten: (() -> Unit)? = null,
     ): Boolean =
         try {
             notificationPoster(manager, tag, id, notification)
+            runCatching { onNotificationWritten?.invoke() }
             true
         } catch (exception: RuntimeException) {
             notificationDebug {

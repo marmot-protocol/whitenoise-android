@@ -7260,6 +7260,437 @@
         ]
       },
       {
+        "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "class LocalNotificationPresenter",
+        "test_ids": [
+          "NTF-006",
+          "NTF-007",
+          "NTF-008",
+          "NTF-011"
+        ]
+      },
+      {
+        "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "class NotificationFirstPostResolver",
+        "test_ids": [
+          "NTF-006",
+          "NTF-007",
+          "NTF-008",
+          "NTF-011"
+        ]
+      },
+      {
+        "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "class WhiteNoiseAppState",
+        "test_ids": [
+          "NTF-006",
+          "NTF-007",
+          "NTF-008",
+          "NTF-010",
+          "NTF-011"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_admin_added",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_admin_added",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_admin_added_passive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_admin_added_passive",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_admin_added_you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_admin_added_you",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_admin_added_you_passive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_admin_added_you_passive",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_admin_removed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_admin_removed",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_admin_removed_passive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_admin_removed_passive",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_admin_removed_you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_admin_removed_you",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_admin_removed_you_passive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_admin_removed_you_passive",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_avatar_changed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_avatar_changed",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_avatar_changed_passive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_avatar_changed_passive",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_disappearing_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_disappearing_off",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_disappearing_off_passive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_disappearing_off_passive",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_disappearing_off_you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_disappearing_off_you",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_disappearing_set",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_disappearing_set",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_disappearing_set_passive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_disappearing_set_passive",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_disappearing_set_you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_disappearing_set_you",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_fallback",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_member_added",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_member_added",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_member_added_passive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_member_added_passive",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_member_added_you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_member_added_you",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_member_added_you_passive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_member_added_you_passive",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_member_left",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_member_left",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_member_removed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_member_removed",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_member_removed_passive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_member_removed_passive",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_member_removed_you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_member_removed_you",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_member_removed_you_passive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_member_removed_you_passive",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_named",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_named",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_named_passive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_named_passive",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_renamed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_renamed",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_renamed_diff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_renamed_diff",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_renamed_diff_passive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_renamed_diff_passive",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_renamed_passive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_renamed_passive",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_someone",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_someone",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_you_admin_added",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_you_admin_added",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_you_admin_removed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_you_admin_removed",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_you_avatar_changed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_you_avatar_changed",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_you_member_added",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_you_member_added",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_you_member_left",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_you_member_left",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_you_member_removed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_you_member_removed",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_you_named",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_you_named",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_you_renamed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_you_renamed",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_system_you_renamed_diff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_system_you_renamed_diff",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_title_invite_from",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_title_invite_from",
+        "test_ids": [
+          "NTF-006",
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:group_title_people_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.group_title_people_count",
+        "test_ids": [
+          "NTF-006",
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:just_you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.just_you",
+        "test_ids": [
+          "NTF-006",
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:notification_group_renamed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.notification_group_renamed",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:notification_group_renamed_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.notification_group_renamed_body",
+        "test_ids": [
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.unknown",
+        "test_ids": [
+          "NTF-006",
+          "NTF-008"
+        ]
+      },
+      {
+        "surface": "notification-first-post:you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.you",
+        "test_ids": [
+          "NTF-006",
+          "NTF-008"
+        ]
+      },
+      {
         "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
         "anchor": "WhiteNoiseApp",

@@ -81,7 +81,14 @@ class StalenessGuardCoverageTest {
                 "AppState.kt:materializeProfileLocally" to
                     listOf("profileCacheLifetime.capture", "profileCacheLifetime.isCurrent"),
                 "AppState.kt:processNotificationUpdate" to
-                    listOf("notificationPostEpoch.capture", "epoch = postEpoch", "postInitialNotificationUpdate"),
+                    listOf(
+                        "notificationPostEpoch.capture",
+                        "resolveNotificationFirstPost",
+                        "postEpoch,",
+                        "postInitialNotificationUpdate",
+                    ),
+                "AppState.kt:resolveNotificationFirstPost" to
+                    listOf("postEpoch: Long", "epoch = postEpoch"),
                 "AppState.kt:reconcileUnavailableNativePushFallback" to
                     listOf(
                         "captureNativePushFallbackOwner",

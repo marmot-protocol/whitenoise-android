@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.SystemClock
@@ -17,7 +18,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.input.TextFieldValue
 import com.google.firebase.messaging.FirebaseMessaging
 import dev.ipf.marmotkit.AccountKeyPackageFfi
@@ -30,7 +30,6 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
-import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -82,9 +81,6 @@ import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
-import dev.ipf.whitenoise.android.core.GroupSystemCopy
-import dev.ipf.whitenoise.android.core.GroupSystemEvents
-import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.HostSafety
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.MarmotClient
@@ -145,10 +141,9 @@ import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareShortcutPublisher
 import dev.ipf.whitenoise.android.share.ShareStagingStore
 import dev.ipf.whitenoise.android.share.shareResolveMime
+import dev.ipf.whitenoise.android.state.GroupInviteNotificationIdentityRefreshStore.RefreshCandidate
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
-import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
-import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupCoordinator
 import dev.ipf.whitenoise.android.ui.onboarding.setup.setupOptions
 import dev.ipf.whitenoise.android.updates.AppSelfUpdateFlows
@@ -206,63 +201,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
 import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
-
-internal suspend fun resolveNotificationMentionDisplayName(
-    bech32: String,
-    accountIdHex: suspend (String) -> String?,
-    profileDisplayName: (String) -> String?,
-    readDisplayName: suspend (String) -> String?,
-    requestProfile: (String) -> Unit,
-): String? {
-    val id = accountIdHex(bech32) ?: return null
-    profileDisplayName(id)?.let { return it }
-    val displayName = readDisplayName(id)?.let { ProfileSanitizer.displayName(it) }
-    if (displayName == null) requestProfile(id)
-    return displayName
-}
-
-internal fun notificationSenderNameOverride(
-    contactNickname: String?,
-    localProfileName: String?,
-): String? =
-    ProfileSanitizer.displayName(contactNickname)
-        ?: ProfileSanitizer.displayName(localProfileName)
-
-internal fun notificationDisplayNameHint(raw: String?): String? {
-    val displayName = ProfileSanitizer.displayName(raw)
-    return displayName?.takeUnless(IdentityFormatter::isNostrIdentityFallback)
-}
-
-internal fun resolvedProfileDisplayName(
-    profileDisplayName: String?,
-    notificationDisplayNameHint: String?,
-): String? =
-    ProfileSanitizer.displayName(profileDisplayName)
-        ?: notificationDisplayNameHint(notificationDisplayNameHint)
-
-internal fun profileLookupRelays(
-    bootstrapRelays: List<String>,
-    activeAccountRelays: List<String>,
-): List<String> = (bootstrapRelays + activeAccountRelays).distinct()
-
-internal suspend fun resolveNotificationPreviewText(
-    raw: String?,
-    parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
-    mentionDisplayName: suspend (String) -> String?,
-): String? {
-    val text = raw?.takeIf { it.isNotBlank() } ?: return null
-    val document = parseMarkdown(text)
-    if (document.blocks.isEmpty()) return null
-    val mentionNames = mutableMapOf<String, String?>()
-    for (bech32 in markdownDocumentMentionBech32s(document)) {
-        mentionNames[bech32] = mentionDisplayName(bech32)
-    }
-    return markdownDocumentToPreviewAnnotatedString(
-        document = document,
-        codeStyle = SpanStyle(),
-        mentionDisplayName = mentionNames::get,
-    ).text.takeIf { it.isNotBlank() }
-}
 
 internal data class ProfileGroupInviteOutcome(
     val attempted: Int,
@@ -467,11 +405,6 @@ internal fun groupCreateFailureCopyable(throwable: Throwable): Boolean =
     }
 
 internal fun startProfileChatFailureCopyable(throwable: Throwable): Boolean = groupCreateFailureCopyable(throwable)
-
-private data class NotificationSystemText(
-    val title: String?,
-    val body: String,
-)
 
 internal data class ConversationNotificationTarget(
     val accountRef: String,
@@ -1130,11 +1063,13 @@ class WhiteNoiseAppState private constructor(
     private val identityLoginCalls: IdentityLoginCalls?,
     private val marmotAccessObserver: (() -> Unit)?,
     private val marmotRuntimeFactory: (Context) -> AppMarmotRuntime,
+    initialMarmotRuntime: AppMarmotRuntime?,
     private val notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription,
     private val notificationDispatcher: CoroutineDispatcher,
     private val notificationCardCancellationDispatcher: CoroutineDispatcher,
     private val notificationReceiverTimeoutMillis: () -> Long,
     private val bootstrapActionableTimeoutMillis: () -> Long,
+    private val notificationFirstPostTimingObserver: ((NotificationFirstPostTimingEvent) -> Unit)?,
     private val notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics,
     private val inboundShareTextStager: ((String, String, String) -> Unit)?,
     private val messageDraftRepositoryOverride: MessageDraftRepository?,
@@ -1173,11 +1108,13 @@ class WhiteNoiseAppState private constructor(
             identityLoginCalls = null,
             marmotAccessObserver = null,
             marmotRuntimeFactory = ::openMarmotRuntime,
+            initialMarmotRuntime = null,
             notificationSubscriber = ::subscribeToNotifications,
             notificationDispatcher = Dispatchers.IO,
             notificationCardCancellationDispatcher = processNotificationCardCancellationDispatcher,
             notificationReceiverTimeoutMillis = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
             bootstrapActionableTimeoutMillis = { BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS },
+            notificationFirstPostTimingObserver = null,
             notificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
             inboundShareTextStager = null,
             messageDraftRepositoryOverride = null,
@@ -1200,11 +1137,13 @@ class WhiteNoiseAppState private constructor(
         identityLoginCalls: IdentityLoginCalls? = null,
         marmotAccessObserver: (() -> Unit)? = null,
         marmotRuntimeFactory: (Context) -> AppMarmotRuntime = ::openMarmotRuntime,
+        initialMarmotRuntime: AppMarmotRuntime? = null,
         notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription = ::subscribeToNotifications,
         notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
         notificationCardCancellationDispatcher: CoroutineDispatcher = processNotificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis: () -> Long = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
         bootstrapActionableTimeoutMillis: () -> Long = { BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS },
+        notificationFirstPostTimingObserver: ((NotificationFirstPostTimingEvent) -> Unit)? = null,
         notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics =
             NotificationNetworkRecoveryDiagnostics(),
         inboundShareTextStager: ((String, String, String) -> Unit)? = null,
@@ -1222,11 +1161,13 @@ class WhiteNoiseAppState private constructor(
         identityLoginCalls = identityLoginCalls,
         marmotAccessObserver = marmotAccessObserver,
         marmotRuntimeFactory = marmotRuntimeFactory,
+        initialMarmotRuntime = initialMarmotRuntime,
         notificationSubscriber = notificationSubscriber,
         notificationDispatcher = notificationDispatcher,
         notificationCardCancellationDispatcher = notificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis = notificationReceiverTimeoutMillis,
         bootstrapActionableTimeoutMillis = bootstrapActionableTimeoutMillis,
+        notificationFirstPostTimingObserver = notificationFirstPostTimingObserver,
         notificationNetworkRecoveryDiagnostics = notificationNetworkRecoveryDiagnostics,
         inboundShareTextStager = inboundShareTextStager,
         messageDraftRepositoryOverride = messageDraftRepository,
@@ -1418,7 +1359,7 @@ class WhiteNoiseAppState private constructor(
         )
 
     @Volatile
-    private var marmotRuntime: AppMarmotRuntime? = null
+    private var marmotRuntime: AppMarmotRuntime? = initialMarmotRuntime
 
     private val bootstrapAttempts = BootstrapAttemptCoordinator()
     private val bootstrapRuntime = BootstrapRuntimeCoordinator<AppMarmotRuntime>()
@@ -2258,10 +2199,45 @@ class WhiteNoiseAppState private constructor(
         )
     private val notificationScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
-    private val notificationLocalIdentityReader =
-        NotificationLocalIdentityReader(notificationScope, notificationDispatcher) { senderIdHex ->
-            marmotIo { displayName(senderIdHex) }
-        }
+    private val notificationFirstPostContentCoordinator =
+        NotificationFirstPostContentCoordinator(notificationScope, notificationDispatcher, SystemClock::elapsedRealtime)
+    private val notificationContentResolution by lazy {
+        createNotificationContentResolutionServices(
+            context = appContext,
+            contactNickname = ::contactNicknameFor,
+            readDisplayName = { id -> marmotIo { displayName(id) } },
+            displayNameHint = { id -> notificationDisplayNameHints[id] },
+            cachedShortNpub = ::cachedShortNpubOrUnknown,
+            hydratedDisplayName = { id ->
+                synchronized(profilePresentationLock) { profilePresentations[id]?.displayName }
+            },
+            requestProfile = ::requestProfile,
+            accountIdHex = ::accountIdHex,
+            parseMarkdown = ::parseMarkdownOrEmpty,
+            recipientAccountIdHex = { ref -> accounts.firstOrNull { it.label == ref }?.accountIdHex },
+            timelineRecord = ::notificationTimelineRecord,
+            groupMembers = { update ->
+                runCatchingCancellable { marmotIo { groupMembers(update.accountRef, update.groupIdHex) } }
+                    .getOrNull()
+                    .orEmpty()
+            },
+            mediaKind = { update -> resolveNotificationMediaKind(update, ::notificationMessageRecord) },
+            signedInAccountCount = { accounts.count { it.isSignedInSigningAccount() } },
+        )
+    }
+    private val notificationAvatarCoordinator by lazy {
+        NotificationAvatarCoordinator(
+            appLocked = { appLockScreenVisible },
+            shouldPost = ::shouldPostNotification,
+            canPost = localNotificationPresenter::canPostNotifications,
+            senderAvatarUrl = { update -> notificationSenderAvatarUrl(update, ::loadUserProfile) },
+            groupAvatarUrl = { update ->
+                ProfileSanitizer.protocolImageUrl(
+                    marmotIo { groupDetails(update.accountRef, update.groupIdHex) }.group.avatarUrl,
+                )
+            },
+        )
+    }
     private val notificationEnrichmentGate = Semaphore(NOTIFICATION_ENRICHMENT_FANOUT)
     private val accountCatchUpCoordinator = AccountCatchUpCoordinator(notificationScope)
     private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
@@ -3173,7 +3149,7 @@ class WhiteNoiseAppState private constructor(
 
     fun publishShareShortcuts(chats: List<ChatListItem>) {
         val accountRef = activeAccountRef ?: return
-        val titleCopy = notificationGroupTitleCopy()
+        val titleCopy = notificationGroupTitleCopy(appContext)
         shareShortcutPublisher.publish(accountRef, chats) { item ->
             chatListItemDisplayTitle(item, this, titleCopy)
         }
@@ -5407,6 +5383,7 @@ class WhiteNoiseAppState private constructor(
     private fun clearCrossAccountCaches() {
         assertMainThread { "clearCrossAccountCaches" }
         profileCacheLifetime.advance()
+        inviteNotificationIdentityRefreshStore.clear()
         accountScopedCaches.clearAll()
         authoritativeMuteOverrides.clear()
         pendingMuteCommands.clear()
@@ -9119,23 +9096,6 @@ class WhiteNoiseAppState private constructor(
         requestProfile(accountIdHex)
     }
 
-    private suspend fun notificationSenderName(
-        update: NotificationUpdateFfi,
-        firstPost: Boolean = false,
-    ): String? {
-        val senderIdHex = update.sender.accountIdHex
-        if (senderIdHex.isBlank()) return null
-        val contactNickname = notificationSenderNameOverride(contactNicknameFor(update.accountRef, senderIdHex), null)
-        val localProfileName =
-            when {
-                contactNickname != null -> null
-                firstPost -> notificationLocalIdentityReader.read(senderIdHex)
-                else -> runCatchingCancellable { marmotIo { displayName(senderIdHex) } }.getOrNull()
-            }
-        return contactNickname ?: notificationSenderNameOverride(null, localProfileName)
-            ?: notificationDisplayNameHints[senderIdHex]
-    }
-
     private fun applyNotificationDisplayNameHint(update: NotificationUpdateFfi) {
         if (update.accountRef != activeAccountRef) return
         val senderIdHex =
@@ -9157,35 +9117,6 @@ class WhiteNoiseAppState private constructor(
             bumpProfileAccountRevision(senderIdHex)
         }
     }
-
-    // The recipient (own) identity's display name for the notification subtext,
-    // resolved the same way the rest of the UI labels the account.
-    private fun notificationRecipientName(accountRef: String): String? = accounts.firstOrNull { it.label == accountRef }?.let { displayName(it.accountIdHex) }
-
-    // Resolve a mention for a one-shot notification. Unlike the Compose bubble
-    // path, a notification will not recompose after requestProfile() finishes,
-    // so do one local display-name read before falling back to shortened bech32.
-    private suspend fun notificationMentionDisplayName(bech32: String): String? =
-        resolveNotificationMentionDisplayName(
-            bech32 = bech32,
-            accountIdHex = { accountIdHex(it) },
-            profileDisplayName = { profileDisplayName(it) },
-            readDisplayName = { accountIdHex ->
-                runCatchingCancellable { marmotIo { displayName(accountIdHex) } }.getOrNull()
-            },
-            requestProfile = { requestProfile(it) },
-        )
-
-    // Flatten notification body text through the same Markdown mention path used
-    // by in-app bubbles/previews. A parser failure or legitimately empty document
-    // deliberately returns null so LocalNotificationFormatter falls back to the
-    // raw FFI preview instead of dropping the message body.
-    private suspend fun notificationPreviewText(raw: String?): String? =
-        resolveNotificationPreviewText(
-            raw = raw,
-            parseMarkdown = { parseMarkdownOrEmpty(it) },
-            mentionDisplayName = { notificationMentionDisplayName(it) },
-        )
 
     private suspend fun notificationMessageRecord(update: NotificationUpdateFfi) =
         update.messageIdHex?.let { messageId ->
@@ -9259,135 +9190,6 @@ class WhiteNoiseAppState private constructor(
                 ?.firstOrNull { it.messageIdHex.equals(messageId, ignoreCase = true) }
         }
 
-    private suspend fun notificationGroupSystemText(
-        update: NotificationUpdateFfi,
-        senderName: String?,
-    ): NotificationSystemText? {
-        val record = notificationTimelineRecord(update) ?: return null
-        if (!MessageProjector.isGroupSystemKind(record.kind)) return null
-        val event = GroupSystemEvents.resolve(record) ?: return null
-        val diff = GroupSystemEvents.renameDiffNames(event)
-        val actorHex = GroupSystemEvents.actorHex(event, record.sender)
-        val actorName =
-            when {
-                GroupSystemEvents.isSelf(update.accountIdHex, actorHex) -> appContext.getString(R.string.you)
-                !senderName.isNullOrBlank() -> senderName
-                !actorHex.isNullOrBlank() -> runCatchingCancellable { displayNameForAccount(update.accountRef, actorHex) }.getOrNull()
-                else -> null
-            } ?: appContext.getString(R.string.group_system_someone)
-        val subjectHex = event.subject
-        val subjectName =
-            when {
-                GroupSystemEvents.isSelf(update.accountIdHex, subjectHex) -> appContext.getString(R.string.you)
-                !subjectHex.isNullOrBlank() -> runCatchingCancellable { displayNameForAccount(update.accountRef, subjectHex) }.getOrNull()
-                else -> null
-            }
-        return NotificationSystemText(
-            title = if (diff != null) appContext.getString(R.string.notification_group_renamed) else null,
-            body =
-                if (diff != null) {
-                    appContext.getString(R.string.notification_group_renamed_body, actorName, diff.oldName, diff.newName)
-                } else {
-                    GroupSystemEvents.summary(
-                        event = event,
-                        actorName = actorName,
-                        subjectName = subjectName,
-                        actorIsSelf = GroupSystemEvents.isSelf(update.accountIdHex, actorHex),
-                        subjectIsSelf = GroupSystemEvents.isSelf(update.accountIdHex, subjectHex),
-                        copy = notificationGroupSystemCopy(),
-                    )
-                },
-        )
-    }
-
-    private fun notificationGroupSystemCopy(): GroupSystemCopy =
-        GroupSystemCopy(
-            memberAddedFormat = appContext.getString(R.string.group_system_member_added),
-            memberAddedPassiveFormat = appContext.getString(R.string.group_system_member_added_passive),
-            memberRemovedFormat = appContext.getString(R.string.group_system_member_removed),
-            memberRemovedPassiveFormat = appContext.getString(R.string.group_system_member_removed_passive),
-            memberLeftFormat = appContext.getString(R.string.group_system_member_left),
-            adminAddedFormat = appContext.getString(R.string.group_system_admin_added),
-            adminAddedPassiveFormat = appContext.getString(R.string.group_system_admin_added_passive),
-            adminRemovedFormat = appContext.getString(R.string.group_system_admin_removed),
-            adminRemovedPassiveFormat = appContext.getString(R.string.group_system_admin_removed_passive),
-            renamedFormat = appContext.getString(R.string.group_system_renamed),
-            renamedPassiveFormat = appContext.getString(R.string.group_system_renamed_passive),
-            renamedDiffFormat = appContext.getString(R.string.group_system_renamed_diff),
-            renamedDiffPassiveFormat = appContext.getString(R.string.group_system_renamed_diff_passive),
-            namedFormat = appContext.getString(R.string.group_system_named),
-            namedPassiveFormat = appContext.getString(R.string.group_system_named_passive),
-            avatarChangedFormat = appContext.getString(R.string.group_system_avatar_changed),
-            avatarChangedPassive = appContext.getString(R.string.group_system_avatar_changed_passive),
-            youMemberAddedFormat = appContext.getString(R.string.group_system_you_member_added),
-            memberAddedYouFormat = appContext.getString(R.string.group_system_member_added_you),
-            memberAddedYouPassive = appContext.getString(R.string.group_system_member_added_you_passive),
-            youMemberRemovedFormat = appContext.getString(R.string.group_system_you_member_removed),
-            memberRemovedYouFormat = appContext.getString(R.string.group_system_member_removed_you),
-            memberRemovedYouPassive = appContext.getString(R.string.group_system_member_removed_you_passive),
-            youMemberLeft = appContext.getString(R.string.group_system_you_member_left),
-            youAdminAddedFormat = appContext.getString(R.string.group_system_you_admin_added),
-            adminAddedYouFormat = appContext.getString(R.string.group_system_admin_added_you),
-            adminAddedYouPassive = appContext.getString(R.string.group_system_admin_added_you_passive),
-            youAdminRemovedFormat = appContext.getString(R.string.group_system_you_admin_removed),
-            adminRemovedYouFormat = appContext.getString(R.string.group_system_admin_removed_you),
-            adminRemovedYouPassive = appContext.getString(R.string.group_system_admin_removed_you_passive),
-            youRenamedFormat = appContext.getString(R.string.group_system_you_renamed),
-            youRenamedDiffFormat = appContext.getString(R.string.group_system_you_renamed_diff),
-            youNamedFormat = appContext.getString(R.string.group_system_you_named),
-            youAvatarChanged = appContext.getString(R.string.group_system_you_avatar_changed),
-            disappearingSetFormat = appContext.getString(R.string.group_system_disappearing_set),
-            disappearingSetYouFormat = appContext.getString(R.string.group_system_disappearing_set_you),
-            disappearingSetPassiveFormat = appContext.getString(R.string.group_system_disappearing_set_passive),
-            disappearingOffFormat = appContext.getString(R.string.group_system_disappearing_off),
-            disappearingOffYou = appContext.getString(R.string.group_system_disappearing_off_you),
-            disappearingOffPassive = appContext.getString(R.string.group_system_disappearing_off_passive),
-            someone = appContext.getString(R.string.group_system_someone),
-            fallback = appContext.getString(R.string.group_system_fallback),
-        )
-
-    // Classify a captionless incoming message so its notification body can name
-    // the attachment type. The runtime payload carries no content type, so read
-    // the stored record (recent history tail) and match by id; a miss or a
-    // non-media record yields None and the generic "New message" body stands.
-    private suspend fun notificationMediaKind(update: NotificationUpdateFfi): ReplyMediaKind =
-        notificationMessageRecord(update)?.let(MessageProjector::mediaKind) ?: ReplyMediaKind.None
-
-    // Resolve the conversation title for a notification the same way the chat
-    // list does, since the runtime payload's group name is empty for unnamed
-    // groups. Returns null for DMs (MessagingStyle shows the sender instead).
-    private suspend fun notificationConversationTitle(update: NotificationUpdateFfi): String? {
-        if (update.isDm) return null
-        // Sanitize the payload name like the display surfaces do (strip
-        // bidi/control chars) before trusting it as a notification title.
-        update.groupName?.let { ProfileSanitizer.displayName(it) }?.let { return it }
-        val members =
-            runCatchingCancellable { marmotIo { groupMembers(update.accountRef, update.groupIdHex) } }
-                .getOrNull()
-                .orEmpty()
-        if (members.isEmpty()) return null
-        return GroupProjector.displayTitle(
-            name = "",
-            // A NEW_MESSAGE only fires for an already-joined group; pending
-            // invites surface as GROUP_INVITE, so the chat list's "Invite from
-            // X" title can't apply and there's no invite account to pass.
-            pendingInviteAccount = null,
-            groupIdHex = update.groupIdHex,
-            otherMemberAccount = GroupProjector.otherMemberAccount(members, update.accountIdHex),
-            memberCount = GroupProjector.uniqueMemberCount(members),
-            memberTitle = { displayNameForAccount(update.accountRef, it) },
-            copy = notificationGroupTitleCopy(),
-        )
-    }
-
-    // A notification renders once, so await the sender's local profile instead
-    // of relying on the UI presentation cache, which materializes
-    // asynchronously. Fall back to the payload picture when the local profile
-    // has none. Sanitize every URL before fetching it.
-    private suspend fun notificationSenderAvatarUrl(update: NotificationUpdateFfi): String? =
-        ProfileSanitizer.protocolImageUrl(loadUserProfile(update.sender.accountIdHex)?.picture)
-            ?: ProfileSanitizer.protocolImageUrl(update.sender.pictureUrl)
-
     private fun shouldPostNotification(
         update: NotificationUpdateFfi,
         engineMuted: Boolean,
@@ -9405,27 +9207,44 @@ class WhiteNoiseAppState private constructor(
     private fun isNotificationGenerationPostAllowed(
         update: NotificationUpdateFfi,
         postEpoch: Long,
+        accountCacheEpoch: Long,
         engineMuted: Boolean,
         requireUnlocked: Boolean,
     ): Boolean {
         val lockAllowsPost = !requireUnlocked || !appLockScreenVisible
         val runtimeAllowsPost =
-            !networkNotificationRecoverySuppressed && notificationPostEpoch.isCurrent(postEpoch)
+            !networkNotificationRecoverySuppressed &&
+                notificationPostEpoch.isCurrent(postEpoch) &&
+                profileCacheLifetime.isCurrent(accountCacheEpoch)
         return lockAllowsPost && runtimeAllowsPost && shouldPostNotification(update, engineMuted)
     }
 
     private fun isNotificationEnrichmentAllowed(
         update: NotificationUpdateFfi,
         postEpoch: Long,
+        accountCacheEpoch: Long,
         engineMuted: Boolean,
     ): Boolean =
         isNotificationGenerationPostAllowed(
             update = update,
             postEpoch = postEpoch,
+            accountCacheEpoch = accountCacheEpoch,
             engineMuted = engineMuted,
             requireUnlocked = true,
         ) &&
             localNotificationPresenter.isNotificationUpdateCurrentForEnrichment(update)
+
+    /** Re-checks every captured fence for one first-post correction candidate. */
+    private fun isNotificationEnrichmentAllowed(
+        update: NotificationUpdateFfi,
+        firstPost: NotificationFirstPost,
+    ): Boolean =
+        isNotificationEnrichmentAllowed(
+            update = update,
+            postEpoch = firstPost.epoch,
+            accountCacheEpoch = firstPost.accountCacheEpoch,
+            engineMuted = firstPost.engineMuted,
+        )
 
     /**
      * Durable engine mute for the update's conversation, resolved once per
@@ -9451,158 +9270,175 @@ class WhiteNoiseAppState private constructor(
         }.getOrDefault(false)
     }
 
-    /**
-     * Resolves sender and conversation images only after the fallback card has
-     * posted. This path also exists in a cold FCM process with no UI-owned
-     * [ChatsController]; remote work remains detached and globally bounded.
-     * Every remote-image launch re-checks the app lock after the preceding
-     * suspending local lookup (#1995).
-     */
-    private suspend fun preWarmNotificationAvatars(
+    /** Writes one silent matching correction under the captured post generation. */
+    private suspend fun postNotificationLateCorrection(
         update: NotificationUpdateFfi,
-        engineMuted: Boolean,
-    ): PreWarmedNotificationAvatars {
-        val eligible =
-            shouldPreWarmNotificationAvatars(
-                update = update,
-                shouldPost = shouldPostNotification(update, engineMuted),
-                canPost = localNotificationPresenter.canPostNotifications(),
-            )
-        if (!eligible) return PreWarmedNotificationAvatars(senderAvatarUrl = null, groupAvatarUrl = null)
-
-        val target = notificationAvatarPreWarmTarget(update, appLockScreenVisible)
-        preWarmNotificationAvatarIfUnlocked(target.senderAvatarUrl)
-        val senderAvatarUrl =
-            if (target.preWarmRemoteImages && target.senderAccountIdHex != null) {
-                bestEffortNotificationAvatarLookup { notificationSenderAvatarUrl(update) }
-            } else {
-                null
-            }
-        preWarmNotificationAvatarIfUnlocked(senderAvatarUrl)
-
-        val groupAvatarUrl =
-            if (target.resolveGroupAvatar) {
-                bestEffortNotificationAvatarLookup {
-                    marmotIo { groupDetails(update.accountRef, update.groupIdHex) }.group.avatarUrl
-                }?.let { ProfileSanitizer.protocolImageUrl(it) }
-            } else {
-                null
-            }
-        preWarmNotificationAvatarIfUnlocked(groupAvatarUrl)
-        return PreWarmedNotificationAvatars(senderAvatarUrl, groupAvatarUrl)
-    }
-
-    private fun preWarmNotificationAvatarIfUnlocked(url: String?) {
-        if (!appLockScreenVisible) AvatarImageLoader.preWarm(url)
-    }
-
-    private suspend fun bestEffortNotificationAvatarLookup(block: suspend () -> String?): String? =
-        try {
-            block()
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (_: Throwable) {
-            null
-        }
-
-    // Conversation shortcut icon: the peer for a DM, or the group's own avatar
-    // for a group chat. The sender's MessagingStyle icon is resolved separately.
-    private suspend fun notificationConversationAvatarUrl(
-        update: NotificationUpdateFfi,
-        senderAvatarUrl: String?,
-        preWarmedGroupAvatarUrl: String?,
-    ): String? =
-        if (update.isDm) {
-            senderAvatarUrl
-        } else {
-            preWarmedGroupAvatarUrl
-                ?: bestEffortNotificationAvatarLookup {
-                    marmotIo { groupDetails(update.accountRef, update.groupIdHex) }.group.avatarUrl
-                }?.let { ProfileSanitizer.protocolImageUrl(it) }
-        }
-
-    private fun notificationGroupTitleCopy(): GroupTitleCopy =
-        GroupTitleCopy(
-            inviteFromFormat = appContext.getString(R.string.group_title_invite_from),
-            groupOfPeopleFormat = appContext.getString(R.string.group_title_people_count),
-            unknownTitle = appContext.getString(R.string.unknown),
-            soleMemberTitle = appContext.getString(R.string.just_you),
-        )
-
-    private suspend fun notificationEnrichedMediaKind(
-        update: NotificationUpdateFfi,
-        systemText: NotificationSystemText?,
-        previewTextOverride: String?,
-    ): ReplyMediaKind =
+        firstPost: NotificationFirstPost,
+        content: NotificationFirstPostContent,
+        conversationAvatarUrl: String? = null,
+        conversationAvatarBitmap: Bitmap? = null,
+        senderAvatarUrl: String? = null,
+        senderAvatarBitmap: Bitmap? = null,
+    ): Boolean {
         if (
-            systemText == null &&
-            LocalNotificationFormatter.needsPreviewTextResolution(update) &&
-            previewTextOverride.isNullOrBlank()
+            !isNotificationEnrichmentAllowed(
+                update,
+                firstPost.epoch,
+                firstPost.accountCacheEpoch,
+                firstPost.engineMuted,
+            ) ||
+            !firstPost.lateCorrectionPermit.acquire()
         ) {
-            // A message with no resolvable text can be a captionless
-            // attachment; classify just those with one history read.
-            notificationMediaKind(update)
-        } else {
-            ReplyMediaKind.None
+            return false
         }
+        var posted = false
+        try {
+            if (isNotificationEnrichmentAllowed(update, firstPost)) {
+                posted =
+                    localNotificationPresenter.show(
+                        update = update,
+                        conversationTitleOverride = content.conversationTitle,
+                        senderNameOverride = content.senderName,
+                        previewTextOverride = content.previewText,
+                        reactedToPreviewOverride = content.reactedToPreview,
+                        mediaKind = content.mediaKind,
+                        recipientAccountSubtext = content.recipientAccountSubtext,
+                        directShareEligible = update.accountRef == activeAccountRef,
+                        conversationAvatarUrl = conversationAvatarUrl,
+                        conversationAvatarBitmap = conversationAvatarBitmap,
+                        senderAvatarUrl = senderAvatarUrl,
+                        senderAvatarBitmap = senderAvatarBitmap,
+                        silentUpdate = true,
+                        replaceCurrentMessage = true,
+                        shortNpub = ::shortNpub,
+                        isPostStillAllowed = {
+                            isNotificationEnrichmentAllowed(
+                                update,
+                                firstPost.epoch,
+                                firstPost.accountCacheEpoch,
+                                firstPost.engineMuted,
+                            )
+                        },
+                    )
+            }
+        } finally {
+            firstPost.lateCorrectionPermit.complete(posted)
+        }
+        return posted
+    }
 
+    /**
+     * Publishes at most one silent late write: corrected text wins over imagery,
+     * while a complete first draw may receive one fully cached avatar update.
+     */
     private suspend fun enrichPostedNotificationUpdate(
         update: NotificationUpdateFfi,
-        preWarmedAvatars: PreWarmedNotificationAvatars,
         firstPost: NotificationFirstPost,
-    ): Boolean {
-        if (!isNotificationEnrichmentAllowed(update, firstPost.epoch, firstPost.engineMuted)) return false
-        val senderNameOverride = firstPost.senderName ?: notificationSenderName(update)
-        val systemText = notificationGroupSystemText(update, senderNameOverride)
-        val previewTextOverride =
-            systemText?.body ?: if (LocalNotificationFormatter.needsPreviewTextResolution(update)) {
-                notificationPreviewText(update.previewText)
-            } else {
-                null
+    ): NotificationLateCorrectionOutcome =
+        if (!isNotificationEnrichmentAllowed(update, firstPost)) {
+            NotificationLateCorrectionOutcome.Stale
+        } else {
+            // Always run the post-deadline resolver. Even a complete local first
+            // draw may contain deterministic mention/title fallbacks that need to
+            // start ordinary profile hydration after the first notify has returned.
+            val content =
+                runCatchingCancellable {
+                    notificationContentResolution.firstPost.resolve(update, localOnly = false)
+                }.getOrNull() ?: firstPost.content
+            when {
+                content == null -> NotificationLateCorrectionOutcome.Failed
+                !isNotificationEnrichmentAllowed(update, firstPost) -> NotificationLateCorrectionOutcome.Stale
+                else -> enrichResolvedNotificationUpdate(update, firstPost, content)
             }
-        val reactedToPreviewOverride =
-            if (LocalNotificationFormatter.needsReactedToPreviewResolution(update)) {
-                notificationPreviewText(update.reactedToPreview)
-            } else {
-                null
-            }
-        val mediaKind = notificationEnrichedMediaKind(update, systemText, previewTextOverride)
-        val senderAvatarUrl =
-            preWarmedAvatars.senderAvatarUrl
-                ?: bestEffortNotificationAvatarLookup { notificationSenderAvatarUrl(update) }
-        val conversationTitle = systemText?.title ?: notificationConversationTitle(update)
-        val conversationAvatarUrl =
-            notificationConversationAvatarUrl(update, senderAvatarUrl, preWarmedAvatars.groupAvatarUrl)
-        // A lock can arrive during any suspending enrichment above. Re-check
-        // after all app-state lookups so a silent update never reveals content.
-        return isNotificationEnrichmentAllowed(update, firstPost.epoch, firstPost.engineMuted) &&
-            localNotificationPresenter.show(
-                update,
-                conversationTitle,
-                senderNameOverride,
-                previewTextOverride,
-                reactedToPreviewOverride,
-                mediaKind,
-                recipientAccountSubtext =
-                    LocalNotificationFormatter.recipientAccountSubtext(
-                        signedInAccountCount = accounts.count { it.isSignedInSigningAccount() },
-                        recipientLabel = notificationRecipientName(update.accountRef),
-                    ),
-                directShareEligible = update.accountRef == activeAccountRef,
-                conversationAvatarUrl = conversationAvatarUrl,
-                senderAvatarUrl = senderAvatarUrl,
-                silentUpdate = true,
-                replaceCurrentMessage = true,
+        }
+
+    /** Routes a stable resolved presentation to its single permitted correction type. */
+    private suspend fun enrichResolvedNotificationUpdate(
+        update: NotificationUpdateFfi,
+        firstPost: NotificationFirstPost,
+        content: NotificationFirstPostContent,
+    ): NotificationLateCorrectionOutcome {
+        val resolvedPresentation =
+            notificationContentPresentation(
+                context = appContext,
+                update = update,
+                content = content,
                 shortNpub = ::shortNpub,
-                isPostStillAllowed = {
-                    isNotificationEnrichmentAllowed(update, firstPost.epoch, firstPost.engineMuted)
-                },
             )
+        return if (
+            notificationLateCorrectionPlan(
+                firstPresentation = firstPost.presentation,
+                resolvedPresentation = resolvedPresentation,
+                hasReadyAvatar = false,
+            ) == NotificationLateCorrectionPlan.Content
+        ) {
+            postNotificationContentCorrection(update, firstPost, content)
+        } else {
+            postNotificationAvatarCorrection(update, firstPost, content)
+        }
     }
 
+    /** Posts corrected text and primes imagery without spending another write. */
+    private suspend fun postNotificationContentCorrection(
+        update: NotificationUpdateFfi,
+        firstPost: NotificationFirstPost,
+        content: NotificationFirstPostContent,
+    ): NotificationLateCorrectionOutcome {
+        val posted = postNotificationLateCorrection(update, firstPost, content)
+        return if (posted) {
+            // Prime future cards only after the text correction is visible. A
+            // fallback receives at most one replacement for this message.
+            notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
+            NotificationLateCorrectionOutcome.ContentPosted
+        } else {
+            NotificationLateCorrectionOutcome.Stale
+        }
+    }
+
+    /** Carries the exact decoded avatar into the only late platform write. */
+    private suspend fun postNotificationAvatarCorrection(
+        update: NotificationUpdateFfi,
+        firstPost: NotificationFirstPost,
+        content: NotificationFirstPostContent,
+    ): NotificationLateCorrectionOutcome {
+        val avatars =
+            notificationAvatarCoordinator.awaitReady(
+                notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted),
+                shouldContinue = {
+                    isNotificationEnrichmentAllowed(update, firstPost)
+                },
+            )
+        val senderAvatarBitmap = avatars.senderAvatarBitmap
+        val conversationAvatarBitmap = if (update.isDm) senderAvatarBitmap else avatars.groupAvatarBitmap
+        val senderAvatarUrl = avatars.senderAvatarUrl.takeIf { senderAvatarBitmap != null }
+        val conversationAvatarUrl =
+            (if (update.isDm) avatars.senderAvatarUrl else avatars.groupAvatarUrl)
+                .takeIf { conversationAvatarBitmap != null }
+        val hasReadyAvatar = senderAvatarBitmap != null || conversationAvatarBitmap != null
+        return if (!hasReadyAvatar) {
+            NotificationLateCorrectionOutcome.Unchanged
+        } else {
+            // A lock can arrive during any suspending enrichment above. The
+            // posting helper rechecks every fence after these lookups.
+            val posted =
+                postNotificationLateCorrection(
+                    update = update,
+                    firstPost = firstPost,
+                    content = content,
+                    conversationAvatarUrl = conversationAvatarUrl,
+                    conversationAvatarBitmap = conversationAvatarBitmap,
+                    senderAvatarUrl = senderAvatarUrl,
+                    senderAvatarBitmap = senderAvatarBitmap,
+                )
+            if (posted) NotificationLateCorrectionOutcome.AvatarPosted else NotificationLateCorrectionOutcome.Stale
+        }
+    }
+
+    /** Posts either the resolved first-draw value or the existing safe fallback. */
     private suspend fun postInitialNotificationUpdate(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
+        receivedAtElapsedMs: Long,
     ): Boolean {
         appStateDebug {
             "notification eligibility outcome=${if (firstPost.shouldPost) "post" else "skip"} " +
@@ -9611,57 +9447,104 @@ class WhiteNoiseAppState private constructor(
         if (!firstPost.shouldPost) return false
 
         val redactContent = appLockScreenVisible
-
-        var posted =
-            localNotificationPresenter.show(
-                update = update,
-                senderNameOverride = firstPost.senderName,
-                redactContent = redactContent,
-                directShareEligible = !redactContent && update.accountRef == activeAccountRef,
-                shortNpub = ::cachedShortNpubOrUnknown,
-                isPostStillAllowed = {
-                    isNotificationGenerationPostAllowed(
-                        update = update,
-                        postEpoch = firstPost.epoch,
-                        engineMuted = firstPost.engineMuted,
-                        requireUnlocked = !redactContent,
-                    )
-                },
+        val onNotificationWritten = {
+            recordNotificationFirstPostTiming(
+                stage = NotificationFirstPostTimingStage.NotifyWritten,
+                receivedAtElapsedMs = receivedAtElapsedMs,
+                outcome = "posted",
             )
+        }
+        var posted = showInitialNotificationUpdate(update, firstPost, redactContent, onNotificationWritten)
         var postedRedacted = redactContent
         // Lock activation can race the suspending presenter setup. Retry only
         // as a redacted card, under the same generation and eligibility gates.
         if (!posted && !redactContent && appLockScreenVisible) {
             postedRedacted = true
-            posted =
-                localNotificationPresenter.show(
-                    update = update,
-                    redactContent = true,
-                    shortNpub = ::cachedShortNpubOrUnknown,
-                    isPostStillAllowed = {
-                        isNotificationGenerationPostAllowed(
-                            update = update,
-                            postEpoch = firstPost.epoch,
-                            engineMuted = firstPost.engineMuted,
-                            requireUnlocked = false,
-                        )
-                    },
-                )
+            posted = showRedactedNotificationUpdate(update, firstPost, onNotificationWritten)
         }
+        rememberPostedGroupInvite(update, firstPost, posted, postedRedacted)
+        return posted
+    }
+
+    /** Executes the resolved or fallback first write under the captured fences. */
+    private suspend fun showInitialNotificationUpdate(
+        update: NotificationUpdateFfi,
+        firstPost: NotificationFirstPost,
+        redactContent: Boolean,
+        onNotificationWritten: () -> Unit,
+    ): Boolean =
+        localNotificationPresenter.show(
+            update = update,
+            conversationTitleOverride = firstPost.content?.conversationTitle,
+            senderNameOverride = firstPost.content?.senderName,
+            previewTextOverride = firstPost.content?.previewText,
+            reactedToPreviewOverride = firstPost.content?.reactedToPreview,
+            mediaKind = firstPost.content?.mediaKind ?: ReplyMediaKind.None,
+            recipientAccountSubtext = firstPost.content?.recipientAccountSubtext,
+            redactContent = redactContent,
+            directShareEligible = !redactContent && update.accountRef == activeAccountRef,
+            shortNpub = ::cachedShortNpubOrUnknown,
+            onNotificationWritten = onNotificationWritten,
+            isPostStillAllowed = {
+                isNotificationGenerationPostAllowed(
+                    update = update,
+                    postEpoch = firstPost.epoch,
+                    accountCacheEpoch = firstPost.accountCacheEpoch,
+                    engineMuted = firstPost.engineMuted,
+                    requireUnlocked = !redactContent,
+                )
+            },
+        )
+
+    /** Retries a lock-raced initial write without carrying any decrypted content. */
+    private suspend fun showRedactedNotificationUpdate(
+        update: NotificationUpdateFfi,
+        firstPost: NotificationFirstPost,
+        onNotificationWritten: () -> Unit,
+    ): Boolean =
+        localNotificationPresenter.show(
+            update = update,
+            redactContent = true,
+            shortNpub = ::cachedShortNpubOrUnknown,
+            onNotificationWritten = onNotificationWritten,
+            isPostStillAllowed = {
+                isNotificationGenerationPostAllowed(
+                    update = update,
+                    postEpoch = firstPost.epoch,
+                    accountCacheEpoch = firstPost.accountCacheEpoch,
+                    engineMuted = firstPost.engineMuted,
+                    requireUnlocked = false,
+                )
+            },
+        )
+
+    /** Retains one posted invite's actual rendered name and shared correction budget. */
+    private fun rememberPostedGroupInvite(
+        update: NotificationUpdateFfi,
+        firstPost: NotificationFirstPost,
+        posted: Boolean,
+        redactContent: Boolean,
+    ) {
         postedGroupInviteIdentity(
             update = update,
             posted = posted,
-            redactContent = postedRedacted,
-            displayedName = notificationDisplayNameHint(update.sender.displayName),
+            redactContent = redactContent,
+            displayedName =
+                firstPost.content?.senderName
+                    ?: notificationDisplayNameHint(update.sender.displayName),
         )?.let { identity ->
             inviteNotificationIdentityRefreshStore.rememberPosted(
                 identity = identity.identity,
                 displayedName = identity.displayedName,
+                postEpoch = firstPost.epoch,
+                accountCacheEpoch = firstPost.accountCacheEpoch,
+                engineMuted = firstPost.engineMuted,
+                lateCorrectionPermit = firstPost.lateCorrectionPermit,
             )
         }
-        return posted
     }
 
+    /** Schedules generation-fenced late content or avatar correction work. */
     private fun scheduleNotificationEnrichment(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
@@ -9669,15 +9552,21 @@ class WhiteNoiseAppState private constructor(
     ) {
         notificationScope.launch(notificationDispatcher) {
             notificationEnrichmentGate.withPermit {
-                if (!isNotificationEnrichmentAllowed(update, firstPost.epoch, firstPost.engineMuted)) {
+                if (
+                    !isNotificationEnrichmentAllowed(
+                        update,
+                        firstPost.epoch,
+                        firstPost.accountCacheEpoch,
+                        firstPost.engineMuted,
+                    )
+                ) {
                     return@withPermit
                 }
-                val avatars = preWarmNotificationAvatars(update, firstPost.engineMuted)
-                val enriched = enrichPostedNotificationUpdate(update, avatars, firstPost)
+                val outcome = enrichPostedNotificationUpdate(update, firstPost)
                 appStateDebug {
-                    "notification timing stage=enrichment-complete " +
+                    "notification timing stage=late-correction " +
                         "elapsed_ms=${(SystemClock.elapsedRealtime() - receivedAtElapsedMs).coerceAtLeast(0L)} " +
-                        "outcome=${if (enriched) "posted" else "stale"}"
+                        "outcome=${outcome.timingValue}"
                 }
             }
         }
@@ -9747,37 +9636,107 @@ class WhiteNoiseAppState private constructor(
     /** Posts and enriches one update under a foreground/app-lock eligibility epoch. */
     private suspend fun processNotificationUpdate(update: NotificationUpdateFfi) {
         val receivedAtElapsedMs = SystemClock.elapsedRealtime()
-        appStateDebug { "notification timing stage=subscription-received elapsed_ms=0 outcome=observed" }
+        recordNotificationFirstPostTiming(
+            stage = NotificationFirstPostTimingStage.Received,
+            receivedAtElapsedMs = receivedAtElapsedMs,
+            outcome = "observed",
+        )
         applyNotificationDisplayNameHint(update)
         scheduleIncomingDocumentDownloadMaintenance(update)
         val postEpoch = notificationPostEpoch.capture()
+        val accountCacheEpoch = profileCacheLifetime.capture()
         val engineMuted = engineNotificationMuted(update)
         val shouldPost = shouldPostNotification(update, engineMuted)
+        recordNotificationFirstPostTiming(
+            stage = NotificationFirstPostTimingStage.EligibilityComplete,
+            receivedAtElapsedMs = receivedAtElapsedMs,
+            outcome = "resolved",
+        )
         val firstPost =
-            NotificationFirstPost(
-                epoch = postEpoch,
-                engineMuted = engineMuted,
-                shouldPost = shouldPost,
-                senderName =
-                    if (shouldPost && !appLockScreenVisible) notificationSenderName(update, firstPost = true) else null,
+            resolveNotificationFirstPost(
+                update,
+                postEpoch,
+                accountCacheEpoch,
+                engineMuted,
+                shouldPost,
+                receivedAtElapsedMs,
             )
-        appStateDebug {
-            "notification timing stage=eligibility-complete " +
-                "elapsed_ms=${(SystemClock.elapsedRealtime() - receivedAtElapsedMs).coerceAtLeast(0L)} outcome=resolved"
-        }
-        val posted =
-            postBeforeNotificationEnrichment(
-                post = { postInitialNotificationUpdate(update, firstPost) },
-                scheduleEnrichment = {
-                    scheduleNotificationEnrichment(update, firstPost, receivedAtElapsedMs)
-                },
-            )
-        appStateDebug {
-            "notification timing stage=first-notify-returned " +
-                "elapsed_ms=${(SystemClock.elapsedRealtime() - receivedAtElapsedMs).coerceAtLeast(0L)} " +
-                "outcome=${if (posted) "posted" else "skipped"}"
-        }
+        postBeforeNotificationEnrichment(
+            post = { postInitialNotificationUpdate(update, firstPost, receivedAtElapsedMs) },
+            scheduleEnrichment = {
+                scheduleNotificationEnrichment(update, firstPost, receivedAtElapsedMs)
+            },
+        )
         schedulePostNotificationMaintenance(update)
+    }
+
+    /** Exercises the exact typed-update production path from JVM or instrumentation acceptance tests. */
+    internal suspend fun processNotificationUpdateForTest(update: NotificationUpdateFfi) {
+        withContext(Dispatchers.Main.immediate) { processNotificationUpdate(update) }
+    }
+
+    /** Resolves all first-write content under the coordinator's one absolute budget. */
+    private suspend fun resolveNotificationFirstPost(
+        update: NotificationUpdateFfi,
+        postEpoch: Long,
+        accountCacheEpoch: Long,
+        engineMuted: Boolean,
+        shouldPost: Boolean,
+        receivedAtElapsedMs: Long,
+    ): NotificationFirstPost {
+        val stage = notificationFirstPostContentCoordinator.startStage()
+        val result =
+            if (shouldPost && !appLockScreenVisible) {
+                notificationFirstPostContentCoordinator.resolve(stage) {
+                    notificationContentResolution.firstPost.resolve(update, localOnly = true)
+                }
+            } else {
+                null
+            }
+        result?.let {
+            recordNotificationFirstPostTiming(
+                stage = NotificationFirstPostTimingStage.ContentComplete,
+                receivedAtElapsedMs = receivedAtElapsedMs,
+                stageStartedAtElapsedMs = stage.startedAtElapsedMillis,
+                outcome = it.timingOutcome(),
+            )
+        }
+        val content =
+            when (result) {
+                is NotificationFirstPostContentResult.Resolved -> result.value
+                else -> null
+            }
+        return NotificationFirstPost(
+            epoch = postEpoch,
+            accountCacheEpoch = accountCacheEpoch,
+            engineMuted = engineMuted,
+            shouldPost = shouldPost,
+            content = content,
+            presentation = notificationContentPresentation(appContext, update, content, ::cachedShortNpubOrUnknown),
+        )
+    }
+
+    /** Publishes one fixed-label timing event without notification identity or content. */
+    private fun recordNotificationFirstPostTiming(
+        stage: NotificationFirstPostTimingStage,
+        receivedAtElapsedMs: Long,
+        stageStartedAtElapsedMs: Long? = null,
+        outcome: String,
+    ) {
+        val now = SystemClock.elapsedRealtime()
+        val event =
+            NotificationFirstPostTimingEvent(
+                stage = stage,
+                observedAtElapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos(),
+                elapsedSinceReceiptMillis = (now - receivedAtElapsedMs).coerceAtLeast(0L),
+                stageElapsedMillis = stageStartedAtElapsedMs?.let { (now - it).coerceAtLeast(0L) },
+                outcome = outcome,
+            )
+        appStateDebug {
+            "notification timing stage=${stage.name} elapsed_ms=${event.elapsedSinceReceiptMillis} " +
+                "stage_ms=${event.stageElapsedMillis ?: -1L} outcome=$outcome"
+        }
+        notificationFirstPostTimingObserver?.invoke(event)
     }
 
     private fun schedulePostNotificationMaintenance(update: NotificationUpdateFfi) {
@@ -9804,66 +9763,108 @@ class WhiteNoiseAppState private constructor(
             .forEach(::launchInviteNotificationIdentityRefresh)
     }
 
-    private fun launchInviteNotificationIdentityRefresh(initialCandidate: GroupInviteNotificationIdentityRefreshStore.RefreshCandidate) {
+    /** Runs one invite-name correction under the original post generations and shared write permit. */
+    private fun launchInviteNotificationIdentityRefresh(initialCandidate: RefreshCandidate) {
         val update = initialCandidate.identity.asNotificationUpdate()
         profileScope.launch {
-            var candidate: GroupInviteNotificationIdentityRefreshStore.RefreshCandidate? = initialCandidate
-            while (candidate != null) {
-                val currentCandidate = candidate
-                var followUp: GroupInviteNotificationIdentityRefreshStore.RefreshCandidate? = null
-                candidate = null
-                inviteNotificationIdentityRefreshStore.runClaimedRefresh(update.notificationKey) {
-                    if (appLockScreenVisible) {
-                        inviteNotificationIdentityRefreshStore.release(update.notificationKey)
-                        // Unlock can race between the visibility check and the
-                        // release above. Re-check after releasing so either this
-                        // coroutine or the unlock hook reclaims the deferred work.
-                        if (!appLockScreenVisible) {
-                            resumePendingInviteNotificationIdentityRefreshes()
-                        }
-                        return@runClaimedRefresh
-                    }
-                    if (!localNotificationPresenter.isGroupInviteNotificationActive(update)) {
-                        inviteNotificationIdentityRefreshStore.forget(update.notificationKey)
-                        return@runClaimedRefresh
-                    }
-                    val refreshResult =
-                        refreshActiveInviteNotificationIdentity(
-                            update = update,
-                            resolvedProfileName = currentCandidate.resolvedName,
-                        )
-                    if (refreshResult.posted) {
-                        followUp =
-                            inviteNotificationIdentityRefreshStore.completeRefresh(
-                                notificationKey = update.notificationKey,
-                                displayedName = refreshResult.displayedName,
-                                contentRedacted = refreshResult.contentRedacted,
-                            )
-                        if (refreshResult.contentRedacted && !appLockScreenVisible) {
-                            // Unlock can race the release in completeRefresh().
-                            resumePendingInviteNotificationIdentityRefreshes()
-                        }
-                    } else if (!localNotificationPresenter.isGroupInviteNotificationActive(update)) {
-                        inviteNotificationIdentityRefreshStore.forget(update.notificationKey)
-                    } else {
-                        inviteNotificationIdentityRefreshStore.release(update.notificationKey)
-                    }
-                }
-                candidate = followUp
+            inviteNotificationIdentityRefreshStore.runClaimedRefresh(initialCandidate) {
+                refreshInviteNotificationIdentity(initialCandidate, update)
             }
         }
     }
 
+    /** Applies stale, lock-deferred, single-writer, and active-card rules to one invite candidate. */
+    private suspend fun refreshInviteNotificationIdentity(
+        candidate: RefreshCandidate,
+        update: NotificationUpdateFfi,
+    ) {
+        when {
+            !isInviteNotificationRefreshCurrent(candidate, update) ->
+                inviteNotificationIdentityRefreshStore.forget(candidate)
+
+            appLockScreenVisible -> deferInviteNotificationIdentityRefresh(candidate)
+
+            !isNotificationEnrichmentAllowed(
+                update,
+                candidate.postEpoch,
+                candidate.accountCacheEpoch,
+                candidate.engineMuted,
+            ) -> inviteNotificationIdentityRefreshStore.forget(candidate)
+
+            !candidate.lateCorrectionPermit.acquire() ->
+                inviteNotificationIdentityRefreshStore.forget(candidate)
+
+            else -> postInviteNotificationIdentityCorrection(candidate, update)
+        }
+    }
+
+    /** Requires both captured generations and the exact active invite card. */
+    private fun isInviteNotificationRefreshCurrent(
+        candidate: RefreshCandidate,
+        update: NotificationUpdateFfi,
+    ): Boolean =
+        inviteNotificationIdentityRefreshStore.isCurrent(candidate) &&
+            isNotificationGenerationPostAllowed(
+                update = update,
+                postEpoch = candidate.postEpoch,
+                accountCacheEpoch = candidate.accountCacheEpoch,
+                engineMuted = candidate.engineMuted,
+                requireUnlocked = false,
+            ) &&
+            localNotificationPresenter.isGroupInviteNotificationActive(update)
+
+    /** Releases a locked candidate and closes the unlock/reclaim race. */
+    private fun deferInviteNotificationIdentityRefresh(candidate: RefreshCandidate) {
+        inviteNotificationIdentityRefreshStore.release(candidate)
+        if (!appLockScreenVisible) resumePendingInviteNotificationIdentityRefreshes()
+    }
+
+    /** Consumes or restores the shared write permit according to the platform result. */
+    private suspend fun postInviteNotificationIdentityCorrection(
+        candidate: RefreshCandidate,
+        update: NotificationUpdateFfi,
+    ) {
+        var correctionPosted = false
+        try {
+            if (!isInviteNotificationRefreshCurrent(candidate, update)) {
+                inviteNotificationIdentityRefreshStore.forget(candidate)
+                return
+            }
+            val result =
+                refreshActiveInviteNotificationIdentity(
+                    update = update,
+                    resolvedProfileName = candidate.resolvedName,
+                    postEpoch = candidate.postEpoch,
+                    accountCacheEpoch = candidate.accountCacheEpoch,
+                    engineMuted = candidate.engineMuted,
+                    isCandidateCurrent = { inviteNotificationIdentityRefreshStore.isCurrent(candidate) },
+                ).also { correctionPosted = it.posted }
+            when {
+                result.posted -> inviteNotificationIdentityRefreshStore.forget(candidate)
+                !localNotificationPresenter.isGroupInviteNotificationActive(update) ->
+                    inviteNotificationIdentityRefreshStore.forget(candidate)
+                else -> inviteNotificationIdentityRefreshStore.release(candidate)
+            }
+        } finally {
+            candidate.lateCorrectionPermit.complete(correctionPosted)
+        }
+    }
+
+    /** Re-renders an active invite only if its captured account and notification generation remain current. */
     private suspend fun refreshActiveInviteNotificationIdentity(
         update: NotificationUpdateFfi,
         resolvedProfileName: String?,
+        postEpoch: Long,
+        accountCacheEpoch: Long,
+        engineMuted: Boolean,
+        isCandidateCurrent: () -> Boolean,
     ): InviteNotificationIdentityRefreshResult {
         val skipEnrichmentForLock = appLockScreenVisible
         val resolvedName =
             if (skipEnrichmentForLock) {
                 null
             } else {
-                notificationSenderName(update)
+                notificationContentResolution.identity.senderName(update)
                     ?: resolvedProfileName
                     ?: notificationDisplayNameHint(update.sender.displayName)
             }
@@ -9881,7 +9882,11 @@ class WhiteNoiseAppState private constructor(
                     } else {
                         LocalNotificationFormatter.recipientAccountSubtext(
                             signedInAccountCount = accounts.count { it.isSignedInSigningAccount() },
-                            recipientLabel = notificationRecipientName(update.accountRef),
+                            recipientLabel =
+                                notificationContentResolution.identity.recipientName(
+                                    update.accountRef,
+                                    localOnly = false,
+                                ),
                         )
                     },
                 redactContent = redactContent,
@@ -9889,8 +9894,13 @@ class WhiteNoiseAppState private constructor(
                 silentUpdate = true,
                 shortNpub = ::shortNpub,
                 isPostStillAllowed = {
-                    !networkNotificationRecoverySuppressed &&
-                        localNotificationPresenter.isGroupInviteNotificationActive(update)
+                    isCandidateCurrent() &&
+                        isNotificationEnrichmentAllowed(
+                            update,
+                            postEpoch,
+                            accountCacheEpoch,
+                            engineMuted,
+                        )
                 },
             )
         return InviteNotificationIdentityRefreshResult(

@@ -7,11 +7,15 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscription
 import dev.ipf.marmotkit.ChatNotificationSettingsFfi
 import dev.ipf.marmotkit.ChatsSubscription
+import dev.ipf.marmotkit.MarkdownBlockFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.NotificationSettingsFfi
@@ -45,9 +49,9 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.CoroutineContext
 
+/** Typed-update fixture that preserves AppState startup, local MDK, and platform posting paths. */
 internal class NotificationBootstrapTestFixture(
     context: Context,
     initiallyFailSubscriptions: Boolean = false,
@@ -58,7 +62,11 @@ internal class NotificationBootstrapTestFixture(
     receiverTimeoutMillis: Long = 100L,
     bootstrapActionableTimeoutMillis: Long = 15_000L,
     notificationUsersHaveDisplayNames: Boolean = true,
+    notificationReceiverHasDisplayName: Boolean = notificationUsersHaveDisplayNames,
     private val localDisplayName: String? = "Alice",
+    previewText: String = "Delivered while bootstrap is still running",
+    messageIdHex: String = "message-a",
+    senderPictureUrl: String? = null,
     isDm: Boolean = false,
     private val accounts: List<AccountSummaryFfi> = emptyList(),
     private val chatListRows: List<ChatListRowFfi> = emptyList(),
@@ -81,6 +89,15 @@ internal class NotificationBootstrapTestFixture(
     private val onClearPushRegistration: ((accountRef: String) -> PushRegistrationShareOutcomeFfi)? = null,
     private val onNotificationSettings: ((accountRef: String) -> NotificationSettingsFfi)? = null,
     nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
+    private val onDisplayName: ((call: Int, accountIdHex: String) -> String?)? = null,
+    private val accountIdHexResolver: suspend (String) -> String? = { null },
+    private val markdownDocumentFactory: ((String?) -> MarkdownDocumentFfi)? = null,
+    private val profileRefreshRequest: (suspend (String) -> Unit)? = null,
+    private val timelinePage: TimelinePageFfi? = null,
+    private val messageRecords: List<AppMessageRecordFfi> = emptyList(),
+    private val profileImageDownload: ((url: String, maxBytes: ULong) -> ByteArray)? = null,
+    notificationFirstPostTimingObserver: ((NotificationFirstPostTimingEvent) -> Unit)? = null,
+    notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val appContext = context.applicationContext
     private val updates = Channel<NotificationUpdateFfi>(Channel.UNLIMITED)
@@ -123,6 +140,10 @@ internal class NotificationBootstrapTestFixture(
     val senderDisplayNameCalls = AtomicInteger(0)
     val nativePushSettingWrites = CopyOnWriteArrayList<Pair<String, Boolean>>()
     val clearedPushRegistrations = CopyOnWriteArrayList<String>()
+    val markdownParseCalls = AtomicInteger(0)
+    val notificationTimelineCalls = AtomicInteger(0)
+    val notificationMessageHistoryCalls = AtomicInteger(0)
+    val notificationGroupDetailsCalls = AtomicInteger(0)
 
     @Volatile
     var receiverWasAttachedAtPostStartEmission = false
@@ -144,20 +165,20 @@ internal class NotificationBootstrapTestFixture(
             groupName = "General".takeUnless { isDm },
             isDm = isDm,
             isMention = false,
-            messageIdHex = "message-a",
+            messageIdHex = messageIdHex,
             sender =
                 NotificationUserFfi(
                     accountIdHex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
                     displayName = "Alice".takeIf { notificationUsersHaveDisplayNames },
-                    pictureUrl = null,
+                    pictureUrl = senderPictureUrl,
                 ),
             receiver =
                 NotificationUserFfi(
                     accountIdHex = "self",
-                    displayName = "Me".takeIf { notificationUsersHaveDisplayNames },
+                    displayName = "Me".takeIf { notificationReceiverHasDisplayName },
                     pictureUrl = null,
                 ),
-            previewText = "Delivered while bootstrap is still running",
+            previewText = previewText,
             reactionEmoji = null,
             reactedToPreview = null,
             timestampMs = 1_982L,
@@ -169,7 +190,11 @@ internal class NotificationBootstrapTestFixture(
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
-            when (method.name) {
+            // Kotlin value-class parameters mangle JVM method names (for example,
+            // `messages-HqaIMu8` and `downloadProfileImage-z13BHRw`). Tests route
+            // on the source-level Marmot method so these real bridge calls reach
+            // their intended fakes.
+            when (method.name.substringBefore('-')) {
                 "onboardingSnapshot" -> onOnboardingSnapshot?.invoke()
                 "start" -> {
                     runtimeStartCalls.incrementAndGet()
@@ -288,10 +313,22 @@ internal class NotificationBootstrapTestFixture(
                     directChatListCalls.incrementAndGet()
                     onChatList?.invoke(arguments?.get(0) as String) ?: chatListRows
                 }
-                "timelineMessages" ->
-                    // An exhausted, empty page: recovery probes conclude
-                    // NotCommitted deterministically instead of erroring.
-                    TimelinePageFfi(messages = emptyList(), hasMoreBefore = false, hasMoreAfter = false)
+                "timelineMessages" -> {
+                    notificationTimelineCalls.incrementAndGet()
+                    timelinePage
+                        // An exhausted, empty page: recovery probes conclude
+                        // NotCommitted deterministically instead of erroring.
+                        ?: TimelinePageFfi(messages = emptyList(), hasMoreBefore = false, hasMoreAfter = false)
+                }
+                "messages" -> {
+                    notificationMessageHistoryCalls.incrementAndGet()
+                    messageRecords
+                }
+                "parseMarkdown" -> {
+                    markdownParseCalls.incrementAndGet()
+                    val raw = arguments?.firstOrNull() as? String
+                    markdownDocumentFactory?.invoke(raw) ?: markdownDocument(raw)
+                }
                 "groupMemberIdsPage" -> {
                     memberProjectionCalls.incrementAndGet()
                     @Suppress("UNCHECKED_CAST")
@@ -299,11 +336,25 @@ internal class NotificationBootstrapTestFixture(
                     onGroupMemberIdsPage?.invoke(groupIds) ?: emptyList<AppGroupMemberIdsFfi>()
                 }
                 "userProfile" -> null
+                "downloadProfileImage" -> {
+                    val download = profileImageDownload ?: error("Unexpected Marmot call: downloadProfileImage")
+                    download(arguments?.get(0) as String, (arguments[1] as Long).toULong())
+                }
+                "groupDetails" -> {
+                    notificationGroupDetailsCalls.incrementAndGet()
+                    throw UnsupportedOperationException(
+                        "Notification avatar group details are unavailable in this fixture",
+                    )
+                }
                 "displayName" -> {
-                    if (arguments?.firstOrNull() == update.sender.accountIdHex) {
-                        senderDisplayNameCalls.incrementAndGet()
-                    }
-                    localDisplayName
+                    val accountIdHex = arguments?.firstOrNull() as String
+                    val call =
+                        if (accountIdHex == update.sender.accountIdHex) {
+                            senderDisplayNameCalls.incrementAndGet()
+                        } else {
+                            0
+                        }
+                    onDisplayName?.invoke(call, accountIdHex) ?: localDisplayName
                 }
                 "registerExternalSigner" -> {
                     signerRegistrationCalls.incrementAndGet()
@@ -321,23 +372,28 @@ internal class NotificationBootstrapTestFixture(
         WhiteNoiseAppState(
             context = appContext,
             draftStore = DraftStore(EmptyDraftPersistence),
-            accountIdHexResolver = { null },
+            accountIdHexResolver = accountIdHexResolver,
             accounts = emptyList(),
             activeAccountRef = accounts.firstOrNull()?.label.orEmpty(),
+            profileReader = if (profileRefreshRequest != null) { _ -> null } else null,
+            profileRefreshRequest = profileRefreshRequest,
             marmotRuntimeFactory = { AppMarmotRuntime(rootPath = "test", marmot = marmot) },
             notificationSubscriber = { subscribe() },
-            notificationDispatcher = notificationDispatchGate ?: Dispatchers.IO,
+            notificationDispatcher = notificationDispatchGate ?: notificationDispatcher,
             notificationReceiverTimeoutMillis = receiverTimeoutMillisState::get,
             bootstrapActionableTimeoutMillis = { bootstrapActionableTimeoutMillis },
             nativePushFallbackPlatform = nativePushFallbackPlatform,
+            notificationFirstPostTimingObserver = notificationFirstPostTimingObserver,
         )
 
+    /** Supplies an inert local chat-list snapshot without a native pointer. */
     private fun emptyChatListSubscription(): ChatListSubscription =
         allocateWithoutConstructor(EmptyChatListSubscription::class.java).apply {
             onSnapshot = localSnapshotReadCalls::incrementAndGet
             rows = chatListRows
         }
 
+    /** Supplies an inert local group snapshot without a native pointer. */
     private fun emptyChatsSubscription(): ChatsSubscription =
         allocateWithoutConstructor(EmptyChatsSubscription::class.java).apply {
             onSnapshot = localSnapshotReadCalls::incrementAndGet
@@ -409,6 +465,7 @@ internal class NotificationBootstrapTestFixture(
         override fun close() = Unit
     }
 
+    /** Releases both asynchronous and synchronous subscription failure gates. */
     fun allowSubscriptions(recoveryTimeoutMillis: Long? = null) {
         recoveryTimeoutMillis?.let(receiverTimeoutMillisState::set)
         subscriptionFailures.set(false)
@@ -416,19 +473,22 @@ internal class NotificationBootstrapTestFixture(
         subscriptionGate.complete(Unit)
     }
 
+    /** Releases a synchronously blocked Marmot runtime start. */
     fun allowRuntimeStart() {
         runtimeStartGate.countDown()
     }
 
+    /** Runs the production bootstrap while pumping Robolectric's paused main looper. */
     suspend fun bootstrap() {
         runWithMainLooperPumping { appState.bootstrap() }
     }
 
+    /** Runs the production explicit-retry path with main-looper pumping. */
     suspend fun retryBootstrap() {
         runWithMainLooperPumping { appState.retryBootstrap() }
     }
 
-    /** Drives warm runtime startup while allowing its main-thread receiver work to complete. */
+    /** Starts notification runtime ownership while pumping its main-thread receiver work. */
     suspend fun ensureNotificationRuntimeStarted() {
         runWithMainLooperPumping { appState.ensureNotificationRuntimeStarted() }
     }
@@ -475,25 +535,78 @@ internal class NotificationBootstrapTestFixture(
         }
     }
 
-    suspend fun awaitNotificationPosted() {
+    /**
+     * Waits for the stable card while optionally advancing Robolectric's Android
+     * clock. Disabling clock advancement is rendering-only control, not
+     * wall-clock or device-latency evidence.
+     */
+    suspend fun awaitNotificationPosted(advanceMainClock: Boolean = true) {
         val manager = appContext.getSystemService(NotificationManager::class.java)
         withTimeout(5_000L) {
             while (manager.activeNotifications.none { it.tag == "account-a|group-a" }) {
+                val mainLooper = shadowOf(Looper.getMainLooper())
+                if (advanceMainClock) {
+                    mainLooper.idleFor(Duration.ofMillis(1L))
+                } else {
+                    mainLooper.idle()
+                }
+                delay(1L)
+            }
+        }
+    }
+
+    /** Waits until the active fixture card carries the expected user-visible body. */
+    suspend fun awaitNotificationBody(expected: String) {
+        val manager = appContext.getSystemService(NotificationManager::class.java)
+        withTimeout(5_000L) {
+            while (
+                manager.activeNotifications
+                    .firstOrNull { it.tag == "account-a|group-a" }
+                    ?.notification
+                    ?.extras
+                    ?.getCharSequence(android.app.Notification.EXTRA_TEXT)
+                    ?.toString() != expected
+            ) {
                 shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
                 delay(1L)
             }
         }
     }
 
+    /** Waits until the post-first-write avatar group lookup has begun. */
+    suspend fun awaitNotificationEnrichmentAttempt() {
+        withTimeout(5_000L) {
+            while (notificationGroupDetailsCalls.get() == 0) delay(1L)
+        }
+    }
+
+    /** Waits for a precise minimum of local sender identity reads. */
+    suspend fun awaitSenderDisplayNameCalls(expected: Int) {
+        withTimeout(5_000L) {
+            while (senderDisplayNameCalls.get() < expected) {
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                delay(1L)
+            }
+        }
+    }
+
+    /** Queues an additional typed update on the live production subscription. */
+    fun emitUpdate(update: NotificationUpdateFfi) {
+        check(updates.trySend(update).isSuccess) { "Notification fixture channel is closed" }
+    }
+
+    /** Seeds then resets npub call accounting for a cache-only assertion. */
     fun warmNpubCache() {
         appState.shortNpub(update.sender.accountIdHex)
         npubCalls.set(0)
     }
 
+    /** Releases the optional post-subscription dispatch gate. */
     fun releaseNotificationDispatch() {
         notificationDispatchGate?.release()
     }
 
+    /** Releases all gates and closes the update stream without touching app data. */
     fun close() {
         runtimeStartGate.countDown()
         notificationDispatchGate?.release()
@@ -524,6 +637,7 @@ internal class NotificationBootstrapTestFixture(
             }
         }
 
+    /** Implements the fixture's restartable notification subscription boundary. */
     private suspend fun subscribe(): AppNotificationSubscription {
         subscriptionCalls.incrementAndGet()
         synchronousSubscriptionGate.await()
@@ -554,6 +668,22 @@ internal class NotificationBootstrapTestFixture(
         if (subscriberAttached.get()) updates.trySend(update)
     }
 
+    /** Builds the minimal production-shaped Markdown tree for fixture text. */
+    private fun markdownDocument(raw: String?): MarkdownDocumentFfi {
+        val source = raw.orEmpty()
+        val inline =
+            if (source.length >= 4 && source.startsWith("**") && source.endsWith("**")) {
+                MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text(source.substring(2, source.length - 2))))
+            } else {
+                MarkdownInlineFfi.Text(source)
+            }
+        return MarkdownDocumentFfi(
+            truncated = false,
+            blocks = listOf(MarkdownBlockFfi.Paragraph(listOf(inline))),
+            blankLinesBefore = ByteArray(0),
+        )
+    }
+
     private object EmptyDraftPersistence : DraftPersistence {
         override fun read(): Map<String, String> = emptyMap()
 
@@ -563,31 +693,52 @@ internal class NotificationBootstrapTestFixture(
         ) = Unit
     }
 
-    private class PostStartNotificationDispatchGate(
+    /** Holds the first post-start dispatch until release, then permanently passes every dispatch through. */
+    internal class PostStartNotificationDispatchGate(
         private val runtimeStarted: AtomicBoolean,
+        private val delegate: CoroutineDispatcher = Dispatchers.IO,
+        private val beforePendingPublication: (() -> Unit)? = null,
     ) : CoroutineDispatcher() {
         private data class PendingDispatch(
             val context: CoroutineContext,
             val block: Runnable,
         )
 
-        private val intercepted = AtomicBoolean(false)
-        private val pending = AtomicReference<PendingDispatch?>()
+        private val stateLock = Any()
+        private var intercepted = false
+        private var released = false
+        private var pending: PendingDispatch? = null
 
+        /** Holds only the first qualifying dispatch while preserving release as a permanent state transition. */
         override fun dispatch(
             context: CoroutineContext,
             block: Runnable,
         ) {
-            if (runtimeStarted.get() && intercepted.compareAndSet(false, true)) {
-                pending.set(PendingDispatch(context, block))
-                return
+            val dispatchNow =
+                synchronized(stateLock) {
+                    if (released || !runtimeStarted.get() || intercepted) {
+                        true
+                    } else {
+                        intercepted = true
+                        beforePendingPublication?.invoke()
+                        pending = PendingDispatch(context, block)
+                        false
+                    }
+                }
+            if (dispatchNow) {
+                delegate.dispatch(context, block)
             }
-            Dispatchers.IO.dispatch(context, block)
         }
 
+        /** Opens the gate permanently and dispatches an already intercepted continuation at most once. */
         fun release() {
-            pending.getAndSet(null)?.let { dispatch ->
-                Dispatchers.IO.dispatch(dispatch.context, dispatch.block)
+            val ready =
+                synchronized(stateLock) {
+                    released = true
+                    pending.also { pending = null }
+                }
+            ready?.let { dispatch ->
+                delegate.dispatch(dispatch.context, dispatch.block)
             }
         }
     }

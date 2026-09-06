@@ -100,6 +100,36 @@ class NotificationTimingDeviceEventsTest {
         assertNull(NotificationTimingDeviceEvents.awaitRemoval(0))
     }
 
+    /** Classifies allowed fixture revisions and drops unexpected text while keeping alert metadata. */
+    @Test
+    fun captureRetainsOnlyExplicitSyntheticBodies() {
+        NotificationTimingDeviceEvents.arm(PACKAGE, TAG, 1, "fallback", "resolved")
+        listener.onNotificationPosted(notification(content = "fallback"))
+        val fallback = NotificationTimingDeviceEvents.awaitPost(0)
+        assertEquals(NotificationTimingContentRevision.Fallback, fallback?.contentRevision)
+        assertEquals("fallback", fallback?.contentText)
+        listener.onNotificationPosted(notification(content = "resolved", onlyAlertOnce = true))
+        val resolved = NotificationTimingDeviceEvents.awaitPost(0)
+        assertEquals(NotificationTimingContentRevision.Resolved, resolved?.contentRevision)
+        assertEquals("resolved", resolved?.contentText)
+        assertEquals(true, resolved?.onlyAlertOnce)
+        listener.onNotificationPosted(notification(content = "unexpected body"))
+        val other = NotificationTimingDeviceEvents.awaitPost(0)
+        assertEquals(NotificationTimingContentRevision.Other, other?.contentRevision)
+        assertNull(other?.contentText)
+    }
+
+    /** A later timing-only capture cannot inherit the preceding probe's content allowlist. */
+    @Test
+    fun rearmingDropsSyntheticContentExpectations() {
+        NotificationTimingDeviceEvents.arm(PACKAGE, TAG, 1, "fallback", "resolved")
+        NotificationTimingDeviceEvents.arm(PACKAGE, TAG, 1)
+        listener.onNotificationPosted(notification(content = "resolved"))
+        val post = NotificationTimingDeviceEvents.awaitPost(0)
+        assertEquals(NotificationTimingContentRevision.Other, post?.contentRevision)
+        assertNull(post?.contentText)
+    }
+
     /** Exercises the framework removal entry point without depending on unused ranking data. */
     private fun deliverRemoval(notification: StatusBarNotification) {
         listener.onNotificationRemoved(
@@ -175,6 +205,8 @@ class NotificationTimingDeviceEventsTest {
         id: Int = 1,
         packageName: String = PACKAGE,
         tag: String = TAG,
+        content: String? = null,
+        onlyAlertOnce: Boolean = false,
         beforeKeyRead: () -> Unit = {},
     ): StatusBarNotification =
         object : StatusBarNotification(
@@ -185,7 +217,10 @@ class NotificationTimingDeviceEventsTest {
             1_000,
             0,
             0,
-            Notification(),
+            Notification().apply {
+                extras.putCharSequence(Notification.EXTRA_TEXT, content)
+                if (onlyAlertOnce) flags = Notification.FLAG_ONLY_ALERT_ONCE
+            },
             Process.myUserHandle(),
             0,
         ) {
