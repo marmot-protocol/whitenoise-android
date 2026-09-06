@@ -1673,4 +1673,6 @@
     <string name="dictation_result_send">Nachricht senden</string>
     <string name="dictation_result_send_description">Nur senden, wenn der ursprüngliche Chat und Entwurf unverändert sind</string>
     <string name="dictation_send_safety_note">Das Senden wird sicher abgebrochen: Wenn sich der ursprüngliche Entwurf, die Mitgliedschaft oder die Sitzung ändert, behält White Noise das Transkript zur Prüfung, statt es zu senden.</string>
+    <string name="dictation_microphone_muted">Mikrofonzugriff ist deaktiviert</string>
+    <string name="dictation_microphone_muted_help">Aktiviere den Mikrofonzugriff in den Android-Datenschutzeinstellungen oder den Schnelleinstellungen und versuche das Diktieren erneut.</string>
 </resources>

@@ -1720,4 +1720,6 @@
     <string name="dictation_disclosure_title">Внешнее распознавание речи</string>
     <string name="dictation_disclosure_message">Установленная служба распознавания обрабатывает надиктованный звук и может отправлять его своему поставщику. По умолчанию White Noise вставляет полученный текст в черновик; автоматическую отправку можно использовать только после явного включения в настройках диктовки.</string>
     <string name="dictation_continue">Продолжить</string>
+    <string name="dictation_microphone_muted">Доступ к микрофону отключён</string>
+    <string name="dictation_microphone_muted_help">Включите доступ к микрофону в настройках конфиденциальности Android или на панели быстрых настроек, затем повторите диктовку.</string>
 </resources>

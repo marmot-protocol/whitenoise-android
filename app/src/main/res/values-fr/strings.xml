@@ -1658,4 +1658,6 @@
     <string name="dictation_disclosure_title">Reconnaissance vocale externe</string>
     <string name="dictation_disclosure_message">Votre service vocal installé traite l’audio dicté et peut l’envoyer à son fournisseur. Par défaut, White Noise colle le texte renvoyé dans votre brouillon ; l’envoi automatique n’est disponible que si vous l’activez explicitement dans les paramètres de Dictée.</string>
     <string name="dictation_continue">Continuer</string>
+    <string name="dictation_microphone_muted">L’accès au microphone est désactivé</string>
+    <string name="dictation_microphone_muted_help">Activez l’accès au microphone dans les paramètres de confidentialité Android ou les paramètres rapides, puis réessayez la dictée.</string>
 </resources>
