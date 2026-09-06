@@ -1709,6 +1709,7 @@ internal fun ConversationScreen(
             pendingDocumentUris = merged
         }
 
+    /** Resolves a message id to its current list index after every leading structural row. */
     fun currentTimelineListIndex(messageId: String): Int? {
         val timelineIndex =
             controller.timeline
@@ -1742,11 +1743,12 @@ internal fun ConversationScreen(
             },
     )
 
-    // Scroll the lazy list so the item at [targetMessageId] sits roughly in the
-    // vertical center of the message-list viewport, leaving context above and
-    // below the target visible (#595, #794). Uses one animated scroll; if the
-    // target was never measured before, any final exact-centering correction is
-    // a non-animated snap rather than the visible bounce from #999.
+    /**
+     * Centers [targetMessageId] with surrounding context through the shared latest-wins owner.
+     *
+     * An unmeasured target uses one animated approach followed by a non-animated exact correction,
+     * avoiding a second visible bounce.
+     */
     suspend fun centerTimelineItemAt(
         targetMessageId: String,
         fallbackTargetIndex: Int,
@@ -2139,6 +2141,7 @@ internal fun ConversationScreen(
         }
     }
 
+    /** Centers and highlights a loaded search row only while its navigation request remains current. */
     suspend fun centerLoadedSearchMessage(
         messageIdHex: String,
         navigationRequest: MessageTargetNavigationOwner.Request,
@@ -2165,6 +2168,7 @@ internal fun ConversationScreen(
         }
     }
 
+    /** Loads and centers one indexed search result under a cancellable latest-wins request. */
     fun scrollToSearchMatch(match: ConversationSearchMatch) {
         val previousSearchJob = navigationState.searchJob
         previousSearchJob?.cancel()
@@ -2626,6 +2630,7 @@ internal fun ConversationScreen(
             )
         }
 
+        /** Commits the chosen unread or tail owner only after its target and viewport are stable. */
         suspend fun commitInitialPosition(): Boolean =
             if (resultingMode is ConversationScrollMode.FollowingTail) {
                 scrollCoordinator.commitInitialTailAnchor(
@@ -2766,6 +2771,7 @@ internal fun ConversationScreen(
     // normal anchor. Local-only: loadUntilMessageAvailable paginates the
     // already-persisted store, never a relay fetch.
     LaunchedEffect(controller, focusMessageId, focusMessageRequestId, ttsFocusSessionId) {
+        /** Reads the latest route- and account-scoped focus target for this effect generation. */
         fun latestFocusMessageId(): String? {
             val sessionId = ttsFocusSessionId ?: return focusMessageId
             return appState
