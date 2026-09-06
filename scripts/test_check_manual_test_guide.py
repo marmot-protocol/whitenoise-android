@@ -227,6 +227,28 @@ class ManualGuideParserTest(unittest.TestCase):
                     },
                 )
 
+    def test_composable_discovery_accepts_multiline_suppress_with_quoted_arguments(self):
+        text = '''
+@Composable
+@Suppress(
+    "FunctionNaming",
+    "LongMethod", // The comment must not terminate annotation parsing.
+)
+internal fun ConversationBottomBar() = Unit
+'''
+        self.assertEqual(MODULE.composable_names(text), {"ConversationBottomBar"})
+
+    def test_composable_discovery_accepts_opt_in_class_arguments(self):
+        text = '''
+@Composable
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalFoundationApi::class,
+)
+private fun TimelineRow() = Unit
+'''
+        self.assertEqual(MODULE.composable_names(text), {"TimelineRow"})
+
 
 if __name__ == "__main__":
     unittest.main()

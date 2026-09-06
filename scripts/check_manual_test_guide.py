@@ -20,10 +20,9 @@ DEFINITION_RE = re.compile(
     r"(?P<body>.+?) → \*\*Expected:\*\* (?P<expected>.+)$"
 )
 CANDIDATE_RE = re.compile(r"^(?:\d+\.|[-*])\s*\[[^]]*]\s*\*\*|\*\*[A-Z]{3,4}-\d{3}")
-COMPOSABLE_RE = re.compile(
-    r"@Composable(?:\s|@[A-Za-z0-9_.()=, ]+)*?\s+"
-    r"(?:(?:internal|private|public)\s+)?fun\s+([A-Z][A-Za-z0-9_]*)\s*\(",
-    re.S,
+ANNOTATION_RE = re.compile(r"@[A-Za-z_][A-Za-z0-9_.]*")
+COMPOSABLE_FUN_RE = re.compile(
+    r"(?:(?:internal|private|public|protected)\s+)?fun\s+([A-Z][A-Za-z0-9_]*)\s*\("
 )
 REQUIRED_HEADINGS = [
     "# White Noise Android manual release testing",
@@ -164,13 +163,94 @@ REQUIRED_INVENTORY_CATEGORIES = {
 }
 
 
+def skip_kotlin_trivia(text: str, offset: int) -> int:
+    """Skip whitespace and comments without treating declaration text as trivia."""
+    while offset < len(text):
+        if text[offset].isspace():
+            offset += 1
+        elif text.startswith("//", offset):
+            newline = text.find("\n", offset + 2)
+            offset = len(text) if newline < 0 else newline + 1
+        elif text.startswith("/*", offset):
+            end = text.find("*/", offset + 2)
+            offset = len(text) if end < 0 else end + 2
+        else:
+            break
+    return offset
+
+
+def consume_kotlin_annotation(text: str, offset: int) -> int | None:
+    """Consume one annotation, including balanced multiline argument syntax."""
+    match = ANNOTATION_RE.match(text, offset)
+    if not match:
+        return None
+    offset = skip_kotlin_trivia(text, match.end())
+    if offset >= len(text) or text[offset] != "(":
+        return offset
+
+    depth = 0
+    quote: str | None = None
+    while offset < len(text):
+        if quote:
+            if quote == '"""' and text.startswith(quote, offset):
+                quote = None
+                offset += 3
+            elif quote != '"""' and text[offset] == "\\":
+                offset += 2
+            elif quote != '"""' and text[offset] == quote:
+                quote = None
+                offset += 1
+            else:
+                offset += 1
+            continue
+        if text.startswith('"""', offset):
+            quote = '"""'
+            offset += 3
+        elif text[offset] in {'"', "'"}:
+            quote = text[offset]
+            offset += 1
+        elif text.startswith("//", offset):
+            newline = text.find("\n", offset + 2)
+            offset = len(text) if newline < 0 else newline + 1
+        elif text.startswith("/*", offset):
+            end = text.find("*/", offset + 2)
+            offset = len(text) if end < 0 else end + 2
+        elif text[offset] == "(":
+            depth += 1
+            offset += 1
+        elif text[offset] == ")":
+            depth -= 1
+            offset += 1
+            if depth == 0:
+                return offset
+        else:
+            offset += 1
+    return None
+
+
+def composable_names(text: str) -> set[str]:
+    """Find upper-camel Compose functions with any intervening annotations."""
+    found: set[str] = set()
+    for composable in re.finditer(r"@Composable\b", text):
+        offset = skip_kotlin_trivia(text, composable.end())
+        while offset < len(text) and text[offset] == "@":
+            annotation_end = consume_kotlin_annotation(text, offset)
+            if annotation_end is None:
+                break
+            offset = skip_kotlin_trivia(text, annotation_end)
+        match = COMPOSABLE_FUN_RE.match(text, offset)
+        if match:
+            found.add(match.group(1))
+    return found
+
+
 def current_composable_surfaces() -> set[tuple[str, str]]:
     source_root = ROOT / "app/src/main/java/dev/ipf/whitenoise/android"
     found: set[tuple[str, str]] = set()
     for source in source_root.rglob("*.kt"):
         text = source.read_text(encoding="utf-8")
         relative = str(source.relative_to(ROOT))
-        for name in COMPOSABLE_RE.findall(text):
+        for name in composable_names(text):
             found.add((relative, name))
     return found
 
