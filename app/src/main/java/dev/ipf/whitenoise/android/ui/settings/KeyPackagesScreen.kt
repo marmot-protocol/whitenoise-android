@@ -112,37 +112,64 @@ internal fun List<AccountKeyPackageFfi>.relayBacked(): List<AccountKeyPackageFfi
 
 internal const val KEY_PACKAGES_CONTENT_TAG = "key-packages-content"
 
+/** Shows the active account's KeyPackages and refreshes after acknowledged mutations. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun KeyPackagesScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
+    loadKeyPackages: suspend (refreshFromNetwork: Boolean) -> List<AccountKeyPackageFfi> = appState::fetchKeyPackages,
+    deleteKeyPackage: suspend (accountRef: String, eventIdHex: String, sourceRelays: List<String>) -> Boolean =
+        appState::deleteKeyPackage,
+) {
+    val accountRef = appState.activeAccountRef
+    key(accountRef) {
+        KeyPackagesScreenForAccount(
+            appState = appState,
+            accountRef = accountRef,
+            onBack = onBack,
+            loadKeyPackages = loadKeyPackages,
+            deleteKeyPackage = deleteKeyPackage,
+        )
+    }
+}
+
+/** Owns one account generation so a switch cancels inventory loads and deletion work. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+@Suppress("FunctionNaming", "LongMethod") // One account-keyed owner keeps mutation and reload cancellation atomic.
+private fun KeyPackagesScreenForAccount(
+    appState: WhiteNoiseAppState,
+    accountRef: String?,
+    onBack: () -> Unit,
+    loadKeyPackages: suspend (refreshFromNetwork: Boolean) -> List<AccountKeyPackageFfi>,
+    deleteKeyPackage: suspend (accountRef: String, eventIdHex: String, sourceRelays: List<String>) -> Boolean,
 ) {
     val scope = rememberCoroutineScope()
-    var packages by remember(appState.activeAccountRef) { mutableStateOf<List<AccountKeyPackageFfi>>(emptyList()) }
+    var packages by remember { mutableStateOf<List<AccountKeyPackageFfi>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var working by remember { mutableStateOf(false) }
-    var loaded by remember(appState.activeAccountRef) { mutableStateOf(false) }
+    var loaded by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<AccountKeyPackageFfi?>(null) }
 
     suspend fun reload(refreshFromNetwork: Boolean = false) {
         loading = true
         try {
-            packages = appState.fetchKeyPackages(refreshFromNetwork = refreshFromNetwork)
+            packages = loadKeyPackages(refreshFromNetwork)
             loaded = true
         } finally {
             loading = false
         }
     }
 
-    LaunchedEffect(appState.activeAccountRef) {
-        if (appState.activeAccountRef != null) reload()
+    LaunchedEffect(accountRef) {
+        if (accountRef != null) reload()
     }
 
     KeyPackagesContent(
         state =
             keyPackagesState(
-                hasActiveAccount = appState.activeAccountRef != null,
+                hasActiveAccount = accountRef != null,
                 loaded = loaded,
                 loading = loading,
                 working = working,
@@ -195,12 +222,14 @@ internal fun KeyPackagesScreen(
             confirmButton = {
                 Button(onClick = {
                     val target = pendingDelete?.takeIf { it.isRelayDeletionTarget() } ?: return@Button
+                    val targetAccount = accountRef ?: return@Button
                     pendingDelete = null
                     working = true
                     scope.launch {
                         try {
-                            appState.deleteKeyPackage(target.eventIdHex, target.sourceRelays)
-                            reload(refreshFromNetwork = true)
+                            if (deleteKeyPackage(targetAccount, target.eventIdHex, target.sourceRelays)) {
+                                reload(refreshFromNetwork = true)
+                            }
                         } finally {
                             working = false
                         }

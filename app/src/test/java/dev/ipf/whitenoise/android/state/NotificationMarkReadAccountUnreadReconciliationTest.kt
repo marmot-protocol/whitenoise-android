@@ -44,6 +44,9 @@ class NotificationMarkReadAccountUnreadReconciliationTest {
     private var backgroundRows: List<ChatListRowFfi> = listOf(unreadRow())
 
     @Volatile
+    private var activeRows: List<ChatListRowFfi> = emptyList()
+
+    @Volatile
     private var backgroundChatListFailure: Throwable? = null
 
     @Volatile
@@ -69,7 +72,7 @@ class NotificationMarkReadAccountUnreadReconciliationTest {
                     }
                     ACTIVE_ACCOUNT -> {
                         activeChatListCalls.incrementAndGet()
-                        emptyList()
+                        activeRows
                     }
                     else -> emptyList()
                 }
@@ -77,178 +80,213 @@ class NotificationMarkReadAccountUnreadReconciliationTest {
             onMarkTimelineMessageRead = { readRow().takeIf { markReadReturnsRow } },
         )
 
+    /** A background mark-read converges its unread dot without switching accounts or receiving another event. */
     @Test
     fun backgroundAccountMarkReadClearsItsDotWithoutSwitchOrInboundNotification() =
         runTest {
-            val fixture = fixture()
-            val appState = fixture.appState
-            fixture.bootstrapAndRefresh()
-            awaitCondition("background dot lights from its own unread") {
-                appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
-            }
-
-            backgroundRows = listOf(readRow())
-            val markedRead =
-                pumpingMainLooper {
-                    appState.markNotificationMessageRead(BACKGROUND_ACCOUNT, GROUP_ID, MESSAGE_ID)
+            withFixture { fixture ->
+                val appState = fixture.appState
+                fixture.bootstrapAndRefresh()
+                awaitCondition("background dot lights from its own unread") {
+                    appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
                 }
 
-            assertTrue(markedRead)
-            assertEquals("no account switch may be required", ACTIVE_ACCOUNT, appState.activeAccountRef)
-            awaitCondition("background dot clears from the authoritative refresh") {
-                !appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
+                backgroundRows = listOf(readRow())
+                val markedRead =
+                    pumpingMainLooper {
+                        appState.markNotificationMessageRead(BACKGROUND_ACCOUNT, GROUP_ID, MESSAGE_ID)
+                    }
+
+                assertTrue(markedRead)
+                assertEquals("no account switch may be required", ACTIVE_ACCOUNT, appState.activeAccountRef)
+                awaitCondition("background dot clears from the authoritative refresh") {
+                    !appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
+                }
+                assertEquals(0uL, appState.confirmedUnreadCountForAccount(BACKGROUND_ACCOUNT))
             }
-            assertEquals(0uL, appState.confirmedUnreadCountForAccount(BACKGROUND_ACCOUNT))
-            fixture.close()
         }
 
+    /** A background mark-read publishes the authoritative unread remainder instead of assuming zero. */
     @Test
     fun backgroundAccountMarkReadReflectsRemainingAuthoritativeUnread() =
         runTest {
-            val fixture = fixture()
-            val appState = fixture.appState
-            fixture.bootstrapAndRefresh()
-            awaitCondition("background dot lights from its own unread") {
-                appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
-            }
-
-            backgroundRows = listOf(unreadRow(unreadCount = 1uL))
-            val markedRead =
-                pumpingMainLooper {
-                    appState.markNotificationMessageRead(BACKGROUND_ACCOUNT, GROUP_ID, MESSAGE_ID)
+            withFixture { fixture ->
+                val appState = fixture.appState
+                fixture.bootstrapAndRefresh()
+                awaitCondition("background dot lights from its own unread") {
+                    appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
                 }
 
-            assertTrue(markedRead)
-            awaitCondition("the post-action count replaces the pre-action value") {
-                appState.confirmedUnreadCountForAccount(BACKGROUND_ACCOUNT) == 1uL
+                backgroundRows = listOf(unreadRow(unreadCount = 1uL))
+                val markedRead =
+                    pumpingMainLooper {
+                        appState.markNotificationMessageRead(BACKGROUND_ACCOUNT, GROUP_ID, MESSAGE_ID)
+                    }
+
+                assertTrue(markedRead)
+                awaitCondition("the post-action count replaces the pre-action value") {
+                    appState.confirmedUnreadCountForAccount(BACKGROUND_ACCOUNT) == 1uL
+                }
+                assertTrue(appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT))
             }
-            assertTrue(appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT))
-            fixture.close()
         }
 
+    /** A background-account action cannot clear independently retained manual attention on another account. */
     @Test
     fun markReadOnOneAccountNeverTouchesAnotherAccountsDot() =
         runTest {
-            val fixture = fixture()
-            val appState = fixture.appState
-            fixture.bootstrapAndRefresh()
-            awaitCondition("background dot lights from its own unread") {
-                appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
-            }
-            // Manually flag the active account so it holds observable dot state
-            // that a background-account action must not clear.
-            appState.updateAccountManualUnread(ACTIVE_ACCOUNT, hasManualUnread = true)
-            assertTrue(appState.accountShowsUnreadDot(ACTIVE_ACCOUNT))
+            withFixture { fixture ->
+                val appState = fixture.appState
+                fixture.bootstrapAndRefresh()
+                awaitCondition("background dot lights from its own unread") {
+                    appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
+                }
+                // Manually flag the active account so it holds observable dot state
+                // that a background-account action must not clear.
+                appState.updateAccountManualUnread(ACTIVE_ACCOUNT, hasManualUnread = true)
+                assertTrue(appState.accountShowsUnreadDot(ACTIVE_ACCOUNT))
 
-            backgroundRows = listOf(readRow())
-            pumpingMainLooper {
-                appState.markNotificationMessageRead(BACKGROUND_ACCOUNT, GROUP_ID, MESSAGE_ID)
-            }
+                backgroundRows = listOf(readRow())
+                pumpingMainLooper {
+                    appState.markNotificationMessageRead(BACKGROUND_ACCOUNT, GROUP_ID, MESSAGE_ID)
+                }
 
-            awaitCondition("background dot clears") {
-                !appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
+                awaitCondition("background dot clears") {
+                    !appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
+                }
+                assertTrue(
+                    "an action on one account must not clear another account's dot",
+                    appState.accountShowsUnreadDot(ACTIVE_ACCOUNT),
+                )
             }
-            assertTrue(
-                "an action on one account must not clear another account's dot",
-                appState.accountShowsUnreadDot(ACTIVE_ACCOUNT),
-            )
-            fixture.close()
         }
 
+    /** Failed reconciliation hides a known-stale badge while retaining its evidence for a later refresh. */
     @Test
     fun refreshFailureAfterMarkReadStopsPresentingTheStaleConfirmedCount() =
         runTest {
-            val fixture = fixture()
-            val appState = fixture.appState
-            fixture.bootstrapAndRefresh()
-            awaitCondition("background dot lights from its own unread") {
-                appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
-            }
-            assertEquals(2uL, appState.confirmedUnreadCountForAccount(BACKGROUND_ACCOUNT))
-
-            backgroundChatListFailure = RuntimeException("refresh unavailable")
-            val markedRead =
-                pumpingMainLooper {
-                    appState.markNotificationMessageRead(BACKGROUND_ACCOUNT, GROUP_ID, MESSAGE_ID)
+            withFixture { fixture ->
+                val appState = fixture.appState
+                fixture.bootstrapAndRefresh()
+                awaitCondition("background dot lights from its own unread") {
+                    appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
                 }
+                assertEquals(2uL, appState.confirmedUnreadCountForAccount(BACKGROUND_ACCOUNT))
 
-            assertTrue(markedRead)
-            // The known-stale value degrades to retained-but-not-presented
-            // instead of staying confirmed, so a failed refresh cannot keep a
-            // stale dot lit.
-            assertFalse(appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT))
-            assertEquals(0uL, appState.confirmedUnreadCountForAccount(BACKGROUND_ACCOUNT))
-            assertEquals(
-                "retained evidence must survive for reconciliation",
-                2uL,
-                appState.unreadCountForAccount(BACKGROUND_ACCOUNT),
-            )
-            fixture.close()
+                backgroundChatListFailure = RuntimeException("refresh unavailable")
+                val markedRead =
+                    pumpingMainLooper {
+                        appState.markNotificationMessageRead(BACKGROUND_ACCOUNT, GROUP_ID, MESSAGE_ID)
+                    }
+
+                assertTrue(markedRead)
+                // The known-stale value degrades to retained-but-not-presented
+                // instead of staying confirmed, so a failed refresh cannot keep a
+                // stale dot lit.
+                assertFalse(appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT))
+                assertEquals(0uL, appState.confirmedUnreadCountForAccount(BACKGROUND_ACCOUNT))
+                assertEquals(
+                    "retained evidence must survive for reconciliation",
+                    2uL,
+                    appState.unreadCountForAccount(BACKGROUND_ACCOUNT),
+                )
+            }
         }
 
+    /** A missing folded row still schedules authoritative reconciliation without a premature stale transition. */
     @Test
     fun nullMarkReadRowStillReconcilesWithoutDegradingPresentationFirst() =
         runTest {
-            val fixture = fixture()
-            val appState = fixture.appState
-            fixture.bootstrapAndRefresh()
-            awaitCondition("background dot lights from its own unread") {
-                appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
-            }
-
-            markReadReturnsRow = false
-            backgroundRows = listOf(readRow())
-            val refreshesBefore = backgroundChatListCalls.get()
-            val markedRead =
-                pumpingMainLooper {
-                    appState.markNotificationMessageRead(BACKGROUND_ACCOUNT, GROUP_ID, MESSAGE_ID)
+            withFixture { fixture ->
+                val appState = fixture.appState
+                fixture.bootstrapAndRefresh()
+                awaitCondition("background dot lights from its own unread") {
+                    appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
                 }
 
-            assertTrue(markedRead)
-            awaitCondition("an authoritative refresh still runs") {
-                backgroundChatListCalls.get() > refreshesBefore
+                markReadReturnsRow = false
+                backgroundRows = listOf(readRow())
+                val refreshesBefore = backgroundChatListCalls.get()
+                val markedRead =
+                    pumpingMainLooper {
+                        appState.markNotificationMessageRead(BACKGROUND_ACCOUNT, GROUP_ID, MESSAGE_ID)
+                    }
+
+                assertTrue(markedRead)
+                awaitCondition("an authoritative refresh still runs") {
+                    backgroundChatListCalls.get() > refreshesBefore
+                }
+                awaitCondition("the refresh converges the dot") {
+                    !appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
+                }
             }
-            awaitCondition("the refresh converges the dot") {
-                !appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
-            }
-            fixture.close()
         }
 
+    /** An active account with a bound controller folds once and does not enqueue a duplicate refresh. */
     @Test
     fun activeAccountMarkReadFoldsTheRowOnceWithoutASecondScheduledRefresh() =
         runTest {
-            val fixture = fixture()
-            val appState = fixture.appState
-            fixture.bootstrapAndRefresh()
-            val controller =
-                ChatsController(
-                    appState = appState,
-                    initialAccountRef = ACTIVE_ACCOUNT,
-                    memberSnapshotLoader = { _, _ -> emptyList() },
-                )
-            appState.attachChatsController(controller)
-            // Let any controller-owned initial load settle first so the counter
-            // isolates the mark-read path from unrelated startup reads.
-            pumpingMainLooper { delay(200L) }
-            val refreshesBefore = activeChatListCalls.get()
+            activeRows = listOf(unreadRow())
+            withFixture { fixture ->
+                val appState = fixture.appState
+                fixture.bootstrapAndRefresh()
+                val controller =
+                    ChatsController(
+                        appState = appState,
+                        initialAccountRef = ACTIVE_ACCOUNT,
+                        memberSnapshotLoader = { _, _ -> emptyList() },
+                    )
+                appState.attachChatsController(controller)
+                try {
+                    controller.applyChatListRow(unreadRow())
+                    awaitCondition("the active controller projects the seeded unread row") {
+                        controller.items.singleOrNull()?.unreadCount == 2uL
+                    }
+                    // This controller has no bind/subscription writer. Drain the seeded
+                    // projection before measuring the returned mark-read row's fold.
+                    pumpingMainLooper { delay(200L) }
+                    val refreshesBefore = activeChatListCalls.get()
+                    val projectionBefore = controller.forwardTargetsRevision
 
-            val markedRead =
-                pumpingMainLooper {
-                    appState.markNotificationMessageRead(ACTIVE_ACCOUNT, GROUP_ID, MESSAGE_ID)
+                    val markedRead =
+                        pumpingMainLooper {
+                            appState.markNotificationMessageRead(ACTIVE_ACCOUNT, GROUP_ID, MESSAGE_ID)
+                        }
+
+                    assertTrue(markedRead)
+                    awaitCondition("the returned read row replaces the active unread row") {
+                        controller.items.singleOrNull()?.unreadCount == 0uL
+                    }
+                    // Give the coalesced refresh scheduler several drain windows: a
+                    // second refresh for the folded account would surface here.
+                    pumpingMainLooper { delay(200L) }
+                    assertEquals(
+                        "the returned row produces one controller projection",
+                        projectionBefore + 1L,
+                        controller.forwardTargetsRevision,
+                    )
+                    assertEquals(0uL, appState.confirmedUnreadCountForAccount(ACTIVE_ACCOUNT))
+                    assertEquals(
+                        "a bound-controller fold must not also schedule a per-account refresh",
+                        refreshesBefore,
+                        activeChatListCalls.get(),
+                    )
+                } finally {
+                    appState.attachChatsController(null)
+                    controller.onCleared()
                 }
+            }
+        }
 
-            assertTrue(markedRead)
-            // Give the coalesced refresh scheduler several drain windows: a
-            // second refresh for the folded account would surface here.
-            pumpingMainLooper { delay(200L) }
-            assertEquals(
-                "a bound-controller fold must not also schedule a per-account refresh",
-                refreshesBefore,
-                activeChatListCalls.get(),
-            )
-            appState.attachChatsController(null)
+    /** Closes each fixture even when an assertion or awaited production callback fails. */
+    private suspend fun withFixture(block: suspend (NotificationBootstrapTestFixture) -> Unit) {
+        val fixture = fixture()
+        try {
+            block(fixture)
+        } finally {
             fixture.close()
         }
+    }
 
     /** Bootstraps the fixture and runs one explicit account refresh so the seeded chat-list truth is confirmed. */
     private suspend fun NotificationBootstrapTestFixture.bootstrapAndRefresh() {

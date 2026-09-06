@@ -721,6 +721,8 @@
     <string name="toast_relay_list_updated">Список реле обновлен</string>
     <string name="toast_relay_update_failed">Обновление реле не удалось</string>
     <string name="error_remove_invalid_relay_urls_first">Сначала удалите недействительные URL реле.</string>
+    <string name="error_no_safe_key_package_source_relay">Нет доступного безопасного исходного реле. Обновите пакеты ключей и повторите попытку.</string>
+    <string name="error_couldnt_verify_relay_hosts">Не удалось проверить узлы реле. Проверьте подключение и повторите попытку.</string>
     <string name="toast_couldnt_load_key_packages">Не удалось загрузить пакеты ключей</string>
     <string name="toast_key_package_deleted">Пакет ключей удалён</string>
     <string name="toast_couldnt_delete_key_package">Не удалось удалить пакет ключей. Попробуйте снова.</string>

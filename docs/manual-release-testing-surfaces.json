@@ -1125,12 +1125,21 @@
         ]
       },
       {
-        "surface": "SeededConversationAuthoritativeReconciliationEffect",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationInitialPresentation.kt",
-        "anchor": "fun SeededConversationAuthoritativeReconciliationEffect(",
+        "surface": "ConversationSeededTailAlignmentRecovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationSeededTailAlignmentRecovery.kt",
+        "anchor": "fun ConversationSeededTailAlignmentRecovery(",
         "test_ids": [
           "CON-002",
           "CON-003"
+        ]
+      },
+      {
+        "surface": "ConversationTailInsetReanchorEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTailInsetReanchorEffect.kt",
+        "anchor": "fun ConversationTailInsetReanchorEffect(",
+        "test_ids": [
+          "CON-001",
+          "CON-014"
         ]
       },
       {
@@ -1490,6 +1499,14 @@
         "surface": "ConversationDictationFloatingControl",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
         "anchor": "fun ConversationDictationFloatingControl(",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "ConversationDictationMicrophoneDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "fun ConversationDictationMicrophoneDialog(",
         "test_ids": [
           "DIC-001"
         ]
@@ -4406,7 +4423,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackagesScreen.kt",
         "anchor": "fun KeyPackageCard(",
         "test_ids": [
-          "SET-001"
+          "ACC-016",
+          "ACC-018"
         ]
       },
       {
@@ -4414,7 +4432,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackagesScreen.kt",
         "anchor": "fun KeyPackagesContent(",
         "test_ids": [
-          "ACC-016"
+          "ACC-016",
+          "ACC-018"
         ]
       },
       {
@@ -4422,7 +4441,17 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackagesScreen.kt",
         "anchor": "fun KeyPackagesScreen(",
         "test_ids": [
-          "SET-001"
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "KeyPackagesScreenForAccount",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackagesScreen.kt",
+        "anchor": "fun KeyPackagesScreenForAccount(",
+        "test_ids": [
+          "ACC-017",
+          "ACC-018"
         ]
       },
       {
@@ -4758,6 +4787,39 @@
       }
     ],
     "settings_controls": [
+      {
+        "surface": "setting:error_couldnt_verify_relay_hosts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.error_couldnt_verify_relay_hosts",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "setting:error_no_safe_key_package_source_relay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/KeyPackageDeletionResult.kt",
+        "anchor": "R.string.error_no_safe_key_package_source_relay",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "setting:toast_couldnt_delete_key_package",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/KeyPackageDeletionResult.kt",
+        "anchor": "R.string.toast_couldnt_delete_key_package",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "setting:toast_key_package_deleted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/KeyPackageDeletionResult.kt",
+        "anchor": "R.string.toast_key_package_deleted",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
       {
         "surface": "setting:account_session",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
