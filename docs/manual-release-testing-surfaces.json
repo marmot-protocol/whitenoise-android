@@ -1139,6 +1139,8 @@
         "anchor": "fun ConversationTailInsetReanchorEffect(",
         "test_ids": [
           "CON-001",
+          "CON-002",
+          "CON-003",
           "CON-014"
         ]
       },
@@ -1233,24 +1235,7 @@
           "CON-001"
         ]
       },
-      {
-        "surface": "ConversationSeededTailAlignmentRecovery",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationSeededTailAlignmentRecovery.kt",
-        "anchor": "fun ConversationSeededTailAlignmentRecovery(",
-        "test_ids": [
-          "CON-002",
-          "CON-003"
-        ]
-      },
-      {
-        "surface": "ConversationTailInsetReanchorEffect",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTailInsetReanchorEffect.kt",
-        "anchor": "fun ConversationTailInsetReanchorEffect(",
-        "test_ids": [
-          "CON-002",
-          "CON-003"
-        ]
-      },
+
       {
         "surface": "ConversationTopBar",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
@@ -1539,14 +1524,7 @@
           "DIC-002"
         ]
       },
-      {
-        "surface": "ConversationDictationMicrophoneDialog",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
-        "anchor": "fun ConversationDictationMicrophoneDialog(",
-        "test_ids": [
-          "DIC-001"
-        ]
-      },
+
       {
         "surface": "ConversationDictationPrimaryAction",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
