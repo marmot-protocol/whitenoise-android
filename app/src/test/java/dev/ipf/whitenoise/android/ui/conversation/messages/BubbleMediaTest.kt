@@ -187,6 +187,7 @@ class BubbleMediaTest {
         assertEquals(1, listOf(visualOwnsFooter, fileOwnsFooter).count { it })
     }
 
+    /** A retained generic file with no confirmed media selects the pending file renderer. */
     @Test
     fun pendingFilePlaceholderOwnsTheOptimisticFileState() {
         assertTrue(
@@ -200,6 +201,7 @@ class BubbleMediaTest {
         )
     }
 
+    /** Confirmed, audio, and visual media each suppress the generic pending-file renderer. */
     @Test
     fun pendingFilePlaceholderNeverDuplicatesAnotherMediaRenderer() {
         assertFalse(

@@ -57,6 +57,7 @@ class ReceivedFileTimestampScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Compares pending and received file cards while preserving their distinct transfer semantics. */
     @Test
     fun sendingAndReceivedFileCardsKeepTheSameFootprint() {
         composeRule.setContent {
@@ -111,6 +112,7 @@ class ReceivedFileTimestampScreenshotTest {
             .assertCountEquals(1)
     }
 
+    /** Captures received, sent, captioned, and grouped file-footer states in one light-theme gallery. */
     @Test
     fun receivedFileTimestampGallery() {
         composeRule.setContent {

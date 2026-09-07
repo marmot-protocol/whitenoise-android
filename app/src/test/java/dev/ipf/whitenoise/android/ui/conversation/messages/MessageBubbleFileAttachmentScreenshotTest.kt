@@ -148,6 +148,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         }
     }
 
+    /** Captures real message bubbles across incoming, outgoing, captioned, pending, and selected layouts. */
     @Test
     fun realMessageBubblePathKeepsFileCardsReadableAcrossParentVariants() {
         val gallery = fileGallery()
@@ -173,6 +174,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         composeRule.onRoot().captureRoboImage(SNAPSHOT_PATH)
     }
 
+    /** Proves the received-file card stays hidden until first-frame cache resolution completes. */
     @Test
     @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h112dp-mdpi")
     fun receivedFileCardHasDeterministicUnresolvedAndResolvedFirstFrames() {
@@ -449,6 +451,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         }
     }
 
+    /** Verifies transfer, sizing, semantics, and selection invariants for every gallery row. */
     private fun assertFileGalleryStates(gallery: GalleryFixtures) {
         assertFileCardAndBubbleWidth(gallery.incoming, expectedWidth = 272f)
         assertFileCardAndBubbleWidth(gallery.downloadedApk, expectedWidth = 272f)
@@ -481,6 +484,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         assertFileCardAndBubbleWidth(gallery.rtl, expectedWidth = 272f)
     }
 
+    /** Renders every parent-layout variant through the production message bubble. */
     @Composable
     private fun FileGallery(gallery: GalleryFixtures) {
         Column(Modifier.width(360.dp)) {
@@ -508,6 +512,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         }
     }
 
+    /** Builds the incoming, outgoing, pending, failure, selection, and RTL gallery records. */
     private fun fileGallery() =
         GalleryFixtures(
             incoming =
