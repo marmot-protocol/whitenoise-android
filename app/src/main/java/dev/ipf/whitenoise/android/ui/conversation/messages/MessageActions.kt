@@ -506,7 +506,11 @@ internal fun forwardTargetMembersPreview(
         ?.takeIf { it.isNotBlank() }
 }
 
-/** Folder bulk-select rows for the account that owns the picker's chat list. */
+/**
+ * Folder bulk-select rows restricted to the owning account's current eligible destinations.
+ * Saved manual membership can contain the origin or removed chats, so intersect before
+ * counting or toggling and retain the same destination order as the individual rows.
+ */
 internal fun forwardFolderBulkRows(
     appState: WhiteNoiseAppState,
     targets: List<ChatListItem>,
@@ -516,6 +520,14 @@ internal fun forwardFolderBulkRows(
 ): List<Pair<ChatFolder, List<String>>> {
     val accountRef = ownerAccountRef ?: return emptyList()
     val store = appState.chatFolderPreferences
+    val eligibleIds =
+        targets
+            .map {
+                it.group.groupIdHex
+                    .trim()
+                    .lowercase(Locale.ROOT)
+            }.filter { it.isNotEmpty() }
+            .distinct()
     val mutedGroupIds = targets.filter(ChatListItem::engineMuted).mapTo(hashSetOf()) { it.group.groupIdHex }
     return store
         .foldersFor(accountRef)
@@ -524,7 +536,7 @@ internal fun forwardFolderBulkRows(
         // renamed default participates like any other folder.
         .filter { it.name.isNotBlank() }
         .map { folder ->
-            folder to
+            val memberIds =
                 chatFolderChatIds(
                     items = targets,
                     manualChatIds = store.membershipFor(accountRef, folder.id),
@@ -534,7 +546,8 @@ internal fun forwardFolderBulkRows(
                         groupIdHex in mutedGroupIds
                     },
                     displayTitle = { forwardTargetDisplayTitle(it, appState, accountRef, groupTitleCopy) },
-                ).toList()
+                ).mapTo(hashSetOf()) { it.trim().lowercase(Locale.ROOT) }
+            folder to eligibleIds.filter(memberIds::contains)
         }.filter { (_, memberIds) -> memberIds.size >= 2 }
 }
 

@@ -1,10 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.border
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -24,7 +20,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,7 +31,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,13 +38,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
@@ -343,14 +332,14 @@ internal fun ChatListFilterChips(
         // `All` is the permanent reset state, not a real folder: always
         // visible, never orderable, selected when nothing else is.
         ChatFolderChip(
-            selected = selectedFolderId == null,
+            state = if (selectedFolderId == null) ToggleableState.On else ToggleableState.Off,
             label = stringResource(R.string.chat_list_filter_all),
             onClick = { onSelect(null) },
             modifier = Modifier.testTag(CHAT_LIST_FILTER_CHIP_ALL_TAG),
         )
         chips.forEach { chip ->
             ChatFolderChip(
-                selected = selectedFolderId == chip.folderId,
+                state = if (selectedFolderId == chip.folderId) ToggleableState.On else ToggleableState.Off,
                 // A renamed default shows its stored name; the localized
                 // default label is only the un-renamed fallback.
                 label =
@@ -370,76 +359,3 @@ internal fun ChatListFilterChips(
         }
     }
 }
-
-@OptIn(ExperimentalFoundationApi::class)
-@Suppress("FunctionNaming")
-@Composable
-private fun ChatFolderChip(
-    selected: Boolean,
-    label: String,
-    onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
-    trailingCount: Int = 0,
-    modifier: Modifier = Modifier,
-) {
-    val trailingIcon: (@Composable () -> Unit)? =
-        if (trailingCount > 0) {
-            {
-                Text(
-                    text = if (trailingCount > 99) "99+" else trailingCount.toString(),
-                    style = MaterialTheme.typography.labelSmall,
-                )
-            }
-        } else {
-            null
-        }
-    val accessibleDescription = chatFolderChipAccessibleDescription(label, trailingCount)
-    val interactionSource = remember { MutableInteractionSource() }
-    val longClickLabel = if (onLongClick != null) stringResource(R.string.edit) else null
-    val gestureModifier =
-        Modifier.combinedClickable(
-            interactionSource = interactionSource,
-            indication = null,
-            onClick = onClick,
-            onLongClick = onLongClick,
-            onLongClickLabel = longClickLabel,
-            role = Role.Checkbox,
-        )
-    Box {
-        FilterChip(
-            selected = selected,
-            onClick = {},
-            label = { Text(label) },
-            trailingIcon = trailingIcon,
-            interactionSource = interactionSource,
-            modifier = Modifier.clearAndSetSemantics {},
-        )
-        Box(
-            modifier =
-                modifier
-                    .matchParentSize()
-                    .then(gestureModifier)
-                    .semantics(mergeDescendants = true) {
-                        contentDescription = accessibleDescription
-                        this.selected = selected
-                    },
-        )
-    }
-}
-
-@Composable
-private fun chatFolderChipAccessibleDescription(
-    label: String,
-    trailingCount: Int,
-): String =
-    if (trailingCount > 0) {
-        val countLabel =
-            pluralStringResource(
-                R.plurals.chat_folder_chat_count,
-                trailingCount,
-                trailingCount,
-            )
-        "$label, $countLabel"
-    } else {
-        label
-    }
