@@ -6615,7 +6615,7 @@
     ],
     "source_coverage": [
       {
-        "surface": "MarmotKit SDK pin: retained-data upgrade and sign-in compatibility",
+        "surface": "MarmotKit SDK pin: backed-up in-place upgrade, startup, and sign-in compatibility",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
         "anchor": "mdk-sha=",
         "test_ids": [

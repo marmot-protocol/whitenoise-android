@@ -121,6 +121,23 @@ class DiagnosticFormatterTest {
         )
     }
 
+    /** Superseded changes use the existing group diagnostic without exposing identifiers or payloads. */
+    @Test
+    fun supersededGroupChangeUsesPrivateGroupDiagnostic() {
+        val event =
+            MarmotEventFfi.GroupChangeSuperseded(
+                accountIdHex = "private-account",
+                accountLabel = "alice",
+                groupIdHex = "private-group",
+                commitIdHex = "private-commit",
+                kind = "group_profile",
+                outcome = "conflict",
+                reason = "private-payload",
+            )
+
+        assertEquals("[alice] group event", DiagnosticFormatter.describe(event, legacyShortHexIdentity))
+    }
+
     @Test
     fun accountErrorsScrubSecretsBeforeTruncating() {
         val secretHex = "a".repeat(64)
