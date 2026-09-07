@@ -33,6 +33,22 @@ internal fun shouldShowMessageStatus(
             -> true
         }
 
+/** Exclusive destinations for a message-level invalidation warning. */
+internal data class InvalidationWarningPlacement(
+    val fileFooter: String?,
+    val outerBubble: String?,
+)
+
+/** Assigns an invalidation warning to exactly one layout owner. */
+internal fun placeInvalidationWarning(
+    warning: String?,
+    fileCardOwnsFooter: Boolean,
+): InvalidationWarningPlacement =
+    InvalidationWarningPlacement(
+        fileFooter = warning.takeIf { fileCardOwnsFooter },
+        outerBubble = warning.takeUnless { fileCardOwnsFooter },
+    )
+
 internal data class BubblePresentation(
     val backgroundArgb: Long,
     val contentArgb: Long,

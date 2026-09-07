@@ -85,6 +85,7 @@ internal fun MediaFileBubbleContent(
     status: MessageStatus = MessageStatus.Received,
     retention: RetentionIndicatorInput? = null,
     reserveRetentionSpace: Boolean = false,
+    footerWarningText: String? = null,
     retentionClockMillis: () -> Long = System::currentTimeMillis,
     onCancelTransfer: (() -> Unit)? = null,
 ) {
@@ -100,6 +101,7 @@ internal fun MediaFileBubbleContent(
         trailingStatus = status.takeIf { showStatus },
         retention = retention,
         reserveRetentionSpace = reserveRetentionSpace,
+        footerWarningText = footerWarningText,
         retentionClockMillis = retentionClockMillis,
         loadingDescription = stringResource(R.string.media_downloading),
         openingDescription = stringResource(R.string.media_opening),
@@ -122,6 +124,7 @@ internal fun FileBubbleContent(
     trailingStatus: MessageStatus?,
     retention: RetentionIndicatorInput? = null,
     reserveRetentionSpace: Boolean = false,
+    footerWarningText: String? = null,
     retentionClockMillis: () -> Long = System::currentTimeMillis,
     loadingDescription: String,
     openingDescription: String = stringResource(R.string.media_opening),
@@ -162,11 +165,13 @@ internal fun FileBubbleContent(
                 trailingStatus = trailingStatus,
                 retentionPresentation = retentionPresentation,
                 reserveRetentionSpace = reserveRetentionSpace,
+                footerWarningText = footerWarningText,
             )
         }
     }
 }
 
+/** Keeps an optional warning and the trailing timestamp/status block in one bounded file footer. */
 @Composable
 private fun FileMetadataRow(
     metadataText: String,
@@ -176,37 +181,54 @@ private fun FileMetadataRow(
     trailingStatus: MessageStatus?,
     retentionPresentation: RetentionIndicatorPresentation,
     reserveRetentionSpace: Boolean,
+    footerWarningText: String?,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    Column(
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Text(
-            text = metadataText,
-            style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.ContentOrLtr),
-            color =
-                if (metadataIsError) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        val hasRetentionMetadata =
-            reserveRetentionSpace || retentionPresentation !is RetentionIndicatorPresentation.Hidden
-        val hasTrailingMetadata =
-            trailingMetadataText != null || trailingStatus != null || hasRetentionMetadata
-        if (hasTrailingMetadata) {
-            FileTrailingMetadata(
-                text = trailingMetadataText,
-                isError = trailingMetadataIsError,
-                status = trailingStatus,
-                retentionPresentation = retentionPresentation,
-                reserveRetentionSpace = reserveRetentionSpace,
+        footerWarningText?.let { warning ->
+            Text(
+                text = warning,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.End,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = metadataText,
+                style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.ContentOrLtr),
+                color =
+                    if (metadataIsError) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            val hasRetentionMetadata =
+                reserveRetentionSpace || retentionPresentation !is RetentionIndicatorPresentation.Hidden
+            val hasTrailingMetadata =
+                trailingMetadataText != null || trailingStatus != null || hasRetentionMetadata
+            if (hasTrailingMetadata) {
+                FileTrailingMetadata(
+                    text = trailingMetadataText,
+                    isError = trailingMetadataIsError,
+                    status = trailingStatus,
+                    retentionPresentation = retentionPresentation,
+                    reserveRetentionSpace = reserveRetentionSpace,
+                )
+            }
         }
     }
 }
