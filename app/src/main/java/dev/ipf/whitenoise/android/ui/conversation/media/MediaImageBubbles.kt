@@ -161,7 +161,7 @@ internal fun rememberMediaBubbleAspectRatio(
         initialMediaBubbleAspectRatio(dim)
     }
 
-/** Renders retained image pixels immediately and materializes misses according to the user's download policy. */
+/** Renders retained image pixels, materializes policy-allowed misses, and delegates viewer ownership to the host. */
 @Composable
 internal fun MediaImageBubble(
     item: TimelineMessage,
@@ -169,7 +169,7 @@ internal fun MediaImageBubble(
     attachmentIndex: Int,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
-    conversationVisualPages: List<MediaViewerPage>,
+    onOpenConversationMedia: (ConversationMediaViewerOpenRequest) -> Unit,
     mine: Boolean,
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
@@ -191,7 +191,7 @@ internal fun MediaImageBubble(
     //   - Bytes-level state (bitmap, failed, reloadToken): keyed on
     //     `sourceEpoch` so a typed-reference upgrade from imeta-fallback
     //     (epoch = 0) to the real listMedia value clears a stuck failure.
-    //   - User-interaction state (viewerOpen, materialization intent): NOT keyed on
+    //   - User-interaction state (materialization intent): NOT keyed on
     //     epoch, because we never want a background typed-ref upgrade to
     //     close a viewer the user just opened, or re-gate a download the
     //     user just consented to.
@@ -212,7 +212,6 @@ internal fun MediaImageBubble(
         )
     }
     var failed by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
-    var viewerOpen by remember(key, attachmentIndex) { mutableStateOf(false) }
     var reloadToken by remember(key, attachmentIndex, epoch) { mutableIntStateOf(0) }
     var cachedPlaintextOnEntry by
         rememberImageAttachmentCacheAvailability(controller, key, attachmentIndex, epoch, presentation != null)
@@ -243,6 +242,20 @@ internal fun MediaImageBubble(
             policyAllowsMaterialization = policyAllowsMaterialization,
         )
     val startDownload = materializationIntent.shouldMaterialize
+
+    /** Hands the logical image to the conversation-owned viewer before row disposal can occur. */
+    fun dispatchViewerOpen() {
+        onOpenConversationMedia(
+            ConversationMediaViewerOpenRequest(
+                messageIdHex = key,
+                attachments = listOf(IndexedValue(attachmentIndex, reference)),
+                tappedAttachmentIndex = attachmentIndex,
+                sender = record.sender,
+                recordedAt = record.recordedAt,
+                mine = mine,
+            ),
+        )
+    }
 
     LaunchedEffect(key, attachmentIndex, epoch, materializationIntent, reloadToken) {
         if (presentation != null) return@LaunchedEffect // already have decoded pixels
@@ -303,7 +316,7 @@ internal fun MediaImageBubble(
             }
             materializationIntent = materializationIntent.afterInteractiveRequest()
         },
-        dispatchOpen = { viewerOpen = true },
+        dispatchOpen = ::dispatchViewerOpen,
     )
 
     Surface(
@@ -343,7 +356,7 @@ internal fun MediaImageBubble(
                                 .fillMaxSize()
                                 .combinedClickable(
                                     onLongClick = onLongPress,
-                                    onClick = { viewerOpen = true },
+                                    onClick = ::dispatchViewerOpen,
                                 ),
                     )
                 is DecodedAttachmentPresentation.Animated ->
@@ -356,7 +369,7 @@ internal fun MediaImageBubble(
                                 .fillMaxSize()
                                 .combinedClickable(
                                     onLongClick = onLongPress,
-                                    onClick = { viewerOpen = true },
+                                    onClick = ::dispatchViewerOpen,
                                 ),
                     )
                 null ->
@@ -415,21 +428,6 @@ internal fun MediaImageBubble(
                 }
             }
         }
-    }
-
-    if (viewerOpen) {
-        ConversationMediaViewer(
-            controller = controller,
-            appState = appState,
-            conversationVisualPages = conversationVisualPages,
-            messageIdHex = key,
-            attachments = listOf(IndexedValue(attachmentIndex, reference)),
-            tappedAttachmentIndex = attachmentIndex,
-            sender = record.sender,
-            recordedAt = record.recordedAt,
-            mine = mine,
-            onDismiss = { viewerOpen = false },
-        )
     }
 }
 
@@ -508,7 +506,7 @@ internal fun MediaVisualGridBubble(
     attachments: List<IndexedValue<MediaAttachmentReferenceFfi>>,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
-    conversationVisualPages: List<MediaViewerPage>,
+    onOpenConversationMedia: (ConversationMediaViewerOpenRequest) -> Unit,
     mine: Boolean,
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
@@ -518,7 +516,20 @@ internal fun MediaVisualGridBubble(
     // Show up to four tiles before collapsing the remainder into a "+N"
     // overlay on the fourth tile, matching the image grid (#527).
     val visible = attachments.take(4)
-    var viewerOpenAttachmentIndex by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
+
+    /** Opens one grid attachment through the row-independent mixed-media session owner. */
+    fun dispatchViewerOpen(attachmentIndex: Int) {
+        onOpenConversationMedia(
+            ConversationMediaViewerOpenRequest(
+                messageIdHex = record.messageIdHex,
+                attachments = attachments,
+                tappedAttachmentIndex = attachmentIndex,
+                sender = record.sender,
+                recordedAt = record.recordedAt,
+                mine = mine,
+            ),
+        )
+    }
 
     val tileAt: @Composable (Int, Modifier) -> Unit = { tileIndex, tileModifier ->
         val entry = visible[tileIndex]
@@ -531,7 +542,7 @@ internal fun MediaVisualGridBubble(
                 controller = controller,
                 appState = appState,
                 mine = mine,
-                onTap = { _ -> viewerOpenAttachmentIndex = entry.index },
+                onTap = { dispatchViewerOpen(entry.index) },
                 overflowCount = if (showOverflow) attachments.size - visible.size else 0,
                 modifier = tileModifier,
                 onLongPress = onLongPress,
@@ -545,7 +556,7 @@ internal fun MediaVisualGridBubble(
                 controller = controller,
                 appState = appState,
                 mine = mine,
-                onTap = { viewerOpenAttachmentIndex = entry.index },
+                onTap = { dispatchViewerOpen(entry.index) },
                 overflowCount = if (showOverflow) attachments.size - visible.size else 0,
                 modifier = tileModifier,
                 onLongPress = onLongPress,
@@ -561,21 +572,6 @@ internal fun MediaVisualGridBubble(
         modifier = Modifier.fillMaxWidth(),
     ) {
         MasonryImageLayout(visibleCount = visible.size, onLongPress = onLongPress, tile = tileAt)
-    }
-
-    viewerOpenAttachmentIndex?.let { tappedAttachmentIndex ->
-        ConversationMediaViewer(
-            controller = controller,
-            appState = appState,
-            conversationVisualPages = conversationVisualPages,
-            messageIdHex = record.messageIdHex,
-            attachments = attachments,
-            tappedAttachmentIndex = tappedAttachmentIndex,
-            sender = record.sender,
-            recordedAt = record.recordedAt,
-            mine = mine,
-            onDismiss = { viewerOpenAttachmentIndex = null },
-        )
     }
 }
 

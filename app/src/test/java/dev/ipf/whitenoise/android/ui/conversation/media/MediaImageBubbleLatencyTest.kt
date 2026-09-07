@@ -306,7 +306,7 @@ class MediaImageBubbleLatencyTest {
             attachmentIndex = 0,
             controller = controller,
             appState = fixture.state,
-            conversationVisualPages = emptyList(),
+            onOpenConversationMedia = {},
             mine = false,
         )
     }

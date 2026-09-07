@@ -1860,7 +1860,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
         "anchor": "fun VideoViewerPage(",
         "test_ids": [
-          "MED-001"
+          "MED-007",
+          "MED-017"
         ]
       },
       {
@@ -1873,10 +1874,20 @@
         ]
       },
       {
+        "surface": "ConversationMediaViewerSessionHost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationMediaViewerSession.kt",
+        "anchor": "fun ConversationMediaViewerSessionHost(",
+        "test_ids": [
+          "MED-007",
+          "MED-015"
+        ]
+      },
+      {
         "surface": "ConversationMediaViewer",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "fun ConversationMediaViewer(",
         "test_ids": [
+          "MED-007",
           "MED-015",
           "MED-016",
           "MED-017"

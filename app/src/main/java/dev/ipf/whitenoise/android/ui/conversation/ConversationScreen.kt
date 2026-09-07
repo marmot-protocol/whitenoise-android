@@ -152,6 +152,9 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerAttac
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerShareRevision
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberConversationMentionPickerState
+import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewer
+import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOwner
+import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerSessionHost
 import dev.ipf.whitenoise.android.ui.conversation.media.NullableFileSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.NullableUriSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
@@ -164,6 +167,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveContentImageUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberConversationMediaViewerSessionState
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberDocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
@@ -2872,6 +2876,16 @@ internal fun ConversationScreen(
         return
     }
 
+    val mediaViewerSessionState =
+        rememberConversationMediaViewerSessionState(
+            owner =
+                ConversationMediaViewerOwner(
+                    accountRef = conversationAccountRef,
+                    conversationId = controller.group.groupIdHex,
+                    runtimeGeneration = appState.runtimeGeneration,
+                ),
+        )
+
     var createOpenConversationTiming by remember(chat.id) {
         mutableStateOf(ChatCreateOpenConversationTimingState())
     }
@@ -3501,7 +3515,7 @@ internal fun ConversationScreen(
                                     },
                                     appState = appState,
                                     controller = controller,
-                                    conversationVisualPages = conversationVisualPages,
+                                    onOpenConversationMedia = { request -> mediaViewerSessionState.open(request) },
                                     eventCardResolver = eventCardResolver,
                                     documentSaveFallback = documentSaveFallback,
                                     composerTextState = composerTextState,
@@ -3887,4 +3901,24 @@ internal fun ConversationScreen(
         onAddDocuments = { documentPickerLauncher.launch(arrayOf("*/*")) },
         onAfterSend = { revealSentMessage() },
     )
+
+    ConversationMediaViewerSessionHost(mediaViewerSessionState) { active ->
+        val request = active.request
+        ConversationMediaViewer(
+            controller = controller,
+            appState = appState,
+            conversationVisualPages = conversationVisualPages,
+            messageIdHex = request.messageIdHex,
+            attachments = request.attachments,
+            tappedAttachmentIndex = request.tappedAttachmentIndex,
+            sender = request.sender,
+            recordedAt = request.recordedAt,
+            mine = request.mine,
+            onDismiss = { mediaViewerSessionState.dismiss(active.sessionId) },
+            selectedAttachment = active.selectedAttachment,
+            onSelectedAttachmentChange = { selected ->
+                mediaViewerSessionState.selectPage(active.sessionId, selected)
+            },
+        )
+    }
 }
