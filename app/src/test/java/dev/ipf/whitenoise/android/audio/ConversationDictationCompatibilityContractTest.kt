@@ -47,6 +47,36 @@ class ConversationDictationCompatibilityContractTest {
     }
 
     @Test
+    fun recognitionServiceFallsBackOnlyToAnUnambiguousInstalledProvider() {
+        val configured = ComponentName("org.configured", "org.configured.Recognition")
+        val activity = ComponentName("org.offline", "org.offline.RecognizeActivity")
+        val matchingService = ComponentName("org.offline", "org.offline.Recognition")
+        val unrelatedService = ComponentName("org.other", "org.other.Recognition")
+
+        assertEquals(
+            configured,
+            conversationDictationRecognitionService(configured, activity, listOf(configured, matchingService)),
+        )
+        assertEquals(
+            matchingService,
+            conversationDictationRecognitionService(null, activity, listOf(matchingService, unrelatedService)),
+        )
+        assertEquals(
+            matchingService,
+            conversationDictationRecognitionService(null, null, listOf(matchingService)),
+        )
+        assertNull(conversationDictationRecognitionService(null, null, listOf(matchingService, unrelatedService)))
+        assertNull(conversationDictationRecognitionService(configured, activity, listOf(matchingService)))
+        assertNull(
+            conversationDictationRecognitionService(
+                null,
+                activity,
+                listOf(matchingService, ComponentName("org.offline", "org.offline.SecondRecognition")),
+            ),
+        )
+    }
+
+    @Test
     fun manifestAndRunbookKeepBothAndroidSpeechContractsDiscoverable() {
         val manifest = projectFile("app/src/main/AndroidManifest.xml").readText()
         val matrix = projectFile("docs/composer-dictation-device-matrix.md").readText()
@@ -58,6 +88,22 @@ class ConversationDictationCompatibilityContractTest {
         assertTrue("Voice IME" in matrix)
         assertTrue("GrapheneOS" in matrix)
         assertTrue("no silent fallback" in matrix.lowercase())
+    }
+
+    @Test
+    fun productionAndPreviewHaveNoTemporaryStartOrderingSelector() {
+        val activity = projectFile("app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt").readText()
+        val controller =
+            projectFile("app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt")
+                .readText()
+
+        assertFalse("DICTATION_START_EXPERIMENT" in activity)
+        assertFalse("ConversationDictationStartExperiment" in controller)
+        assertFalse("checkRecognitionSupport" in controller)
+        assertTrue("event=platform_start_listening" in controller)
+        val listenerRegistration = controller.indexOf("recognizer.setRecognitionListener(")
+        val platformStart = controller.indexOf("recognizer.startListening(recognitionIntent)")
+        assertTrue(listenerRegistration >= 0 && platformStart > listenerRegistration)
     }
 
     private fun projectFile(relative: String): File =

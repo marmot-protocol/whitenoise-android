@@ -1705,6 +1705,8 @@
     <string name="dictation_cancel">Отменить диктовку</string>
     <string name="dictation_provider_unavailable">Распознавание речи недоступно</string>
     <string name="dictation_permission_denied">Требуется доступ к микрофону</string>
+    <string name="dictation_provider_access_rejected">Служба распознавания речи отклонила доступ к микрофону</string>
+    <string name="dictation_open_voice_input_settings">Выбрать сервис распознавания речи</string>
     <string name="dictation_permission_denied_permanently">Разрешите доступ к микрофону в настройках</string>
     <string name="dictation_microphone_in_use">Микрофон уже используется</string>
     <string name="dictation_no_speech">Речь не распознана</string>

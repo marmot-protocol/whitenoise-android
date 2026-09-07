@@ -2,14 +2,15 @@
 <resources>
     <string name="dictation_done">Готово</string>
     <string name="dictation_notification_title">Диктовка активна</string>
-    <string name="dictation_notification_text">Нажмите «Готово», чтобы завершить, или «Отмена», чтобы удалить</string>
+    <string name="dictation_notification_text">Выберите «Отмена», «Вставить» или «Отправить»</string>
+    <string name="dictation_notification_unavailable">Включите уведомления о диктовке, чтобы использовать «Отмена», «Вставить» и «Отправить» вне приложения.</string>
     <string name="notification_channel_dictation">Диктовка</string>
     <string name="notification_channel_dictation_description">Управляет активной диктовкой в поле сообщения</string>
     <string name="dictation_settings_title">Диктовка</string>
     <string name="dictation_settings_subtitle">Выберите, когда завершать диктовку и что делать с текстом</string>
-    <string name="dictation_settings_explainer">White Noise использует именно ту службу распознавания речи, которая выбрана в Android. Эта служба обрабатывает звук; White Noise хранит в памяти только полученный текст, пока он не будет вставлен или отправлен.</string>
+    <string name="dictation_settings_explainer">White Noise использует установленную службу распознавания речи. Эта служба обрабатывает звук; White Noise хранит в памяти только полученный текст, пока он не будет вставлен или отправлен.</string>
     <string name="dictation_finish_title">Завершение диктовки</string>
-    <string name="dictation_finish_manual">Когда я нажму «Готово»</string>
+    <string name="dictation_finish_manual">Когда я выберу «Вставить» или «Отправить»</string>
     <string name="dictation_finish_after_silence">После %1$d секунд тишины</string>
     <string name="dictation_result_title">После завершения</string>
     <string name="dictation_result_paste">Вставить в черновик</string>
