@@ -9,6 +9,7 @@
     <string name="error_restart_app_before_retry">Il caricamento locale della conversazione è ancora in corso. Riavvia White Noise prima di riprovare.</string>
     <string name="error_loaded_content_may_be_out_of_date">I contenuti caricati sono ancora disponibili, ma potrebbero non essere aggiornati. Nuovo tentativo…</string>
     <string name="error_loaded_content_kept">Impossibile caricare altri contenuti. I tuoi messaggi sono ancora disponibili; riprova quando vuoi.</string>
+    <string name="error_conversation_membership_unavailable">Impossibile verificare i membri di questa conversazione. Riprova per mostrare i tuoi messaggi.</string>
     <string name="refresh">Aggiorna dump</string>
     <string name="retry">Riprova</string>
     <string name="chat_folder_members_loading">Aggiornamento cartella</string>

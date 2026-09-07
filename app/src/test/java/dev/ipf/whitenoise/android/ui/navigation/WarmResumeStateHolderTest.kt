@@ -22,6 +22,8 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.RetainedComposerExpansion
 import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollSnapshot
+import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -315,10 +317,117 @@ class WarmResumeStateHolderTest {
                 memberSnapshotLoader = { _, _ -> emptyList() },
             )
         holder.selectedChat.value = snapshotController.items.single()
+        holder.selectedChatOpenContext.value =
+            ConversationOpenContext(
+                notificationRouteTraceRequestId = 41L,
+                pinnedAccountRef = ACCOUNT_REF,
+            )
 
         holder.chatsController(ACCOUNT_REF, runtimeGeneration = 5)
 
         assertNull(holder.selectedChat.value)
+        assertEquals(ConversationOpenContext(), holder.selectedChatOpenContext.value)
+        holder.release()
+        snapshotController.onCleared()
+    }
+
+    /**
+     * The exact early notification route survives its target-account controller
+     * replacement, while every prior presentation owner and scroll hint resets.
+     */
+    @Test
+    fun sameRuntimeAccountReplacementRetainsOnlyThePinnedNotificationRoute() {
+        val state = appState()
+        val processState = MainShellProcessState(state)
+        val holder = MainShellStateHolder(state, SavedStateHandle(), processState)
+        holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
+        val snapshotController = snapshotController(state)
+        val selected = snapshotController.items.single()
+        val routeContext =
+            ConversationOpenContext(
+                focusMessageId = "notification-message",
+                focusMessageRequestId = 17L,
+                notificationOpenRequestId = 19L,
+                notificationRouteTraceRequestId = 23L,
+                pinnedAccountRef = SECOND_ACCOUNT_REF,
+            )
+        holder.selectedChat.value = selected
+        holder.selectedChatOpenContext.value = routeContext
+        holder.selectedChatJustCreated.value = true
+        holder.selectedChatOpenedAsDmHint.value = true
+        holder.conversationScrollSnapshots[conversationScrollKey(SECOND_ACCOUNT_REF, GROUP_ID)] =
+            ConversationScrollSnapshot(
+                firstVisibleItemIndex = 3,
+                firstVisibleItemScrollOffset = 11,
+                anchorItemId = "message:notification-message",
+                anchorMessageIdHex = "notification-message",
+            )
+        val earlyConversation =
+            holder.conversationController(
+                chatId = GROUP_ID,
+                accountRef = SECOND_ACCOUNT_REF,
+                runtimeGeneration = 4,
+                presentationKey = 0,
+            ) {
+                ConversationController(appState = state, initialGroup = selected.group)
+            }
+
+        holder.chatsController(SECOND_ACCOUNT_REF, runtimeGeneration = 4)
+
+        assertSame(selected, holder.selectedChat.value)
+        assertEquals(routeContext, holder.selectedChatOpenContext.value)
+        assertFalse(holder.selectedChatJustCreated.value)
+        assertFalse(holder.selectedChatOpenedAsDmHint.value)
+        assertTrue(holder.conversationScrollSnapshots.isEmpty())
+        val replacementConversation =
+            holder.conversationController(
+                chatId = GROUP_ID,
+                accountRef = SECOND_ACCOUNT_REF,
+                runtimeGeneration = 4,
+                presentationKey = 0,
+            ) {
+                ConversationController(appState = state, initialGroup = selected.group)
+            }
+        assertNotSame(earlyConversation, replacementConversation)
+        holder.release()
+        snapshotController.onCleared()
+    }
+
+    /** An ordinary account change cannot carry a selected conversation into the target account. */
+    @Test
+    fun sameRuntimeAccountReplacementDropsAnOrdinaryRoute() {
+        val state = appState()
+        val holder = MainShellStateHolder(state, SavedStateHandle())
+        holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
+        val snapshotController = snapshotController(state)
+        holder.selectedChat.value = snapshotController.items.single()
+        holder.selectedChatOpenContext.value = ConversationOpenContext(pinnedAccountRef = SECOND_ACCOUNT_REF)
+        holder.chatsController(SECOND_ACCOUNT_REF, runtimeGeneration = 4)
+
+        assertNull(holder.selectedChat.value)
+        assertEquals(ConversationOpenContext(), holder.selectedChatOpenContext.value)
+        holder.release()
+        snapshotController.onCleared()
+    }
+
+    /** A notification trace pinned to another account cannot cross an account-controller boundary. */
+    @Test
+    fun sameRuntimeAccountReplacementDropsANotificationRoutePinnedElsewhere() {
+        val state = appState()
+        val holder = MainShellStateHolder(state, SavedStateHandle())
+        holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
+        val snapshotController = snapshotController(state)
+        holder.selectedChat.value = snapshotController.items.single()
+        holder.selectedChatOpenContext.value =
+            ConversationOpenContext(
+                notificationRouteTraceRequestId = 23L,
+                pinnedAccountRef = "another-account",
+            )
+
+        holder.chatsController(SECOND_ACCOUNT_REF, runtimeGeneration = 4)
+
+        assertNull(holder.selectedChat.value)
+        assertEquals(ConversationOpenContext(), holder.selectedChatOpenContext.value)
         holder.release()
         snapshotController.onCleared()
     }
@@ -482,6 +591,15 @@ class WarmResumeStateHolderTest {
             running = true,
         )
 
+    /** Builds one isolated local projection controller for retained-route ownership tests. */
+    private fun snapshotController(state: WhiteNoiseAppState) =
+        ChatsController(
+            appState = state,
+            initialAccountRef = ACCOUNT_REF,
+            initialLocalSnapshot = localSnapshot(),
+            memberSnapshotLoader = { _, _ -> emptyList() },
+        )
+
     /** Creates one identity-distinct text request for lifecycle ownership tests. */
     private fun shareRequest(requestId: String) =
         ShareRequest(
@@ -546,6 +664,7 @@ class WarmResumeStateHolderTest {
     private companion object {
         const val SENSITIVE_DRAFT = "private unsent body must stay out of saved state"
         const val ACCOUNT_REF = "warm-resume-account"
+        const val SECOND_ACCOUNT_REF = "second-account"
         val GROUP_ID = "1".repeat(64)
     }
 }

@@ -1122,7 +1122,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationInitialPresentation.kt",
         "anchor": "fun ConversationInitialLoadingOverlay(",
         "test_ids": [
-          "CON-015"
+          "CON-015",
+          "NTF-009"
         ]
       },
       {
@@ -1224,7 +1225,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "fun ConversationLoadErrorContent(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "NTF-009"
         ]
       },
       {
@@ -1232,7 +1234,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "fun ConversationScreen(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "NTF-009"
         ]
       },
       {
@@ -3554,7 +3557,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
         "anchor": "fun MainShell(",
         "test_ids": [
-          "NAV-001"
+          "NAV-001",
+          "NTF-009"
         ]
       },
       {
@@ -3571,7 +3575,8 @@
         "anchor": "fun PrepareMainShellFirstFrame(",
         "test_ids": [
           "INT-002",
-          "INT-003"
+          "INT-003",
+          "NTF-009"
         ]
       },
       {
@@ -4872,6 +4877,14 @@
       }
     ],
     "settings_controls": [
+      {
+        "surface": "setting:error_conversation_membership_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.error_conversation_membership_unavailable",
+        "test_ids": [
+          "NTF-009"
+        ]
+      },
       {
         "surface": "setting:error_couldnt_verify_relay_hosts",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",

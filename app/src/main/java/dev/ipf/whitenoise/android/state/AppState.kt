@@ -7179,6 +7179,17 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Clears pre-commit route cards without claiming suppression for a still-hidden transcript. */
+    internal fun dismissNotificationRouteCards(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
+        val target = conversationOpenDismissalTarget(accountRef, groupIdHex) ?: return
+        runCatching {
+            localNotificationPresenter.dismissConversationMessagesImmediately(target.accountRef, target.groupIdHex)
+        }.onFailure { appStateDebug { "notification route dismiss failed group=${target.groupIdHex.take(8)}" } }
+    }
+
     /** Publish Compose ownership immediately, then dismiss existing cards off the main thread. */
     fun setActiveConversationFromUi(
         accountRef: String?,

@@ -7,6 +7,61 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationInitialPresentationTest {
+    /** Unknown notification membership must not reveal a provisionally group-styled transcript. */
+    @Test
+    fun notificationSemanticGroupWaitsForMembershipEvidenceBeforeTranscriptReveal() {
+        assertFalse(
+            conversationTranscriptReadyToReveal(
+                initialPresentationCommitted = true,
+                notificationOpenRequestId = 1L,
+                transcriptPresentationKnown = false,
+            ),
+        )
+    }
+
+    /** Account-owned presentation evidence permits an already-anchored notification transcript. */
+    @Test
+    fun notificationTranscriptRevealsFromAccountOwnedPresentationEvidence() {
+        assertTrue(revealTranscript(transcriptPresentationKnown = true))
+    }
+
+    /** Verified chrome cannot reveal rows before their initial position is committed. */
+    @Test
+    fun notificationPresentationEvidenceNeverBypassesTheInitialAnchor() {
+        assertFalse(
+            conversationTranscriptReadyToReveal(
+                initialPresentationCommitted = false,
+                notificationOpenRequestId = 1L,
+                transcriptPresentationKnown = true,
+            ),
+        )
+    }
+
+    /** The notification-only presentation gate leaves ordinary route anchoring unchanged. */
+    @Test
+    fun ordinaryConversationRevealStillDependsOnlyOnItsInitialAnchor() {
+        assertTrue(
+            conversationTranscriptReadyToReveal(
+                initialPresentationCommitted = true,
+                notificationOpenRequestId = 0L,
+                transcriptPresentationKnown = false,
+            ),
+        )
+    }
+
+    /** A retired invite cannot expose an empty route while authoritative membership is unresolved. */
+    @Test
+    fun unresolvedInviteAcceptanceKeepsAnAuthoritativeEmptyRouteHidden() {
+        assertFalse(
+            notificationAuthoritativeEmptyPresentationReady(
+                notificationRouteActive = true,
+                authoritativeEmptyTimeline = true,
+                routePresentationSettled = true,
+                inviteAcceptanceResolutionPending = true,
+            ),
+        )
+    }
+
     /** Allows a projected, fully-read conversation to seed its real tail immediately. */
     @Test
     fun ordinaryReadTailAnchorsOnTheFirstFrameEvenWithoutASeed() {
@@ -246,4 +301,12 @@ class ConversationInitialPresentationTest {
         hasFocusedDestination = hasFocus,
         notificationOpenRequestId = notificationRequest,
     )
+
+    /** Isolates the membership boundary for an anchored notification-owned route. */
+    private fun revealTranscript(transcriptPresentationKnown: Boolean) =
+        conversationTranscriptReadyToReveal(
+            initialPresentationCommitted = true,
+            notificationOpenRequestId = 1L,
+            transcriptPresentationKnown = transcriptPresentationKnown,
+        )
 }

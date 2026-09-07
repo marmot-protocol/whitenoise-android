@@ -56,8 +56,13 @@ internal class MainShellProcessState(
         if (current != null && current.accountRef == accountRef && current.runtimeGeneration == runtimeGeneration) {
             return current.controller
         }
+        val notificationRoute = retainedNotificationRouteForReplacement(current, accountRef, runtimeGeneration)
         clearRetainedRoute()
         clearConversationControllers()
+        notificationRoute?.let { retained ->
+            selectedChat.value = retained.chat
+            selectedChatOpenContext.value = retained.openContext
+        }
         val controller =
             ChatsController(
                 appState = appState,
@@ -76,6 +81,27 @@ internal class MainShellProcessState(
             current.controller.onCleared()
         }
         return controller
+    }
+
+    /**
+     * Carries only an exact notification-owned route across its same-runtime
+     * account replacement; controllers, scroll state, and ordinary routes reset.
+     */
+    private fun retainedNotificationRouteForReplacement(
+        current: RetainedChatsController?,
+        accountRef: String?,
+        runtimeGeneration: Int,
+    ): RetainedNotificationRoute? {
+        val openContext = selectedChatOpenContext.value
+        val replacementKeepsRuntime =
+            accountRef != null &&
+                current?.accountRef != accountRef &&
+                current?.runtimeGeneration == runtimeGeneration
+        return selectedChat.value
+            ?.takeIf {
+                openContext.pinnedAccountRef == accountRef && openContext.notificationRouteTraceRequestId != null
+            }?.let { chat -> RetainedNotificationRoute(chat, openContext) }
+            ?.takeIf { replacementKeepsRuntime }
     }
 
     /** Grants the cold-process connection presentation exactly once. */
@@ -166,6 +192,11 @@ internal class MainShellProcessState(
         val accountRef: String?,
         val runtimeGeneration: Int,
         val controller: ChatsController,
+    )
+
+    private data class RetainedNotificationRoute(
+        val chat: ChatListItem,
+        val openContext: ConversationOpenContext,
     )
 
     private data class ConversationControllerKey(

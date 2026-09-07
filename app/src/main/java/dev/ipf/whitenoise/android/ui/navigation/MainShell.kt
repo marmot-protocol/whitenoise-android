@@ -76,6 +76,7 @@ import dev.ipf.whitenoise.android.state.observeTtsConversationDestination
 import dev.ipf.whitenoise.android.state.reconcileProvisionalOpenChat
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
+import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
@@ -139,11 +140,6 @@ internal data class ConversationTransitionContent(
     val openContext: ConversationOpenContext,
     val justCreated: Boolean,
     val openedAsDmHint: Boolean,
-)
-
-private data class ConversationTimelineVisibility(
-    val controller: ConversationController,
-    val visible: Boolean,
 )
 
 internal fun conversationControllerAccountRef(
@@ -888,6 +884,10 @@ internal fun MainShell(
                 requestId = routingRequestId,
                 sectionName = NotificationRouteTraceSection.FIRST_CONVERSATION_FRAME,
             )
+            // A notification route owns a one-shot cancellation before its
+            // selected-chat commit. Ongoing suppression and attachment routing
+            // still wait for the authoritative transcript to become visible.
+            appState.dismissNotificationRouteCards(target.accountRef, target.groupIdHex)
             selectedChat = chatItem
             routingNotification = false
             onNotificationTargetHandled(target, routingRequestId)
@@ -1843,14 +1843,15 @@ internal fun MainShell(
     val conversationController =
         selectedOrPendingConversationController
             ?: accountOwnedExitingConversationContent?.controller
-    var conversationTimelineVisibility by remember {
-        mutableStateOf<ConversationTimelineVisibility?>(null)
-    }
+    val conversationTimelineVisibility = remember { ConversationTimelineVisibilityOwner<ConversationController>() }
+    val currentConversationTimelineOwner by rememberUpdatedState(selectedOrPendingConversationController)
+    val currentConversationTimelineRequestId by
+        rememberUpdatedState(selectedChatOpenContext.notificationOpenRequestId)
     val selectedConversationTimelineVisible =
-        conversationTimelineVisibility
-            ?.takeIf { it.controller === selectedOrPendingConversationController }
-            ?.visible
-            ?: true
+        conversationTimelineVisibility.isCurrent(
+            owner = selectedOrPendingConversationController,
+            notificationOpenRequestId = selectedChatOpenContext.notificationOpenRequestId,
+        )
     val attachmentOpenSelectedChat = selectedChat
     val attachmentOpenDestinationAccountRef =
         selectedOrPendingConversationController
@@ -1944,10 +1945,15 @@ internal fun MainShell(
         conversationController?.hasPublishedAuthoritativeTimeline,
         conversationController?.error,
         conversationController?.terminalConversationUnavailable,
+        conversationController?.memberRosterState,
         selectedChatOpenContext.notificationRouteTraceRequestId,
     ) {
         val requestId = selectedChatOpenContext.notificationRouteTraceRequestId ?: return@LaunchedEffect
-        if (conversationController?.error != null || conversationController?.terminalConversationUnavailable == true) {
+        if (
+            conversationController?.error != null ||
+            conversationController?.terminalConversationUnavailable == true ||
+            conversationController?.transcriptPresentationNeedsRetry == true
+        ) {
             releaseNotificationFirstFrameGate(requestId)
             NotificationRouteTrace.finishRequest(requestId)
             return@LaunchedEffect
@@ -2161,11 +2167,13 @@ internal fun MainShell(
                             notificationReadThroughCommitter.commit(commitNotificationReadThrough)
                         },
                         onNotificationTimelineVisibilityChanged = { visible ->
-                            conversationTimelineVisibility =
-                                ConversationTimelineVisibility(
-                                    controller = content.controller,
-                                    visible = visible,
-                                )
+                            conversationTimelineVisibility.reportIfCurrent(
+                                owner = content.controller,
+                                notificationOpenRequestId = content.openContext.notificationOpenRequestId,
+                                visible = visible,
+                                selectedOwner = currentConversationTimelineOwner,
+                                selectedNotificationOpenRequestId = currentConversationTimelineRequestId,
+                            )
                         },
                         onFirstFrameCommitted = {
                             content.openContext.notificationRouteTraceRequestId?.let { requestId ->
@@ -2211,11 +2219,13 @@ internal fun MainShell(
                             // Invalidate notification ownership before retaining
                             // the outgoing screen for its Back animation. That
                             // retained screen must never republish its account.
-                            conversationTimelineVisibility =
-                                ConversationTimelineVisibility(
-                                    controller = content.controller,
-                                    visible = false,
-                                )
+                            conversationTimelineVisibility.reportIfCurrent(
+                                owner = content.controller,
+                                notificationOpenRequestId = content.openContext.notificationOpenRequestId,
+                                visible = false,
+                                selectedOwner = currentConversationTimelineOwner,
+                                selectedNotificationOpenRequestId = currentConversationTimelineRequestId,
+                            )
                             appState.clearActiveConversation()
                             // Flush the hidden list before exposing it, so the first
                             // drawn return frame already has the optimistic preview
