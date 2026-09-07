@@ -220,6 +220,8 @@ class ConversationTailAlignmentStateTest {
         composeRule.waitForIdle()
     }
 
+    // One composition deliberately mirrors all pre-holder remember keys for identity comparisons.
+    @Suppress("LongMethod")
     @Composable
     private fun HolderHarness(fixture: HolderFixture) {
         if (!fixture.mounted.value) return
