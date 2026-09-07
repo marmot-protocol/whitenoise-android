@@ -5080,9 +5080,9 @@
         ]
       },
       {
-        "surface": "string:dictation_open_voice_input_settings",
+        "surface": "string:dictation_open_speech_service",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
-        "anchor": "R.string.dictation_open_voice_input_settings",
+        "anchor": "R.string.dictation_open_speech_service",
         "test_ids": [
           "DIC-002"
         ]

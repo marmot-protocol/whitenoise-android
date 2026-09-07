@@ -1644,7 +1644,7 @@
     <string name="dictation_provider_unavailable">O reconhecimento de voz não está disponível</string>
     <string name="dictation_permission_denied">É necessária a permissão do microfone</string>
     <string name="dictation_provider_access_rejected">O serviço de voz recusou o acesso ao microfone</string>
-    <string name="dictation_open_voice_input_settings">Escolher um serviço de voz</string>
+    <string name="dictation_open_speech_service">Abrir o serviço de voz</string>
     <string name="dictation_permission_denied_permanently">Permita o acesso ao microfone nas Configurações</string>
     <string name="dictation_microphone_in_use">O microfone já está em uso</string>
     <string name="dictation_no_speech">Nenhuma fala foi reconhecida</string>

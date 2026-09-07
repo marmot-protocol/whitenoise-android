@@ -255,6 +255,12 @@ internal interface ConversationDictationPlatform {
     /** Whether Android has an explicit selected recognition service to validate after permission. */
     fun recognitionConfigured(): Boolean = recognitionAvailable()
 
+    /**
+     * The package of the speech service this session resolved, or null when none is installed.
+     * A failure the user can only clear inside that app needs somewhere to send them.
+     */
+    fun speechProviderPackage(): String? = null
+
     /** Whether an in-process recognition service can be created. */
     fun recognitionAvailable(): Boolean
 
@@ -450,6 +456,10 @@ internal class ConversationDictationController internal constructor(
 
     val deliveryInProgress: Boolean
         get() = dispatchedSessionId != null && dispatchedSessionId == state.sessionId
+
+    /** The speech service package a provider failure's recovery action has to open. */
+    val speechProviderPackage: String?
+        get() = runCatching(platform::speechProviderPackage).getOrNull()
 
     val completionActionsEnabled: Boolean
         get() =
@@ -2133,6 +2143,12 @@ internal class AndroidConversationDictationPlatform(
             conversationDictationRecognitionServiceAvailable(pinned, eligibleRecognitionServices())
         conversationDictationDiagnostic("event=recognition_service_available available=$available")
         return available
+    }
+
+    /** Names the pinned provider's package without switching providers to answer the question. */
+    override fun speechProviderPackage(): String? {
+        val pinned = sessionRecognitionService ?: resolvedRecognitionService(selectedRecognitionService())
+        return pinned?.packageName
     }
 
     /** Resolves one component and pins it as this session's provider. */

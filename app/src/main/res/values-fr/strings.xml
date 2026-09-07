@@ -1644,7 +1644,7 @@
     <string name="dictation_provider_unavailable">La reconnaissance vocale n’est pas disponible</string>
     <string name="dictation_permission_denied">L’autorisation du microphone est nécessaire</string>
     <string name="dictation_provider_access_rejected">Le service vocal a refusé l’accès au microphone</string>
-    <string name="dictation_open_voice_input_settings">Choisir un service vocal</string>
+    <string name="dictation_open_speech_service">Ouvrir le service vocal</string>
     <string name="dictation_permission_denied_permanently">Autorisez l’accès au microphone dans les paramètres</string>
     <string name="dictation_microphone_in_use">Le microphone est déjà utilisé</string>
     <string name="dictation_no_speech">Aucune parole n’a été reconnue</string>

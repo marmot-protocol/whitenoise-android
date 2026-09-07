@@ -1617,7 +1617,7 @@
     <string name="dictation_provider_unavailable">語音辨識無法使用</string>
     <string name="dictation_permission_denied">需要麥克風權限</string>
     <string name="dictation_provider_access_rejected">語音服務拒絕存取麥克風</string>
-    <string name="dictation_open_voice_input_settings">選擇語音服務</string>
+    <string name="dictation_open_speech_service">開啟語音服務</string>
     <string name="dictation_permission_denied_permanently">請在設定中允許使用麥克風</string>
     <string name="dictation_microphone_in_use">麥克風正在使用中</string>
     <string name="dictation_no_speech">未辨識到語音</string>

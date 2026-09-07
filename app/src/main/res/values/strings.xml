@@ -1319,7 +1319,7 @@
     <string name="dictation_provider_unavailable">Speech recognition isn’t available</string>
     <string name="dictation_permission_denied">Microphone permission is needed</string>
     <string name="dictation_provider_access_rejected">Speech service rejected microphone access</string>
-    <string name="dictation_open_voice_input_settings">Choose a speech service</string>
+    <string name="dictation_open_speech_service">Open the speech service</string>
     <string name="dictation_permission_denied_permanently">Allow microphone access in Settings</string>
     <string name="dictation_microphone_muted">Microphone access is off</string>
     <string name="dictation_microphone_muted_help">Turn on microphone access in Android privacy settings or Quick Settings, then try dictation again.</string>

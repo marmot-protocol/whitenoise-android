@@ -7,20 +7,19 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import android.provider.Settings as AndroidSettings
 
 /** The one action that can clear a given dictation failure without leaving White Noise's controls. */
-internal enum class ConversationDictationRecovery { Retry, AppSettings, VoiceInputSettings }
+internal enum class ConversationDictationRecovery { Retry, AppSettings, SpeechProviderSetup }
 
 /**
  * A provider that is missing, or that refuses an app-owned caller it cannot attribute, is only
- * fixable by choosing a speech service in Android's voice-input settings. Retrying the same
- * unusable provider cannot succeed, and White Noise never opens the provider's own recognition
- * screen in its place.
+ * fixable inside the speech service itself. Retrying the same unusable provider cannot succeed, and
+ * White Noise never opens the provider's own recognition screen in its place.
  */
 internal fun dictationFailureRecovery(reason: ConversationDictationFailure): ConversationDictationRecovery =
     when (reason) {
         ConversationDictationFailure.PermissionPermanentlyDenied -> ConversationDictationRecovery.AppSettings
         ConversationDictationFailure.ProviderAccessRejected,
         ConversationDictationFailure.ProviderUnavailable,
-        -> ConversationDictationRecovery.VoiceInputSettings
+        -> ConversationDictationRecovery.SpeechProviderSetup
         else -> ConversationDictationRecovery.Retry
     }
 
@@ -36,19 +35,32 @@ internal fun openDictationAppSettings(context: Context) {
 }
 
 /**
- * Opens Android's voice-input picker, where the selected recognition service is chosen. A build
- * without that screen falls back to this app's details page, which is the nearest place the user
- * can act, so the action is never inert.
+ * Opens the speech service itself, because that is the only place a user can finish setting it up:
+ * granting its own microphone permission, and running whatever setup makes it usable as the system
+ * recognizer. Android 17 routes ACTION_VOICE_INPUT_SETTINGS to the digital-assistant role, which
+ * cannot select a package that only provides a RecognitionService, so that screen is a dead end and
+ * is no longer offered first. Falling back to the provider's app details, then to White Noise's own,
+ * keeps the action from ever being inert.
  */
-internal fun openVoiceInputSettings(context: Context) {
-    startFirstResolvable(
-        context,
-        Intent(AndroidSettings.ACTION_VOICE_INPUT_SETTINGS),
+internal fun openSpeechProviderSetup(
+    context: Context,
+    providerPackage: String?,
+) {
+    val candidates = mutableListOf<Intent>()
+    providerPackage?.let { provider ->
+        context.packageManager.getLaunchIntentForPackage(provider)?.let(candidates::add)
+        candidates +=
+            Intent(
+                AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.fromParts("package", provider, null),
+            )
+    }
+    candidates +=
         Intent(
             AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS,
             Uri.fromParts("package", context.packageName, null),
-        ),
-    )
+        )
+    startFirstResolvable(context, *candidates.toTypedArray())
 }
 
 private fun startFirstResolvable(

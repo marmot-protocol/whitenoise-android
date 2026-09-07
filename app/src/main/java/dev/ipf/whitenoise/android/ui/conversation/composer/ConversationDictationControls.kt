@@ -249,7 +249,8 @@ private fun ConversationDictationFailureAction(
         onClick =
             when (recovery) {
                 ConversationDictationRecovery.AppSettings -> ({ openDictationAppSettings(context) })
-                ConversationDictationRecovery.VoiceInputSettings -> ({ openVoiceInputSettings(context) })
+                ConversationDictationRecovery.SpeechProviderSetup ->
+                    ({ openSpeechProviderSetup(context, controller.speechProviderPackage) })
                 ConversationDictationRecovery.Retry -> controller::retry
             },
         modifier = Modifier.size(48.dp),
@@ -265,7 +266,7 @@ private fun ConversationDictationFailureAction(
                 stringResource(
                     when (recovery) {
                         ConversationDictationRecovery.AppSettings -> R.string.open_app_settings
-                        ConversationDictationRecovery.VoiceInputSettings -> R.string.dictation_open_voice_input_settings
+                        ConversationDictationRecovery.SpeechProviderSetup -> R.string.dictation_open_speech_service
                         ConversationDictationRecovery.Retry -> R.string.retry
                     },
                 ),

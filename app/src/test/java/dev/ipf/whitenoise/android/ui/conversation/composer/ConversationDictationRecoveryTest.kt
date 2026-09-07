@@ -11,13 +11,13 @@ import org.junit.Test
  */
 class ConversationDictationRecoveryTest {
     @Test
-    fun unusableProviderOffersVoiceInputSettingsInsteadOfRetry() {
+    fun unusableProviderOffersItsOwnSetupInsteadOfRetry() {
         listOf(
             ConversationDictationFailure.ProviderAccessRejected,
             ConversationDictationFailure.ProviderUnavailable,
         ).forEach { reason ->
             assertEquals(
-                ConversationDictationRecovery.VoiceInputSettings,
+                ConversationDictationRecovery.SpeechProviderSetup,
                 dictationFailureRecovery(reason),
             )
         }

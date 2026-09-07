@@ -1642,7 +1642,7 @@
     <string name="dictation_provider_unavailable">Spracherkennung ist nicht verfügbar</string>
     <string name="dictation_permission_denied">Mikrofonberechtigung ist erforderlich</string>
     <string name="dictation_provider_access_rejected">Sprachdienst hat Mikrofonzugriff abgelehnt</string>
-    <string name="dictation_open_voice_input_settings">Sprachdienst auswählen</string>
+    <string name="dictation_open_speech_service">Sprachdienst öffnen</string>
     <string name="dictation_permission_denied_permanently">Mikrofonzugriff in den Einstellungen erlauben</string>
     <string name="dictation_microphone_in_use">Das Mikrofon wird bereits verwendet</string>
     <string name="dictation_no_speech">Keine Sprache erkannt</string>
