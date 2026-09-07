@@ -83,8 +83,7 @@ class ConversationAnchoringSourceCoverageTest {
         )
     }
 
-    private fun String.containsAll(vararg fragments: String): Boolean =
-        fragments.all(::contains)
+    private fun String.containsAll(vararg fragments: String): Boolean = fragments.all(::contains)
 
     private fun conversationScreenSource(): File =
         listOf(
