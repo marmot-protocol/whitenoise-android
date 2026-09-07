@@ -222,8 +222,8 @@ class ConversationDictationPersistentControlTest {
         render(fixture, fontScale = 2f, rtl = true)
 
         val root = composeRule.onNodeWithTag(ROOT_TAG).getUnclippedBoundsInRoot()
-        // An unusable provider offers voice-input settings, not a retry that cannot succeed.
-        listOf("Choose a speech service", "Dismiss").forEach { label ->
+        // An unusable provider offers its own setup, not a retry that cannot succeed.
+        listOf("Open the speech service", "Dismiss").forEach { label ->
             val action = composeRule.onNodeWithContentDescription(label).assertIsDisplayed().getUnclippedBoundsInRoot()
             assertTrue(action.left >= root.left && action.right <= root.right)
             assertTrue(action.top >= root.top && action.bottom <= root.bottom)
