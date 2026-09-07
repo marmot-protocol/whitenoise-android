@@ -6602,6 +6602,18 @@
     ],
     "source_coverage": [
       {
+        "surface": "MarmotKit SDK pin: retained-data upgrade and sign-in compatibility",
+        "source": "app/src/main/marmotkit/MARMOT_VERSION",
+        "anchor": "mdk-sha=",
+        "test_ids": [
+          "INT-010",
+          "ONB-006",
+          "ONB-008",
+          "ONB-012",
+          "SET-019"
+        ]
+      },
+      {
         "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
         "anchor": "WhiteNoiseApp",
