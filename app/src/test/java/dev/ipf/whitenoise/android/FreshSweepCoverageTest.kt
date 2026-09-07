@@ -228,6 +228,7 @@ class FreshSweepCoverageTest {
         assertEquals(1L, relativeTimeRefreshDelayMillis(Instant.ofEpochMilli(179_999L)))
     }
 
+    /** Keeps retained-file revalidation wired through the row-independent video open owner. */
     @Test
     fun retainedMediaFilesAreRevalidatedBeforePlayback() {
         val voice = source("ui/conversation/media/MediaVoice.kt")
@@ -244,10 +245,10 @@ class FreshSweepCoverageTest {
                 "persistedAttachmentOpenEffect(" in voiceBubble,
         )
         assertTrue(
-            "video playback must rematerialize a retained file that LRU eviction removed",
+            "video playback must rematerialize through the conversation-owned viewer after LRU eviction",
             "validatedAttachmentCacheFile(localFile)" in videoBubble &&
                 "localFile = null" in videoBubble &&
-                "controller.requestAttachmentOpen(messageIdHex, attachmentIndex)" in videoBubble &&
+                "dispatchViewerOpen()" in videoBubble &&
                 "persistedAttachmentOpenEffect(" in videoBubble,
         )
         assertTrue(
@@ -256,7 +257,7 @@ class FreshSweepCoverageTest {
                 "localFile = null" in videoGridTile &&
                 "controller.requestAttachmentOpen(messageIdHex, attachmentIndex)" in videoGridTile &&
                 "persistedAttachmentOpenEffect(" in videoGridTile &&
-                "onTap(playableFile)" in videoGridTile,
+                "dispatchViewerOpen()" in videoGridTile,
         )
     }
 

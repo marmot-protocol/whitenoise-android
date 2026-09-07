@@ -121,8 +121,8 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
+import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
-import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
 import dev.ipf.whitenoise.android.ui.conversation.media.messageHasShareablePayload
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
@@ -285,7 +285,7 @@ internal fun MessageBubble(
     item: TimelineMessage,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
-    conversationVisualPages: List<MediaViewerPage> = emptyList(),
+    onOpenConversationMedia: (ConversationMediaViewerOpenRequest) -> Unit = {},
     eventCardResolver: NostrEventCardResolver? = null,
     documentSaveFallback: DocumentSaveFallback? = null,
     // #1206: shared composer text state so the full-screen reader's composer
@@ -1853,7 +1853,7 @@ internal fun MessageBubble(
                                         record = record,
                                         controller = controller,
                                         appState = appState,
-                                        conversationVisualPages = conversationVisualPages,
+                                        onOpenConversationMedia = onOpenConversationMedia,
                                         bubbleMedia = bubbleMedia,
                                         sharedLocation = sharedLocation,
                                         sharedContact = sharedContact,
@@ -1919,7 +1919,7 @@ internal fun MessageBubble(
                                         record = record,
                                         controller = controller,
                                         appState = appState,
-                                        conversationVisualPages = conversationVisualPages,
+                                        onOpenConversationMedia = onOpenConversationMedia,
                                         bubbleMedia = bubbleMedia,
                                         sharedLocation = sharedLocation,
                                         sharedContact = sharedContact,

@@ -12,15 +12,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
@@ -175,6 +178,7 @@ internal data class MediaViewerPagerSelection(
     val currentPage: MediaViewerPage,
 )
 
+/** Preserves the selected logical attachment while an authoritative gallery replaces its references. */
 @Composable
 internal fun rememberMediaViewerPagerSelection(
     pages: List<MediaViewerPage>,
@@ -224,6 +228,7 @@ internal fun rememberMediaViewerPagerSelection(
     )
 }
 
+/** Renders pager pages with stable logical keys and exposes the settled page to accessibility. */
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 @Composable
 internal fun StableMediaViewerPager(
@@ -300,6 +305,10 @@ internal fun visualMediaViewerGallery(
     }
 }
 
+/**
+ * Resolves an inline attachment into the conversation-wide gallery while preserving the
+ * caller-owned logical selection across reference refreshes and viewport changes.
+ */
 @Composable
 @Suppress("FunctionNaming")
 internal fun ConversationMediaViewer(
@@ -314,6 +323,10 @@ internal fun ConversationMediaViewer(
     mine: Boolean,
     onDismiss: () -> Unit,
     onShareRequest: (suspend (MediaViewerShareRequest) -> Result<Unit>)? = null,
+    selectedAttachment: ConversationMediaViewerAttachmentId? = null,
+    onSelectedAttachmentChange: (ConversationMediaViewerAttachmentId) -> Unit = {},
+    onVideoPlayerChanged: (androidx.media3.exoplayer.ExoPlayer?) -> Unit = {},
+    videoFileResolver: VideoViewerFileResolver = ::resolveVideoViewerFile,
 ) {
     val messagePages =
         remember(messageIdHex, attachments, mine, sender, recordedAt) {
@@ -325,16 +338,35 @@ internal fun ConversationMediaViewer(
         remember(conversationVisualPages, messagePages, tappedAttachmentIndex) {
             visualMediaViewerGallery(conversationVisualPages, messagePages, tappedAttachmentIndex)
         }
+    val selectedStartIndex =
+        selectedAttachment
+            ?.let { selected ->
+                gallery.pages.indexOfFirst {
+                    it.messageIdHex == selected.messageIdHex && it.attachmentIndex == selected.attachmentIndex
+                }
+            }?.takeIf { it >= 0 }
+            ?: gallery.startIndex
     FullScreenMediaViewer(
         controller = controller,
         appState = appState,
         pages = gallery.pages,
-        startIndex = gallery.startIndex,
+        startIndex = selectedStartIndex,
         onDismiss = onDismiss,
         onShareRequest = onShareRequest,
+        onCurrentPageChange = { page ->
+            onSelectedAttachmentChange(
+                ConversationMediaViewerAttachmentId(page.messageIdHex, page.attachmentIndex),
+            )
+        },
+        onVideoPlayerChanged = onVideoPlayerChanged,
+        videoFileResolver = videoFileResolver,
     )
 }
 
+/**
+ * Presents the media pager and reports its settled logical page without owning conversation
+ * lifetime. The caller decides when a viewer generation is created or dismissed.
+ */
 @Composable
 internal fun FullScreenMediaViewer(
     controller: ConversationController,
@@ -343,6 +375,9 @@ internal fun FullScreenMediaViewer(
     startIndex: Int,
     onDismiss: () -> Unit,
     onShareRequest: (suspend (MediaViewerShareRequest) -> Result<Unit>)? = null,
+    onCurrentPageChange: (MediaViewerPage) -> Unit = {},
+    onVideoPlayerChanged: (androidx.media3.exoplayer.ExoPlayer?) -> Unit = {},
+    videoFileResolver: VideoViewerFileResolver = ::resolveVideoViewerFile,
 ) {
     if (pages.isEmpty()) {
         // Defensive — callers shouldn't open an empty viewer, but guard so the
@@ -357,6 +392,10 @@ internal fun FullScreenMediaViewer(
     val pagerSelection = rememberMediaViewerPagerSelection(pages, startIndex)
     val currentPageIndex = pagerSelection.currentPageIndex
     val currentPage = pagerSelection.currentPage
+    val latestOnCurrentPageChange by rememberUpdatedState(onCurrentPageChange)
+    LaunchedEffect(currentPage.messageIdHex, currentPage.attachmentIndex) {
+        latestOnCurrentPageChange(currentPage)
+    }
     val pagePositionDescription =
         if (pages.size > 1) {
             stringResource(R.string.media_viewer_page_position, currentPageIndex + 1, pages.size)
@@ -388,7 +427,11 @@ internal fun FullScreenMediaViewer(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties =
+            DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
     ) {
         MediaViewerFrame(
             senderLabel = appState.displayName(currentPage.sender),
@@ -404,7 +447,15 @@ internal fun FullScreenMediaViewer(
                         runCatchingCancellable {
                             val saved =
                                 if (MediaReferenceSupport.isVideoMedia(ref)) {
-                                    val file = materializeVideoAttachment(context, controller, msgId, attachmentIndex, ref, owned)
+                                    val file =
+                                        materializeVideoAttachment(
+                                            context,
+                                            controller,
+                                            msgId,
+                                            attachmentIndex,
+                                            ref,
+                                            owned,
+                                        )
                                     withContext(Dispatchers.IO) {
                                         saveVideoToGallery(context, file, ref.fileName, ref.mediaType)
                                     }
@@ -510,6 +561,8 @@ internal fun FullScreenMediaViewer(
                         reference = pageDescriptor.reference,
                         isCurrent = isCurrent,
                         mine = pageDescriptor.mine,
+                        onPlayerChanged = onVideoPlayerChanged,
+                        videoFileResolver = videoFileResolver,
                     )
                 } else {
                     ViewerPage(
@@ -530,6 +583,10 @@ internal fun FullScreenMediaViewer(
     }
 }
 
+/**
+ * Draws edge-to-edge media while keeping interactive chrome inside the supplied safe insets.
+ * The injectable inset value also makes cutout and large-type layouts deterministic in tests.
+ */
 @Composable
 internal fun MediaViewerFrame(
     senderLabel: String,
@@ -538,6 +595,7 @@ internal fun MediaViewerFrame(
     onSave: () -> Unit,
     onShare: () -> Unit,
     snackbarHostState: SnackbarHostState,
+    contentWindowInsets: WindowInsets = WindowInsets.safeDrawing,
     modifier: Modifier = Modifier,
     body: @Composable BoxScope.() -> Unit,
 ) {
@@ -553,8 +611,9 @@ internal fun MediaViewerFrame(
                 Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(8.dp),
+                    .windowInsetsPadding(
+                        contentWindowInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+                    ).padding(8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -563,7 +622,11 @@ internal fun MediaViewerFrame(
             }
             Row {
                 IconButton(onClick = onSave) {
-                    Icon(Icons.Default.Download, contentDescription = stringResource(R.string.media_save), tint = Color.White)
+                    Icon(
+                        Icons.Default.Download,
+                        contentDescription = stringResource(R.string.media_save),
+                        tint = Color.White,
+                    )
                 }
                 IconButton(onClick = onShare) {
                     Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share), tint = Color.White)
@@ -579,8 +642,9 @@ internal fun MediaViewerFrame(
                         Brush.verticalGradient(
                             listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f)),
                         ),
-                    ).navigationBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    ).windowInsetsPadding(
+                        contentWindowInsets.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
+                    ).padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
             Text(
                 text = senderLabel,
@@ -601,7 +665,9 @@ internal fun MediaViewerFrame(
             modifier =
                 Modifier
                     .align(Alignment.BottomCenter)
-                    .navigationBarsPadding(),
+                    .windowInsetsPadding(
+                        contentWindowInsets.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
+                    ),
             snackbar = { SwipeDismissibleSnackbar(it) },
         )
     }

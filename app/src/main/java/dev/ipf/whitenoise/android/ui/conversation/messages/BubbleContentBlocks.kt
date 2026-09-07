@@ -57,11 +57,11 @@ import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
+import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaFileBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaImageBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPendingPlaceholder
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVideoBubble
-import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVisualGridBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVoiceBubble
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
@@ -120,6 +120,10 @@ internal fun VisualMediaFooterFrame(
     }
 }
 
+/**
+ * Renders the typed content blocks of one message and forwards visual-media open requests to
+ * the conversation owner, keeping full-screen state outside this potentially lazy-disposed row.
+ */
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 internal fun ColumnScope.BubbleMediaBlocks(
@@ -127,7 +131,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
     record: AppMessageRecordFfi,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
-    conversationVisualPages: List<MediaViewerPage>,
+    onOpenConversationMedia: (ConversationMediaViewerOpenRequest) -> Unit,
     bubbleMedia: BubbleMedia,
     sharedLocation: SharedLocation?,
     sharedContact: SharedContact?,
@@ -205,7 +209,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         mine = mine,
                         controller = controller,
                         appState = appState,
-                        conversationVisualPages = conversationVisualPages,
+                        onOpenConversationMedia = onOpenConversationMedia,
                         onLongPress = onMediaLongPress,
                         attachedToCaption = attachedToCaption,
                     )
@@ -216,7 +220,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         attachmentIndex = entry.index,
                         controller = controller,
                         appState = appState,
-                        conversationVisualPages = conversationVisualPages,
+                        onOpenConversationMedia = onOpenConversationMedia,
                         mine = mine,
                         onLongPress = onMediaLongPress,
                         attachedToCaption = attachedToCaption,
@@ -237,7 +241,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                     attachments = bubbleMedia.visuals,
                     controller = controller,
                     appState = appState,
-                    conversationVisualPages = conversationVisualPages,
+                    onOpenConversationMedia = onOpenConversationMedia,
                     mine = mine,
                     onLongPress = onMediaLongPress,
                     attachedToCaption = attachedToCaption,
@@ -339,7 +343,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         mine = true,
                         controller = controller,
                         appState = appState,
-                        conversationVisualPages = conversationVisualPages,
+                        onOpenConversationMedia = onOpenConversationMedia,
                         onLongPress = onMediaLongPress,
                         uploading = !uploadFailed,
                         uploadFailed = uploadFailed,
@@ -353,7 +357,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         attachmentIndex = entry.index,
                         controller = controller,
                         appState = appState,
-                        conversationVisualPages = conversationVisualPages,
+                        onOpenConversationMedia = onOpenConversationMedia,
                         mine = true,
                         onLongPress = onMediaLongPress,
                         uploading = !uploadFailed,
@@ -375,7 +379,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                     attachments = bubbleMedia.pendingVisuals,
                     controller = controller,
                     appState = appState,
-                    conversationVisualPages = conversationVisualPages,
+                    onOpenConversationMedia = onOpenConversationMedia,
                     mine = true,
                     onLongPress = onMediaLongPress,
                     uploading = !uploadFailed,
