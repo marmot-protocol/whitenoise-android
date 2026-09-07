@@ -7,6 +7,25 @@ import org.junit.Test
 import java.io.File
 
 class AttachmentDownloadProductionWiringTest {
+    /** Both epoch probing and retained-file disk validation must finish before returning to Main. */
+    @Test
+    fun videoCacheEffectValidatesRetainedFilesOnIo() {
+        val effect =
+            source("MediaVideo.kt")
+                .substringAfter("private fun rememberCachedVideoAttachmentFileState(")
+                .substringBefore("return cachedFile")
+                .normalized()
+
+        assertTrue(
+            "The cache probe and retained-file validation must share the IO context",
+            "val (file, retained) = withContext(Dispatchers.IO) { val probed = cachedVideoAttachmentFile(" in effect,
+        )
+        assertTrue(
+            "Retained-file validation must run before IO exits and Compose state is published",
+            "probed to validatedAttachmentCacheFile(cachedFile.value) } cachedFile.value =" in effect,
+        )
+    }
+
     /** APK installer completion is owned by the app shell, not the originating bubble. */
     @Test
     fun installerHandoffOwnerOutlivesTheOriginatingFileBubble() {
@@ -24,6 +43,7 @@ class AttachmentDownloadProductionWiringTest {
         assertTrue("EncryptedAttachmentInstallerHandoffRecordStore.create(context)" in worker)
     }
 
+    /** Verifies every visual-media tap promotes transfer work before delegating viewer ownership. */
     @Test
     fun visibleMediaPromotesAnAutomaticTransferWhenTheUserTapsIt() {
         val image = source("MediaImageBubbles.kt").normalized()
@@ -31,13 +51,14 @@ class AttachmentDownloadProductionWiringTest {
         val voice = source("MediaVoice.kt").normalized()
 
         assertEquals(2, occurrences(image, "afterInteractiveRequest()"))
-        assertEquals(2, occurrences(video, "afterInteractiveRequest()"))
+        assertEquals(4, occurrences(video, "afterInteractiveRequest()"))
         assertEquals(1, occurrences(voice, "afterInteractiveRequest()"))
         assertEquals(2, occurrences(image, "persistedAttachmentOpenEffect("))
         assertEquals(2, occurrences(video, "persistedAttachmentOpenEffect("))
         assertEquals(1, occurrences(voice, "persistedAttachmentOpenEffect("))
         assertTrue(occurrences(image, "requestAttachmentOpen(") >= 5)
-        assertTrue(occurrences(video, "requestAttachmentOpen(") >= 4)
+        assertTrue(occurrences(video, "requestAttachmentOpen(") >= 1)
+        assertTrue(occurrences(video, "dispatchViewerOpen()") >= 4)
         assertTrue(occurrences(voice, "requestAttachmentOpen(") >= 2)
     }
 

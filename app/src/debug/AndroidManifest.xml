@@ -8,6 +8,7 @@
         <!-- Keep device-only Compose fixtures resumed when test hardware is locked. -->
         <activity
             android:name="androidx.activity.ComponentActivity"
+            android:configChanges="orientation|screenLayout|screenSize|smallestScreenSize|keyboardHidden"
             android:showWhenLocked="true"
             android:turnScreenOn="true" />
 

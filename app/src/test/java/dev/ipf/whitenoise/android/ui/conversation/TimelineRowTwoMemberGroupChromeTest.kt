@@ -166,6 +166,7 @@ class TimelineRowTwoMemberGroupChromeTest {
             .captureRoboImage("src/test/snapshots/timeline_three_member_group_sender_chrome_missing_profile_light.png")
     }
 
+    /** Renders the production timeline row while accepting its default no-op media-viewer owner. */
     @androidx.compose.runtime.Composable
     @Suppress("LongMethod")
     private fun TimelineRowFixture(
@@ -184,7 +185,6 @@ class TimelineRowTwoMemberGroupChromeTest {
             onMeasured = { _, _ -> },
             appState = appState,
             controller = controller,
-            conversationVisualPages = emptyList(),
             composerTextState = composerTextState,
             highlighted = false,
             selectionMode = false,
