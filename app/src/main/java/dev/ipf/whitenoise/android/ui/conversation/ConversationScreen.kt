@@ -147,7 +147,6 @@ import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.conversationComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerAttachmentSheetState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerShareRevision
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
@@ -215,16 +214,17 @@ private data class ConversationSearchScrollAnchor(
 private class ConversationNavigationState(
     initialFollowedLatestId: String?,
     initialSeedTailAwaitingAuthoritative: Boolean,
+    surfaceState: ConversationSurfaceState,
 ) {
     var lastFollowedLatestId by mutableStateOf(initialFollowedLatestId)
     var seedTailAwaitingAuthoritative by mutableStateOf(initialSeedTailAwaitingAuthoritative)
     var initialTimelineLoadStarted by mutableStateOf(false)
-    var initialTimelineBackfillNoProgress by mutableStateOf(false)
+    var initialTimelineBackfillNoProgress by surfaceState.initialTimelineBackfillNoProgress
     var initialTimelineBackfillRetryGeneration by mutableLongStateOf(0L)
     val targetHighlight = MessageTargetHighlightLifecycle()
     val targetNavigation = MessageTargetNavigationOwner()
     var navigateReplyJob by mutableStateOf<Job?>(null)
-    var searchOpen by mutableStateOf(false)
+    var searchOpen by surfaceState.searchOpen
     var searchQuery by mutableStateOf("")
     var searchPinnedMatchId by mutableStateOf<String?>(null)
     var searchJob by mutableStateOf<Job?>(null)
@@ -272,12 +272,14 @@ private fun rememberConversationNavigationState(
     controller: ConversationController,
     initialFollowedLatestId: String?,
     initialSeedTailAwaitingAuthoritative: Boolean,
+    surfaceState: ConversationSurfaceState,
 ): ConversationNavigationState {
     val state =
-        remember(controller) {
+        remember(controller, surfaceState) {
             ConversationNavigationState(
                 initialFollowedLatestId = initialFollowedLatestId,
                 initialSeedTailAwaitingAuthoritative = initialSeedTailAwaitingAuthoritative,
+                surfaceState = surfaceState,
             )
         }
     DisposableEffect(state) {
@@ -557,6 +559,8 @@ internal fun ConversationScreen(
     onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ -> onOpenConversation(item, false) },
     onGroupCreateFlowSuperseded: () -> Unit = {},
     onTtsTransportBodyClick: (() -> Unit)? = null,
+    surfaceState: ConversationSurfaceState? = null,
+    dictationControlsVisible: Boolean = true,
 ) {
     WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
     // The conversation's own account. Identical to the active account except
@@ -567,6 +571,10 @@ internal fun ConversationScreen(
     // active ref catches up.
     val conversationAccountRef = controller.boundAccountRef
     val conversationSelfAccountIdHex = controller.boundAccountIdHex
+    val presentationState =
+        surfaceState ?: remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) {
+            ConversationSurfaceState()
+        }
     // Push the global snackbar host above the conversation composer so
     // a toast (e.g. the post-invite-accept confirmation) doesn't
     // overlap and intercept touches on the message input. Resets to
@@ -616,15 +624,14 @@ internal fun ConversationScreen(
         }
     }
     val collapseLongMessages = appState.collapseLongMessagesInGroup(chat.group.groupIdHex)
-    // When the developer streaming-debug toggle flips, re-publish the timeline.
-    // Turning it off drops the transient QUIC debug rows so they don't linger.
-    LaunchedEffect(controller, appState.streamingDebugEnabled) {
-        controller.refreshStreamingDebugPresentation()
-    }
+    ConversationStreamingDebugRefreshEffect(
+        controller = controller,
+        streamingDebugEnabled = appState.streamingDebugEnabled,
+    )
     var menuOpen by remember { mutableStateOf(false) }
     // Keyed on the controller as well as chat.id so the same shared group under
     // another account cannot inherit this account's details route.
-    var showDetails by remember(controller, chat.id) { mutableStateOf(false) }
+    var showDetails by presentationState.showDetails
     // Notification suppression must follow the visible *timeline*, not merely an
     // open chat. While group details/settings (and its sub-screens) are up, the
     // user can't see incoming messages, so those must notify — lift the
@@ -720,10 +727,15 @@ internal fun ConversationScreen(
         remember(chat.id) {
             ConversationBottomChromeHeightObserver()
         }
-    var measuredBottomChromeHeightPx by remember(controller) { mutableStateOf<Int?>(null) }
-    var bottomInputRevision by remember(controller) { mutableLongStateOf(0L) }
-    var routePresentationFrozen by
-        remember(controller) { mutableStateOf(routeTransitionInProgress) }
+    val bottomInsetState =
+        remember(controller) {
+            ConversationBottomInsetState(
+                initialRoutePresentationFrozen = routeTransitionInProgress,
+            )
+        }
+    var measuredBottomChromeHeightPx by bottomInsetState.measuredBottomChromeHeightPx
+    var bottomInputRevision by bottomInsetState.bottomInputRevision
+    var routePresentationFrozen by bottomInsetState.routePresentationFrozen
     val freezeRoutePresentation =
         conversationRoutePresentationShouldFreeze(
             routeTransitionInProgress = routeTransitionInProgress,
@@ -754,10 +766,7 @@ internal fun ConversationScreen(
     // selected while the user scrolls deeper into history. This remains transient
     // composition state deliberately: serializing decrypted message snapshots into
     // Android saved state would extend their lifetime and privacy footprint.
-    val selectedMessages =
-        remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) {
-            mutableStateMapOf<String, BatchMessageSelection>()
-        }
+    val selectedMessages = presentationState.selectedMessages
     var batchForwardSheetOpen by
         remember(chat.id, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var batchAttachmentSaveInFlight by
@@ -778,23 +787,23 @@ internal fun ConversationScreen(
         remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) {
             mutableStateOf<BatchDeleteRetryState?>(null)
         }
-    var initialTimelineAnchored by
-        // Reveal from the first frame only when the authoritative page is already
-        // loaded (the preloaded chat-list-tap path anchors at the tail immediately).
-        // A direct open still awaiting its page must stay hidden until
-        // reconciliation scrolls to the tail, otherwise the grown page lays out at
-        // the clamped top spacer and flashes the oldest rows before jumping down.
+    // Reveal from the first frame only when the authoritative page is already
+    // loaded (the preloaded chat-list-tap path anchors at the tail immediately).
+    // A direct open still awaiting its page must stay hidden until
+    // reconciliation scrolls to the tail, otherwise the grown page lays out at
+    // the clamped top spacer and flashes the oldest rows before jumping down.
+    val seededTailState =
         remember(controller, notificationOpenRequestId) {
-            mutableStateOf(firstFrameSeed.anchorTailImmediately && !firstFrameSeed.awaitingAuthoritativeTimeline)
+            ConversationSeededTailState(
+                initialTimelineAnchored =
+                    firstFrameSeed.anchorTailImmediately && !firstFrameSeed.awaitingAuthoritativeTimeline,
+                initialCommitted = !firstFrameSeed.anchorTailImmediately,
+            )
         }
-    var seededTailAlignmentCommitted by
-        remember(controller, notificationOpenRequestId) {
-            mutableStateOf(!firstFrameSeed.anchorTailImmediately)
-        }
-    var seededTailAlignmentRecoveryVisible by
-        remember(controller, notificationOpenRequestId) { mutableStateOf(false) }
-    var seededTailAlignmentRetryGeneration by
-        remember(controller, notificationOpenRequestId) { mutableLongStateOf(0L) }
+    var initialTimelineAnchored by seededTailState.initialTimelineAnchored
+    var seededTailAlignmentCommitted by seededTailState.committed
+    var seededTailAlignmentRecoveryVisible by seededTailState.recoveryVisible
+    var seededTailAlignmentRetryGeneration by seededTailState.retryGeneration
     val transcriptVisibilityCommitted by
         remember(controller, notificationOpenRequestId, listState, firstFrameSeed.anchorTailImmediately) {
             derivedStateOf {
@@ -830,6 +839,7 @@ internal fun ConversationScreen(
             controller = controller,
             initialFollowedLatestId = firstFrameSeed.latestTimelineId,
             initialSeedTailAwaitingAuthoritative = firstFrameSeed.awaitingAuthoritativeTimeline,
+            surfaceState = presentationState,
         )
     // Id of the newest row the bottom-follow has reacted to. A real append
     // gives a new last id while the previous one stays in the list; an
@@ -1136,19 +1146,7 @@ internal fun ConversationScreen(
             batchDeleteRetryState = null
         }
     }
-    val composerGate =
-        conversationComposerGate(
-            pendingInvite = controller.group.pendingConfirmation,
-            inviteAcceptanceResolutionPending = controller.inviteAcceptanceResolutionPending,
-            membersVerified = controller.membersVerified,
-            isSelfMember = controller.isSelfMember,
-            seededSelfMember = controller.seededSelfMember,
-            seededMembershipKnown = controller.seededMembershipKnown,
-            assumeMemberUntilVerified = notificationOpenRequestId != 0L,
-            unrecoverable = controller.group.unrecoverable,
-            disbanding = controller.group.disbanding,
-            disbanded = controller.group.disbanded,
-        )
+    val composerGate = conversationControllerComposerGate(controller, notificationOpenRequestId)
     val batchSelectionUi =
         rememberConversationBatchSelectionUiState(
             selectedMessages = selectedMessages,
@@ -3125,6 +3123,7 @@ internal fun ConversationScreen(
         bottomBar = {
             ConversationBottomBar(
                 compactHeight = compactHeightConversation,
+                dictationControlsVisible = dictationControlsVisible,
                 selectionMode = selectionMode,
                 selectionActionAvailability =
                     batchSelectionUi.actionAvailability.let { availability ->

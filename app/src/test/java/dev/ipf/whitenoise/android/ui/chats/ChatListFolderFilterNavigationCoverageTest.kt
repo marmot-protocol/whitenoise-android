@@ -28,7 +28,7 @@ class ChatListFolderFilterNavigationCoverageTest {
         val chatsScreenWiring =
             mainShell.requiredSection(
                 start = "ChatsScreen(",
-                end = "\n                            )",
+                end = "MainSection.Settings ->",
             )
         assertTrue(
             "ChatsScreen must receive the shell-owned folder filter",
@@ -59,13 +59,10 @@ class ChatListFolderFilterNavigationCoverageTest {
         val conversationRoute =
             mainShellSource().readText().requiredSection(
                 start = "ConversationScreen(",
-                end = "\n                    )",
+                end = "MainShellContentRoute.NotificationLoading ->",
             )
         val onBack =
-            conversationRoute.requiredSection(
-                start = "onBack = {",
-                end = "\n                        },",
-            )
+            conversationRoute.requiredBraceSection(start = "onBack = {")
 
         assertFalse(
             "returning from a conversation must not alter the remembered folder filter",
@@ -157,5 +154,23 @@ class ChatListFolderFilterNavigationCoverageTest {
         val endIndex = indexOf(end, startIndex + start.length)
         require(endIndex >= 0) { "Missing section end: $end" }
         return substring(startIndex, endIndex)
+    }
+
+    private fun String.requiredBraceSection(start: String): String {
+        val startIndex = indexOf(start)
+        require(startIndex >= 0) { "Missing section start: $start" }
+        val openBrace = indexOf('{', startIndex)
+        require(openBrace >= 0) { "Missing section brace: $start" }
+        var depth = 0
+        for (index in openBrace until length) {
+            when (this[index]) {
+                '{' -> depth += 1
+                '}' -> {
+                    depth -= 1
+                    if (depth == 0) return substring(startIndex, index + 1)
+                }
+            }
+        }
+        error("Missing section close: $start")
     }
 }

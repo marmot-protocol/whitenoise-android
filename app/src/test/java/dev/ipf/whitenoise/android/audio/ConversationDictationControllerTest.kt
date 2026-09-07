@@ -298,18 +298,20 @@ class ConversationDictationControllerTest {
         assertFalse(platform.session.started)
     }
 
-    /** A device with no selected recognizer uses the provider Activity before requesting app microphone access. */
+    /** Native mode fails visibly without silently opening an external provider surface. */
     @Test
-    fun missingSelectedServiceFallsBackToProviderActivityBeforeRuntimePermission() {
+    fun unresolvedRecognitionServiceFailsWithoutLaunchingProviderActivity() {
         val platform = FakePlatform(hasPermission = false, configured = false, available = false)
         val fixture = fixture(draft = TextFieldValue(""), platform = platform)
 
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
 
-        assertTrue(fixture.controller.state is ConversationDictationState.ProviderActivityRequired)
-        assertEquals(1L, fixture.controller.providerActivityRequestId)
+        assertEquals(
+            ConversationDictationFailure.ProviderUnavailable,
+            (fixture.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertEquals(0L, fixture.controller.providerActivityRequestId)
         assertEquals(0L, fixture.controller.permissionRequestId)
-        assertEquals(0, platform.recognitionAvailabilityChecks)
         assertFalse(platform.session.started)
     }
 
@@ -343,8 +345,11 @@ class ConversationDictationControllerTest {
             platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
             fixture.controller.retry()
 
-            assertTrue(fixture.controller.state is ConversationDictationState.ProviderActivityRequired)
-            assertEquals(1L, fixture.controller.providerActivityRequestId)
+            assertEquals(
+                ConversationDictationFailure.ProviderUnavailable,
+                (fixture.controller.state as ConversationDictationState.Failed).reason,
+            )
+            assertEquals(0L, fixture.controller.providerActivityRequestId)
             assertEquals(0L, fixture.controller.permissionRequestId)
             assertFalse(platform.session.started)
             assertFalse(fixture.controller.ownsMicrophone)
@@ -354,14 +359,9 @@ class ConversationDictationControllerTest {
 
     /** A missing service still fails deterministically when Android has no compatible provider Activity. */
     @Test
-    fun missingSelectedServiceAndProviderActivityFailsUnavailable() {
+    fun missingServiceAndActivityFailsWithoutRuntimePermission() {
         val platform =
-            FakePlatform(
-                hasPermission = false,
-                configured = false,
-                available = false,
-                activityAvailable = false,
-            )
+            FakePlatform(hasPermission = false, configured = false, available = false, activityAvailable = false)
         val fixture = fixture(draft = TextFieldValue(""), platform = platform)
 
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
@@ -477,7 +477,7 @@ class ConversationDictationControllerTest {
     }
 
     @Test
-    fun grantedPermissionRejectedByRecognitionServiceFallsBackToProviderActivity() {
+    fun grantedPermissionRejectedByRecognitionServiceRetriesOnceWithoutProviderActivity() {
         var microphoneReleases = 0
         var durableStops = 0
         val fixture =
@@ -488,14 +488,26 @@ class ConversationDictationControllerTest {
             )
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         val rejectedSession = fixture.platform.session
+        fixture.platform.configured = false
 
         fixture.platform.listener.onError(ConversationDictationFailure.PermissionDenied)
 
-        assertTrue(fixture.controller.state is ConversationDictationState.ProviderActivityRequired)
-        assertEquals(1L, fixture.controller.providerActivityRequestId)
-        assertFalse(fixture.controller.ownsMicrophone)
-        assertFalse(fixture.controller.hasDurableSession)
+        assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+        assertEquals(0L, fixture.controller.providerActivityRequestId)
+        assertTrue(fixture.controller.ownsMicrophone)
+        assertTrue(fixture.controller.hasDurableSession)
         assertTrue(rejectedSession.destroyed)
+        assertEquals(1, fixture.platform.recognitionConfigurationChecks)
+        fixture.scheduler.runDelay(500L)
+        assertEquals(2, fixture.platform.sessions.size)
+
+        fixture.platform.listener.onError(ConversationDictationFailure.PermissionDenied)
+
+        assertEquals(
+            ConversationDictationFailure.PermissionDenied,
+            (fixture.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertEquals(0L, fixture.controller.providerActivityRequestId)
         assertEquals(1, microphoneReleases)
         assertEquals(1, durableStops)
     }
@@ -767,6 +779,7 @@ class ConversationDictationControllerTest {
         assertEquals(0, fixture.writes)
         assertEquals(0, releases)
         assertTrue(firstSession.destroyed)
+        fixture.scheduler.runDelay(250L)
         assertEquals(2, fixture.platform.sessions.size)
         assertTrue(fixture.controller.state is ConversationDictationState.Starting)
 
@@ -821,11 +834,15 @@ class ConversationDictationControllerTest {
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
 
         fixture.platform.listener.onResult("Hello")
+        fixture.scheduler.runDelay(250L)
         assertEquals(2, fixture.platform.sessions.size)
         fixture.platform.listener.onResult("Hello")
+        fixture.scheduler.runDelay(250L)
         assertEquals(3, fixture.platform.sessions.size)
         fixture.platform.listener.onResult(",")
+        fixture.scheduler.runDelay(250L)
         fixture.platform.listener.onResult("world")
+        fixture.scheduler.runDelay(250L)
         fixture.platform.listener.onResult("world")
         fixture.controller.stop()
 
@@ -841,6 +858,7 @@ class ConversationDictationControllerTest {
         val firstGeneration = fixture.platform.listener
 
         firstGeneration.onResult("Hello")
+        fixture.scheduler.runDelay(250L)
         assertEquals(2, fixture.platform.sessions.size)
         firstGeneration.onResult("Hello")
         fixture.controller.stop()
@@ -865,7 +883,9 @@ class ConversationDictationControllerTest {
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
 
         fixture.platform.listener.onResult("first")
+        fixture.scheduler.runDelay(250L)
         fixture.platform.listener.onResult("second")
+        fixture.scheduler.runDelay(250L)
 
         assertEquals(1, acquisitions)
         assertEquals(0, releases)
@@ -923,6 +943,215 @@ class ConversationDictationControllerTest {
             assertEquals(listOf(Triple(ACCOUNT, GROUP, "Draft dictated")), sent)
             assertEquals("", fixture.drafts.getValue(key()).text)
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    /** Explicit Paste wins over the stored automatic-send preference for this one session. */
+    @Test
+    fun pasteActionOverridesStoredSendPreference() {
+        var sendCalls = 0
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Draft", TextRange(5)),
+                deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
+                sendTranscriptIfOriginUnchanged = {
+                    sendCalls += 1
+                    true
+                },
+            )
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.controller.paste()
+        fixture.platform.listener.onResult("dictated")
+
+        assertEquals("Draft dictated", fixture.drafts.getValue(key()).text)
+        assertEquals(0, sendCalls)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
+    @Test
+    fun firstCompletionChoiceWinsAndDoesNotLeakIntoTheNextSession() {
+        var sendCalls = 0
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                sendTranscriptIfOriginUnchanged = {
+                    sendCalls += 1
+                    true
+                },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.controller.paste()
+        fixture.controller.send()
+        fixture.platform.listener.onResult("first")
+        assertEquals("first", fixture.drafts.getValue(key()).text)
+        assertEquals(0, sendCalls)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.controller.send()
+        fixture.controller.paste()
+        fixture.platform.listener.onResult("second")
+        // No delivery scope exists: the chosen Send must retain the result for review, never paste it.
+        assertTrue(fixture.controller.state is ConversationDictationState.ReviewRequired)
+        assertEquals("first", fixture.drafts.getValue(key()).text)
+        assertEquals(0, sendCalls)
+    }
+
+    /** Explicit Send wins over the stored paste preference and retains the immutable-origin gate. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun sendActionOverridesStoredPastePreference() =
+        runTest {
+            val sent = mutableListOf<String>()
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetValidator = { _, _ -> true },
+                    targetValidationScope = this,
+                    deliveryMode = { ConversationDictationDeliveryMode.PasteIntoDraft },
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        sent += request.payload
+                        true
+                    },
+                )
+
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.controller.send()
+            fixture.platform.listener.onResult("dictated")
+            advanceUntilIdle()
+
+            assertEquals(listOf("Draft dictated"), sent)
+            assertEquals("", fixture.drafts.getValue(key()).text)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun failureAfterDispatchRetainsTranscriptWithoutAllowingAnotherSendOrInsert() =
+        runTest {
+            var sends = 0
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        assertTrue(request.beginDispatch())
+                        sends += 1
+                        error("unconfirmed dispatch")
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.controller.send()
+            fixture.platform.listener.onResult("dictated")
+            advanceUntilIdle()
+
+            assertEquals(
+                "dictated",
+                (fixture.controller.state as ConversationDictationState.DeliveryUnknown).transcript,
+            )
+            fixture.controller.send()
+            fixture.controller.paste()
+            fixture.controller.insertReviewAtEnd()
+            assertEquals(1, sends)
+            assertEquals("Draft", fixture.drafts.getValue(key()).text)
+            assertFalse(fixture.controller.hasDurableSession)
+            assertFalse(fixture.controller.ownsMicrophone)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun cancellationBeforeDispatchPreventsAWaitingCommit() =
+        runTest {
+            val commitLock = CompletableDeferred<Unit>()
+            var sends = 0
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Draft"),
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        commitLock.await()
+                        if (request.beginDispatch()) sends += 1
+                        true
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.controller.send()
+            fixture.platform.listener.onResult("dictated")
+            runCurrent()
+            fixture.controller.cancel()
+            commitLock.complete(Unit)
+            advanceUntilIdle()
+
+            assertEquals(0, sends)
+            assertEquals("Draft", fixture.drafts.getValue(key()).text)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun cancellationAfterDispatchCannotHideOrRepeatTheSend() =
+        runTest {
+            val completion = CompletableDeferred<Boolean>()
+            var sends = 0
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Draft"),
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        assertTrue(request.beginDispatch())
+                        sends += 1
+                        completion.await()
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.controller.send()
+            fixture.platform.listener.onResult("dictated")
+            runCurrent()
+            fixture.controller.cancel()
+            fixture.controller.send()
+            fixture.controller.paste()
+
+            assertTrue(fixture.controller.deliveryInProgress)
+            assertTrue(fixture.controller.blocksNewRequest)
+            assertFalse(fixture.controller.completionActionsEnabled)
+            completion.complete(true)
+            advanceUntilIdle()
+            assertEquals(1, sends)
+            assertEquals("", fixture.drafts.getValue(key()).text)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun dispatchTimeoutIsUnknownButPreDispatchFailureRemainsRecoverable() =
+        runTest {
+            val pending = CompletableDeferred<Boolean>()
+            val timedOut =
+                fixture(
+                    draft = TextFieldValue("Draft"),
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        request.beginDispatch()
+                        pending.await()
+                    },
+                )
+            timedOut.controller.requestStart(ACCOUNT, GROUP, timedOut.drafts.getValue(key()))
+            timedOut.controller.send()
+            timedOut.platform.listener.onResult("dictated")
+            advanceUntilIdle()
+            assertTrue(timedOut.controller.state is ConversationDictationState.DeliveryUnknown)
+            assertFalse(timedOut.controller.hasDurableSession)
+
+            val rejected =
+                fixture(
+                    draft = TextFieldValue("Draft"),
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { error("draft lookup failed before dispatch") },
+                )
+            rejected.controller.requestStart(ACCOUNT, GROUP, rejected.drafts.getValue(key()))
+            rejected.controller.send()
+            rejected.platform.listener.onResult("dictated")
+            advanceUntilIdle()
+            assertTrue(rejected.controller.state is ConversationDictationState.ReviewRequired)
         }
 
     /** Verifies foreground-service ownership remains active until asynchronous delivery accepts or rejects. */
@@ -1114,15 +1343,16 @@ class ConversationDictationControllerTest {
         )
     }
 
-    /** Verifies repeated empty generations terminate instead of spinning the recognizer indefinitely. */
+    /** Verifies three rapid empty generations terminate while ordinary silence stays recoverable. */
     @Test
     fun repeatedNoSpeechCallbacksStopAfterABoundedNumberOfRestarts() {
         val fixture = fixture(draft = TextFieldValue(""))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
 
-        repeat(8) {
+        repeat(2) {
             fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
             assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+            fixture.scheduler.runDelay(250L)
         }
         fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
 
@@ -1130,8 +1360,139 @@ class ConversationDictationControllerTest {
             ConversationDictationFailure.NoSpeech,
             (fixture.controller.state as ConversationDictationState.Failed).reason,
         )
-        assertEquals(9, fixture.platform.sessions.size)
+        assertEquals(3, fixture.platform.sessions.size)
         assertFalse(fixture.controller.hasDurableSession)
+    }
+
+    @Test
+    fun ordinaryNoSpeechSurvivesTwoMinutesWithoutConsumingRapidLoopBudget() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        repeat(54) {
+            fixture.platform.listener.onReady()
+            fixture.scheduler.advanceBy(2_000L)
+            fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+            assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+            fixture.scheduler.advanceBy(250L)
+        }
+
+        assertTrue(fixture.controller.hasDurableSession)
+        assertEquals(54 + 1, fixture.platform.sessions.size)
+    }
+
+    @Test
+    fun providerDisconnectRetriesAtBoundedBackoffAndNeverReportsNetwork() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        listOf(500L, 1_000L, 2_000L).forEachIndexed { index, delay ->
+            fixture.platform.listener.onReady()
+            fixture.platform.listener.onError(ConversationDictationFailure.ProviderDisconnected)
+            assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+            fixture.scheduler.advanceBy(delay - 1L)
+            assertEquals(index + 1, fixture.platform.sessions.size)
+            fixture.scheduler.advanceBy(1L)
+            assertEquals(index + 2, fixture.platform.sessions.size)
+        }
+        fixture.platform.listener.onError(ConversationDictationFailure.ProviderDisconnected)
+
+        assertEquals(
+            ConversationDictationFailure.ProviderDisconnected,
+            (fixture.controller.state as ConversationDictationState.Failed).reason,
+        )
+    }
+
+    @Test
+    fun pasteDuringReconnectFinalizesUsefulTextOnceAndFencesLateRestart() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("keep this")
+        fixture.scheduler.advanceBy(250L)
+        fixture.platform.listener.onError(ConversationDictationFailure.ProviderDisconnected)
+
+        fixture.controller.paste()
+        fixture.controller.send()
+        fixture.scheduler.advanceBy(500L)
+
+        assertEquals("keep this", fixture.drafts.getValue(key()).text)
+        assertEquals(1, fixture.writes)
+        assertEquals(2, fixture.platform.sessions.size)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
+    @Test
+    fun delayedRestartRechecksTargetAndMicrophoneBeforeOpeningAnotherGeneration() {
+        var targetPresent = true
+        val removed = fixture(draft = TextFieldValue(""), targetAvailable = { targetPresent })
+        removed.controller.requestStart(ACCOUNT, GROUP, removed.drafts.getValue(key()))
+        removed.platform.listener.onResult("retained")
+        targetPresent = false
+        removed.scheduler.advanceBy(250L)
+        assertTrue(removed.controller.state is ConversationDictationState.Idle)
+        assertEquals(1, removed.platform.sessions.size)
+
+        val revoked = fixture(draft = TextFieldValue(""))
+        revoked.controller.requestStart(ACCOUNT, GROUP, revoked.drafts.getValue(key()))
+        revoked.platform.listener.onResult("retained")
+        revoked.platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.AppOpDenied
+        revoked.scheduler.advanceBy(250L)
+        assertEquals(
+            "retained",
+            (revoked.controller.state as ConversationDictationState.ReviewRequired).transcript,
+        )
+        assertEquals(1, revoked.platform.sessions.size)
+    }
+
+    @Test
+    fun cancellationAndReplacementInsideDelayedProbesCannotReviveTheOldSession() {
+        val cancelled = fixture(draft = TextFieldValue(""))
+        cancelled.controller.requestStart(ACCOUNT, GROUP, cancelled.drafts.getValue(key()))
+        cancelled.platform.listener.onResult("retained")
+        cancelled.platform.onMicrophoneAccessCheck = cancelled.controller::cancel
+        cancelled.scheduler.advanceBy(250L)
+        assertTrue(cancelled.controller.state is ConversationDictationState.Idle)
+        assertEquals(1, cancelled.platform.sessions.size)
+
+        val replacedPlatform = FakePlatform()
+        lateinit var replaced: Fixture
+        replaced = fixture(draft = TextFieldValue(""), platform = replacedPlatform)
+        replaced.drafts[OTHER_ACCOUNT to OTHER_GROUP] = TextFieldValue("Other")
+        replaced.controller.requestStart(ACCOUNT, GROUP, replaced.drafts.getValue(key()))
+        replaced.platform.listener.onResult("old")
+        replacedPlatform.onRecognitionAvailableCheck = {
+            replacedPlatform.onRecognitionAvailableCheck = null
+            replaced.controller.requestStart(
+                OTHER_ACCOUNT,
+                OTHER_GROUP,
+                replaced.drafts.getValue(OTHER_ACCOUNT to OTHER_GROUP),
+            )
+        }
+        replaced.scheduler.advanceBy(250L)
+        assertTrue(replaced.controller.isOwnedBy(OTHER_ACCOUNT, OTHER_GROUP))
+        assertEquals(2, replaced.platform.sessions.size)
+    }
+
+    @Test
+    fun configuredSilenceResetsForSubsequentSpeechAndPasteStillWins() {
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                finishAfterSilenceMillis = { 3_000L },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("first")
+        fixture.scheduler.advanceBy(250L)
+        fixture.platform.listener.onReady()
+        fixture.scheduler.advanceBy(1_000L)
+        fixture.platform.listener.onBeginningOfSpeech()
+        fixture.scheduler.advanceBy(2_500L)
+        assertTrue(fixture.controller.state is ConversationDictationState.Listening)
+        fixture.platform.listener.onResult("second")
+        fixture.controller.paste()
+
+        assertEquals("first second", fixture.drafts.getValue(key()).text)
+        assertEquals(1, fixture.writes)
     }
 
     /** Verifies every generation watchdog retains already recognized words for explicit review. */
@@ -1140,6 +1501,7 @@ class ConversationDictationControllerTest {
         val starting = fixture(draft = TextFieldValue(""))
         starting.controller.requestStart(ACCOUNT, GROUP, starting.drafts.getValue(key()))
         starting.platform.listener.onResult("starting words")
+        starting.scheduler.runDelay(250L)
         starting.scheduler.runDelay(10_000L)
         assertEquals(
             "starting words",
@@ -1149,6 +1511,7 @@ class ConversationDictationControllerTest {
         val providerProcessing = fixture(draft = TextFieldValue(""))
         providerProcessing.controller.requestStart(ACCOUNT, GROUP, providerProcessing.drafts.getValue(key()))
         providerProcessing.platform.listener.onResult("provider words")
+        providerProcessing.scheduler.runDelay(250L)
         providerProcessing.platform.listener.onEndOfSpeech()
         providerProcessing.scheduler.runDelay(20_000L)
         assertEquals(
@@ -1159,6 +1522,7 @@ class ConversationDictationControllerTest {
         val manualStop = fixture(draft = TextFieldValue(""))
         manualStop.controller.requestStart(ACCOUNT, GROUP, manualStop.drafts.getValue(key()))
         manualStop.platform.listener.onResult("manual words")
+        manualStop.scheduler.runDelay(250L)
         manualStop.platform.listener.onBeginningOfSpeech()
         manualStop.controller.stop()
         manualStop.scheduler.runDelay(20_000L)
@@ -1200,7 +1564,7 @@ class ConversationDictationControllerTest {
         val rejected =
             fixture(
                 draft = TextFieldValue("Keep"),
-                startDurableSession = { false },
+                startDurableSession = { _, _ -> false },
             )
         rejected.controller.requestStart(ACCOUNT, GROUP, rejected.drafts.getValue(key()))
         assertEquals(
@@ -1218,7 +1582,7 @@ class ConversationDictationControllerTest {
                 releaseMicrophone = { microphoneReleases += 1 },
             )
         destroyed.controller.requestStart(ACCOUNT, GROUP, destroyed.drafts.getValue(key()))
-        destroyed.controller.onDurableServiceDestroyed()
+        destroyed.controller.onDurableServiceDestroyed(requireNotNull(destroyed.controller.notificationSessionToken))
 
         assertTrue(destroyed.controller.state is ConversationDictationState.Idle)
         assertEquals(1, microphoneReleases)
@@ -1237,8 +1601,9 @@ class ConversationDictationControllerTest {
                 platform = platform,
                 readDraft = { _, _ -> ConversationDictationDraftSnapshot(TextFieldValue(""), 0L) },
                 writeDraft = { _, _, _, _ -> true },
-                startDurableSession = {
+                startDurableSession = { _, ready ->
                     ownershipObservedByServiceStart = controller.hasDurableSession
+                    ready()
                     true
                 },
                 disclosureAccepted = { true },
@@ -1250,6 +1615,229 @@ class ConversationDictationControllerTest {
         assertTrue(ownershipObservedByServiceStart)
         assertTrue(controller.hasDurableSession)
         assertTrue(platform.session.started)
+    }
+
+    /** Enqueue success alone cannot acquire the microphone or create a recognizer. */
+    @Test
+    fun captureWaitsForPromotionAndDuplicateReadyDoesNotRestart() {
+        lateinit var ready: () -> Unit
+        var acquisitions = 0
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Keep"),
+                startDurableSession = { _, callback ->
+                    ready = callback
+                    true
+                },
+                tryAcquireMicrophone = {
+                    acquisitions++
+                    true
+                },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        assertTrue(fixture.controller.hasDurableSession)
+        assertTrue(fixture.controller.completionActionsEnabled)
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertTrue(fixture.platform.sessions.isEmpty())
+        ready()
+        ready()
+        assertEquals(1, acquisitions)
+        assertEquals(1, fixture.platform.sessions.size)
+        assertTrue(fixture.platform.session.started)
+    }
+
+    /** Even a synchronous acknowledgement must wait for the enqueue result to be accepted. */
+    @Test
+    fun synchronousReadyCannotCaptureWhenEnqueueIsRejected() {
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Keep"),
+                startDurableSession = { _, ready ->
+                    ready()
+                    false
+                },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        assertTrue(fixture.platform.sessions.isEmpty())
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertFalse(fixture.controller.hasDurableSession)
+        assertEquals(
+            ConversationDictationFailure.Unknown,
+            (fixture.controller.state as ConversationDictationState.Failed).reason,
+        )
+    }
+
+    /** Late acknowledgement/destruction from a cancelled session cannot touch its replacement. */
+    @Test
+    fun stalePromotionCallbacksCannotReviveOrDestroyReplacement() {
+        val callbacks = mutableListOf<() -> Unit>()
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Keep"),
+                startDurableSession = { _, ready ->
+                    callbacks += ready
+                    true
+                },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val oldToken = requireNotNull(fixture.controller.notificationSessionToken)
+        fixture.controller.cancel()
+        callbacks[0]()
+        assertTrue(fixture.platform.sessions.isEmpty())
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        callbacks[0]()
+        fixture.controller.onDurableServiceDestroyed(oldToken)
+        fixture.controller.onDurableServiceStartFailed(oldToken)
+        assertTrue(fixture.controller.hasDurableSession)
+        assertTrue(fixture.platform.sessions.isEmpty())
+        callbacks[1]()
+        assertEquals(1, fixture.platform.sessions.size)
+    }
+
+    @Test
+    fun throwingPromotionProbeFailsOnlyItsOwningSession() {
+        lateinit var ready: () -> Unit
+        val platform = FakePlatform()
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Keep"),
+                platform = platform,
+                startDurableSession = { _, callback ->
+                    ready = callback
+                    true
+                },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        platform.recognitionAvailableFailure = IllegalStateException("probe failed")
+
+        ready()
+
+        assertEquals(
+            ConversationDictationFailure.Unknown,
+            (fixture.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertFalse(fixture.controller.hasDurableSession)
+        assertTrue(fixture.platform.sessions.isEmpty())
+    }
+
+    @Test
+    fun replacementDuringPromotionProbeCannotBeFailedOrRevivedByOldCallback() {
+        val callbacks = mutableListOf<() -> Unit>()
+        val platform = FakePlatform()
+        lateinit var fixture: Fixture
+        fixture =
+            fixture(
+                draft = TextFieldValue("Keep"),
+                platform = platform,
+                startDurableSession = { _, callback ->
+                    callbacks += callback
+                    true
+                },
+            )
+        fixture.drafts[OTHER_ACCOUNT to OTHER_GROUP] = TextFieldValue("Other")
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        platform.onRecognitionAvailableCheck = {
+            platform.onRecognitionAvailableCheck = null
+            fixture.controller.requestStart(
+                OTHER_ACCOUNT,
+                OTHER_GROUP,
+                fixture.drafts.getValue(OTHER_ACCOUNT to OTHER_GROUP),
+            )
+        }
+
+        callbacks[0]()
+
+        assertTrue(fixture.controller.isOwnedBy(OTHER_ACCOUNT, OTHER_GROUP))
+        assertTrue(fixture.platform.sessions.isEmpty())
+        callbacks[1]()
+        assertEquals(1, fixture.platform.sessions.size)
+    }
+
+    /** A service that never promotes has a finite deadline and releases ownership once. */
+    @Test
+    fun missingPromotionTimesOutWithoutOpeningMicrophone() {
+        lateinit var ready: () -> Unit
+        var stops = 0
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Keep"),
+                startDurableSession = { _, callback ->
+                    ready = callback
+                    true
+                },
+                stopDurableSession = { stops++ },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.scheduler.advanceBy(2_999L)
+        assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+        assertTrue(fixture.platform.sessions.isEmpty())
+        fixture.scheduler.advanceBy(1L)
+        assertEquals(
+            ConversationDictationFailure.TimedOut,
+            (fixture.controller.state as ConversationDictationState.Failed).reason,
+        )
+        ready()
+        fixture.controller.cancel()
+        assertEquals(1, stops)
+        assertTrue(fixture.platform.sessions.isEmpty())
+    }
+
+    /** Cancel/Paste/Send during startup never briefly opens capture or writes an empty result. */
+    @Test
+    fun completionDuringPromotionDisarmsPendingCapture() {
+        listOf<(ConversationDictationController) -> Unit>(
+            ConversationDictationController::cancel,
+            ConversationDictationController::paste,
+            ConversationDictationController::send,
+        ).forEach { complete ->
+            lateinit var ready: () -> Unit
+            var stops = 0
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Keep"),
+                    startDurableSession = { _, callback ->
+                        ready = callback
+                        true
+                    },
+                    stopDurableSession = { stops++ },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            complete(fixture.controller)
+            ready()
+            assertTrue(fixture.platform.sessions.isEmpty())
+            assertFalse(fixture.controller.hasDurableSession)
+            assertEquals(0, fixture.writes)
+            assertEquals("Keep", fixture.drafts.getValue(key()).text)
+            assertEquals(1, stops)
+        }
+    }
+
+    /** Permissions, target ownership, and provider availability are fresh after the async wait. */
+    @Test
+    fun promotionRechecksRevokedAccessTargetAndProvider() {
+        listOf("permission", "target", "provider").forEach { revoked ->
+            lateinit var ready: () -> Unit
+            var availableTarget = true
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Keep"),
+                    startDurableSession = { _, callback ->
+                        ready = callback
+                        true
+                    },
+                    targetAvailable = { availableTarget },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            when (revoked) {
+                "permission" -> fixture.platform.hasPermission = false
+                "target" -> availableTarget = false
+                "provider" -> fixture.platform.available = false
+            }
+            ready()
+            assertTrue(fixture.platform.sessions.isEmpty())
+            assertFalse(fixture.controller.hasDurableSession)
+            assertFalse(fixture.controller.ownsMicrophone)
+        }
     }
 
     @Test
@@ -1404,7 +1992,10 @@ class ConversationDictationControllerTest {
         platform: FakePlatform = FakePlatform(),
         tryAcquireMicrophone: () -> Boolean = { true },
         releaseMicrophone: () -> Unit = {},
-        startDurableSession: () -> Boolean = { true },
+        startDurableSession: (String, () -> Unit) -> Boolean = { _, ready ->
+            ready()
+            true
+        },
         stopDurableSession: () -> Unit = {},
         finishAfterSilenceMillis: () -> Long? = { null },
         deliveryMode: () -> ConversationDictationDeliveryMode = {
@@ -1447,7 +2038,7 @@ class ConversationDictationControllerTest {
                 stopDurableSession = stopDurableSession,
                 disclosureAccepted = { true },
                 markDisclosureAccepted = {},
-                elapsedRealtime = { 100L },
+                elapsedRealtime = scheduler::now,
                 scheduleTimeout = scheduler::schedule,
                 finishAfterSilenceMillis = finishAfterSilenceMillis,
                 deliveryMode = deliveryMode,
@@ -1496,17 +2087,33 @@ class ConversationDictationControllerTest {
             private set
         var recognitionAvailabilityChecks = 0
             private set
+        var recognitionConfigurationChecks = 0
+            private set
+        var recognitionAvailableFailure: RuntimeException? = null
+        var onRecognitionAvailableCheck: (() -> Unit)? = null
+        var onMicrophoneAccessCheck: (() -> Unit)? = null
         lateinit var activityReadinessCallback: (Boolean) -> Unit
             private set
 
         override fun hasRecordAudioPermission(): Boolean = hasPermission
 
-        override fun microphoneAccess(): ConversationDictationMicrophoneAccess = microphoneAccessOverride ?: super.microphoneAccess()
+        override fun microphoneAccess(): ConversationDictationMicrophoneAccess {
+            onMicrophoneAccessCheck?.let { callback ->
+                onMicrophoneAccessCheck = null
+                callback()
+            }
+            return microphoneAccessOverride ?: super.microphoneAccess()
+        }
 
-        override fun recognitionConfigured(): Boolean = configured
+        override fun recognitionConfigured(): Boolean {
+            recognitionConfigurationChecks += 1
+            return configured
+        }
 
         override fun recognitionAvailable(): Boolean {
             recognitionAvailabilityChecks += 1
+            onRecognitionAvailableCheck?.invoke()
+            recognitionAvailableFailure?.let { throw it }
             return available
         }
 
@@ -1557,18 +2164,22 @@ class ConversationDictationControllerTest {
 
     private class FakeTimeoutScheduler {
         private val tasks = mutableListOf<Task>()
+        private var currentTimeMillis = 100L
+
+        fun now(): Long = currentTimeMillis
 
         fun schedule(
             delayMillis: Long,
             callback: () -> Unit,
         ): ConversationDictationTimeoutHandle {
-            val task = Task(delayMillis, callback)
+            val task = Task(delayMillis, currentTimeMillis + delayMillis, callback)
             tasks += task
             return ConversationDictationTimeoutHandle { task.cancelled = true }
         }
 
         fun runLatest() {
             val task = tasks.last { !it.cancelled && !it.ran }
+            currentTimeMillis = maxOf(currentTimeMillis, task.dueAtMillis)
             task.ran = true
             task.callback()
         }
@@ -1576,22 +2187,37 @@ class ConversationDictationControllerTest {
         /** Runs the newest live timeout matching [delayMillis]. */
         fun runDelay(delayMillis: Long) {
             val task = tasks.last { !it.cancelled && !it.ran && it.delayMillis == delayMillis }
+            currentTimeMillis = maxOf(currentTimeMillis, task.dueAtMillis)
             task.ran = true
             task.callback()
         }
 
-        /** Runs every live timeout due no later than [delayMillis]. */
-        fun runThrough(delayMillis: Long) {
-            tasks
-                .filter { !it.cancelled && !it.ran && it.delayMillis <= delayMillis }
-                .forEach { task ->
-                    task.ran = true
-                    task.callback()
-                }
+        /** Advances shared monotonic time and drains newly due callbacks in deadline order. */
+        fun runThrough(delayMillis: Long) = advanceBy(delayMillis)
+
+        fun advanceBy(delayMillis: Long) {
+            val targetTime = currentTimeMillis + delayMillis
+            repeat(1_000) {
+                val next =
+                    tasks
+                        .withIndex()
+                        .filter { !it.value.cancelled && !it.value.ran && it.value.dueAtMillis <= targetTime }
+                        .minWithOrNull(compareBy<IndexedValue<Task>> { it.value.dueAtMillis }.thenBy { it.index })
+                        ?.value
+                        ?: run {
+                            currentTimeMillis = targetTime
+                            return
+                        }
+                currentTimeMillis = next.dueAtMillis
+                next.ran = true
+                next.callback()
+            }
+            error("virtual timeout scheduler exceeded its iteration bound")
         }
 
         private data class Task(
             val delayMillis: Long,
+            val dueAtMillis: Long,
             val callback: () -> Unit,
             var cancelled: Boolean = false,
             var ran: Boolean = false,

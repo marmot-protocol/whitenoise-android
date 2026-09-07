@@ -25,14 +25,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -64,10 +62,8 @@ import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.WarmResumeUsefulSurface
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
-import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationFloatingControl
 import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
 import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleSharedMedia
-import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardOperationStatusHost
 import dev.ipf.whitenoise.android.ui.navigation.MainShell
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.navigation.PrepareMainShellFirstFrame
@@ -82,8 +78,6 @@ import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -91,7 +85,7 @@ internal const val TRANSIENT_NOTICE_DURATION_MILLIS = 2_000L
 internal const val GLOBAL_TRANSIENT_NOTICE_TAG = "global-transient-notice"
 
 /** Keeps exactly one dictation control visible without duplicating the origin composer. */
-internal fun shouldShowConversationDictationFloatingControl(
+internal fun shouldShowConversationDictationPersistentControl(
     state: ConversationDictationState,
     originVisible: Boolean,
     appLockScreenVisible: Boolean,
@@ -107,6 +101,7 @@ internal fun shouldShowConversationDictationFloatingControl(
             is ConversationDictationState.ProviderActivityActive,
             is ConversationDictationState.Failed,
             is ConversationDictationState.ReviewRequired,
+            is ConversationDictationState.DeliveryUnknown,
             -> true
             ConversationDictationState.Idle,
             is ConversationDictationState.DisclosureRequired,
@@ -202,10 +197,6 @@ internal fun WhiteNoiseApp(
     // can read it; child screens mutate via [LocalSnackbarBottomInset].
     val snackbarBottomInset = remember { mutableStateOf(0.dp) }
     val snackbarContentInset = remember { mutableStateOf(0.dp) }
-    val forwardOperationVisible by
-        remember(appState) {
-            appState.activeForwardOperation.map { it != null }.distinctUntilChanged()
-        }.collectAsState(initial = false)
     val toast = appState.toast
     val transientNotice = appState.transientNotice
     val context = LocalContext.current
@@ -217,10 +208,6 @@ internal fun WhiteNoiseApp(
     val dictationState = dictation.state
     val dictationPermissionRequestId = dictation.permissionRequestId
     val dictationProviderActivityRequestId = dictation.providerActivityRequestId
-    val dictationOriginVisible =
-        dictationState.target?.let { target ->
-            appState.isConversationDictationOriginVisible(target.accountRef, target.groupIdHex)
-        } == true
     val density = LocalDensity.current
     var firstUsefulFrameRecorded by remember(warmResumeTraceToken, warmResumeEpoch) { mutableStateOf(false) }
     val visibleShareRequest = mainShellStateHolder.visibleShareRequest
@@ -529,23 +516,17 @@ internal fun WhiteNoiseApp(
                                         surface = renderedSurface,
                                     ) {
                                         WarmResumeUsefulSurface {
-                                            ShellTransientNoticeLayout(
-                                                notice = transientNotice,
-                                                persistentTopContent = { ForwardOperationStatusHost(appState) },
-                                                persistentTopContentConsumesStatusBars = forwardOperationVisible,
-                                            ) {
-                                                MainShell(
-                                                    appState = appState,
-                                                    stateHolder = mainShellStateHolder,
-                                                    inboundNotificationTarget = inboundNotificationTarget,
-                                                    inboundNotificationRequestId = inboundNotificationRequestId,
-                                                    onNotificationTargetHandled = onNotificationTargetHandled,
-                                                    inboundShareRequest = inboundShareRequest,
-                                                    onShareRequestHandled = onShareRequestHandled,
-                                                    inboundAppUpdateTap = inboundAppUpdateTap,
-                                                    onAppUpdateTapHandled = onAppUpdateTapHandled,
-                                                )
-                                            }
+                                            MainShell(
+                                                appState = appState,
+                                                stateHolder = mainShellStateHolder,
+                                                inboundNotificationTarget = inboundNotificationTarget,
+                                                inboundNotificationRequestId = inboundNotificationRequestId,
+                                                onNotificationTargetHandled = onNotificationTargetHandled,
+                                                inboundShareRequest = inboundShareRequest,
+                                                onShareRequestHandled = onShareRequestHandled,
+                                                inboundAppUpdateTap = inboundAppUpdateTap,
+                                                onAppUpdateTapHandled = onAppUpdateTapHandled,
+                                            )
                                         }
                                     }
                                 }
@@ -574,23 +555,6 @@ internal fun WhiteNoiseApp(
                             WipeOutcomeSheet(
                                 report = report,
                                 onDismiss = { appState.pendingWipeReport = null },
-                            )
-                        }
-                        if (
-                            shouldShowConversationDictationFloatingControl(
-                                state = dictationState,
-                                originVisible = dictationOriginVisible,
-                                appLockScreenVisible = appState.appLockScreenVisible,
-                            )
-                        ) {
-                            ConversationDictationFloatingControl(
-                                state = dictationState,
-                                controller = dictation,
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .navigationBarsPadding()
-                                        .padding(end = 16.dp, bottom = 88.dp),
                             )
                         }
                     }
