@@ -1910,6 +1910,14 @@
         ]
       },
       {
+        "surface": "Media viewer save action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.media_save",
+        "test_ids": [
+          "MED-015"
+        ]
+      },
+      {
         "surface": "StableMediaViewerPager",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "fun StableMediaViewerPager(",
