@@ -14,8 +14,10 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertArrayEquals
@@ -36,6 +38,7 @@ import java.io.File
 class VoiceAttachmentCacheStateTest {
     private companion object {
         private const val TEST_HANG_GUARD_MS = 30_000L
+        private const val PATH_SERIALIZATION_PROBE_MS = 1_000L
     }
 
     @Test
@@ -187,72 +190,140 @@ class VoiceAttachmentCacheStateTest {
                 source
                     .substringAfter("internal suspend fun materializeVoiceAttachmentSource("),
         )
+        val materializer =
+            source
+                .substringAfter("internal suspend fun materializeVoiceAttachmentSource(")
+                .substringBefore("internal fun cachedVoiceAttachmentFile(")
+        val pathLock = materializer.indexOf("voiceMaterializationPathLocks.withLock(file.absolutePath)")
+        val cacheProbe = materializer.indexOf("file.takeIf { it.isFile && it.length() > 0L }")
+        val publication = materializer.indexOf("AttachmentCachePublication.publishSourceAfterLoad")
+        assertTrue(
+            "one path lock must wrap both the complete-file probe and cache publication",
+            pathLock >= 0 && cacheProbe > pathLock && publication > cacheProbe,
+        )
     }
 
-    /** Proves identical attachment ids cannot join a previous controller owner's suspended flight. */
+    /** Proves replacement owners serialize one path but retry after the previous owner's failure. */
     @Test
-    fun samePathDifferentOwnersMaterializeIndependently() {
+    fun samePathDifferentOwnersSerializeBeforeIndependentRetry() {
         runBlocking {
             withTimeout(TEST_HANG_GUARD_MS) {
-                val context = RuntimeEnvironment.getApplication()
-                val messageId = "voice-owner-flight-${System.nanoTime()}"
-                val attachmentIndex = 1
-                val reference = mediaReference(mediaType = "audio/mp4")
+                val attachment = ownerFlightAttachment("voice-owner-retry")
                 val firstOwner = Any()
                 val secondOwner = Any()
                 val firstEntered = CompletableDeferred<Unit>()
                 val secondEntered = CompletableDeferred<Unit>()
                 val releaseFirst = CompletableDeferred<Unit>()
                 val releaseSecond = CompletableDeferred<Unit>()
-                val attachment = OwnerFlightAttachment(context, messageId, attachmentIndex, reference)
-                val cacheFile =
-                    File(
-                        File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() },
-                        "$messageId-$attachmentIndex-${reference.sourceEpoch}.m4a",
-                    )
-                cacheFile.delete()
+                val recoveredBytes = ByteArray(128) { (it + 1).toByte() }
 
                 val first =
-                    startFailingOwnerFlight(
+                    startOwnerFlight(
                         attachment,
                         firstOwner,
                         firstEntered,
                         releaseFirst,
-                        "first owner released",
-                    )
-                val second =
-                    startFailingOwnerFlight(
-                        attachment,
-                        secondOwner,
-                        secondEntered,
-                        releaseSecond,
-                        "second owner released",
-                    )
+                    ) { error("first owner released") }
+                var second: Deferred<Result<File>>? = null
                 try {
                     firstEntered.await()
-                    secondEntered.await()
-                    assertFalse("both owner flights must remain suspended", first.isCompleted || second.isCompleted)
+                    val replacement =
+                        startOwnerFlight(
+                            attachment,
+                            secondOwner,
+                            secondEntered,
+                            releaseSecond,
+                        ) { AttachmentPlaintext.Bytes(recoveredBytes) }
+                    second = replacement
+                    assertNull(
+                        "the replacement resolver must wait for the active path owner",
+                        withTimeoutOrNull(PATH_SERIALIZATION_PROBE_MS) { secondEntered.await() },
+                    )
+                    assertFalse("the replacement owner must remain suspended", replacement.isCompleted)
 
                     releaseFirst.complete(Unit)
-                    releaseSecond.complete(Unit)
                     assertEquals("first owner released", first.await().exceptionOrNull()?.message)
-                    assertEquals("second owner released", second.await().exceptionOrNull()?.message)
-                } finally {
-                    releaseFirst.complete(Unit)
+                    secondEntered.await()
+                    assertFalse("the replacement retains its independent retry", replacement.isCompleted)
+
                     releaseSecond.complete(Unit)
-                    cacheFile.delete()
+                    assertArrayEquals(recoveredBytes, replacement.await().getOrThrow().readBytes())
+                } finally {
+                    withContext(NonCancellable) {
+                        releaseFirst.complete(Unit)
+                        releaseSecond.complete(Unit)
+                        runCatching { first.await() }
+                        second?.let { runCatching { it.await() } }
+                        attachment.cacheFile.delete()
+                    }
                 }
             }
         }
     }
 
-    /** Starts one owner-scoped source load that remains held until its expected failure is released. */
-    private fun CoroutineScope.startFailingOwnerFlight(
+    /** Proves a replacement owner reuses the first owner's complete publication without resolving again. */
+    @Test
+    fun samePathDifferentOwnersReuseCompletedPublication() {
+        runBlocking {
+            withTimeout(TEST_HANG_GUARD_MS) {
+                val attachment = ownerFlightAttachment("voice-owner-success")
+                val firstEntered = CompletableDeferred<Unit>()
+                val secondEntered = CompletableDeferred<Unit>()
+                val releaseFirst = CompletableDeferred<Unit>()
+                val releaseSecond = CompletableDeferred<Unit>()
+                val publishedBytes = ByteArray(128) { (it + 1).toByte() }
+                val first =
+                    startOwnerFlight(attachment, Any(), firstEntered, releaseFirst) {
+                        AttachmentPlaintext.Bytes(publishedBytes)
+                    }
+                var second: Deferred<Result<File>>? = null
+                try {
+                    firstEntered.await()
+                    val replacement =
+                        startOwnerFlight(attachment, Any(), secondEntered, releaseSecond) {
+                            error("replacement owner must reuse the completed publication")
+                        }
+                    second = replacement
+                    assertNull(
+                        "the replacement resolver must wait for the active path owner",
+                        withTimeoutOrNull(PATH_SERIALIZATION_PROBE_MS) { secondEntered.await() },
+                    )
+                    assertFalse(
+                        "the replacement owner must not return before publication completes",
+                        replacement.isCompleted,
+                    )
+
+                    releaseFirst.complete(Unit)
+                    val firstFile = first.await().getOrThrow()
+                    val secondFile = replacement.await().getOrThrow()
+
+                    assertFalse(
+                        "the replacement owner must not resolve an already-published path",
+                        secondEntered.isCompleted,
+                    )
+                    assertEquals(firstFile, secondFile)
+                    assertArrayEquals(publishedBytes, firstFile.readBytes())
+                    assertArrayEquals(publishedBytes, secondFile.readBytes())
+                } finally {
+                    withContext(NonCancellable) {
+                        releaseFirst.complete(Unit)
+                        releaseSecond.complete(Unit)
+                        runCatching { first.await() }
+                        second?.let { runCatching { it.await() } }
+                        attachment.cacheFile.delete()
+                    }
+                }
+            }
+        }
+    }
+
+    /** Starts one owner-scoped source load and holds its chosen result behind [release]. */
+    private fun CoroutineScope.startOwnerFlight(
         attachment: OwnerFlightAttachment,
         owner: Any,
         entered: CompletableDeferred<Unit>,
         release: CompletableDeferred<Unit>,
-        failureMessage: String,
+        sourceAfterRelease: () -> AttachmentPlaintext,
     ): Deferred<Result<File>> =
         async(start = CoroutineStart.UNDISPATCHED) {
             runCatching {
@@ -265,19 +336,38 @@ class VoiceAttachmentCacheStateTest {
                     resolveSource = {
                         entered.complete(Unit)
                         release.await()
-                        error(failureMessage)
+                        sourceAfterRelease()
                     },
                 )
             }
         }
 
-    /** Stable attachment identity shared by two deliberately distinct owner flights. */
+    /** Stable path fixture shared by two deliberately distinct presentation owners. */
     private data class OwnerFlightAttachment(
         val context: android.content.Context,
         val messageId: String,
         val attachmentIndex: Int,
         val reference: MediaAttachmentReferenceFfi,
-    )
+    ) {
+        val cacheFile: File =
+            File(
+                File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() },
+                "$messageId-$attachmentIndex-${reference.sourceEpoch}.m4a",
+            )
+    }
+
+    /** Creates one absent voice-cache path for an owner-replacement materialization test. */
+    private fun ownerFlightAttachment(prefix: String): OwnerFlightAttachment {
+        val attachment =
+            OwnerFlightAttachment(
+                context = RuntimeEnvironment.getApplication(),
+                messageId = "$prefix-${System.nanoTime()}",
+                attachmentIndex = 1,
+                reference = mediaReference(mediaType = "audio/mp4"),
+            )
+        attachment.cacheFile.delete()
+        return attachment
+    }
 
     /** Proves a waiter cannot accept a partial file while the owner publishes the same path. */
     @Test

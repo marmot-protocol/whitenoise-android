@@ -70,6 +70,7 @@ import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.KeyedMutexPool
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
@@ -85,6 +86,9 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 private val voiceMaterializations = SingleFlight<VoiceMaterializationFlightKey, java.io.File>()
+
+/** Serializes stable cache publication across owner-scoped presentation flights. */
+private val voiceMaterializationPathLocks = KeyedMutexPool()
 
 /** Keeps in-flight source work isolated to the controller that authorized it. */
 private class VoiceMaterializationFlightKey(
@@ -774,7 +778,10 @@ internal suspend fun materializeVoiceAttachment(
         },
     )
 
-/** Publishes one closeable voice source and reuses a complete stable playback file. */
+/**
+ * Publishes one closeable voice source behind a path-wide recheck. Replacement owners reuse a
+ * completed file, but resolve independently after a preceding owner fails.
+ */
 @VisibleForTesting
 internal suspend fun materializeVoiceAttachmentSource(
     context: android.content.Context,
@@ -787,12 +794,14 @@ internal suspend fun materializeVoiceAttachmentSource(
     val file = voiceAttachmentCacheFile(context, messageIdHex, attachmentIndex, reference)
     val attachmentKey = AttachmentCachePublication.attachmentKey(messageIdHex, attachmentIndex, reference.sourceEpoch)
     return voiceMaterializations.run(VoiceMaterializationFlightKey(file.absolutePath, materializationOwner)) {
-        withContext(Dispatchers.IO) {
-            file.takeIf { it.isFile && it.length() > 0L }?.also(AttachmentPlaintextCache::touch)
-        } ?: run {
-            val published = AttachmentCachePublication.publishSourceAfterLoad(attachmentKey, file, resolveSource)
-            if (!published) throw java.io.IOException("attachment cache publication aborted for ${file.name}")
-            file
+        voiceMaterializationPathLocks.withLock(file.absolutePath) {
+            withContext(Dispatchers.IO) {
+                file.takeIf { it.isFile && it.length() > 0L }?.also(AttachmentPlaintextCache::touch)
+            } ?: run {
+                val published = AttachmentCachePublication.publishSourceAfterLoad(attachmentKey, file, resolveSource)
+                if (!published) throw java.io.IOException("attachment cache publication aborted for ${file.name}")
+                file
+            }
         }
     }
 }

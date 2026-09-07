@@ -22,17 +22,16 @@ import java.io.File
 internal class ConversationVoiceOwnerReplacementTest : ConversationVoiceDownloadAnchorTestBase() {
     /**
      * Replaces account and controller in place while both owners use identical
-     * chat, message, attachment, and runtime keys. Each controller must start
-     * independent source work and only the current owner may publish row state.
+     * chat, message, attachment, and runtime keys. The current owner must reuse
+     * the serialized publication without accepting the stale owner's row state.
      */
     @Test
-    fun inPlaceOwnerReplacementRejectsTheOldMaterializationCompletion() {
+    fun inPlaceOwnerReplacementReusesTheFileButRejectsTheOldPresentation() {
         val scenario = ownerReplacementScenario()
         try {
             val host = startOldOwnerDownload(scenario)
-            val newOwnerAnchor = replaceOwnerAndStartIndependentDownload(scenario, host)
-            assertOldOwnerCompletionIsRejected(scenario, newOwnerAnchor)
-            assertCurrentOwnerCompletionSucceeds(scenario, newOwnerAnchor)
+            val newOwnerAnchor = replaceOwnerAndAwaitSerializedDownload(scenario, host)
+            assertCompletedPublicationTransfersToCurrentOwner(scenario, newOwnerAnchor)
         } finally {
             closeFixture(scenario.oldFixture, scenario.runtime)
             closeFixture(scenario.newFixture, scenario.runtime)
@@ -112,8 +111,8 @@ internal class ConversationVoiceOwnerReplacementTest : ConversationVoiceDownload
         }
     }
 
-    /** Rebinds ConversationScreen in place and proves the second controller starts a distinct flight. */
-    private fun replaceOwnerAndStartIndependentDownload(
+    /** Rebinds ConversationScreen and holds its new source request behind the active path owner. */
+    private fun replaceOwnerAndAwaitSerializedDownload(
         scenario: OwnerReplacementScenario,
         host: ConversationTestHost,
     ): ConversationViewportEvidence {
@@ -128,14 +127,14 @@ internal class ConversationVoiceOwnerReplacementTest : ConversationVoiceDownload
             assertVoiceActionTarget(scenario.voiceId, R.string.media_tap_to_download)
             clickVoiceAction(scenario.voiceId, R.string.media_tap_to_download)
             awaitAttachmentOpenIntent(scenario.newFixture.controller, scenario.voiceId)
-            scenario.newControl.awaitMaterializationAttempt(0)
+            assertVoiceActionTarget(scenario.voiceId, R.string.media_downloading)
             assertEquals(1, scenario.oldControl.materializationAttempts)
-            assertEquals(1, scenario.newControl.materializationAttempts)
+            assertEquals(0, scenario.newControl.materializationAttempts)
         }
     }
 
-    /** Releases only stale work and requires the current row to remain downloading and unhydrated. */
-    private fun assertOldOwnerCompletionIsRejected(
+    /** Lets the current owner reuse complete bytes without reviving the stale owner's presentation. */
+    private fun assertCompletedPublicationTransfersToCurrentOwner(
         scenario: OwnerReplacementScenario,
         newOwnerAnchor: ConversationViewportEvidence,
     ) {
@@ -150,31 +149,18 @@ internal class ConversationVoiceOwnerReplacementTest : ConversationVoiceDownload
                 reference = scenario.oldFixture.references.getValue(scenario.voiceId),
             ) != null
         }
-        composeRule.waitForIdle()
-
-        assertVoiceActionTarget(scenario.voiceId, R.string.media_downloading)
-        assertFalse(scenario.oldControl.waveformStarted.isCompleted)
-        assertFalse(scenario.oldControl.durationStarted.isCompleted)
-        assertFalse(scenario.newControl.waveformStarted.isCompleted)
-        assertFalse(scenario.newControl.durationStarted.isCompleted)
-        assertViewportStayedFixed("old owner completion", newOwnerAnchor, scenario.newEvidence, checkpoint)
-        assertNoScrollWrites("old owner completion", scenario.newEvidence)
-    }
-
-    /** Releases the current owner and requires its real row to hydrate without moving the viewport. */
-    private fun assertCurrentOwnerCompletionSucceeds(
-        scenario: OwnerReplacementScenario,
-        newOwnerAnchor: ConversationViewportEvidence,
-    ) {
-        val checkpoint = scenario.newEvidence.checkpoint()
-        scenario.newControl.succeedMaterialization(0)
+        scenario.oldControl.awaitSuccessfulMaterializationReturn()
         scenario.newControl.awaitSuccessfulMaterializationReturn()
         scenario.newControl.awaitHydrationStarted()
+
+        assertEquals(0, scenario.newControl.materializationAttempts)
+        assertFalse(scenario.oldControl.waveformStarted.isCompleted)
+        assertFalse(scenario.oldControl.durationStarted.isCompleted)
         scenario.newControl.releaseHydration()
         scenario.newControl.awaitHydrationCompleted()
         awaitVoiceAction(scenario.voiceId, R.string.voice_message_pause)
-        assertViewportStayedFixed("current owner completion", newOwnerAnchor, scenario.newEvidence, checkpoint)
-        assertNoScrollWrites("current owner completion", scenario.newEvidence)
+        assertViewportStayedFixed("serialized owner replacement", newOwnerAnchor, scenario.newEvidence, checkpoint)
+        assertNoScrollWrites("serialized owner replacement", scenario.newEvidence)
         assertEquals("account-b", scenario.newEvidence.latestViewport().accountRef)
     }
 
