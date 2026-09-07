@@ -201,7 +201,7 @@ SEMANTIC_OWNER_IDS = {
         "permission:android.permission.RECEIVE_BOOT_COMPLETED": {"NTF-014"},
         "permission:android.permission.RECORD_AUDIO": {"MED-008", "DIC-001"},
         "permission:android.permission.REQUEST_INSTALL_PACKAGES": {"MED-018", "SYS-008"},
-        "permission:android.permission.VIBRATE": {"NTF-009"},
+        "permission:android.permission.VIBRATE": {"GRP-016"},
         "permission:android.permission.WAKE_LOCK": {"NTF-014", "TTS-001"},
     },
     "android_entry_points": {
@@ -338,6 +338,50 @@ def consume_kotlin_type_parameters(text: str, offset: int) -> int | None:
     return None
 
 
+def kotlin_code_mask(text: str) -> str:
+    """Blank Kotlin comments and literals while preserving source offsets."""
+    masked = list(text)
+    offset = 0
+    while offset < len(text):
+        if text.startswith("//", offset):
+            end = text.find("\n", offset + 2)
+            end = len(text) if end < 0 else end
+        elif text.startswith("/*", offset):
+            end = offset + 2
+            depth = 1
+            while end < len(text) and depth:
+                if text.startswith("/*", end):
+                    depth += 1
+                    end += 2
+                elif text.startswith("*/", end):
+                    depth -= 1
+                    end += 2
+                else:
+                    end += 1
+        elif text.startswith('"""', offset):
+            closing = text.find('"""', offset + 3)
+            end = len(text) if closing < 0 else closing + 3
+        elif text[offset] in {'"', "'"}:
+            quote = text[offset]
+            end = offset + 1
+            while end < len(text):
+                if text[end] == "\\":
+                    end += 2
+                elif text[end] == quote:
+                    end += 1
+                    break
+                else:
+                    end += 1
+        else:
+            offset += 1
+            continue
+        for index in range(offset, min(end, len(text))):
+            if text[index] != "\n":
+                masked[index] = " "
+        offset = end
+    return "".join(masked)
+
+
 def composable_declaration_name(text: str, offset: int) -> str | None:
     """Parse one annotated function and return its inventory surface name."""
     declaration_start = offset
@@ -380,7 +424,7 @@ def composable_declaration_name(text: str, offset: int) -> str | None:
 def composable_names(text: str) -> set[str]:
     """Find visual and receiver-qualified Compose function declarations."""
     found: set[str] = set()
-    for composable in re.finditer(r"(?m)^[ \t]*@Composable\b", text):
+    for composable in re.finditer(r"@Composable\b", kotlin_code_mask(text)):
         offset = skip_kotlin_trivia(text, composable.end())
         while offset < len(text) and text[offset] == "@":
             annotation_end = consume_kotlin_annotation(text, offset)

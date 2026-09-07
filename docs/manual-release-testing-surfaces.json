@@ -6623,7 +6623,7 @@
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.permission.VIBRATE",
         "test_ids": [
-          "NTF-009"
+          "GRP-016"
         ]
       },
       {

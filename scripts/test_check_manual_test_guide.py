@@ -278,6 +278,25 @@ internal fun ConversationBottomBar() = Unit
 '''
         self.assertEqual(MODULE.composable_names(text), {"ConversationBottomBar"})
 
+    def test_composable_discovery_accepts_preceding_annotation_on_same_line(self):
+        text = '''
+@Suppress("unused") @Composable
+fun FutureWidget() = Unit
+'''
+        self.assertEqual(MODULE.composable_names(text), {"FutureWidget"})
+
+    def test_composable_discovery_ignores_comments_strings_and_non_declarations(self):
+        text = '''
+// @Composable fun CommentedScreen() = Unit
+/* @Composable fun BlockCommentedScreen() = Unit */
+val marker = "@Composable fun StringScreen() = Unit"
+val callback = @Composable { Unit }
+
+@Composable
+fun RealScreen() = Unit
+'''
+        self.assertEqual(MODULE.composable_names(text), {"RealScreen"})
+
     def test_composable_discovery_accepts_opt_in_class_arguments(self):
         text = '''
 @Composable
@@ -452,6 +471,17 @@ private fun <T BrokenScreen(value: T) = Unit
             ):
                 MODULE.validate_inventory({"MED-004", "SEC-005"}, errors)
             self.assertTrue(any("expected exactly: MED-004" in error for error in errors))
+
+    def test_vibration_permission_uses_vibration_checklist_owner(self):
+        surface = "permission:android.permission.VIBRATE"
+        inventory = json.loads(MODULE.INVENTORY.read_text(encoding="utf-8"))
+        entry = next(
+            item
+            for item in inventory["categories"]["manifest_permissions"]
+            if item["surface"] == surface
+        )
+        self.assertEqual(MODULE.SEMANTIC_OWNER_IDS["manifest_permissions"][surface], {"GRP-016"})
+        self.assertEqual(entry["test_ids"], ["GRP-016"])
 
     def test_inventory_rejects_missing_mapped_semantic_surface(self):
         with tempfile.TemporaryDirectory() as directory:
