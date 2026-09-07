@@ -7,6 +7,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationInitialPresentationTest {
+    /** A settled empty ordinary route owns its presentation even though no row can be anchored. */
+    @Test
+    fun ordinaryAuthoritativeEmptyConversationCommitsPresentation() {
+        assertTrue(
+            conversationAuthoritativeEmptyPresentationReady(
+                authoritativeEmptyTimeline = true,
+                routePresentationSettled = true,
+                inviteAcceptanceResolutionPending = false,
+            ),
+        )
+    }
+
     /** Unknown notification membership must not reveal a provisionally group-styled transcript. */
     @Test
     fun notificationSemanticGroupWaitsForMembershipEvidenceBeforeTranscriptReveal() {
@@ -53,11 +65,29 @@ class ConversationInitialPresentationTest {
     @Test
     fun unresolvedInviteAcceptanceKeepsAnAuthoritativeEmptyRouteHidden() {
         assertFalse(
-            notificationAuthoritativeEmptyPresentationReady(
-                notificationRouteActive = true,
+            conversationAuthoritativeEmptyPresentationReady(
                 authoritativeEmptyTimeline = true,
                 routePresentationSettled = true,
                 inviteAcceptanceResolutionPending = true,
+            ),
+        )
+    }
+
+    /** Empty presentation never bypasses unfinished timeline or route-state resolution. */
+    @Test
+    fun incompleteEmptyConversationRemainsHidden() {
+        assertFalse(
+            conversationAuthoritativeEmptyPresentationReady(
+                authoritativeEmptyTimeline = false,
+                routePresentationSettled = true,
+                inviteAcceptanceResolutionPending = false,
+            ),
+        )
+        assertFalse(
+            conversationAuthoritativeEmptyPresentationReady(
+                authoritativeEmptyTimeline = true,
+                routePresentationSettled = false,
+                inviteAcceptanceResolutionPending = false,
             ),
         )
     }

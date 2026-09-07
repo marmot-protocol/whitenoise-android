@@ -13,14 +13,12 @@ internal fun conversationTranscriptReadyToReveal(
     initialPresentationCommitted &&
         (notificationOpenRequestId == 0L || transcriptPresentationKnown)
 
-/** Accepts an empty notification route only after both timeline and ownership state settle. */
-internal fun notificationAuthoritativeEmptyPresentationReady(
-    notificationRouteActive: Boolean,
+/** Accepts an empty conversation only after its authoritative timeline and route state settle. */
+internal fun conversationAuthoritativeEmptyPresentationReady(
     authoritativeEmptyTimeline: Boolean,
     routePresentationSettled: Boolean,
     inviteAcceptanceResolutionPending: Boolean,
 ): Boolean =
-    notificationRouteActive &&
-        authoritativeEmptyTimeline &&
+    authoritativeEmptyTimeline &&
         routePresentationSettled &&
         !inviteAcceptanceResolutionPending

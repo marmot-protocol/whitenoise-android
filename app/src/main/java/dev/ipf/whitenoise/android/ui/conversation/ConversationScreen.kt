@@ -829,8 +829,7 @@ internal fun ConversationScreen(
     // A completed empty page has no row to anchor. Commit that presentation
     // directly, but keep every loading, error, ownership, and roster gate.
     val authoritativeEmptyPresentationReady =
-        notificationAuthoritativeEmptyPresentationReady(
-            notificationRouteActive = notificationOpenRequestId != 0L,
+        conversationAuthoritativeEmptyPresentationReady(
             authoritativeEmptyTimeline =
                 navigationState.initialTimelineLoadStarted &&
                     controller.hasPublishedAuthoritativeTimeline &&

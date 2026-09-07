@@ -1061,7 +1061,10 @@ abstract class NotificationRouteTimelinePresentationFixture {
     }
 
     /** Evaluates a fresh target message against the AppState policy owned by the mounted route. */
-    protected fun WhiteNoiseAppState.shouldPostIncomingTargetNotification(): Boolean {
+    protected fun WhiteNoiseAppState.shouldPostIncomingTargetNotification(
+        accountRef: String = TARGET_ACCOUNT,
+        accountIdHex: String = TARGET_ACCOUNT_ID,
+    ): Boolean {
         val method =
             WhiteNoiseAppState::class.java
                 .getDeclaredMethod(
@@ -1069,41 +1072,43 @@ abstract class NotificationRouteTimelinePresentationFixture {
                     NotificationUpdateFfi::class.java,
                     Boolean::class.javaPrimitiveType!!,
                 ).apply { isAccessible = true }
-        return method.invoke(this, targetNotificationUpdate(), false) as Boolean
+        return method.invoke(this, targetNotificationUpdate(accountRef, accountIdHex), false) as Boolean
     }
 
     /** Creates one ordinary incoming update for the exact notification-routed account and group. */
-    private fun targetNotificationUpdate() =
-        NotificationUpdateFfi(
-            notificationKey = "message:$TARGET_ACCOUNT:fresh-message",
-            conversationKey = "conversation:$TARGET_ACCOUNT:${ConversationTimelineTestIds.GROUP_ID}",
-            trigger = NotificationTriggerFfi.NEW_MESSAGE,
-            trafficClass = NotificationTrafficClassFfi.STANDARD,
-            accountRef = TARGET_ACCOUNT,
-            accountIdHex = TARGET_ACCOUNT_ID,
-            groupIdHex = ConversationTimelineTestIds.GROUP_ID,
-            groupName = "Fixture group",
-            isDm = false,
-            isMention = false,
-            messageIdHex = "fresh-message",
-            sender =
-                NotificationUserFfi(
-                    accountIdHex = ConversationTimelineTestIds.SENDER_ID,
-                    displayName = SENDER_NAME,
-                    pictureUrl = null,
-                ),
-            receiver =
-                NotificationUserFfi(
-                    accountIdHex = TARGET_ACCOUNT_ID,
-                    displayName = "Fixture owner",
-                    pictureUrl = null,
-                ),
-            previewText = "Fresh incoming message",
-            reactionEmoji = null,
-            reactedToPreview = null,
-            timestampMs = 1_982L,
-            isFromSelf = false,
-        )
+    private fun targetNotificationUpdate(
+        accountRef: String,
+        accountIdHex: String,
+    ) = NotificationUpdateFfi(
+        notificationKey = "message:$accountRef:fresh-message",
+        conversationKey = "conversation:$accountRef:${ConversationTimelineTestIds.GROUP_ID}",
+        trigger = NotificationTriggerFfi.NEW_MESSAGE,
+        trafficClass = NotificationTrafficClassFfi.STANDARD,
+        accountRef = accountRef,
+        accountIdHex = accountIdHex,
+        groupIdHex = ConversationTimelineTestIds.GROUP_ID,
+        groupName = "Fixture group",
+        isDm = false,
+        isMention = false,
+        messageIdHex = "fresh-message",
+        sender =
+            NotificationUserFfi(
+                accountIdHex = ConversationTimelineTestIds.SENDER_ID,
+                displayName = SENDER_NAME,
+                pictureUrl = null,
+            ),
+        receiver =
+            NotificationUserFfi(
+                accountIdHex = accountIdHex,
+                displayName = "Fixture owner",
+                pictureUrl = null,
+            ),
+        previewText = "Fresh incoming message",
+        reactionEmoji = null,
+        reactedToPreview = null,
+        timestampMs = 1_982L,
+        isFromSelf = false,
+    )
 
     /** Adds a fixture controller once using ownership identity rather than value equality. */
     private fun MutableList<ConversationController>.addIfAbsentByIdentity(controller: ConversationController) {

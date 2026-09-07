@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationLiveSubscriptions
+import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.awaitConversationCondition
@@ -19,9 +20,11 @@ import dev.ipf.whitenoise.android.state.awaitOpenedTimelineSubscriptionsClosed
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
 import dev.ipf.whitenoise.android.state.timelinePage
+import dev.ipf.whitenoise.android.state.timelineRecord
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_INITIAL_LOADING_TEST_TAG
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -37,6 +40,56 @@ import java.util.concurrent.atomic.AtomicInteger
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36])
 class NotificationRouteTimelinePresentationFixtureTest : NotificationRouteTimelinePresentationFixture() {
+    /** An ordinary empty screen publishes visibility and suppresses its first foreground peer notification. */
+    @Test
+    fun ordinaryEmptyConversationSuppressesItsFirstPeerNotification() {
+        val harness = DirectNotificationConversationHarness(composeRule)
+        val timeline = ScriptedConversationTimelineSubscription(timelinePage())
+        val scripted = ScriptedConversationLiveSubscriptions(listOf(timeline), conversationTimelineTestGroup())
+        val fixture = harness.create(scripted.subscriptions)
+        val mounted = mutableStateOf(true)
+        val reports = CopyOnWriteArrayList<Boolean>()
+        fixture.appState.setAppInForeground(true)
+        try {
+            awaitConversationCondition {
+                fixture.controller.hasPublishedAuthoritativeTimeline && !fixture.controller.isLoading
+            }
+            assertTrue(
+                fixture.appState.shouldPostIncomingTargetNotification(
+                    ConversationTimelineTestIds.ACCOUNT_REF,
+                    ConversationTimelineTestIds.ACCOUNT_ID,
+                ),
+            )
+            harness.mount(fixture, mounted, notificationOpenRequestId = { 0L }) { _, visible ->
+                reports += visible
+                fixture.appState.setActiveConversationFromUi(
+                    ConversationTimelineTestIds.ACCOUNT_REF.takeIf { visible },
+                    ConversationTimelineTestIds.GROUP_ID.takeIf { visible },
+                )
+            }
+            awaitCondition(failureMessage = { "ordinary empty route never became visible: $reports" }) {
+                reports.lastOrNull() == true
+            }
+            assertFalse(
+                fixture.appState.shouldPostIncomingTargetNotification(
+                    ConversationTimelineTestIds.ACCOUNT_REF,
+                    ConversationTimelineTestIds.ACCOUNT_ID,
+                ),
+            )
+
+            timeline.emitWindow(timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_B, 2uL)))
+            awaitCondition { fixture.controller.timeline.size == 1 && reports.lastOrNull() == true }
+            composeRule.onNodeWithText("body-${ConversationTimelineTestIds.MESSAGE_B}").assertIsDisplayed()
+        } finally {
+            try {
+                harness.dispose(fixture, mounted)
+            } finally {
+                fixture.appState.setActiveConversationFromUi(null, null)
+                awaitOpenedTimelineSubscriptionsClosed(scripted)
+            }
+        }
+    }
+
     /** A fresh request on the retained ready screen must publish its own visibility report. */
     @Test
     fun sameReadyConversationReportsEveryNotificationRequest() {
