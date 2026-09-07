@@ -837,7 +837,10 @@ internal fun MainShell(
                 exactPreloadReady = exactPreloadState is NotificationMessagePreloadState.Ready,
             )
 
-        fun commitNotificationConversationOpen(chatItem: ChatListItem) {
+        suspend fun commitNotificationConversationOpen(chatItem: ChatListItem) {
+            // Await cancellation before publishing any route state. A superseded
+            // effect must not partially commit while its platform call is pending.
+            appState.dismissNotificationRouteCards(target.accountRef, target.groupIdHex)
             sectionName = MainSection.Chats.name
             settingsDetailName = null
             settingsHomeViewport =
@@ -884,10 +887,6 @@ internal fun MainShell(
                 requestId = routingRequestId,
                 sectionName = NotificationRouteTraceSection.FIRST_CONVERSATION_FRAME,
             )
-            // A notification route owns a one-shot cancellation before its
-            // selected-chat commit. Ongoing suppression and attachment routing
-            // still wait for the authoritative transcript to become visible.
-            appState.dismissNotificationRouteCards(target.accountRef, target.groupIdHex)
             selectedChat = chatItem
             routingNotification = false
             onNotificationTargetHandled(target, routingRequestId)

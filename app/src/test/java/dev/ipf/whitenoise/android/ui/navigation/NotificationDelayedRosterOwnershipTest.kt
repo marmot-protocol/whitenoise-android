@@ -347,8 +347,8 @@ abstract class NotificationDelayedRosterFixture {
 
     /** Waits for the real target controller to publish its exact authoritative message page. */
     private fun awaitAuthoritativeController(fixture: DelayedRosterFixture): ConversationController {
-        check(fixture.gate.preloadCompleted.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-            "notification preload did not complete"
+        awaitCondition(failureMessage = { "notification preload did not complete" }) {
+            fixture.gate.preloadCompleted.count == 0L
         }
         awaitCondition { fixture.handled.get() }
         awaitCondition {
@@ -356,8 +356,8 @@ abstract class NotificationDelayedRosterFixture {
                 controller.hasPublishedAuthoritativeTimeline && timelineMessageIds(controller) == listOf(MESSAGE_ID)
             } == true
         }
-        check(fixture.gate.targetRosterStarted.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-            "target roster read did not start"
+        awaitCondition(failureMessage = { "target roster read did not start" }) {
+            fixture.gate.targetRosterStarted.count == 0L
         }
         return fixture.appState.attachedConversationControllersForTest().single()
     }
@@ -536,6 +536,7 @@ abstract class NotificationDelayedRosterFixture {
         val groupIdHex = arguments?.getOrNull(1) as? String
         check(accountRef == SOURCE_ACCOUNT || accountRef == TARGET_ACCOUNT) { "unknown roster account" }
         check(groupIdHex == SHARED_GROUP) { "wrong roster group" }
+        if (accountRef == SOURCE_ACCOUNT) gate.rosterReadCount.incrementAndGet()
         if (accountRef == TARGET_ACCOUNT) {
             gate.targetRosterReadCount.incrementAndGet()
             gate.targetRosterStarted.countDown()

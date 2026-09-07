@@ -8,6 +8,23 @@ import org.junit.Test
 import java.io.File
 
 class NotificationConversationOpenCoverageTest {
+    /** Route state is published only after the awaited card cancellation has returned. */
+    @Test
+    fun routeCommitAwaitsDismissalBeforePublishingNavigationState() {
+        val source = mainShellSource()
+        val start = source.indexOf("suspend fun commitNotificationConversationOpen(chatItem: ChatListItem) {")
+        assertTrue("route commit must be suspendable", start >= 0)
+        val commit =
+            source
+                .substring(start)
+                .substringBefore("fun fallBackToChatList()")
+        val dismiss = commit.indexOf("appState.dismissNotificationRouteCards(")
+        val navigation = commit.indexOf("sectionName = MainSection.Chats.name")
+        val selected = commit.indexOf("selectedChat = chatItem")
+        assertTrue("cancellation must precede every route-state publication", dismiss >= 0 && navigation > dismiss)
+        assertTrue("selected chat must commit after cancellation", selected > navigation)
+    }
+
     @Test
     fun notificationOpenClearsSearchFocusAndRequestsUnreadAnchor() {
         val previous =

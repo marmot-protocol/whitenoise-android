@@ -274,8 +274,10 @@ class NotificationRouteTimelinePresentationScreenshotTest : NotificationRouteTim
                             listOf(ConversationTimelineTestIds.MESSAGE_B)
                         },
                 )
-            check(routeGate.rosterStarted.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-                "target roster read did not start"
+            awaitInitialRouteCondition(
+                failureMessage = { "target roster read did not start: ${routeState(appState, mountedController)}" },
+            ) {
+                routeGate.rosterStarted.count == 0L
             }
             assertEquals(1L, routeGate.targetBroadBindStarted.count)
             assertTrue(
@@ -413,8 +415,10 @@ class NotificationRouteTimelinePresentationScreenshotTest : NotificationRouteTim
                     appState = appState,
                     expectedMessageIds = listOf(ConversationTimelineTestIds.MESSAGE_B),
                 )
-            check(routeGate.rosterStarted.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-                "target roster read did not start"
+            awaitInitialRouteCondition(
+                failureMessage = { "target roster read did not start: ${routeState(appState, mountedController)}" },
+            ) {
+                routeGate.rosterStarted.count == 0L
             }
             composeRule.waitUntil(timeoutMillis = ROUTE_TIMEOUT_MILLIS) {
                 composeRule
