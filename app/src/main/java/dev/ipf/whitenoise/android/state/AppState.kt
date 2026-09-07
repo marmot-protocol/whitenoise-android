@@ -5100,6 +5100,22 @@ class WhiteNoiseAppState private constructor(
         return required
     }
 
+    /** Rejects superseded runtimes, cancelled intents, and accounts removed during suspended activation work. */
+    private fun canPublishAccountActivation(
+        label: String,
+        requestGeneration: Long,
+        activationRuntimeGeneration: Int,
+        shouldActivate: () -> Boolean,
+    ): Boolean {
+        if (!shouldActivate() ||
+            !isAccountSwitchCurrent(requestGeneration) ||
+            runtimeGeneration != activationRuntimeGeneration
+        ) {
+            return false
+        }
+        return accounts.any { it.label == label && !it.signedOut }
+    }
+
     /** Publishes a generation-fenced account switch and releases activation intent on every exit path. */
     @Suppress("ReturnCount") // Sign-in failure and supersession are distinct non-activation outcomes.
     suspend fun setActiveAccount(
@@ -5128,6 +5144,15 @@ class WhiteNoiseAppState private constructor(
             val activationStillWanted =
                 shouldActivate() && isAccountSwitchCurrent(requestGeneration)
             val preloadPlan = accountSwitchPreloadPlan(switchingAccounts, activationStillWanted, preloadPolicy)
+            val activationRuntimeGeneration = runtimeGeneration
+            // Self metadata remains independent of the chat-row read and its failure boundary.
+            val startupProfile =
+                preloadStartupSelfProfile(
+                    preloadPolicy,
+                    target?.accountIdHex,
+                    activationStillWanted,
+                    ::loadAccountSwitchProfileSeed,
+                )
             val localSnapshot =
                 if (preloadPlan.loadLocalRows) {
                     loadAccountSwitchLocalSnapshot(
@@ -5138,23 +5163,25 @@ class WhiteNoiseAppState private constructor(
                 } else {
                     null
                 }
+            val activationAllowed = {
+                canPublishAccountActivation(label, requestGeneration, activationRuntimeGeneration, shouldActivate)
+            }
             // A route may outlive the UI intent that requested it while a signed-out
             // account is being restored. Let request-scoped callers reject that late
             // activation without cancelling the process-lifetime sign-in work.
-            if (!shouldActivate() || !isAccountSwitchCurrent(requestGeneration)) return false
-            // Account switch: drop in-process plaintext so account A's bytes
-            // aren't reachable from account B's UI loops, but keep L2 (disk)
-            // intact. The disk cache key is `mediaCacheKey(account, msg)`, so
-            // switching to B can never read A's files — and switching BACK to
-            // A re-hydrates L1 from L2 with a single file read instead of a
-            // re-download. Sign-out (signOutActiveAccount) is what actually
-            // wipes disk; switching is just a UI context flip.
+            if (!activationAllowed()) return false
+            if (switchingAccounts) hideConversationShortcutsFromDirectShare()
+            // Shortcut cleanup suspends: reject supersession/deletion again before publishing seeds.
+            if (!activationAllowed()) return false
+            val currentStartupProfiles = startupSeeds(startupProfile)
+            // Clear and publish without suspending, so a rejected activation retains the current profile.
+            // Account-keyed disk media survives ordinary switches.
             if (switchingAccounts) {
                 clearInMemoryMediaCaches()
                 clearCrossAccountCaches()
-                hideConversationShortcutsFromDirectShare()
             }
             stageAccountSwitchLocalSnapshot(label, switchingAccounts, requestGeneration, localSnapshot)
+            currentStartupProfiles.forEach(::applyAccountSwitchProfileSeed)
             activeAccountRef = label
             preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
             reloadMediaAutoDownloadMatrix()
@@ -5168,15 +5195,23 @@ class WhiteNoiseAppState private constructor(
             // immediate default; the notification route releases this after the
             // target frame, on failure, or when superseded.
             awaitPostActivationWork()
-            if (isCurrentPostActivationAccountSwitch(label, requestGeneration)) {
-                accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
-                configurePrivacyRuntime()
-                refreshLocalNotificationSettings()
-                syncNativePushRegistrationIfEnabled()
-            }
+            refreshActivatedAccount(label, requestGeneration)
             return true
         } finally {
             accountSwitchHandoff.finishRequest(requestGeneration)
+        }
+    }
+
+    /** Runs best-effort refreshes only after activation and its caller-owned first-frame wait. */
+    private suspend fun refreshActivatedAccount(
+        label: String,
+        requestGeneration: Long,
+    ) {
+        if (isCurrentPostActivationAccountSwitch(label, requestGeneration)) {
+            accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
+            configurePrivacyRuntime()
+            refreshLocalNotificationSettings()
+            syncNativePushRegistrationIfEnabled()
         }
     }
 
@@ -10171,6 +10206,7 @@ class WhiteNoiseAppState private constructor(
         return accountSwitchProfileSeed(id, profile, rawDisplayName)
     }
 
+    /** Publishes sanitized authoritative metadata, including explicit profile-field removal. */
     internal fun applyAccountSwitchProfileSeed(seed: AccountSwitchProfileSeed) {
         applyProfilePresentation(
             accountIdHex = seed.accountIdHex,

@@ -8919,6 +8919,14 @@
           "SEC-007",
           "INT-010"
         ]
+      },
+      {
+        "surface": "Startup self-profile activation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/StartupSelfProfilePresentation.kt",
+        "anchor": "internal suspend fun loadStartupSelfProfileSeeds(",
+        "test_ids": [
+          "INT-003"
+        ]
       }
     ],
     "notification_content_contracts": [

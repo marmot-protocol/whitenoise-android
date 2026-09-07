@@ -44,6 +44,7 @@ import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
 import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsStatusFfi
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -93,6 +94,7 @@ internal class NotificationBootstrapTestFixture(
     // boundary per call; every default preserves the fixture's original shape.
     private val onOnboardingSnapshot: (() -> OnboardingSnapshotFfi?)? = null,
     private val onAuditLogSettings: (() -> Unit)? = null,
+    private val onUserProfile: ((accountIdHex: String) -> UserProfileMetadataFfi?)? = null,
     private val onChatList: ((accountRef: String) -> List<ChatListRowFfi>)? = null,
     private val onGroupMemberIdsPage: ((groupIds: List<String>) -> List<AppGroupMemberIdsFfi>)? = null,
     private val onMarkTimelineMessageRead: (() -> ChatListRowFfi?)? = null,
@@ -384,7 +386,7 @@ internal class NotificationBootstrapTestFixture(
                     val groupIds = arguments?.get(1) as List<String>
                     onGroupMemberIdsPage?.invoke(groupIds) ?: emptyList<AppGroupMemberIdsFfi>()
                 }
-                "userProfile" -> null
+                "userProfile" -> onUserProfile?.invoke(arguments?.first() as String)
                 "downloadProfileImage" -> {
                     val download = profileImageDownload ?: error("Unexpected Marmot call: downloadProfileImage")
                     download(arguments?.get(0) as String, (arguments[1] as Long).toULong())
