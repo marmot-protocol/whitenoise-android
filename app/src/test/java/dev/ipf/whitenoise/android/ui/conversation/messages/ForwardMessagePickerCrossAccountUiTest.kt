@@ -403,6 +403,44 @@ class ForwardMessagePickerCrossAccountUiTest {
         appState.chatFolderPreferences.clearAllForAccount(ACCOUNT_REF)
     }
 
+    /** Folder edits update eligibility and accessible labels without remounting the picker. */
+    @Test
+    fun folderPreferenceChangesRefreshTheMountedPicker() {
+        val appState = twoAccountAppState()
+        val store = appState.chatFolderPreferences
+        store.clearAllForAccount(ACCOUNT_REF)
+        val folder = seedFolder(appState, ACCOUNT_REF, "Live folder", GROUP_UNDER_A, GROUP_UNDER_A_2)
+        val expectedTargets = appState.forwardTargets().map { it.group.groupIdHex }
+        val (factory, _) = accountBControllerFactory()
+        var selected = emptyList<String>()
+        try {
+            composeRule.setContent {
+                Picker(
+                    appState = appState,
+                    factory = factory,
+                    onPickerStateChanged = { _, groupIds, _ -> selected = groupIds },
+                )
+            }
+            assertFolderChipState(folder, 2, ToggleableState.Off)
+
+            composeRule.runOnIdle {
+                assertTrue(store.setChatInFolder(ACCOUNT_REF, folder.id, GROUP_UNDER_A_2, included = false))
+            }
+            composeRule.onNodeWithTag(forwardFolderChipTestTag(folder.id)).assertDoesNotExist()
+
+            composeRule.runOnIdle {
+                assertTrue(store.setChatInFolder(ACCOUNT_REF, folder.id, GROUP_UNDER_A_2, included = true))
+                assertTrue(store.renameFolder(ACCOUNT_REF, folder.id, "Renamed folder"))
+            }
+            assertFolderChipState(folder.copy(name = "Renamed folder"), 2, ToggleableState.Off)
+            composeRule.onNodeWithTag(forwardFolderChipTestTag(folder.id)).performClick()
+            composeRule.waitForIdle()
+            assertEquals(expectedTargets, selected)
+        } finally {
+            composeRule.runOnIdle { store.clearAllForAccount(ACCOUNT_REF) }
+        }
+    }
+
     /** Profile hydration re-evaluates a keyword folder under the active search without remounting. */
     @Test
     fun profileRevisionRefreshesAFilteredKeywordFolder() {

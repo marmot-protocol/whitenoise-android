@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -208,7 +209,8 @@ private fun rememberForwardDestinationState(
 /**
  * Picker body: source-message summary, the sending-account row and sheet,
  * account-scoped search/folders/chat rows, and the confirm bar that binds the
- * explicit destination account to the accepted selection.
+ * explicit destination account to the accepted selection. Folder preference
+ * changes refresh the current account's shortcuts while the picker stays open.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -304,12 +306,15 @@ internal fun ForwardMessagePickerContent(
                 }
             }
         }
+    val folderStates by appState.chatFolderPreferences.state.collectAsState()
+    val accountFolderState = destination.selectedAccountRef?.let { folderStates[it.trim()] }
     val folderRows =
         remember(
             targets,
             titleCopy,
             destination.selectedAccountRef,
             destination.selectedAccountIdHex,
+            accountFolderState,
             memberRevision,
             appState.profileRevisionForCompose,
         ) {
