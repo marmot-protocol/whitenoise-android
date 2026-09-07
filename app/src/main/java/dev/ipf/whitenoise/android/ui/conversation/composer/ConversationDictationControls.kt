@@ -2,29 +2,27 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,7 +30,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -41,45 +38,47 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
-import android.provider.Settings as AndroidSettings
 
 internal const val COMPOSER_DICTATION_STRIP_TAG = "composer-dictation-strip"
 internal const val COMPOSER_DICTATION_REVIEW_DIALOG_TAG = "composer-dictation-review-dialog"
 internal const val COMPOSER_DICTATION_COMPACT_ACTIONS_TAG = "composer-dictation-compact-actions"
-internal const val APP_DICTATION_FLOAT_TAG = "app-dictation-float"
+internal const val APP_DICTATION_CONTROL_TAG = "app-dictation-control"
+internal const val DICTATION_PROGRESS_TAG = "dictation-progress"
 
-/** App-root control used while the immutable dictation origin is not visible. */
+/** App-root bottom control used while the immutable dictation origin is not visible. */
 @Composable
-internal fun ConversationDictationFloatingControl(
+internal fun ConversationDictationPersistentControl(
     state: ConversationDictationState,
     controller: ConversationDictationController,
     modifier: Modifier = Modifier,
 ) {
     if (state is ConversationDictationState.Idle) return
-    val status = dictationStatusLabel(state)
+    val status =
+        if (controller.deliveryInProgress) {
+            stringResource(R.string.message_status_pending)
+        } else {
+            dictationStatusLabel(state)
+        }
     Surface(
-        shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 6.dp,
-        shadowElevation = 6.dp,
+        tonalElevation = 2.dp,
         modifier =
             modifier
-                .widthIn(max = 320.dp)
-                .testTag(APP_DICTATION_FLOAT_TAG)
+                .fillMaxWidth()
+                .testTag(APP_DICTATION_CONTROL_TAG)
                 .semantics {
                     liveRegion = LiveRegionMode.Polite
                     stateDescription = status
                 },
     ) {
         Row(
-            modifier = Modifier.padding(start = 14.dp),
+            modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
@@ -98,7 +97,7 @@ internal fun ConversationDictationFloatingControl(
     }
 }
 
-/** Compact Done/Cancel controls shared by the origin composer and app-root float. */
+/** Compact Cancel/Paste/Send controls shared by the origin composer and app-root bar. */
 @Composable
 internal fun ConversationDictationCompactActions(
     state: ConversationDictationState,
@@ -106,59 +105,87 @@ internal fun ConversationDictationCompactActions(
     modifier: Modifier = Modifier,
 ) {
     if (state is ConversationDictationState.Idle) return
-    val status = dictationStatusLabel(state)
+    val status =
+        if (controller.deliveryInProgress) {
+            stringResource(R.string.message_status_pending)
+        } else {
+            dictationStatusLabel(state)
+        }
     var reviewDialogOpen by remember(state.sessionId) { mutableStateOf(false) }
-    Row(
+    Box(
         modifier =
             modifier
-                .width(96.dp)
+                .width(if (state.hasActiveRecognitionActions) 144.dp else 96.dp)
                 .testTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)
                 .semantics {
                     liveRegion = LiveRegionMode.Polite
                     stateDescription = status
                 },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.End,
     ) {
-        ConversationDictationPrimaryAction(
-            state = state,
-            controller = controller,
-            status = status,
-            onReview = { reviewDialogOpen = true },
-        )
-        ConversationDictationDismissAction(state, controller)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End,
+        ) {
+            if (state.hasActiveRecognitionActions) {
+                ConversationDictationActiveActions(controller)
+            } else {
+                ConversationDictationPrimaryAction(
+                    state = state,
+                    controller = controller,
+                    status = status,
+                    onReview = { reviewDialogOpen = true },
+                )
+                ConversationDictationDismissAction(state, controller)
+            }
+        }
+        if (state is ConversationDictationState.Starting || state is ConversationDictationState.Processing) {
+            LinearProgressIndicator(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .testTag(DICTATION_PROGRESS_TAG),
+            )
+        }
     }
-    if (state is ConversationDictationState.Failed && state.reason == ConversationDictationFailure.MicrophoneMuted) {
-        val context = LocalContext.current
-        ConversationDictationMicrophoneDialog(
-            onDismiss = controller::dismissFailure,
-            onOpenSettings = {
-                controller.dismissFailure()
-                runCatching {
-                    context.startActivity(
-                        Intent(AndroidSettings.ACTION_PRIVACY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                }
-            },
-        )
+    ConversationDictationSessionDialogs(state, controller, reviewDialogOpen) { reviewDialogOpen = false }
+}
+
+private val ConversationDictationState.hasActiveRecognitionActions: Boolean
+    get() =
+        this is ConversationDictationState.Starting ||
+            this is ConversationDictationState.Listening ||
+            this is ConversationDictationState.Processing
+
+/** Keeps all three explicit outcomes visible for the lifetime of app-owned recognition. */
+@Composable
+private fun ConversationDictationActiveActions(controller: ConversationDictationController) {
+    IconButton(
+        onClick = controller::cancel,
+        enabled = !controller.deliveryInProgress,
+        modifier = Modifier.size(48.dp),
+    ) {
+        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
     }
-    if (reviewDialogOpen && state is ConversationDictationState.ReviewRequired) {
-        ConversationDictationReviewDialog(
-            transcript = state.transcript,
-            onInsert = {
-                reviewDialogOpen = false
-                controller.insertReviewAtEnd()
-            },
-            onDiscard = {
-                reviewDialogOpen = false
-                controller.dismissReview()
-            },
-            onDismiss = { reviewDialogOpen = false },
-        )
+    IconButton(
+        onClick = controller::paste,
+        enabled = controller.completionActionsEnabled,
+        modifier = Modifier.size(48.dp),
+    ) {
+        Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.paste))
+    }
+    IconButton(
+        onClick = controller::send,
+        enabled = controller.completionActionsEnabled,
+        modifier = Modifier.size(48.dp),
+    ) {
+        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
     }
 }
 
-/** Shows Done, recovery, review, or progress in the first compact action slot. */
+/** Shows recovery, review, or progress in the first compact action slot. */
 @Composable
 private fun ConversationDictationPrimaryAction(
     state: ConversationDictationState,
@@ -167,18 +194,10 @@ private fun ConversationDictationPrimaryAction(
     onReview: () -> Unit,
 ) {
     when (state) {
-        is ConversationDictationState.Starting,
-        is ConversationDictationState.Listening,
-        ->
-            IconButton(onClick = controller::stop, modifier = Modifier.size(48.dp)) {
-                Icon(
-                    Icons.Default.Check,
-                    contentDescription = stringResource(R.string.dictation_done),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
         is ConversationDictationState.Failed -> ConversationDictationFailureAction(state, controller)
-        is ConversationDictationState.ReviewRequired ->
+        is ConversationDictationState.ReviewRequired,
+        is ConversationDictationState.DeliveryUnknown,
+        ->
             IconButton(onClick = onReview, modifier = Modifier.size(48.dp)) {
                 Icon(
                     Icons.Default.Edit,
@@ -197,23 +216,37 @@ private fun ConversationDictationPrimaryAction(
     }
 }
 
-/** Chooses settings after permanent denial and retry for recoverable failures. */
+/** Chooses the settings page that can actually clear a failure, and retry for the rest. */
 @Composable
 private fun ConversationDictationFailureAction(
     state: ConversationDictationState.Failed,
     controller: ConversationDictationController,
 ) {
     val context = LocalContext.current
-    val permanentlyDenied = state.reason == ConversationDictationFailure.PermissionPermanentlyDenied
+    val recovery = dictationFailureRecovery(state.reason)
     IconButton(
-        onClick = if (permanentlyDenied) ({ openDictationAppSettings(context) }) else controller::retry,
+        onClick =
+            when (recovery) {
+                ConversationDictationRecovery.AppSettings -> ({ openDictationAppSettings(context) })
+                ConversationDictationRecovery.VoiceInputSettings -> ({ openVoiceInputSettings(context) })
+                ConversationDictationRecovery.Retry -> controller::retry
+            },
         modifier = Modifier.size(48.dp),
     ) {
         Icon(
-            imageVector = if (permanentlyDenied) Icons.Default.Settings else Icons.Default.Refresh,
+            imageVector =
+                if (recovery == ConversationDictationRecovery.Retry) {
+                    Icons.Default.Refresh
+                } else {
+                    Icons.Default.Settings
+                },
             contentDescription =
                 stringResource(
-                    if (permanentlyDenied) R.string.open_app_settings else R.string.retry,
+                    when (recovery) {
+                        ConversationDictationRecovery.AppSettings -> R.string.open_app_settings
+                        ConversationDictationRecovery.VoiceInputSettings -> R.string.dictation_open_voice_input_settings
+                        ConversationDictationRecovery.Retry -> R.string.retry
+                    },
                 ),
         )
     }
@@ -229,12 +262,14 @@ private fun ConversationDictationDismissAction(
         when (state) {
             is ConversationDictationState.Failed -> controller::dismissFailure
             is ConversationDictationState.ReviewRequired -> controller::dismissReview
+            is ConversationDictationState.DeliveryUnknown -> controller::dismissDeliveryUnknown
             else -> controller::cancel
         }
     val label =
         when (state) {
             is ConversationDictationState.Failed -> R.string.dismiss
             is ConversationDictationState.ReviewRequired -> R.string.dictation_discard_transcript
+            is ConversationDictationState.DeliveryUnknown -> R.string.dictation_discard_transcript
             else -> R.string.dictation_cancel
         }
     IconButton(onClick = onClick, modifier = Modifier.size(48.dp)) {
@@ -243,64 +278,6 @@ private fun ConversationDictationDismissAction(
             contentDescription = stringResource(label),
         )
     }
-}
-
-/** Explains system microphone blocking before any silent recognition session starts. */
-@Composable
-internal fun ConversationDictationMicrophoneDialog(
-    onDismiss: () -> Unit,
-    onOpenSettings: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        modifier = Modifier.testTag("dictation-microphone-dialog"),
-        title = { Text(stringResource(R.string.dictation_microphone_muted)) },
-        text = { Text(stringResource(R.string.dictation_microphone_muted_help)) },
-        confirmButton = {
-            TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.open_settings)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        },
-    )
-}
-
-/** Preserves a failed/conflicted transcript until the user explicitly inserts, copies, or discards it. */
-@Suppress("DEPRECATION")
-@Composable
-private fun ConversationDictationReviewDialog(
-    transcript: String,
-    onInsert: () -> Unit,
-    onDiscard: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val clipboard = LocalClipboardManager.current
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.dictation_review_title)) },
-        text = { Text(transcript) },
-        confirmButton = {
-            Row {
-                TextButton(
-                    onClick = {
-                        clipboard.setText(AnnotatedString(transcript))
-                        onDiscard()
-                    },
-                ) {
-                    Text(stringResource(R.string.copy))
-                }
-                TextButton(onClick = onInsert) {
-                    Text(stringResource(R.string.dictation_insert_at_end))
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDiscard) {
-                Text(stringResource(R.string.discard))
-            }
-        },
-        modifier = Modifier.testTag(COMPOSER_DICTATION_REVIEW_DIALOG_TAG),
-    )
 }
 
 /** Maps controller phases to concise, localized live-region announcements. */
@@ -318,6 +295,7 @@ private fun dictationStatusLabel(state: ConversationDictationState): String =
         is ConversationDictationState.Processing -> stringResource(R.string.dictation_processing)
         is ConversationDictationState.Failed -> dictationFailureLabel(state.reason)
         is ConversationDictationState.ReviewRequired -> stringResource(R.string.dictation_review_required)
+        is ConversationDictationState.DeliveryUnknown -> stringResource(R.string.delivery_not_confirmed)
         is ConversationDictationState.Idle -> ""
     }
 
@@ -327,26 +305,16 @@ private fun dictationFailureLabel(reason: ConversationDictationFailure): String 
     stringResource(
         when (reason) {
             ConversationDictationFailure.ProviderUnavailable -> R.string.dictation_provider_unavailable
+            ConversationDictationFailure.ProviderAccessRejected -> R.string.dictation_provider_access_rejected
             ConversationDictationFailure.PermissionDenied -> R.string.dictation_permission_denied
             ConversationDictationFailure.PermissionPermanentlyDenied -> R.string.dictation_permission_denied_permanently
             ConversationDictationFailure.MicrophoneMuted -> R.string.dictation_microphone_muted
             ConversationDictationFailure.MicrophoneInUse -> R.string.dictation_microphone_in_use
             ConversationDictationFailure.NoSpeech -> R.string.dictation_no_speech
             ConversationDictationFailure.Network -> R.string.dictation_network_error
+            ConversationDictationFailure.ProviderDisconnected -> R.string.dictation_provider_unavailable
             ConversationDictationFailure.RecognizerBusy -> R.string.dictation_recognizer_busy
             ConversationDictationFailure.TimedOut -> R.string.dictation_timed_out
             ConversationDictationFailure.Unknown -> R.string.dictation_failed
         },
     )
-
-/** Opens White Noise's Android permission page after a permanent microphone denial. */
-private fun openDictationAppSettings(context: android.content.Context) {
-    runCatching {
-        context.startActivity(
-            Intent(
-                AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                Uri.fromParts("package", context.packageName, null),
-            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-    }
-}
