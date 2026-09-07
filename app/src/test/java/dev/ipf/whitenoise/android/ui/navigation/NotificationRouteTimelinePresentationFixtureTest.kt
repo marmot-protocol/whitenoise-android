@@ -169,7 +169,7 @@ class NotificationRouteTimelinePresentationFixtureTest : NotificationRouteTimeli
 
     /** Yields to immediate worker work without firing an unrelated future main-loop deadline. */
     @Test
-    fun initialRouteWaitDoesNotAdvanceFutureMainDeadline() {
+    fun routeWaitDoesNotAdvanceFutureMainDeadline() {
         val handler = Handler(Looper.getMainLooper())
         val delayedDeadline = CountDownLatch(1)
         val workerStarted = CountDownLatch(1)
@@ -187,7 +187,7 @@ class NotificationRouteTimelinePresentationFixtureTest : NotificationRouteTimeli
         worker.start()
         try {
             check(workerStarted.await(1L, TimeUnit.SECONDS)) { "real worker did not start" }
-            awaitInitialRouteCondition(
+            awaitCondition(
                 failureMessage = { "real worker did not complete before the route deadline" },
             ) {
                 if (polls.incrementAndGet() == 3) releaseWorker.countDown()

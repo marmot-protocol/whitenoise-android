@@ -274,7 +274,7 @@ class NotificationRouteTimelinePresentationScreenshotTest : NotificationRouteTim
                             listOf(ConversationTimelineTestIds.MESSAGE_B)
                         },
                 )
-            awaitInitialRouteCondition(
+            awaitCondition(
                 failureMessage = { "target roster read did not start: ${routeState(appState, mountedController)}" },
             ) {
                 routeGate.rosterStarted.count == 0L
@@ -415,7 +415,7 @@ class NotificationRouteTimelinePresentationScreenshotTest : NotificationRouteTim
                     appState = appState,
                     expectedMessageIds = listOf(ConversationTimelineTestIds.MESSAGE_B),
                 )
-            awaitInitialRouteCondition(
+            awaitCondition(
                 failureMessage = { "target roster read did not start: ${routeState(appState, mountedController)}" },
             ) {
                 routeGate.rosterStarted.count == 0L
@@ -648,7 +648,7 @@ abstract class NotificationRouteTimelinePresentationFixture {
         ) {
             handled.get()
         }
-        awaitInitialRouteCondition(
+        awaitCondition(
             failureMessage = {
                 val observedController = appState.attachedConversationControllersForTest().singleOrNull()
                 "authoritative routed timeline did not mount: " +
@@ -663,21 +663,6 @@ abstract class NotificationRouteTimelinePresentationFixture {
             } == true
         }
         return appState.attachedConversationControllersForTest().single()
-    }
-
-    /** Yields real worker time without advancing the controller's bounded initial-read deadline. */
-    protected fun awaitInitialRouteCondition(
-        failureMessage: () -> String,
-        condition: () -> Boolean,
-    ) {
-        val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(ROUTE_TIMEOUT_MILLIS)
-        while (System.nanoTime() <= deadlineNanos) {
-            composeRule.waitForIdle()
-            ShadowLooper.idleMainLooper()
-            if (condition()) return
-            Thread.sleep(POLL_INTERVAL_MILLIS)
-        }
-        throw AssertionError(failureMessage())
     }
 
     /** Forces the mounted notification conversation through a background reconnect. */
@@ -1009,7 +994,7 @@ abstract class NotificationRouteTimelinePresentationFixture {
         local = local,
     )
 
-    /** Pumps Compose, Robolectric main, and real worker time within one monotonic route deadline. */
+    /** Pumps ready UI work and yields to real workers without advancing unrelated future main-loop deadlines. */
     protected fun awaitCondition(
         failureMessage: () -> String = { "Condition not met after route deadline" },
         condition: () -> Boolean,
@@ -1020,7 +1005,6 @@ abstract class NotificationRouteTimelinePresentationFixture {
             ShadowLooper.idleMainLooper()
             if (condition()) return
             Thread.sleep(POLL_INTERVAL_MILLIS)
-            ShadowLooper.idleMainLooper(POLL_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
         }
         throw AssertionError(failureMessage())
     }
