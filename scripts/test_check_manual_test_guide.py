@@ -414,7 +414,7 @@ private fun <T BrokenScreen(value: T) = Unit
                     mock.patch.object(MODULE, "ROOT", root),
                     mock.patch.object(MODULE, "INVENTORY", inventory),
                     mock.patch.object(MODULE, "REQUIRED_INVENTORY_CATEGORIES", set()),
-                    mock.patch.object(MODULE, "SEMANTIC_OWNER_IDS", {surface: {"MSG-001"}}),
+                    mock.patch.object(MODULE, "SEMANTIC_OWNER_IDS", {category: {surface: {"MSG-001"}}}),
                 ):
                     MODULE.validate_inventory({"MSG-001"}, errors)
                 self.assertTrue(any("at least one active test ID" in error for error in errors))
@@ -443,7 +443,7 @@ private fun <T BrokenScreen(value: T) = Unit
                 encoding="utf-8",
             )
             errors = []
-            expected = {"permission:android.permission.CAMERA": {"MED-004"}}
+            expected = {"manifest_permissions": {"permission:android.permission.CAMERA": {"MED-004"}}}
             with (
                 mock.patch.object(MODULE, "ROOT", root),
                 mock.patch.object(MODULE, "INVENTORY", inventory),
@@ -452,6 +452,73 @@ private fun <T BrokenScreen(value: T) = Unit
             ):
                 MODULE.validate_inventory({"MED-004", "SEC-005"}, errors)
             self.assertTrue(any("expected exactly: MED-004" in error for error in errors))
+
+    def test_inventory_rejects_missing_mapped_semantic_surface(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            inventory = root / "inventory.json"
+            inventory.write_text(
+                json.dumps({"categories": {"manifest_permissions": []}}),
+                encoding="utf-8",
+            )
+            errors = []
+            surface = "permission:android.permission.CAMERA"
+            with (
+                mock.patch.object(MODULE, "ROOT", root),
+                mock.patch.object(MODULE, "INVENTORY", inventory),
+                mock.patch.object(MODULE, "REQUIRED_INVENTORY_CATEGORIES", set()),
+                mock.patch.object(
+                    MODULE,
+                    "SEMANTIC_OWNER_IDS",
+                    {"manifest_permissions": {surface: {"MED-004"}}},
+                ),
+            ):
+                MODULE.validate_inventory({"MED-004"}, errors)
+            self.assertTrue(
+                any("mapped semantic surface is missing from manifest_permissions inventory" in error for error in errors)
+            )
+
+    def test_semantic_owner_mapping_is_scoped_to_inventory_category(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "screen.kt"
+            source.write_text("android.permission.CAMERA", encoding="utf-8")
+            inventory = root / "inventory.json"
+            inventory.write_text(
+                json.dumps(
+                    {
+                        "categories": {
+                            "manifest_permissions": [
+                                {
+                                    "surface": "permission:android.permission.CAMERA",
+                                    "source": "screen.kt",
+                                    "anchor": "android.permission.CAMERA",
+                                    "test_ids": ["MED-004"],
+                                }
+                            ],
+                            "settings_controls": [
+                                {
+                                    "surface": "permission:android.permission.CAMERA",
+                                    "source": "screen.kt",
+                                    "anchor": "android.permission.CAMERA",
+                                    "test_ids": ["SET-001"],
+                                }
+                            ],
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            errors = []
+            expected = {"manifest_permissions": {"permission:android.permission.CAMERA": {"MED-004"}}}
+            with (
+                mock.patch.object(MODULE, "ROOT", root),
+                mock.patch.object(MODULE, "INVENTORY", inventory),
+                mock.patch.object(MODULE, "REQUIRED_INVENTORY_CATEGORIES", set()),
+                mock.patch.object(MODULE, "SEMANTIC_OWNER_IDS", expected),
+            ):
+                MODULE.validate_inventory({"MED-004", "SET-001"}, errors)
+            self.assertEqual(errors, [])
 
 
 if __name__ == "__main__":

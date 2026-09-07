@@ -182,49 +182,52 @@ REQUIRED_INVENTORY_CATEGORIES = {
 # permission and Android entry point must match its manually reviewed checklist
 # ownership exactly, so regeneration cannot preserve a stale or unrelated ID.
 SEMANTIC_OWNER_IDS = {
-    "permission:android.permission.ACCESS_COARSE_LOCATION": {"MED-012"},
-    "permission:android.permission.ACCESS_FINE_LOCATION": {"MED-012"},
-    "permission:android.permission.ACCESS_NETWORK_STATE": {"INT-006", "INT-007"},
-    "permission:android.permission.CAMERA": {"MED-004"},
-    "permission:android.permission.FOREGROUND_SERVICE": {"NTF-014", "TTS-001", "DIC-001"},
-    "permission:android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK": {"TTS-001"},
-    "permission:android.permission.FOREGROUND_SERVICE_MICROPHONE": {"DIC-001"},
-    "permission:android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING": {"NTF-006", "NTF-014"},
-    "permission:android.permission.FOREGROUND_SERVICE_SPECIAL_USE": {"NTF-006", "NTF-014"},
-    "permission:android.permission.INTERNET": {"INT-006", "INT-007"},
-    "permission:android.permission.POST_NOTIFICATIONS": {"NTF-001"},
-    "permission:android.permission.READ_EXTERNAL_STORAGE": {"MED-002"},
-    "permission:android.permission.READ_MEDIA_IMAGES": {"MED-002"},
-    "permission:android.permission.READ_MEDIA_VIDEO": {"MED-002"},
-    "permission:android.permission.READ_MEDIA_VISUAL_USER_SELECTED": {"MED-002"},
-    "permission:android.permission.RECEIVE_BOOT_COMPLETED": {"NTF-014"},
-    "permission:android.permission.RECORD_AUDIO": {"MED-008", "DIC-001"},
-    "permission:android.permission.REQUEST_INSTALL_PACKAGES": {"MED-018", "SYS-008"},
-    "permission:android.permission.VIBRATE": {"NTF-009"},
-    "permission:android.permission.WAKE_LOCK": {"NTF-014", "TTS-001"},
-    "intent:${deepLinkScheme}": {"SYS-006"},
-    "intent:android.intent.action.BOOT_COMPLETED": {"NTF-014"},
-    "intent:android.intent.action.MAIN": {"INT-001", "INT-002"},
-    "intent:android.intent.action.MY_PACKAGE_REPLACED": {"NTF-014", "SYS-008"},
-    "intent:android.intent.action.SEND": {"SYS-004", "SYS-005"},
-    "intent:android.intent.action.SEND_MULTIPLE": {"SYS-004", "SYS-005"},
-    "intent:android.intent.action.TTS_SERVICE": {"TTS-001", "TTS-002"},
-    "intent:android.intent.action.VIEW": {"SYS-006"},
-    "intent:android.intent.category.BROWSABLE": {"SYS-006"},
-    "intent:android.intent.category.DEFAULT": {"SYS-004", "SYS-006"},
-    "intent:android.intent.category.LAUNCHER": {"INT-001", "INT-002"},
-    "intent:android.speech.RecognitionService": {"DIC-001", "DIC-002"},
-    "intent:android.speech.action.RECOGNIZE_SPEECH": {"DIC-001", "DIC-002"},
-    "intent:application/*": {"SYS-004"},
-    "intent:audio/*": {"SYS-004"},
-    "intent:com.google.firebase.MESSAGING_EVENT": {"NTF-002", "NTF-003", "NTF-006"},
-    "intent:image/*": {"SYS-004"},
-    "intent:marmot": {"SYS-006"},
-    "intent:nostrsigner": {"ONB-010", "ONB-011", "ONB-012"},
-    "intent:text/plain": {"SYS-004"},
-    "intent:video/*": {"SYS-004"},
-    "android-direct-share:conversation-shortcuts": {"SYS-011"},
-    "TtsTrustWarningDialog": {"TTS-003"},
+    "manifest_permissions": {
+        "permission:android.permission.ACCESS_COARSE_LOCATION": {"MED-012"},
+        "permission:android.permission.ACCESS_FINE_LOCATION": {"MED-012"},
+        "permission:android.permission.ACCESS_NETWORK_STATE": {"INT-006", "INT-007"},
+        "permission:android.permission.CAMERA": {"MED-004"},
+        "permission:android.permission.FOREGROUND_SERVICE": {"NTF-014", "TTS-001", "DIC-001"},
+        "permission:android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK": {"TTS-001"},
+        "permission:android.permission.FOREGROUND_SERVICE_MICROPHONE": {"DIC-001"},
+        "permission:android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING": {"NTF-006", "NTF-014"},
+        "permission:android.permission.FOREGROUND_SERVICE_SPECIAL_USE": {"NTF-006", "NTF-014"},
+        "permission:android.permission.INTERNET": {"INT-006", "INT-007"},
+        "permission:android.permission.POST_NOTIFICATIONS": {"NTF-001"},
+        "permission:android.permission.READ_EXTERNAL_STORAGE": {"MED-002"},
+        "permission:android.permission.READ_MEDIA_IMAGES": {"MED-002"},
+        "permission:android.permission.READ_MEDIA_VIDEO": {"MED-002"},
+        "permission:android.permission.READ_MEDIA_VISUAL_USER_SELECTED": {"MED-002"},
+        "permission:android.permission.RECEIVE_BOOT_COMPLETED": {"NTF-014"},
+        "permission:android.permission.RECORD_AUDIO": {"MED-008", "DIC-001"},
+        "permission:android.permission.REQUEST_INSTALL_PACKAGES": {"MED-018", "SYS-008"},
+        "permission:android.permission.VIBRATE": {"NTF-009"},
+        "permission:android.permission.WAKE_LOCK": {"NTF-014", "TTS-001"},
+    },
+    "android_entry_points": {
+        "intent:${deepLinkScheme}": {"SYS-006"},
+        "intent:android.intent.action.BOOT_COMPLETED": {"NTF-014"},
+        "intent:android.intent.action.MAIN": {"INT-001", "INT-002"},
+        "intent:android.intent.action.MY_PACKAGE_REPLACED": {"NTF-014", "SYS-008"},
+        "intent:android.intent.action.SEND": {"SYS-004", "SYS-005"},
+        "intent:android.intent.action.SEND_MULTIPLE": {"SYS-004", "SYS-005"},
+        "intent:android.intent.action.TTS_SERVICE": {"TTS-001", "TTS-002"},
+        "intent:android.intent.action.VIEW": {"SYS-006"},
+        "intent:android.intent.category.BROWSABLE": {"SYS-006"},
+        "intent:android.intent.category.DEFAULT": {"SYS-004", "SYS-006"},
+        "intent:android.intent.category.LAUNCHER": {"INT-001", "INT-002"},
+        "intent:android.speech.RecognitionService": {"DIC-001", "DIC-002"},
+        "intent:android.speech.action.RECOGNIZE_SPEECH": {"DIC-001", "DIC-002"},
+        "intent:application/*": {"SYS-004"},
+        "intent:audio/*": {"SYS-004"},
+        "intent:com.google.firebase.MESSAGING_EVENT": {"NTF-002", "NTF-003", "NTF-006"},
+        "intent:image/*": {"SYS-004"},
+        "intent:marmot": {"SYS-006"},
+        "intent:nostrsigner": {"ONB-010", "ONB-011", "ONB-012"},
+        "intent:text/plain": {"SYS-004"},
+        "intent:video/*": {"SYS-004"},
+        "android-direct-share:conversation-shortcuts": {"SYS-011"},
+    },
 }
 
 
@@ -428,7 +431,7 @@ def validate_inventory(active: set[str], errors: list[str]) -> None:
             )
         )
     seen: set[tuple[str, str, str]] = set()
-    ownership: dict[str, set[str]] = {}
+    ownership: dict[tuple[str, str], set[str]] = {}
     for category, entries in categories.items():
         if not entries:
             errors.append(finding(INVENTORY, 0, category, "category is empty"))
@@ -459,21 +462,24 @@ def validate_inventory(active: set[str], errors: list[str]) -> None:
                     )
                 )
             for test_id in test_ids:
-                ownership.setdefault(entry.get("surface", ""), set()).add(test_id)
+                ownership.setdefault((category, entry.get("surface", "")), set()).add(test_id)
                 if test_id not in active:
                     errors.append(finding(INVENTORY, 0, test_id, "inventory reference does not resolve to an active ID"))
     for entry in data.get("discovery_exceptions", []):
         if not entry.get("reason"):
             errors.append(finding(INVENTORY, 0, entry.get("surface", "exception"), "discovery exception needs a reason"))
     semantic_categories = {"manifest_permissions", "android_entry_points"}
+    semantic_surfaces_seen: dict[str, set[str]] = {category: set() for category in semantic_categories}
     for category, entries in categories.items():
         for entry in entries:
             surface = entry.get("surface", "")
-            expected = SEMANTIC_OWNER_IDS.get(surface)
+            expected = SEMANTIC_OWNER_IDS.get(category, {}).get(surface)
             if category in semantic_categories and expected is None:
                 errors.append(finding(INVENTORY, 0, surface, "missing independently reviewed semantic owner mapping"))
                 continue
-            if expected is not None and ownership.get(surface, set()) != expected:
+            if category in semantic_categories:
+                semantic_surfaces_seen[category].add(surface)
+            if expected is not None and ownership.get((category, surface), set()) != expected:
                 errors.append(
                     finding(
                         INVENTORY,
@@ -482,6 +488,13 @@ def validate_inventory(active: set[str], errors: list[str]) -> None:
                         f"semantic owner mismatch; expected exactly: {', '.join(sorted(expected))}",
                     )
                 )
+    for category, mappings in SEMANTIC_OWNER_IDS.items():
+        if category not in categories:
+            continue
+        for surface in sorted(set(mappings) - semantic_surfaces_seen.get(category, set())):
+            errors.append(
+                finding(INVENTORY, 0, surface, f"mapped semantic surface is missing from {category} inventory")
+            )
 
 
 def parse_revision_guide(revision: str) -> tuple[set[str], set[str]] | None:
