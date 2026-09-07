@@ -16,8 +16,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
+import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
-import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudProgress
@@ -71,7 +71,7 @@ internal fun TimelineRowMessageBubble(
     item: TimelineMessage,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
-    conversationVisualPages: List<MediaViewerPage> = emptyList(),
+    onOpenConversationMedia: (ConversationMediaViewerOpenRequest) -> Unit = {},
     eventCardResolver: NostrEventCardResolver? = null,
     documentSaveFallback: DocumentSaveFallback? = null,
     composerTextState: ComposerTextState,
@@ -123,7 +123,7 @@ internal fun TimelineRowMessageBubble(
         item = item,
         controller = controller,
         appState = appState,
-        conversationVisualPages = conversationVisualPages,
+        onOpenConversationMedia = onOpenConversationMedia,
         eventCardResolver = eventCardResolver,
         documentSaveFallback = documentSaveFallback,
         composerTextState = composerTextState,

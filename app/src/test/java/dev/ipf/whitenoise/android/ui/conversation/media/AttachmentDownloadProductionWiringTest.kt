@@ -24,6 +24,7 @@ class AttachmentDownloadProductionWiringTest {
         assertTrue("EncryptedAttachmentInstallerHandoffRecordStore.create(context)" in worker)
     }
 
+    /** Verifies every visual-media tap promotes transfer work before delegating viewer ownership. */
     @Test
     fun visibleMediaPromotesAnAutomaticTransferWhenTheUserTapsIt() {
         val image = source("MediaImageBubbles.kt").normalized()
@@ -31,13 +32,14 @@ class AttachmentDownloadProductionWiringTest {
         val voice = source("MediaVoice.kt").normalized()
 
         assertEquals(2, occurrences(image, "afterInteractiveRequest()"))
-        assertEquals(2, occurrences(video, "afterInteractiveRequest()"))
+        assertEquals(4, occurrences(video, "afterInteractiveRequest()"))
         assertEquals(1, occurrences(voice, "afterInteractiveRequest()"))
         assertEquals(2, occurrences(image, "persistedAttachmentOpenEffect("))
         assertEquals(2, occurrences(video, "persistedAttachmentOpenEffect("))
         assertEquals(1, occurrences(voice, "persistedAttachmentOpenEffect("))
         assertTrue(occurrences(image, "requestAttachmentOpen(") >= 5)
-        assertTrue(occurrences(video, "requestAttachmentOpen(") >= 4)
+        assertTrue(occurrences(video, "requestAttachmentOpen(") >= 1)
+        assertTrue(occurrences(video, "dispatchViewerOpen()") >= 4)
         assertTrue(occurrences(voice, "requestAttachmentOpen(") >= 2)
     }
 

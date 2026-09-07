@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,10 +43,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
@@ -81,12 +84,98 @@ private val videoPlaybackAudioAttributes =
         .setUsage(androidx.media3.common.C.USAGE_MEDIA)
         .build()
 
+/** Stable semantics identity for a visual-video affordance in production Compose tests. */
+internal fun videoAttachmentOpenTestTag(
+    messageIdHex: String,
+    attachmentIndex: Int,
+): String = "video-attachment-open:$messageIdHex:$attachmentIndex"
+
+/**
+ * Cryptographic identity shared by viewer state that must survive metadata-only
+ * source-epoch upgrades but reset before different bytes can reuse it.
+ */
+internal data class VideoAttachmentContentKey(
+    val messageIdHex: String,
+    val attachmentIndex: Int,
+    val mediaType: String,
+    val plaintextSha256: String,
+    val ciphertextSha256: String,
+    val nonceHex: String,
+    val version: EncryptedMediaVersionFfi,
+)
+
+/** Builds the source-epoch-independent identity for one encrypted video attachment. */
+internal fun videoAttachmentContentKey(
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+): VideoAttachmentContentKey =
+    VideoAttachmentContentKey(
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        mediaType = reference.mediaType,
+        plaintextSha256 = reference.plaintextSha256,
+        ciphertextSha256 = reference.ciphertextSha256,
+        nonceHex = reference.nonceHex,
+        version = reference.version,
+    )
+
+/** Exact materialized-content identity that owns one Media3 player instance. */
+internal data class VideoViewerPlayerKey(
+    val contentKey: VideoAttachmentContentKey,
+    val filePath: String,
+)
+
+/** Keeps a player through metadata-only source-epoch upgrades and re-keys for a different file. */
+internal fun videoViewerPlayerKey(
+    file: java.io.File,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+): VideoViewerPlayerKey =
+    VideoViewerPlayerKey(
+        contentKey = videoAttachmentContentKey(messageIdHex, attachmentIndex, reference),
+        filePath = file.absolutePath,
+    )
+
+/** Injectable owner-chain seam for deterministic device coverage of pending materialization. */
+internal typealias VideoViewerFileResolver =
+    suspend (
+        context: Context,
+        controller: ConversationController,
+        messageIdHex: String,
+        attachmentIndex: Int,
+        reference: MediaAttachmentReferenceFfi,
+        mine: Boolean,
+        priority: AttachmentDownloadPriority,
+    ) -> java.io.File
+
+/** Resolves a viewer's video through the production controller-owned materialization path. */
+internal suspend fun resolveVideoViewerFile(
+    context: Context,
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    mine: Boolean,
+    priority: AttachmentDownloadPriority,
+): java.io.File =
+    materializeVideoAttachment(
+        context = context,
+        controller = controller,
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        reference = reference,
+        mine = mine,
+        priority = priority,
+    )
+
 /**
  * Single video tile in an album grid. Auto-materialises on first
  * composition (mine + cached short-circuit; otherwise FFI download honoring
  * the auto-download policy), decodes a scaled poster, overlays a centered
- * play affordance. Tap delivers the materialised file to the parent so
- * the bubble can open the fullscreen player.
+ * play affordance. Tap delegates the logical attachment immediately so a
+ * conversation-owned viewer can continue materialization after this lazy tile is disposed.
  */
 @Composable
 internal fun MediaVideoGridTile(
@@ -96,14 +185,13 @@ internal fun MediaVideoGridTile(
     controller: ConversationController,
     appState: WhiteNoiseAppState,
     mine: Boolean,
-    onTap: (java.io.File) -> Unit,
+    onTap: () -> Unit,
     overflowCount: Int,
     modifier: Modifier = Modifier,
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val epoch = reference.sourceEpoch
     var localFile by
         rememberCachedVideoAttachmentFileState(
@@ -146,6 +234,12 @@ internal fun MediaVideoGridTile(
     val startDownload = materializationIntent.shouldMaterialize
     var reloadToken by remember(messageIdHex, attachmentIndex, epoch) { mutableIntStateOf(0) }
 
+    /** Promotes the tap to interactive priority and delegates ownership before this tile can dispose. */
+    fun dispatchViewerOpen() {
+        materializationIntent = materializationIntent.afterInteractiveRequest()
+        onTap()
+    }
+
     LaunchedEffect(
         messageIdHex,
         attachmentIndex,
@@ -179,6 +273,7 @@ internal fun MediaVideoGridTile(
         }
     }
 
+    /** Revalidates a cached tile before handing its logical attachment to the viewer owner. */
     suspend fun dispatchReadyVideo() {
         val playableFile =
             withContext(Dispatchers.IO) {
@@ -192,7 +287,7 @@ internal fun MediaVideoGridTile(
         }
         localFile = playableFile
         failed = false
-        onTap(playableFile)
+        dispatchViewerOpen()
     }
 
     persistedAttachmentOpenEffect(
@@ -243,22 +338,12 @@ internal fun MediaVideoGridTile(
 
     Box(
         modifier =
-            modifier.combinedClickable(
-                onLongClick = onLongPress,
-                onClick = {
-                    val f = localFile
-                    when {
-                        f != null ->
-                            scope.launch { dispatchReadyVideo() }
-                        failed -> {
-                            controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
-                        }
-                        else -> {
-                            controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
-                        }
-                    }
-                },
-            ),
+            modifier
+                .testTag(videoAttachmentOpenTestTag(messageIdHex, attachmentIndex))
+                .combinedClickable(
+                    onLongClick = onLongPress,
+                    onClick = ::dispatchViewerOpen,
+                ),
     ) {
         val poster = posterBitmap
         when {
@@ -349,6 +434,7 @@ internal fun MediaVideoGridTile(
     }
 }
 
+/** Materializes one inline video and delegates its open request to the conversation host. */
 @Composable
 internal fun MediaVideoBubble(
     item: TimelineMessage,
@@ -356,8 +442,9 @@ internal fun MediaVideoBubble(
     reference: MediaAttachmentReferenceFfi,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
-    conversationVisualPages: List<MediaViewerPage>,
+    onOpenConversationMedia: (ConversationMediaViewerOpenRequest) -> Unit,
     mine: Boolean,
+    videoFileResolver: VideoViewerFileResolver = ::resolveVideoViewerFile,
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
     uploadFailed: Boolean = false,
@@ -411,7 +498,6 @@ internal fun MediaVideoBubble(
         mutableStateOf(cachedThumbnail?.asImageBitmap())
     }
     var durationMs by remember(pillKey, epoch) { mutableLongStateOf(0L) }
-    var viewerOpen by remember(pillKey) { mutableStateOf(false) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
     // Mirrors the image bubble's auto-download gate, but already-local bytes
     // bypass the network-spend policy so chat re-entry starts at Play instead
@@ -448,14 +534,14 @@ internal fun MediaVideoBubble(
         if (!startDownload) return@LaunchedEffect
         loading = true
         runCatching {
-            materializeVideoAttachment(
-                context = context,
-                controller = controller,
-                messageIdHex = messageIdHex,
-                attachmentIndex = attachmentIndex,
-                reference = reference,
-                mine = mine,
-                priority = materializationIntent.priority,
+            videoFileResolver(
+                context,
+                controller,
+                messageIdHex,
+                attachmentIndex,
+                reference,
+                mine,
+                materializationIntent.priority,
             )
         }.onSuccess { f ->
             localFile = f
@@ -471,6 +557,22 @@ internal fun MediaVideoBubble(
         loading = false
     }
 
+    /** Opens the logical video immediately so materialization can continue after bubble disposal. */
+    fun dispatchViewerOpen() {
+        materializationIntent = materializationIntent.afterInteractiveRequest()
+        onOpenConversationMedia(
+            ConversationMediaViewerOpenRequest(
+                messageIdHex = messageIdHex,
+                attachments = listOf(IndexedValue(attachmentIndex, reference)),
+                tappedAttachmentIndex = attachmentIndex,
+                sender = record.sender,
+                recordedAt = record.recordedAt,
+                mine = mine,
+            ),
+        )
+    }
+
+    /** Revalidates a cached bubble before handing its logical attachment to the viewer owner. */
     suspend fun dispatchReadyVideo() {
         val playableFile =
             withContext(Dispatchers.IO) {
@@ -480,12 +582,12 @@ internal fun MediaVideoBubble(
             localFile = null
             posterBitmap = null
             durationMs = 0L
-            controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+            dispatchViewerOpen()
             return
         }
         localFile = playableFile
         failed = false
-        viewerOpen = true
+        dispatchViewerOpen()
     }
 
     persistedAttachmentOpenEffect(
@@ -589,13 +691,14 @@ internal fun MediaVideoBubble(
                 modifier =
                     Modifier
                         .size(56.dp)
+                        .testTag(videoAttachmentOpenTestTag(messageIdHex, attachmentIndex))
                         .combinedClickable(
                             onLongClick = onLongPress,
                             onClick = {
                                 when {
                                     uploadFailed -> onRetryUpload?.invoke()
-                                    loading -> controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
-                                    else -> scope.launch { dispatchReadyVideo() }
+                                    localFile != null -> scope.launch { dispatchReadyVideo() }
+                                    else -> dispatchViewerOpen()
                                 }
                             },
                         ),
@@ -694,20 +797,6 @@ internal fun MediaVideoBubble(
                 }
             }
         }
-    }
-    if (viewerOpen) {
-        ConversationMediaViewer(
-            controller = controller,
-            appState = appState,
-            conversationVisualPages = conversationVisualPages,
-            messageIdHex = record.messageIdHex,
-            attachments = listOf(IndexedValue(attachmentIndex, reference)),
-            tappedAttachmentIndex = attachmentIndex,
-            sender = record.sender,
-            recordedAt = record.recordedAt,
-            mine = mine,
-            onDismiss = { viewerOpen = false },
-        )
     }
 }
 
@@ -916,6 +1005,7 @@ internal fun cachedVideoAttachmentFile(
         ),
     )
 
+/** Retains validated bytes across metadata-only epoch changes without crossing content identity. */
 @Composable
 private fun rememberCachedVideoAttachmentFileState(
     context: Context,
@@ -923,11 +1013,12 @@ private fun rememberCachedVideoAttachmentFileState(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
 ): MutableState<java.io.File?> {
+    val contentKey = videoAttachmentContentKey(messageIdHex, attachmentIndex, reference)
     val cachedFile =
-        remember(messageIdHex, attachmentIndex, reference.sourceEpoch, reference.mediaType) {
+        remember(contentKey) {
             mutableStateOf<java.io.File?>(null)
         }
-    LaunchedEffect(messageIdHex, attachmentIndex, reference.sourceEpoch, reference.mediaType) {
+    LaunchedEffect(contentKey, reference.sourceEpoch) {
         val file =
             withContext(Dispatchers.IO) {
                 cachedVideoAttachmentFile(
@@ -937,7 +1028,16 @@ private fun rememberCachedVideoAttachmentFileState(
                     reference = reference,
                 )
             }
-        if (cachedFile.value == null) cachedFile.value = file
+        val retained = validatedAttachmentCacheFile(cachedFile.value)
+        cachedFile.value =
+            when {
+                file != null -> file
+                // The source epoch may upgrade after a fallback row is shown. The remember key
+                // already fences every cryptographic content field, so that metadata-only change
+                // can keep playing the validated bytes without rebuilding Media3.
+                retained != null -> retained
+                else -> null
+            }
     }
     return cachedFile
 }
@@ -1004,16 +1104,16 @@ internal fun VideoViewerPage(
     reference: MediaAttachmentReferenceFfi,
     isCurrent: Boolean,
     mine: Boolean,
+    onPlayerChanged: (androidx.media3.exoplayer.ExoPlayer?) -> Unit = {},
+    videoFileResolver: VideoViewerFileResolver = ::resolveVideoViewerFile,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val latestReference by rememberUpdatedState(reference)
+    val latestOnPlayerChanged by rememberUpdatedState(onPlayerChanged)
+    val contentKey = videoAttachmentContentKey(messageIdHex, attachmentIndex, reference)
     val playbackRecoveryJob =
-        remember(
-            messageIdHex,
-            attachmentIndex,
-            reference.sourceEpoch,
-            reference.mediaType,
-        ) {
+        remember(contentKey) {
             mutableStateOf<Job?>(null)
         }
     DisposableEffect(playbackRecoveryJob) {
@@ -1026,37 +1126,28 @@ internal fun VideoViewerPage(
             attachmentIndex = attachmentIndex,
             reference = reference,
         )
-    var playbackInvalidated by remember(
-        messageIdHex,
-        attachmentIndex,
-        reference.sourceEpoch,
-        reference.mediaType,
-    ) {
+    var playbackInvalidated by remember(contentKey) {
         mutableStateOf(false)
     }
-    var cacheInvalidating by remember(
-        messageIdHex,
-        attachmentIndex,
-        reference.sourceEpoch,
-        reference.mediaType,
-    ) {
+    var cacheInvalidating by remember(contentKey) {
         mutableStateOf(false)
     }
-    var loadFailed by remember(messageIdHex, attachmentIndex, reference.sourceEpoch) { mutableStateOf(false) }
-    var reloadToken by remember(messageIdHex, attachmentIndex, reference.sourceEpoch) { mutableIntStateOf(0) }
-    LaunchedEffect(messageIdHex, attachmentIndex, reference.sourceEpoch, isCurrent, reloadToken) {
+    var loadFailed by remember(contentKey) { mutableStateOf(false) }
+    var reloadToken by remember(contentKey) { mutableIntStateOf(0) }
+    LaunchedEffect(contentKey, reference.sourceEpoch, isCurrent, reloadToken) {
         if (!isCurrent) return@LaunchedEffect
         if (localFile != null) return@LaunchedEffect
         if (playbackInvalidated) return@LaunchedEffect
         loadFailed = false
         runCatching {
-            materializeVideoAttachment(
-                context = context,
-                controller = controller,
-                messageIdHex = messageIdHex,
-                attachmentIndex = attachmentIndex,
-                reference = reference,
-                mine = mine,
+            videoFileResolver(
+                context,
+                controller,
+                messageIdHex,
+                attachmentIndex,
+                reference,
+                mine,
+                AttachmentDownloadPriority.Interactive,
             )
         }.onSuccess { localFile = it }
             .onFailure {
@@ -1101,14 +1192,9 @@ internal fun VideoViewerPage(
         )
         return
     }
+    val playerKey = videoViewerPlayerKey(file, messageIdHex, attachmentIndex, reference)
     val exo =
-        remember(
-            file,
-            messageIdHex,
-            attachmentIndex,
-            reference.sourceEpoch,
-            reference.mediaType,
-        ) {
+        remember(playerKey) {
             androidx.media3.exoplayer.ExoPlayer
                 .Builder(context)
                 .build()
@@ -1129,7 +1215,7 @@ internal fun VideoViewerPage(
                                                 controller = controller,
                                                 messageIdHex = messageIdHex,
                                                 attachmentIndex = attachmentIndex,
-                                                reference = reference,
+                                                reference = latestReference,
                                                 mine = mine,
                                             )
                                             localFile = null
@@ -1149,7 +1235,13 @@ internal fun VideoViewerPage(
                     )
                 }
         }
-    DisposableEffect(exo) { onDispose { exo.release() } }
+    DisposableEffect(exo) {
+        latestOnPlayerChanged(exo)
+        onDispose {
+            latestOnPlayerChanged(null)
+            exo.release()
+        }
+    }
     // Only the current page owns a decoder or audio focus. HorizontalPager
     // pre-composes neighbours, so preparing in remember would hold multiple
     // MediaCodec instances and could invalidate healthy cache entries when a
