@@ -7,6 +7,25 @@ import org.junit.Test
 import java.io.File
 
 class AttachmentDownloadProductionWiringTest {
+    /** Both epoch probing and retained-file disk validation must finish before returning to Main. */
+    @Test
+    fun videoCacheEffectValidatesRetainedFilesOnIo() {
+        val effect =
+            source("MediaVideo.kt")
+                .substringAfter("private fun rememberCachedVideoAttachmentFileState(")
+                .substringBefore("return cachedFile")
+                .normalized()
+
+        assertTrue(
+            "The cache probe and retained-file validation must share the IO context",
+            "val (file, retained) = withContext(Dispatchers.IO) { val probed = cachedVideoAttachmentFile(" in effect,
+        )
+        assertTrue(
+            "Retained-file validation must run before IO exits and Compose state is published",
+            "probed to validatedAttachmentCacheFile(cachedFile.value) } cachedFile.value =" in effect,
+        )
+    }
+
     /** APK installer completion is owned by the app shell, not the originating bubble. */
     @Test
     fun installerHandoffOwnerOutlivesTheOriginatingFileBubble() {

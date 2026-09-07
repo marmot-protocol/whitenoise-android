@@ -1005,7 +1005,10 @@ internal fun cachedVideoAttachmentFile(
         ),
     )
 
-/** Retains validated bytes across metadata-only epoch changes without crossing content identity. */
+/**
+ * Retains validated bytes across metadata-only epoch changes without crossing content identity.
+ * Disk validation and cache recency updates run on IO; state publication returns to Main.
+ */
 @Composable
 private fun rememberCachedVideoAttachmentFileState(
     context: Context,
@@ -1019,16 +1022,17 @@ private fun rememberCachedVideoAttachmentFileState(
             mutableStateOf<java.io.File?>(null)
         }
     LaunchedEffect(contentKey, reference.sourceEpoch) {
-        val file =
+        val (file, retained) =
             withContext(Dispatchers.IO) {
-                cachedVideoAttachmentFile(
-                    context = context,
-                    messageIdHex = messageIdHex,
-                    attachmentIndex = attachmentIndex,
-                    reference = reference,
-                )
+                val probed =
+                    cachedVideoAttachmentFile(
+                        context = context,
+                        messageIdHex = messageIdHex,
+                        attachmentIndex = attachmentIndex,
+                        reference = reference,
+                    )
+                probed to validatedAttachmentCacheFile(cachedFile.value)
             }
-        val retained = validatedAttachmentCacheFile(cachedFile.value)
         cachedFile.value =
             when {
                 file != null -> file
