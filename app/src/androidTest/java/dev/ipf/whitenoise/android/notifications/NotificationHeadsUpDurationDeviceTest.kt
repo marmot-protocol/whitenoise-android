@@ -72,9 +72,12 @@ class NotificationHeadsUpDurationDeviceTest {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             shell("pm grant ${context.packageName} ${Manifest.permission.POST_NOTIFICATIONS}")
         }
-        NotificationTimingDeviceEvents.listenerConnected = false
-        shell("cmd notification allow_listener ${listener.flattenToString()}")
-        listenerProvisioned = true
+        val notificationManager = context.getSystemService(NotificationManager::class.java)
+        if (!notificationManager.isNotificationListenerAccessGranted(listener)) {
+            NotificationTimingDeviceEvents.listenerConnected = false
+            listenerProvisioned = true
+            shell("cmd notification allow_listener ${listener.flattenToString()}")
+        }
         NotificationListenerService.requestRebind(listener)
         assertTrue(
             "Debug notification listener did not connect; verify notification-listener access on the device",
@@ -376,14 +379,16 @@ class NotificationHeadsUpDurationDeviceTest {
                     .orEmpty(),
         )
 
-    /** Extracts exact-key rows only from the nested HeadsUpManagerPhone StatusBar block. */
+    /** Extracts exact-key rows, returning null when the expected SystemUI section is unavailable. */
     private fun captureHeadsUpDump(
         key: String,
         statusBarDumpable: String?,
-    ): List<String> {
-        if (statusBarDumpable == null) return emptyList()
+    ): List<String>? {
+        if (statusBarDumpable == null) return null
         val statusBarDump = shell("$SYSTEM_UI_DUMP_COMMAND $statusBarDumpable")
-        return HeadsUpSystemUiDiagnostics.exactTargetLines(statusBarDump, key)
+        return HeadsUpSystemUiDiagnostics.headsUpManagerPhoneBlock(statusBarDump)?.filter {
+            HeadsUpSystemUiDiagnostics.lineContainsExactTargetKey(it, key)
+        }
     }
 
     /** Correlates exact-key API 30 and newer SystemUI evidence without exporting unrelated entries. */
@@ -391,7 +396,7 @@ class NotificationHeadsUpDurationDeviceTest {
         key: String,
         prePostBaseline: SystemUiLogSnapshot,
         observationBaseline: SystemUiLogSnapshot,
-        initialDumpLines: List<String>,
+        initialDumpLines: List<String>?,
         channelImportance: Int,
     ): SystemUiHeadsUpEvidence {
         val finalDumpLines = captureHeadsUpDump(key, prePostBaseline.statusBarDumpable)
@@ -409,8 +414,8 @@ class NotificationHeadsUpDurationDeviceTest {
                 )
             }
         return SystemUiHeadsUpEvidence(
-            initialDumpLines = initialDumpLines,
-            finalDumpLines = finalDumpLines,
+            initialDumpLines = initialDumpLines.orEmpty(),
+            finalDumpLines = finalDumpLines.orEmpty(),
             statusBarDumpable = prePostBaseline.statusBarDumpable,
             modernLogDumpable = prePostBaseline.modernLogDumpable,
             postEventLines = deltas.postEvent.lines,
@@ -440,21 +445,13 @@ class NotificationHeadsUpDurationDeviceTest {
     private fun systemUiEvidenceGaps(
         deltas: SystemUiLogDeltas,
         baseline: SystemUiLogSnapshot,
-        initialDumpLines: List<String>,
-        finalDumpLines: List<String>,
+        initialDumpLines: List<String>?,
+        finalDumpLines: List<String>?,
         channelImportance: Int,
     ): List<String> {
         val baselinesStable = deltas.all().all { it.baselineStable }
-        val sawInitialShow =
-            deltas.postEvent.lines.any(::isApi30HeadsUpVisible) ||
-                deltas.postModern.lines.any(::isHeadsUpShow)
-        val sawNaturalHide =
-            deltas.naturalEvent.lines.any(::isApi30HeadsUpHidden) ||
-                deltas.naturalModern.lines.any(::isHeadsUpRemoval)
-        val sawReasonedNaturalHide =
-            deltas.naturalModern.lines.any { line ->
-                isHeadsUpRemoval(line) && line.contains("reason", ignoreCase = true)
-            }
+        val sawInitialShow = deltas.postEvent.lines.any(::isApi30HeadsUpVisible)
+        val sawNaturalHide = deltas.naturalEvent.lines.any(::isApi30HeadsUpHidden)
         return buildList {
             if (!baselinesStable) add("SystemUI buffer baseline rotated")
             if (baseline.statusBarDumpable == null) add("no supported StatusBar dumpable was registered")
@@ -462,11 +459,19 @@ class NotificationHeadsUpDurationDeviceTest {
             if (channelImportance < NotificationManager.IMPORTANCE_HIGH) {
                 add("notification channel importance $channelImportance is below HIGH")
             }
-            if (initialDumpLines.isEmpty()) add("initial HeadsUpManagerPhone dump did not contain the target key")
+            if (initialDumpLines == null) {
+                add("initial HeadsUpManagerPhone section was unavailable")
+            } else if (initialDumpLines.isEmpty()) {
+                add("initial HeadsUpManagerPhone dump did not contain the target key")
+            }
             if (!sawInitialShow) add("no exact-key heads-up show transition was captured")
             if (!sawNaturalHide) add("no exact-key natural heads-up removal transition was captured")
-            if (!sawReasonedNaturalHide) add("no exact-key reason-bearing heads-up removal was available")
-            if (finalDumpLines.isNotEmpty()) add("target remained in the final HeadsUpManagerPhone dump")
+            add("API 30 has no validated reason-bearing removal format; modern log rows are diagnostic only")
+            if (finalDumpLines == null) {
+                add("final HeadsUpManagerPhone section was unavailable")
+            } else if (finalDumpLines.isNotEmpty()) {
+                add("target remained in the final HeadsUpManagerPhone dump")
+            }
         }
     }
 
@@ -488,18 +493,6 @@ class NotificationHeadsUpDurationDeviceTest {
 
     /** Recognizes the API 30 event-log transition whose visible field is true. */
     private fun isApi30HeadsUpVisible(line: String): Boolean = API30_VISIBLE_EVENT_REGEX.containsMatchIn(line)
-
-    /** Recognizes an add/show entry from newer SystemUI log buffers. */
-    private fun isHeadsUpShow(line: String): Boolean {
-        val normalized = line.lowercase()
-        return normalized.contains("show") || normalized.contains("add")
-    }
-
-    /** Recognizes a reason-capable removal/hide entry from newer SystemUI log buffers. */
-    private fun isHeadsUpRemoval(line: String): Boolean {
-        val normalized = line.lowercase()
-        return normalized.contains("remove") || normalized.contains("hide")
-    }
 
     /** Reads a bounded natural observation window from instrumentation arguments. */
     private fun observationWindowMillis(): Long =
@@ -573,7 +566,10 @@ class NotificationHeadsUpDurationDeviceTest {
     private companion object {
         const val ARG_ALLOW_HEADS_UP_PROBE = "allowHeadsUpProbe"
         const val ARG_OBSERVATION_WINDOW_MS = "headsUpObservationMs"
-        const val LISTENER_CONNECT_TIMEOUT_MS = 5_000L
+
+        /** Allows Android 11's ten-second rebind delay after instrumentation restarts a bound listener. */
+        const val LISTENER_CONNECT_TIMEOUT_MS = 15_000L
+
         const val LISTENER_EVENT_TIMEOUT_MS = 5_000L
         const val HOME_SETTLE_MS = 500L
         const val DEFAULT_OBSERVATION_WINDOW_MS = 8_000L

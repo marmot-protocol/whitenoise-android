@@ -126,6 +126,17 @@ buffer only when it is registered. If the image exposes no exact-key initial
 state, natural hide transition, or reason-bearing removal line, the run reports
 its filtered evidence and ends as **inconclusive**, never as a pass.
 
+The current API 30 probe has no validated reason-bearing removal format, so its
+duration conclusion is always **inconclusive**, even when card delivery and
+cleanup assertions succeed. Modern buffer rows remain raw diagnostic evidence;
+words such as “remove” or “reason” are not proof of completed removal. A missing
+or failed initial/final SystemUI section is likewise unavailable evidence, not
+proof that the target banner is absent. Existing listener access is retained;
+the fixture revokes only a grant it added for that run. Listener setup allows up
+to 15 seconds because instrumentation restarts the target process and Android
+11 defers rebinding a dead listener by 10 seconds. This readiness allowance is
+separate from notification delivery and the untouched observation window.
+
 Listener and SystemUI diagnostics still do not prove rendered-pixel dwell. A
 duration claim additionally requires a Perfetto trace containing the test's
 `WN heads-up ...` markers and an external high-frame-rate recording. Record the

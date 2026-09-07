@@ -14,11 +14,12 @@ internal object HeadsUpSystemUiDiagnostics {
      * Returns the indented body of `HeadsUpManagerPhone state:` only. A sibling
      * StatusBar section can contain the same shade-card key after heads-up has
      * collapsed, so parsing stops at the next nonblank line at header depth.
+     * A missing section returns null rather than claiming an empty heads-up state.
      */
-    fun headsUpManagerPhoneBlock(statusBarDump: String): List<String> {
+    fun headsUpManagerPhoneBlock(statusBarDump: String): List<String>? {
         val lines = statusBarDump.lineSequence().toList()
         val headerIndex = lines.indexOfFirst { it.trim() == HEADS_UP_MANAGER_HEADER }
-        if (headerIndex < 0) return emptyList()
+        if (headerIndex < 0) return null
         val headerIndent = lines[headerIndex].leadingWhitespaceCount()
         return lines
             .drop(headerIndex + 1)
@@ -29,7 +30,7 @@ internal object HeadsUpSystemUiDiagnostics {
     fun exactTargetLines(
         statusBarDump: String,
         key: String,
-    ): List<String> = headsUpManagerPhoneBlock(statusBarDump).filter { lineContainsExactTargetKey(it, key) }
+    ): List<String> = headsUpManagerPhoneBlock(statusBarDump).orEmpty().filter { lineContainsExactTargetKey(it, key) }
 
     /**
      * Matches a complete framework key in a `key=` field, event-log list, or

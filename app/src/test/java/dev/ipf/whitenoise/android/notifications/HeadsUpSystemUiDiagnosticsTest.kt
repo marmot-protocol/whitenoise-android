@@ -2,11 +2,23 @@ package dev.ipf.whitenoise.android.notifications
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Regression coverage for StatusBar's indentation-delimited heads-up subsection. */
 class HeadsUpSystemUiDiagnosticsTest {
+    /** A failed or unsupported dump must remain distinct from a supported empty heads-up section. */
+    @Test
+    fun missingHeadsUpBlockIsNotEvidenceOfAnEmptyHeadsUpState() {
+        assertNull(HeadsUpSystemUiDiagnostics.headsUpManagerPhoneBlock("Can't find service: activity"))
+        assertNull(HeadsUpSystemUiDiagnostics.headsUpManagerPhoneBlock(""))
+        assertEquals(
+            emptyList<String>(),
+            HeadsUpSystemUiDiagnostics.headsUpManagerPhoneBlock("HeadsUpManagerPhone state:"),
+        )
+    }
+
     /** Retains exact-key rows from the real nested HeadsUpManagerPhone shape. */
     @Test
     fun extractsExactTargetFromHeadsUpManagerPhoneBlock() {
