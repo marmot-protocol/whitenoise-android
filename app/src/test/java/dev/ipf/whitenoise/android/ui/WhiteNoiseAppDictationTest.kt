@@ -13,7 +13,7 @@ class WhiteNoiseAppDictationTest {
     @Test
     fun `origin composer owns controls while it is visible`() {
         assertFalse(
-            shouldShowConversationDictationFloatingControl(
+            shouldShowConversationDictationPersistentControl(
                 state = listening,
                 originVisible = true,
                 appLockScreenVisible = false,
@@ -23,23 +23,23 @@ class WhiteNoiseAppDictationTest {
 
     /** Verifies app-root controls take ownership after navigation hides the immutable origin. */
     @Test
-    fun `root float owns controls on other app surfaces`() {
+    fun `persistent root control owns controls on other app surfaces`() {
         assertTrue(
-            shouldShowConversationDictationFloatingControl(
+            shouldShowConversationDictationPersistentControl(
                 state = listening,
                 originVisible = false,
                 appLockScreenVisible = false,
             ),
         )
         assertTrue(
-            shouldShowConversationDictationFloatingControl(
+            shouldShowConversationDictationPersistentControl(
                 state = ConversationDictationState.Processing(1L, target),
                 originVisible = false,
                 appLockScreenVisible = false,
             ),
         )
         assertTrue(
-            shouldShowConversationDictationFloatingControl(
+            shouldShowConversationDictationPersistentControl(
                 state = ConversationDictationState.ReviewRequired(1L, target, "hello"),
                 originVisible = false,
                 appLockScreenVisible = false,
@@ -49,16 +49,16 @@ class WhiteNoiseAppDictationTest {
 
     /** Verifies privacy gates never expose dictation controls above lock or preflight surfaces. */
     @Test
-    fun `privacy and preflight surfaces never expose the root float`() {
+    fun `privacy and preflight surfaces never expose the persistent root control`() {
         assertFalse(
-            shouldShowConversationDictationFloatingControl(
+            shouldShowConversationDictationPersistentControl(
                 state = listening,
                 originVisible = false,
                 appLockScreenVisible = true,
             ),
         )
         assertFalse(
-            shouldShowConversationDictationFloatingControl(
+            shouldShowConversationDictationPersistentControl(
                 state = ConversationDictationState.DisclosureRequired(1L, target),
                 originVisible = false,
                 appLockScreenVisible = false,

@@ -87,25 +87,25 @@ class ComposerDictationControlTest {
 
     /** Verifies app-owned controls replace only their compact slot and leave adjacent actions stable. */
     @Test
-    fun compactComposerActionMorphsToAppOwnedDoneAndCancelWithoutMovingNeighbors() {
+    fun compactComposerActionMorphsToCancelPasteSendWithoutMovingEmojiOrFocus() {
         val controller = render(draft = TextFieldValue("Ready"))
         val field = composeRule.onNode(hasSetTextAction()).performClick().assertIsFocused()
         val emojiBefore = composeRule.onNodeWithContentDescription("Open emoji picker").getUnclippedBoundsInRoot()
-        val sendBefore = composeRule.onNodeWithContentDescription("Send").getUnclippedBoundsInRoot()
 
         composeRule.onNodeWithContentDescription("Dictate text").performClick()
 
         assertTrue(controller.state is ConversationDictationState.Starting)
         assertTrue(controller.ownsMicrophone)
         composeRule.onNodeWithTag(COMPOSER_DICTATION_STRIP_TAG).assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Done").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Cancel dictation").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Cancel").assertIsDisplayed()
         field.assertIsDisplayed().assertIsFocused()
         assertEquals(
             emojiBefore,
             composeRule.onNodeWithContentDescription("Open emoji picker").getUnclippedBoundsInRoot(),
         )
-        assertEquals(sendBefore, composeRule.onNodeWithContentDescription("Send").getUnclippedBoundsInRoot())
+        composeRule.onNodeWithContentDescription("Send").assertIsDisplayed()
+        assertEquals(1, composeRule.onAllNodesWithContentDescription("Send").fetchSemanticsNodes().size)
     }
 
     /** Verifies starting dictation does not focus a composer whose keyboard was already closed. */
@@ -118,8 +118,9 @@ class ComposerDictationControlTest {
 
         assertTrue(controller.state is ConversationDictationState.Starting)
         field.assertIsDisplayed().assertIsNotFocused()
-        composeRule.onNodeWithContentDescription("Done").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Cancel dictation").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Cancel").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Send").assertIsDisplayed()
     }
 
     /** Verifies app-owned dictation removes the competing voice-note microphone from the same composer. */
@@ -133,8 +134,9 @@ class ComposerDictationControlTest {
             composeRule.onNodeWithContentDescription("Dictate text").performClick()
 
             composeRule.onNodeWithContentDescription("Hold to record voice message").assertDoesNotExist()
-            composeRule.onNodeWithContentDescription("Done").assertIsDisplayed()
-            composeRule.onNodeWithContentDescription("Cancel dictation").assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("Cancel").assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("Send").assertIsDisplayed()
         } finally {
             voiceRecording.release()
         }
