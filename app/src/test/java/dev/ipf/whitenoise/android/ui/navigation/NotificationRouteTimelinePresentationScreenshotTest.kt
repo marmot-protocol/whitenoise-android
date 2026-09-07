@@ -9,8 +9,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -43,6 +45,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.ConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestDraftPersistence
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -51,6 +54,7 @@ import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.assertTimelineSubscriptionSnapshotBeforeFirstNextWindow
+import dev.ipf.whitenoise.android.state.awaitConversationCondition
 import dev.ipf.whitenoise.android.state.awaitOpenedTimelineSubscriptionsClosed
 import dev.ipf.whitenoise.android.state.conversationTimelineReconnectFixtures
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
@@ -99,6 +103,37 @@ private const val POLL_INTERVAL_MILLIS = 10L
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class NotificationRouteTimelinePresentationScreenshotTest : NotificationRouteTimelinePresentationFixture() {
+    /** A terminal notification route restores the established removed-member surface instead of loading forever. */
+    @Test
+    fun notificationRoute_terminalEvictionShowsTheNonEditableRemovedState() {
+        val directHarness = DirectNotificationConversationHarness(composeRule)
+        val fixture =
+            directHarness.create(
+                ConversationLiveSubscriptions(
+                    openTimeline = { _, _, _ -> error("GroupStateError::UseAfterEviction") },
+                    openGroupState = { _, _ -> error("terminal timeline open must not bind group state") },
+                ),
+            )
+        val mounted = mutableStateOf(true)
+        try {
+            awaitConversationCondition { fixture.controller.terminalConversationUnavailable }
+            assertNull(fixture.controller.error)
+            directHarness.mount(fixture, mounted, notificationOpenRequestId = { 41L })
+            composeRule.waitForIdle()
+
+            composeRule.onNodeWithTag(CONVERSATION_INITIAL_LOADING_TEST_TAG).assertDoesNotExist()
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            composeRule.onNodeWithText(context.getString(R.string.you_are_no_longer_a_member)).assertIsDisplayed()
+            composeRule.onNodeWithText(context.getString(R.string.no_messages_yet)).assertIsDisplayed()
+            composeRule.onAllNodes(hasSetTextAction()).assertCountEquals(0)
+            composeRule.onRoot().captureRoboImage(
+                "src/test/snapshots/notification_route_terminal_eviction_light.png",
+            )
+        } finally {
+            directHarness.dispose(fixture, mounted)
+        }
+    }
+
     /** A reconnect must publish the notified row through the existing mounted route controller. */
     @Test
     fun notificationRoutedReconnectShowsNotifiedMessageWithoutRecreatingController() {

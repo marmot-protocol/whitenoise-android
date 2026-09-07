@@ -860,7 +860,7 @@ internal fun ConversationScreen(
     // account-owned roster or first authoritative page is still withheld; it
     // must keep future notifications eligible until that presentation commits.
     // Details and their nested routes remain non-owning after the reveal too.
-    LaunchedEffect(controller, showDetails, transcriptReadyToReveal) {
+    LaunchedEffect(controller, notificationOpenRequestId, showDetails, transcriptReadyToReveal) {
         onNotificationTimelineVisibilityChanged(!showDetails && transcriptReadyToReveal)
     }
 
@@ -3457,6 +3457,7 @@ internal fun ConversationScreen(
                     )
                 renderedTimeline.isEmpty() &&
                     notificationOpenRequestId != 0L &&
+                    !controller.terminalConversationUnavailable &&
                     !transcriptReadyToReveal ->
                     ConversationInitialLoadingOverlay(
                         visible = true,
