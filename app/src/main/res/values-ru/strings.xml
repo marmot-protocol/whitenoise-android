@@ -503,7 +503,9 @@
     <string name="keep_connected_subtitle">Получать сообщения, пока White Noise работает в фоновом режиме.</string>
     <string name="native_push">Push-уведомления</string>
     <string name="native_push_subtitle">Будит приложение, когда у реле есть новые события для доставки.</string>
-    <string name="native_push_unavailable_subtitle">Требуются Google Play и сборка с настроенным push-сервером.</string>
+    <string name="native_push_missing_server_subtitle">Push-уведомления недоступны: в этой сборке не настроен push-сервер.</string>
+    <string name="native_push_google_play_unavailable_subtitle">Для push-уведомлений нужны совместимые сервисы Google Play на этом устройстве.</string>
+    <string name="native_push_firebase_unavailable_subtitle">Push-уведомления недоступны: Firebase не настроен или не удалось его инициализировать.</string>
     <string name="notification_categories">Категории уведомлений</string>
     <string name="notification_categories_subtitle">Android управляет звуком, вибрацией, важностью и режимом «Не беспокоить» для каждой категории.</string>
     <string name="notification_defaults">Настройки по умолчанию для всех чатов</string>

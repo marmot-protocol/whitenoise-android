@@ -471,7 +471,9 @@
     <string name="keep_connected_subtitle">Recevoir des messages pendant que White Noise fonctionne en arrière-plan.</string>
     <string name="native_push">Notifications push</string>
     <string name="native_push_subtitle">Réveille l’application lorsque le relais a de nouveaux événements à livrer.</string>
-    <string name="native_push_unavailable_subtitle">Nécessite les services Google Play et une version configurée avec un serveur push.</string>
+    <string name="native_push_missing_server_subtitle">Les notifications push sont indisponibles, car aucun serveur push n’est configuré dans cette version.</string>
+    <string name="native_push_google_play_unavailable_subtitle">Les notifications push nécessitent des services Google Play compatibles sur cet appareil.</string>
+    <string name="native_push_firebase_unavailable_subtitle">Les notifications push sont indisponibles, car Firebase n\'est pas configuré ou n\'a pas pu être initialisé.</string>
     <string name="notification_categories">Catégories de notifications</string>
     <string name="notification_categories_subtitle">Android contrôle le son, la vibration, l’importance et le mode Ne pas déranger pour chaque catégorie.</string>
     <string name="notification_defaults">Réglages par défaut pour toutes les discussions</string>

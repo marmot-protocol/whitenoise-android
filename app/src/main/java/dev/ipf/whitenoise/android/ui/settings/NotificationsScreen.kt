@@ -5,6 +5,7 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -43,12 +44,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SettingsGroup
 import kotlinx.coroutines.launch
 
+/** Displays account-scoped notification delivery controls and app-wide channel defaults. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun NotificationsScreen(
@@ -134,20 +137,11 @@ internal fun NotificationsScreen(
                         )
                     }
                     item {
-                        val nativePushAvailable = appState.isNativePushAvailable()
-                        NotificationSwitchRow(
-                            title = stringResource(R.string.native_push),
-                            subtitle =
-                                stringResource(
-                                    if (nativePushAvailable) {
-                                        R.string.native_push_subtitle
-                                    } else {
-                                        R.string.native_push_unavailable_subtitle
-                                    },
-                                ),
-                            icon = Icons.Filled.NotificationsActive,
-                            checked = nativePushAvailable && appState.localNotificationSettings?.nativePushEnabled == true,
-                            enabled = nativePushAvailable && appState.activeAccountRef != null,
+                        val nativePushCapability = appState.nativePushCapability()
+                        NativePushSettingRow(
+                            capability = nativePushCapability,
+                            accountReady = appState.activeAccountRef != null,
+                            checked = appState.localNotificationSettings?.nativePushEnabled == true,
                             onCheckedChange = { enabled ->
                                 if (enabled && !appState.localNotificationPermissionGranted) {
                                     pendingNativePushEnable = true
@@ -168,6 +162,34 @@ internal fun NotificationsScreen(
         }
     }
 }
+
+/** Renders native push as available or with its first actionable unsupported cause. */
+@Composable
+internal fun NativePushSettingRow(
+    capability: NativePushCapability,
+    accountReady: Boolean,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    NotificationSwitchRow(
+        title = stringResource(R.string.native_push),
+        subtitle = stringResource(capability.subtitleResource()),
+        icon = Icons.Filled.NotificationsActive,
+        checked = capability.isAvailable && checked,
+        enabled = capability.isAvailable && accountReady,
+        onCheckedChange = onCheckedChange,
+    )
+}
+
+/** Maps each native-push capability outcome to localized settings copy. */
+@StringRes
+internal fun NativePushCapability.subtitleResource(): Int =
+    when (this) {
+        NativePushCapability.MissingPushServerConfiguration -> R.string.native_push_missing_server_subtitle
+        NativePushCapability.GooglePlayServicesUnavailable -> R.string.native_push_google_play_unavailable_subtitle
+        NativePushCapability.FirebaseUnavailable -> R.string.native_push_firebase_unavailable_subtitle
+        NativePushCapability.Available -> R.string.native_push_subtitle
+    }
 
 // A toggle row sized to sit inside a segmented SettingsGroup item (the segment
 // Surface owns the shape; the row owns its own inset, like a ListItem).

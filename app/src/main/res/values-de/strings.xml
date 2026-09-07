@@ -471,7 +471,9 @@
     <string name="keep_connected_subtitle">Nachrichten empfangen, während White Noise im Hintergrund läuft.</string>
     <string name="native_push">Push-Benachrichtigungen</string>
     <string name="native_push_subtitle">Die App aufwecken, wenn der Relay neue Ereignisse zustellen will.</string>
-    <string name="native_push_unavailable_subtitle">Benötigt Google Play-Dienste und einen Build mit konfiguriertem Push-Server.</string>
+    <string name="native_push_missing_server_subtitle">Push ist nicht verfügbar, weil in diesem Build kein Push-Server konfiguriert ist.</string>
+    <string name="native_push_google_play_unavailable_subtitle">Push erfordert kompatible Google Play-Dienste auf diesem Gerät.</string>
+    <string name="native_push_firebase_unavailable_subtitle">Push ist nicht verfügbar, weil Firebase nicht konfiguriert ist oder nicht initialisiert werden konnte.</string>
     <string name="notification_categories">Benachrichtigungskategorien</string>
     <string name="notification_categories_subtitle">Android steuert Ton, Vibration, Wichtigkeit und „Nicht stören“ für jede Kategorie.</string>
     <string name="notification_defaults">Standardeinstellungen für alle Chats</string>
