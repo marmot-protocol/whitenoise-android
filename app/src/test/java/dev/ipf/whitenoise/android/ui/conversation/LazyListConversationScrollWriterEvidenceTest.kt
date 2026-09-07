@@ -38,64 +38,38 @@ internal class LazyListConversationScrollWriterEvidenceTest {
 
     /** A visible snap-to-tail reports its measured physical-end request exactly once. */
     @Test
-    fun visibleSnapTailReportsTheMeasuredOffset() {
-        val fixture = mountList()
-        val targetSize = fixture.visibleSize(VISIBLE_TARGET_INDEX)
-
-        fixture.runWriterCommand { writer.scrollToTail(VISIBLE_TARGET_INDEX) }
-
-        assertEquals(
-            listOf(scrollEvidence(animated = false, VISIBLE_TARGET_INDEX, targetSize)),
-            fixture.evidence.writes,
-        )
-    }
+    fun visibleSnapTailReportsTheMeasuredOffset() = assertTailWrites(animated = false, visible = true)
 
     /** An unmeasured snap-to-tail reports both materialization and measured correction writes. */
     @Test
-    fun unmeasuredSnapTailReportsInitialAndCorrectionWrites() {
-        val fixture = mountList()
-        fixture.assertNotVisible(UNMEASURED_TARGET_INDEX)
-
-        fixture.runWriterCommand { writer.scrollToTail(UNMEASURED_TARGET_INDEX) }
-
-        assertEquals(
-            listOf(
-                scrollEvidence(animated = false, UNMEASURED_TARGET_INDEX, 0),
-                scrollEvidence(animated = false, UNMEASURED_TARGET_INDEX, ROW_HEIGHT_PX),
-            ),
-            fixture.evidence.writes,
-        )
-    }
+    fun unmeasuredSnapTailReportsInitialAndCorrectionWrites() = assertTailWrites(animated = false, visible = false)
 
     /** A visible animated tail command reports its measured physical-end request exactly once. */
     @Test
-    fun visibleAnimatedTailReportsTheMeasuredOffset() {
-        val fixture = mountList()
-        val targetSize = fixture.visibleSize(VISIBLE_TARGET_INDEX)
-
-        fixture.runWriterCommand { writer.animateScrollToTail(VISIBLE_TARGET_INDEX) }
-
-        assertEquals(
-            listOf(scrollEvidence(animated = true, VISIBLE_TARGET_INDEX, targetSize)),
-            fixture.evidence.writes,
-        )
-    }
+    fun visibleAnimatedTailReportsTheMeasuredOffset() = assertTailWrites(animated = true, visible = true)
 
     /** An unmeasured animated tail reports both materialization and measured correction writes. */
     @Test
-    fun unmeasuredAnimatedTailReportsInitialAndCorrectionWrites() {
+    fun unmeasuredAnimatedTailReportsInitialAndCorrectionWrites() = assertTailWrites(animated = true, visible = false)
+
+    /** Checks the selected command's complete ordered writes after proving its initial measurement state. */
+    private fun assertTailWrites(
+        animated: Boolean,
+        visible: Boolean,
+    ) {
         val fixture = mountList()
-        fixture.assertNotVisible(UNMEASURED_TARGET_INDEX)
-
-        fixture.runWriterCommand { writer.animateScrollToTail(UNMEASURED_TARGET_INDEX) }
-
-        assertEquals(
-            listOf(
-                scrollEvidence(animated = true, UNMEASURED_TARGET_INDEX, 0),
-                scrollEvidence(animated = true, UNMEASURED_TARGET_INDEX, ROW_HEIGHT_PX),
-            ),
-            fixture.evidence.writes,
-        )
+        val index = if (visible) VISIBLE_TARGET_INDEX else UNMEASURED_TARGET_INDEX
+        val expectedOffsets =
+            if (visible) {
+                listOf(fixture.visibleSize(index))
+            } else {
+                fixture.assertNotVisible(index)
+                listOf(0, ROW_HEIGHT_PX)
+            }
+        fixture.runWriterCommand {
+            if (animated) writer.animateScrollToTail(index) else writer.scrollToTail(index)
+        }
+        assertEquals(expectedOffsets.map { scrollEvidence(animated, index, it) }, fixture.evidence.writes)
     }
 
     /** Mounts an oversized-row list so visible and not-yet-measured branches are deterministic. */
