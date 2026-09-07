@@ -1081,7 +1081,8 @@
         "test_ids": [
           "CON-005",
           "CON-007",
-          "CON-013"
+          "CON-013",
+          "CON-017"
         ]
       },
       {
@@ -1445,7 +1446,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
         "anchor": "fun ComposerBar(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "CON-017"
         ]
       },
       {
@@ -1469,7 +1471,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
         "anchor": "fun ComposerPlatformPreImeBackHandler(",
         "test_ids": [
-          "CON-013"
+          "CON-013",
+          "CON-017"
         ]
       },
       {
@@ -1477,7 +1480,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
         "anchor": "fun ComposerResizeHandle(",
         "test_ids": [
-          "CON-013"
+          "CON-013",
+          "CON-017"
         ]
       },
       {
@@ -2474,7 +2478,8 @@
           "MED-009",
           "MSG-001",
           "MSG-013",
-          "MSG-015"
+          "MSG-015",
+          "CON-017"
         ]
       },
       {

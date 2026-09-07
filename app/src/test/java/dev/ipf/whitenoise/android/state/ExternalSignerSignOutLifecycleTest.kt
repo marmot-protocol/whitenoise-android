@@ -129,20 +129,28 @@ class ExternalSignerSignOutLifecycleTest {
                 .set(state, AppMarmotRuntime(rootPath = "test", marmot = marmot))
         }
 
+    /** Completed non-destructive sign-out clears geometry only after engine-owned teardown completes. */
     @Test
     fun successfulExternalSignerSignOutUsesTheNormalCompletionPath() =
         runBlocking {
             val appState = appState()
+            retainComposerExpansion(appState)
 
             val completion = appState.signOutActiveAccount(deleteKeyPackages = true)
 
             assertEquals(SignOutCompletion.Complete, completion)
             assertEquals(1, signOutCalls.get())
             assertTrue(listAccountsCalls.get() > 0)
+            assertNull(appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(
+                COMPOSER_EXPANSION,
+                appState.composerExpansionStateRetention.preferenceFor(OTHER_ACCOUNT_REF, GROUP_ID),
+            )
             assertNull(appState.activeAccountRef)
             assertTrue(appState.phase is AppPhase.Onboarding)
         }
 
+    /** An unfinished engine teardown retains both the active session and its composer geometry. */
     @Test
     fun unfinishedEngineTeardownKeepsTheExternalSignerSessionActive() =
         runBlocking {
@@ -155,6 +163,7 @@ class ExternalSignerSignOutLifecycleTest {
                         ),
                 )
             val appState = appState()
+            retainComposerExpansion(appState)
             val phaseBefore = appState.phase
 
             val completion = appState.signOutActiveAccount(deleteKeyPackages = true)
@@ -164,6 +173,10 @@ class ExternalSignerSignOutLifecycleTest {
             assertEquals(0, listAccountsCalls.get())
             assertEquals(ACCOUNT_REF, appState.activeAccountRef)
             assertEquals(listOf(ACCOUNT_REF), appState.accounts.map { it.label })
+            assertEquals(
+                COMPOSER_EXPANSION,
+                appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+            )
             assertEquals(phaseBefore, appState.phase)
         }
 
@@ -198,11 +211,13 @@ class ExternalSignerSignOutLifecycleTest {
             assertTrue(appState.phase is AppPhase.Onboarding)
         }
 
+    /** Completed destructive wipe removes the account-scoped composer geometry with the session. */
     @Test
     fun successfulExternalSignerWipeUsesTheNormalRemovalPath() =
         runBlocking {
             val shortcutId = publishConversationShortcut()
             val appState = appState()
+            retainComposerExpansion(appState)
 
             val outcome = appState.signOutAndWipeActiveAccount()
 
@@ -210,11 +225,17 @@ class ExternalSignerSignOutLifecycleTest {
             assertEquals(1, wipeCalls.get())
             assertTrue(listAccountsCalls.get() > 0)
             assertTrue(appState.accounts.isEmpty())
+            assertNull(appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(
+                COMPOSER_EXPANSION,
+                appState.composerExpansionStateRetention.preferenceFor(OTHER_ACCOUNT_REF, GROUP_ID),
+            )
             assertNull(appState.activeAccountRef)
             assertTrue(appState.phase is AppPhase.Onboarding)
             assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).none { it.id == shortcutId })
         }
 
+    /** An unfinished destructive wipe restores the active session without dropping its geometry. */
     @Test
     fun unfinishedExternalSignerWipeRestoresTheActiveSession() =
         runBlocking {
@@ -228,6 +249,7 @@ class ExternalSignerSignOutLifecycleTest {
                         ),
                 )
             val appState = appState()
+            retainComposerExpansion(appState)
             val phaseBefore = appState.phase
 
             val outcome = appState.signOutAndWipeActiveAccount()
@@ -237,6 +259,10 @@ class ExternalSignerSignOutLifecycleTest {
             assertEquals(0, listAccountsCalls.get())
             assertEquals(listOf(ACCOUNT_REF), appState.accounts.map { it.label })
             assertEquals(ACCOUNT_REF, appState.activeAccountRef)
+            assertEquals(
+                COMPOSER_EXPANSION,
+                appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+            )
             assertEquals(phaseBefore, appState.phase)
             assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).any { it.id == shortcutId })
         }
@@ -253,8 +279,27 @@ class ExternalSignerSignOutLifecycleTest {
         return shortcut.id
     }
 
+    /** Seeds the exact account/conversation geometry whose destructive lifecycle is under test. */
+    private fun retainComposerExpansion(appState: WhiteNoiseAppState) {
+        appState.composerExpansionStateRetention.update(
+            accountRef = ACCOUNT_REF,
+            groupIdHex = GROUP_ID,
+            preference = COMPOSER_EXPANSION,
+            draftGeneration = 1L,
+        )
+        appState.composerExpansionStateRetention.update(
+            accountRef = OTHER_ACCOUNT_REF,
+            groupIdHex = GROUP_ID,
+            preference = COMPOSER_EXPANSION,
+            draftGeneration = 1L,
+        )
+    }
+
     private companion object {
         const val ACCOUNT_REF = "external-account"
+        const val OTHER_ACCOUNT_REF = "other-account"
         const val ACCOUNT_HEX = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        const val GROUP_ID = "group-a"
+        val COMPOSER_EXPANSION = RetainedComposerExpansion(RetainedComposerExpansionMode.Manual, 240f)
     }
 }

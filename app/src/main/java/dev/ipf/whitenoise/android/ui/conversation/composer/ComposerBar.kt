@@ -287,8 +287,44 @@ internal fun repairComposerMentionEdit(
 internal class ComposerTextState(
     initial: TextFieldValue,
 ) {
+    private var contentRevision = 0L
     val valueState: MutableState<TextFieldValue> = mutableStateOf(initial)
     val preEditState: MutableState<TextFieldValue?> = mutableStateOf(null)
+
+    /** Captures the exact content generation an asynchronous acceptance may clear. */
+    fun acceptanceToken(): ComposerAcceptanceToken =
+        ComposerAcceptanceToken(
+            text = valueState.value.text,
+            source = this,
+            contentRevision = contentRevision,
+        )
+
+    /** Applies field state while advancing acceptance ownership only for content edits. */
+    fun updateValue(value: TextFieldValue) {
+        if (value.text != valueState.value.text) contentRevision += 1L
+        valueState.value = value
+    }
+
+    /** Clears an accepted send only while its exact text generation still owns the field. */
+    fun clearAccepted(token: ComposerAcceptanceToken): Boolean {
+        if (!token.isCurrentFor(this, valueState.value.text, contentRevision)) return false
+        updateValue(TextFieldValue(""))
+        return true
+    }
+}
+
+/** Opaque content generation and source-state identity captured before an asynchronous send. */
+internal class ComposerAcceptanceToken(
+    val text: String,
+    private val source: ComposerTextState,
+    private val contentRevision: Long,
+) {
+    /** Rejects callbacks transported into a replacement state even when text and revision alias. */
+    fun isCurrentFor(
+        state: ComposerTextState,
+        text: String,
+        contentRevision: Long,
+    ): Boolean = source === state && this.text == text && this.contentRevision == contentRevision
 }
 
 // Last measured keyboard pane height per orientation, shared across composer
@@ -305,6 +341,10 @@ internal fun rememberComposerTextState(
     externalRevision: Any? = 0,
 ): ComposerTextState = remember(draftKey, externalRevision) { ComposerTextState(initialDraft) }
 
+/**
+ * Owns the live conversation input while delegating explicit resize retention
+ * to the account/conversation state boundary supplied by production.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ComposerBar(
@@ -318,6 +358,8 @@ internal fun ComposerBar(
     initialDraft: TextFieldValue = TextFieldValue(""),
     onDraftChange: (TextFieldValue) -> Unit = {},
     draftKey: Any? = null,
+    draftAccountRef: String? = null,
+    draftGroupIdHex: String? = null,
     onAfterSend: () -> Unit = {},
     onPickFromGallery: (() -> Unit)? = null,
     onPickRecentMedia: ((Uri) -> Unit)? = null,
@@ -392,40 +434,103 @@ internal fun ComposerBar(
     var composerEmojiPickerRequested by remember { mutableStateOf(false) }
     var composerEmojiSearchActive by remember { mutableStateOf(false) }
     var composerKeyboardRestorePending by remember { mutableStateOf(false) }
-    // The user-selected expansion mode survives rotation and window resizes:
-    // manual and full-screen heights re-clamp against the live post-inset
-    // maximum in composerHeightPx, so a stale pixel height cannot overflow the
-    // rotated viewport. Only a chat switch or font-scale change resets it.
-    var composerExpansion by
+    // Standalone fixtures keep a local fallback. Production binds the explicit
+    // account/conversation owner below, with manual dp converted back to live
+    // pixels and clamped by composerHeightPx for every viewport.
+    var localComposerExpansion by
         remember(
             draftKey,
+            draftAccountRef,
+            draftGroupIdHex,
             configuration.fontScale,
         ) {
             mutableStateOf(ComposerExpansionState())
         }
-    var dismissInputAfterCollapse by remember(draftKey) { mutableStateOf(false) }
-    var composerHeightDragActive by remember(draftKey) { mutableStateOf(false) }
-    var composerHeightTransitionEpoch by remember(draftKey) { mutableIntStateOf(0) }
-    var completedComposerHeightTransitionEpoch by remember(draftKey) { mutableIntStateOf(0) }
-    var composerHeightTransitionStartPx by remember(draftKey) { mutableFloatStateOf(0f) }
-    var visibleComposerHeightPx by remember(draftKey) { mutableFloatStateOf(0f) }
+    val retainedExpansionOwner =
+        appState?.takeIf { draftAccountRef != null && draftGroupIdHex != null }
+
+    /** Reads retained dp geometry through the density and viewport of this frame. */
+    fun currentComposerExpansion(): ComposerExpansionState =
+        retainedExpansionOwner
+            ?.composerExpansionStateRetention
+            ?.preferenceFor(checkNotNull(draftAccountRef), checkNotNull(draftGroupIdHex))
+            ?.toComposerExpansionState(density)
+            ?: if (retainedExpansionOwner != null) ComposerExpansionState() else localComposerExpansion
+    var composerHeightDragActive by
+        remember(draftKey, draftAccountRef, draftGroupIdHex, configuration.orientation) {
+            mutableStateOf(false)
+        }
+    // Keep pointer-rate pixels local and publish one density-independent record
+    // when the drag settles; SavedStateHandle must not serialize every delta.
+    var composerHeightDragState by
+        remember(draftKey, draftAccountRef, draftGroupIdHex, configuration.orientation) {
+            mutableStateOf<ComposerExpansionState?>(null)
+        }
+    val composerExpansion = composerHeightDragState ?: currentComposerExpansion()
+    var composerHeightTransitionEpoch by
+        remember(draftKey, draftAccountRef, draftGroupIdHex) {
+            mutableIntStateOf(0)
+        }
+    var completedComposerHeightTransitionEpoch by
+        remember(draftKey, draftAccountRef, draftGroupIdHex) {
+            mutableIntStateOf(0)
+        }
+    var composerHeightTransitionStartPx by
+        remember(draftKey, draftAccountRef, draftGroupIdHex) {
+            mutableFloatStateOf(0f)
+        }
+    var visibleComposerHeightPx by
+        remember(draftKey, draftAccountRef, draftGroupIdHex) {
+            mutableFloatStateOf(0f)
+        }
     var composerUsesMultilineControls by
-        remember(draftKey, configuration.orientation, configuration.fontScale) {
+        remember(
+            draftKey,
+            draftAccountRef,
+            draftGroupIdHex,
+            configuration.orientation,
+            configuration.fontScale,
+        ) {
             mutableStateOf(false)
         }
     var automaticComposerHeightPx by
-        remember(draftKey, configuration.orientation, configuration.fontScale) {
+        remember(
+            draftKey,
+            draftAccountRef,
+            draftGroupIdHex,
+            configuration.orientation,
+            configuration.fontScale,
+        ) {
             mutableFloatStateOf(0f)
         }
     var customInputPaneHeightPx by remember(configuration.orientation) { mutableFloatStateOf(0f) }
 
+    /** Publishes one settled gesture or accessible toggle to the stable draft owner. */
+    fun publishComposerExpansion(next: ComposerExpansionState) {
+        if (retainedExpansionOwner == null) {
+            localComposerExpansion = next
+        } else {
+            retainedExpansionOwner.composerExpansionStateRetention.update(
+                accountRef = checkNotNull(draftAccountRef),
+                groupIdHex = checkNotNull(draftGroupIdHex),
+                preference = next.toRetainedPreference(density),
+                draftGeneration =
+                    retainedExpansionOwner.composerDraftGeneration(
+                        checkNotNull(draftAccountRef),
+                        checkNotNull(draftGroupIdHex),
+                    ),
+            )
+        }
+    }
+
+    /** Starts a discrete height animation without serializing pointer-rate deltas. */
     fun transitionComposerExpansion(next: ComposerExpansionState) {
-        if (next != composerExpansion) {
+        if (next != currentComposerExpansion()) {
             composerHeightTransitionStartPx =
                 visibleComposerHeightPx.takeIf { it > 0f }
                     ?: automaticComposerHeightPx
             composerHeightTransitionEpoch += 1
-            composerExpansion = next
+            publishComposerExpansion(next)
         }
     }
     // Field state is a TextFieldValue (not a bare String) so the caret can
@@ -464,14 +569,14 @@ internal fun ComposerBar(
             // long-press-to-edit on every other modern chat composer.
             if (preEditFieldValue == null) preEditFieldValue = textFieldValue
             val prefill = editingInitialText.orEmpty()
-            textFieldValue = TextFieldValue(text = prefill, selection = TextRange(prefill.length))
+            textState.updateValue(TextFieldValue(text = prefill, selection = TextRange(prefill.length)))
             composerTextEditOwnerId = editingMessageId
             onBottomInputChanged()
             runCatching { composerFocus.requestFocus() }
         } else if (preEditFieldValue != null) {
             // Edit cancelled or submitted: restore the draft the user had
             // been composing before they tapped Edit (text + original caret).
-            textFieldValue = preEditFieldValue ?: TextFieldValue("")
+            textState.updateValue(preEditFieldValue ?: TextFieldValue(""))
             preEditFieldValue = null
             composerTextEditOwnerId = null
         } else {
@@ -504,16 +609,6 @@ internal fun ComposerBar(
         } else {
             null
         }
-    LaunchedEffect(dismissInputAfterCollapse) {
-        if (dismissInputAfterCollapse) {
-            // The expanded/automatic modifier swap can replace the focus node.
-            // Clear focus after that recomposition so it cannot be restored by
-            // the layout transition triggered by the same Back callback.
-            focusManager.clearFocus(force = true)
-            keyboardController?.hide()
-            dismissInputAfterCollapse = false
-        }
-    }
     val imeInsets = WindowInsets.ime
     val imeTargetInsets = WindowInsets.imeAnimationTarget
     val navigationInsets = WindowInsets.navigationBars
@@ -762,16 +857,16 @@ internal fun ComposerBar(
     val submitMessage: () -> Unit = {
         if (text.isNotBlank()) {
             val sendingEdit = editingMessageId != null
-            val sentText = text
-            onSend(sentText) {
+            val acceptanceToken = textState.acceptanceToken()
+            onSend(acceptanceToken.text) {
                 if (!sendingEdit) {
                     // onAccepted can land after the user has started typing the
-                    // next message (Enter-to-send makes that common). Only clear
-                    // if the field still holds exactly what we sent, so newly
-                    // typed text is never wiped.
-                    if (textFieldValue.text == sentText) {
-                        textFieldValue = TextFieldValue("")
-                        composerExpansion = ComposerExpansionState()
+                    // next message (Enter-to-send makes that common). Only the
+                    // exact shared content generation may clear the field.
+                    if (textState.clearAccepted(acceptanceToken)) {
+                        if (retainedExpansionOwner == null) {
+                            publishComposerExpansion(ComposerExpansionState())
+                        }
                     }
                     onAfterSend()
                 }
@@ -780,7 +875,7 @@ internal fun ComposerBar(
     }
 
     fun applyComposerFieldValue(value: TextFieldValue) {
-        textFieldValue = value
+        textState.updateValue(value)
         if (editingMessageId == null) onDraftChange(value)
     }
 
@@ -961,16 +1056,6 @@ internal fun ComposerBar(
                 )
                 completedComposerHeightTransitionEpoch = composerHeightTransitionEpoch
             }
-        }
-
-        BackHandler(
-            enabled =
-                composerExpansion.mode != ComposerExpansionMode.Automatic &&
-                    !showEmojiPane &&
-                    !showAttachmentPane,
-        ) {
-            transitionComposerExpansion(collapseComposer(composerExpansion))
-            onBottomInputChanged()
         }
 
         Column(
@@ -1185,11 +1270,7 @@ internal fun ComposerBar(
                         attachmentSheetOpen = attachmentSheetState.isOpen,
                         preImeBackEnabled = !composerEmojiPickerOpen && !attachmentSheetState.isOpen,
                         onPreImeBack = {
-                            if (composerExpansion.mode != ComposerExpansionMode.Automatic) {
-                                transitionComposerExpansion(collapseComposer(composerExpansion))
-                                dismissInputAfterCollapse = true
-                                onBottomInputChanged()
-                            } else if (onComposerPreImeBack != null) {
+                            if (onComposerPreImeBack != null) {
                                 onComposerPreImeBack()
                             } else {
                                 focusManager.clearFocus(force = true)
@@ -1225,14 +1306,18 @@ internal fun ComposerBar(
                         expansionMode = composerExpansion.mode,
                         onExpansionToggle = {
                             composerHeightDragActive = false
-                            transitionComposerExpansion(toggleComposerFullScreen(composerExpansion))
+                            composerHeightDragState = null
+                            transitionComposerExpansion(toggleComposerFullScreen(currentComposerExpansion()))
                             onBottomInputChanged()
                         },
-                        onHeightDragStarted = { composerHeightDragActive = true },
+                        onHeightDragStarted = {
+                            composerHeightDragActive = true
+                            composerHeightDragState = currentComposerExpansion()
+                        },
                         onHeightDrag = { dragAmount ->
-                            composerExpansion =
+                            composerHeightDragState =
                                 dragComposerHeight(
-                                    state = composerExpansion,
+                                    state = composerHeightDragState ?: currentComposerExpansion(),
                                     dragDeltaYPx = dragAmount,
                                     automaticHeightPx = resolvedAutomaticHeightPx,
                                     minimumManualHeightPx = minimumManualComposerHeightPx,
@@ -1240,21 +1325,22 @@ internal fun ComposerBar(
                                 )
                         },
                         onHeightDragStopped = {
-                            composerHeightDragActive = false
                             val settledExpansion =
                                 settleComposerHeight(
-                                    state = composerExpansion,
+                                    state = composerHeightDragState ?: currentComposerExpansion(),
                                     automaticHeightPx = resolvedAutomaticHeightPx,
                                     minimumManualHeightPx = minimumManualComposerHeightPx,
                                     maximumHeightPx = maximumComposerHeightPx,
                                     deadbandPx = with(density) { 20.dp.toPx() },
                                 )
+                            composerHeightDragActive = false
+                            composerHeightDragState = null
                             transitionComposerExpansion(settledExpansion)
                             onBottomInputChanged()
                         },
                         overlayBackRegistrar = overlayBackRegistrar,
                         inputContentVisible = !isRecordingVoice,
-                        inputFocusEnabled = !dismissInputAfterCollapse,
+                        inputFocusEnabled = true,
                         expandedTrailingActionInset = trailingControlsWidth,
                         compactMeasurementWidth =
                             (maxWidth - trailingControlsWidth - 8.dp)

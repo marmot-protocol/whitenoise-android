@@ -121,6 +121,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.messageHasShareablePayload
@@ -2247,7 +2248,9 @@ internal fun MessageBubble(
                                             onDraftChange = {
                                                 appState.setDraft(controller.boundAccountRef, groupIdHex, it)
                                             },
-                                            draftKey = groupIdHex,
+                                            draftKey = composerDraftOwnerKey(controller.boundAccountRef, groupIdHex),
+                                            draftAccountRef = controller.boundAccountRef,
+                                            draftGroupIdHex = groupIdHex,
                                             textState = composerTextState,
                                             editingMessageId = controller.editingMessageId,
                                             editingInitialText = editingRecord?.let { controller.displayedText(it) },

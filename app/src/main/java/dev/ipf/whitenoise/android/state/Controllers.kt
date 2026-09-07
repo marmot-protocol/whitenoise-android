@@ -1316,6 +1316,7 @@ private suspend fun WhiteNoiseAppState.deleteGroupLocalWithClientCleanup(
     evictGroupMediaCaches(account, groupIdHex)
     deleteDraftBeforeGroupRemoval(account, groupIdHex)
     marmotIo { deleteGroupLocal(account, groupIdHex) }
+    removeComposerExpansionForGroup(account, groupIdHex)
     dismissConversationNotifications(account, groupIdHex)
 }
 
@@ -5146,6 +5147,7 @@ class ChatsController private constructor(
                     }
                 }
             }
+            appState.removeComposerExpansionForGroup(account, groupIdHex)
             // Invalidate both snapshot sources that seed the next
             // ConversationController so re-opening the just-left group renders
             // the disabled notice immediately instead of flashing the active
@@ -5336,6 +5338,7 @@ class ChatsController private constructor(
                 false
             }
         if (!left) return false
+        appState.removeComposerExpansionForGroup(account, groupIdHex) // Remote leave is already irreversible.
         // Left the group; drop local data. Best-effort — the row is already gone
         // and we're out of the group, so a wipe failure only leaves local remnants.
         runCatching { appState.deleteGroupLocalWithClientCleanup(account, groupIdHex) }
@@ -9772,6 +9775,7 @@ class ConversationController(
                         }
                     }
                 }
+                appState.removeComposerExpansionForGroup(account, group.groupIdHex)
                 // Authoritative local self-leave: record it before the
                 // synchronous snapshot drop so any subsequent
                 // authoritative roster round-trip that still

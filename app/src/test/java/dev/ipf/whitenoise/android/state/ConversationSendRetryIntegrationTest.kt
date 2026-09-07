@@ -39,6 +39,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -289,6 +290,87 @@ class ConversationSendRetryIntegrationTest {
 
         assertEquals("next message", appState.draftFor(GROUP_ID))
     }
+
+    /** A definite post-acceptance failure restores the geometry captured with its draft. */
+    @Test
+    fun terminalFailureRestoresTheCapturedComposerExpansion() =
+        runTest {
+            val appState = appState()
+            appState.setDraft(GROUP_ID, TextFieldValue("restore height"))
+            appState.composerExpansionStateRetention.update(
+                ACCOUNT_REF,
+                GROUP_ID,
+                manualExpansion(240f),
+                appState.composerDraftGeneration(ACCOUNT_REF, GROUP_ID),
+            )
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        assertNull(appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+                        throw MarmotKitException.Publish("relay rejected event")
+                    },
+                )
+
+            appState.sendConversationText(controller, "restore height")
+
+            assertEquals(
+                manualExpansion(240f),
+                appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+            )
+        }
+
+    /** A stale durable callback cannot remove geometry selected for a newer draft generation. */
+    @Test
+    fun lateDurableAcceptanceCannotDeleteANewerDraftsComposerExpansion() =
+        runTest {
+            val appState = appState()
+            appState.setDraft(GROUP_ID, TextFieldValue("first"))
+            appState.composerExpansionStateRetention.update(
+                ACCOUNT_REF,
+                GROUP_ID,
+                manualExpansion(240f),
+                appState.composerDraftGeneration(ACCOUNT_REF, GROUP_ID),
+            )
+            val publishStarted = CompletableDeferred<Unit>()
+            val finishPublish = CompletableDeferred<Unit>()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        publishStarted.complete(Unit)
+                        finishPublish.await()
+                        SendSummaryFfi(
+                            published = 1u,
+                            messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+            val send = async { appState.sendConversationText(controller, "first") }
+            publishStarted.await()
+            assertNull(appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+
+            appState.setDraft(GROUP_ID, TextFieldValue("next"))
+            appState.composerExpansionStateRetention.update(
+                ACCOUNT_REF,
+                GROUP_ID,
+                manualExpansion(300f),
+                appState.composerDraftGeneration(ACCOUNT_REF, GROUP_ID),
+            )
+            finishPublish.complete(Unit)
+            send.await()
+
+            assertEquals(
+                manualExpansion(300f),
+                appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+            )
+        }
 
     @Test
     fun preAcceptanceFailureKeepsTheComposerDraftForRehydration() =
@@ -1270,6 +1352,13 @@ class ConversationSendRetryIntegrationTest {
         retentionSeconds = retentionSeconds,
         retentionExpiresAt = retentionExpiresAt,
     )
+
+    /** Creates the density-independent manual-height record used by send lifecycle assertions. */
+    private fun manualExpansion(heightDp: Float) =
+        RetainedComposerExpansion(
+            mode = RetainedComposerExpansionMode.Manual,
+            manualHeightDp = heightDp,
+        )
 
     private fun WhiteNoiseAppState.draftFor(groupIdHex: String): String? = draftFor(ACCOUNT_REF, groupIdHex)
 

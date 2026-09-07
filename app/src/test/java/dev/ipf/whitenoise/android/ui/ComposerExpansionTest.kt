@@ -1,13 +1,17 @@
 package dev.ipf.whitenoise.android.ui
 
+import androidx.compose.ui.unit.Density
+import dev.ipf.whitenoise.android.state.RetainedComposerExpansion
+import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_EXPANSION_ANIMATION_MILLIS
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerExpansionMode
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerExpansionState
-import dev.ipf.whitenoise.android.ui.conversation.composer.collapseComposer
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerHeightAnimationDurationMillis
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerHeightPx
 import dev.ipf.whitenoise.android.ui.conversation.composer.dragComposerHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.settleComposerHeight
+import dev.ipf.whitenoise.android.ui.conversation.composer.toComposerExpansionState
+import dev.ipf.whitenoise.android.ui.conversation.composer.toRetainedPreference
 import dev.ipf.whitenoise.android.ui.conversation.composer.toggleComposerFullScreen
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -100,11 +104,27 @@ class ComposerExpansionTest {
         )
     }
 
+    /** The resize handle remains the only gesture that explicitly leaves full-screen mode. */
     @Test
-    fun tapAndBackReturnToTheNaturalAutoGrownHeight() {
+    fun resizeHandleTapIsTheExplicitFullScreenCollapsePath() {
         val full = toggleComposerFullScreen(ComposerExpansionState(ComposerExpansionMode.Manual, 320f))
         assertEquals(ComposerExpansionMode.FullScreen, full.mode)
         assertEquals(ComposerExpansionState(), toggleComposerFullScreen(full))
-        assertEquals(ComposerExpansionState(), collapseComposer(full))
+    }
+
+    /** Retained dp geometry scales with density and clamps against the live viewport. */
+    @Test
+    fun retainedManualHeightUsesDpAndReclampsAgainstEachLiveViewport() {
+        val retained =
+            ComposerExpansionState(ComposerExpansionMode.Manual, manualHeightPx = 480f)
+                .toRetainedPreference(Density(density = 2f))
+
+        assertEquals(
+            RetainedComposerExpansion(RetainedComposerExpansionMode.Manual, manualHeightDp = 240f),
+            retained,
+        )
+        val restored = checkNotNull(retained).toComposerExpansionState(Density(density = 3f))
+        assertEquals(720f, restored.manualHeightPx)
+        assertEquals(600f, composerHeightPx(restored, 400f, 140f, 600f))
     }
 }

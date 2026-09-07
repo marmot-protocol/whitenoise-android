@@ -1096,8 +1096,9 @@ class ComposerExpansionBehaviorTest {
         assertTrue("editor tap must not resize the composer", abs(finalHeight - initialHeight) <= 1f)
     }
 
+    /** Focus dismissal must not reinterpret Back as an explicit resize choice. */
     @Test
-    fun backFromFocusedFullScreenCollapsesAndClearsFocus() {
+    fun focusedBackDismissesInputWithoutChangingTheSelectedExpansion() {
         var overlayCallback: OnBackInvokedCallback? = null
         var overlayPriority: Int? = null
         val registrar =
@@ -1120,7 +1121,7 @@ class ComposerExpansionBehaviorTest {
         composeRule.runOnIdle { checkNotNull(overlayCallback).onBackInvoked() }
         composeRule.waitForIdle()
 
-        assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
+        assertResizeHandleToggleLabel(R.string.composer_collapse)
         assertNull("losing focus must release the overlay callback", overlayCallback)
         editor.assertIsNotFocused()
     }

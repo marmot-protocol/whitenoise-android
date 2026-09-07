@@ -1,5 +1,9 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.state.RetainedComposerExpansion
+import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
 import kotlin.math.abs
 
 internal const val COMPOSER_EXPANSION_ANIMATION_MILLIS = 220
@@ -14,6 +18,47 @@ internal data class ComposerExpansionState(
     val mode: ComposerExpansionMode = ComposerExpansionMode.Automatic,
     val manualHeightPx: Float? = null,
 )
+
+/** Stable account/conversation key shared by every composer surface for one draft owner. */
+internal fun composerDraftOwnerKey(
+    accountRef: String?,
+    groupIdHex: String,
+): Pair<String?, String> = accountRef to groupIdHex
+
+/** Converts live pixels to the density-independent value safe for retained UI state. */
+internal fun ComposerExpansionState.toRetainedPreference(density: Density): RetainedComposerExpansion? =
+    when (mode) {
+        ComposerExpansionMode.Automatic -> null
+        ComposerExpansionMode.FullScreen ->
+            RetainedComposerExpansion(
+                mode = RetainedComposerExpansionMode.FullScreen,
+                manualHeightDp = null,
+            )
+        ComposerExpansionMode.Manual -> {
+            val heightDp =
+                manualHeightPx
+                    ?.takeIf { it.isFinite() && it > 0f }
+                    ?.let { with(density) { it.toDp().value } }
+            heightDp?.let {
+                RetainedComposerExpansion(
+                    mode = RetainedComposerExpansionMode.Manual,
+                    manualHeightDp = it,
+                )
+            }
+        }
+    }
+
+/** Rehydrates retained dp geometry into the current density; viewport clamping remains live. */
+internal fun RetainedComposerExpansion.toComposerExpansionState(density: Density): ComposerExpansionState =
+    when (mode) {
+        RetainedComposerExpansionMode.FullScreen ->
+            ComposerExpansionState(mode = ComposerExpansionMode.FullScreen)
+        RetainedComposerExpansionMode.Manual ->
+            ComposerExpansionState(
+                mode = ComposerExpansionMode.Manual,
+                manualHeightPx = manualHeightDp?.let { with(density) { it.dp.toPx() } },
+            )
+    }
 
 internal fun composerHeightAnimationDurationMillis(
     mode: ComposerExpansionMode,
@@ -114,7 +159,3 @@ internal fun toggleComposerFullScreen(state: ComposerExpansionState): ComposerEx
     } else {
         ComposerExpansionState(mode = ComposerExpansionMode.FullScreen)
     }
-
-/** Back from either user-expanded mode returns to the natural auto-grown height. */
-internal fun collapseComposer(state: ComposerExpansionState): ComposerExpansionState =
-    if (state.mode == ComposerExpansionMode.Automatic) state else ComposerExpansionState()
