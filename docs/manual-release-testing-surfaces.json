@@ -4547,6 +4547,14 @@
         ]
       },
       {
+        "surface": "NativePushSettingRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "fun NativePushSettingRow(",
+        "test_ids": [
+          "NTF-004"
+        ]
+      },
+      {
         "surface": "NotificationSwitchRow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "fun NotificationSwitchRow(",
@@ -5637,6 +5645,38 @@
         "anchor": "R.string.publishing",
         "test_ids": [
           "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:native_push_firebase_unavailable_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.native_push_firebase_unavailable_subtitle",
+        "test_ids": [
+          "NTF-004"
+        ]
+      },
+      {
+        "surface": "setting:native_push_google_play_unavailable_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.native_push_google_play_unavailable_subtitle",
+        "test_ids": [
+          "NTF-004"
+        ]
+      },
+      {
+        "surface": "setting:native_push_missing_server_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.native_push_missing_server_subtitle",
+        "test_ids": [
+          "NTF-004"
+        ]
+      },
+      {
+        "surface": "setting:native_push_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.native_push_subtitle",
+        "test_ids": [
+          "NTF-004"
         ]
       },
       {
