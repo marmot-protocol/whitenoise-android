@@ -60,7 +60,7 @@ class NotificationHapticVisualTimingDeviceTest {
     fun recordsNotifyAndListenerPostForExternalHapticVisualCorrelation() {
         val update = update()
         val expected = LocalNotificationFormatter.conversationDismissalKey(update.accountRef, update.groupIdHex)
-        NotificationTimingDeviceEvents.arm(context.packageName, expected.tag)
+        NotificationTimingDeviceEvents.arm(context.packageName, expected.tag, expected.id)
         val probe = TimingProbe()
         val presenter = timingPresenter(probe)
         presenter.ensureChannels()
