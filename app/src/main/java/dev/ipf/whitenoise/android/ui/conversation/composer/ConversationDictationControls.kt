@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -50,6 +52,9 @@ internal const val COMPOSER_DICTATION_REVIEW_DIALOG_TAG = "composer-dictation-re
 internal const val COMPOSER_DICTATION_COMPACT_ACTIONS_TAG = "composer-dictation-compact-actions"
 internal const val APP_DICTATION_CONTROL_TAG = "app-dictation-control"
 internal const val DICTATION_PROGRESS_TAG = "dictation-progress"
+
+private val DICTATION_PROGRESS_HEIGHT = 3.dp
+private const val DICTATION_PROGRESS_TRACK_ALPHA = 0.18f
 
 /** App-root bottom control used while the immutable dictation origin is not visible. */
 @Composable
@@ -140,17 +145,33 @@ internal fun ConversationDictationCompactActions(
             }
         }
         if (state is ConversationDictationState.Starting || state is ConversationDictationState.Processing) {
-            LinearProgressIndicator(
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
-                        .testTag(DICTATION_PROGRESS_TAG),
+            ConversationDictationProgressHairline(
+                modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
     }
     ConversationDictationSessionDialogs(state, controller, reviewDialogOpen) { reviewDialogOpen = false }
+}
+
+/**
+ * A rounded hairline reads as the bar's own activity rather than a stretched progress control:
+ * it keeps a soft track so the sweep stays legible on both themes, inset from the bar's rounded
+ * edge, with no indicator gap or stop dot to break the line.
+ */
+@Composable
+private fun ConversationDictationProgressHairline(modifier: Modifier = Modifier) {
+    LinearProgressIndicator(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 6.dp)
+                .height(DICTATION_PROGRESS_HEIGHT)
+                .testTag(DICTATION_PROGRESS_TAG),
+        color = MaterialTheme.colorScheme.primary,
+        trackColor = MaterialTheme.colorScheme.primary.copy(alpha = DICTATION_PROGRESS_TRACK_ALPHA),
+        strokeCap = StrokeCap.Round,
+        gapSize = 0.dp,
+    )
 }
 
 private val ConversationDictationState.hasActiveRecognitionActions: Boolean
