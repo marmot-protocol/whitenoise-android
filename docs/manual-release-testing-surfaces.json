@@ -1660,7 +1660,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
         "anchor": "fun FileBubbleContent(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-009",
+          "MSG-015"
         ]
       },
       {
@@ -1668,7 +1670,10 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
         "anchor": "fun FileMetadataRow(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-009",
+          "MSG-013",
+          "MSG-015"
         ]
       },
       {
@@ -1676,7 +1681,10 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
         "anchor": "fun FileTrailingMetadata(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-009",
+          "MSG-013",
+          "MSG-015"
         ]
       },
       {
@@ -1700,7 +1708,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
         "anchor": "fun MediaFileBubbleContent(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-009",
+          "MSG-015"
         ]
       },
       {
@@ -1724,7 +1734,10 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaFileBubble.kt",
         "anchor": "fun MediaFileBubble(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-009",
+          "MSG-013",
+          "MSG-015"
         ]
       },
       {
@@ -2411,7 +2424,10 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
         "anchor": "fun MessageBubble(",
         "test_ids": [
-          "MSG-001"
+          "MED-009",
+          "MSG-001",
+          "MSG-013",
+          "MSG-015"
         ]
       },
       {

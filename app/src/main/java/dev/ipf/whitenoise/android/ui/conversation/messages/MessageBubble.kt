@@ -1526,14 +1526,15 @@ internal fun MessageBubble(
                             }
                         }
                 }
-                // An uncaptioned visual message carries the footer over the
+                // An uncaptioned visual-only message carries the footer over the
                 // bottom-right media tile. For an album that is the last visible
-                // image/video; a caption (if any) owns the footer instead.
+                // image/video; a file card or caption owns the footer instead.
                 val footerOnVisualMedia =
                     visualMediaOwnsFooter(
                         deleted = deleted,
                         hasInvalidationWarning = invalidationWarning != null,
                         visualCount = visualAttachments.size,
+                        fileCount = fileAttachments.size,
                         hasCaption = mediaCaption != null,
                     )
                 val confirmedFileFooterInCard =
@@ -1590,6 +1591,7 @@ internal fun MessageBubble(
                             deleted = deleted,
                             hasInvalidationWarning = invalidationWarning != null,
                             visualCount = pendingVisualRefs.size,
+                            fileCount = 0,
                             hasCaption = mediaCaption != null,
                         )
                 val pendingFileFooterInCard =
@@ -1600,6 +1602,13 @@ internal fun MessageBubble(
                     ) &&
                         showPendingPlaceholder
                 val fileFooterInCard = confirmedFileFooterInCard || pendingFileFooterInCard
+                val invalidationWarningPlacement =
+                    placeInvalidationWarning(
+                        warning = invalidationWarning,
+                        fileCardOwnsFooter = confirmedFileFooterInCard,
+                    )
+                val fileFooterWarning = invalidationWarningPlacement.fileFooter
+                val outerInvalidationWarning = invalidationWarningPlacement.outerBubble
                 val showOutgoingStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation)
                 // `hasMedia` decides whether this row renders a media card with
                 // an optional integrated caption, or stays a text-only bubble.
@@ -1675,7 +1684,7 @@ internal fun MessageBubble(
                         parseMarkdown = parseMarkdown,
                     )
                 val bodyOrWarningInsideBubble =
-                    shouldFrameMessageBubbleSupplement(bodyTextToRender, invalidationWarning)
+                    shouldFrameMessageBubbleSupplement(bodyTextToRender, outerInvalidationWarning)
                 // Captions/plain bodies sit on the resolved bubble background and therefore use
                 // its paired WCAG-safe content color. Footer-only media rows are
                 // outside the bubble and retain the page's surface foreground.
@@ -1864,6 +1873,7 @@ internal fun MessageBubble(
                                         footerOnVisualMedia = footerOnVisualMedia,
                                         footerOnPendingVisual = footerOnPendingVisual,
                                         showPendingPlaceholder = showPendingPlaceholder,
+                                        fileFooterWarning = fileFooterWarning,
                                         onMediaLongPress = onMediaLongPress,
                                         attachedToCaption = true,
                                     )
@@ -1904,7 +1914,7 @@ internal fun MessageBubble(
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
                                     showTimestamp = !fileFooterInCard,
-                                    invalidationWarning = invalidationWarning,
+                                    invalidationWarning = outerInvalidationWarning,
                                     mine = mine,
                                     onExpand = { if (!deleted) expandedFullView = true },
                                 )
@@ -1930,6 +1940,7 @@ internal fun MessageBubble(
                                         footerOnVisualMedia = footerOnVisualMedia,
                                         footerOnPendingVisual = footerOnPendingVisual,
                                         showPendingPlaceholder = showPendingPlaceholder,
+                                        fileFooterWarning = fileFooterWarning,
                                         onMediaLongPress = onMediaLongPress,
                                         attachedToCaption = false,
                                     )
@@ -1973,7 +1984,7 @@ internal fun MessageBubble(
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
                                     showTimestamp = !fileFooterInCard,
-                                    invalidationWarning = invalidationWarning,
+                                    invalidationWarning = outerInvalidationWarning,
                                     mine = mine,
                                     onExpand = { if (!deleted) expandedFullView = true },
                                 )
