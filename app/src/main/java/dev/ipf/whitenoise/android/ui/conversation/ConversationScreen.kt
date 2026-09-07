@@ -727,10 +727,15 @@ internal fun ConversationScreen(
         remember(chat.id) {
             ConversationBottomChromeHeightObserver()
         }
-    var measuredBottomChromeHeightPx by remember(controller) { mutableStateOf<Int?>(null) }
-    var bottomInputRevision by remember(controller) { mutableLongStateOf(0L) }
-    var routePresentationFrozen by
-        remember(controller) { mutableStateOf(routeTransitionInProgress) }
+    val bottomInsetState =
+        remember(controller) {
+            ConversationBottomInsetState(
+                initialRoutePresentationFrozen = routeTransitionInProgress,
+            )
+        }
+    var measuredBottomChromeHeightPx by bottomInsetState.measuredBottomChromeHeightPx
+    var bottomInputRevision by bottomInsetState.bottomInputRevision
+    var routePresentationFrozen by bottomInsetState.routePresentationFrozen
     val freezeRoutePresentation =
         conversationRoutePresentationShouldFreeze(
             routeTransitionInProgress = routeTransitionInProgress,
@@ -782,23 +787,23 @@ internal fun ConversationScreen(
         remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) {
             mutableStateOf<BatchDeleteRetryState?>(null)
         }
-    var initialTimelineAnchored by
-        // Reveal from the first frame only when the authoritative page is already
-        // loaded (the preloaded chat-list-tap path anchors at the tail immediately).
-        // A direct open still awaiting its page must stay hidden until
-        // reconciliation scrolls to the tail, otherwise the grown page lays out at
-        // the clamped top spacer and flashes the oldest rows before jumping down.
+    // Reveal from the first frame only when the authoritative page is already
+    // loaded (the preloaded chat-list-tap path anchors at the tail immediately).
+    // A direct open still awaiting its page must stay hidden until
+    // reconciliation scrolls to the tail, otherwise the grown page lays out at
+    // the clamped top spacer and flashes the oldest rows before jumping down.
+    val seededTailState =
         remember(controller, notificationOpenRequestId) {
-            mutableStateOf(firstFrameSeed.anchorTailImmediately && !firstFrameSeed.awaitingAuthoritativeTimeline)
+            ConversationSeededTailState(
+                initialTimelineAnchored =
+                    firstFrameSeed.anchorTailImmediately && !firstFrameSeed.awaitingAuthoritativeTimeline,
+                initialCommitted = !firstFrameSeed.anchorTailImmediately,
+            )
         }
-    var seededTailAlignmentCommitted by
-        remember(controller, notificationOpenRequestId) {
-            mutableStateOf(!firstFrameSeed.anchorTailImmediately)
-        }
-    var seededTailAlignmentRecoveryVisible by
-        remember(controller, notificationOpenRequestId) { mutableStateOf(false) }
-    var seededTailAlignmentRetryGeneration by
-        remember(controller, notificationOpenRequestId) { mutableLongStateOf(0L) }
+    var initialTimelineAnchored by seededTailState.initialTimelineAnchored
+    var seededTailAlignmentCommitted by seededTailState.committed
+    var seededTailAlignmentRecoveryVisible by seededTailState.recoveryVisible
+    var seededTailAlignmentRetryGeneration by seededTailState.retryGeneration
     val transcriptVisibilityCommitted by
         remember(controller, notificationOpenRequestId, listState, firstFrameSeed.anchorTailImmediately) {
             derivedStateOf {

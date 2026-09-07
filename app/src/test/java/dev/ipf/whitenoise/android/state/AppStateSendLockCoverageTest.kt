@@ -350,19 +350,28 @@ class AppStateSendLockCoverageTest {
 
         val initialAnchoredOwner =
             source.substring(
-                source.indexOf("var initialTimelineAnchored by"),
+                source.indexOf("val seededTailState ="),
                 source.indexOf("ConversationTtsAutoReadEffects("),
             )
-        val anchoredSeedInitializer =
-            "mutableStateOf(firstFrameSeed.anchorTailImmediately && !firstFrameSeed.awaitingAuthoritativeTimeline)"
+        val bottomInsetOwner =
+            source.substring(
+                source.indexOf("val bottomInsetState ="),
+                source.indexOf("val freezeRoutePresentation ="),
+            )
 
         assertTrue(
             "same-group account switches must reset anchoring state and cancel effects that capture the old controller",
             "remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration)" in unreadJumpOwner &&
                 "mutableStateOf(ConversationUnreadJumpState())" in unreadJumpOwner &&
                 "remember(controller, notificationOpenRequestId)" in initialAnchoredOwner &&
-                anchoredSeedInitializer in initialAnchoredOwner &&
-                "remember(controller) {" in source &&
+                "ConversationSeededTailState(" in initialAnchoredOwner &&
+                "firstFrameSeed.anchorTailImmediately && !firstFrameSeed.awaitingAuthoritativeTimeline" in initialAnchoredOwner &&
+                "var initialTimelineAnchored by seededTailState.initialTimelineAnchored" in initialAnchoredOwner &&
+                "remember(controller) {" in bottomInsetOwner &&
+                "ConversationBottomInsetState(" in bottomInsetOwner &&
+                "var measuredBottomChromeHeightPx by bottomInsetState.measuredBottomChromeHeightPx" in bottomInsetOwner &&
+                "var bottomInputRevision by bottomInsetState.bottomInputRevision" in bottomInsetOwner &&
+                "var routePresentationFrozen by bottomInsetState.routePresentationFrozen" in bottomInsetOwner &&
                 "ConversationNavigationState(" in source &&
                 "onDispose(state::cancelJobs)" in source &&
                 "var lastFollowedLatestId by mutableStateOf(initialFollowedLatestId)" in source &&
