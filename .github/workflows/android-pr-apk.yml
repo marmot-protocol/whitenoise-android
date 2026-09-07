@@ -146,7 +146,10 @@ jobs:
           set -euo pipefail
           apk=$(find app/build/outputs/apk -type f -name '*arm64-v8a*.apk' -print -quit)
           test -n "$apk"
-          mkdir -p preview-candidate
+          mapping=app/build/outputs/mapping/previewPlayRelease/mapping.txt
+          test -s "$mapping"
+          apk_sha256=$(sha256sum "$apk" | cut -d' ' -f1)
+          mkdir -p preview-candidate preview-diagnostic
           cp "$apk" "preview-candidate/whitenoise-pr-${PR_NUMBER}-${PR_PREVIEW_CHANNEL}-unsigned.apk"
           (cd preview-candidate && sha256sum *.apk > SHA256SUMS)
           printf '%s\n' \
@@ -154,11 +157,27 @@ jobs:
             "channel=$PR_PREVIEW_CHANNEL" \
             "head_sha=$PREVIEW_HEAD_SHA" \
             "run_number=$GITHUB_RUN_NUMBER" > preview-candidate/provenance.env
+          cp "$mapping" preview-diagnostic/mapping.txt
+          (cd preview-diagnostic && sha256sum mapping.txt > SHA256SUMS)
+          printf '%s\n' \
+            "pr_number=$PR_NUMBER" \
+            "channel=$PR_PREVIEW_CHANNEL" \
+            "head_sha=$PREVIEW_HEAD_SHA" \
+            "run_number=$GITHUB_RUN_NUMBER" \
+            "unsigned_apk_sha256=$apk_sha256" > preview-diagnostic/provenance.env
 
       - name: Upload untrusted candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pr-preview-${{ matrix.channel }}
           path: preview-candidate/
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload untrusted optimizer diagnostics
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr-preview-${{ matrix.channel }}-diagnostics
+          path: preview-diagnostic/
           if-no-files-found: error
           retention-days: 1

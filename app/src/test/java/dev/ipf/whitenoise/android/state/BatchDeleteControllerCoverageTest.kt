@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class BatchDeleteControllerCoverageTest {
     private val source = AppStateSendLockCoverageTest()
@@ -77,6 +78,7 @@ class BatchDeleteControllerCoverageTest {
     @Test
     fun batchDeleteRetryStateIsScopedToConversationOwnerAndGuardsRecomposition() {
         val conversation = source.conversationScreenSource().readText().replace(Regex("\\s+"), " ")
+        val mainShell = mainShellSource().readText().replace(Regex("\\s+"), " ")
         // The owner account follows the conversation, not the live active ref,
         // so a notification-routed early open keeps one owner across the
         // account-switch flip while real owner changes still reset the state.
@@ -86,10 +88,12 @@ class BatchDeleteControllerCoverageTest {
 
         assertTrue(
             "failed selections, retry state, and the submission guard must reset together when their owner changes",
-            "val selectedMessages = remember($ownerKeys)" in conversation &&
+            "val selectedMessages = presentationState.selectedMessages" in conversation &&
+                "surfaceState ?: remember($ownerKeys) { ConversationSurfaceState() }" in conversation &&
                 "var batchDeleteRetryState by remember($ownerKeys)" in conversation &&
                 "val batchDeleteSubmissionGuard = remember($ownerKeys)" in conversation,
         )
+        assertConversationSurfaceOwnership(mainShell)
         assertTrue(
             "recomposition or repeated taps must not start a second delete while the scoped attempt is active",
             "if (attempts.isEmpty() || !batchDeleteSubmissionGuard.tryStart()) return" in conversation &&
@@ -107,4 +111,22 @@ class BatchDeleteControllerCoverageTest {
                 "appState.present" !in conversation.substring(cancellationStart, cancellationEnd),
         )
     }
+
+    private fun assertConversationSurfaceOwnership(mainShell: String) {
+        val surfaceOwner =
+            "remember(selectedOrPendingConversationController, appState.runtimeGeneration) { " +
+                "ConversationSurfaceState() }"
+        assertTrue(surfaceOwner in mainShell)
+        assertTrue("chatId = openChat.id" in mainShell)
+        assertTrue("accountRef = accountRef" in mainShell)
+        assertTrue("runtimeGeneration = appState.runtimeGeneration" in mainShell)
+        assertTrue("surfaceState = selectedConversationSurfaceState" in mainShell)
+    }
+
+    private fun mainShellSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing MainShell.kt source file")
 }

@@ -23,7 +23,8 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import javax.crypto.spec.SecretKeySpec
 import kotlin.coroutines.Continuation
-import kotlin.coroutines.intrinsics.startCoroutineUninterceptedOrReturn
+import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+import kotlin.coroutines.startCoroutine
 
 /** Real host download/cache plumbing with a controllable, network-free native boundary. */
 internal class MediaDownloadIntegrationFixture : AutoCloseable {
@@ -98,7 +99,8 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
                 active.decrementAndGet()
             }
         }
-        return operation.startCoroutineUninterceptedOrReturn(args.last() as Continuation<MediaDownloadResultFfi>)
+        operation.startCoroutine(args.last() as Continuation<MediaDownloadResultFfi>)
+        return COROUTINE_SUSPENDED
     }
 
     /** Discards the encrypted index as after restart; an optional key callback can hold test-owned reads. */

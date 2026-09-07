@@ -40,7 +40,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val onPresentProfileBlock =
             mainShell.requiredSection(
                 start = "onPresentProfile = {",
-                end = "\n                                },",
+                end = "MainSection.Settings ->",
             )
         assertTrue(
             "chat-list profile presentation must arm the list-bound snapshot",
@@ -77,14 +77,14 @@ class ChatListProfileReturnSnapCoverageTest {
         val profileSheetBlock =
             mainShell.requiredSection(
                 start = "ProfileGroupForegroundCoordinator(",
-                end = "\n    ) {",
+                end = "val routeForwardDirection =",
                 occurrence = 1,
             )
 
         val onDismissBlock =
             profileSheetBlock.requiredSection(
                 start = "onDismissProfile = {",
-                end = "\n        },",
+                end = "onClosePicker =",
             )
         assertTrue(
             "profile dismiss must clear the list-bound snapshot",
@@ -94,7 +94,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val onOpenSettingsBlock =
             mainShell.requiredSection(
                 start = "onOpenSettings = {",
-                end = "\n                                },",
+                end = "onOpenGroup = {",
             )
         assertTrue(
             "unrelated chat-list navigation must reset return-head provenance",
@@ -104,7 +104,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val onOpenGroupBlock =
             mainShell.requiredSection(
                 start = "onOpenGroup = {",
-                end = "\n                                },",
+                end = "onPresentProfile = {",
             )
         assertTrue(
             "direct list opens must carry visible-head provenance into the prepared-route request",
@@ -179,7 +179,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val chatsScreenWiring =
             mainShell.requiredSection(
                 start = "ChatsScreen(",
-                end = "\n                            )",
+                end = "MainSection.Settings ->",
             )
         assertTrue(
             "ChatsScreen must receive the published head from the state machine",

@@ -20,6 +20,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -157,6 +158,25 @@ class MediaDownloadHostRegressionTest {
             fixture.entered.receive().succeed(expected)
             assertArrayEquals(expected, retry.await())
             assertEquals(3, fixture.calls.size)
+        }
+
+    /** Immediate and externally completed failures both retain the precise throwable across the proxy boundary. */
+    @Test
+    fun immediateAndExternallyCompletedNativeFailuresUseContinuationDelivery() =
+        runTest(dispatcher) {
+            val immediateFailure = MarmotKitException.Runtime("immediate synthetic failure")
+            fixture.onDownload = { it.fail(immediateFailure) }
+            val immediate = async { runCatching { download(20) } }
+            val immediateCall = fixture.entered.receive()
+            assertEquals(reference(20), immediateCall.reference)
+            assertSame(immediateFailure, immediate.await().exceptionOrNull())
+
+            fixture.onDownload = {}
+            val externalFailure = MarmotKitException.InvalidMediaReference("external synthetic failure")
+            val externallyCompleted = async { runCatching { download(21) } }
+            fixture.entered.receive().fail(externalFailure)
+            assertSame(externalFailure, externallyCompleted.await().exceptionOrNull())
+            assertEquals(0, fixture.active.get())
         }
 
     /** A cold encrypted index still serves verified bytes without invoking the native boundary. */
