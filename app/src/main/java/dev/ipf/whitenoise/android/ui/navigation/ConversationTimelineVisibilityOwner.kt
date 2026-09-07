@@ -19,7 +19,7 @@ internal fun conversationTimelineReportIsCurrent(
 internal class ConversationTimelineVisibilityOwner<T : Any> {
     private var report by mutableStateOf<Report<T>?>(null)
 
-    /** Publishes only when the candidate is still the exact selected owner and request. */
+    /** Accepts only the selected owner/request and releases its retained controller when hidden. */
     fun reportIfCurrent(
         owner: T,
         notificationOpenRequestId: Long,
@@ -28,7 +28,7 @@ internal class ConversationTimelineVisibilityOwner<T : Any> {
         selectedNotificationOpenRequestId: Long,
     ) {
         if (owner !== selectedOwner || notificationOpenRequestId != selectedNotificationOpenRequestId) return
-        report = Report(owner, notificationOpenRequestId, visible)
+        report = if (visible) Report(owner, notificationOpenRequestId, true) else null
     }
 
     /** Returns true only when the retained report belongs to this exact owner and request. */

@@ -6712,6 +6712,26 @@
         ]
       }
     ],
+    "notification_content_contracts": [
+      {
+        "surface": "group-removal concise notification content",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationFormatter.kt",
+        "anchor": "private fun notificationBody(",
+        "test_ids": [
+          "NTF-008",
+          "NTF-011"
+        ]
+      },
+      {
+        "surface": "plain notification body and privacy presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "suspend fun show(",
+        "test_ids": [
+          "NTF-008",
+          "NTF-011"
+        ]
+      }
+    ],
     "documentation_contracts": [
       {
         "surface": "release-run completion and failure reporting",
