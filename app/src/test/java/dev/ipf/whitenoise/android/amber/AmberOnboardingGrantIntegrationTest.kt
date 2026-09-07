@@ -16,6 +16,9 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityOptionsCompat
+import dev.ipf.marmotkit.MarmotKitException
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -101,6 +104,74 @@ class AmberOnboardingGrantIntegrationTest {
         assertEquals(listOf("plaintext", "counterparty", pubkey), rememberedProvider.lastQueryArgs.get())
         assertEquals("remembered work must not open a second Amber session", 1, launcher.launchCount.get())
     }
+
+    /** Amber 6.6.0 omits the rejection ID; kind-0 denial must finish promptly and require explicit retry. */
+    @Test
+    fun optionalProfileDenialReturnsWithoutAPromptLoopAndExplicitRetryCanApprove() {
+        val pubkey = "ab".repeat(32)
+        Nip55.saveSignerPackage(context, Nip55.AMBER_PACKAGE)
+        val signer = AmberSignerController(context, approvalTimeoutMs = 5_000).buildSigner(pubkey)
+        val profile = profileEvent(pubkey)
+        val failure = AtomicReference<Throwable>()
+        val denied = CountDownLatch(1)
+        Thread {
+            try {
+                signer.signEvent(profile)
+            } catch (error: Throwable) {
+                failure.set(error)
+            } finally {
+                denied.countDown()
+            }
+        }.start()
+        awaitLoginIntent()
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data = Intent().putExtra(Nip55.EXTRA_REJECTED, true),
+        )
+        assertTrue(denied.await(2, TimeUnit.SECONDS))
+        assertTrue(failure.get() is MarmotKitException.ExternalSignerRejected)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(1, launcher.launchCount.get())
+
+        launcher.launched.set(null)
+        val result = AtomicReference<String>()
+        val retried = CountDownLatch(1)
+        Thread {
+            try {
+                result.set(signer.signEvent(profile))
+            } finally {
+                retried.countDown()
+            }
+        }.start()
+        val retry = awaitLoginIntent()
+        val signature = "cd".repeat(64)
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data =
+                Intent().putExtra(
+                    Nip55.EXTRA_RESULTS,
+                    JSONArray()
+                        .put(
+                            JSONObject().put("id", retry.getStringExtra(Nip55.EXTRA_ID)).put("signature", signature),
+                        ).toString(),
+                ),
+        )
+        assertTrue(retried.await(2, TimeUnit.SECONDS))
+        assertEquals(signature, JSONObject(checkNotNull(result.get())).getString("sig"))
+        assertEquals(2, launcher.launchCount.get())
+    }
+
+    /** Builds a kind-0 request that is deliberately absent from the grouped login grants. */
+    private fun profileEvent(pubkey: String): String =
+        JSONObject()
+            .put("id", "profile-event")
+            .put("pubkey", pubkey)
+            .put("created_at", 1_700_000_000)
+            .put("kind", 0)
+            .put("tags", JSONArray())
+            .put("content", "{\"display_name\":\"Disposable setup test\"}")
+            .put("sig", "")
+            .toString()
 
     private fun awaitLoginIntent(): Intent {
         val deadline = System.currentTimeMillis() + 2_000

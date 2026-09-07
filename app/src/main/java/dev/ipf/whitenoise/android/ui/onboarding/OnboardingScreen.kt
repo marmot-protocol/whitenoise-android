@@ -90,7 +90,8 @@ internal fun dispatchOnboardingAction(
     onOffline: (OnboardingAction) -> Unit,
     onStart: () -> Unit,
 ) {
-    when (onboardingActionDecision(inFlightAction, hasValidatedInternet)) {
+    val identityOnly = requestedAction != OnboardingAction.Creating
+    when (onboardingActionDecision(inFlightAction, hasValidatedInternet || identityOnly)) {
         OnboardingActionDecision.IgnoreBusy -> Unit
         OnboardingActionDecision.ShowOffline -> onOffline(requestedAction)
         OnboardingActionDecision.Start -> onStart()
@@ -129,7 +130,11 @@ internal fun OnboardingScreen(
 
     fun applyStep(step: SignInStep) {
         when (step) {
-            SignInStep.SignedIn -> clearSensitiveClipboard(context)
+            SignInStep.SignedIn, SignInStep.SetupStarted -> {
+                clearSensitiveClipboard(context)
+                identity = ""
+                recoveryConsentedFor = null
+            }
             SignInStep.AskRecoveryConsent -> recoveryConsentVisible = true
             is SignInStep.InlineError -> importErrorRes = step.messageRes
         }
@@ -144,7 +149,7 @@ internal fun OnboardingScreen(
         if (inFlightAction != OnboardingAction.Idle) return
         inFlightAction = OnboardingAction.Importing
         importErrorRes = null
-        scope.launch {
+        appState.launchMutation {
             try {
                 applyStep(step())
             } finally {
@@ -260,6 +265,8 @@ internal fun importIdentityErrorRes(identity: String): Int =
 internal sealed interface SignInStep {
     data object SignedIn : SignInStep
 
+    data object SetupStarted : SignInStep
+
     data class InlineError(
         val messageRes: Int,
     ) : SignInStep
@@ -284,6 +291,7 @@ internal fun signInStepFor(
 ): SignInStep =
     when (outcome) {
         IdentityImportOutcome.Success -> SignInStep.SignedIn
+        IdentityImportOutcome.SetupStarted -> SignInStep.SetupStarted
         IdentityImportOutcome.SetupRecoveryRequired ->
             if (identity == recoveryConsentedFor) {
                 SignInStep.InlineError(R.string.sign_in_error_setup_recovery_failed)
@@ -307,6 +315,7 @@ internal fun signInStepFor(
 internal fun recoveryStepFor(outcome: IdentityImportOutcome): SignInStep =
     when (outcome) {
         IdentityImportOutcome.Success -> SignInStep.SignedIn
+        IdentityImportOutcome.SetupStarted -> SignInStep.SetupStarted
         IdentityImportOutcome.SetupRetryRequired -> SignInStep.InlineError(R.string.sign_in_error_setup_retry)
         IdentityImportOutcome.SetupKeyPackageRecoveryAvailable ->
             SignInStep.InlineError(R.string.sign_in_error_setup_key_package_retry)

@@ -167,6 +167,7 @@ internal class NotificationBootstrapTestFixture(
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
             when (method.name) {
+                "onboardingSnapshot" -> null
                 "start" -> {
                     runtimeStartCalls.incrementAndGet()
                     runtimeStartGate.await()

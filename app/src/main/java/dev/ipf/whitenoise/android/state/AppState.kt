@@ -38,6 +38,7 @@ import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationsSubscription
+import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.RelayEndpointClassificationFfi
 import dev.ipf.marmotkit.RelayTelemetryResourceFfi
@@ -148,6 +149,8 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolutio
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
 import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
+import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupCoordinator
+import dev.ipf.whitenoise.android.ui.onboarding.setup.setupOptions
 import dev.ipf.whitenoise.android.updates.AppSelfUpdateFlows
 import dev.ipf.whitenoise.android.updates.AppSelfUpdateState
 import dev.ipf.whitenoise.android.updates.AppUpdateConstants
@@ -1140,6 +1143,16 @@ class WhiteNoiseAppState private constructor(
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
 ) {
+    /** Interactive imports stay separate from the active account until MDK certifies readiness. */
+    internal val accountSetup by lazy {
+        AccountSetupCoordinator(this, mutationsScope, onPhaseChange = { phase = it }) { runtime, account ->
+            val reported = withContext(Dispatchers.IO) { amberSigner.requestPublicKey() }
+            val canonical = withContext(Dispatchers.IO) { runtime.accountIdHex(reported) }
+            check(canonical == account) { "signer account does not match setup" }
+            withContext(Dispatchers.IO) { runtime.registerExternalSigner(account, amberSigner.buildSigner(account)) }
+        }
+    }
+
     /** Process-owned, bounded composer geometry keyed by account and conversation. */
     internal val composerExpansionStateRetention = ComposerExpansionStateRetention()
 
@@ -2815,6 +2828,7 @@ class WhiteNoiseAppState private constructor(
         // Fence any foreground-service retry that was captured before this
         // destructive teardown. The wipe/restore path owns listener restart;
         // a delayed service retry must not reinstall work across that boundary.
+        accountSetup.close()
         notificationRuntimeRecovery.advance()
         networkNotificationRecoverySuppressed = true
         val restartNotifications =
@@ -4041,7 +4055,7 @@ class WhiteNoiseAppState private constructor(
                             onActivated = { phase = AppPhase.Ready },
                         )
                     }
-                check(activated) { "startup account activation did not complete" }
+                check(activated || accountSetup.controller != null) { "startup account activation did not complete" }
             }
             bootstrapCompleted = true
         } catch (error: Throwable) {
@@ -4145,7 +4159,7 @@ class WhiteNoiseAppState private constructor(
 
     private suspend fun resumeCompletedBootstrap(): Boolean {
         if (!bootstrapCompleted) return false
-        if (accounts.isNotEmpty()) phase = AppPhase.Ready
+        if (accounts.isNotEmpty() && activeAccountRef != null) phase = AppPhase.Ready
         val receiverReady = awaitNotificationReceiverForStartupWithin(notificationReceiverTimeoutMillis())
         appStateDebug { "bootstrap resumed; notification receiver active=$receiverReady" }
         if (accounts.isEmpty()) phase = AppPhase.Onboarding
@@ -4325,9 +4339,14 @@ class WhiteNoiseAppState private constructor(
         val trimmed = identity.trim()
         if (!permitsDirectIdentityImport(trimmed)) return IdentityImportOutcome.Failed
         return try {
-            val summary = engineLogin(trimmed)
-            activateImportedIdentity(summary)
-            IdentityImportOutcome.Success
+            val setup = beginIdentitySetup(trimmed)
+            if (setup != null) {
+                IdentityImportOutcome.SetupStarted
+            } else {
+                val summary = engineLogin(trimmed)
+                activateImportedIdentity(summary)
+                IdentityImportOutcome.Success
+            }
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
             logRedactedIdentityFailure("identity import", error)
@@ -4356,6 +4375,20 @@ class WhiteNoiseAppState private constructor(
             rethrowIfCancellation(error)
             logRedactedIdentityFailure("identity setup recovery", error)
             identityImportOutcome(error)
+        }
+    }
+
+    /** Only MDK's explicit legacy-account refusal retains the consent-gated old login path. */
+    private suspend fun beginIdentitySetup(nsec: String): OnboardingSnapshotFfi? {
+        identityLoginCalls?.let { calls ->
+            return calls.beginOnboarding(nsec)?.also { accountSetup.open(it) }
+        }
+        return try {
+            accountSetup.begin(nsec)
+        } catch (_: MarmotKitException.OnboardingActionUnavailable) {
+            // An unfinished interactive checkpoint is returned by begin, never routed here.
+            // MDK also rejects legacy login for interactive ownership as a second barrier.
+            null
         }
     }
 
@@ -4408,15 +4441,14 @@ class WhiteNoiseAppState private constructor(
     fun isAmberSignerInstalled(): Boolean = amberSigner.isSignerInstalled()
 
     /**
-     * Log in with the NIP-55 external signer (Amber). Mirrors [importIdentity]:
-     * ask the signer for its public key (foreground prompt), register the
-     * external-signer callback, then create the local account via
-     * `loginExternalSigner` (which signs its kind:450 identity proof through the
-     * signer — so a returned summary proves the signer works, and a failure
-     * leaves no account behind).
+     * Accept an identity from the NIP-55 external signer (Amber), then open its
+     * staged setup before activating it. The foreground public-key request
+     * establishes signer grants; MDK owns the saved setup checkpoint and later
+     * signing decisions. Existing accounts that cannot enter staged setup use
+     * the legacy login and signer-reconciliation path.
      *
      * Typed engine/protocol errors are surfaced distinctly: a user cancel/reject
-     * is a gentle "cancelled" toast (the account is untouched); every other
+     * is a gentle "cancelled" toast; every other
      * failure (unavailable / mismatch / runtime) is a copyable failure toast.
      */
     suspend fun loginWithAmber() {
@@ -4430,6 +4462,18 @@ class WhiteNoiseAppState private constructor(
                 marmotIo { accountIdHex(reportedPubkey) }
                     ?: throw MarmotKitException.Runtime("signer returned an invalid public key")
             amberSignInStage = 2
+            val snapshot =
+                try {
+                    marmotIo {
+                        beginExternalSignerOnboarding(pubkeyHex, amberSigner.buildSigner(pubkeyHex), setupOptions())
+                    }
+                } catch (_: MarmotKitException.OnboardingActionUnavailable) {
+                    null
+                }
+            if (snapshot != null) {
+                accountSetup.open(snapshot)
+                return
+            }
             val summary =
                 marmotIo {
                     loginExternalSigner(
@@ -4493,6 +4537,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun refreshAccountSnapshot(): List<AccountSummaryFfi> {
         val requestToken = accountListLifetime.advance()
         val refreshedAccounts = marmotIo { listAccounts() }
+        val pendingAccounts = accountSetup.pendingAccounts(refreshedAccounts)
         val bubbleColorMigrationSucceeded =
             withContext(Dispatchers.IO) {
                 LegacyBubbleColorMigration.migrate(
@@ -4508,6 +4553,7 @@ class WhiteNoiseAppState private constructor(
         }
         var publishedAccounts = accounts
         accountListLifetime.runIfCurrent(requestToken) {
+            accountSetup.acceptAccounts(pendingAccounts)
             accounts = refreshedAccounts
             releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
             publishedAccounts = refreshedAccounts
@@ -4603,7 +4649,7 @@ class WhiteNoiseAppState private constructor(
                 accountListLifetime.isCurrent(accountListTokenAtStart) &&
                 accountUnreadStore.isRefreshCurrent(refreshGeneration)
 
-        val signingAccounts = accountSummaries.filter { it.isSignedInSigningAccount() }
+        val signingAccounts = accountSummaries.filter { it.isSignedInSigningAccount() && accountSetup.eligible(it) }
         if (signingAccounts.isEmpty()) {
             if (!refreshIsCurrent()) return
             accountUnreadStore.publishRefresh(
@@ -4954,6 +5000,13 @@ class WhiteNoiseAppState private constructor(
             }
         }
 
+    /** Diverts pending account selection before legacy sign-in or chat projection starts. */
+    private suspend fun routePendingAccountSetup(label: String): Boolean {
+        val required = marmotRuntime != null && accountSetup.routeIfPending(label)
+        if (required && activeAccountRef == label) activeAccountRef = null
+        return required
+    }
+
     /** Publishes a generation-fenced account switch and releases activation intent on every exit path. */
     @Suppress("ReturnCount") // Sign-in failure and supersession are distinct non-activation outcomes.
     suspend fun setActiveAccount(
@@ -4964,6 +5017,7 @@ class WhiteNoiseAppState private constructor(
         awaitPostActivationWork: suspend () -> Unit = {},
         onActivated: () -> Unit = {},
     ): Boolean {
+        if (routePendingAccountSetup(label)) return false
         val requestGeneration = accountSwitchHandoff.beginRequest(label)
         try {
             val switchingAccounts = label != activeAccountRef
@@ -7259,7 +7313,7 @@ class WhiteNoiseAppState private constructor(
     suspend fun sweepExpiredDisappearingMessages() {
         ensureNotificationRuntimeStarted()
         if (marmotRuntime == null) return
-        val signedInAccounts = accounts.filter { it.isSignedInSigningAccount() }
+        val signedInAccounts = accounts.filter { it.isSignedInSigningAccount() && accountSetup.eligible(it) }
         for (account in signedInAccounts) {
             currentCoroutineContext().ensureActive()
             runRetentionSweep(account.label, System.currentTimeMillis())
@@ -7849,7 +7903,10 @@ class WhiteNoiseAppState private constructor(
         // receive them. Only the upsert path is gated on config + GMS.
         drainPendingPushClears()
         drainPendingPushDisables()
-        var accountRefs = accounts.filter { it.isSignedInSigningAccount() }.map { it.label }
+        var accountRefs =
+            accounts
+                .filter { it.isSignedInSigningAccount() && accountSetup.eligible(it) }
+                .map { it.label }
         if (accountRefs.isEmpty()) {
             // Only clear the durable #755 retry flag when the account list is
             // authoritative. setAppInForeground() can trigger this before
@@ -7857,7 +7914,10 @@ class WhiteNoiseAppState private constructor(
             // would strand a signed-in device on a stale push token.
             if (marmotRuntime == null) return false
             refreshAccounts()
-            accountRefs = accounts.filter { it.isSignedInSigningAccount() }.map { it.label }
+            accountRefs =
+                accounts
+                    .filter { it.isSignedInSigningAccount() && accountSetup.eligible(it) }
+                    .map { it.label }
             if (accountRefs.isEmpty()) {
                 pushTokenStore.clearPendingNativePushRegistrationSync()
                 return true
@@ -10168,6 +10228,9 @@ internal fun permitsDirectIdentityImport(trimmed: String): Boolean = IdentityEnt
 internal sealed interface IdentityImportOutcome {
     data object Success : IdentityImportOutcome
 
+    /** Identity accepted; explicit setup routing replaces immediate activation. */
+    data object SetupStarted : IdentityImportOutcome
+
     /** Input the engine was never asked about, or a failure with no typed meaning. */
     data object Failed : IdentityImportOutcome
 
@@ -10195,6 +10258,9 @@ internal sealed interface IdentityImportOutcome {
  * other wrapper.
  */
 internal interface IdentityLoginCalls {
+    /** Tests may supply the identity-only result before exercising legacy recovery. */
+    suspend fun beginOnboarding(nsec: String): OnboardingSnapshotFfi? = null
+
     suspend fun login(
         nsec: String,
         relays: List<String>,
