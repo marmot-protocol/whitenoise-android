@@ -382,8 +382,17 @@
       },
       {
         "surface": "ChatFolderChip",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderChip.kt",
         "anchor": "fun ChatFolderChip(",
+        "test_ids": [
+          "FLD-001",
+          "MSG-010"
+        ]
+      },
+      {
+        "surface": "Chat folder chip edit action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderChip.kt",
+        "anchor": "R.string.edit",
         "test_ids": [
           "FLD-001"
         ]
@@ -2233,6 +2242,25 @@
         "anchor": "fun EditHistoryVersionRow(",
         "test_ids": [
           "MSG-001"
+        ]
+      },
+      {
+        "surface": "ForwardFolderChips",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "fun ForwardFolderChips(",
+        "test_ids": [
+          "FLD-001",
+          "FLD-002",
+          "MSG-010"
+        ]
+      },
+      {
+        "surface": "Forwarding folder section label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "R.string.chat_folders_title",
+        "test_ids": [
+          "FLD-001",
+          "MSG-010"
         ]
       },
       {

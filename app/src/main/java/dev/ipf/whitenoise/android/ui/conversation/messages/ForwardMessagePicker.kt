@@ -2,10 +2,12 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,7 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.triStateToggleable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Forward
@@ -24,23 +26,20 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -48,13 +47,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -69,6 +66,7 @@ import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isForwardOwnerSignedIn
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
+import dev.ipf.whitenoise.android.ui.chats.ChatFolderChip
 import dev.ipf.whitenoise.android.ui.chats.chatFolderTriState
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
@@ -90,6 +88,11 @@ import java.util.Locale
 
 internal const val FORWARD_CHAT_PICKER_SCREEN_TEST_TAG = "forward_chat_picker_full_screen"
 internal const val FORWARD_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG = "forward_chat_picker_account_row"
+internal const val FORWARD_FOLDER_CHIP_ROW_TEST_TAG = "forward_folder_chip_row"
+private val FORWARD_FOLDER_CHIP_LABEL_MAX_WIDTH = 200.dp
+
+/** Stable semantics tag for a folder action whose visible label may be renamed. */
+internal fun forwardFolderChipTestTag(folderId: String): String = "forward_folder_chip-$folderId"
 
 /** Mirrors the picker's live destination account, selection, and selected-chat titles. */
 internal typealias PickerStateListener =
@@ -302,7 +305,14 @@ internal fun ForwardMessagePickerContent(
             }
         }
     val folderRows =
-        remember(targets, titleCopy, destination.selectedAccountRef) {
+        remember(
+            targets,
+            titleCopy,
+            destination.selectedAccountRef,
+            destination.selectedAccountIdHex,
+            memberRevision,
+            appState.profileRevisionForCompose,
+        ) {
             forwardFolderBulkRows(
                 appState = appState,
                 targets = targets,
@@ -470,6 +480,7 @@ private fun ForwardSelectionSummary(
     }
 }
 
+/** Keeps folder bulk actions in one compact region above ordinary, individually selectable destinations. */
 @Composable
 @Suppress("LongParameterList", "LongMethod")
 private fun ForwardTargetList(
@@ -519,25 +530,17 @@ private fun ForwardTargetList(
                 }
             }
             if (visibleFolderRows.isNotEmpty()) {
-                item { SectionHeader(stringResource(R.string.chat_folders_title)) }
-                items(visibleFolderRows, key = { (folder, _) -> "folder:${folder.id}" }) { (folder, memberIds) ->
-                    val triState = chatFolderTriState(memberIds, selected.toSet())
-                    ListItem(
-                        modifier =
-                            Modifier.triStateToggleable(
-                                state = triState,
-                                role = Role.Checkbox,
-                                onClick = {
-                                    onSelectionChange(forwardSelectionAfterFolderToggle(selected, memberIds))
-                                },
-                            ),
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        leadingContent = { TriStateCheckbox(state = triState, onClick = null) },
-                        headlineContent = { Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        supportingContent = {
-                            Text(pluralStringResource(R.plurals.chat_folder_chat_count, memberIds.size, memberIds.size))
-                        },
-                    )
+                item(key = "forward-folder-controls") {
+                    Column {
+                        SectionHeader(stringResource(R.string.chat_folders_title))
+                        key(ownerAccountRef) {
+                            ForwardFolderChips(
+                                folderRows = visibleFolderRows,
+                                selected = selected,
+                                onSelectionChange = onSelectionChange,
+                            )
+                        }
+                    }
                 }
             }
             if (filteredTargets.isNotEmpty()) item { SectionHeader(stringResource(R.string.recent_chats)) }
@@ -552,6 +555,42 @@ private fun ForwardTargetList(
                     onToggle = { groupId ->
                         onSelectionChange(toggleForwardTargetSelection(selected, groupId))
                     },
+                )
+            }
+        }
+    }
+}
+
+/** Compact bulk-selection controls that keep the destination list vertically primary. */
+@Composable
+internal fun ForwardFolderChips(
+    folderRows: List<Pair<ChatFolder, List<String>>>,
+    selected: List<String>,
+    onSelectionChange: (List<String>) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val selectedSet = remember(selected) { selected.toSet() }
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm)
+                .testTag(FORWARD_FOLDER_CHIP_ROW_TEST_TAG),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
+    ) {
+        folderRows.forEach { (folder, memberIds) ->
+            key(folder.id) {
+                ChatFolderChip(
+                    state = chatFolderTriState(memberIds, selectedSet),
+                    label = folder.name,
+                    trailingCount = memberIds.size,
+                    showStateIndicator = true,
+                    labelMaxWidth = FORWARD_FOLDER_CHIP_LABEL_MAX_WIDTH,
+                    onClick = {
+                        onSelectionChange(forwardSelectionAfterFolderToggle(selected, memberIds))
+                    },
+                    modifier = Modifier.testTag(forwardFolderChipTestTag(folder.id)),
                 )
             }
         }
