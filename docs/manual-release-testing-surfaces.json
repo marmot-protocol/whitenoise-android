@@ -1,5 +1,5 @@
 {
-  "base_revision": "200a370bb09427ba9f042b7d09bebb3d157256c3",
+  "base_revision": "c4474c6c6316c4073116cf28d6891b31f6c1c6de",
   "categories": {
     "composable_surfaces": [
       {
@@ -4869,6 +4869,252 @@
         "test_ids": [
           "INT-001"
         ]
+      },
+      {
+        "surface": "WhiteNoiseAppState.observeTtsConversationDestination",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateTtsDestination.kt",
+        "anchor": "fun WhiteNoiseAppState.observeTtsConversationDestination(",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "Modifier.cancelPointersAcrossChatListMotion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListRowPlacementGate.kt",
+        "anchor": "fun Modifier.cancelPointersAcrossChatListMotion(",
+        "test_ids": [
+          "CHL-003",
+          "CHL-005"
+        ]
+      },
+      {
+        "surface": "AppText.resolveForCompose",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
+        "anchor": "fun AppText.resolveForCompose(",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "Modifier.longPressOrVerticalDrag",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnchoredDragSelection.kt",
+        "anchor": "fun Modifier.longPressOrVerticalDrag(",
+        "test_ids": [
+          "CHL-011",
+          "MSG-004",
+          "MSG-012"
+        ]
+      },
+      {
+        "surface": "Modifier.snackbarSurfaceBoundary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Snackbar.kt",
+        "anchor": "fun Modifier.snackbarSurfaceBoundary(",
+        "test_ids": [
+          "AXY-001"
+        ]
+      },
+      {
+        "surface": "BoxScope.StickyDayRibbon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+        "anchor": "fun BoxScope.StickyDayRibbon(",
+        "test_ids": [
+          "CON-002"
+        ]
+      },
+      {
+        "surface": "Modifier.textAttachmentSelectionLongPress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentSelection.kt",
+        "anchor": "fun Modifier.textAttachmentSelectionLongPress(",
+        "test_ids": [
+          "MED-010",
+          "MSG-009"
+        ]
+      },
+      {
+        "surface": "ColumnScope.BubbleBodyFooterAndRetry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/BubbleContentBlocks.kt",
+        "anchor": "fun ColumnScope.BubbleBodyFooterAndRetry(",
+        "test_ids": [
+          "CON-006",
+          "MED-003",
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "ColumnScope.BubbleMediaBlocks",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/BubbleContentBlocks.kt",
+        "anchor": "fun ColumnScope.BubbleMediaBlocks(",
+        "test_ids": [
+          "MED-003",
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "Modifier.observeMessageTextDoubleTap",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleDoubleTapSeek.kt",
+        "anchor": "fun Modifier.observeMessageTextDoubleTap(",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "BoxScope.MessageBubbleSelectionTapTarget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleSelection.kt",
+        "anchor": "fun BoxScope.MessageBubbleSelectionTapTarget(",
+        "test_ids": [
+          "MSG-012"
+        ]
+      },
+      {
+        "surface": "Modifier.messageBubbleSelectionRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleSelection.kt",
+        "anchor": "fun Modifier.messageBubbleSelectionRow(",
+        "test_ids": [
+          "MSG-012"
+        ]
+      },
+      {
+        "surface": "BoxScope.MediaFooterOverlay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageInlineFooter.kt",
+        "anchor": "fun BoxScope.MediaFooterOverlay(",
+        "test_ids": [
+          "MSG-001",
+          "MED-003",
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "ColumnScope.MessageReactionSummary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReactionChrome.kt",
+        "anchor": "fun ColumnScope.MessageReactionSummary(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "RowScope.MessageSenderAvatarSlot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReactionChrome.kt",
+        "anchor": "fun RowScope.MessageSenderAvatarSlot(",
+        "test_ids": [
+          "CON-002"
+        ]
+      },
+      {
+        "surface": "Modifier.dismissTextSelectionOnOutsideTap",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageTextSelection.kt",
+        "anchor": "fun Modifier.dismissTextSelectionOnOutsideTap(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-009"
+        ]
+      },
+      {
+        "surface": "Modifier.readerTextSelectionLongPress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReaderTextSelection.kt",
+        "anchor": "fun Modifier.readerTextSelectionLongPress(",
+        "test_ids": [
+          "MED-010",
+          "MSG-009"
+        ]
+      },
+      {
+        "surface": "Modifier.twoFingerSwipeDown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/TtsTwoFingerSwipe.kt",
+        "anchor": "fun Modifier.twoFingerSwipeDown(",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "NostrEventCardKind.label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardFormatting.kt",
+        "anchor": "fun NostrEventCardKind.label(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "NostrEventCardModel.primaryAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardFormatting.kt",
+        "anchor": "fun NostrEventCardModel.primaryAction(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "MonthSectionedColumn",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt",
+        "anchor": "fun <T> MonthSectionedColumn(",
+        "test_ids": [
+          "INT-001",
+          "GRP-018"
+        ]
+      },
+      {
+        "surface": "ConversationRouteAnimatedContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/RouteTransitionSurfaces.kt",
+        "anchor": "fun <T> ConversationRouteAnimatedContent(",
+        "test_ids": [
+          "NAV-005",
+          "NAV-006"
+        ]
+      },
+      {
+        "surface": "RowScope.OnboardingOfflineMessage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "fun RowScope.OnboardingOfflineMessage(",
+        "test_ids": [
+          "ONB-001",
+          "ONB-002"
+        ]
+      },
+      {
+        "surface": "BoxScope.AvatarViewerImageContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+        "anchor": "fun BoxScope.AvatarViewerImageContent(",
+        "test_ids": [
+          "ACC-004"
+        ]
+      },
+      {
+        "surface": "EncryptedBackupPassphraseStrength.color",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun EncryptedBackupPassphraseStrength.color(",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "AppFont.pickerLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "fun AppFont.pickerLabel(",
+        "test_ids": [
+          "SET-007"
+        ]
+      },
+      {
+        "surface": "ChatFolderManageItem.displayName",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
+        "anchor": "fun ChatFolderManageItem.displayName(",
+        "test_ids": [
+          "SET-009"
+        ]
+      },
+      {
+        "surface": "Modifier.settingsRowAmoledSurfaceBorder",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun Modifier.settingsRowAmoledSurfaceBorder(",
+        "test_ids": [
+          "SET-002"
+        ]
+      },
+      {
+        "surface": "Modifier.amoledSurfaceBorder",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/theme/AmoledSurface.kt",
+        "anchor": "fun Modifier.amoledSurfaceBorder(",
+        "test_ids": [
+          "SET-002"
+        ]
       }
     ],
     "settings_controls": [
@@ -6234,8 +6480,7 @@
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.permission.ACCESS_COARSE_LOCATION",
         "test_ids": [
-          "MED-012",
-          "SEC-005"
+          "MED-012"
         ]
       },
       {
@@ -6243,8 +6488,7 @@
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.permission.ACCESS_FINE_LOCATION",
         "test_ids": [
-          "MED-012",
-          "SEC-005"
+          "MED-012"
         ]
       },
       {
@@ -6261,8 +6505,7 @@
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.permission.CAMERA",
         "test_ids": [
-          "MED-004",
-          "SEC-005"
+          "MED-004"
         ]
       },
       {
@@ -6288,7 +6531,6 @@
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.permission.FOREGROUND_SERVICE_MICROPHONE",
         "test_ids": [
-          "CON-009",
           "DIC-001"
         ]
       },
@@ -6324,8 +6566,7 @@
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.permission.POST_NOTIFICATIONS",
         "test_ids": [
-          "NTF-001",
-          "SEC-005"
+          "NTF-001"
         ]
       },
       {
@@ -6333,8 +6574,7 @@
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.permission.READ_EXTERNAL_STORAGE",
         "test_ids": [
-          "MED-002",
-          "SEC-005"
+          "MED-002"
         ]
       },
       {
@@ -6342,8 +6582,7 @@
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.permission.READ_MEDIA_IMAGES",
         "test_ids": [
-          "MED-002",
-          "SEC-005"
+          "MED-002"
         ]
       },
       {
@@ -6351,8 +6590,7 @@
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.permission.READ_MEDIA_VIDEO",
         "test_ids": [
-          "MED-002",
-          "SEC-005"
+          "MED-002"
         ]
       },
       {
@@ -6360,8 +6598,7 @@
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
         "test_ids": [
-          "MED-002",
-          "SEC-005"
+          "MED-002"
         ]
       },
       {
@@ -6377,9 +6614,8 @@
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.permission.RECORD_AUDIO",
         "test_ids": [
-          "CON-009",
           "DIC-001",
-          "SEC-005"
+          "MED-008"
         ]
       },
       {
@@ -6405,8 +6641,7 @@
         "anchor": "android.permission.REQUEST_INSTALL_PACKAGES",
         "test_ids": [
           "MED-018",
-          "SYS-008",
-          "SEC-005"
+          "SYS-008"
         ]
       }
     ],
@@ -6571,8 +6806,9 @@
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "nostrsigner",
         "test_ids": [
-          "ONB-009",
-          "ONB-010"
+          "ONB-010",
+          "ONB-011",
+          "ONB-012"
         ]
       },
       {

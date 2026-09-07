@@ -21,9 +21,25 @@ DEFINITION_RE = re.compile(
 )
 CANDIDATE_RE = re.compile(r"^(?:\d+\.|[-*])\s*\[[^]]*]\s*\*\*|\*\*[A-Z]{3,4}-\d{3}")
 ANNOTATION_RE = re.compile(r"@[A-Za-z_][A-Za-z0-9_.]*")
-COMPOSABLE_FUN_RE = re.compile(
-    r"(?:(?:internal|private|public|protected)\s+)?fun\s+([A-Z][A-Za-z0-9_]*)\s*\("
-)
+IDENTIFIER_RE = re.compile(r"(?:[A-Za-z_][A-Za-z0-9_]*|`[^`\n]+`)")
+FUNCTION_MODIFIERS = {
+    "abstract",
+    "actual",
+    "expect",
+    "external",
+    "final",
+    "infix",
+    "inline",
+    "internal",
+    "open",
+    "operator",
+    "override",
+    "private",
+    "protected",
+    "public",
+    "suspend",
+    "tailrec",
+}
 REQUIRED_HEADINGS = [
     "# White Noise Android manual release testing",
     "## How to use this guide",
@@ -162,6 +178,59 @@ REQUIRED_INVENTORY_CATEGORIES = {
     "android_entry_points",
 }
 
+# This is deliberately independent of the generated inventory. Every manifest
+# permission and Android entry point must match its manually reviewed checklist
+# ownership exactly, so regeneration cannot preserve a stale or unrelated ID.
+SEMANTIC_OWNER_IDS = {
+    "permission:android.permission.ACCESS_COARSE_LOCATION": {"MED-012"},
+    "permission:android.permission.ACCESS_FINE_LOCATION": {"MED-012"},
+    "permission:android.permission.ACCESS_NETWORK_STATE": {"INT-006", "INT-007"},
+    "permission:android.permission.CAMERA": {"MED-004"},
+    "permission:android.permission.FOREGROUND_SERVICE": {"NTF-014", "TTS-001", "DIC-001"},
+    "permission:android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK": {"TTS-001"},
+    "permission:android.permission.FOREGROUND_SERVICE_MICROPHONE": {"DIC-001"},
+    "permission:android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING": {"NTF-006", "NTF-014"},
+    "permission:android.permission.FOREGROUND_SERVICE_SPECIAL_USE": {"NTF-006", "NTF-014"},
+    "permission:android.permission.INTERNET": {"INT-006", "INT-007"},
+    "permission:android.permission.POST_NOTIFICATIONS": {"NTF-001"},
+    "permission:android.permission.READ_EXTERNAL_STORAGE": {"MED-002"},
+    "permission:android.permission.READ_MEDIA_IMAGES": {"MED-002"},
+    "permission:android.permission.READ_MEDIA_VIDEO": {"MED-002"},
+    "permission:android.permission.READ_MEDIA_VISUAL_USER_SELECTED": {"MED-002"},
+    "permission:android.permission.RECEIVE_BOOT_COMPLETED": {"NTF-014"},
+    "permission:android.permission.RECORD_AUDIO": {"MED-008", "DIC-001"},
+    "permission:android.permission.REQUEST_INSTALL_PACKAGES": {"MED-018", "SYS-008"},
+    "permission:android.permission.VIBRATE": {"NTF-009"},
+    "permission:android.permission.WAKE_LOCK": {"NTF-014", "TTS-001"},
+    "intent:${deepLinkScheme}": {"SYS-006"},
+    "intent:android.intent.action.BOOT_COMPLETED": {"NTF-014"},
+    "intent:android.intent.action.MAIN": {"INT-001", "INT-002"},
+    "intent:android.intent.action.MY_PACKAGE_REPLACED": {"NTF-014", "SYS-008"},
+    "intent:android.intent.action.SEND": {"SYS-004", "SYS-005"},
+    "intent:android.intent.action.SEND_MULTIPLE": {"SYS-004", "SYS-005"},
+    "intent:android.intent.action.TTS_SERVICE": {"TTS-001", "TTS-002"},
+    "intent:android.intent.action.VIEW": {"SYS-006"},
+    "intent:android.intent.category.BROWSABLE": {"SYS-006"},
+    "intent:android.intent.category.DEFAULT": {"SYS-004", "SYS-006"},
+    "intent:android.intent.category.LAUNCHER": {"INT-001", "INT-002"},
+    "intent:android.speech.RecognitionService": {"DIC-001", "DIC-002"},
+    "intent:android.speech.action.RECOGNIZE_SPEECH": {"DIC-001", "DIC-002"},
+    "intent:application/*": {"SYS-004"},
+    "intent:audio/*": {"SYS-004"},
+    "intent:com.google.firebase.MESSAGING_EVENT": {"NTF-002", "NTF-003", "NTF-006"},
+    "intent:image/*": {"SYS-004"},
+    "intent:marmot": {"SYS-006"},
+    "intent:nostrsigner": {"ONB-010", "ONB-011", "ONB-012"},
+    "intent:text/plain": {"SYS-004"},
+    "intent:video/*": {"SYS-004"},
+    "android-direct-share:conversation-shortcuts": {"SYS-011"},
+    "TtsTrustWarningDialog": {"TTS-003"},
+}
+
+
+class ComposableDiscoveryError(ValueError):
+    """A declaration-like @Composable site could not be parsed safely."""
+
 
 def skip_kotlin_trivia(text: str, offset: int) -> int:
     """Skip whitespace and comments without treating declaration text as trivia."""
@@ -228,19 +297,97 @@ def consume_kotlin_annotation(text: str, offset: int) -> int | None:
     return None
 
 
+def consume_kotlin_type_parameters(text: str, offset: int) -> int | None:
+    """Consume a balanced Kotlin type-parameter list beginning at ``<``."""
+    if offset >= len(text) or text[offset] != "<":
+        return None
+    depth = 0
+    quote: str | None = None
+    while offset < len(text):
+        if quote:
+            if text[offset] == "\\":
+                offset += 2
+            elif text[offset] == quote:
+                quote = None
+                offset += 1
+            else:
+                offset += 1
+            continue
+        if text[offset] in {'"', "'"}:
+            quote = text[offset]
+            offset += 1
+        elif text.startswith("//", offset):
+            newline = text.find("\n", offset + 2)
+            offset = len(text) if newline < 0 else newline + 1
+        elif text.startswith("/*", offset):
+            end = text.find("*/", offset + 2)
+            offset = len(text) if end < 0 else end + 2
+        elif text[offset] == "<":
+            depth += 1
+            offset += 1
+        elif text[offset] == ">":
+            depth -= 1
+            offset += 1
+            if depth == 0:
+                return offset
+        else:
+            offset += 1
+    return None
+
+
+def composable_declaration_name(text: str, offset: int) -> str | None:
+    """Parse one annotated function and return its inventory surface name."""
+    declaration_start = offset
+    while True:
+        token = IDENTIFIER_RE.match(text, offset)
+        if token is None:
+            return None
+        value = token.group(0).strip("`")
+        if value == "fun":
+            offset = skip_kotlin_trivia(text, token.end())
+            break
+        if value not in FUNCTION_MODIFIERS:
+            return None
+        offset = skip_kotlin_trivia(text, token.end())
+
+    if offset < len(text) and text[offset] == "<":
+        type_parameters_end = consume_kotlin_type_parameters(text, offset)
+        if type_parameters_end is None:
+            line = text.count("\n", 0, declaration_start) + 1
+            raise ComposableDiscoveryError(f"line {line}: cannot parse @Composable function type parameters")
+        offset = skip_kotlin_trivia(text, type_parameters_end)
+
+    identifier = r"(?:[A-Za-z_][A-Za-z0-9_]*|`[^`\n]+`)"
+    receiver_atom = rf"{identifier}(?:\s*<[^<>()\n]+>)?\??"
+    qualified_re = re.compile(
+        rf"(?P<qualified>{receiver_atom}(?:\s*\.\s*{identifier})*)\s*\("
+    )
+    match = qualified_re.match(text, offset)
+    if match is None:
+        line = text.count("\n", 0, declaration_start) + 1
+        raise ComposableDiscoveryError(f"line {line}: cannot parse @Composable function declaration")
+
+    qualified = re.sub(r"\s*\.\s*", ".", match.group("qualified")).replace("`", "")
+    function_name = qualified.rsplit(".", 1)[-1]
+    if "." in qualified or (function_name and function_name[0].isupper()):
+        return qualified
+    return None
+
+
 def composable_names(text: str) -> set[str]:
-    """Find upper-camel Compose functions with any intervening annotations."""
+    """Find visual and receiver-qualified Compose function declarations."""
     found: set[str] = set()
-    for composable in re.finditer(r"@Composable\b", text):
+    for composable in re.finditer(r"(?m)^[ \t]*@Composable\b", text):
         offset = skip_kotlin_trivia(text, composable.end())
         while offset < len(text) and text[offset] == "@":
             annotation_end = consume_kotlin_annotation(text, offset)
             if annotation_end is None:
-                break
+                line = text.count("\n", 0, offset) + 1
+                raise ComposableDiscoveryError(f"line {line}: cannot parse annotation after @Composable")
             offset = skip_kotlin_trivia(text, annotation_end)
-        match = COMPOSABLE_FUN_RE.match(text, offset)
-        if match:
-            found.add(match.group(1))
+        name = composable_declaration_name(text, offset)
+        if name:
+            found.add(name)
     return found
 
 
@@ -297,42 +444,44 @@ def validate_inventory(active: set[str], errors: list[str]) -> None:
             anchor = entry.get("anchor")
             if anchor and anchor not in source.read_text(encoding="utf-8"):
                 errors.append(finding(INVENTORY, 0, entry.get("surface", "inventory"), "source anchor no longer exists"))
-            for test_id in entry.get("test_ids", []):
+            test_ids = entry.get("test_ids")
+            coverage_exception = entry.get("coverage_exception")
+            if not isinstance(test_ids, list):
+                errors.append(finding(INVENTORY, 0, entry.get("surface", "inventory"), "test_ids must be a list"))
+                test_ids = []
+            if not test_ids and not (isinstance(coverage_exception, str) and coverage_exception.strip()):
+                errors.append(
+                    finding(
+                        INVENTORY,
+                        0,
+                        entry.get("surface", "inventory"),
+                        "inventory entry must own at least one active test ID or have a reason-bearing coverage_exception",
+                    )
+                )
+            for test_id in test_ids:
                 ownership.setdefault(entry.get("surface", ""), set()).add(test_id)
                 if test_id not in active:
                     errors.append(finding(INVENTORY, 0, test_id, "inventory reference does not resolve to an active ID"))
     for entry in data.get("discovery_exceptions", []):
         if not entry.get("reason"):
             errors.append(finding(INVENTORY, 0, entry.get("surface", "exception"), "discovery exception needs a reason"))
-    if not ({"manifest_permissions", "android_entry_points"} & set(categories)):
-        return
-    required_owners = {
-        "permission:android.permission.ACCESS_FINE_LOCATION": {"MED-012", "SEC-005"},
-        "permission:android.permission.CAMERA": {"MED-004", "SEC-005"},
-        "permission:android.permission.POST_NOTIFICATIONS": {"NTF-001", "SEC-005"},
-        "permission:android.permission.RECORD_AUDIO": {"CON-009", "DIC-001", "SEC-005"},
-        "permission:android.permission.REQUEST_INSTALL_PACKAGES": {"MED-018", "SYS-008", "SEC-005"},
-        "intent:android.intent.action.SEND": {"SYS-004", "SYS-005"},
-        "intent:android.intent.action.SEND_MULTIPLE": {"SYS-004", "SYS-005"},
-        "intent:android.intent.action.TTS_SERVICE": {"TTS-001", "TTS-002"},
-        "intent:android.speech.RecognitionService": {"DIC-001", "DIC-002"},
-        "intent:com.google.firebase.MESSAGING_EVENT": {"NTF-002", "NTF-003", "NTF-006"},
-        "intent:marmot": {"SYS-006"},
-        "intent:nostrsigner": {"ONB-009", "ONB-010"},
-        "android-direct-share:conversation-shortcuts": {"SYS-011"},
-        "TtsTrustWarningDialog": {"TTS-003"},
-    }
-    for surface, expected in required_owners.items():
-        missing = expected - ownership.get(surface, set())
-        if missing:
-            errors.append(
-                finding(
-                    INVENTORY,
-                    0,
-                    surface,
-                    f"missing owning test IDs: {', '.join(sorted(missing))}",
+    semantic_categories = {"manifest_permissions", "android_entry_points"}
+    for category, entries in categories.items():
+        for entry in entries:
+            surface = entry.get("surface", "")
+            expected = SEMANTIC_OWNER_IDS.get(surface)
+            if category in semantic_categories and expected is None:
+                errors.append(finding(INVENTORY, 0, surface, "missing independently reviewed semantic owner mapping"))
+                continue
+            if expected is not None and ownership.get(surface, set()) != expected:
+                errors.append(
+                    finding(
+                        INVENTORY,
+                        0,
+                        surface,
+                        f"semantic owner mismatch; expected exactly: {', '.join(sorted(expected))}",
+                    )
                 )
-            )
 
 
 def parse_revision_guide(revision: str) -> tuple[set[str], set[str]] | None:

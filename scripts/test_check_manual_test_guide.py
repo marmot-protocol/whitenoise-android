@@ -289,6 +289,170 @@ private fun TimelineRow() = Unit
 '''
         self.assertEqual(MODULE.composable_names(text), {"TimelineRow"})
 
+    def test_composable_discovery_accepts_receivers_modifiers_and_type_parameters(self):
+        text = '''
+@Composable
+private inline fun <T> BoxScope.FuturePanel(value: T) = Unit
+
+@Composable
+internal fun WhiteNoiseAppState.observeDestination() = Unit
+
+@Composable
+fun <T> GenericScreen(value: T) = Unit
+'''
+        self.assertEqual(
+            MODULE.composable_names(text),
+            {
+                "BoxScope.FuturePanel",
+                "WhiteNoiseAppState.observeDestination",
+                "GenericScreen",
+            },
+        )
+
+    def test_composable_discovery_fails_closed_for_unparsed_function_declaration(self):
+        text = '''
+@Composable
+private fun <T BrokenScreen(value: T) = Unit
+'''
+        with self.assertRaisesRegex(MODULE.ComposableDiscoveryError, "cannot parse"):
+            MODULE.composable_names(text)
+
+    def test_inventory_rejects_empty_test_ownership(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "screen.kt"
+            source.write_text("FutureScreen", encoding="utf-8")
+            inventory = root / "inventory.json"
+            inventory.write_text(
+                json.dumps(
+                    {
+                        "categories": {
+                            "settings_controls": [
+                                {
+                                    "surface": "FutureScreen",
+                                    "source": "screen.kt",
+                                    "anchor": "FutureScreen",
+                                    "test_ids": [],
+                                }
+                            ]
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            errors = []
+            with (
+                mock.patch.object(MODULE, "ROOT", root),
+                mock.patch.object(MODULE, "INVENTORY", inventory),
+                mock.patch.object(MODULE, "REQUIRED_INVENTORY_CATEGORIES", set()),
+            ):
+                MODULE.validate_inventory({"MSG-001"}, errors)
+            self.assertTrue(any("at least one active test ID" in error for error in errors))
+
+    def test_inventory_allows_reasoned_coverage_exception(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "screen.kt"
+            source.write_text("FutureScreen", encoding="utf-8")
+            inventory = root / "inventory.json"
+            inventory.write_text(
+                json.dumps(
+                    {
+                        "categories": {
+                            "settings_controls": [
+                                {
+                                    "surface": "FutureScreen",
+                                    "source": "screen.kt",
+                                    "anchor": "FutureScreen",
+                                    "test_ids": [],
+                                    "coverage_exception": "Covered by a platform-owned state with no executable app action.",
+                                }
+                            ]
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            errors = []
+            with (
+                mock.patch.object(MODULE, "ROOT", root),
+                mock.patch.object(MODULE, "INVENTORY", inventory),
+                mock.patch.object(MODULE, "REQUIRED_INVENTORY_CATEGORIES", set()),
+            ):
+                MODULE.validate_inventory({"MSG-001"}, errors)
+            self.assertEqual(errors, [])
+
+    def test_manifest_permission_and_entry_point_require_coverage(self):
+        for category, surface, anchor in (
+            ("manifest_permissions", "permission:android.permission.FUTURE", "android.permission.FUTURE"),
+            ("android_entry_points", "intent:future", "future"),
+        ):
+            with self.subTest(category=category), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                source = root / "AndroidManifest.xml"
+                source.write_text(anchor, encoding="utf-8")
+                inventory = root / "inventory.json"
+                inventory.write_text(
+                    json.dumps(
+                        {
+                            "categories": {
+                                category: [
+                                    {
+                                        "surface": surface,
+                                        "source": "AndroidManifest.xml",
+                                        "anchor": anchor,
+                                        "test_ids": [],
+                                    }
+                                ]
+                            }
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                errors = []
+                with (
+                    mock.patch.object(MODULE, "ROOT", root),
+                    mock.patch.object(MODULE, "INVENTORY", inventory),
+                    mock.patch.object(MODULE, "REQUIRED_INVENTORY_CATEGORIES", set()),
+                    mock.patch.object(MODULE, "SEMANTIC_OWNER_IDS", {surface: {"MSG-001"}}),
+                ):
+                    MODULE.validate_inventory({"MSG-001"}, errors)
+                self.assertTrue(any("at least one active test ID" in error for error in errors))
+
+    def test_inventory_rejects_semantically_stale_owner_id(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "AndroidManifest.xml"
+            source.write_text("android.permission.CAMERA", encoding="utf-8")
+            inventory = root / "inventory.json"
+            inventory.write_text(
+                json.dumps(
+                    {
+                        "categories": {
+                            "manifest_permissions": [
+                                {
+                                    "surface": "permission:android.permission.CAMERA",
+                                    "source": "AndroidManifest.xml",
+                                    "anchor": "android.permission.CAMERA",
+                                    "test_ids": ["SEC-005"],
+                                }
+                            ]
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            errors = []
+            expected = {"permission:android.permission.CAMERA": {"MED-004"}}
+            with (
+                mock.patch.object(MODULE, "ROOT", root),
+                mock.patch.object(MODULE, "INVENTORY", inventory),
+                mock.patch.object(MODULE, "REQUIRED_INVENTORY_CATEGORIES", set()),
+                mock.patch.object(MODULE, "SEMANTIC_OWNER_IDS", expected),
+            ):
+                MODULE.validate_inventory({"MED-004", "SEC-005"}, errors)
+            self.assertTrue(any("expected exactly: MED-004" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()
