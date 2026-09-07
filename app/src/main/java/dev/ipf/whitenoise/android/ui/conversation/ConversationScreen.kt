@@ -147,6 +147,7 @@ import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerAttachmentSheetState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerShareRevision
@@ -2962,7 +2963,7 @@ internal fun ConversationScreen(
         )
     val composerTextState =
         rememberComposerTextState(
-            draftKey = controller.group.groupIdHex,
+            draftKey = composerDraftOwnerKey(draftAccountRef, controller.group.groupIdHex),
             initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
             externalRevision = composerShareRevision to composerDictationRevision,
         )
@@ -3887,12 +3888,8 @@ internal fun ConversationScreen(
         onDocumentUrisChange = { pendingDocumentUris = it },
         mediaSender = mediaSender,
         chatTitle = controller.title(groupTitleCopy),
-        composerText = { composerTextState.valueState.value.text },
-        onCaptionAccepted = { seededCaption ->
-            if (composerTextState.valueState.value.text == seededCaption) {
-                composerTextState.valueState.value = TextFieldValue("")
-            }
-        },
+        composerText = composerTextState::acceptanceToken,
+        onCaptionAccepted = composerTextState::clearAccepted,
         onAddPhotos = {
             imagePickerLauncher.launch(
                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),

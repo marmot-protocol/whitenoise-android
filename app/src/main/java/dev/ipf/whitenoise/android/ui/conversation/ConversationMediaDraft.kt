@@ -33,6 +33,7 @@ import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAcceptanceToken
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoPreview
@@ -461,6 +462,7 @@ internal fun rememberConversationMediaDraftState(
     return state
 }
 
+/** Retains one caption acceptance generation across preview recompositions and staged-media edits. */
 @Composable
 @Suppress("LongMethod") // Preview callbacks intentionally share one snapshot of the staged attachment list.
 internal fun ConversationMediaDraftContent(
@@ -472,15 +474,17 @@ internal fun ConversationMediaDraftContent(
     onDocumentUrisChange: (List<Uri>) -> Unit,
     mediaSender: ConversationMediaSender,
     chatTitle: String,
-    composerText: () -> String,
-    onCaptionAccepted: (seededCaption: String) -> Unit,
+    composerText: () -> ComposerAcceptanceToken,
+    onCaptionAccepted: (seededCaption: ComposerAcceptanceToken) -> Unit,
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
     onAfterSend: () -> Unit,
 ) {
     val previewStateHolder = rememberSaveableStateHolder()
     if ((mediaSlots.isNotEmpty() || documentUris.isNotEmpty()) && state.activeEditor == null) {
-        val seededCaption = composerText()
+        // Preserve the caption's acceptance generation for the lifetime of this
+        // preview; recomposition must not rebind its eventual callback to newer text.
+        val seededCaption = remember(state, chatId) { composerText() }
         val preparedPreviews =
             remember(state.backedPhotos, state.preparedPhotos) {
                 state.preparedPreviews()
@@ -494,7 +498,7 @@ internal fun ConversationMediaDraftContent(
                 mediaSlots = mediaSlots,
                 documentUris = documentUris,
                 chatTitle = chatTitle,
-                initialCaption = seededCaption,
+                initialCaption = seededCaption.text,
                 onDismiss = {
                     (state.backedPhotos.keys + state.preparedPhotos.keys).forEach(state::releasePreparedPhoto)
                     onMediaSlotsChange(emptyList())

@@ -8,6 +8,8 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -127,5 +129,41 @@ class ComposerTextStateShareRevisionTest {
                 composerState.valueState.value,
             )
         }
+    }
+
+    /** Content ABA invalidates a prior token even when the visible string returns to its old value. */
+    @Test
+    fun acceptanceTokenTracksContentGenerationRatherThanOnlyTextEquality() {
+        val state = ComposerTextState(TextFieldValue("draft", TextRange(5)))
+        val token = state.acceptanceToken()
+
+        state.updateValue(TextFieldValue("interim", TextRange(7)))
+        state.updateValue(TextFieldValue("draft", TextRange(5)))
+
+        assertFalse(state.clearAccepted(token))
+        assertEquals("draft", state.valueState.value.text)
+    }
+
+    /** Selection-only changes preserve the acceptance generation because content is unchanged. */
+    @Test
+    fun selectionOnlyChangeDoesNotInvalidateAcceptedContent() {
+        val state = ComposerTextState(TextFieldValue("draft", TextRange(5)))
+        val token = state.acceptanceToken()
+
+        state.updateValue(TextFieldValue("draft", TextRange(2)))
+
+        assertTrue(state.clearAccepted(token))
+        assertEquals("", state.valueState.value.text)
+    }
+
+    /** A media callback's old token cannot clear an identical new state created by external rehydration. */
+    @Test
+    fun mediaAcceptanceTokenCannotClearAnIdenticalReplacementState() {
+        val previousState = ComposerTextState(TextFieldValue("draft", TextRange(5)))
+        val transportedToken = previousState.acceptanceToken()
+        val replacementState = ComposerTextState(TextFieldValue("draft", TextRange(5)))
+
+        assertFalse(replacementState.clearAccepted(transportedToken))
+        assertEquals("draft", replacementState.valueState.value.text)
     }
 }

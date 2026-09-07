@@ -20,12 +20,13 @@ internal data class ProfileGroupInviteToast(
     val copyable: Boolean = false,
 )
 
-/** Generation fence for deleting only the composer draft represented by one send gesture. */
+/** Draft-generation and UI-revision fence for one optimistic composer send gesture. */
 internal data class DraftSendClearToken(
     val accountRef: String,
     val groupIdHex: String,
     val generation: MessageDraftGeneration,
     val recoveryDraft: ComposerDraftSnapshot?,
+    val composerExpansionRevision: Long?,
 )
 
 internal class StartProfileChatNoActiveAccountException : IllegalStateException("No active account")

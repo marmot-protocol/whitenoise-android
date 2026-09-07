@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import android.content.Context
+import android.os.Bundle
+import android.os.Parcel
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -16,7 +19,10 @@ import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.RetainedComposerExpansion
+import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
@@ -394,6 +400,69 @@ class WarmResumeStateHolderTest {
         controller.onCleared()
     }
 
+    /**
+     * Process restoration carries only the exact bounded geometry schema; the
+     * MDK-owned draft body never enters Android saved state.
+     */
+    @Test
+    fun composerExpansionUsesBoundedShellSavedStateAcrossProcessRestoration() {
+        val savedState = SavedStateHandle()
+        val firstState = appState()
+        val holder = MainShellStateHolder(firstState, savedState)
+        firstState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue(SENSITIVE_DRAFT))
+        firstState.composerExpansionStateRetention.update(
+            ACCOUNT_REF,
+            GROUP_ID,
+            RetainedComposerExpansion(RetainedComposerExpansionMode.Manual, manualHeightDp = 240f),
+            draftGeneration = firstState.composerDraftGeneration(ACCOUNT_REF, GROUP_ID),
+        )
+        val savedBundle = checkNotNull(savedState.get<Bundle>("main_shell_composer_expansion"))
+        assertEquals(
+            setOf("account_refs", "group_ids", "modes", "manual_heights_dp"),
+            savedBundle.keySet(),
+        )
+        assertEquals(arrayListOf(ACCOUNT_REF), savedBundle.getStringArrayList("account_refs"))
+        assertEquals(arrayListOf(GROUP_ID), savedBundle.getStringArrayList("group_ids"))
+        assertEquals(
+            arrayListOf(RetainedComposerExpansionMode.Manual.name),
+            savedBundle.getStringArrayList("modes"),
+        )
+        assertArrayEquals(floatArrayOf(240f), savedBundle.getFloatArray("manual_heights_dp"), 0f)
+        assertFalse(
+            savedBundle.keySet().any { key ->
+                savedBundle.getStringArrayList(key)?.any { it.contains(SENSITIVE_DRAFT) } == true
+            },
+        )
+        holder.release()
+        val restoredBundle = savedBundle.parcelRoundTrip()
+
+        val restoredState = appState()
+        val restoredHolder =
+            MainShellStateHolder(
+                restoredState,
+                SavedStateHandle(mapOf("main_shell_composer_expansion" to restoredBundle)),
+            )
+
+        assertEquals(
+            RetainedComposerExpansion(RetainedComposerExpansionMode.Manual, manualHeightDp = 240f),
+            restoredState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+        )
+        assertNull(restoredState.composerExpansionStateRetention.preferenceFor("other-account", GROUP_ID))
+        restoredHolder.release()
+    }
+
+    /** Recreates a Bundle through Android's parcel wire format before owner restoration. */
+    private fun Bundle.parcelRoundTrip(): Bundle {
+        val parcel = Parcel.obtain()
+        return try {
+            writeToParcel(parcel, 0)
+            parcel.setDataPosition(0)
+            Bundle.CREATOR.createFromParcel(parcel)
+        } finally {
+            parcel.recycle()
+        }
+    }
+
     private fun appState(): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext<Context>(),
@@ -475,6 +544,7 @@ class WarmResumeStateHolderTest {
     }
 
     private companion object {
+        const val SENSITIVE_DRAFT = "private unsent body must stay out of saved state"
         const val ACCOUNT_REF = "warm-resume-account"
         val GROUP_ID = "1".repeat(64)
     }

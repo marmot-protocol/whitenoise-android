@@ -114,8 +114,6 @@ import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorSourceStore
 import dev.ipf.whitenoise.android.media.editor.MarmotMessageDraftGateway
-import dev.ipf.whitenoise.android.media.editor.MessageDraftConditionalDeleteResult
-import dev.ipf.whitenoise.android.media.editor.MessageDraftGeneration
 import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
@@ -1190,6 +1188,9 @@ class WhiteNoiseAppState private constructor(
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
 ) {
+    /** Process-owned, bounded composer geometry keyed by account and conversation. */
+    internal val composerExpansionStateRetention = ComposerExpansionStateRetention()
+
     constructor(context: Context) :
         this(
             context = context,
@@ -2295,6 +2296,18 @@ class WhiteNoiseAppState private constructor(
             },
         )
     private val draftSummaryRefreshLifetime = StalenessGuard()
+    private val composerDraftExpansionBridge =
+        ComposerDraftExpansionBridge(
+            draftWriter = draftWriter,
+            draftStore = draftStore,
+            draftRepository = messageDraftRepository,
+            expansionRetention = composerExpansionStateRetention,
+            scope = mutationsScope,
+            onDraftPresentationRestored = { draftHydrationRevision += 1 },
+            onCleanupFailure = { groupIdHex, cause ->
+                appStateDebug(cause) { "sent draft cleanup failed group=${groupIdHex.take(8)}" }
+            },
+        )
     private val notificationScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private val notificationLocalIdentityReader =
@@ -2418,9 +2431,14 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         value: TextFieldValue,
     ) {
-        draftStore.set(accountRef, groupIdHex, value)
-        draftWriter.submit(accountRef, groupIdHex, value.text)
+        composerDraftExpansionBridge.setDraft(accountRef, groupIdHex, value)
     }
+
+    /** Current draft generation used to bind an explicit composer resize. */
+    internal fun composerDraftGeneration(
+        accountRef: String,
+        groupIdHex: String,
+    ): Long = composerDraftExpansionBridge.generation(accountRef, groupIdHex)
 
     private fun conversationDictationDraftSnapshot(
         accountRef: String,
@@ -2447,16 +2465,7 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         expectedRevision: Long,
         value: TextFieldValue,
-    ): Boolean {
-        draftWriter.submitIfCurrent(
-            accountRef = accountRef,
-            groupIdHex = groupIdHex,
-            expected = MessageDraftGeneration(expectedRevision),
-            content = value.text,
-        ) ?: return false
-        draftStore.set(accountRef, groupIdHex, value)
-        return true
-    }
+    ): Boolean = composerDraftExpansionBridge.setDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
 
     /** Hydrates the selected composer from MDK without retaining attachment plaintext in Android state. */
     fun loadDraft(
@@ -2485,68 +2494,11 @@ class WhiteNoiseAppState private constructor(
     internal fun captureDraftForSend(
         accountRef: String?,
         groupIdHex: String,
-    ): DraftSendClearToken? =
-        accountRef?.let {
-            DraftSendClearToken(
-                accountRef = it,
-                groupIdHex = groupIdHex,
-                generation = draftWriter.generation(it, groupIdHex),
-                recoveryDraft = draftStore.getDraft(it, groupIdHex),
-            )
-        }
+    ): DraftSendClearToken? = composerDraftExpansionBridge.captureForSend(accountRef, groupIdHex)
 
-    /**
-     * Hide the accepted send from lifecycle UI while its MDK draft remains
-     * durable for crash recovery. The generation fence preserves any newer
-     * text entered after the send gesture.
-     */
-    private fun hideDraftForPendingSend(token: DraftSendClearToken): Boolean =
-        draftWriter.beginPendingSendPresentation(token.accountRef, token.groupIdHex, token.generation) {
-            if (token.recoveryDraft != null) {
-                draftStore.hideForPendingSend(token.accountRef, token.groupIdHex)
-            }
-        }
-
-    /** Restore only the exact lifecycle draft hidden by a publish that failed. */
-    private fun restoreDraftAfterFailedSend(token: DraftSendClearToken) {
-        val recoveryDraft = token.recoveryDraft ?: return
-        draftWriter.runIfCurrent(token.accountRef, token.groupIdHex, token.generation) {
-            draftStore.restoreSnapshot(token.accountRef, token.groupIdHex, recoveryDraft)
-        }
-    }
-
+    /** Clears only the draft and geometry generation durably accepted by MDK. */
     internal fun clearDraftAfterSuccessfulSend(pendingClear: DraftSendClearToken) {
-        val accountRef = pendingClear.accountRef
-        val groupIdHex = pendingClear.groupIdHex
-        val sentGeneration = pendingClear.generation
-        val cleanupGeneration =
-            draftWriter.beginSuccessfulSendCleanup(accountRef, groupIdHex, sentGeneration) {
-                // Generation ownership and lifecycle projection clear are one
-                // atomic writer action, so a concurrent accepted mutation
-                // cannot be cleared after it becomes current.
-                draftStore.set(accountRef, groupIdHex, TextFieldValue(""))
-            }
-        cleanupGeneration ?: return
-        // Generation ownership is advanced first. Clearing the lifecycle
-        // projection afterward is therefore one-way: a read captured before
-        // durable acceptance can no longer rehydrate this sent text (#2225).
-        mutationsScope.launch {
-            when (val deletion = draftWriter.deleteIfCurrent(accountRef, groupIdHex, cleanupGeneration)) {
-                is MessageDraftConditionalDeleteResult.Applied -> {
-                    when (val result = deletion.result) {
-                        is MessageDraftMutationResult.Success -> {
-                            draftWriter.runIfCurrent(accountRef, groupIdHex, cleanupGeneration) {
-                                draftStore.replaceFromAuthoritative(accountRef, groupIdHex, null, null)
-                            }
-                        }
-                        is MessageDraftMutationResult.Failure ->
-                            appStateDebug(result.cause) { "sent draft cleanup failed group=${groupIdHex.take(8)}" }
-                        else -> Unit
-                    }
-                }
-                MessageDraftConditionalDeleteResult.Superseded -> Unit
-            }
-        }
+        composerDraftExpansionBridge.clearAfterDurableAcceptance(pendingClear)
     }
 
     internal suspend fun sendConversationText(
@@ -2561,7 +2513,7 @@ class WhiteNoiseAppState private constructor(
             text = text,
             onAccepted = {
                 accepted = true
-                pendingClear?.let(::hideDraftForPendingSend)
+                pendingClear?.let(composerDraftExpansionBridge::hideForPendingSend)
                 onAccepted()
             },
             onDurablyAccepted = {
@@ -2569,7 +2521,9 @@ class WhiteNoiseAppState private constructor(
                 pendingClear?.let(::clearDraftAfterSuccessfulSend)
             },
             onTerminalFailure = {
-                if (accepted && !durablyAccepted) pendingClear?.let(::restoreDraftAfterFailedSend)
+                if (accepted && !durablyAccepted) {
+                    pendingClear?.let(composerDraftExpansionBridge::restoreAfterTerminalFailure)
+                }
             },
         )
     }
@@ -2577,9 +2531,14 @@ class WhiteNoiseAppState private constructor(
     internal suspend fun deleteDraftBeforeGroupRemoval(
         accountRef: String,
         groupIdHex: String,
-    ): MessageDraftMutationResult {
-        draftWriter.flush()
-        return messageDraftRepository.delete(accountRef, groupIdHex)
+    ): MessageDraftMutationResult = composerDraftExpansionBridge.deleteBeforeGroupRemoval(accountRef, groupIdHex)
+
+    /** Drops UI-only composer geometry when its owning conversation is explicitly removed. */
+    internal fun removeComposerExpansionForGroup(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
+        composerExpansionStateRetention.removeGroup(accountRef, groupIdHex)
     }
 
     /**
@@ -5480,6 +5439,7 @@ class WhiteNoiseAppState private constructor(
 
         // Preserve per-account durable state for later account switching, but
         // synchronously drop plaintext memory and await the decrypted-disk wipe.
+        composerExpansionStateRetention.removeAccount(signedOutRef)
         conversationDictation.onAccountUnavailable(signedOutRef)
         stopTtsForRemovedAccount(signedOutRef)
         clearInMemoryMediaCaches()
@@ -5570,6 +5530,7 @@ class WhiteNoiseAppState private constructor(
                 restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
                 return outcome
             }
+            composerExpansionStateRetention.removeAccount(wipedRef)
             clearConversationShortcutsForAccount(
                 accountRef = wipedRef,
                 includeUnscopedLegacy = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() },

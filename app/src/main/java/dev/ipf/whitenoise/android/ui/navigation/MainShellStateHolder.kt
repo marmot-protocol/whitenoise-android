@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import android.os.Bundle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -17,6 +18,8 @@ import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
+import dev.ipf.whitenoise.android.state.SavedComposerExpansion
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollSnapshot
 
@@ -184,6 +187,22 @@ internal class MainShellStateHolder(
     private val savedStateHandle: SavedStateHandle,
     private val processState: MainShellProcessState = MainShellProcessState(appState),
 ) : ViewModel() {
+    private val composerExpansionStateSubscription: AutoCloseable
+
+    init {
+        appState.composerExpansionStateRetention.restoreIfEmpty(
+            decodeComposerExpansionSavedState(savedStateHandle[SAVED_COMPOSER_EXPANSION_KEY]),
+        )
+        composerExpansionStateSubscription =
+            appState.composerExpansionStateRetention.observe { records ->
+                if (records.isEmpty()) {
+                    savedStateHandle.remove<Bundle>(SAVED_COMPOSER_EXPANSION_KEY)
+                } else {
+                    savedStateHandle[SAVED_COMPOSER_EXPANSION_KEY] = encodeComposerExpansionSavedState(records)
+                }
+            }
+    }
+
     /**
      * Activity-task-owned inbound share. Keeping this on the retained holder
      * lets configuration recreation preserve the newest request without using
@@ -444,11 +463,13 @@ internal class MainShellStateHolder(
     override fun onCleared() {
         // The Application-owned process state transfers to a fresh Activity.
         // Account/runtime replacement and process death remain its cleanup boundaries.
+        composerExpansionStateSubscription.close()
         super.onCleared()
     }
 
     /** Releases manually-owned holders used by isolated composable tests. */
     fun release() {
+        composerExpansionStateSubscription.close()
         processState.release()
     }
 
@@ -490,8 +511,50 @@ internal class MainShellStateHolder(
         const val SAVED_ACCOUNT_REF_KEY = "main_shell_selected_account_ref"
         const val SAVED_GROUP_ID_KEY = "main_shell_selected_group_id"
         const val SAVED_PENDING_SHARE_REQUEST_ID_KEY = "main_shell_pending_share_request_id"
+        const val SAVED_COMPOSER_EXPANSION_KEY = "main_shell_composer_expansion"
     }
 }
+
+/** Encodes only bounded primitive UI geometry in the shell's saved-state Bundle. */
+private fun encodeComposerExpansionSavedState(records: List<SavedComposerExpansion>): Bundle =
+    Bundle().apply {
+        putStringArrayList(COMPOSER_EXPANSION_ACCOUNTS, ArrayList(records.map { it.accountRef }))
+        putStringArrayList(COMPOSER_EXPANSION_GROUPS, ArrayList(records.map { it.groupIdHex }))
+        putStringArrayList(COMPOSER_EXPANSION_MODES, ArrayList(records.map { it.mode.name }))
+        putFloatArray(
+            COMPOSER_EXPANSION_HEIGHTS,
+            records.map { it.manualHeightDp ?: Float.NaN }.toFloatArray(),
+        )
+    }
+
+/** Fails closed when a restored Bundle is malformed or its parallel fields do not match. */
+@Suppress("ReturnCount") // Each schema field is mandatory; partial geometry must never be restored.
+private fun decodeComposerExpansionSavedState(bundle: Bundle?): List<SavedComposerExpansion> {
+    bundle ?: return emptyList()
+    val accounts = bundle.getStringArrayList(COMPOSER_EXPANSION_ACCOUNTS) ?: return emptyList()
+    val groups = bundle.getStringArrayList(COMPOSER_EXPANSION_GROUPS) ?: return emptyList()
+    val modes = bundle.getStringArrayList(COMPOSER_EXPANSION_MODES) ?: return emptyList()
+    val heights = bundle.getFloatArray(COMPOSER_EXPANSION_HEIGHTS) ?: return emptyList()
+    if (accounts.size != groups.size || accounts.size != modes.size || accounts.size != heights.size) {
+        return emptyList()
+    }
+    return accounts.indices.mapNotNull { index ->
+        val mode =
+            runCatching { RetainedComposerExpansionMode.valueOf(modes[index]) }.getOrNull()
+                ?: return@mapNotNull null
+        SavedComposerExpansion(
+            accountRef = accounts[index],
+            groupIdHex = groups[index],
+            mode = mode,
+            manualHeightDp = heights[index].takeUnless { it.isNaN() },
+        )
+    }
+}
+
+private const val COMPOSER_EXPANSION_ACCOUNTS = "account_refs"
+private const val COMPOSER_EXPANSION_GROUPS = "group_ids"
+private const val COMPOSER_EXPANSION_MODES = "modes"
+private const val COMPOSER_EXPANSION_HEIGHTS = "manual_heights_dp"
 
 internal enum class WarmResumeLifecycleClass {
     SameActivity,

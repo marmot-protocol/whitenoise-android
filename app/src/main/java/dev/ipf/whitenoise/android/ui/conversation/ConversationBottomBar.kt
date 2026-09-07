@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.DisbandedGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 
 private val ConversationTopInteractionClearance = 64.dp
 
@@ -205,7 +206,13 @@ internal fun ConversationBottomBar(
                             },
                             initialDraft = initialDraft,
                             onDraftChange = onDraftChange,
-                            draftKey = controller.group.groupIdHex,
+                            draftKey =
+                                composerDraftOwnerKey(
+                                    controller.boundAccountRef,
+                                    controller.group.groupIdHex,
+                                ),
+                            draftAccountRef = controller.boundAccountRef,
+                            draftGroupIdHex = controller.group.groupIdHex,
                             textState = composerTextState,
                             attachmentSheetState = composerAttachmentSheet,
                             editingMessageId = controller.editingMessageId,
