@@ -24,6 +24,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class GroupStateMemberRefreshGateTest {
+    /** A restored account-owned roster keeps compact chrome until authoritative verification arrives. */
     @Test
     fun restoredTwoMemberGroupSnapshotPreservesTranscriptChromeAcrossRefresh() =
         runBlocking {
@@ -51,11 +52,13 @@ class GroupStateMemberRefreshGateTest {
             assertEquals(2, firstController.memberCount)
             assertFalse(firstController.isDm)
             assertFalse(firstController.membersVerified)
+            assertTrue(firstController.hasKnownTranscriptPresentation)
             assertTrue(firstController.usesDirectTranscriptChrome)
             firstController.retryMembers()
             assertTrue(firstController.usesDirectTranscriptChrome)
         }
 
+    /** Direct projections and valid opening snapshots classify chrome without fabricating verification. */
     @Test
     fun directTranscriptChromeSurvivesRestoredAndUnprojectedOpenings() {
         val restoredSnapshot = twoMemberSnapshot()
@@ -69,6 +72,7 @@ class GroupStateMemberRefreshGateTest {
             )
         assertFalse(restoredDirectController.membersVerified)
         assertTrue(restoredDirectController.isDm)
+        assertTrue(restoredDirectController.hasKnownTranscriptPresentation)
         assertTrue(restoredDirectController.usesDirectTranscriptChrome)
 
         val unprojectedUnnamedController =
@@ -79,9 +83,11 @@ class GroupStateMemberRefreshGateTest {
             )
         assertTrue(unprojectedUnnamedController.isDm)
         assertFalse(unprojectedUnnamedController.membersVerified)
+        assertTrue(unprojectedUnnamedController.hasKnownTranscriptPresentation)
         assertTrue(unprojectedUnnamedController.usesDirectTranscriptChrome)
     }
 
+    /** A refresh failure retains this controller's snapshot but never seeds a replacement controller. */
     @Test
     fun failedRefreshKeepsLastKnownTwoMemberChromeAndDoesNotLeakToReplacementController() =
         runBlocking {
@@ -97,6 +103,8 @@ class GroupStateMemberRefreshGateTest {
             refreshFailureController.retryMembers()
             assertFalse(refreshFailureController.membersVerified)
             assertEquals(GroupRosterLoadState.FAILED, refreshFailureController.memberRosterState)
+            assertTrue(refreshFailureController.hasKnownTranscriptPresentation)
+            assertFalse(refreshFailureController.transcriptPresentationNeedsRetry)
             assertTrue(refreshFailureController.usesDirectTranscriptChrome)
 
             // Account and conversation switches replace the controller. The
@@ -104,10 +112,38 @@ class GroupStateMemberRefreshGateTest {
             // instead of inheriting the previous conversation's two-party mode.
             val replacementController = ConversationController(appState = appState(), initialGroup = group())
             assertFalse(replacementController.membersVerified)
+            assertFalse(replacementController.hasKnownTranscriptPresentation)
             assertFalse(replacementController.usesDirectTranscriptChrome)
             assertTrue(refreshFailureController.usesDirectTranscriptChrome)
         }
 
+    /** Cold failed and inconsistent rosters require recovery instead of a guessed transcript presentation. */
+    @Test
+    fun coldRosterRequiresRetryOnlyAfterFailureOrInconsistentEvidence() =
+        runBlocking {
+            var failRead = true
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    groupRosterReader = { _, _ ->
+                        if (failRead) error("roster unavailable")
+                        roster(member("alice", isAdmin = true, isSelf = true, local = true), memberCount = 2u)
+                    },
+                )
+            assertFalse(controller.hasKnownTranscriptPresentation)
+            assertFalse(controller.transcriptPresentationNeedsRetry)
+            controller.retryMembers()
+            assertEquals(GroupRosterLoadState.FAILED, controller.memberRosterState)
+            assertTrue(controller.transcriptPresentationNeedsRetry)
+            failRead = false
+            controller.retryMembers()
+            assertEquals(GroupRosterLoadState.INCONSISTENT, controller.memberRosterState)
+            assertFalse(controller.hasKnownTranscriptPresentation)
+            assertTrue(controller.transcriptPresentationNeedsRetry)
+        }
+
+    /** An explicit direct-route seed is sufficient for chrome, not for claiming a verified roster. */
     @Test
     fun directOpeningHintPreservesChromeWithoutRowOrRosterUntilAuthoritativeStateArrives() =
         runBlocking {
@@ -121,6 +157,7 @@ class GroupStateMemberRefreshGateTest {
 
             assertFalse(controller.membersVerified)
             assertTrue(controller.isDm)
+            assertTrue(controller.hasKnownTranscriptPresentation)
             assertTrue(controller.usesDirectTranscriptChrome)
 
             controller.retryMembers()

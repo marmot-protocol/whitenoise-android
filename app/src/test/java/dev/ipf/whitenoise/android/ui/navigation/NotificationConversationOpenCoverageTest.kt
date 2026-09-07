@@ -1,12 +1,30 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
 class NotificationConversationOpenCoverageTest {
+    /** Route state is published only after the awaited card cancellation has returned. */
+    @Test
+    fun routeCommitAwaitsDismissalBeforePublishingNavigationState() {
+        val source = mainShellSource()
+        val start = source.indexOf("suspend fun commitNotificationConversationOpen(chatItem: ChatListItem) {")
+        assertTrue("route commit must be suspendable", start >= 0)
+        val commit =
+            source
+                .substring(start)
+                .substringBefore("fun fallBackToChatList()")
+        val dismiss = commit.indexOf("appState.dismissNotificationRouteCards(")
+        val navigation = commit.indexOf("sectionName = MainSection.Chats.name")
+        val selected = commit.indexOf("selectedChat = chatItem")
+        assertTrue("cancellation must precede every route-state publication", dismiss >= 0 && navigation > dismiss)
+        assertTrue("selected chat must commit after cancellation", selected > navigation)
+    }
+
     @Test
     fun notificationOpenClearsSearchFocusAndRequestsUnreadAnchor() {
         val previous =
@@ -28,6 +46,70 @@ class NotificationConversationOpenCoverageTest {
         val repeated = nextNotificationConversationOpenContext(first)
 
         assertNotEquals(first.notificationOpenRequestId, repeated.notificationOpenRequestId)
+    }
+
+    /** A prior visible report cannot own a replacement request on the same retained controller. */
+    @Test
+    fun timelineVisibilityRequiresTheExactControllerRequestAndVisibleState() {
+        assertTrue(conversationTimelineReportIsCurrent(true, true, 7L, 7L))
+        assertFalse(conversationTimelineReportIsCurrent(true, true, 7L, 8L))
+        assertFalse(conversationTimelineReportIsCurrent(false, true, 7L, 7L))
+        assertFalse(conversationTimelineReportIsCurrent(true, false, 7L, 7L))
+    }
+
+    /** A same-controller request replacement invalidates its predecessor before the new report commits. */
+    @Test
+    fun timelineVisibilityOwnerInvalidatesAReplacedRequestSynchronously() {
+        val owner = ConversationTimelineVisibilityOwner<Any>()
+        val controller = Any()
+        val outgoingController = Any()
+        var selectedOwner: Any? = controller
+        var selectedRequestId = 7L
+        val publish: (Any, Long, Boolean) -> Unit = { candidateOwner, requestId, visible ->
+            owner.reportIfCurrent(candidateOwner, requestId, visible, selectedOwner, selectedRequestId)
+        }
+        val retainedRequestSevenCallback: (Boolean) -> Unit = { visible -> publish(controller, 7L, visible) }
+        val retainedOutgoingCallback: (Boolean) -> Unit = { visible -> publish(outgoingController, 8L, visible) }
+
+        retainedRequestSevenCallback(true)
+        assertTrue(owner.isCurrent(controller, notificationOpenRequestId = 7L))
+        selectedRequestId = 8L
+        assertFalse(owner.isCurrent(controller, notificationOpenRequestId = 8L))
+
+        publish(controller, 8L, true)
+        assertTrue(owner.isCurrent(controller, notificationOpenRequestId = 8L))
+        retainedRequestSevenCallback(false)
+        retainedOutgoingCallback(false)
+        assertTrue(owner.isCurrent(controller, notificationOpenRequestId = 8L))
+
+        publish(controller, 8L, false)
+        assertFalse(owner.isCurrent(controller, notificationOpenRequestId = 8L))
+        selectedOwner = outgoingController
+        assertFalse(owner.isCurrent(outgoingController, notificationOpenRequestId = 8L))
+    }
+
+    /** A newly hidden request cannot inherit a visible report from the same retained controller. */
+    @Test
+    fun notificationVisibilityIsOwnedByTheExactOpenRequest() {
+        val source = mainShellSource().replace(Regex("\\s+"), " ")
+
+        assertTrue(
+            "the visibility owner must publish one request-scoped report",
+            "ConversationTimelineVisibilityOwner<ConversationController>()" in source,
+        )
+        assertTrue(
+            "the current route must reject another request generation from the same controller",
+            "conversationTimelineVisibility.isCurrent(" in source &&
+                "owner = selectedOrPendingConversationController" in source &&
+                "notificationOpenRequestId = selectedChatOpenContext.notificationOpenRequestId" in source,
+        )
+        assertTrue(
+            "each conversation surface must publish the request generation it actually renders",
+            "conversationTimelineVisibility.reportIfCurrent(" in source &&
+                "selectedOwner = currentConversationTimelineOwner" in source &&
+                "selectedNotificationOpenRequestId = currentConversationTimelineRequestId" in source &&
+                "notificationOpenRequestId = content.openContext.notificationOpenRequestId" in source,
+        )
     }
 
     @Test

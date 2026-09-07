@@ -9,6 +9,7 @@
     <string name="error_restart_app_before_retry">Локальная загрузка переписки всё ещё выполняется. Перезапустите White Noise перед повторной попыткой.</string>
     <string name="error_loaded_content_may_be_out_of_date">Загруженные данные по-прежнему доступны, но могли устареть. Повторная попытка…</string>
     <string name="error_loaded_content_kept">Не удалось загрузить дополнительные данные. Ваши сообщения по-прежнему доступны; повторите попытку, когда будете готовы.</string>
+    <string name="error_conversation_membership_unavailable">Не удалось проверить участников этой переписки. Повторите попытку, чтобы показать сообщения.</string>
     <string name="refresh">Обновить дамп</string>
     <string name="retry">Повторить</string>
     <string name="chat_folder_members_loading">Обновление папки</string>

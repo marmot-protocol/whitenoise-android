@@ -10,8 +10,9 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class LocalNotificationRemovalFormatterTest {
+    /** Removal is one sentence while its account/group-scoped notification identity stays unchanged. */
     @Test
-    fun removalNotificationUsesMembershipIdentityAndExplainsReadOnlyHistory() {
+    fun removalNotificationUsesMembershipIdentityAndOneSentence() {
         val content =
             content(
                 update(
@@ -21,49 +22,52 @@ class LocalNotificationRemovalFormatterTest {
             )
 
         assertEquals("You were removed from Launch", content?.title)
-        assertEquals(
-            "You can view your message history, but you can no longer send messages.",
-            content?.body,
-        )
+        assertEquals("", content?.body)
         assertEquals("group-membership|account|group", content?.notificationTag)
         assertEquals(LocalNotificationFormatter.GROUP_MEMBERSHIP_NOTIFICATION_ID, content?.notificationId)
         assertNotEquals("account|group", content?.notificationTag)
     }
 
+    /** Missing group names retain a localized, meaningful title without a second sentence. */
     @Test
     fun removalNotificationFallsBackWhenTheGroupHasNoName() {
         val content = content(update(groupName = null, previewText = null))
 
         assertEquals("You were removed from a group", content?.title)
+        assertEquals("", content?.body)
     }
 
+    /** Actor summaries must not repeat the removal already stated by the title. */
     @Test
-    fun removalNotificationUsesThePayloadSummaryWhenNoOverrideIsAvailable() {
+    fun removalNotificationOmitsThePayloadSummary() {
         val content = content(update(previewText = "Alice removed you"))
 
-        assertEquals("Alice removed you", content?.body)
+        assertEquals("You were removed from General", content?.title)
+        assertEquals("", content?.body)
     }
 
+    /** Resolving the actor does not reintroduce a duplicate removal sentence. */
     @Test
-    fun resolvedRemovalSummaryTakesPrecedenceOverThePayloadSummary() {
+    fun removalNotificationOmitsTheResolvedSummary() {
         val content =
             content(
                 update(previewText = "Someone removed you"),
                 previewTextOverride = "Alice removed you",
             )
 
-        assertEquals("Alice removed you", content?.body)
+        assertEquals("", content?.body)
     }
 
+    /** A blank override cannot fall back to the redundant native summary. */
     @Test
-    fun blankRemovalSummaryOverrideFallsBackToThePayloadSummary() {
+    fun blankRemovalSummaryOverrideStillOmitsThePayloadSummary() {
         val content =
             content(
                 update(previewText = "Alice removed you"),
                 previewTextOverride = "   ",
             )
 
-        assertEquals("Alice removed you", content?.body)
+        assertEquals("", content?.body)
     }
 
     @Test

@@ -422,10 +422,17 @@ class LocalNotificationPresenter(
                 // independently of messages. They aren't repliable, so no
                 // MessagingStyle / reply / mark-read — just a plain expandable card.
                 NotificationStyleChoice.Plain -> {
-                    builder
-                        .setContentTitle(notificationContent.title)
-                        .setContentText(notificationContent.body)
-                        .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
+                    builder.setContentTitle(notificationContent.title)
+                    if (notificationContent.body.isNotBlank()) {
+                        builder
+                            .setContentText(notificationContent.body)
+                            .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
+                    } else {
+                        // Expand the same sentence for long group names without repeating its title.
+                        builder.setStyle(
+                            NotificationCompat.BigTextStyle().setBigContentTitle("").bigText(notificationContent.title),
+                        )
+                    }
                 }
 
                 // Messages stack into one per-conversation card; invites are
