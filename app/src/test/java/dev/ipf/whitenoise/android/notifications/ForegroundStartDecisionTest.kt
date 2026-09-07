@@ -126,11 +126,13 @@ class ForegroundStartDecisionTest {
         }
     }
 
+    /** Only an explicit user start owns preference rollback and an error toast after rejection. */
     @Test
     fun onlyUserToggleRejectionReconcilesBackgroundConnectionPreference() {
         assertEquals(true, shouldReconcileBackgroundConnectionRejection(ForegroundStartTrigger.UserToggle))
         assertEquals(false, shouldReconcileBackgroundConnectionRejection(ForegroundStartTrigger.PushWake))
         assertEquals(false, shouldReconcileBackgroundConnectionRejection(ForegroundStartTrigger.SystemWake))
+        assertEquals(false, shouldReconcileBackgroundConnectionRejection(ForegroundStartTrigger.CapabilityFallback))
     }
 
     @Test
@@ -193,18 +195,28 @@ class ForegroundStartDecisionTest {
         )
     }
 
+    /** Capability migration remains persistent, unlike push wake and token-sync nudges. */
     @Test
     fun pushWakeAndNativePushSyncAreOneShotForegroundStarts() {
         assertEquals(true, isOneShotForegroundStart(syncNativePushRegistrationRequested = false, ForegroundStartTrigger.PushWake))
         assertEquals(true, isOneShotForegroundStart(syncNativePushRegistrationRequested = true, ForegroundStartTrigger.SystemWake))
         assertEquals(false, isOneShotForegroundStart(syncNativePushRegistrationRequested = false, ForegroundStartTrigger.UserToggle))
+        assertEquals(
+            false,
+            isOneShotForegroundStart(
+                syncNativePushRegistrationRequested = false,
+                trigger = ForegroundStartTrigger.CapabilityFallback,
+            ),
+        )
     }
 
+    /** Capability migration does not inherit the bounded push-wake lock. */
     @Test
     fun onlyPushWakeUsesPartialWakeLock() {
         assertEquals(true, shouldHoldPushWakeLock(ForegroundStartTrigger.PushWake))
         assertEquals(false, shouldHoldPushWakeLock(ForegroundStartTrigger.UserToggle))
         assertEquals(false, shouldHoldPushWakeLock(ForegroundStartTrigger.SystemWake))
+        assertEquals(false, shouldHoldPushWakeLock(ForegroundStartTrigger.CapabilityFallback))
     }
 
     @Test
@@ -259,6 +271,7 @@ class ForegroundStartDecisionTest {
         )
     }
 
+    /** Capability migration uses the remote-messaging type and never the boot-only special-use type. */
     @Test
     fun userAndPushStartsUseRemoteMessagingForegroundServiceType() {
         assertEquals(
@@ -268,6 +281,10 @@ class ForegroundStartDecisionTest {
         assertEquals(
             ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING,
             foregroundServiceTypeForTrigger(ForegroundStartTrigger.PushWake),
+        )
+        assertEquals(
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING,
+            foregroundServiceTypeForTrigger(ForegroundStartTrigger.CapabilityFallback),
         )
     }
 }

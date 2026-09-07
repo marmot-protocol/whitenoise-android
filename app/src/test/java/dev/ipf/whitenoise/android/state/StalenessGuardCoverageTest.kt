@@ -67,6 +67,7 @@ class StalenessGuardCoverageTest {
     fun awaitThenPublishPathsAreGuardedOrExplicitlyExempt() {
         val appState = productionSource("AppState.kt")
         val controllers = productionSource("Controllers.kt")
+        val nativePushFallback = productionSource("NativePushFallbackRuntime.kt")
         val guardedPaths =
             mapOf(
                 "AppState.kt:refreshAccountUnreadCounts" to
@@ -81,6 +82,32 @@ class StalenessGuardCoverageTest {
                     listOf("profileCacheLifetime.capture", "profileCacheLifetime.isCurrent"),
                 "AppState.kt:processNotificationUpdate" to
                     listOf("notificationPostEpoch.capture", "epoch = postEpoch", "postInitialNotificationUpdate"),
+                "AppState.kt:reconcileUnavailableNativePushFallback" to
+                    listOf(
+                        "captureNativePushFallbackOwner",
+                        "ownerIsCurrent = ::ownsNativePushFallback",
+                        "nativePushFallback.reconcile",
+                    ),
+                "AppState.kt:clearPushRegistrationForOwnerLocked" to
+                    listOf("ownsNativePushFallback(owner)", "clearPending(owner.accountRef)"),
+                "NativePushFallbackRuntime.kt:reconcile" to
+                    listOf("readNativePushFallbackSettings", "ownerIsCurrent", "ensurePersistentFallback"),
+                "NativePushFallbackRuntime.kt:ensurePersistentFallback" to
+                    listOf(
+                        "requiresPersistentConnection",
+                        "ensureNativePushFallbackRuntime",
+                        "ownerIsCurrent",
+                        "intentLifetime.isCurrent",
+                    ),
+                "NativePushFallbackRuntime.kt:ensureNativePushFallbackRuntime" to
+                    listOf(
+                        "persistBackgroundConnectionEnabled",
+                        "intentIsCurrent",
+                        "readiness.request",
+                        "ownerIsCurrent",
+                    ),
+                "NativePushFallbackRuntime.kt:disableNativePushAfterFallbackReady" to
+                    listOf("recordPendingRegistrationClear", "ensureActive", "ownerIsCurrent", "fallbackIsReady"),
                 "Controllers.kt:bind" to listOf("bindLifetime.advance", "bindEpoch"),
                 "Controllers.kt:schedulePendingMemberFetches" to
                     listOf("bindEpoch", "memberCacheEpoch", "memberCacheLifetime.isCurrent"),
@@ -109,7 +136,12 @@ class StalenessGuardCoverageTest {
             )
         guardedPaths.forEach { (path, markers) ->
             val (fileName, functionName) = path.split(':', limit = 2)
-            val source = if (fileName == "AppState.kt") appState else controllers
+            val source =
+                when (fileName) {
+                    "AppState.kt" -> appState
+                    "NativePushFallbackRuntime.kt" -> nativePushFallback
+                    else -> controllers
+                }
             val body = source.functionSection(functionName)
             markers.forEach { marker ->
                 assertTrue("$path must retain $marker", marker in body)
@@ -234,6 +266,7 @@ class StalenessGuardCoverageTest {
                     listOf("messageProgressGeneration", "edgeRequestGeneration", "parkedTerminalGeneration"),
                 "NotificationStreamForegroundService.kt" to
                     listOf("pendingPushWakeGeneration", "completedPushWakeGeneration"),
+                "NativePushFallbackRuntime.kt" to listOf("sequence"),
                 "AvatarImageLoader.kt" to listOf("preWarmQueuedGeneration"),
                 "AccountUnreadStore.kt" to listOf("revision"),
             )
@@ -259,6 +292,28 @@ class StalenessGuardCoverageTest {
         }
     }
 
+    /** Keeps extracted top-level helper checks inside their own declaration boundary. */
+    @Test
+    fun topLevelGuardWindowsDoNotBorrowFromTheNextHelper() {
+        val source =
+            """
+            internal suspend fun firstHelper() {
+                persistBackgroundConnectionEnabled()
+            }
+            internal suspend fun nextHelper() {
+                ownerIsCurrent()
+            }
+            """.trimIndent()
+
+        val first = source.functionSection("firstHelper")
+        assertTrue("the helper must retain its own persistence boundary", "persistBackgroundConnectionEnabled" in first)
+        assertFalse("a later helper cannot satisfy this helper's ownership guard", "ownerIsCurrent" in first)
+        assertTrue(
+            "the next helper remains independently auditable",
+            "ownerIsCurrent" in source.functionSection("nextHelper"),
+        )
+    }
+
     /** Finds suspended functions that later assign mutable state owned by their class. */
     private fun asyncPublicationCandidates(
         fileName: String,
@@ -269,7 +324,7 @@ class StalenessGuardCoverageTest {
                 .findAll(source)
                 .map { it.groupValues[1] }
                 .toSet()
-        return source.classFunctionSections().mapNotNullTo(mutableSetOf()) { (name, body) ->
+        return source.functionSections().mapNotNullTo(mutableSetOf()) { (name, body) ->
             if ("suspend" !in body.substringBefore('(')) {
                 return@mapNotNullTo null
             }
@@ -289,11 +344,11 @@ class StalenessGuardCoverageTest {
         }
     }
 
-    /** Splits class-level functions into source slices suitable for lightweight policy checks. */
-    private fun String.classFunctionSections(): List<Pair<String, String>> {
+    /** Splits functions at one declaration indentation into bounded source-policy windows. */
+    private fun String.functionSections(indentation: String = "    "): List<Pair<String, String>> {
         val declarations =
             Regex(
-                """(?m)^ {4}(?:(?:private|internal|public|protected)\s+)?""" +
+                """(?m)^${Regex.escape(indentation)}(?:(?:private|internal|public|protected)\s+)?""" +
                     """(?:(?:suspend|inline|operator|override|open)\s+)*fun\s+(?:\w+\.)?(\w+)\s*\(""",
             ).findAll(this).toList()
         return declarations.mapIndexed { index, match ->
@@ -302,9 +357,9 @@ class StalenessGuardCoverageTest {
         }
     }
 
-    /** Returns the source slice for the named class-level function. */
+    /** Finds the named class member or top-level helper without borrowing the next helper's guards. */
     private fun String.functionSection(functionName: String): String =
-        classFunctionSections().firstOrNull { it.first == functionName }?.second
+        (functionSections() + functionSections(indentation = "")).firstOrNull { it.first == functionName }?.second
             ?: error("Missing function $functionName")
 
     /** Loads the production files that own audited latest-wins paths. */

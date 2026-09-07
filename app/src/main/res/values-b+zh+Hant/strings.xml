@@ -460,7 +460,9 @@
     <string name="keep_connected_subtitle">在 White Noise 後台執行時接收訊息。</string>
     <string name="native_push">推播通知</string>
     <string name="native_push_subtitle">中繼有新事件需要送達時喚醒應用程式。</string>
-    <string name="native_push_unavailable_subtitle">需要 Google Play 服務，以及配置了推播伺服器的構建版本。</string>
+    <string name="native_push_missing_server_subtitle">此構建版本未設定推播伺服器，因此無法使用推播通知。</string>
+    <string name="native_push_google_play_unavailable_subtitle">推播通知需要此裝置提供相容的 Google Play 服務。</string>
+    <string name="native_push_firebase_unavailable_subtitle">Firebase 未設定或無法初始化，因此無法使用推播通知。</string>
     <string name="notification_categories">通知類別</string>
     <string name="notification_categories_subtitle">Android 控制每個類別的聲音、震動、重要性和勿擾模式。</string>
     <string name="notification_defaults">所有聊天的預設設定</string>

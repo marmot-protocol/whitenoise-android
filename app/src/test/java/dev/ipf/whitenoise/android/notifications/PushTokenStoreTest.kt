@@ -136,7 +136,7 @@ class PushTokenStoreTest {
     @Test
     fun recordPendingClearAddsTheRef() {
         val store = store()
-        store.recordPendingClear("npub-a")
+        assertTrue(store.recordPendingClear("npub-a"))
         assertEquals(setOf("npub-a"), store.pendingClears())
     }
 
@@ -145,6 +145,20 @@ class PushTokenStoreTest {
         val store = store()
         store.recordPendingClear("npub-a")
         store.recordPendingClear("npub-a")
+        assertEquals(setOf("npub-a"), store.pendingClears())
+    }
+
+    /** A failed disk commit is retried even though SharedPreferences already exposes the in-memory marker. */
+    @Test
+    fun recordPendingClearRecommitsAnInMemoryMarkerAfterCommitFailure() {
+        val preferences = FakeSharedPreferences(ArrayDeque(listOf(false, true)))
+        val store = PushTokenStore(preferences)
+
+        assertFalse(store.recordPendingClear("npub-a"))
+        assertEquals(setOf("npub-a"), store.pendingClears())
+        assertTrue(store.recordPendingClear("npub-a"))
+
+        assertEquals(2, preferences.commitCalls)
         assertEquals(setOf("npub-a"), store.pendingClears())
     }
 
@@ -392,8 +406,12 @@ class PushTokenStoreTest {
      * (the documented Android sharing hazard) on purpose, so the defensive-copy
      * tests genuinely exercise pendingClears()/pendingDisables().
      */
-    private class FakeSharedPreferences : SharedPreferences {
+    private class FakeSharedPreferences(
+        private val commitResults: ArrayDeque<Boolean> = ArrayDeque(),
+    ) : SharedPreferences {
         private val values: MutableMap<String, Any?> = Collections.synchronizedMap(HashMap())
+        var commitCalls = 0
+            private set
 
         override fun getString(
             key: String?,
@@ -501,8 +519,9 @@ class PushTokenStoreTest {
             }
 
             override fun commit(): Boolean {
+                commitCalls += 1
                 flush()
-                return true
+                return commitResults.removeFirstOrNull() ?: true
             }
 
             override fun apply() = flush()
