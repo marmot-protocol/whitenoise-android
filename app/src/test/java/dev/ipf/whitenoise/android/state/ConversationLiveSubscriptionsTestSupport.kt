@@ -174,9 +174,11 @@ internal fun timelineRecord(
         retentionExpiresAt = null,
     )
 
+/** Builds an isolated live-subscription state with explicit conversation-account ownership. */
 internal fun conversationTimelineTestAppState(
     liveSubscriptions: ConversationLiveSubscriptions,
     recoveryDiagnostics: NotificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
+    accountRef: String = ConversationTimelineTestIds.ACCOUNT_REF,
 ): WhiteNoiseAppState =
     WhiteNoiseAppState(
         context = ApplicationProvider.getApplicationContext<Context>(),
@@ -185,7 +187,7 @@ internal fun conversationTimelineTestAppState(
         accounts =
             listOf(
                 AccountSummaryFfi(
-                    label = ConversationTimelineTestIds.ACCOUNT_REF,
+                    label = accountRef,
                     accountIdHex = ConversationTimelineTestIds.ACCOUNT_ID,
                     localSigning = true,
                     externalSigning = false,
@@ -193,7 +195,7 @@ internal fun conversationTimelineTestAppState(
                     running = true,
                 ),
             ),
-        activeAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,
+        activeAccountRef = accountRef,
         notificationNetworkRecoveryDiagnostics = recoveryDiagnostics,
     ).also { state ->
         state.liveSubscriptionOverrides.conversation = liveSubscriptions
