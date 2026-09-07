@@ -10,10 +10,11 @@ import java.io.File
 import java.time.Instant
 
 class FreshSweepCoverageTest {
+    /** Pins selection memoization to its own derivation block, independent of earlier reveal effects. */
     @Test
     fun conversationSelectionDerivationsAreRememberedByTheirRealInputs() {
         val source = source("ui/conversation/ConversationScreen.kt")
-        val block = source.substring(source.indexOf("val renderedTimeline ="), source.indexOf("LaunchedEffect(", source.indexOf("val renderedTimeline =")))
+        val block = source.section("val selectableMessageProjections =", "LaunchedEffect(")
 
         assertTrue("selectable message projections must be memoized", "val selectableMessageProjections =\n        remember(" in block)
         val projectionsStart = block.indexOf("val selectableMessageProjections =")
@@ -28,6 +29,7 @@ class FreshSweepCoverageTest {
         )
         val rememberInputs = projectionsBlock.substring(rememberStart, rememberEnd)
 
+        assertTrue("timeline changes must invalidate projections", "renderedTimeline" in rememberInputs)
         assertTrue("deletions must invalidate projections", "controller.deletedMessageIds" in projectionsBlock)
         assertTrue("edits must invalidate projections", "controller.editsByTarget" in projectionsBlock)
         assertTrue("retention expiry must invalidate projections", "eligibilityNowSeconds" in rememberInputs)

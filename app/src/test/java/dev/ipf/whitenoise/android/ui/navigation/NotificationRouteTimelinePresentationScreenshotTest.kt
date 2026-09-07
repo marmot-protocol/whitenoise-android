@@ -609,9 +609,13 @@ abstract class NotificationRouteTimelinePresentationFixture {
         ) {
             handled.get()
         }
-        awaitCondition(
+        awaitInitialRouteCondition(
             failureMessage = {
-                "authoritative routed timeline did not mount: ${routeState(appState, handled = handled)} " +
+                val observedController = appState.attachedConversationControllersForTest().singleOrNull()
+                "authoritative routed timeline did not mount: " +
+                    "${routeState(appState, mountedController = observedController, handled = handled)} " +
+                    "authoritative=${observedController?.hasPublishedAuthoritativeTimeline} " +
+                    "loading=${observedController?.isLoading} loadFailure=${observedController?.error != null} " +
                     "expectedMessageCount=${expectedMessageIds.size}"
             },
         ) {
@@ -620,6 +624,21 @@ abstract class NotificationRouteTimelinePresentationFixture {
             } == true
         }
         return appState.attachedConversationControllersForTest().single()
+    }
+
+    /** Yields real worker time without advancing the controller's bounded initial-read deadline. */
+    protected fun awaitInitialRouteCondition(
+        failureMessage: () -> String,
+        condition: () -> Boolean,
+    ) {
+        val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(ROUTE_TIMEOUT_MILLIS)
+        while (System.nanoTime() <= deadlineNanos) {
+            composeRule.waitForIdle()
+            ShadowLooper.idleMainLooper()
+            if (condition()) return
+            Thread.sleep(POLL_INTERVAL_MILLIS)
+        }
+        throw AssertionError(failureMessage())
     }
 
     /** Forces the mounted notification conversation through a background reconnect. */
