@@ -1,27 +1,12 @@
-name: Android Production Release
+name: Android Production Build
 
 on:
   workflow_dispatch:
     inputs:
       expected_version:
-        description: Exact app versionName to build (for example 2026.9.4)
+        description: Exact app versionName to build (for example 2026.9.9)
         required: true
         type: string
-      create_github_draft:
-        description: Create or refresh a draft GitHub release
-        required: true
-        default: true
-        type: boolean
-      publish_zapstore:
-        description: Publish the verified APK and listing to Zapstore
-        required: true
-        default: false
-        type: boolean
-      upload_play_internal:
-        description: Release the verified AAB to the selected Play internal testers
-        required: true
-        default: false
-        type: boolean
 
 concurrency:
   group: android-production-release
@@ -32,6 +17,7 @@ permissions:
 
 jobs:
   prepare:
+    if: github.ref == 'refs/heads/master'
     name: Build and verify release bundle
     runs-on: ubuntu-latest
     timeout-minutes: 75
@@ -44,6 +30,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
@@ -124,156 +111,35 @@ jobs:
           WHITENOISE_PLAY_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.WHITENOISE_PLAY_UPLOAD_KEYSTORE_PASSWORD }}
           WHITENOISE_PLAY_UPLOAD_KEY_ALIAS: ${{ secrets.WHITENOISE_PLAY_UPLOAD_KEY_ALIAS }}
           WHITENOISE_PLAY_UPLOAD_KEY_PASSWORD: ${{ secrets.WHITENOISE_PLAY_UPLOAD_KEY_PASSWORD }}
-          WHITENOISE_PRODUCTION_OTLP_ENDPOINT: ${{ vars.WHITENOISE_PRODUCTION_OTLP_ENDPOINT }}
+          WHITENOISE_OTLP_ENDPOINT: ${{ secrets.WHITENOISE_OTLP_ENDPOINT }}
           WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN: ${{ secrets.WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN }}
-          WHITENOISE_PRODUCTION_AUDIT_LOG_ENDPOINT: ${{ vars.WHITENOISE_PRODUCTION_AUDIT_LOG_ENDPOINT }}
-          WHITENOISE_PRODUCTION_AUDIT_LOG_AUTH_TOKEN: ${{ secrets.WHITENOISE_PRODUCTION_AUDIT_LOG_AUTH_TOKEN }}
-          WHITENOISE_PRODUCTION_TELEMETRY_TENANT: ${{ vars.WHITENOISE_PRODUCTION_TELEMETRY_TENANT }}
-          WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX: ${{ vars.WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX }}
-          WHITENOISE_PRODUCTION_PUSH_RELAY_HINT: ${{ vars.WHITENOISE_PRODUCTION_PUSH_RELAY_HINT }}
-        run: ./scripts/prepare-production-release.sh --expected-version "${{ inputs.expected_version }}"
+          WHITENOISE_AUDIT_LOG_ENDPOINT: ${{ secrets.WHITENOISE_AUDIT_LOG_ENDPOINT }}
+          WHITENOISE_AUDIT_LOG_AUTH_TOKEN: ${{ secrets.WHITENOISE_AUDIT_LOG_AUTH_TOKEN }}
+          WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX: ${{ secrets.WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX }}
+          WHITENOISE_PUSH_RELAY_HINT: ${{ secrets.WHITENOISE_PUSH_RELAY_HINT }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: ./scripts/prepare-production-release.sh --expected-version "$EXPECTED_VERSION"
 
       - name: Upload verified release bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: android-production-${{ steps.version.outputs.name }}-${{ github.sha }}
+          name: android-production-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/production-release/
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 30
 
-  github-draft:
-    name: Create draft GitHub release
-    needs: prepare
-    if: ${{ inputs.create_github_draft && github.ref_name == 'master' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout release notes
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Download verified release bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: android-production-${{ needs.prepare.outputs.version }}-${{ github.sha }}
-          path: build/production-release
-
-      - name: Create or refresh draft
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION_NAME: ${{ needs.prepare.outputs.version }}
-        run: |
-          set -euo pipefail
-          tag="android-v$VERSION_NAME"
-          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            is_draft="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)"
-            [[ "$is_draft" == true ]] || { echo "Refusing to replace published release $tag" >&2; exit 1; }
-            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
-              --draft --title "White Noise Android $VERSION_NAME" \
-              --notes-file build/production-release/release-notes-en-US.txt
-            gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber build/production-release/*
-          else
-            gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
-              --draft --target "$GITHUB_SHA" \
-              --title "White Noise Android $VERSION_NAME" \
-              --notes-file build/production-release/release-notes-en-US.txt \
-              build/production-release/*
-          fi
-
-  zapstore:
-    name: Publish Zapstore release
-    needs: prepare
-    if: ${{ inputs.publish_zapstore && github.ref_name == 'master' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment: zapstore-production
-
-    steps:
-      - name: Checkout release configuration
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Download verified release bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: android-production-${{ needs.prepare.outputs.version }}-${{ github.sha }}
-          path: build/production-release
-
-      - name: Install pinned ZSP
-        run: ./scripts/install-zsp.sh "$RUNNER_TEMP/bin/zsp"
-
-      - name: Restore the Zapstore signer client identity
-        shell: bash
-        env:
-          SIGN_WITH: ${{ secrets.ZAPSTORE_SIGN_WITH }}
-          BUNKER_CLIENT_KEY: ${{ secrets.ZAPSTORE_BUNKER_CLIENT_KEY }}
-        run: |
-          set -euo pipefail
-          [[ -n "$SIGN_WITH" ]] || { echo "Missing ZAPSTORE_SIGN_WITH" >&2; exit 1; }
-          if [[ "$SIGN_WITH" == bunker://* ]]; then
-            [[ "$BUNKER_CLIENT_KEY" =~ ^[0-9a-fA-F]{64}$ ]] || {
-              echo "ZAPSTORE_BUNKER_CLIENT_KEY must contain 64 hex characters when using a bunker signer" >&2
-              exit 1
-            }
-            signer_pubkey="${SIGN_WITH#bunker://}"
-            signer_pubkey="${signer_pubkey%%\?*}"
-            signer_pubkey="$(printf '%s' "$signer_pubkey" | tr '[:upper:]' '[:lower:]')"
-            [[ "$signer_pubkey" =~ ^[0-9a-f]{64}$ ]] || {
-              echo "ZAPSTORE_SIGN_WITH contains an invalid bunker signer pubkey" >&2
-              exit 1
-            }
-            zsp_config="$RUNNER_TEMP/zsp-config"
-            key_dir="$zsp_config/zsp/bunker-keys"
-            umask 077
-            mkdir -p "$key_dir"
-            printf '%s\n' "$BUNKER_CLIENT_KEY" > "$key_dir/$signer_pubkey.key"
-            printf 'XDG_CONFIG_HOME=%s\n' "$zsp_config" >> "$GITHUB_ENV"
-          fi
-
-      - name: Publish verified APK and metadata
-        env:
-          SIGN_WITH: ${{ secrets.ZAPSTORE_SIGN_WITH }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: >-
-          "$RUNNER_TEMP/bin/zsp" publish -y
-          --commit "$GITHUB_SHA"
-          zapstore.yaml
-
-  play-internal:
-    name: Release to Play internal testers
-    needs: prepare
-    if: ${{ inputs.upload_play_internal && github.ref_name == 'master' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment: google-play-internal
-
-    steps:
-      - name: Download verified release bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: android-production-${{ needs.prepare.outputs.version }}-${{ github.sha }}
-          path: build/production-release
-
-      - name: Prepare localized Play release notes
+      - name: Record candidate identity for review
         shell: bash
         run: |
-          mkdir -p build/play-whats-new
-          cp build/production-release/release-notes-en-US.txt build/play-whats-new/whatsnew-en-US
-
-      - name: Upload and release internal track
-        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: dev.ipf.whitenoise.android
-          releaseFiles: build/production-release/*.aab
-          tracks: internal
-          status: completed
-          releaseName: White Noise ${{ needs.prepare.outputs.version }}
-          whatsNewDirectory: build/play-whats-new
-          mappingFile: build/production-release/mapping-${{ needs.prepare.outputs.version }}.txt
+          python3 - <<'PYCODE'
+          import hashlib, json, os
+          from pathlib import Path
+          path = Path("build/production-release/release-manifest.json")
+          manifest = json.loads(path.read_text())
+          digest = hashlib.sha256(path.read_bytes()).hexdigest()
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write(f"Candidate {manifest['versionName']} / code {manifest['versionCode']}\n\n")
+              summary.write(f"Source: `{manifest['sourceCommit']}`\n\nBuild run: `{os.environ['GITHUB_RUN_ID']}`\n\n")
+              summary.write(f"Manifest SHA-256: `{digest}`\n\n")
+              summary.write("No release or store publication occurred. Review and test these artifacts before distribution.\n")
+          PYCODE

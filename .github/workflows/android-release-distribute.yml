@@ -1,0 +1,102 @@
+name: Android Release - GitHub Draft or Play Internal
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Successful Android Production Build run ID whose artifacts were reviewed
+        required: true
+        type: string
+      expected_version:
+        description: Exact versionName of the reviewed candidate
+        required: true
+        type: string
+      manifest_sha256:
+        description: SHA-256 of the reviewed release-manifest.json from that build
+        required: true
+        type: string
+      destination:
+        description: Destination (Play is internal testing only)
+        required: true
+        type: choice
+        default: github-draft
+        options:
+          - github-draft
+          - play-internal
+
+concurrency:
+  group: android-release-distribution
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  github-draft:
+    if: github.ref == 'refs/heads/master' && inputs.destination == 'github-draft'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Checkout trusted workflow tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Fetch and verify the reviewed candidate
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN_ID: ${{ inputs.build_run_id }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+          MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
+        run: >-
+          python3 scripts/release_bundle.py fetch
+          --run-id "$BUILD_RUN_ID" --version "$EXPECTED_VERSION"
+          --manifest-sha256 "$MANIFEST_SHA256"
+      - name: Create or resume matching GitHub draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/release_bundle.py github-draft
+
+  play-internal:
+    if: github.ref == 'refs/heads/master' && inputs.destination == 'play-internal'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: google-play-internal
+    steps:
+      - name: Checkout trusted workflow tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Fetch and verify the reviewed candidate
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN_ID: ${{ inputs.build_run_id }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+          MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
+        run: >-
+          python3 scripts/release_bundle.py fetch
+          --run-id "$BUILD_RUN_ID" --version "$EXPECTED_VERSION"
+          --manifest-sha256 "$MANIFEST_SHA256"
+      - name: Prepare localized Play release notes
+        run: |
+          mkdir -p build/play-whats-new
+          cp build/production-release/release-notes-en-US.txt build/play-whats-new/whatsnew-en-US
+
+      - name: Upload reviewed AAB to internal testing only
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: dev.ipf.whitenoise.android
+          releaseFiles: build/production-release/*.aab
+          tracks: internal
+          status: completed
+          releaseName: White Noise ${{ steps.candidate.outputs.version }}
+          whatsNewDirectory: build/play-whats-new
+          mappingFile: build/production-release/mapping-${{ steps.candidate.outputs.version }}.txt

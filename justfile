@@ -94,7 +94,7 @@ production-release version="":
 verify-release-metadata:
     ./scripts/check-release-metadata.py
 
-# Regenerate Play/Zapstore listing images from deterministic app screenshots.
+# Regenerate the icon and feature graphic; preserve curated phone screenshots.
 store-assets:
     ./scripts/generate-store-assets.sh
 

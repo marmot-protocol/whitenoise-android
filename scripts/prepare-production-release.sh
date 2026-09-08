@@ -14,7 +14,6 @@ Options:
   --allow-incomplete-runtime   Permit missing production push/telemetry values
                                for a non-publishable local rehearsal
   --expected-version <name>    Require the canonical versionName to match
-  --skip-build                 Verify currently built APK/AAB outputs
   --help                       Show this help
 EOF
 }
@@ -22,7 +21,6 @@ EOF
 allow_dirty=false
 allow_incomplete_runtime=false
 expected_version=""
-skip_build=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --allow-dirty)
@@ -40,10 +38,6 @@ while [[ $# -gt 0 ]]; do
       fi
       expected_version="$2"
       shift 2
-      ;;
-    --skip-build)
-      skip_build=true
-      shift
       ;;
     --help|-h)
       usage
@@ -108,10 +102,7 @@ production_runtime_value() {
   # Keep the release guard aligned with the canonical defaults compiled by
   # app/build.gradle.kts. These public identifiers are not credentials.
   case "$property_name" in
-    WHITENOISE_PRODUCTION_TELEMETRY_TENANT)
-      printf '%s' 'whitenoise-android'
-      ;;
-    WHITENOISE_PRODUCTION_PUSH_RELAY_HINT)
+    WHITENOISE_PUSH_RELAY_HINT)
       printf '%s' 'wss://relay.eu.whitenoise.chat'
       ;;
   esac
@@ -144,13 +135,12 @@ fi
 
 runtime_missing=""
 for runtime_name in \
-  WHITENOISE_PRODUCTION_OTLP_ENDPOINT \
+  WHITENOISE_OTLP_ENDPOINT \
   WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN \
-  WHITENOISE_PRODUCTION_AUDIT_LOG_ENDPOINT \
-  WHITENOISE_PRODUCTION_AUDIT_LOG_AUTH_TOKEN \
-  WHITENOISE_PRODUCTION_TELEMETRY_TENANT \
+  WHITENOISE_AUDIT_LOG_ENDPOINT \
+  WHITENOISE_AUDIT_LOG_AUTH_TOKEN \
   WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX \
-  WHITENOISE_PRODUCTION_PUSH_RELAY_HINT; do
+  WHITENOISE_PUSH_RELAY_HINT; do
   if [[ -z "$(production_runtime_value "$runtime_name")" ]]; then
     runtime_missing="$runtime_missing $runtime_name"
   fi
@@ -171,14 +161,16 @@ if [[ -n "$runtime_missing" ]]; then
 fi
 
 "$repo_dir/scripts/check-release-metadata.py"
+# Fail before building if this version already identifies another source commit.
+python3 "$repo_dir/scripts/release_bundle.py" check-tag --source "$source_sha" --version "$version_name"
+bundletool="$repo_dir/build/tools/bundletool.jar"
+"$repo_dir/scripts/install-bundletool.sh" "$bundletool"
 
-if [[ "$skip_build" != true ]]; then
-  "$repo_dir/scripts/release.sh" --flavor production --abi arm64-v8a
-  (
-    cd "$repo_dir"
-    ./gradlew :app:bundleProductionPlayRelease -Pandroid.injected.testOnly=false
-  )
-fi
+"$repo_dir/scripts/release.sh" --flavor production --abi arm64-v8a
+(
+  cd "$repo_dir"
+  ./gradlew :app:bundleProductionPlayRelease -Pandroid.injected.testOnly=false
+)
 
 apk_source_dir="$repo_dir/app/build/outputs/apk/productionZapstore/release"
 aab_source="$repo_dir/app/build/outputs/bundle/productionPlayRelease/app-production-play-release.aab"
@@ -229,10 +221,28 @@ if [[ "$actual_play_upload_sha" != "$expected_play_upload_sha" ]]; then
   exit 1
 fi
 
+java -jar "$bundletool" validate --bundle="$aab_source" >/dev/null
+for field in package android:versionCode android:versionName; do
+  actual="$(java -jar "$bundletool" dump manifest --bundle="$aab_source" --xpath="/manifest/@$field")"
+  case "$field" in
+    package) expected="$application_id" ;;
+    android:versionCode) expected="$version_code" ;;
+    android:versionName) expected="$version_name" ;;
+  esac
+  [[ "$actual" == "$expected" ]] || { echo "error: AAB $field differs from canonical release identity" >&2; exit 1; }
+done
+
 aab_abis="$(unzip -Z1 "$aab_source" | awk -F/ '/^base\/lib\/[^\/]+\/.*\.so$/ { print $3 }' | sort -u | paste -sd, -)"
 if [[ "$aab_abis" != "arm64-v8a,armeabi-v7a,x86,x86_64" ]]; then
   echo "error: Play App Bundle does not contain the expected four ABIs; found: $aab_abis" >&2
   exit 1
+fi
+
+[[ "$(git -C "$repo_dir" rev-parse HEAD)" == "$source_sha" ]] || {
+  echo 'error: source commit changed during build' >&2; exit 1;
+}
+if [[ "$allow_dirty" != true && -n "$(git -C "$repo_dir" status --porcelain --untracked-files=normal)" ]]; then
+  echo 'error: source worktree changed during build' >&2; exit 1
 fi
 
 rm -rf "$output_dir"
@@ -245,18 +255,18 @@ cp "$aab_source" "$aab_output"
 cp "$repo_dir/fastlane/metadata/android/en-US/changelogs/$version_code.txt" "$notes_output"
 
 mapping_source="$repo_dir/app/build/outputs/mapping/productionPlayRelease/mapping.txt"
-if [[ -f "$mapping_source" ]]; then
-  cp "$mapping_source" "$output_dir/mapping-$version_name.txt"
-fi
+[[ -s "$mapping_source" ]] || { echo "error: missing Play R8 mapping" >&2; exit 1; }
+cp "$mapping_source" "$output_dir/mapping-$version_name.txt"
 
 (
   cd "$repo_dir"
-  zip -q -r "$output_dir/store-assets-$version_name.zip" fastlane/metadata/android/en-US
+  zip -q -r "$output_dir/store-assets-$version_name.zip" fastlane/metadata/android/en-US zapstore.yaml
 )
 
 python3 - "$output_dir" "$application_id" "$version_name" "$version_code" "$source_sha" "$worktree_dirty" "$runtime_complete" "$runtime_missing" "$actual_app_signing_sha" "$actual_play_upload_sha" "$zsp_version" <<'PY'
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -271,7 +281,9 @@ for artifact in sorted(output_dir.iterdir()):
     }
 
 manifest = {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
+    "buildRunId": os.environ.get("GITHUB_RUN_ID", ""),
+    "buildRunAttempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
     "applicationId": sys.argv[2],
     "versionName": sys.argv[3],
     "versionCode": int(sys.argv[4]),

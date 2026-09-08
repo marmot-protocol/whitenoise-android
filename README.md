@@ -281,8 +281,13 @@ all ABI/version invariants, and collect the release manifest, checksums, release
 notes, and store assets together, run:
 
 ```bash
-just production-release 2026.9.4
+just production-release <version>
 ```
+
+The manual **Android Production Build** workflow creates the candidate without
+publishing. A separate workflow distributes reviewed artifacts to a GitHub draft
+or Play internal testing. Public Zapstore publication requires its own workflow,
+version-specific confirmation, and protected-environment approval.
 
 The verified bundle is written to `build/production-release/`. Zapstore and
 GitHub must distribute the exact APK from that directory; rebuilding or
