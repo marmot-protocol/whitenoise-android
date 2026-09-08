@@ -18,15 +18,10 @@ internal class AccountSetupAutomation {
     }
 }
 
-/** Optional missing metadata is background work, never a separate confirmation screen. */
+/** Follow-list checks advance in the background; a missing profile keeps its edit-or-skip choice. */
 internal val AccountSetupState.optionalMetadataPending: Boolean
     get() {
-        val optional =
-            currentStep?.step in
-                setOf(
-                    dev.ipf.marmotkit.OnboardingStepFfi.PROFILE,
-                    dev.ipf.marmotkit.OnboardingStepFfi.FOLLOWS,
-                )
+        val optional = currentStep?.step == dev.ipf.marmotkit.OnboardingStepFfi.FOLLOWS
         val interrupted = snapshot?.cancellationPending == true
         return optional && !interrupted && snapshot?.proposal == null
     }

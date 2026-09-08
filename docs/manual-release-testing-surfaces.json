@@ -7619,6 +7619,24 @@
         "test_ids": [
           "ONB-014"
         ]
+      },
+      {
+        "surface": "Profile edit-or-skip decision remains visible while follows advance automatically",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupAutomation.kt",
+        "anchor": "internal val AccountSetupState.optionalMetadataPending",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014"
+        ]
+      },
+      {
+        "surface": "Automatic defaults skip only follows and preserve the native profile decision",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDefaults.kt",
+        "anchor": "private fun OnboardingStepStateFfi.canSkipFollows()",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014"
+        ]
       }
     ],
     "notification_content_contracts": [

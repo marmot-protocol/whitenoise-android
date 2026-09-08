@@ -34,13 +34,16 @@ class AccountSetupContentTest {
     private var reconnected = 0
     private var details = 0
 
-    /** Missing profile metadata has no decision buttons or expanded checklist. */
+    /** Missing profile metadata offers working edit and skip choices without expanding the checklist. */
     @Test
-    fun missingProfileDoesNotInterruptSetup() {
+    fun missingProfileOffersEditAndSkip() {
         show(AccountSetupState(snapshot = setupSnapshot()))
-        composeRule.onNodeWithTag("setup-action-EDIT_PROFILE").assertDoesNotExist()
-        composeRule.onNodeWithTag("setup-action-CONTINUE_WITHOUT").assertDoesNotExist()
-        composeRule.onNodeWithText("Checking your account…").assertIsDisplayed()
+        composeRule.onNodeWithTag("setup-action-EDIT_PROFILE").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("setup-action-CONTINUE_WITHOUT").assertIsDisplayed().performClick()
+        assertEquals(listOf(OnboardingActionFfi.EDIT_PROFILE), edits)
+        val skip = SetupRequest(3uL, OnboardingStepFfi.PROFILE, OnboardingActionFfi.CONTINUE_WITHOUT)
+        assertEquals(listOf(skip), actions)
+        composeRule.onNodeWithText("Add a name so people recognize you.", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("Follow list").assertDoesNotExist()
         composeRule.onNodeWithTag("setup-details").assertIsDisplayed()
     }

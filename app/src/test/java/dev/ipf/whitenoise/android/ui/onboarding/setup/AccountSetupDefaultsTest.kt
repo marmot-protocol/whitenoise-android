@@ -22,14 +22,20 @@ class AccountSetupDefaultsTest {
             assertEquals(device, advance(device))
         }
 
-    /** A fresh account needs no profile, follow, recommended-relay, or relay-approval taps. */
-    @Test fun freshAccountAdvancesToDeviceConsent() =
+    /** A missing profile must wait for the user's edit or skip decision without native mutation. */
+    @Test fun missingProfileIsNeverSkippedAutomatically() =
+        runTest {
+            val profile = setupSnapshot()
+            assertEquals(profile, advance(profile))
+        }
+
+    /** After the profile decision, follows and missing relay defaults require no extra confirmation taps. */
+    @Test fun completedProfileAdvancesToDeviceConsent() =
         runTest {
             val device = setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.CONTINUE_ANYWAY))
             val result =
                 advance(
-                    setupSnapshot(),
-                    "continueOnboardingWithout" to setupSnapshot(OnboardingStepFfi.FOLLOWS),
+                    setupSnapshot(OnboardingStepFfi.FOLLOWS),
                     "continueOnboardingWithout" to missing(OnboardingStepFfi.RELAYS),
                     "proposeOnboardingRecommendedRelays" to proposal(OnboardingStepFfi.RELAYS),
                     "approveOnboardingRepair" to missing(OnboardingStepFfi.INBOX_RELAYS),

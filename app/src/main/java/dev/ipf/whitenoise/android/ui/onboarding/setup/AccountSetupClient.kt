@@ -109,7 +109,7 @@ internal class MarmotAccountSetupClient(
             marmot.userProfile(account)
         }
 
-    /** Executes explicit decisions, then advances optional metadata and confirmed-missing lists. */
+    /** Executes explicit decisions, then advances optional follows and confirmed-missing lists. */
     override suspend fun execute(request: SetupRequest): OnboardingSnapshotFfi? =
         withContext(Dispatchers.IO) {
             val result = dispatch(request)

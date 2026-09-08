@@ -31,7 +31,7 @@ class AccountSetupContentScreenshotTest {
     /** Captures the busy preflight state with the current decision and checklist visible. */
     @Test fun progress() = capture("progress", AccountSetupState(snapshot = setupSnapshot(), busy = true))
 
-    /** Missing profile metadata remains a quiet progression state without buttons. */
+    /** Missing profile metadata offers a concise edit-or-skip decision. */
     @Test fun profileInput() = capture("profile", AccountSetupState(snapshot = setupSnapshot()))
 
     /** Records the profile form with existing draft values and its review action. */

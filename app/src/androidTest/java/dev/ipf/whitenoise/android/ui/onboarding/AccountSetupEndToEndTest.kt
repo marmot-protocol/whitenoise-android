@@ -31,7 +31,7 @@ class AccountSetupEndToEndTest {
     private val context = instrumentation.targetContext
     private val app get() = (composeRule.activity.application as WhiteNoiseApplication).appState
 
-    /** Imports a fresh disposable key, advances all harmless defaults, and opens Chats after device consent. */
+    /** Imports a disposable key, publishes a chosen name, and opens Chats after defaults and device consent. */
     @Test
     fun disposableNsecCompletesSetupThroughVisibleButtons() {
         val arguments = InstrumentationRegistry.getArguments()
@@ -57,6 +57,17 @@ class AccountSetupEndToEndTest {
         composeRule.waitUntil(30_000) { app.accountSetup.controller != null }
         val setup = requireNotNull(app.accountSetup.controller)
         assertNotEquals(setup.account, app.activeAccountRef)
+        waitForDecision(setup, OnboardingStepFfi.PROFILE)
+        click(OnboardingActionFfi.EDIT_PROFILE)
+        composeRule.waitUntil(30_000) { setup.state.value.editor != null && !setup.state.value.busy }
+        composeRule.onNodeWithText(context.getString(R.string.setup_display_name)).performTextInput("Onboarding test")
+        composeRule.onNodeWithText(context.getString(R.string.setup_review_changes)).performScrollTo().performClick()
+        composeRule.waitUntil(30_000) {
+            setup.state.value.snapshot
+                ?.proposal != null &&
+                !setup.state.value.busy
+        }
+        click(OnboardingActionFfi.APPROVE_REPAIR)
         waitForDecision(setup, OnboardingStepFfi.SINGLE_DEVICE)
         assertNotEquals(setup.account, app.activeAccountRef)
         composeRule.activityRule.scenario.recreate()

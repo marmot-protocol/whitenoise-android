@@ -13,7 +13,7 @@ internal class AccountSetupDefaults(
     private val marmot: MarmotInterface,
     private val account: String,
 ) {
-    /** Skips optional metadata and creates only confirmed-missing relay lists, stopping at genuine decisions. */
+    /** Skips follow-list setup and creates only confirmed-missing relay lists, stopping at genuine decisions. */
     suspend fun advance(initial: OnboardingSnapshotFfi): OnboardingSnapshotFfi {
         var current = initial
         val attempted = mutableSetOf<OnboardingStepFfi>()
@@ -32,7 +32,7 @@ internal class AccountSetupDefaults(
         val step = AccountSetupState(snapshot = current).currentStep
         return if (step != null && attempted.add(step.step)) {
             when {
-                step.canSkipMetadata() -> marmot.continueOnboardingWithout(account, step.step)
+                step.canSkipFollows() -> marmot.continueOnboardingWithout(account, step.step)
                 step.confirmedMissingRelays() -> createMissingRelays(step.step)
                 else -> null
             }
@@ -60,9 +60,9 @@ internal class AccountSetupDefaults(
     }
 }
 
-/** Optional records have no onboarding publication or completion requirement. */
-private fun OnboardingStepStateFfi.canSkipMetadata() =
-    step in setOf(OnboardingStepFfi.PROFILE, OnboardingStepFfi.FOLLOWS) &&
+/** Follow-list setup is optional; profile completion remains an explicit edit-or-skip choice. */
+private fun OnboardingStepStateFfi.canSkipFollows() =
+    step == OnboardingStepFfi.FOLLOWS &&
         OnboardingActionFfi.CONTINUE_WITHOUT in actions
 
 /** Missing is affirmative discovery evidence; unknown, unhealthy, and existing lists require review. */
