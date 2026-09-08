@@ -88,7 +88,8 @@ internal object NotificationTimingDeviceEvents {
         expectedTarget = null
         posts.clear()
         removals.clear()
-        expectedTarget = NotificationTimingTarget(packageName, notificationTag, notificationId, fallbackContent, resolvedContent)
+        expectedTarget =
+            NotificationTimingTarget(packageName, notificationTag, notificationId, fallbackContent, resolvedContent)
     }
 
     /** Rejects every callback not owned by the armed synthetic target. */
@@ -153,8 +154,10 @@ internal object NotificationTimingDeviceEvents {
     private fun contentRevision(content: String?): NotificationTimingContentRevision {
         val target = expectedTarget ?: return NotificationTimingContentRevision.Other
         return when {
-            target.fallbackContent != null && content == target.fallbackContent -> NotificationTimingContentRevision.Fallback
-            target.resolvedContent != null && content == target.resolvedContent -> NotificationTimingContentRevision.Resolved
+            target.fallbackContent != null && content == target.fallbackContent ->
+                NotificationTimingContentRevision.Fallback
+            target.resolvedContent != null && content == target.resolvedContent ->
+                NotificationTimingContentRevision.Resolved
             else -> NotificationTimingContentRevision.Other
         }
     }
