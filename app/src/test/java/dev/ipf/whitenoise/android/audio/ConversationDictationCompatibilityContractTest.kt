@@ -148,11 +148,16 @@ class ConversationDictationCompatibilityContractTest {
 
         assertArrayEquals(
             byteArrayOf(
-                0x00, 0x00,
-                0x01, 0x00,
-                0xFE.toByte(), 0xFF.toByte(),
-                0xFF.toByte(), 0x7F,
-                0x00, 0x80.toByte(),
+                0x00,
+                0x00,
+                0x01,
+                0x00,
+                0xFE.toByte(),
+                0xFF.toByte(),
+                0xFF.toByte(),
+                0x7F,
+                0x00,
+                0x80.toByte(),
             ),
             encoded,
         )

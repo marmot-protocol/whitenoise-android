@@ -20,8 +20,8 @@ internal fun conversationDictationRecognitionIntent(): Intent =
 internal fun conversationDictationRecognitionActivityIntent(): Intent = conversationDictationRecognitionIntent()
 
 /** Reports whether this Android version defines the caller-supplied audio recognizer extras. */
-internal fun conversationDictationAudioSourceSupported(): Boolean =
-    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+@Suppress("MaxLineLength")
+internal fun conversationDictationAudioSourceSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
 /**
  * Declares audio White Noise captured itself, so a provider that cannot open the microphone for an
