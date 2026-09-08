@@ -202,6 +202,7 @@
     <string name="conversation_search_no_matches">No matches</string>
     <string name="leave">Leave</string>
     <string name="couldnt_load_conversation">Couldn\'t load conversation</string>
+    <string name="error_conversation_membership_unavailable">Couldn\'t verify this conversation\'s members. Retry to show your messages.</string>
     <string name="no_messages_yet">No messages yet</string>
     <string name="group_empty_only_you_title">This group is only you</string>
     <string name="group_empty_invite_members">Invite people when you are ready.</string>

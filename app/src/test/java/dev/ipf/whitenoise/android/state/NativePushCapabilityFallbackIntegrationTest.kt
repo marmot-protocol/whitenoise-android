@@ -10,6 +10,7 @@ import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -302,19 +303,22 @@ class NativePushCapabilityFallbackIntegrationTest {
                     }
                 }
 
-                val switchToBJob = async { fixture.appState.setActiveAccount(ACCOUNT_B) }
+                val settingsBeforeSwitch = fixture.appState.localNotificationSettings
+                val switchToBJob = async { holdAccountSwitchAfterActivation(fixture, ACCOUNT_B) }
                 switchToB = switchToBJob
                 awaitActiveAccount(fixture, ACCOUNT_B)
-                val switchBackToAJob = async { fixture.appState.setActiveAccount(ACCOUNT_A) }
+                val switchBackToAJob = async { holdAccountSwitchAfterActivation(fixture, ACCOUNT_A) }
                 switchBackToA = switchBackToAJob
                 awaitActiveAccount(fixture, ACCOUNT_A)
                 fixture.runWithMainLooperPumping {
                     switchToBJob.cancelAndJoin()
                     switchBackToAJob.cancelAndJoin()
                 }
+                assertEquals(settingsBeforeSwitch, fixture.appState.localNotificationSettings)
                 releaseDisable.countDown()
 
                 fixture.runWithMainLooperPumping { syncJob.join() }
+                assertEquals(settingsBeforeSwitch, fixture.appState.localNotificationSettings)
                 assertTrue(fixture.appState.localNotificationSettings?.nativePushEnabled == true)
                 assertTrue(fixture.clearedPushRegistrations.isEmpty())
                 assertEquals(setOf(ACCOUNT_A), tokenStore.pendingClears())
@@ -504,7 +508,13 @@ class NativePushCapabilityFallbackIntegrationTest {
             }
         }
 
-    /** Waits for the real account-switch local-ready boundary without advancing post-activation work. */
+    /** Holds the real switch before unrelated settings refresh can race the late-native-result assertion. */
+    private suspend fun holdAccountSwitchAfterActivation(
+        fixture: NotificationBootstrapTestFixture,
+        accountRef: String,
+    ): Boolean = fixture.appState.setActiveAccount(accountRef, awaitPostActivationWork = { awaitCancellation() })
+
+    /** Observes local activation; callers separately hold post-activation work at its production boundary. */
     private suspend fun awaitActiveAccount(
         fixture: NotificationBootstrapTestFixture,
         accountRef: String,

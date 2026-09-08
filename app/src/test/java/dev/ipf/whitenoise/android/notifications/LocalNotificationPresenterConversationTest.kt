@@ -266,7 +266,9 @@ class LocalNotificationPresenterConversationTest {
         )
     }
 
+    /** Preserves the initial card's grouping while suppressing repeat alerts during cold-avatar enrichment. */
     @Test
+    @Config(sdk = [30, 36])
     fun coldAvatarsPostUsefulCardBeforeSilentSameKeyEnrichment() {
         val posts = mutableListOf<Triple<String, Int, Notification>>()
         var pendingEnrichment: (suspend () -> Unit)? = null
@@ -314,6 +316,9 @@ class LocalNotificationPresenterConversationTest {
         assertEquals(2, posts.size)
         assertEquals(posts[0].first, posts[1].first)
         assertEquals(posts[0].second, posts[1].second)
+        assertEquals(posts[0].third.channelId, posts[1].third.channelId)
+        assertEquals(posts[0].third.group, posts[1].third.group)
+        assertEquals(posts[0].third.groupAlertBehavior, posts[1].third.groupAlertBehavior)
         assertTrue(posts[1].third.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         assertEquals(0, posts[1].third.defaults)
         assertNull(posts[1].third.sound)

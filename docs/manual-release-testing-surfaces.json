@@ -1124,7 +1124,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationInitialPresentation.kt",
         "anchor": "fun ConversationInitialLoadingOverlay(",
         "test_ids": [
-          "CON-015"
+          "CON-015",
+          "NTF-009"
         ]
       },
       {
@@ -1228,7 +1229,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "fun ConversationLoadErrorContent(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "NTF-009"
         ]
       },
       {
@@ -1236,7 +1238,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "fun ConversationScreen(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "NTF-009"
         ]
       },
       {
@@ -2053,7 +2056,16 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
         "anchor": "fun MediaVoiceBubble(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "VoiceAttachmentContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "fun VoiceAttachmentContent(",
+        "test_ids": [
+          "MED-008"
         ]
       },
       {
@@ -3626,7 +3638,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
         "anchor": "fun MainShell(",
         "test_ids": [
-          "NAV-001"
+          "NAV-001",
+          "NTF-009"
         ]
       },
       {
@@ -3652,7 +3665,8 @@
         "anchor": "fun PrepareMainShellFirstFrame(",
         "test_ids": [
           "INT-002",
-          "INT-003"
+          "INT-003",
+          "NTF-009"
         ]
       },
       {
@@ -5203,6 +5217,14 @@
         ]
       },
       {
+        "surface": "setting:error_conversation_membership_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.error_conversation_membership_unavailable",
+        "test_ids": [
+          "NTF-009"
+        ]
+      },
+      {
         "surface": "setting:error_couldnt_verify_relay_hosts",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "R.string.error_couldnt_verify_relay_hosts",
@@ -5233,6 +5255,46 @@
         "test_ids": [
           "ACC-016",
           "ACC-018"
+        ]
+      },
+      {
+        "surface": "voice-action:media-downloading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.media_downloading",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice-action:media-download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.media_tap_to_download",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice-action:failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.voice_message_failed",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice-action:pause",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.voice_message_pause",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice-action:play",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.voice_message_play",
+        "test_ids": [
+          "MED-008"
         ]
       },
       {
@@ -6892,6 +6954,26 @@
     ],
     "source_coverage": [
       {
+        "surface": "Superseded group-change diagnostic summary and payload privacy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/DiagnosticFormatter.kt",
+        "anchor": "is MarmotEventFfi.GroupChangeSuperseded ->",
+        "test_ids": [
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "MarmotKit SDK pin: backed-up in-place upgrade, startup, and sign-in compatibility",
+        "source": "app/src/main/marmotkit/MARMOT_VERSION",
+        "anchor": "mdk-sha=",
+        "test_ids": [
+          "INT-010",
+          "ONB-006",
+          "ONB-008",
+          "ONB-012",
+          "SET-019"
+        ]
+      },
+      {
         "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
         "anchor": "WhiteNoiseApp",
@@ -6986,6 +7068,35 @@
           "SYS-009",
           "SYS-010",
           "SYS-011"
+        ]
+      }
+    ],
+    "notification_content_contracts": [
+      {
+        "surface": "same-card avatar enrichment preserves heads-up eligibility without repeat alerts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "private fun buildEnrichedMessagingNotification(",
+        "test_ids": [
+          "NTF-006",
+          "NTF-010"
+        ]
+      },
+      {
+        "surface": "group-removal concise notification content",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationFormatter.kt",
+        "anchor": "private fun notificationBody(",
+        "test_ids": [
+          "NTF-008",
+          "NTF-011"
+        ]
+      },
+      {
+        "surface": "plain notification body and privacy presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "suspend fun show(",
+        "test_ids": [
+          "NTF-008",
+          "NTF-011"
         ]
       }
     ],

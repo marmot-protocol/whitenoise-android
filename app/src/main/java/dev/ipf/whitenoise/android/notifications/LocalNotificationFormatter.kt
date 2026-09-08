@@ -264,6 +264,7 @@ object LocalNotificationFormatter {
                 }
         }
 
+    /** Removal is fully described by its localized title; other events retain their existing previews. */
     private fun notificationBody(
         kind: ContentKind,
         update: NotificationUpdateFfi,
@@ -278,14 +279,7 @@ object LocalNotificationFormatter {
                 ContentKind.MESSAGE ->
                     messageBody(update, context, previewTextOverride, reactedToPreviewOverride, mediaKind)
                 ContentKind.INVITE -> inviteBody(update, context, senderName)
-                ContentKind.REMOVED_FROM_GROUP ->
-                    clean(previewTextOverride)
-                        ?: clean(update.previewText)
-                        ?: text(
-                            context,
-                            R.string.notification_removed_from_group_body,
-                            "You can view your message history, but you can no longer send messages.",
-                        )
+                ContentKind.REMOVED_FROM_GROUP -> ""
                 ContentKind.MADE_ADMIN ->
                     clean(previewTextOverride)
                         ?: clean(update.previewText)

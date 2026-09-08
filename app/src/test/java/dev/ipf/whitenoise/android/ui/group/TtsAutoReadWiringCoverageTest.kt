@@ -37,15 +37,15 @@ class TtsAutoReadWiringCoverageTest {
     }
 
     @Test
-    fun conversationTtsEffectsOpenIdleTriggerUsesAnchoredBacklogAndAutoReadOwnership() {
+    fun conversationTtsEffectsOpenIdleTriggerUsesRevealedBacklogAndAutoReadOwnership() {
         val body = source("ui/conversation/ConversationTtsEffects.kt")
-        val openEffectStart = body.indexOf("LaunchedEffect(controller, chatId, initialTimelineAnchored)")
+        val openEffectStart = body.indexOf("LaunchedEffect(controller, chatId, transcriptReadyToReveal)")
         val openEffectEnd = body.indexOf("// Live continuation", openEffectStart)
         val openEffect = body.substring(openEffectStart, openEffectEnd)
 
         assertTrue(
-            "open-time auto-read must wait for timeline anchor",
-            "if (!initialTimelineAnchored) return@LaunchedEffect" in openEffect,
+            "open-time auto-read must wait for the authoritative transcript reveal",
+            "if (!transcriptReadyToReveal) return@LaunchedEffect" in openEffect,
         )
         assertTrue(
             "open-time auto-read must use bounded backlog helper",
@@ -73,7 +73,7 @@ class TtsAutoReadWiringCoverageTest {
     @Test
     fun conversationTtsEffectsLiveContinuationSkipsSeedAndRequiresOwnedSession() {
         val body = source("ui/conversation/ConversationTtsEffects.kt")
-        val liveEffectStart = body.indexOf("LaunchedEffect(controller, chatId) {")
+        val liveEffectStart = body.indexOf("LaunchedEffect(controller, chatId, transcriptReadyToReveal) {")
         val liveEffectEnd = body.indexOf("// On a real foreground return", liveEffectStart)
         val liveEffect = body.substring(liveEffectStart, liveEffectEnd)
 
@@ -86,12 +86,52 @@ class TtsAutoReadWiringCoverageTest {
             "ownsTtsAutoReadSession(controller.group.groupIdHex)" in liveEffect,
         )
         assertTrue(
+            "live continuation must reject a withheld transcript",
+            "if (!transcriptReadyToReveal) return@collect" in liveEffect,
+        )
+        assertTrue(
             "live continuation must only extend active speech",
             "TtsState.Speaking" in liveEffect && "TtsState.Paused" in liveEffect,
         )
         assertTrue(
             "live continuation must append rather than replace",
             "appendSpeech(entry" in liveEffect,
+        )
+    }
+
+    /** Withheld notification transcripts must gate every automatic speech lane, not only paint. */
+    @Test
+    fun notificationTranscriptRevealOwnsOpenLiveAndResumeAutoRead() {
+        val effects = source("ui/conversation/ConversationTtsEffects.kt").replace(Regex("\\s+"), " ")
+        val screen = source("ui/conversation/ConversationScreen.kt").replace(Regex("\\s+"), " ")
+
+        assertTrue(
+            "the screen must pass the same reveal owner used by paint and accessibility",
+            "transcriptReadyToReveal = transcriptReadyToReveal" in screen,
+        )
+        assertTrue(
+            "open-time auto-read must restart only for a revealed transcript",
+            effects
+                .split("LaunchedEffect(controller, chatId, transcriptReadyToReveal)")
+                .size > 2,
+        )
+        assertTrue(
+            "foreground-return auto-read must retry when the withheld transcript reveals",
+            "LaunchedEffect(controller, chatId, autoReadResumeGeneration, transcriptReadyToReveal)" in effects,
+        )
+        assertTrue(
+            "a hidden or cancelled resume generation must not replay when reveal changes",
+            "handledAutoReadResumeGeneration = autoReadResumeGeneration" in effects,
+        )
+        assertTrue(
+            "open and resume speech must fail closed before their cancellable projection work",
+            effects
+                .split("if (!transcriptReadyToReveal) return@LaunchedEffect")
+                .size > 2,
+        )
+        assertTrue(
+            "live continuation must reject hidden rows before appending speech",
+            "if (!transcriptReadyToReveal) return@collect" in effects,
         )
     }
 

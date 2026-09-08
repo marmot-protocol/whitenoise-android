@@ -77,6 +77,7 @@ import dev.ipf.whitenoise.android.state.observeTtsConversationDestination
 import dev.ipf.whitenoise.android.state.reconcileProvisionalOpenChat
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
+import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
@@ -843,7 +844,10 @@ internal fun MainShell(
                 exactPreloadReady = exactPreloadState is NotificationMessagePreloadState.Ready,
             )
 
-        fun commitNotificationConversationOpen(chatItem: ChatListItem) {
+        suspend fun commitNotificationConversationOpen(chatItem: ChatListItem) {
+            // Await cancellation before publishing any route state. A superseded
+            // effect must not partially commit while its platform call is pending.
+            appState.dismissNotificationRouteCards(target.accountRef, target.groupIdHex)
             sectionName = MainSection.Chats.name
             settingsDetailName = null
             settingsHomeViewport =
@@ -1847,7 +1851,15 @@ internal fun MainShell(
             ?: accountOwnedExitingConversationContent?.controller
     val selectedConversationSurfaceState =
         remember(selectedOrPendingConversationController, appState.runtimeGeneration) { ConversationSurfaceState() }
-    val selectedConversationTimelineVisible = !selectedConversationSurfaceState.showDetails.value
+    val conversationTimelineVisibility = remember { ConversationTimelineVisibilityOwner<ConversationController>() }
+    val currentConversationTimelineOwner by rememberUpdatedState(selectedOrPendingConversationController)
+    val currentConversationTimelineRequestId by
+        rememberUpdatedState(selectedChatOpenContext.notificationOpenRequestId)
+    val selectedConversationTimelineVisible =
+        conversationTimelineVisibility.isCurrent(
+            owner = selectedOrPendingConversationController,
+            notificationOpenRequestId = selectedChatOpenContext.notificationOpenRequestId,
+        )
     val dictationComposerRoute =
         ConversationDictationComposerRoute(
             selectedChatId = selectedChat?.id,
@@ -1962,10 +1974,15 @@ internal fun MainShell(
         conversationController?.hasPublishedAuthoritativeTimeline,
         conversationController?.error,
         conversationController?.terminalConversationUnavailable,
+        conversationController?.memberRosterState,
         selectedChatOpenContext.notificationRouteTraceRequestId,
     ) {
         val requestId = selectedChatOpenContext.notificationRouteTraceRequestId ?: return@LaunchedEffect
-        if (conversationController?.error != null || conversationController?.terminalConversationUnavailable == true) {
+        if (
+            conversationController?.error != null ||
+            conversationController?.terminalConversationUnavailable == true ||
+            conversationController?.transcriptPresentationNeedsRetry == true
+        ) {
             releaseNotificationFirstFrameGate(requestId)
             NotificationRouteTrace.finishRequest(requestId)
             return@LaunchedEffect
@@ -2390,68 +2407,68 @@ internal fun MainShell(
                                 )
                         }
                 }
-            }
-            ConversationRouteSettledPerformanceMarker(
-                conversationId = transitionContent?.chat?.id,
-                routeTransition = routeTransition,
-                destinationContentReady =
-                    transitionContent?.controller?.let { controller ->
-                        preparedConversationCanOpen(
-                            hasPublishedAuthoritativeTimeline = controller.hasPublishedAuthoritativeTimeline,
-                            hasPreparedInitialPresentation = controller.hasPreparedInitialPresentation,
-                            hasLoadError = controller.error != null,
-                            terminalConversationUnavailable = controller.terminalConversationUnavailable,
-                        )
-                    } ?: true,
-            )
-            ConversationControllerReleasedPerformanceMarker(
-                controllerReleased =
-                    conversationControllerReleased(
-                        conversationOpen = transitionContent != null,
-                        exitingContentRetained = exitingConversationContent != null,
-                        controllerPresent = conversationController != null,
-                    ),
-            )
-        }
-        val showQuickAccountSwitchCue =
-            quickAccountSwitchShouldShowCue(
-                transition = quickAccountSwitchTransition,
-                activeAccountRef = appState.activeAccountRef,
-                targetLocallyReady = quickSwitchTargetLocallyReady,
-                targetHasAnyChats = quickSwitchTargetHasAnyChats,
-            )
-        QuickAccountSwitchTransitionOverlay(
-            transition =
-                quickAccountSwitchTransition.takeIf {
-                    quickSwitchOwnsTargetFrame && quickSwitchTargetHasAnyChats
-                },
-            visible = showQuickAccountSwitchCue,
-            onFinished = { requestId ->
-                quickAccountSwitchTransition?.takeIf { it.requestId == requestId }?.let { request ->
-                    quickAccountSwitchTransition =
-                        if (navAccountStable) {
-                            null
-                        } else {
-                            request.copy(phase = QuickAccountSwitchPhase.RevealComplete)
-                        }
-                }
-            },
-        )
-
-        // Compose after every shell/profile/new-group surface. The full-screen
-        // Dialog owns pointer and accessibility focus while preserving the route
-        // underneath for an exact return after cancellation (issue #1721).
-        if (shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) {
-            visiblePickerRequest?.let { request ->
-                ShareChatPickerFullScreen(
-                    appState = appState,
-                    requestId = request.requestId,
-                    payload = request.payload,
-                    onDismiss = clearSharePickerRequest,
-                    onStage = { accountRef, groupIds ->
-                        stageShareToChats(request, accountRef, groupIds)
-                    },
+                ConversationRouteSettledPerformanceMarker(
+                    conversationId = transitionContent?.chat?.id,
+                    routeTransition = routeTransition,
+                    destinationContentReady =
+                        transitionContent?.controller?.let { controller ->
+                            preparedConversationCanOpen(
+                                hasPublishedAuthoritativeTimeline = controller.hasPublishedAuthoritativeTimeline,
+                                hasPreparedInitialPresentation = controller.hasPreparedInitialPresentation,
+                                hasLoadError = controller.error != null,
+                                terminalConversationUnavailable = controller.terminalConversationUnavailable,
+                            )
+                        } ?: true,
                 )
+                ConversationControllerReleasedPerformanceMarker(
+                    controllerReleased =
+                        conversationControllerReleased(
+                            conversationOpen = transitionContent != null,
+                            exitingContentRetained = exitingConversationContent != null,
+                            controllerPresent = conversationController != null,
+                        ),
+                )
+            }
+            val showQuickAccountSwitchCue =
+                quickAccountSwitchShouldShowCue(
+                    transition = quickAccountSwitchTransition,
+                    activeAccountRef = appState.activeAccountRef,
+                    targetLocallyReady = quickSwitchTargetLocallyReady,
+                    targetHasAnyChats = quickSwitchTargetHasAnyChats,
+                )
+            QuickAccountSwitchTransitionOverlay(
+                transition =
+                    quickAccountSwitchTransition.takeIf {
+                        quickSwitchOwnsTargetFrame && quickSwitchTargetHasAnyChats
+                    },
+                visible = showQuickAccountSwitchCue,
+                onFinished = { requestId ->
+                    quickAccountSwitchTransition?.takeIf { it.requestId == requestId }?.let { request ->
+                        quickAccountSwitchTransition =
+                            if (navAccountStable) {
+                                null
+                            } else {
+                                request.copy(phase = QuickAccountSwitchPhase.RevealComplete)
+                            }
+                    }
+                },
+            )
+
+            // Compose after every shell/profile/new-group surface. The full-screen
+            // Dialog owns pointer and accessibility focus while preserving the route
+            // underneath for an exact return after cancellation (issue #1721).
+            if (shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) {
+                visiblePickerRequest?.let { request ->
+                    ShareChatPickerFullScreen(
+                        appState = appState,
+                        requestId = request.requestId,
+                        payload = request.payload,
+                        onDismiss = clearSharePickerRequest,
+                        onStage = { accountRef, groupIds ->
+                            stageShareToChats(request, accountRef, groupIds)
+                        },
+                    )
+                }
             }
         }
     }

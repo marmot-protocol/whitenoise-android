@@ -121,10 +121,12 @@ import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
+import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
+import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.MentionDetectionCache
@@ -269,6 +271,12 @@ private val InitialTimelineBackfillNoProgressError =
         report =
             "Operation: CONVERSATION_INITIAL_BACKFILL_NO_PROGRESS\n" +
                 "No backward timeline progress was observed.",
+    )
+
+private val InitialTranscriptRosterError =
+    ErrorPresentation(
+        message = AppText.Resource(R.string.error_conversation_membership_unavailable),
+        report = "Operation: CONVERSATION_TRANSCRIPT_ROSTER\nAccount-owned membership could not be verified.",
     )
 
 /** Remembers navigation state per controller and cancels all controller-owned jobs on disposal. */
@@ -637,14 +645,6 @@ internal fun ConversationScreen(
     // Keyed on the controller as well as chat.id so the same shared group under
     // another account cannot inherit this account's details route.
     var showDetails by presentationState.showDetails
-    // Notification suppression must follow the visible *timeline*, not merely an
-    // open chat. While group details/settings (and its sub-screens) are up, the
-    // user can't see incoming messages, so those must notify — lift the
-    // active-conversation suppression for the group while details are showing
-    // and restore it on return to the timeline.
-    LaunchedEffect(controller, showDetails) {
-        onNotificationTimelineVisibilityChanged(!showDetails)
-    }
     var pendingTopBarLeaveAction by remember { mutableStateOf<LeaveAction?>(null) }
     // Sole-admin Leave gate: a sole admin with other members can't leave until
     // they hand admin to someone else. Instead of the old toast-only dead end,
@@ -693,6 +693,7 @@ internal fun ConversationScreen(
                 initialFirstVisibleItemScrollOffset = positionalScrollRestore?.firstVisibleItemScrollOffset ?: 0,
             )
         }
+    val scrollEvidenceSink = LocalConversationScrollEvidenceSink.current
     val ttsQuickTransportViewportLock = rememberTtsQuickTransportViewportLock(listState)
     var unreadJumpState by
         remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) {
@@ -705,9 +706,10 @@ internal fun ConversationScreen(
             chat.id,
             conversationAccountRef,
             appState.runtimeGeneration,
+            scrollEvidenceSink,
         ) {
             ConversationScrollCoordinator(
-                writer = LazyListConversationScrollWriter(listState),
+                writer = LazyListConversationScrollWriter(listState, scrollEvidenceSink),
                 initialMode =
                     if (scrollRestore != null) {
                         ConversationScrollMode.ReadingHistory(
@@ -792,6 +794,19 @@ internal fun ConversationScreen(
         remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) {
             mutableStateOf<BatchDeleteRetryState?>(null)
         }
+    // Edits mutate their original message and must not occupy a lazy-list slot.
+    // Keep every reveal and scroll decision on the same filtered projection.
+    val renderedTimeline =
+        remember(controller.timeline) {
+            controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        }
+    val navigationState =
+        rememberConversationNavigationState(
+            controller = controller,
+            initialFollowedLatestId = firstFrameSeed.latestTimelineId,
+            initialSeedTailAwaitingAuthoritative = firstFrameSeed.awaitingAuthoritativeTimeline,
+            surfaceState = presentationState,
+        )
     // Reveal from the first frame only when the authoritative page is already
     // loaded (the preloaded chat-list-tap path anchors at the tail immediately).
     // A direct open still awaiting its page must stay hidden until
@@ -821,12 +836,49 @@ internal fun ConversationScreen(
                 )
             }
         }
+    // A completed empty page has no row to anchor. Commit that presentation
+    // directly, but keep every loading, error, ownership, and roster gate.
+    val authoritativeEmptyPresentationReady =
+        conversationAuthoritativeEmptyPresentationReady(
+            authoritativeEmptyTimeline =
+                navigationState.initialTimelineLoadStarted &&
+                    controller.hasPublishedAuthoritativeTimeline &&
+                    renderedTimeline.isEmpty() &&
+                    !controller.hasMoreBefore &&
+                    !controller.hasMoreAfterTimeline &&
+                    !controller.isLoadingOlder &&
+                    !controller.isLoading,
+            routePresentationSettled =
+                controller.error == null &&
+                    !controller.terminalConversationUnavailable &&
+                    !controller.group.pendingConfirmation,
+            inviteAcceptanceResolutionPending = controller.inviteAcceptanceResolutionPending,
+        )
+    val transcriptReadyToReveal =
+        conversationTranscriptReadyToReveal(
+            initialPresentationCommitted =
+                transcriptVisibilityCommitted || authoritativeEmptyPresentationReady,
+            notificationOpenRequestId = notificationOpenRequestId,
+            transcriptPresentationKnown = controller.hasKnownTranscriptPresentation,
+        )
+    val transcriptPresentationNeedsRetry =
+        notificationOpenRequestId != 0L && controller.transcriptPresentationNeedsRetry
 
-    // First-frame completion waits for the same committed visibility predicate
-    // as paint, accessibility, and performance selectors. An oversized cached
-    // tail is not useful until its measured physical-end correction lands.
-    LaunchedEffect(chat.id, notificationOpenRequestId, transcriptVisibilityCommitted) {
-        if (notificationOpenRequestId == 0L || !transcriptVisibilityCommitted) return@LaunchedEffect
+    // Notification suppression follows only the transcript the user can
+    // actually read. A routed conversation can already be selected while its
+    // account-owned roster or first authoritative page is still withheld; it
+    // must keep future notifications eligible until that presentation commits.
+    // Details and their nested routes remain non-owning after the reveal too.
+    LaunchedEffect(controller, notificationOpenRequestId, showDetails, transcriptReadyToReveal) {
+        onNotificationTimelineVisibilityChanged(!showDetails && transcriptReadyToReveal)
+    }
+
+    // First-frame completion waits for the initial anchor and a trustworthy
+    // transcript presentation. A notification-routed semantic group without an
+    // account-owned roster stays neutral until membership verifies, so the trace
+    // cannot complete on a hidden or known-wrong transcript (#2231).
+    LaunchedEffect(chat.id, notificationOpenRequestId, transcriptReadyToReveal) {
+        if (notificationOpenRequestId == 0L || !transcriptReadyToReveal) return@LaunchedEffect
         withFrameNanos { }
         onFirstFrameCommitted()
     }
@@ -837,15 +889,8 @@ internal fun ConversationScreen(
         chatId = chat.id,
         entryUnreadCount = entryUnreadCount,
         entryFirstUnreadMessageId = entryFirstUnreadMessageId,
-        initialTimelineAnchored = initialTimelineAnchored,
+        transcriptReadyToReveal = transcriptReadyToReveal,
     )
-    val navigationState =
-        rememberConversationNavigationState(
-            controller = controller,
-            initialFollowedLatestId = firstFrameSeed.latestTimelineId,
-            initialSeedTailAwaitingAuthoritative = firstFrameSeed.awaitingAuthoritativeTimeline,
-            surfaceState = presentationState,
-        )
     // Id of the newest row the bottom-follow has reacted to. A real append
     // gives a new last id while the previous one stays in the list; an
     // older-page load trims the newest rows, so the previous id is gone and
@@ -872,16 +917,6 @@ internal fun ConversationScreen(
     //   immediately advances HWM to the last timeline index, so the badge
     //   shows 0 — matching the convention that an "open chat" is read up to
     //   the visible row, not the last delivered row.
-    // Edits (kind-1009) are derived state, not chat — they mutate the
-    // original message's body via [editsByTarget] and must not occupy a slot
-    // in the lazy list. A naive `return@items` still reserves the slot, which
-    // (combined with `Arrangement.spacedBy`) leaves a visible gap. Filter
-    // them out up front and base every index/scroll calculation on the
-    // filtered list so what we count matches what we render.
-    val renderedTimeline =
-        remember(controller.timeline) {
-            controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-        }
     val hasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
     val olderHeaderCount = if (hasOlderHeader) 1 else 0
     val loadFailurePlacement = loadFailurePlacement(controller.error != null, renderedTimeline.isNotEmpty())
@@ -1036,6 +1071,33 @@ internal fun ConversationScreen(
                     controller.error != null &&
                     controller.errorEdge == ConversationLoadFailureEdge.TOP,
         )
+    }
+
+    val viewportCaptureRevision = scrollEvidenceSink?.viewportCaptureRevision?.value ?: 0L
+    LaunchedEffect(listState, controller, scrollEvidenceSink, viewportCaptureRevision) {
+        val sink = scrollEvidenceSink ?: return@LaunchedEffect
+        snapshotFlow {
+            val layoutInfo = listState.layoutInfo
+            ConversationViewportEvidence(
+                captureRevision = viewportCaptureRevision,
+                accountRef = conversationAccountRef,
+                mode = scrollCoordinator.mode,
+                anchor = currentScrollAnchor(),
+                viewportStartOffsetPx = layoutInfo.viewportStartOffset,
+                viewportEndOffsetPx = layoutInfo.viewportEndOffset,
+                viewportHeightPx = layoutInfo.viewportSize.height,
+                canScrollForward = listState.canScrollForward,
+                visibleItems =
+                    layoutInfo.visibleItemsInfo.map { visible ->
+                        ConversationVisibleItemEvidence(
+                            index = visible.index,
+                            key = visible.key.toString(),
+                            offsetPx = visible.offset,
+                            sizePx = visible.size,
+                        )
+                    },
+            )
+        }.collect(sink::onViewport)
     }
 
     @Suppress("ReturnCount") // Guard clauses keep invalid live-timeline gesture state explicit.
@@ -3240,7 +3302,8 @@ internal fun ConversationScreen(
                 onNextSearchMatch = { navigateToSearchMatch(forward = true) },
                 hasError =
                     loadFailurePlacement == LoadFailurePlacement.FullScreen ||
-                        navigationState.initialTimelineBackfillNoProgress,
+                        navigationState.initialTimelineBackfillNoProgress ||
+                        transcriptPresentationNeedsRetry,
                 composerGate = composerGate,
                 controller = controller,
                 appState = appState,
@@ -3385,6 +3448,19 @@ internal fun ConversationScreen(
                     InvitePreviewPlaceholder(
                         inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
                     )
+                transcriptPresentationNeedsRetry ->
+                    ConversationLoadErrorContent(
+                        error = InitialTranscriptRosterError,
+                        onRetry = { scope.launch { controller.retryMembers() } },
+                    )
+                renderedTimeline.isEmpty() &&
+                    notificationOpenRequestId != 0L &&
+                    !controller.terminalConversationUnavailable &&
+                    !transcriptReadyToReveal ->
+                    ConversationInitialLoadingOverlay(
+                        visible = true,
+                        graceMillis = CONVERSATION_ANCHORED_LOADING_GRACE_MILLIS,
+                    )
                 renderedTimeline.isEmpty() && controller.isLoading ->
                     ConversationInitialLoadingOverlay(visible = true)
                 renderedTimeline.isEmpty() &&
@@ -3430,17 +3506,17 @@ internal fun ConversationScreen(
                                     .padding(horizontal = 12.dp)
                                     // Paint, TalkBack exposure, and first-useful-frame
                                     // reporting share one predicate. An oversized cached
-                                    // final row therefore cannot become observable at its
-                                    // start before the physical-end correction lands.
+                                    // final row or unknown notification roster therefore
+                                    // cannot become observable before both owners commit.
                                     .drawWithContent {
-                                        if (transcriptVisibilityCommitted) drawContent()
+                                        if (transcriptReadyToReveal) drawContent()
                                     }.graphicsLayer {
-                                        alpha = if (transcriptVisibilityCommitted) 1f else 0f
+                                        alpha = if (transcriptReadyToReveal) 1f else 0f
                                     }.semantics {
-                                        if (!transcriptVisibilityCommitted) hideFromAccessibility()
+                                        if (!transcriptReadyToReveal) hideFromAccessibility()
                                     }.performanceTestTag(
                                         PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE,
-                                        enabled = transcriptVisibilityCommitted && renderedTimeline.isNotEmpty(),
+                                        enabled = transcriptReadyToReveal && renderedTimeline.isNotEmpty(),
                                     ).onGloballyPositioned { coordinates ->
                                         val position = coordinates.positionInWindow()
                                         transcriptWindowTop = position.y
@@ -3608,7 +3684,10 @@ internal fun ConversationScreen(
                             )
                         }
                         ConversationInitialLoadingOverlay(
-                            visible = !transcriptVisibilityCommitted && !seededTailAlignmentRecoveryVisible,
+                            visible =
+                                !transcriptReadyToReveal &&
+                                    !transcriptPresentationNeedsRetry &&
+                                    !seededTailAlignmentRecoveryVisible,
                             graceMillis = CONVERSATION_ANCHORED_LOADING_GRACE_MILLIS,
                         )
                         ConversationSeededTailAlignmentRecovery(
@@ -3623,13 +3702,13 @@ internal fun ConversationScreen(
                         // Confined to its own child so the scroll-backed reads
                         // (label + isScrollInProgress) recompose only the ribbon,
                         // not this LazyColumn-hosting Box scope (#375).
-                        if (initialTimelineAnchored) {
+                        if (transcriptReadyToReveal) {
                             StickyDayRibbon(
                                 listState = listState,
                                 labelState = stickyDayLabelState,
                             )
                         }
-                        if (initialTimelineAnchored && !selectionMode) {
+                        if (transcriptReadyToReveal && !selectionMode) {
                             Column(
                                 modifier =
                                     Modifier

@@ -36,6 +36,7 @@ object DiagnosticFormatter {
         val occurredAtUtc: String,
     )
 
+    /** Summarizes SDK events for diagnostics without copying private event payloads. */
     fun describe(
         event: MarmotEventFfi,
         identity: DiagnosticIdentityPresentation,
@@ -65,6 +66,8 @@ object DiagnosticFormatter {
                     event.update.update.groupIdHex,
                 )} (${event.update.update.messages.size} messages)"
             is MarmotEventFfi.GroupEvent ->
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] group event"
+            is MarmotEventFfi.GroupChangeSuperseded ->
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] group event"
             is MarmotEventFfi.AccountError ->
                 // The FFI error string is not guaranteed content-free; scrub

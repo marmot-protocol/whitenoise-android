@@ -17,6 +17,7 @@ class MessageMultiSelectCoverageTest {
         assertTrue(actionModelSource.contains("MessageActionKind.Select -> stringResource(R.string.select)"))
     }
 
+    /** Selection affordances belong to the revealed transcript and cannot expose a hidden notification route. */
     @Test
     fun conversationOwnsSelectionActionsAndBottomSelectionBar() {
         val screenSource = source("ConversationScreen.kt")
@@ -29,7 +30,7 @@ class MessageMultiSelectCoverageTest {
         assertTrue(screenSource.contains("batchCopyText(actionItems)"))
         assertTrue(screenSource.contains("batchForwardPayloads(actionItems)"))
         assertTrue(screenSource.contains("batchSelectionActionAvailability("))
-        assertTrue(screenSource.contains("if (initialTimelineAnchored && !selectionMode)"))
+        assertTrue(screenSource.contains("if (transcriptReadyToReveal && !selectionMode)"))
     }
 
     @Test
