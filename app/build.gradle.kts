@@ -215,12 +215,14 @@ val playUploadSigning =
                 "WHITENOISE_KEY_PASSWORD",
             ),
     )
-val requestedProductionPlayRelease =
+// Only the AAB entry point selects the upload key and disables APK splits.
+// Manifest/label checks may request all variants together and must retain splits.
+val requestedProductionPlayBundle =
     gradle.startParameter.taskNames.any { taskName ->
-        taskName.substringAfterLast(":").contains("ProductionPlayRelease", ignoreCase = true)
+        taskName.substringAfterLast(":").equals("bundleProductionPlayRelease", ignoreCase = true)
     }
 val productionReleaseSigning =
-    if (requestedProductionPlayRelease) playUploadSigning else directProductionReleaseSigning
+    if (requestedProductionPlayBundle) playUploadSigning else directProductionReleaseSigning
 val stagingReleaseSigning =
     ReleaseSigning(
         keystorePath = signingProperty("WHITENOISE_STAGING_KEYSTORE_PATH"),
@@ -634,7 +636,7 @@ android {
             // App bundles carry every ABI and let Play generate optimized APKs.
             // Enabling APK splits for the same task produces multiple shrunk
             // resource archives, which AGP cannot package into one AAB.
-            isEnable = !requestedProductionPlayRelease
+            isEnable = !requestedProductionPlayBundle
             reset()
             include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
             isUniversalApk = true
