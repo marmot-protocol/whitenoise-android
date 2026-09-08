@@ -213,9 +213,7 @@ class AppNavigationTest {
         val appState = appState()
         composeRule.setContent {
             WhiteNoiseTheme {
-                ShellTransientNoticeLayout(notice = appState.transientNotice) {
-                    MainShell(appState = appState)
-                }
+                MainShell(appState = appState)
             }
         }
         awaitAttachedChatsController(appState)
