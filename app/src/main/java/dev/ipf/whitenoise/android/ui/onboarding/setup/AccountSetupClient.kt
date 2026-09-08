@@ -40,7 +40,7 @@ internal interface AccountSetupClient {
     suspend fun profile(): UserProfileMetadataFfi?
 }
 
-/** The revision belongs to the displayed decision, not the latest asynchronously received state. */
+/** The revision and recovery epoch identify the displayed decision, even when native state advances. */
 internal data class SetupRequest(
     val revision: ULong,
     val step: OnboardingStepFfi,
@@ -48,6 +48,7 @@ internal data class SetupRequest(
     val readRelays: List<String> = emptyList(),
     val writeRelays: List<String> = emptyList(),
     val profile: UserProfileMetadataFfi? = null,
+    val recoveryEpoch: String? = null,
 )
 
 /** Holds one runtime instance for its entire lifetime; replacement runtimes get a new client. */
@@ -147,9 +148,10 @@ internal class MarmotAccountSetupClient(
                         account,
                         requireNotNull(profile),
                     )
-                OnboardingActionFfi.APPROVE_REPAIR -> marmot.approveOnboardingRepair(account, revision)
+                OnboardingActionFfi.APPROVE_REPAIR -> marmot.approveSetupRepair(account, revision, recoveryEpoch)
                 OnboardingActionFfi.CANCEL_REPAIR -> marmot.cancelOnboardingRepair(account)
-                OnboardingActionFfi.CONTINUE_ANYWAY -> marmot.acknowledgeOnboardingSingleDevice(account, revision)
+                OnboardingActionFfi.CONTINUE_ANYWAY ->
+                    marmot.acknowledgeSetupSingleDevice(account, revision, recoveryEpoch)
                 OnboardingActionFfi.RECONNECT_SIGNER -> {
                     reconnectSigner()
                     marmot.retryOnboardingStep(account, step)

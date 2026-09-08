@@ -135,6 +135,33 @@ class MarmotAccountSetupClientTest {
             assertEquals(listOf("approveOnboardingRepair"), calls)
         }
 
+    /** Both grant APIs retain the reviewed epoch and revision, including legacy checkpoints without an epoch. */
+    @Test
+    fun consentForwardsTheDisplayedRecoveryEpoch() =
+        runTest {
+            val grants =
+                mapOf(
+                    OnboardingActionFfi.APPROVE_REPAIR to "approveOnboardingRepair",
+                    OnboardingActionFfi.CONTINUE_ANYWAY to "acknowledgeOnboardingSingleDevice",
+                )
+            for ((action, method) in grants) {
+                for (epoch in listOf(null, "reviewed-epoch")) {
+                    val calls = mutableListOf<String>()
+                    val marmot =
+                        nativeBoundary { name, arguments ->
+                            calls += name
+                            assertEquals(SETUP_TEST_ACCOUNT, arguments[0])
+                            assertEquals(7uL, (arguments[1] as Long).toULong())
+                            if (epoch != null) assertEquals(epoch, arguments[2])
+                        }
+                    MarmotAccountSetupClient(marmot, SETUP_TEST_ACCOUNT) {}.execute(
+                        SetupRequest(7uL, OnboardingStepFfi.SINGLE_DEVICE, action, recoveryEpoch = epoch),
+                    )
+                    assertEquals(listOf(method + if (epoch == null) "" else "InEpoch"), calls)
+                }
+            }
+        }
+
     /** Both identity mechanisms share the same published native preflight boundary. */
     @Test fun preflightReturnsTheFirstConsequentialDecision() =
         runTest {

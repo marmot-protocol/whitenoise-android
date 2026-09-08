@@ -241,7 +241,7 @@ internal class AccountSetupController(
     }
 }
 
-/** Approval belongs to the reviewed proposal; other decisions belong to the surrounding checkpoint. */
+/** Grants must match the reviewed recovery epoch as well as the proposal or checkpoint revision. */
 private fun OnboardingSnapshotFfi.matchesDecision(
     account: String,
     request: SetupRequest,
@@ -257,7 +257,11 @@ private fun OnboardingSnapshotFfi.matchesDecision(
         } else {
             revision
         }
-    return accountIdHex == account && request.action in actions && request.revision == expectedRevision
+    val grantsConsent =
+        request.action == OnboardingActionFfi.APPROVE_REPAIR ||
+            request.action == OnboardingActionFfi.CONTINUE_ANYWAY
+    val epochMatches = !grantsConsent || request.recoveryEpoch == recoveryEpoch
+    return accountIdHex == account && request.action in actions && request.revision == expectedRevision && epochMatches
 }
 
 /** Converts an editor draft into a proposal request without approving publication. */

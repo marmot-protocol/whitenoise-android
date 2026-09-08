@@ -5975,18 +5975,10 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Applies an explicit device-privacy choice through MDK’s current consent API. */
     suspend fun setTelemetryEnabled(enabled: Boolean): Boolean =
         runCatching {
-            val current = relayTelemetrySettings ?: marmotIo { relayTelemetrySettings() }
-            val updated =
-                marmotIo {
-                    setRelayTelemetrySettings(
-                        RelayTelemetrySettingsFfi(
-                            exportEnabled = enabled,
-                            exportIntervalSeconds = current.exportIntervalSeconds,
-                        ),
-                    )
-                }
+            val updated = marmotIo { updateTelemetryConsent(enabled) }
             relayTelemetrySettings = updated
             presentTransient(R.string.toast_security_privacy_updated)
             true

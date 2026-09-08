@@ -35,6 +35,29 @@ class AccountSetupApprovalRevisionTest {
             controller.close()
         }
 
+    /** An identical revision in another recovery attempt cannot reuse either publication or device consent. */
+    @Test
+    fun grantsCannotCrossRecoveryEpochs() =
+        runTest {
+            for (action in listOf(OnboardingActionFfi.APPROVE_REPAIR, OnboardingActionFfi.CONTINUE_ANYWAY)) {
+                val initial = repairSnapshot(3uL, actions = listOf(action)).copy(recoveryEpoch = "reviewed-epoch")
+                val client = FakeSetupClient(initial)
+                val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+                controller.reconnect()
+                runCurrent()
+                client.current = initial.copy(recoveryEpoch = "replacement-epoch")
+                controller.submit(
+                    SetupRequest(3uL, OnboardingStepFfi.RELAYS, action, recoveryEpoch = initial.recoveryEpoch),
+                )
+                runCurrent()
+                assertEquals(1, client.snapshotReads)
+                assertTrue(client.requests.isEmpty())
+                assertTrue(controller.state.value.staleDecision)
+                assertEquals(client.current, controller.state.value.snapshot)
+                controller.close()
+            }
+        }
+
     /** A replaced proposal must be reviewed again even when approval is still an offered action. */
     @Test
     fun replacedProposalCannotUseThePreviousApproval() = rejectFreshRepair(repairSnapshot(6uL, proposalRevision = 4uL))

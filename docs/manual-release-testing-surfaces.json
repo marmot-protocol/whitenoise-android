@@ -1250,7 +1250,6 @@
           "CON-001"
         ]
       },
-
       {
         "surface": "ConversationTopBar",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
@@ -1564,7 +1563,6 @@
           "DIC-003"
         ]
       },
-
       {
         "surface": "ConversationDictationPrimaryAction",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
@@ -7254,7 +7252,11 @@
           "ONB-006",
           "ONB-008",
           "ONB-012",
-          "SET-019"
+          "SET-019",
+          "ONB-017",
+          "ONB-018",
+          "ONB-020",
+          "SEC-007"
         ]
       },
       {
@@ -8082,6 +8084,32 @@
           "ONB-015",
           "ONB-016",
           "ONB-018"
+        ]
+      },
+      {
+        "surface": "Recovered onboarding consent: approveSetupRepair",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupApprovals.kt",
+        "anchor": "MarmotInterface.approveSetupRepair(",
+        "test_ids": [
+          "ONB-017",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Recovered onboarding consent: acknowledgeSetupSingleDevice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupApprovals.kt",
+        "anchor": "MarmotInterface.acknowledgeSetupSingleDevice(",
+        "test_ids": [
+          "ONB-018"
+        ]
+      },
+      {
+        "surface": "Explicit telemetry consent after SDK migration",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/TelemetryConsent.kt",
+        "anchor": "MarmotInterface.updateTelemetryConsent(",
+        "test_ids": [
+          "SEC-007",
+          "INT-010"
         ]
       }
     ],
