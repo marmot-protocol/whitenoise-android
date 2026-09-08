@@ -218,7 +218,7 @@ class AccountSetupControllerTest {
 
     /** Fences commands and activation callbacks after the runtime owner is replaced. */
     @Test
-    fun invalidatedRuntimeCannotActivateOrSubmit() =
+    fun invalidatedRuntimeCannotActivate() =
         runTest {
             val client = FakeSetupClient(setupSnapshot(ready = true))
             var current = true
@@ -236,9 +236,41 @@ class AccountSetupControllerTest {
             controller.reconnect()
             runCurrent()
             controller.openChats()
-            controller.submit(SetupRequest(3uL, OnboardingStepFfi.PROFILE, OnboardingActionFfi.CONTINUE_WITHOUT))
             runCurrent()
             assertFalse(activated)
+            assertTrue(client.requests.isEmpty())
+            controller.close()
+        }
+
+    /** Isolates runtime invalidation from busy, stale-revision, and unavailable-action guards. */
+    @Test
+    fun invalidatedIdleRuntimeCannotSubmit() =
+        runTest {
+            val client = FakeSetupClient()
+            var current = true
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { current }, {}, {})
+            controller.reconnect()
+            runCurrent()
+            val request = SetupRequest(3uL, OnboardingStepFfi.PROFILE, OnboardingActionFfi.CONTINUE_WITHOUT)
+            assertFalse(controller.state.value.busy)
+            assertEquals(
+                request.revision,
+                controller.state.value.snapshot
+                    ?.revision,
+            )
+            assertEquals(
+                request.step,
+                controller.state.value.currentStep
+                    ?.step,
+            )
+            assertTrue(
+                request.action in
+                    controller.state.value.currentStep!!
+                        .actions,
+            )
+            current = false
+            controller.submit(request)
+            runCurrent()
             assertTrue(client.requests.isEmpty())
             controller.close()
         }

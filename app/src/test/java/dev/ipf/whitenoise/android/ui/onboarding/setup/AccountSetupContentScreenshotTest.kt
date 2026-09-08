@@ -117,6 +117,16 @@ class AccountSetupContentScreenshotTest {
             dark = true,
         )
 
+    /** Expanded device diagnostics explain an inconclusive result without asserting another device is absent. */
+    @Test fun deviceDiscoveryDetails() =
+        capture(
+            "device_discovery_details",
+            AccountSetupState(
+                snapshot = setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.CONTINUE_ANYWAY)),
+                detailsExpanded = true,
+            ),
+        )
+
     /** Records the recoverable error presentation without losing the current decision. */
     @Test fun failure() = capture("failure", AccountSetupState(snapshot = setupSnapshot(), error = true))
 

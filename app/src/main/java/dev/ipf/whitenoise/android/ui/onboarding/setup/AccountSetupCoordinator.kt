@@ -18,6 +18,7 @@ internal class AccountSetupCoordinator(
     private val app: WhiteNoiseAppState,
     private val scope: CoroutineScope,
     private val onPhaseChange: (AppPhase) -> Unit,
+    private val awaitActivationReadiness: suspend () -> Unit,
     private val reconnectSigner: suspend (MarmotInterface, String) -> Unit,
 ) {
     var controller by mutableStateOf<AccountSetupController?>(null)
@@ -102,13 +103,17 @@ internal class AccountSetupCoordinator(
         val snapshot = client.snapshot() ?: return
         if (snapshot.ready && !snapshot.cancellationPending && generation == token) {
             app.refreshAccounts()
-            val activated =
-                app.setActiveAccount(
-                    account,
-                    shouldActivate = { generation == token && app.runtimeGeneration == runtimeGeneration },
-                    onActivated = { onPhaseChange(AppPhase.Ready) },
-                )
-            if (activated) scope.launch { if (generation == token) close() }
+            // Resumed setup may have diverted bootstrap before its receiver/privacy barrier.
+            awaitActivationReadiness()
+            if (generation == token && app.runtimeGeneration == runtimeGeneration) {
+                val activated =
+                    app.setActiveAccount(
+                        account,
+                        shouldActivate = { generation == token && app.runtimeGeneration == runtimeGeneration },
+                        onActivated = { onPhaseChange(AppPhase.Ready) },
+                    )
+                if (activated) scope.launch { if (generation == token) close() }
+            }
         }
     }
 }

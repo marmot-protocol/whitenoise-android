@@ -1134,6 +1134,8 @@ class LocalizationResourceTest {
             mapOf(
                 "values-de" to
                     setOf(
+                        // "Details" is also the standard German label for additional information.
+                        "setup_details",
                         // "Name" is the German word for "name".
                         "profile_contact_name_hint",
                         // "Album" is the German word for "album", and the

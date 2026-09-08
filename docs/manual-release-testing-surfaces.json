@@ -5107,6 +5107,30 @@
           "ONB-016",
           "ONB-018"
         ]
+      },
+      {
+        "surface": "Device discovery details: R.string.setup_device_none",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
+        "anchor": "R.string.setup_device_none",
+        "test_ids": [
+          "ONB-018"
+        ]
+      },
+      {
+        "surface": "Device discovery details: R.string.setup_device_possible",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
+        "anchor": "R.string.setup_device_possible",
+        "test_ids": [
+          "ONB-018"
+        ]
+      },
+      {
+        "surface": "Device discovery details: R.string.setup_device_unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
+        "anchor": "R.string.setup_device_unknown",
+        "test_ids": [
+          "ONB-018"
+        ]
       }
     ],
     "settings_controls": [

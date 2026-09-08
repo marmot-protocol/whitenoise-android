@@ -320,6 +320,17 @@ class AccountSetupContentTest {
         assertTrue(actions.isEmpty())
     }
 
+    /** Incomplete discovery remains available without expanding the normal acknowledgment copy. */
+    @Test fun unknownDeviceDiscoveryAppearsInDetails() {
+        show(AccountSetupState(snapshot = setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE), detailsExpanded = true))
+        composeRule
+            .onNodeWithText(
+                "We could not determine whether another installation exists. " +
+                    "Continue only if you want to use this device.",
+            ).performScrollTo()
+            .assertIsDisplayed()
+    }
+
     /** Relay diagnostics identify the exact endpoint before Details or a replacement proposal is opened. */
     @Test fun retiredRelayIsNamedBesideItsFinding() {
         val snapshot = setupSnapshot(OnboardingStepFfi.RELAYS, listOf(OnboardingActionFfi.USE_RECOMMENDED_RELAYS))

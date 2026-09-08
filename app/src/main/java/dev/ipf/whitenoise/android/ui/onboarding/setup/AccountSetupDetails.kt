@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
@@ -69,6 +70,17 @@ internal fun SetupDetails(state: AccountSetupState) {
             Text(state.accountLabel, style = MaterialTheme.typography.labelMedium)
             state.currentStep?.findings?.forEach { finding ->
                 SetupFindingContent(finding)
+            }
+            if (state.currentStep?.step == OnboardingStepFfi.SINGLE_DEVICE) {
+                Text(
+                    stringResource(
+                        when (snapshot.singleDeviceNotice?.discovery ?: OnboardingDeviceDiscoveryFfi.UNKNOWN) {
+                            OnboardingDeviceDiscoveryFfi.NONE_FOUND -> R.string.setup_device_none
+                            OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE -> R.string.setup_device_possible
+                            OnboardingDeviceDiscoveryFfi.UNKNOWN -> R.string.setup_device_unknown
+                        },
+                    ),
+                )
             }
             SetupChecklist(snapshot)
         }

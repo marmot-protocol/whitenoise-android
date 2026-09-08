@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -53,6 +54,26 @@ class AmberLoginReconciliationCoverageTest {
                 """registerExternalSigner\s*\(\s*summary\.label\s*,\s*amberSigner\.buildSigner\(pubkeyHex\)""",
             ).containsMatchIn(body),
         )
+    }
+
+    /** Production nsec imports must not turn arbitrary onboarding failures into legacy login attempts. */
+    @Test
+    fun productionNsecFallbackCatchesOnlyExplicitLegacyRefusal() {
+        val source = appStateSource().readText()
+        val start = source.indexOf("private suspend fun beginIdentitySetup(")
+        val end = source.indexOf("private suspend fun engineLogin(", start)
+        require(start >= 0 && end > start) { "Missing nsec setup boundary" }
+        val body = source.substring(start, end)
+        val production = body.substring(body.indexOf("return try {"))
+        assertTrue(production.contains("accountSetup.begin(nsec)"))
+        val caughtTypes =
+            Regex("catch\\s*\\([^:]+:\\s*([^)]*)\\)")
+                .findAll(production)
+                .map { it.groupValues[1].trim() }
+                .toList()
+        assertEquals(listOf("MarmotKitException.OnboardingActionUnavailable"), caughtTypes)
+        val fallback = production.substringAfter("catch (_: MarmotKitException.OnboardingActionUnavailable)")
+        assertTrue("explicit legacy refusal must leave setup for the old login path", fallback.contains("null"))
     }
 
     private fun appStateSource(): File =

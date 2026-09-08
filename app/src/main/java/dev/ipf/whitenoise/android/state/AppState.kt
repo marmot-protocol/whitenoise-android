@@ -1144,7 +1144,12 @@ class WhiteNoiseAppState private constructor(
 ) {
     /** Interactive imports stay separate from the active account until MDK certifies readiness. */
     internal val accountSetup by lazy {
-        AccountSetupCoordinator(this, mutationsScope, onPhaseChange = { phase = it }) { runtime, account ->
+        AccountSetupCoordinator(
+            this,
+            mutationsScope,
+            onPhaseChange = { phase = it },
+            awaitActivationReadiness = ::completeReceiverGatedStartup,
+        ) { runtime, account ->
             val reported = withContext(Dispatchers.IO) { amberSigner.requestPublicKey() }
             val canonical = withContext(Dispatchers.IO) { runtime.accountIdHex(reported) }
             check(canonical == account) { "signer account does not match setup" }
