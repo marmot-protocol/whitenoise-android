@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -67,10 +68,7 @@ internal fun SetupDetails(state: AccountSetupState) {
         state.snapshot?.let { snapshot ->
             Text(state.accountLabel, style = MaterialTheme.typography.labelMedium)
             state.currentStep?.findings?.forEach { finding ->
-                Text(
-                    stringResource(setupFindingTitle(finding.issue)) + finding.endpoint?.let { "\n$it" }.orEmpty(),
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                SetupFindingContent(finding)
             }
             SetupChecklist(snapshot)
         }
@@ -82,7 +80,7 @@ internal fun SetupDetails(state: AccountSetupState) {
     }
 }
 
-/** Quiet optional links share one row; completion has no generic setup controls. */
+/** Routine device consent keeps only Details; work and recovery retain an explicit save-and-exit action. */
 @Composable
 internal fun SetupFooter(
     state: AccountSetupState,
@@ -101,10 +99,30 @@ internal fun SetupFooter(
                     )
                 }
             }
-            TextButton(onClick = onLater, modifier = Modifier.testTag("setup-later")) {
-                Text(stringResource(R.string.setup_later))
+            if (!state.routineDeviceNotice) {
+                TextButton(onClick = onLater, modifier = Modifier.testTag("setup-later")) {
+                    Text(stringResource(R.string.setup_later))
+                }
             }
         }
         if (state.detailsExpanded && !state.busy) SetupDetails(state)
+    }
+}
+
+/** Keeps the affected endpoint beside its finding, including before the user opens diagnostic details. */
+@Composable
+internal fun SetupFindingContent(finding: OnboardingFindingFfi) {
+    Column(
+        modifier = Modifier.semantics(mergeDescendants = true) {},
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
+    ) {
+        finding.endpoint?.takeIf { it.isNotBlank() }?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium)
+        }
+        Text(
+            stringResource(setupFindingTitle(finding.issue)),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }

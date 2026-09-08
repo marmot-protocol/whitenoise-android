@@ -11,7 +11,10 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingFindingFfi
+import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRepairProposalFfi
+import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -149,7 +152,11 @@ class AccountSetupContentScreenshotTest {
                 snapshot =
                     setupSnapshot(
                         OnboardingStepFfi.SINGLE_DEVICE,
-                        listOf(OnboardingActionFfi.CONTINUE_ANYWAY, OnboardingActionFfi.CANCEL_ONBOARDING),
+                        listOf(
+                            OnboardingActionFfi.CONTINUE_ANYWAY,
+                            OnboardingActionFfi.RETRY,
+                            OnboardingActionFfi.CANCEL_ONBOARDING,
+                        ),
                     ),
             ),
         )
@@ -171,7 +178,11 @@ class AccountSetupContentScreenshotTest {
     private fun deviceSnapshot() =
         setupSnapshot(
             OnboardingStepFfi.SINGLE_DEVICE,
-            listOf(OnboardingActionFfi.CONTINUE_ANYWAY, OnboardingActionFfi.CANCEL_ONBOARDING),
+            listOf(
+                OnboardingActionFfi.CONTINUE_ANYWAY,
+                OnboardingActionFfi.RETRY,
+                OnboardingActionFfi.CANCEL_ONBOARDING,
+            ),
         )
 
     /** Records diagnostics only after the user requests them. */
@@ -180,6 +191,28 @@ class AccountSetupContentScreenshotTest {
             "details",
             AccountSetupState(snapshot = deviceSnapshot(), detailsExpanded = true),
         )
+
+    /** Identifies the retired endpoint beside the actionable finding before Details is expanded. */
+    @Test fun retiredRelay() {
+        val snapshot =
+            setupSnapshot(
+                OnboardingStepFfi.RELAYS,
+                listOf(OnboardingActionFfi.USE_RECOMMENDED_RELAYS, OnboardingActionFfi.RETRY),
+            )
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
+            listOf(OnboardingFindingFfi(OnboardingIssueFfi.RETIRED_RELAY, "wss://retired.example"))
+        capture("retired_relay", AccountSetupState(snapshot = snapshot))
+    }
+
+    /** Keeps a failed device check distinct from the routine one-action consent screen. */
+    @Test fun failedDeviceCheck() {
+        val snapshot = setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.RETRY))
+        snapshot.steps.first { it.step == OnboardingStepFfi.SINGLE_DEVICE }.apply {
+            status = OnboardingStatusFfi.RETRYABLE_FAILURE
+            findings = listOf(OnboardingFindingFfi(OnboardingIssueFfi.TIMED_OUT, null))
+        }
+        capture("device_retry", AccountSetupState(snapshot = snapshot))
+    }
 
     /** Freezes animation time and records the supplied state with explicit theme, direction, and density. */
     private fun capture(

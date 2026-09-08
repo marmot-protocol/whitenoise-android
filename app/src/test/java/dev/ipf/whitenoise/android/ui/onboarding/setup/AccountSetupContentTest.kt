@@ -11,7 +11,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingFindingFfi
+import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRepairProposalFfi
+import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -299,16 +302,49 @@ class AccountSetupContentTest {
                 snapshot =
                     setupSnapshot(
                         OnboardingStepFfi.SINGLE_DEVICE,
-                        listOf(OnboardingActionFfi.CONTINUE_ANYWAY, OnboardingActionFfi.CANCEL_ONBOARDING),
+                        listOf(
+                            OnboardingActionFfi.CONTINUE_ANYWAY,
+                            OnboardingActionFfi.RETRY,
+                            OnboardingActionFfi.CANCEL_ONBOARDING,
+                        ),
                     ),
             ),
         )
         composeRule.onNodeWithTag("setup-action-CONTINUE_ANYWAY").assertIsDisplayed()
+        composeRule.onNodeWithTag("setup-action-RETRY").assertDoesNotExist()
+        composeRule.onNodeWithTag("setup-later").assertDoesNotExist()
         composeRule.onNodeWithTag("setup-action-CANCEL_ONBOARDING").assertDoesNotExist()
         composeRule.onNodeWithText("Follow list").assertDoesNotExist()
         composeRule.onNodeWithTag("setup-details").performClick()
         assertEquals(1, details)
         assertTrue(actions.isEmpty())
+    }
+
+    /** Relay diagnostics identify the exact endpoint before Details or a replacement proposal is opened. */
+    @Test fun retiredRelayIsNamedBesideItsFinding() {
+        val snapshot = setupSnapshot(OnboardingStepFfi.RELAYS, listOf(OnboardingActionFfi.USE_RECOMMENDED_RELAYS))
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
+            listOf(OnboardingFindingFfi(OnboardingIssueFfi.RETIRED_RELAY, "wss://retired.example"))
+        show(AccountSetupState(snapshot = snapshot))
+        composeRule.onNodeWithText("wss://retired.example").assertIsDisplayed()
+        composeRule.onNodeWithText("This relay is retired.").assertIsDisplayed()
+        composeRule.onNodeWithTag("setup-action-USE_RECOMMENDED_RELAYS").assertIsDisplayed()
+        assertTrue(actions.isEmpty())
+    }
+
+    /** A real device-check failure keeps an explained, working retry and a non-destructive exit. */
+    @Test fun failedDeviceCheckRetainsRetryAndLater() {
+        val snapshot = setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.RETRY))
+        snapshot.steps.first { it.step == OnboardingStepFfi.SINGLE_DEVICE }.apply {
+            status = OnboardingStatusFfi.RETRYABLE_FAILURE
+            findings = listOf(OnboardingFindingFfi(OnboardingIssueFfi.TIMED_OUT, null))
+        }
+        show(AccountSetupState(snapshot = snapshot))
+        composeRule.onNodeWithText("This check timed out.").assertIsDisplayed()
+        composeRule.onNodeWithTag("setup-action-RETRY").assertIsDisplayed().performClick()
+        assertEquals(OnboardingActionFfi.RETRY, actions.single().action)
+        composeRule.onNodeWithTag("setup-later").performScrollTo().performClick()
+        assertEquals(1, later)
     }
 
     /** A ready screen sheds diagnostics and exit links rather than asking the user to finish setup again. */

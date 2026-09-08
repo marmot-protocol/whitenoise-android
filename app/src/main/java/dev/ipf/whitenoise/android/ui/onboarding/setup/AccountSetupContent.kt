@@ -159,17 +159,14 @@ private fun SetupDecisionContent(
             )
         }
         SetupOperationNotice(snapshot, step)
-        if (step.step != OnboardingStepFfi.PROFILE &&
-            step.step != OnboardingStepFfi.SINGLE_DEVICE &&
-            snapshot.proposal?.step != step.step
-        ) {
-            step.findings.firstOrNull()?.let { Text(stringResource(setupFindingTitle(it.issue))) }
+        if (step.step != OnboardingStepFfi.PROFILE && snapshot.proposal?.step != step.step) {
+            state.decisionFinding?.let { SetupFindingContent(it) }
         }
         if (step.step == OnboardingStepFfi.SINGLE_DEVICE) {
             SetupSingleDeviceNotice(snapshot.singleDeviceNotice?.discovery)
         }
         snapshot.proposal?.takeIf { it.step == step.step }?.let { SetupProposalContent(it) }
-        SetupActionButtons(snapshot, step, state.busy, onAction, onEdit, state.detailsExpanded)
+        SetupActionButtons(state, onAction, onEdit)
     }
 }
 

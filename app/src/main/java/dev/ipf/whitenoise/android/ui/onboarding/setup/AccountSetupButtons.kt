@@ -14,23 +14,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.OnboardingActionFfi
-import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
-import dev.ipf.marmotkit.OnboardingStepStateFfi
 
 /** Orders presentation only: every offered action retains its exact native revision and callback. */
 @Composable
 internal fun SetupActionButtons(
-    snapshot: OnboardingSnapshotFfi,
-    step: OnboardingStepStateFfi,
-    busy: Boolean,
+    state: AccountSetupState,
     onAction: (SetupRequest) -> Unit,
     onEdit: (OnboardingStepFfi, OnboardingActionFfi, ULong) -> Unit,
-    expanded: Boolean = false,
 ) {
-    val ordered = setupOrderedActions(step.actions)
+    val snapshot = state.snapshot ?: return
+    val step = state.currentStep ?: return
+    val ordered =
+        setupOrderedActions(step.actions).filterNot {
+            it == OnboardingActionFfi.RETRY && state.routineDeviceNotice
+        }
     val actions =
-        if (expanded || snapshot.cancellationPending) {
+        if (state.detailsExpanded || snapshot.cancellationPending) {
             ordered
         } else {
             ordered.filter { it != OnboardingActionFfi.CANCEL_ONBOARDING }.take(2)
@@ -43,7 +43,7 @@ internal fun SetupActionButtons(
                 snapshot.revision
             }
         val canApprove = action != OnboardingActionFfi.APPROVE_REPAIR || snapshot.proposal?.step == step.step
-        SetupActionButton(action, primary = action == actions.firstOrNull(), enabled = !busy && canApprove) {
+        SetupActionButton(action, primary = action == actions.firstOrNull(), enabled = !state.busy && canApprove) {
             if (action in setupEditorActions) {
                 onEdit(step.step, action, revision)
             } else {

@@ -5097,6 +5097,16 @@
           "ONB-019",
           "ONB-021"
         ]
+      },
+      {
+        "surface": "SetupFindingContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
+        "anchor": "fun SetupFindingContent(",
+        "test_ids": [
+          "ONB-015",
+          "ONB-016",
+          "ONB-018"
+        ]
       }
     ],
     "settings_controls": [
@@ -7662,6 +7672,26 @@
         "test_ids": [
           "ONB-018",
           "ONB-021"
+        ]
+      },
+      {
+        "surface": "Routine device notice hides redundant retry and exit controls while recovery preserves them",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupAutomation.kt",
+        "anchor": "internal val AccountSetupState.routineDeviceNotice",
+        "test_ids": [
+          "ONB-018",
+          "ONB-019",
+          "ONB-021"
+        ]
+      },
+      {
+        "surface": "Current finding pairs the affected relay endpoint with its diagnostic explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
+        "anchor": "fun SetupFindingContent(",
+        "test_ids": [
+          "ONB-015",
+          "ONB-016",
+          "ONB-018"
         ]
       }
     ],
