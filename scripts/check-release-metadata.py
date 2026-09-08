@@ -54,12 +54,71 @@ def unique_match(pattern: str, content: str, label: str) -> str:
     return matches[0]
 
 
-def png_info(image: Path) -> tuple[int, int, int, int]:
+def read_png(image: Path) -> tuple[int, int, int, int, bytes]:
+    """Validate the complete non-interlaced RGB/RGBA store export."""
     payload = image.read_bytes()
-    if payload[:8] != b"\x89PNG\r\n\x1a\n" or payload[12:16] != b"IHDR":
-        fail(f"not a PNG: {image.relative_to(ROOT)}")
-    width, height, bit_depth, color_type = struct.unpack(">IIBB", payload[16:26])
-    return width, height, bit_depth, color_type
+    if payload[:8] != b"\x89PNG\r\n\x1a\n":
+        fail(f"not a PNG: {image.name}")
+    offset = 8
+    header = None
+    compressed = bytearray()
+    seen_data = ended_data = ended = False
+    while offset < len(payload):
+        if offset + 12 > len(payload):
+            fail(f"truncated PNG chunk: {image.name}")
+        length = struct.unpack_from(">I", payload, offset)[0]
+        end = offset + 12 + length
+        if end > len(payload):
+            fail(f"truncated PNG chunk payload: {image.name}")
+        kind = payload[offset + 4:offset + 8]
+        data = payload[offset + 8:end - 4]
+        crc = struct.unpack_from(">I", payload, end - 4)[0]
+        if zlib.crc32(kind + data) != crc:
+            fail(f"invalid PNG chunk CRC: {image.name}")
+        if header is None and kind != b"IHDR":
+            fail(f"PNG must start with IHDR: {image.name}")
+        if kind == b"IHDR":
+            if header is not None or length != 13:
+                fail(f"invalid PNG header: {image.name}")
+            header = struct.unpack(">IIBBBBB", data)
+        elif kind == b"IDAT":
+            if ended_data:
+                fail(f"noncontiguous PNG image data: {image.name}")
+            seen_data = True
+            compressed.extend(data)
+        else:
+            ended_data = seen_data
+            if kind == b"IEND":
+                if length or not seen_data or end != len(payload):
+                    fail(f"invalid PNG end: {image.name}")
+                ended = True
+            elif kind == b"tRNS":
+                fail(f"PNG transparency chunks are unsupported: {image.name}")
+            elif kind == b"PLTE":
+                if seen_data or not length or length % 3 or length > 768:
+                    fail(f"invalid PNG palette: {image.name}")
+            elif not kind[0] & 32:
+                fail(f"unsupported critical PNG chunk: {image.name}")
+        offset = end
+    if header is None or not ended:
+        fail(f"incomplete PNG: {image.name}")
+    width, height, depth, color, compression, filtering, interlace = header
+    if not (0 < width <= 4096 and 0 < height <= 4096 and depth == 8 and color in (2, 6)):
+        fail(f"unsupported PNG dimensions/format: {image.name}")
+    if compression or filtering or interlace:
+        fail(f"unsupported PNG compression/filter/interlace method: {image.name}")
+    stride = width * (4 if color == 6 else 3)
+    expected = height * (stride + 1)
+    decoder = zlib.decompressobj()
+    try:
+        raw = decoder.decompress(compressed, expected + 1)
+    except zlib.error:
+        fail(f"invalid PNG compressed data: {image.name}")
+    if len(raw) != expected or not decoder.eof or decoder.unused_data or decoder.unconsumed_tail:
+        fail(f"invalid PNG image data length/stream: {image.name}")
+    if any(raw[y * (stride + 1)] not in range(5) for y in range(height)):
+        fail(f"invalid PNG filter: {image.name}")
+    return width, height, depth, color, raw
 
 
 def require_png(
@@ -71,14 +130,14 @@ def require_png(
 ) -> None:
     if not image.is_file():
         fail(f"missing store asset: {image.relative_to(ROOT)}")
-    width, height, bit_depth, actual_color_type = png_info(image)
+    width, height, bit_depth, actual_color_type, raw = read_png(image)
     if (width, height) != dimensions:
         fail(
             f"{image.relative_to(ROOT)} is {width}x{height}; "
             f"expected {dimensions[0]}x{dimensions[1]}"
         )
     if allow_opaque_rgba and bit_depth == 8 and actual_color_type == 6:
-        require_opaque_rgba(image, width, height)
+        require_opaque_rgba(image, width, height, raw)
         return
     if bit_depth != 8 or actual_color_type != color_type:
         fail(
@@ -87,22 +146,13 @@ def require_png(
         )
 
 
-def require_opaque_rgba(image: Path, width: int, height: int) -> None:
+def require_opaque_rgba(image: Path, width: int, height: int, raw: bytes | None = None) -> None:
     """Accept opaque RGBA exports without modifying the designer's PNG bytes."""
-    payload = image.read_bytes()
-    if payload[28] != 0:
-        fail(f"interlaced RGBA screenshot is unsupported: {image.name}")
-    compressed = bytearray()
-    offset = 8
-    while offset < len(payload):
-        length = struct.unpack_from(">I", payload, offset)[0]
-        if payload[offset + 4:offset + 8] == b"IDAT":
-            compressed.extend(payload[offset + 8:offset + 8 + length])
-        offset += 12 + length
-    raw = zlib.decompress(compressed)
+    if raw is None:
+        actual_width, actual_height, depth, color, raw = read_png(image)
+        if (actual_width, actual_height, depth, color) != (width, height, 8, 6):
+            fail(f"invalid RGBA screenshot format: {image.name}")
     stride = width * 4
-    if len(raw) != height * (stride + 1):
-        fail(f"invalid RGBA screenshot data: {image.name}")
     previous = bytearray(stride)
     for y in range(height):
         start = y * (stride + 1)

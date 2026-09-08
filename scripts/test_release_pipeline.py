@@ -39,7 +39,7 @@ class BundleTests(unittest.TestCase):
         self.path = Path(self.temp.name)
         self.policy = bundle.properties()
         names = [f'whitenoise-android-{VERSION}-arm64-v8a.apk', f'whitenoise-android-{VERSION}-play.aab',
-                 f'mapping-{VERSION}.txt', 'release-notes-en-US.txt', f'store-assets-{VERSION}.zip']
+                 f'mapping-{VERSION}-play.txt', f'mapping-{VERSION}-zapstore.txt', 'release-notes-en-US.txt', f'store-assets-{VERSION}.zip']
         files = {}
         for name in names:
             path = self.path / name
@@ -93,11 +93,12 @@ class BundleTests(unittest.TestCase):
                 self.manifest[field] = original
 
     def test_missing_mapping_or_extra_apk_is_rejected(self):
-        mapping = self.path / f'mapping-{VERSION}.txt'
-        mapping.unlink()
-        with self.assertRaisesRegex(ValueError, 'bundle files'):
-            self.verify()
-        mapping.write_bytes(b'fixture ' + mapping.name.encode())
+        for distribution in ('play', 'zapstore'):
+            mapping = self.path / f'mapping-{VERSION}-{distribution}.txt'
+            mapping.unlink()
+            with self.assertRaisesRegex(ValueError, 'bundle files'):
+                self.verify()
+            mapping.write_bytes(b'fixture ' + mapping.name.encode())
         (self.path / 'unexpected.apk').write_bytes(b'other build')
         with self.assertRaisesRegex(ValueError, 'bundle files'):
             self.verify()
@@ -216,7 +217,7 @@ class ZapstoreIntegrationTests(unittest.TestCase):
                 out = root / 'build/production-release'
                 out.mkdir(parents=True)
                 for name in (f'whitenoise-android-{VERSION}-arm64-v8a.apk', f'whitenoise-android-{VERSION}-play.aab',
-                             f'mapping-{VERSION}.txt'):
+                             f'mapping-{VERSION}-play.txt', f'mapping-{VERSION}-zapstore.txt'):
                     (out / name).write_bytes(b'synthetic fixture, never a real artifact')
                 (out / 'release-notes-en-US.txt').write_text('Release notes')
                 with zipfile.ZipFile(out / f'store-assets-{VERSION}.zip', 'w') as z:
@@ -284,11 +285,42 @@ class WorkflowBoundaryTests(unittest.TestCase):
 
 class ScreenshotTests(unittest.TestCase):
     @staticmethod
-    def png(alpha):
+    def png(alpha=255, *, color=6, raw=None, compressed=None):
         def chunk(kind, data):
             return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
-        return (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 1, 1, 8, 6, 0, 0, 0)) +
-                chunk(b'IDAT', zlib.compress(bytes([0, 10, 20, 30, alpha]))) + chunk(b'IEND', b''))
+        if raw is None:
+            raw = bytes([0, 10, 20, 30] + ([alpha] if color == 6 else []))
+        if compressed is None:
+            compressed = zlib.compress(raw)
+        return (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 1, 1, 8, color, 0, 0, 0)) +
+                chunk(b'IDAT', compressed) + chunk(b'IEND', b''))
+
+    def test_complete_rgb_and_rgba_assets_are_accepted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'image.png'
+            for color in (2, 6):
+                path.write_bytes(self.png(color=color))
+                metadata.require_png(path, dimensions=(1, 1), color_type=color)
+
+    def test_damaged_rgb_and_rgba_assets_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'image.png'
+            for color in (2, 6):
+                valid = self.png(color=color)
+                bad_crc = bytearray(valid)
+                bad_crc[41] ^= 1
+                compressed = zlib.compress(bytes([0, 10, 20, 30] + ([255] if color == 6 else [])))
+                cases = [valid[:7], valid[:27], valid[:-13], valid[:-1], valid + b'extra',
+                         bytes(bad_crc), self.png(color=color, raw=b'\x00'),
+                         self.png(color=color, compressed=b'invalid'),
+                         self.png(color=color, compressed=compressed[:-1]),
+                         self.png(color=color, compressed=compressed + b'extra'),
+                         self.png(color=color, raw=bytes([5, 10, 20, 30] + ([255] if color == 6 else [])))]
+                for payload in cases:
+                    with self.subTest(color=color, payload=payload):
+                        path.write_bytes(payload)
+                        with self.assertRaises(SystemExit):
+                            metadata.require_png(path, dimensions=(1, 1), color_type=color)
 
     def test_opaque_rgba_is_accepted_and_transparency_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

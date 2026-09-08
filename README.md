@@ -194,8 +194,12 @@ retains the direct-distribution production key as the app-signing key:
 
 - `WHITENOISE_PLAY_UPLOAD_KEYSTORE_PATH`
 - `WHITENOISE_PLAY_UPLOAD_KEY_ALIAS`
-- `WHITENOISE_PLAY_UPLOAD_KEYSTORE_PASSWORD` (falls back to the production password)
-- `WHITENOISE_PLAY_UPLOAD_KEY_PASSWORD` (falls back to the production password)
+- `WHITENOISE_PLAY_UPLOAD_KEYSTORE_PASSWORD` (local Gradle builds fall back to the production password)
+- `WHITENOISE_PLAY_UPLOAD_KEY_PASSWORD` (local Gradle builds fall back to the production password)
+
+The production build workflow requires both Play password secrets explicitly.
+Run `:app:bundleProductionPlayRelease` in its own Gradle invocation, separately
+from APK tasks, so its upload-key signing and packaging settings stay isolated.
 
 Staging release builds use staging-only signing values:
 

@@ -192,7 +192,7 @@ if [[ -z "$aapt_bin" || ! -x "$aapt_bin" || -z "$apksigner_bin" || ! -x "$apksig
   exit 1
 fi
 
-badging="$($aapt_bin dump badging "$apk_source")"
+badging="$("$aapt_bin" dump badging "$apk_source")"
 actual_application_id="$(printf '%s\n' "$badging" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")"
 actual_version_code="$(printf '%s\n' "$badging" | sed -n "s/^package: .*versionCode='\([^']*\)'.*/\1/p")"
 actual_version_name="$(printf '%s\n' "$badging" | sed -n "s/^package: .*versionName='\([^']*\)'.*/\1/p")"
@@ -254,9 +254,12 @@ cp "$apk_source" "$apk_output"
 cp "$aab_source" "$aab_output"
 cp "$repo_dir/fastlane/metadata/android/en-US/changelogs/$version_code.txt" "$notes_output"
 
-mapping_source="$repo_dir/app/build/outputs/mapping/productionPlayRelease/mapping.txt"
-[[ -s "$mapping_source" ]] || { echo "error: missing Play R8 mapping" >&2; exit 1; }
-cp "$mapping_source" "$output_dir/mapping-$version_name.txt"
+for distribution in Play Zapstore; do
+  mapping_source="$repo_dir/app/build/outputs/mapping/production${distribution}Release/mapping.txt"
+  [[ -s "$mapping_source" ]] || { echo "error: missing $distribution R8 mapping" >&2; exit 1; }
+  mapping_suffix="$(printf '%s' "$distribution" | tr '[:upper:]' '[:lower:]')"
+  cp "$mapping_source" "$output_dir/mapping-$version_name-$mapping_suffix.txt"
+done
 
 (
   cd "$repo_dir"

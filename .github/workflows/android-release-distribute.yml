@@ -99,4 +99,4 @@ jobs:
           status: completed
           releaseName: White Noise ${{ steps.candidate.outputs.version }}
           whatsNewDirectory: build/play-whats-new
-          mappingFile: build/production-release/mapping-${{ steps.candidate.outputs.version }}.txt
+          mappingFile: build/production-release/mapping-${{ steps.candidate.outputs.version }}-play.txt

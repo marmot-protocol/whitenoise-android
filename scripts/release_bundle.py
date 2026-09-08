@@ -89,7 +89,8 @@ def verify_bundle(directory, expected_digest, version, source, run_id, attempt, 
         require(manifest.get(field) == policy[key], f"Release policy mismatch: {field}")
     require(type(manifest.get("versionCode")) is int and manifest["versionCode"] > 0, "Invalid version code")
     expected_files = {f"whitenoise-android-{version}-arm64-v8a.apk", f"whitenoise-android-{version}-play.aab",
-                      f"mapping-{version}.txt", "release-notes-en-US.txt", f"store-assets-{version}.zip"}
+                      f"mapping-{version}-play.txt", f"mapping-{version}-zapstore.txt",
+                      "release-notes-en-US.txt", f"store-assets-{version}.zip"}
     require(set(manifest["files"]) == expected_files, "Release payload file set is incorrect")
     require({p.name for p in directory.iterdir()} == expected_files | {"release-manifest.json", "checksums-sha256.txt"},
             "Unexpected or missing bundle files")

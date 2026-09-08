@@ -112,7 +112,8 @@ not load the app-signing keystore into the publication job.
 2. Dispatch **Android Production Build** on master with the exact versionName.
 3. Approve the signing environment. The build checks configuration, builds both
    variants, checks APK package/version/signer/ABI and Play bundle validity,
-   package/version/upload signer/four ABIs, and requires the Play R8 mapping.
+   package/version/upload signer/four ABIs, and requires separate Play and Zapstore
+   R8 mappings for crash retracing. Both mappings are retained in the reviewed bundle.
 4. Download the candidate artifact. Review its manifest, checksums, release
    notes, listing archive, APK and AAB; exercise the manual release checklist on
    authorized test devices. Compare the manifest source with the intended commit.

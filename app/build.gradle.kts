@@ -221,6 +221,10 @@ val requestedProductionPlayBundle =
     gradle.startParameter.taskNames.any { taskName ->
         taskName.substringAfterLast(":").equals("bundleProductionPlayRelease", ignoreCase = true)
     }
+require(!requestedProductionPlayBundle || gradle.startParameter.taskNames.size == 1) {
+    "Run :app:bundleProductionPlayRelease in its own Gradle invocation; " +
+        "the Play upload key and disabled APK splits apply to the entire invocation."
+}
 val productionReleaseSigning =
     if (requestedProductionPlayBundle) playUploadSigning else directProductionReleaseSigning
 val stagingReleaseSigning =
