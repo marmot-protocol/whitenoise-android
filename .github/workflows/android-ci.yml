@@ -28,7 +28,9 @@ jobs:
   validate:
     name: Compile, test, ktlint, detekt, Android lint
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Cold full-suite runs can reach screenshots at minute 42. Leave time for
+    # both variants and report uploads instead of cancelling a passing suite.
+    timeout-minutes: 60
 
     steps:
       - name: Checkout

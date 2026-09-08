@@ -47,7 +47,9 @@ jobs:
   fuzz-regression:
     name: Fuzz compile and regression replay
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Cold app + unit-test compilation can consume the old five-minute limit
+    # before the bounded corpus replays finish. Keep room for setup and teardown.
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
