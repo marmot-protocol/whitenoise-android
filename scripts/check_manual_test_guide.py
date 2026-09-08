@@ -338,6 +338,61 @@ def consume_kotlin_type_parameters(text: str, offset: int) -> int | None:
     return None
 
 
+def consume_kotlin_string(text: str, offset: int) -> int:
+    """Consume a Kotlin string or character literal, including nested string templates."""
+    if text.startswith('"""', offset):
+        delimiter = '"""'
+        cursor = offset + 3
+    else:
+        delimiter = text[offset]
+        cursor = offset + 1
+
+    while cursor < len(text):
+        if delimiter != "'" and text.startswith("${", cursor):
+            cursor = consume_kotlin_template_expression(text, cursor + 2)
+        elif text.startswith(delimiter, cursor):
+            return cursor + len(delimiter)
+        elif delimiter != '"""' and text[cursor] == "\\":
+            cursor += 2
+        else:
+            cursor += 1
+    return len(text)
+
+
+def consume_kotlin_template_expression(text: str, offset: int) -> int:
+    """Consume a balanced ``${...}`` body, including literals and nested templates."""
+    depth = 1
+    while offset < len(text):
+        if text.startswith("//", offset):
+            newline = text.find("\n", offset + 2)
+            offset = len(text) if newline < 0 else newline + 1
+        elif text.startswith("/*", offset):
+            offset += 2
+            comment_depth = 1
+            while offset < len(text) and comment_depth:
+                if text.startswith("/*", offset):
+                    comment_depth += 1
+                    offset += 2
+                elif text.startswith("*/", offset):
+                    comment_depth -= 1
+                    offset += 2
+                else:
+                    offset += 1
+        elif text.startswith('"""', offset) or text[offset] in {'"', "'"}:
+            offset = consume_kotlin_string(text, offset)
+        elif text[offset] == "{":
+            depth += 1
+            offset += 1
+        elif text[offset] == "}":
+            depth -= 1
+            offset += 1
+            if depth == 0:
+                return offset
+        else:
+            offset += 1
+    return len(text)
+
+
 def kotlin_code_mask(text: str) -> str:
     """Blank Kotlin comments and literals while preserving source offsets."""
     masked = list(text)
@@ -358,20 +413,8 @@ def kotlin_code_mask(text: str) -> str:
                     end += 2
                 else:
                     end += 1
-        elif text.startswith('"""', offset):
-            closing = text.find('"""', offset + 3)
-            end = len(text) if closing < 0 else closing + 3
-        elif text[offset] in {'"', "'"}:
-            quote = text[offset]
-            end = offset + 1
-            while end < len(text):
-                if text[end] == "\\":
-                    end += 2
-                elif text[end] == quote:
-                    end += 1
-                    break
-                else:
-                    end += 1
+        elif text.startswith('"""', offset) or text[offset] in {'"', "'"}:
+            end = consume_kotlin_string(text, offset)
         else:
             offset += 1
             continue

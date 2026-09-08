@@ -285,6 +285,15 @@ fun FutureWidget() = Unit
 '''
         self.assertEqual(MODULE.composable_names(text), {"FutureWidget"})
 
+    def test_composable_discovery_preserves_declaration_after_nested_template_string(self):
+        text = '''
+val value: String? = null
+val label = "${value ?: "don't"}"
+@Composable
+fun FutureWidget() = Unit
+'''
+        self.assertEqual(MODULE.composable_names(text), {"FutureWidget"})
+
     def test_composable_discovery_ignores_comments_strings_and_non_declarations(self):
         text = '''
 // @Composable fun CommentedScreen() = Unit
