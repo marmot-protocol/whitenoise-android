@@ -2213,6 +2213,15 @@ internal fun MainShell(
                             onNotificationUnreadBoundaryCaptured = {
                                 notificationReadThroughCommitter.commit(commitNotificationReadThrough)
                             },
+                            onNotificationTimelineVisibilityChanged = { visible ->
+                                conversationTimelineVisibility.reportIfCurrent(
+                                    owner = content.controller,
+                                    notificationOpenRequestId = content.openContext.notificationOpenRequestId,
+                                    visible = visible,
+                                    selectedOwner = currentConversationTimelineOwner,
+                                    selectedNotificationOpenRequestId = currentConversationTimelineRequestId,
+                                )
+                            },
                             onFirstFrameCommitted = {
                                 content.openContext.notificationRouteTraceRequestId?.let { requestId ->
                                     releaseNotificationFirstFrameGate(requestId)
