@@ -7637,6 +7637,32 @@
           "ONB-013",
           "ONB-014"
         ]
+      },
+      {
+        "surface": "Imported-account setup: R.string.setup_details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
+        "anchor": "R.string.setup_details",
+        "test_ids": [
+          "ONB-013",
+          "ONB-020"
+        ]
+      },
+      {
+        "surface": "Imported-account setup: R.string.setup_hide_details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
+        "anchor": "R.string.setup_hide_details",
+        "test_ids": [
+          "ONB-013"
+        ]
+      },
+      {
+        "surface": "Imported-account setup: R.string.setup_opening_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
+        "anchor": "R.string.setup_opening_chats",
+        "test_ids": [
+          "ONB-018",
+          "ONB-021"
+        ]
       }
     ],
     "notification_content_contracts": [
