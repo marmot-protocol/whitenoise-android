@@ -2,8 +2,9 @@
 
 ## Follow-up contract (stacked on PR 2496, 2026-09-06)
 
-The composer starts app-owned dictation when one eligible recognition service
-can be resolved. White Noise owns Cancel, Paste, Send and session lifecycle;
+The composer resolves one eligible recognition service and chooses its capture
+surface before recording. A version-keyed caller-audio capability check selects
+app-owned dictation or the provider Activity. White Noise owns Cancel, Paste, Send and session lifecycle;
 the installed provider owns recognition. The originating account, conversation,
 draft revision and insertion anchor are captured before recording.
 
@@ -12,8 +13,8 @@ draft revision and insertion anchor are captured before recording.
   the automatic delivery preference for this session.
 - Send finishes recognition and sends once only after authoritative origin
   validation and a final draft check under the conversation commit lock. The
-  captured draft is cleared only after durable acceptance, so the composer can
-  still show that text while the pending row is on screen (#2512 follow-up).
+  captured draft clears when its pending row appears and is restored if delivery
+  is not confirmed, without overwriting newer edits.
 - The first completion choice wins. Paste and Send become disabled while that
   choice finishes; Cancel remains available until irreversible dispatch begins.
 - After dispatch begins, the controls show a pending send and cannot cancel or
@@ -53,7 +54,7 @@ recognition across every provider, OS restriction or process death.
 | Contract | Capture and UI owner | Capability and boundary |
 |---|---|---|
 | App-owned `SpeechRecognizer` | White Noise controls; provider recognition | Effective microphone access and one eligible `RecognitionService`; explicit component binding. |
-| Provider Activity | Provider capture, endpointing and UI | An Activity resolving `android.speech.action.RECOGNIZE_SPEECH`, used only in explicit compatibility mode. In-app recognition never opens it, not even after a failure: its provider-owned floating surface would replace White Noise's own controls. |
+| Provider Activity | Provider capture, endpointing and UI | An Activity resolving `android.speech.action.RECOGNIZE_SPEECH`, chosen before capture when the provider cannot accept caller audio. An active in-app recording never switches to this surface after failure. |
 | Voice IME | Keyboard/IME capture and text commit | Ordinary editor input. White Noise does not control its recording lifecycle or promise immutable-origin routing. |
 
 There is no silent fallback to an arbitrary recognition service. If Android has
@@ -64,14 +65,23 @@ unexported and application-disabled services are excluded. The resolved componen
 is pinned and rechecked before each recognition generation; it is never replaced
 mid-session merely because the selected setting changes.
 
-Resolving a component does not make it usable. A service that Android has not
-selected in `VOICE_RECOGNITION_SERVICE` can still refuse the bound caller at the
-AppOps/attribution boundary with error 9 while White Noise itself holds
-RECORD_AUDIO, so app-owned capture on an empty selected-service device is
-attempted, not assumed. Such a rejection is terminal for that session and is
-reported in the composer, whose failure action opens Android's voice-input
-settings: choosing a service there is what makes app-owned capture work, and
-retrying the same unusable provider cannot.
+Resolving a component does not establish caller-audio support. Android grants
+microphone binding capabilities to selected, configured on-device and preinstalled
+recognizers. Ordinary unselected providers need White Noise to supply audio through
+`EXTRA_AUDIO_SOURCE` and must implement caller attribution and descriptor reading.
+On supported Android versions, the first use of such a provider sends an empty
+pipe before capturing audio. A result or no-match response establishes support;
+permission/client rejection selects the provider Activity. The answer is cached
+for the provider package and version code, so upgrading a provider rechecks it.
+Inconclusive errors, including `ERROR_SERVER`, and timeouts are not cached and
+continue through the in-app path, where the real failure remains visible. Android
+versions without caller-audio extras use the provider Activity when needed.
+
+This chooses one recording UI per gesture. Cancellation/backgrounding during the
+check prevents recording and discards late callbacks. A missing provider or a
+failed active recording offers recovery; it never opens a second recording UI.
+Android 17 has no recognizer picker: opening the provider's app permits model/setup
+recovery, while the system voice-input action can open an unrelated assistant role.
 
 The provider Activity compatibility path is a distinct, visible provider-owned
 screen. A bounded, cancellable 1.5-second availability check shows Checking speech
@@ -82,8 +92,9 @@ and origin checks; a provider cancel leaves the original draft unchanged.
 
 Offline preference is a request to the provider, not a network-isolation
 guarantee. Service discovery cannot prove a model is downloaded or ready.
-Language/model setup and downloads remain provider-owned. Unsupported
-language/model errors do not switch to another recognition service.
+Language/model setup and downloads remain provider-owned. Offline Voice Input
+engine failures offer Open speech service so the user can configure its model.
+Unsupported language/model errors do not switch to another recognition service.
 
 ## Microphone access and failure recovery
 
@@ -102,7 +113,7 @@ ownership and end the session as a provider access rejection. Do not open the
 provider's recognition Activity in its place. Its floating surface takes over
 the screen, its capture is not White Noise's to cancel, paste or send, and a
 first tap that lands there while a later tap reaches app-owned capture makes the
-control surface unpredictable. Offer voice-input settings instead.
+control surface unpredictable. Offer the provider's own setup app instead.
 
 If a later provider generation fails after useful text was accumulated, retain
 that text for explicit review. An ambiguous draft merge offers Copy, Insert at end
@@ -118,9 +129,10 @@ queries, unit tests and a provider Activity success do not prove app-owned captu
 
 | Configuration | Capability evidence | Exact-head journey |
 |---|---|---|
-| Pixel 6a GrapheneOS + Offline Voice Input (`dev.notune.transcribe`) | 2026-09-07: API 37, provider 0.1.18/code 19, selected `.VoiceRecognitionService`; both app and provider microphone grants present. | Native recognition fails with error 9 before Ready at source `030e2dba59c8da06875a118e5cafeb3d607b600f`. Not a supported full journey. |
-| Android with empty selected-service setting | Deterministic resolver tests cover the sole service, matching Activity package and ambiguous providers. Reporter logs for head `fb0047511` show the resolved `dev.notune.transcribe/.VoiceRecognitionService` refusing all 10 sessions with error 9 while the app grant was present, so app-owned capture is unavailable in this configuration. | Reporter testing of head `938bd40ec` found app-owned capture succeeding only after the provider's own Activity had run once, so a first tap landed on the provider surface and a later tap reached in-app capture. In-app dictation no longer opens that Activity: the expected journey here is a provider access rejection whose action opens voice-input settings, and selecting a service is what enables app-owned capture. Pending physical verification; do not infer it from the configured fixture, whose selected-service setting is populated. |
-| Activity-only provider | Deterministic controller coverage for explicit compatibility mode. Earlier published-head user logs show Activity-returned text, not background capture. | Pending for the updated candidate. |
+| Pixel 6a GrapheneOS + Offline Voice Input (`dev.notune.transcribe`) | Earlier 2026-09-07 diagnostics used a populated selected-service setting. That configuration was set through ADB and is not representative of a user-reachable Android 17 setup. | Historical diagnostic evidence only; do not reuse it as current acceptance. |
+| Android with empty selected-service setting + caller-audio-capable Offline Voice Input | Owner tests on 2026-09-08 at White Noise `f4f71f1a88f082e5c9e66cc986b9f4e5e739b857` with provider `c689f00` returned transcripts in three consecutive sessions, dropped zero audio and released microphone/service ownership after each. | Configured-model caller-audio path passed. This precedes the capability router and is not device proof for its new head; missing-model recovery remains separate. |
+| Provider without caller-audio support | The capability router chooses the Activity before real capture after a conclusive probe, or when Android lacks the audio-source extras. | Verify first-use check, cached route, cancellation and provider-upgrade recheck on an appropriate fixture. |
+| Activity-only provider | Explicit compatibility controller coverage remains. Automatic routing requires an unambiguous service or an applicable platform fallback. | Pending dedicated configuration. |
 | Voice IME only / no speech provider | Independent Android contracts; IME presence is not evidence of a service or Activity. | Pending dedicated configuration; do not reconfigure personal providers to manufacture a result. |
 
 Use the guarded fixture preflight and session tools. Record provider package
@@ -161,9 +173,9 @@ and released capture without inference. The original provider selection, privacy
 setting and APKs were restored, the synthetic draft removed, and the diagnostic
 app disabled. No message was sent.
 
-These results isolate a provider/client compatibility boundary. They do not fix
-the installed provider, identify its sole failing framework branch, or establish
-all production lifecycle gates. The diagnostic adapter is one-shot, not a
+These historical results isolated a provider/client compatibility boundary. The
+2026-09-08 caller-audio result above supersedes the unsolved-cause status, but
+neither result establishes all production lifecycle gates. The diagnostic adapter is one-shot, not a
 replacement provider. Send, notification actions, prolonged manual silence,
 lock/unlock and current-head full native acceptance remain unverified.
 

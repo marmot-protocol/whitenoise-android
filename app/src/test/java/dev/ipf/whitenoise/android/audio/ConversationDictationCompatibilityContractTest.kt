@@ -13,6 +13,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
+import java.io.FileInputStream
 
 @RunWith(RobolectricTestRunner::class)
 class ConversationDictationCompatibilityContractTest {
@@ -137,6 +138,25 @@ class ConversationDictationCompatibilityContractTest {
         } finally {
             pipe.forEach(ParcelFileDescriptor::close)
         }
+    }
+
+    @Test
+    fun theProbeSourceIsAlreadyAtEndOfAudioAndOpensNoMicrophone() {
+        val source = checkNotNull(conversationDictationEmptyCallerAudioSource())
+        try {
+            // A provider that reads the descriptor sees an empty utterance immediately.
+            assertEquals(-1, FileInputStream(source.fileDescriptor).read())
+        } finally {
+            source.close()
+        }
+
+        val controller =
+            projectFile("app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt")
+                .readText()
+
+        // Capability detection must never open a recorder: it hands over a descriptor only.
+        assertFalse("AudioRecord(" in controller)
+        assertTrue("ConversationDictationCallerAudioProbe" in controller)
     }
 
     @Test

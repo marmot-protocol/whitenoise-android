@@ -6,10 +6,12 @@ import android.Manifest
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.provider.Settings
 import android.speech.RecognitionListener
@@ -40,6 +42,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 private const val DICTATION_DIAGNOSTIC_TAG = "WNDictation"
+
+/** The Android preference file that owns dictation's platform-capability and consent state. */
+private const val CONVERSATION_DICTATION_PREFERENCES_NAME = "whitenoise"
 
 /** Emits PII-free speech-service state that survives release-build app-log export. */
 internal fun conversationDictationDiagnostic(event: String) {
@@ -273,6 +278,25 @@ internal interface ConversationDictationPlatform {
         return ConversationDictationTimeoutHandle {}
     }
 
+    /**
+     * What is already known about the resolved provider's ability to transcribe audio White Noise
+     * captures itself.
+     *
+     * The default keeps every platform that opens the microphone for the app on the in-app path.
+     */
+    @Suppress("MaxLineLength")
+    fun callerAudioRequirement(): ConversationDictationCallerAudioRequirement = ConversationDictationCallerAudioRequirement.NotNeeded
+
+    /**
+     * Establishes an unknown caller-audio answer without opening the microphone, then reports it
+     * exactly once. The returned handle prevents both a late callback and a recorded verdict.
+     */
+    @Suppress("MaxLineLength")
+    fun probeCallerAudioSupport(callback: (ConversationDictationCallerAudioRequirement) -> Unit): ConversationDictationTimeoutHandle {
+        callback(callerAudioRequirement())
+        return ConversationDictationTimeoutHandle {}
+    }
+
     /** Creates one recognition generation whose callbacks are owned by [listener]. */
     fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession
 }
@@ -403,6 +427,8 @@ internal class ConversationDictationController internal constructor(
     private var silenceTimeoutHandle: ConversationDictationTimeoutHandle? = null
     private var readinessHandle: ConversationDictationTimeoutHandle? = null
     private var readinessStartedAtMillis: Long? = null
+    private var nextCallerAudioProbeId = 0L
+    private var pendingCallerAudioProbeId: Long? = null
     private var microphoneHeld = false
     private var durableSession = false
     private var durableSessionReady by mutableStateOf(false)
@@ -942,9 +968,128 @@ internal class ConversationDictationController internal constructor(
     ) {
         conversationDictationDiagnostic("event=start_target mode=${target.mode.name}")
         when (target.mode) {
-            ConversationDictationMode.InApp -> startOrRequestPermission(sessionId, target)
+            ConversationDictationMode.InApp -> startInAppOrDivertToProvider(sessionId, target)
             ConversationDictationMode.ProviderActivity -> prepareProviderActivity(sessionId, target)
         }
+    }
+
+    /**
+     * Chooses the one surface this gesture will show.
+     *
+     * An unprivileged provider can only serve an app-owned session when it transcribes
+     * the audio White Noise captures. Deciding that here, from what is already known about the
+     * installed provider build, keeps one gesture to one UI: the in-app controls never hand an
+     * already-rejected session to the provider's own recognition Activity mid-gesture.
+     */
+    private fun startInAppOrDivertToProvider(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+    ) {
+        // A platform that cannot answer is treated as one that never needed caller audio, which is
+        // the path every configuration used before this routing existed.
+        val requirement =
+            runCatching(platform::callerAudioRequirement)
+                .getOrDefault(ConversationDictationCallerAudioRequirement.NotNeeded)
+        conversationDictationDiagnostic("event=caller_audio_requirement requirement=${requirement.name}")
+        if (requirement == ConversationDictationCallerAudioRequirement.Unknown) {
+            probeCallerAudioSupport(sessionId, target)
+        } else {
+            routeByCallerAudioRequirement(sessionId, target, requirement)
+        }
+    }
+
+    /** Sends this session to app-owned capture, or to the only surface that can still capture. */
+    private fun routeByCallerAudioRequirement(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        requirement: ConversationDictationCallerAudioRequirement,
+    ) {
+        if (requirement.allowsInAppCapture) {
+            startOrRequestPermission(sessionId, target)
+            return
+        }
+        // The provider ignores caller-supplied audio and cannot open the microphone for an
+        // app-owned session, so its own recognition UI is the only surface that can capture.
+        prepareProviderActivity(
+            sessionId,
+            target.copy(mode = ConversationDictationMode.ProviderActivity),
+        )
+    }
+
+    /**
+     * Asks the resolved provider once, without opening the microphone, and routes this exact
+     * session on the answer. [ConversationDictationState.CheckingProvider] already renders as the
+     * bounded readiness phase, so the wait needs no new surface.
+     */
+    private fun probeCallerAudioSupport(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+    ) {
+        val probeId = ++nextCallerAudioProbeId
+        pendingCallerAudioProbeId = probeId
+        val startedAt = elapsedRealtime()
+        readinessStartedAtMillis = startedAt
+        state = ConversationDictationState.CheckingProvider(sessionId, target, startedAt)
+        emitReadiness(ConversationDictationReadinessPhase.CheckingService)
+        conversationDictationDiagnostic("event=caller_audio_probe_start")
+        armSessionTimeout(sessionId, CALLER_AUDIO_PROBE_TIMEOUT_MILLIS) {
+            resolveCallerAudioProbe(
+                probeId,
+                sessionId,
+                target,
+                ConversationDictationCallerAudioRequirement.Unknown,
+            )
+        }
+        val handle =
+            runCatching {
+                platform.probeCallerAudioSupport { requirement ->
+                    resolveCallerAudioProbe(probeId, sessionId, target, requirement)
+                }
+            }.getOrElse { failure ->
+                if (failure !is RuntimeException) throw failure
+                // A platform that cannot even start the question has established nothing about the
+                // descriptor, so this session resolves as unknown rather than failing the gesture.
+                conversationDictationDiagnostic(
+                    "event=caller_audio_probe_start_failed type=${failure.javaClass.simpleName}",
+                )
+                resolveCallerAudioProbe(
+                    probeId,
+                    sessionId,
+                    target,
+                    ConversationDictationCallerAudioRequirement.Unknown,
+                )
+                ConversationDictationTimeoutHandle {}
+            }
+        // A synchronous answer has already routed this session, and that routing can own a
+        // readiness handle of its own, so only a still-pending probe adopts this one.
+        if (pendingCallerAudioProbeId == probeId) readinessHandle = handle else handle.cancel()
+    }
+
+    /**
+     * Applies the first answer a probe produces and discards every later one.
+     *
+     * An answer that establishes nothing about caller-supplied audio keeps app-owned capture, where
+     * the real failure stays visible, instead of sending the user into provider UI whose engine
+     * would fail the same way.
+     */
+    private fun resolveCallerAudioProbe(
+        probeId: Long,
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        requirement: ConversationDictationCallerAudioRequirement,
+    ) {
+        if (pendingCallerAudioProbeId != probeId) return
+        val checking = state as? ConversationDictationState.CheckingProvider
+        if (checking?.sessionId != sessionId) return
+        pendingCallerAudioProbeId = null
+        sessionTimeoutHandle?.cancel()
+        sessionTimeoutHandle = null
+        readinessHandle?.cancel()
+        readinessHandle = null
+        conversationDictationDiagnostic("event=caller_audio_probe_result requirement=${requirement.name}")
+        // A divert publishes its own readiness sequence from the provider-Activity check.
+        if (requirement.allowsInAppCapture) emitReadiness(ConversationDictationReadinessPhase.ServiceReady)
+        routeByCallerAudioRequirement(sessionId, target, requirement)
     }
 
     /** Performs the bounded microphone-free readiness check before provider UI launch. */
@@ -995,10 +1140,8 @@ internal class ConversationDictationController internal constructor(
         conversationDictationDiagnostic("event=recognition_configured configured=$configured")
         val microphoneAccess = platform.microphoneAccess()
         conversationDictationDiagnostic("event=microphone_preflight access=${microphoneAccess.name}")
-        // In-app dictation stays inside White Noise: it never opens the provider's own
-        // recognition UI, whose floating surface would replace these controls. An
-        // unusable service fails visibly instead, and the failure offers voice-input
-        // settings so the user can select a service that app-owned capture can drive.
+        // Routing has already chosen this gesture's capture surface. A failed in-app session
+        // stays here with recovery; it never opens a second recording UI mid-gesture.
         if (!configured) {
             val failure =
                 when (microphoneAccess) {
@@ -1534,6 +1677,8 @@ internal class ConversationDictationController internal constructor(
         readinessHandle?.cancel()
         readinessHandle = null
         readinessStartedAtMillis = null
+        // A cancelled probe must neither route this session nor record what it was about to learn.
+        pendingCallerAudioProbeId = null
         promotionTimeoutHandle?.cancel()
         promotionTimeoutHandle = null
         cancelPendingRestart()
@@ -1860,11 +2005,17 @@ internal class ConversationDictationController internal constructor(
     }
 
     private companion object {
-        const val PREFERENCES_NAME = "whitenoise"
+        const val PREFERENCES_NAME = CONVERSATION_DICTATION_PREFERENCES_NAME
         const val DISCLOSURE_ACCEPTED_KEY = "composer_dictation_external_provider_disclosed"
         const val STARTING_TIMEOUT_MILLIS = 10_000L
         const val FOREGROUND_READINESS_TIMEOUT_MILLIS = 3_000L
         const val PROVIDER_READINESS_TIMEOUT_MILLIS = 1_500L
+
+        /**
+         * Safety bound for a platform probe that never answers. It outlives the platform's own
+         * probe timeout so a real answer, including its inconclusive one, always wins.
+         */
+        const val CALLER_AUDIO_PROBE_TIMEOUT_MILLIS = 6_000L
         const val MAX_SESSION_MILLIS = 30L * 60L * 1_000L
         const val PROCESSING_TIMEOUT_MILLIS = 20_000L
         const val ORDINARY_SILENCE_MILLIS = 2_000L
@@ -2097,6 +2248,19 @@ internal class AndroidConversationDictationPlatform(
 ) : ConversationDictationPlatform {
     private var sessionRecognitionService: ComponentName? = null
 
+    /**
+     * Remembers what each provider build answered about caller-supplied audio.
+     *
+     * This is Android platform-capability state, not White Noise protocol data: it describes an
+     * installed package's behavior, so it belongs to the device and must survive the process that
+     * learned it, or every launch would probe again.
+     */
+    private val callerAudioVerdicts =
+        ConversationDictationCallerAudioVerdicts(
+            read = { key -> callerAudioPreferences().getString(key, null) },
+            write = { key, value -> callerAudioPreferences().edit().putString(key, value).apply() },
+        )
+
     /** Reports the runtime microphone grant required before creating an app-owned recognizer. */
     override fun hasRecordAudioPermission(): Boolean {
         val granted =
@@ -2200,26 +2364,102 @@ internal class AndroidConversationDictationPlatform(
     }
 
     /**
-     * Captures in White Noise when Android has selected no recognizer, which is exactly when the
-     * platform binds the provider without `BIND_INCLUDE_CAPABILITIES` and the session would fail
-     * with `ERROR_INSUFFICIENT_PERMISSIONS` before the provider recorded anything. A
-     * system-selected provider records for itself, so that path is left alone.
+     * Captures in White Noise for an ordinary unselected provider, whose binding lacks the
+     * microphone capability. Selected and preinstalled providers keep their own capture path.
      */
     private fun openCallerAudioIfProviderCannotRecord(): ConversationDictationCallerAudio? {
         val systemSelected = selectedRecognitionService() != null
+        val providerRecords = providerCanRecord(sessionRecognitionService)
         val supported = conversationDictationAudioSourceSupported()
         val source =
-            if (systemSelected || !supported) {
+            if (providerRecords || !supported) {
                 null
             } else {
                 ConversationDictationCallerAudio.open()
             }
         conversationDictationDiagnostic(
             "event=caller_audio_mode enabled=${source != null} " +
-                "system_selected=$systemSelected supported=$supported",
+                "system_selected=$systemSelected provider_records=$providerRecords supported=$supported",
         )
         return source
     }
+
+    /** Reports what is already known about the resolved provider build, without asking it. */
+    override fun callerAudioRequirement(): ConversationDictationCallerAudioRequirement {
+        val requirement = knownCallerAudioRequirement(callerAudioProvider())
+        conversationDictationDiagnostic("event=caller_audio_known requirement=${requirement.name}")
+        return requirement
+    }
+
+    /**
+     * Asks the resolved provider build whether it reads a caller-supplied descriptor, records a
+     * conclusive answer for that exact build, and reports the answer once on the main thread.
+     */
+    override fun probeCallerAudioSupport(callback: (ConversationDictationCallerAudioRequirement) -> Unit): ConversationDictationTimeoutHandle {
+        val provider = callerAudioProvider()
+        val known = knownCallerAudioRequirement(provider)
+        if (known != ConversationDictationCallerAudioRequirement.Unknown || provider == null) {
+            // Nothing to ask: either the answer is already settled, or no provider build was
+            // resolved and the ordinary session preflight owns that failure.
+            callback(known)
+            return ConversationDictationTimeoutHandle {}
+        }
+        return ConversationDictationCallerAudioProbe(
+            context = context,
+            provider = provider,
+            verdicts = callerAudioVerdicts,
+            resolveProvider = ::callerAudioProvider,
+            callback = callback,
+        ).start()
+    }
+
+    /**
+     * Answers from installed state alone.
+     *
+     * A selected or preinstalled recognizer opens the microphone for itself, so caller-supplied audio never
+     * applies. Before Tiramisu the platform defines no caller-audio extras at all, so an app-owned
+     * session cannot supply audio and the provider's own UI is genuinely the only surface that can
+     * capture. Otherwise the answer is whatever this provider build has already established.
+     */
+    private fun knownCallerAudioRequirement(provider: ConversationDictationCallerAudioProvider?): ConversationDictationCallerAudioRequirement =
+        when {
+            providerCanRecord(provider?.component) -> ConversationDictationCallerAudioRequirement.NotNeeded
+            !conversationDictationAudioSourceSupported() -> ConversationDictationCallerAudioRequirement.Unsupported
+            provider == null -> ConversationDictationCallerAudioRequirement.Unknown
+            else -> callerAudioVerdicts.recorded(provider.packageName, provider.versionCode)
+        }
+
+    /**
+     * Names the provider build a verdict can belong to.
+     *
+     * Both the component and its version code are required: a verdict describes one installed
+     * build, so a version lookup that fails must leave the answer unknown rather than key a cache
+     * entry on a version this app never read.
+     */
+    private fun callerAudioProvider(): ConversationDictationCallerAudioProvider? {
+        val component = resolvedRecognitionService(selectedRecognitionService()) ?: return null
+        return providerVersionCode(component.packageName)?.let { versionCode ->
+            ConversationDictationCallerAudioProvider(component, versionCode)
+        }
+    }
+
+    /** Preinstalled recognizers also receive Android's microphone binding capability. */
+    private fun providerCanRecord(component: ComponentName?): Boolean {
+        if (selectedRecognitionService() != null) return true
+        return component?.let {
+            runCatching {
+                val application = context.packageManager.getApplicationInfo(it.packageName, 0)
+                application.flags and ApplicationInfo.FLAG_SYSTEM != 0
+            }.getOrDefault(false)
+        } ?: false
+    }
+
+    private fun providerVersionCode(packageName: String): Long? =
+        runCatching {
+            PackageInfoCompat.getLongVersionCode(context.packageManager.getPackageInfo(packageName, 0))
+        }.getOrNull()
+
+    private fun callerAudioPreferences() = context.getSharedPreferences(CONVERSATION_DICTATION_PREFERENCES_NAME, Context.MODE_PRIVATE)
 
     /** Parses Android's secure setting for the currently selected recognition service. */
     private fun selectedRecognitionService(): ComponentName? =
@@ -2258,11 +2498,156 @@ internal class AndroidConversationDictationPlatform(
 
     private fun ComponentName?.describeProvider(): String {
         if (this == null) return "component=none"
-        val versionCode =
-            runCatching {
-                PackageInfoCompat.getLongVersionCode(context.packageManager.getPackageInfo(packageName, 0))
-            }.getOrNull()
+        val versionCode = providerVersionCode(packageName)
         return "component=${flattenToShortString()} version_code=${versionCode ?: "unknown"}"
+    }
+}
+
+/**
+ * Asks one provider build whether it transcribes audio the caller supplies.
+ *
+ * The probe opens no microphone. It hands over a descriptor that is already at end of audio and
+ * never constructs an [android.media.AudioRecord]; a provider that ignores the descriptor reaches
+ * for a microphone the platform will not let an unprivileged recognizer open, which is exactly the
+ * refusal being detected.
+ */
+private class ConversationDictationCallerAudioProbe(
+    private val context: Context,
+    private val provider: ConversationDictationCallerAudioProvider,
+    private val verdicts: ConversationDictationCallerAudioVerdicts,
+    private val resolveProvider: () -> ConversationDictationCallerAudioProvider?,
+    private val callback: (ConversationDictationCallerAudioRequirement) -> Unit,
+) {
+    private val handler = Handler(Looper.getMainLooper())
+    private val settled = AtomicBoolean(false)
+    private val cancelled = AtomicBoolean(false)
+    private val expire = Runnable { settle(ConversationDictationCallerAudioRequirement.Unknown) }
+    private val release = Runnable(::releaseNow)
+    private var recognizer: SpeechRecognizer? = null
+    private var source: ParcelFileDescriptor? = null
+
+    /** Starts the session on the main looper, which is the only thread a recognizer accepts. */
+    fun start(): ConversationDictationTimeoutHandle {
+        handler.post(::begin)
+        handler.postDelayed(expire, PROBE_TIMEOUT_MILLIS)
+        return ConversationDictationTimeoutHandle {
+            cancelled.set(true)
+            handler.removeCallbacks(expire)
+            handler.post(release)
+        }
+    }
+
+    private fun begin() {
+        if (cancelled.get() || settled.get()) return
+        conversationDictationDiagnostic(
+            "event=caller_audio_probe_session component=${provider.component.flattenToShortString()}",
+        )
+        runCatching(::startProbeSession)
+            .onFailure { failure ->
+                // Setup failure says nothing about the descriptor, so it must not be recorded.
+                conversationDictationDiagnostic(
+                    "event=caller_audio_probe_setup_failed type=${failure.javaClass.simpleName}",
+                )
+                settle(ConversationDictationCallerAudioRequirement.Unknown)
+            }
+    }
+
+    private fun startProbeSession() {
+        val descriptor =
+            checkNotNull(conversationDictationEmptyCallerAudioSource()) { "caller-audio probe source unavailable" }
+        // The descriptor stays open until this probe settles. startListening only queues the
+        // request on the main looper, so the intent, and the descriptor inside it, is marshalled
+        // after this returns; closing here would hand the provider a dead descriptor.
+        source = descriptor
+        val created = SpeechRecognizer.createSpeechRecognizer(context, provider.component)
+        recognizer = created
+        created.setRecognitionListener(ProbeListener())
+        created.startListening(
+            conversationDictationRecognitionIntent().withConversationDictationAudioSource(descriptor),
+        )
+    }
+
+    /**
+     * Applies the first terminal answer and ignores every later one.
+     *
+     * The answer belongs to the build that produced it, so a provider replaced during the probe
+     * invalidates it: neither the verdict nor the routing decision may be applied to a different
+     * build.
+     */
+    private fun settle(requirement: ConversationDictationCallerAudioRequirement) {
+        if (!settled.compareAndSet(false, true)) return
+        handler.removeCallbacks(expire)
+        // Teardown runs on a later main-looper turn so the recognizer is never destroyed from
+        // inside its own callback, and the descriptor outlives this dispatch.
+        handler.post(release)
+        if (cancelled.get()) return
+        handler.post { deliver(requirement) }
+    }
+
+    /**
+     * Records and reports the answer once teardown has run.
+     *
+     * Both the cache write and the report are fenced here rather than at the terminal callback, so
+     * a probe cancelled while teardown was pending leaves no verdict behind and reports nothing.
+     */
+    private fun deliver(requirement: ConversationDictationCallerAudioRequirement) {
+        if (cancelled.get()) return
+        val current = resolveProvider()
+        val answered = if (current == provider) requirement else ConversationDictationCallerAudioRequirement.Unknown
+        conversationDictationDiagnostic(
+            "event=caller_audio_probe_settled requirement=${answered.name} same_provider=${current == provider}",
+        )
+        // An inconclusive answer, including one about a provider build that changed underneath this
+        // probe, records nothing so the question can be asked again.
+        verdicts.record(provider.packageName, provider.versionCode, answered)
+        callback(answered)
+    }
+
+    private fun releaseNow() {
+        // Cancelling first stops a still-running session before its recognizer goes away, so the
+        // provider is not left holding a descriptor this probe is about to close.
+        runCatching { recognizer?.cancel() }
+        runCatching { recognizer?.destroy() }
+        recognizer = null
+        runCatching { source?.close() }
+        source = null
+    }
+
+    /** Turns the provider's first terminal callback into a caller-audio answer. */
+    private inner class ProbeListener : RecognitionListener {
+        override fun onReadyForSpeech(params: Bundle?) = Unit
+
+        override fun onBeginningOfSpeech() = Unit
+
+        override fun onRmsChanged(rmsdB: Float) = Unit
+
+        override fun onBufferReceived(buffer: ByteArray?) = Unit
+
+        override fun onEndOfSpeech() = Unit
+
+        override fun onError(error: Int) {
+            conversationDictationDiagnostic("event=caller_audio_probe_error code=$error")
+            settle(conversationDictationClassifyCallerAudioProbe(error))
+        }
+
+        override fun onResults(results: Bundle?) {
+            settle(conversationDictationClassifyCallerAudioProbe(null))
+        }
+
+        override fun onPartialResults(partialResults: Bundle?) = Unit
+
+        override fun onEvent(
+            eventType: Int,
+            params: Bundle?,
+        ) = Unit
+    }
+
+    private companion object {
+        /**
+         * An empty utterance answers as fast as the provider can bind, but a cold provider process
+         * still has to start. A probe that outlives this bound established nothing.
+         */
+        const val PROBE_TIMEOUT_MILLIS = 4_000L
     }
 }
 
@@ -2339,10 +2724,9 @@ private class AndroidConversationDictationRecognitionSession(
     override fun start() {
         check(!started && !destroyed)
         started = true
-        val intent = startIntent()
-        conversationDictationDiagnostic(
-            "event=platform_start_listening caller_audio=${intent !== recognitionIntent}",
-        )
+        val capturing = callerAudio?.start() == true
+        conversationDictationDiagnostic("event=platform_start_listening caller_audio=$capturing")
+        val intent = startIntent(capturing)
         // Both descriptors stay open until capture ends. SpeechRecognizer.startListening only
         // queues the request on the main looper, so the intent, and the descriptor inside it, is
         // marshalled after this returns; closing here would hand the provider a dead descriptor
@@ -2355,20 +2739,19 @@ private class AndroidConversationDictationRecognitionSession(
     }
 
     /**
-     * Adds White Noise's own capture to the request when the provider cannot open the microphone
-     * for this session. Capture that refuses to start falls back to the provider's own microphone
-     * so a configuration that already works keeps working.
+     * Adds White Noise's own capture to the request when capture actually started. Capture that
+     * refuses to start falls back to the provider's own microphone so a configuration that already
+     * works keeps working.
      */
-    private fun startIntent(): Intent {
+    private fun startIntent(capturing: Boolean): Intent {
         val source = callerAudio
-        return if (source != null && source.start()) {
-            recognitionIntent.withConversationDictationAudioSource(source.providerEnd)
-        } else {
-            if (source != null) {
-                conversationDictationDiagnostic("event=caller_audio_unavailable fallback=provider_microphone")
-            }
-            recognitionIntent
+        if (capturing && source != null) {
+            return recognitionIntent.withConversationDictationAudioSource(source.providerEnd)
         }
+        if (source != null) {
+            conversationDictationDiagnostic("event=caller_audio_unavailable fallback=provider_microphone")
+        }
+        return recognitionIntent
     }
 
     /** Requests the provider to finish the current utterance and return its final result. */

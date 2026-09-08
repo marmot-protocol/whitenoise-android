@@ -2393,6 +2393,232 @@ class ConversationDictationControllerTest {
         assertTrue(processing.controller.state is ConversationDictationState.Idle)
     }
 
+    @Test
+    fun aProviderThatCanUseCallerAudioKeepsTheGestureOnTheInAppControls() {
+        val platform = FakePlatform(callerAudio = ConversationDictationCallerAudioRequirement.Supported)
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        assertEquals(0, platform.callerAudioProbes)
+        assertEquals(
+            ConversationDictationMode.InApp,
+            fixture.controller.state.target
+                ?.mode,
+        )
+        assertTrue(platform.session.started)
+    }
+
+    @Test
+    fun aProviderThatCannotUseCallerAudioIsRoutedToItsOwnUiBeforeAnythingStarts() {
+        val platform =
+            FakePlatform(
+                hasPermission = false,
+                callerAudio = ConversationDictationCallerAudioRequirement.Unsupported,
+            )
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        assertTrue(fixture.controller.state is ConversationDictationState.ProviderActivityRequired)
+        assertEquals(
+            ConversationDictationMode.ProviderActivity,
+            fixture.controller.state.target
+                ?.mode,
+        )
+        assertTrue(platform.sessions.isEmpty())
+        // The provider owns that microphone, so White Noise asks the user for nothing.
+        assertEquals(0L, fixture.controller.permissionRequestId)
+    }
+
+    @Test
+    fun anUnestablishedProviderIsProbedOnceAndThenUsesTheInAppControls() {
+        val platform =
+            FakePlatform(
+                callerAudio = ConversationDictationCallerAudioRequirement.Unknown,
+                probeAnswer = ConversationDictationCallerAudioRequirement.Supported,
+            )
+        val phases = mutableListOf<ConversationDictationReadinessPhase>()
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Keep"),
+                platform = platform,
+                onReadinessEvent = { phases += it.phase },
+            )
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        // A second tap on the same target must not start a second probe.
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        assertEquals(1, platform.callerAudioProbes)
+        assertEquals(
+            listOf(
+                ConversationDictationReadinessPhase.CheckingService,
+                ConversationDictationReadinessPhase.ServiceReady,
+            ),
+            phases,
+        )
+        assertTrue(platform.session.started)
+        assertEquals(
+            ConversationDictationMode.InApp,
+            fixture.controller.state.target
+                ?.mode,
+        )
+    }
+
+    @Test
+    fun anInconclusiveProbeKeepsInAppCaptureSoTheRealFailureStaysVisible() {
+        val platform =
+            FakePlatform(
+                callerAudio = ConversationDictationCallerAudioRequirement.Unknown,
+                probeAnswer = ConversationDictationCallerAudioRequirement.Unknown,
+            )
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        assertEquals(1, platform.callerAudioProbes)
+        assertTrue(platform.session.started)
+        assertEquals(0L, fixture.controller.providerActivityRequestId)
+    }
+
+    @Test
+    fun aProbeThePlatformCannotStartKeepsInAppCaptureAndReleasesItsTimeout() {
+        val platform =
+            FakePlatform(
+                callerAudio = ConversationDictationCallerAudioRequirement.Unknown,
+                probeAnswer = ConversationDictationCallerAudioRequirement.Unsupported,
+            )
+        platform.callerAudioProbeFailure = IllegalStateException("no recognizer")
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        // The question was asked, failed, and established nothing, so the gesture stays in-app
+        // rather than throwing out of requestStart or waiting on a probe that will never answer.
+        assertEquals(1, platform.callerAudioProbes)
+        assertTrue(platform.session.started)
+        assertFalse(fixture.controller.state is ConversationDictationState.CheckingProvider)
+        assertEquals(0L, fixture.controller.providerActivityRequestId)
+    }
+
+    @Test
+    fun aProbeThatEstablishesRefusalHandsOwnershipToTheProviderReadinessCheck() {
+        val platform =
+            FakePlatform(
+                deferActivityReadiness = true,
+                callerAudio = ConversationDictationCallerAudioRequirement.Unknown,
+                probeAnswer = ConversationDictationCallerAudioRequirement.Unsupported,
+            )
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        // The synchronous answer released the finished probe and started the provider-Activity
+        // readiness check, which is the pending work this session now owns.
+        assertTrue(platform.callerAudioProbeCancelled)
+        assertFalse(platform.readinessCancelled)
+        assertTrue(fixture.controller.state is ConversationDictationState.CheckingProvider)
+
+        fixture.controller.cancel()
+
+        assertTrue(platform.readinessCancelled)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
+    @Test
+    fun aDivertedGestureShowsOnlyTheProviderActivityAfterItsReadinessCheck() {
+        val platform =
+            FakePlatform(
+                deferActivityReadiness = true,
+                callerAudio = ConversationDictationCallerAudioRequirement.Unknown,
+                probeAnswer = ConversationDictationCallerAudioRequirement.Unsupported,
+            )
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        platform.activityReadinessCallback(true)
+
+        assertTrue(fixture.controller.state is ConversationDictationState.ProviderActivityRequired)
+        assertEquals(1L, fixture.controller.providerActivityRequestId)
+        assertTrue(platform.sessions.isEmpty())
+    }
+
+    @Test
+    fun cancellingDuringAProbeStopsItAndFencesItsLateAnswer() {
+        val platform =
+            FakePlatform(
+                callerAudio = ConversationDictationCallerAudioRequirement.Unknown,
+                probeAnswer = ConversationDictationCallerAudioRequirement.Unsupported,
+                deferCallerAudioProbe = true,
+            )
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        assertTrue(fixture.controller.state is ConversationDictationState.CheckingProvider)
+        fixture.controller.cancel()
+        platform.callerAudioProbeCallback(ConversationDictationCallerAudioRequirement.Unsupported)
+
+        assertTrue(platform.callerAudioProbeCancelled)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertEquals(0L, fixture.controller.providerActivityRequestId)
+        assertTrue(platform.sessions.isEmpty())
+    }
+
+    @Test
+    fun aProbeThatNeverAnswersFallsBackToInAppCaptureAndIgnoresItsLateAnswer() {
+        val platform =
+            FakePlatform(
+                callerAudio = ConversationDictationCallerAudioRequirement.Unknown,
+                probeAnswer = ConversationDictationCallerAudioRequirement.Unsupported,
+                deferCallerAudioProbe = true,
+            )
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.scheduler.runDelay(6_000L)
+
+        assertTrue(platform.callerAudioProbeCancelled)
+        assertTrue(platform.session.started)
+
+        platform.callerAudioProbeCallback(ConversationDictationCallerAudioRequirement.Unsupported)
+
+        assertEquals(0L, fixture.controller.providerActivityRequestId)
+        assertEquals(
+            ConversationDictationMode.InApp,
+            fixture.controller.state.target
+                ?.mode,
+        )
+    }
+
+    @Test
+    fun noProbeRunsBeforeTheFirstUseDisclosureIsAccepted() {
+        val platform =
+            FakePlatform(
+                callerAudio = ConversationDictationCallerAudioRequirement.Unknown,
+                probeAnswer = ConversationDictationCallerAudioRequirement.Unsupported,
+            )
+        var disclosureAccepted = false
+        val controller =
+            ConversationDictationController(
+                platform = platform,
+                readDraft = { _, _ -> ConversationDictationDraftSnapshot(TextFieldValue("Keep"), 0) },
+                writeDraft = { _, _, _, _ -> error("Routing must not write") },
+                disclosureAccepted = { disclosureAccepted },
+                markDisclosureAccepted = { disclosureAccepted = true },
+            )
+
+        controller.requestStart(ACCOUNT, GROUP, TextFieldValue("Keep"))
+
+        assertEquals(0, platform.callerAudioProbes)
+        assertTrue(controller.state is ConversationDictationState.DisclosureRequired)
+
+        controller.acceptDisclosure()
+
+        assertEquals(1, platform.callerAudioProbes)
+        assertTrue(controller.state is ConversationDictationState.ProviderActivityRequired)
+    }
+
     /** Builds a deterministic controller harness with injectable ownership, validation, and delivery seams. */
     private fun fixture(
         draft: TextFieldValue,
@@ -2490,6 +2716,12 @@ class ConversationDictationControllerTest {
         var createFailure: Throwable? = null,
         var microphoneAccessOverride: ConversationDictationMicrophoneAccess? = null,
         private val completePreparationOnStop: Boolean = false,
+        // Every existing case keeps the default: a platform whose provider records for itself.
+        var callerAudio: ConversationDictationCallerAudioRequirement =
+            ConversationDictationCallerAudioRequirement.NotNeeded,
+        var probeAnswer: ConversationDictationCallerAudioRequirement =
+            ConversationDictationCallerAudioRequirement.Supported,
+        private val deferCallerAudioProbe: Boolean = false,
     ) : ConversationDictationPlatform {
         lateinit var listener: ConversationDictationRecognitionListener
         var session = FakeSession()
@@ -2506,6 +2738,15 @@ class ConversationDictationControllerTest {
         var onMicrophoneAccessCheck: (() -> Unit)? = null
         lateinit var activityReadinessCallback: (Boolean) -> Unit
             private set
+        var callerAudioProbes = 0
+            private set
+        var callerAudioProbeCancelled = false
+            private set
+        lateinit var callerAudioProbeCallback: (ConversationDictationCallerAudioRequirement) -> Unit
+            private set
+
+        /** Simulates a platform that cannot even start the question, such as a recognizer refusal. */
+        var callerAudioProbeFailure: RuntimeException? = null
 
         override fun hasRecordAudioPermission(): Boolean = hasPermission
 
@@ -2535,6 +2776,16 @@ class ConversationDictationControllerTest {
             activityReadinessCallback = callback
             if (!deferActivityReadiness) callback(activityAvailable)
             return ConversationDictationTimeoutHandle { readinessCancelled = true }
+        }
+
+        override fun callerAudioRequirement(): ConversationDictationCallerAudioRequirement = callerAudio
+
+        override fun probeCallerAudioSupport(callback: (ConversationDictationCallerAudioRequirement) -> Unit): ConversationDictationTimeoutHandle {
+            callerAudioProbes += 1
+            callerAudioProbeFailure?.let { throw it }
+            callerAudioProbeCallback = callback
+            if (!deferCallerAudioProbe) callback(probeAnswer)
+            return ConversationDictationTimeoutHandle { callerAudioProbeCancelled = true }
         }
 
         override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {

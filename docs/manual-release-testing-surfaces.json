@@ -1465,7 +1465,8 @@
           "CON-001",
           "CON-017",
           "DIC-001",
-          "DIC-002"
+          "DIC-002",
+          "DIC-003"
         ]
       },
       {
@@ -1559,7 +1560,8 @@
         "anchor": "fun ConversationDictationPersistentControl(",
         "test_ids": [
           "DIC-001",
-          "DIC-002"
+          "DIC-002",
+          "DIC-003"
         ]
       },
 
@@ -7210,6 +7212,31 @@
       }
     ],
     "source_coverage": [
+      {
+        "surface": "Dictation caller-audio capability routing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun probeCallerAudioSupport(",
+        "test_ids": [
+          "DIC-002",
+          "DIC-003"
+        ]
+      },
+      {
+        "surface": "Dictation caller-audio capability probe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private class ConversationDictationCallerAudioProbe(",
+        "test_ids": [
+          "DIC-003"
+        ]
+      },
+      {
+        "surface": "Dictation caller-audio provider verdict cache",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCallerAudioSupport.kt",
+        "anchor": "internal class ConversationDictationCallerAudioVerdicts(",
+        "test_ids": [
+          "DIC-003"
+        ]
+      },
       {
         "surface": "Superseded group-change diagnostic summary and payload privacy",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/core/DiagnosticFormatter.kt",
