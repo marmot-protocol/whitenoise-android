@@ -23,11 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
@@ -37,31 +33,16 @@ import dev.ipf.whitenoise.android.ui.theme.Dimens
 /** Compact account context and progress leave the current decision near the top of a phone screen. */
 @Composable
 internal fun SetupHeader(state: AccountSetupState) {
-    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd)) {
-        Text(stringResource(R.string.setup_title), style = MaterialTheme.typography.headlineMedium)
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceLg)) {
         Text(
-            stringResource(R.string.setup_intro),
-            style = MaterialTheme.typography.bodyMedium,
+            stringResource(R.string.setup_title),
+            style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         state.snapshot?.let { snapshot ->
-            Text(
-                state.accountLabel,
-                style = MaterialTheme.typography.labelMedium,
-                fontFamily = FontFamily.Monospace,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.clearAndSetSemantics { contentDescription = snapshot.accountIdHex },
-            )
             LinearProgressIndicator(
                 progress = { state.completedSteps.toFloat() / snapshot.steps.size.coerceAtLeast(1) },
                 modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                stringResource(R.string.setup_progress_count, state.completedSteps, snapshot.steps.size),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

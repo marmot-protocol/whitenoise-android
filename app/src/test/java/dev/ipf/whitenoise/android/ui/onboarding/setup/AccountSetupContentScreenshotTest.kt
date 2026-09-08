@@ -28,10 +28,13 @@ import org.robolectric.annotation.GraphicsMode
 class AccountSetupContentScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Captures the busy preflight state with the current decision and checklist visible. */
     @Test fun progress() = capture("progress", AccountSetupState(snapshot = setupSnapshot(), busy = true))
 
+    /** Missing profile metadata remains a quiet progression state without buttons. */
     @Test fun profileInput() = capture("profile", AccountSetupState(snapshot = setupSnapshot()))
 
+    /** Records the profile form with existing draft values and its review action. */
     @Test fun profileEditor() =
         capture(
             "profile_editor",
@@ -48,14 +51,33 @@ class AccountSetupContentScreenshotTest {
             ),
         )
 
+    /** Records the inbox-specific publication field without a misleading read/write relay label. */
+    @Test fun inboxEditor() =
+        capture(
+            "inbox_editor",
+            AccountSetupState(
+                snapshot = setupSnapshot(OnboardingStepFfi.INBOX_RELAYS),
+                editor =
+                    SetupEditor(
+                        3uL,
+                        OnboardingStepFfi.INBOX_RELAYS,
+                        OnboardingActionFfi.EDIT_RELAYS,
+                        reads = "wss://inbox.example",
+                    ),
+            ),
+        )
+
+    /** Checks the bounded content width on a tablet-sized surface. */
     @Test
     @Config(qualifiers = "en-w720dp-h1024dp-mdpi")
-    fun tabletProfile() = capture("tablet_profile", AccountSetupState(snapshot = setupSnapshot()))
+    fun tabletDevice() = capture("tablet_device", AccountSetupState(snapshot = deviceSnapshot()))
 
+    /** Records the first visible decision in a short landscape viewport. */
     @Test
     @Config(qualifiers = "en-w780dp-h360dp-mdpi")
-    fun landscapeProfile() = capture("landscape_profile", AccountSetupState(snapshot = setupSnapshot()))
+    fun landscapeDevice() = capture("landscape_device", AccountSetupState(snapshot = deviceSnapshot()))
 
+    /** Records exact relay capabilities and the replacement warning before approval. */
     @Test fun relayProposal() {
         val snapshot =
             setupSnapshot(
@@ -69,7 +91,7 @@ class AccountSetupContentScreenshotTest {
             OnboardingRepairProposalFfi(
                 OnboardingStepFfi.RELAYS,
                 3uL,
-                null,
+                "existing-relay-record",
                 listOf("wss://read.example"),
                 listOf("wss://write.example"),
                 null,
@@ -78,6 +100,7 @@ class AccountSetupContentScreenshotTest {
         capture("relay_proposal", AccountSetupState(snapshot = snapshot))
     }
 
+    /** Covers the signer-recovery decision using the dark application theme. */
     @Test fun signerDark() =
         capture(
             "signer_dark",
@@ -91,15 +114,17 @@ class AccountSetupContentScreenshotTest {
             dark = true,
         )
 
+    /** Records the recoverable error presentation without losing the current decision. */
     @Test fun failure() = capture("failure", AccountSetupState(snapshot = setupSnapshot(), error = true))
 
+    /** Captures the notice for a publication that was approved before interruption. */
     @Test fun approvedRepairRetry() {
         val snapshot = setupSnapshot(OnboardingStepFfi.RELAYS, listOf(OnboardingActionFfi.RETRY))
         snapshot.proposal =
             OnboardingRepairProposalFfi(
                 OnboardingStepFfi.RELAYS,
                 3uL,
-                null,
+                "existing-relay-record",
                 listOf("wss://read.example"),
                 listOf("wss://write.example"),
                 null,
@@ -108,12 +133,15 @@ class AccountSetupContentScreenshotTest {
         capture("approved_repair_retry", AccountSetupState(snapshot = snapshot))
     }
 
+    /** Captures pending cancellation separately from approved-repair recovery. */
     @Test fun cancellationRetry() {
-        val snapshot = setupSnapshot(actions = listOf(OnboardingActionFfi.CANCEL_ONBOARDING))
+        val snapshot =
+            setupSnapshot(OnboardingStepFfi.INBOX_RELAYS, listOf(OnboardingActionFfi.CANCEL_ONBOARDING))
         snapshot.cancellationPending = true
         capture("cancellation_retry", AccountSetupState(snapshot = snapshot))
     }
 
+    /** Records the acknowledgment text and evidence about another possible installation. */
     @Test fun singleDevice() =
         capture(
             "single_device",
@@ -126,17 +154,34 @@ class AccountSetupContentScreenshotTest {
             ),
         )
 
+    /** Keeps completion visible when the native stream has already disconnected. */
     @Test fun ready() = capture("ready", AccountSetupState(snapshot = setupSnapshot(ready = true), disconnected = true))
 
+    /** Checks readable decisions and reachable controls at double font scale in RTL. */
     @Test fun largeRtl() =
         capture(
             "large_rtl",
-            AccountSetupState(snapshot = setupSnapshot()),
+            AccountSetupState(snapshot = deviceSnapshot()),
             dark = true,
             rtl = true,
             fontScale = 2f,
         )
 
+    /** Represents the only routine decision after automatic metadata and relay checks. */
+    private fun deviceSnapshot() =
+        setupSnapshot(
+            OnboardingStepFfi.SINGLE_DEVICE,
+            listOf(OnboardingActionFfi.CONTINUE_ANYWAY, OnboardingActionFfi.CANCEL_ONBOARDING),
+        )
+
+    /** Records diagnostics only after the user requests them. */
+    @Test fun expandedDetails() =
+        capture(
+            "details",
+            AccountSetupState(snapshot = deviceSnapshot(), detailsExpanded = true),
+        )
+
+    /** Freezes animation time and records the supplied state with explicit theme, direction, and density. */
     private fun capture(
         name: String,
         state: AccountSetupState,
@@ -160,7 +205,7 @@ class AccountSetupContentScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/account_setup_$name.png")
         if (name == "large_rtl") {
             composeRule.mainClock.autoAdvance = true
-            composeRule.onNodeWithTag("setup-action-CONTINUE_WITHOUT").performScrollTo()
+            composeRule.onNodeWithTag("setup-action-CONTINUE_ANYWAY").performScrollTo()
             composeRule.onRoot().captureRoboImage("src/test/snapshots/account_setup_large_rtl_actions.png")
         }
     }

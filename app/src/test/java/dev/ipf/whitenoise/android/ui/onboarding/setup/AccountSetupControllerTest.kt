@@ -15,6 +15,7 @@ import org.junit.Test
 
 /** Exercises decisions and lifecycle through the same client boundary used by the native adapter. */
 class AccountSetupControllerTest {
+    /** Ensures failure before the first accepted snapshot still releases the acquired subscription. */
     @Test
     fun initialSnapshotFailureStillClosesTheNativeSubscription() =
         runTest {
@@ -27,6 +28,7 @@ class AccountSetupControllerTest {
             controller.close()
         }
 
+    /** Preserves a missing display name when only the About field was edited. */
     @Test
     fun editingAboutDoesNotPromoteAFallbackNameToDisplayName() =
         runTest {
@@ -52,6 +54,7 @@ class AccountSetupControllerTest {
             controller.close()
         }
 
+    /** Checks subscription ordering and prevents activation while a profile decision is pending. */
     @Test
     fun subscribesBeforePreflightAndDoesNotActivateForAProfileDecision() =
         runTest {
@@ -79,6 +82,7 @@ class AccountSetupControllerTest {
             assertTrue(client.closed)
         }
 
+    /** Exercises single-flight submission while a decision is still awaiting its native result. */
     @Test
     fun repeatedTapsPublishOnlyOneDecisionWithTheDisplayedRevision() =
         runTest {
@@ -99,6 +103,7 @@ class AccountSetupControllerTest {
             controller.close()
         }
 
+    /** Rejects an approval when the authoritative checkpoint has advanced beyond the displayed proposal. */
     @Test
     fun newerStoredRevisionRequiresFreshReviewWithoutPublishing() =
         runTest {
@@ -119,6 +124,7 @@ class AccountSetupControllerTest {
             controller.close()
         }
 
+    /** Prevents UI requests from invoking native actions that the current checkpoint does not offer. */
     @Test
     fun actionsAbsentFromTheSnapshotNeverReachTheEngine() =
         runTest {
@@ -132,6 +138,7 @@ class AccountSetupControllerTest {
             controller.close()
         }
 
+    /** Revalidates readiness before activation even when the update stream ended normally. */
     @Test
     fun readyThenTerminatedStreamStillAllowsOpenChatsAfterFreshRead() =
         runTest {
@@ -158,6 +165,7 @@ class AccountSetupControllerTest {
             controller.close()
         }
 
+    /** Stops activation when the fresh authoritative snapshot no longer certifies readiness. */
     @Test
     fun readThatRevokesReadinessPreventsActivation() =
         runTest {
@@ -172,9 +180,9 @@ class AccountSetupControllerTest {
                     { activated = true },
                     {},
                 )
+            client.snapshotOverride = setupSnapshot(revision = 4uL)
             controller.reconnect()
             runCurrent()
-            client.current = setupSnapshot(revision = 4uL)
             controller.openChats()
             runCurrent()
             assertFalse(activated)
@@ -185,6 +193,7 @@ class AccountSetupControllerTest {
             controller.close()
         }
 
+    /** Rejects updates belonging to another account or an older checkpoint revision. */
     @Test
     fun foreignAccountAndOldRevisionUpdatesAreDiscarded() =
         runTest {
@@ -207,6 +216,7 @@ class AccountSetupControllerTest {
             controller.close()
         }
 
+    /** Fences commands and activation callbacks after the runtime owner is replaced. */
     @Test
     fun invalidatedRuntimeCannotActivateOrSubmit() =
         runTest {
@@ -222,9 +232,9 @@ class AccountSetupControllerTest {
                     { activated = true },
                     {},
                 )
+            client.beforeSnapshot = { current = false }
             controller.reconnect()
             runCurrent()
-            current = false
             controller.openChats()
             controller.submit(SetupRequest(3uL, OnboardingStepFfi.PROFILE, OnboardingActionFfi.CONTINUE_WITHOUT))
             runCurrent()
@@ -233,6 +243,7 @@ class AccountSetupControllerTest {
             controller.close()
         }
 
+    /** Retains metadata outside the edited fields and preserves the draft when proposal creation fails. */
     @Test
     fun profileProposalPreservesUntouchedMetadataAndFailedDraft() =
         runTest {
@@ -273,6 +284,7 @@ class AccountSetupControllerTest {
             controller.close()
         }
 
+    /** Retries the saved native operation without creating or approving another repair. */
     @Test
     fun repairRetryUsesTheSavedStepWithoutReproposingOrApproving() =
         runTest {
@@ -292,6 +304,7 @@ class AccountSetupControllerTest {
             controller.close()
         }
 
+    /** Keeps failed cancellation recoverable and emits a single exit after successful retry. */
     @Test
     fun cancellationFailureKeepsTheRouteAndSuccessfulRetryExitsOnce() =
         runTest {
@@ -300,7 +313,7 @@ class AccountSetupControllerTest {
                     setupSnapshot(
                         OnboardingStepFfi.SINGLE_DEVICE,
                         listOf(OnboardingActionFfi.CANCEL_ONBOARDING),
-                    ),
+                    ).apply { cancellationPending = true },
                 )
             var exits = 0
             val controller =
@@ -314,6 +327,11 @@ class AccountSetupControllerTest {
                 )
             controller.reconnect()
             runCurrent()
+            assertEquals(
+                OnboardingStepFfi.SINGLE_DEVICE,
+                controller.state.value.currentStep
+                    ?.step,
+            )
             val request = SetupRequest(3uL, OnboardingStepFfi.SINGLE_DEVICE, OnboardingActionFfi.CANCEL_ONBOARDING)
             client.fail = true
             controller.submit(request)
@@ -328,7 +346,7 @@ class AccountSetupControllerTest {
         }
 }
 
-private class FakeSetupClient(
+internal class FakeSetupClient(
     var current: OnboardingSnapshotFfi = setupSnapshot(),
 ) : AccountSetupClient {
     val order = mutableListOf<String>()
@@ -341,37 +359,49 @@ private class FakeSetupClient(
     var closed = false
     var snapshotReads = 0
     var failInitialSnapshot = false
+    var beforeSnapshot: () -> Unit = {}
+    var snapshotOverride: OnboardingSnapshotFfi? = null
+    var executeResult: ((SetupRequest) -> OnboardingSnapshotFfi?)? = null
 
+    /** Counts authoritative rereads so activation tests can assert fresh readiness checks. */
     override suspend fun snapshot(): OnboardingSnapshotFfi {
         snapshotReads++
-        return current
+        beforeSnapshot()
+        return snapshotOverride ?: current
     }
 
+    /** Records preflight execution so tests can assert that subscription attachment came first. */
     override suspend fun run(): OnboardingSnapshotFfi {
         order += "run"
         return current
     }
 
+    /** Returns fixture metadata for field-preservation tests. */
     override suspend fun profile(): UserProfileMetadataFfi? = metadata
 
+    /** Records decisions and can suspend, fail, or cancel them at controlled test boundaries. */
     override suspend fun execute(request: SetupRequest): OnboardingSnapshotFfi? {
         requests += request
         hold?.await()
         check(!fail)
-        return if (cancel) null else current
+        return if (cancel) null else executeResult?.invoke(request) ?: current
     }
 
+    /** Returns a controllable update stream and records subscription acquisition order. */
     override suspend fun subscribe(): AccountSetupSubscription {
         order += "subscribe"
         return object : AccountSetupSubscription {
+            /** Can fail the initial subscription read to exercise resource cleanup before reader startup. */
             override fun snapshot(): OnboardingSnapshotFfi {
                 check(!failInitialSnapshot)
                 return current
             }
 
+            /** Waits for the next scripted update, returning null after the test stream closes. */
             override suspend fun next() = updates.receiveCatching().getOrNull()
 
-            override fun close() {
+            /** Records native subscription release for cancellation and initial-read failure assertions. */
+            override suspend fun close() {
                 closed = true
             }
         }

@@ -609,17 +609,17 @@ abstract class NotificationRouteTimelinePresentationFixture {
         appState: WhiteNoiseAppState,
         expectedMessageIds: List<String> = listOf(ConversationTimelineTestIds.MESSAGE_A),
     ): ConversationController {
-        if (!routeGate.exactPreloadBeforeBroadBind) {
-            awaitCondition(
-                failureMessage = {
-                    "target account was not activated before exact preload: " +
-                        routeState(appState, handled = handled)
-                },
-            ) {
-                appState.activeAccountRef == TARGET_ACCOUNT
-            }
-            routeGate.releasePreload.countDown()
+        // This fixture owns preload versus broad-bind ordering, not the pre-activation controller
+        // replacement covered by WarmResumeStateHolderTest. Setup eligibility is now an async read.
+        awaitCondition(
+            failureMessage = {
+                "target account was not activated before exact preload: " +
+                    routeState(appState, handled = handled)
+            },
+        ) {
+            appState.activeAccountRef == TARGET_ACCOUNT
         }
+        routeGate.releasePreload.countDown()
         awaitCondition(
             failureMessage = {
                 "notification preload did not complete: ${routeState(appState, handled = handled)} " +
@@ -758,7 +758,7 @@ abstract class NotificationRouteTimelinePresentationFixture {
         rosterFails: Boolean = false,
     ) {
         val preloadStarted = CountDownLatch(1)
-        val releasePreload = CountDownLatch(if (exactPreloadBeforeBroadBind) 0 else 1)
+        val releasePreload = CountDownLatch(1)
         val preloadCompleted = CountDownLatch(1)
         val releaseBroadBind = CountDownLatch(if (exactPreloadBeforeBroadBind) 1 else 0)
         val rosterStarted = CountDownLatch(1)
@@ -827,6 +827,8 @@ abstract class NotificationRouteTimelinePresentationFixture {
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
             when (method.name) {
+                // Preserve ordinary notification activation through the setup eligibility check.
+                "onboardingSnapshot" -> null
                 "groupDetails" -> {
                     groupDetails()
                 }

@@ -6,19 +6,15 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -31,9 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,6 +58,7 @@ internal fun AccountSetupScreen(
         controller::reconnect,
         controller::openChats,
         onLater,
+        controller::toggleDetails,
     )
 }
 
@@ -80,6 +74,7 @@ internal fun AccountSetupContent(
     onReconnect: () -> Unit,
     onOpenChats: () -> Unit,
     onLater: () -> Unit,
+    onToggleDetails: () -> Unit = {},
 ) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.safeDrawingPadding().imePadding(), contentAlignment = Alignment.TopCenter) {
@@ -93,48 +88,21 @@ internal fun AccountSetupContent(
             ) {
                 SetupHeader(state)
                 SetupErrors(state, onReconnect)
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    shape = MaterialTheme.shapes.extraLarge,
+                Column(
+                    Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
                 ) {
-                    Column(
-                        Modifier.fillMaxWidth().padding(Dimens.spaceLg),
-                        verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
-                    ) {
-                        if (state.busy) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
-                            ) {
-                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                                Text(
-                                    stringResource(R.string.setup_working),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                                )
-                            }
-                        }
-                        if (state.editor != null) {
+                    when {
+                        state.editor != null ->
                             SetupEditorContent(state.editor, state.busy, onEditorChange, onSaveEditor, onDismissEditor)
-                        } else {
-                            SetupDecisionContent(state, onAction, onEdit, onOpenChats)
+                        state.busy || state.snapshot == null -> SetupProgress(state.snapshot?.ready == true)
+                        state.optionalMetadataPending -> {
+                            if (!state.error && !state.disconnected && !state.staleDecision) SetupProgress()
                         }
+                        else -> SetupDecisionContent(state, onAction, onEdit, onOpenChats)
                     }
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm)) {
-                    TextButton(onClick = onLater, modifier = Modifier.fillMaxWidth().testTag("setup-later")) {
-                        Text(stringResource(R.string.setup_later))
-                    }
-                    Text(
-                        stringResource(R.string.setup_later_help),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                state.snapshot?.let { snapshot ->
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    SetupChecklist(snapshot)
-                }
+                SetupFooter(state, onToggleDetails, onLater)
             }
         }
     }
@@ -181,8 +149,9 @@ private fun SetupDecisionContent(
             Text(stringResource(R.string.setup_open_chats))
         }
     } else if (step != null) {
+        SetupStepIcon(step.step)
         Text(stringResource(setupStepTitle(step.step)), style = MaterialTheme.typography.headlineSmall)
-        if (step.step == OnboardingStepFfi.PROFILE && snapshot.proposal == null) {
+        if (step.step == OnboardingStepFfi.PROFILE && snapshot.proposal?.step != step.step) {
             Text(
                 stringResource(R.string.setup_profile_help),
                 style = MaterialTheme.typography.bodyMedium,
@@ -190,15 +159,17 @@ private fun SetupDecisionContent(
             )
         }
         SetupOperationNotice(snapshot, step)
-        step.findings.forEach { finding ->
-            Text(stringResource(setupFindingTitle(finding.issue)) + finding.endpoint?.let { "\n$it" }.orEmpty())
+        if (step.step != OnboardingStepFfi.PROFILE &&
+            step.step != OnboardingStepFfi.SINGLE_DEVICE &&
+            snapshot.proposal?.step != step.step
+        ) {
+            step.findings.firstOrNull()?.let { Text(stringResource(setupFindingTitle(it.issue))) }
         }
-        if (step.step == OnboardingStepFfi.FOLLOWS) Text(stringResource(R.string.setup_follows_help))
         if (step.step == OnboardingStepFfi.SINGLE_DEVICE) {
             SetupSingleDeviceNotice(snapshot.singleDeviceNotice?.discovery)
         }
-        snapshot.proposal?.let { SetupProposalContent(it) }
-        SetupActionButtons(snapshot, step, state.busy, onAction, onEdit)
+        snapshot.proposal?.takeIf { it.step == step.step }?.let { SetupProposalContent(it) }
+        SetupActionButtons(snapshot, step, state.busy, onAction, onEdit, state.detailsExpanded)
     }
 }
 
@@ -210,7 +181,7 @@ private fun SetupOperationNotice(
 ) {
     if (snapshot.cancellationPending) {
         SetupNotice(stringResource(R.string.setup_cancel_pending))
-    } else if (snapshot.proposal != null && OnboardingActionFfi.APPROVE_REPAIR !in step.actions) {
+    } else if (snapshot.proposal?.step == step.step && OnboardingActionFfi.APPROVE_REPAIR !in step.actions) {
         SetupNotice(stringResource(R.string.setup_approved_repair_pending))
     }
 }
@@ -220,21 +191,14 @@ private fun SetupOperationNotice(
 private fun SetupSingleDeviceNotice(discovered: OnboardingDeviceDiscoveryFfi?) {
     val discovery = discovered ?: OnboardingDeviceDiscoveryFfi.UNKNOWN
     Text(stringResource(R.string.setup_single_device_help))
-    Text(
-        stringResource(
-            when (discovery) {
-                OnboardingDeviceDiscoveryFfi.NONE_FOUND -> R.string.setup_device_none
-                OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE -> R.string.setup_device_possible
-                OnboardingDeviceDiscoveryFfi.UNKNOWN -> R.string.setup_device_unknown
-            },
-        ),
-    )
+    if (discovery == OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE) {
+        SetupNotice(stringResource(R.string.setup_device_possible))
+    }
 }
 
 /** Shows the complete replacement before publication, including separate read/write capabilities. */
 @Composable
 private fun SetupProposalContent(proposal: OnboardingRepairProposalFfi) {
-    Text(stringResource(R.string.setup_proposal_title), style = MaterialTheme.typography.titleMedium)
     if (proposal.step == OnboardingStepFfi.PROFILE) {
         Text(stringResource(R.string.setup_profile_publish_help))
         proposal.profile?.let { profile ->
@@ -242,7 +206,7 @@ private fun SetupProposalContent(proposal: OnboardingRepairProposalFfi) {
             Text(profile.about.orEmpty())
         }
     } else {
-        SetupNotice(stringResource(R.string.setup_replacement_warning))
+        if (proposal.previousEventId != null) SetupNotice(stringResource(R.string.setup_replacement_warning))
         val listTitle =
             if (proposal.step == OnboardingStepFfi.INBOX_RELAYS) {
                 R.string.setup_inbox_list
@@ -283,12 +247,11 @@ private fun SetupEditorContent(
             label = {
                 Text(
                     stringResource(
-                        if (editor.action ==
-                            OnboardingActionFfi.EDIT_DISCOVERY_RELAYS
-                        ) {
-                            R.string.setup_discovery_list
-                        } else {
-                            R.string.setup_read_list
+                        when {
+                            editor.action == OnboardingActionFfi.EDIT_DISCOVERY_RELAYS ->
+                                R.string.setup_discovery_list
+                            editor.step == OnboardingStepFfi.INBOX_RELAYS -> R.string.setup_inbox_list
+                            else -> R.string.setup_read_list
                         },
                     ),
                 )
@@ -343,7 +306,6 @@ private fun SetupProfileFields(
         enabled = !busy,
         modifier = Modifier.fillMaxWidth(),
     )
-    Text(stringResource(R.string.setup_profile_preserve))
 }
 
 internal val setupEditorActions =

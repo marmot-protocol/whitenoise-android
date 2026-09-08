@@ -116,5 +116,5 @@ internal class AccountSetupCoordinator(
 /** A cancelled or unfinished checkpoint can never certify chat readiness. */
 internal fun OnboardingSnapshotFfi.requiresSetup(): Boolean = !ready || cancellationPending
 
-/** The engine uses these relays for discovery and proposals; they are never silently published. */
+/** Confirmed-missing lists use these native defaults; existing relay lists still require review. */
 internal fun setupOptions() = OnboardingOptionsFfi(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)

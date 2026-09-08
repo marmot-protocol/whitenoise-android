@@ -26,16 +26,24 @@ internal fun SetupActionButtons(
     busy: Boolean,
     onAction: (SetupRequest) -> Unit,
     onEdit: (OnboardingStepFfi, OnboardingActionFfi, ULong) -> Unit,
+    expanded: Boolean = false,
 ) {
-    val actions = setupOrderedActions(step.actions)
+    val ordered = setupOrderedActions(step.actions)
+    val actions =
+        if (expanded || snapshot.cancellationPending) {
+            ordered
+        } else {
+            ordered.filter { it != OnboardingActionFfi.CANCEL_ONBOARDING }.take(2)
+        }
     actions.forEach { action ->
         val revision =
             if (action == OnboardingActionFfi.APPROVE_REPAIR) {
-                snapshot.proposal?.revision ?: snapshot.revision
+                snapshot.proposal?.takeIf { it.step == step.step }?.revision ?: snapshot.revision
             } else {
                 snapshot.revision
             }
-        SetupActionButton(action, primary = action == actions.firstOrNull(), enabled = !busy) {
+        val canApprove = action != OnboardingActionFfi.APPROVE_REPAIR || snapshot.proposal?.step == step.step
+        SetupActionButton(action, primary = action == actions.firstOrNull(), enabled = !busy && canApprove) {
             if (action in setupEditorActions) {
                 onEdit(step.step, action, revision)
             } else {
@@ -70,7 +78,10 @@ private fun SetupActionButton(
     }
 }
 
-/** Prioritizes the next useful decision without inventing an action that MDK did not offer. */
+/**
+ * Orders native decisions supported by v1. Follows are checked or skipped without publishing a replacement
+ * (issue #2519); EDIT_FOLLOWS therefore intentionally has no editor or publication grant in this flow.
+ */
 internal fun setupOrderedActions(actions: List<OnboardingActionFfi>) = setupActionOrder.filter { it in actions }
 
 private val setupActionOrder =

@@ -6,6 +6,25 @@ import java.io.File
 
 /** Pins the runtime-reconciliation barrier required after a fresh Amber login. */
 class AmberLoginReconciliationCoverageTest {
+    /** Accepted interactive checkpoints return to setup before either legacy login or account activation. */
+    @Test
+    fun interactiveAmberSetupTakesOwnershipBeforeLegacyActivation() {
+        val source = appStateSource().readText()
+        val start = source.indexOf("suspend fun loginWithAmber()")
+        val end = source.indexOf("private suspend fun reregisterExternalSigners()", start)
+        val body = source.substring(start, end)
+        val begin = body.indexOf("beginExternalSignerOnboarding(")
+        val mount = body.indexOf("accountSetup.open(snapshot)", begin)
+        val exit = body.indexOf("return", mount)
+        val legacy = body.indexOf("loginExternalSigner(", exit)
+        assertTrue("interactive setup must be attempted first", begin >= 0 && mount > begin)
+        assertTrue("accepted setup must return before legacy login", exit > mount && legacy > exit)
+        assertTrue(
+            "only MDK's explicit legacy refusal allows fallback",
+            body.substring(begin, mount).contains("catch (_: MarmotKitException.OnboardingActionUnavailable)"),
+        )
+    }
+
     @Test
     fun externalSignerIsReconciledBeforeTheAccountIsExposed() {
         val source = appStateSource().readText()

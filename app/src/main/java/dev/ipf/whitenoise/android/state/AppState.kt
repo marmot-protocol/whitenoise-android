@@ -85,7 +85,6 @@ import dev.ipf.whitenoise.android.core.GroupSystemCopy
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.HostSafety
-import dev.ipf.whitenoise.android.core.IdentityEntryInput
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -10215,74 +10214,5 @@ internal suspend fun awaitBootstrapAttempt(
 private const val BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS = 15_000L
 
 private fun String?.nonBlankOrNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
-
-/** Whether [WhiteNoiseAppState.importIdentity] may call the engine — direct import is nsec-only. */
-internal fun permitsDirectIdentityImport(trimmed: String): Boolean = IdentityEntryInput.classify(trimmed) == IdentityEntryInput.Kind.SecretKey
-
-/**
- * How a direct nsec sign-in ended. The engine's account-setup states are kept
- * apart because each one calls for a different thing from the user: two are
- * resumable by signing in again, one says the account was never in the state
- * recovery applies to, and one needs explicit consent before anything rotates.
- */
-internal sealed interface IdentityImportOutcome {
-    data object Success : IdentityImportOutcome
-
-    /** Identity accepted; explicit setup routing replaces immediate activation. */
-    data object SetupStarted : IdentityImportOutcome
-
-    /** Input the engine was never asked about, or a failure with no typed meaning. */
-    data object Failed : IdentityImportOutcome
-
-    /** Durable account setup can be resumed by retrying the same sign-in. */
-    data object SetupRetryRequired : IdentityImportOutcome
-
-    /** A recoverable KeyPackage setup state exists, so retry rather than reset. */
-    data object SetupKeyPackageRecoveryAvailable : IdentityImportOutcome
-
-    /** The account was not in the incomplete-setup state the reset applies to. */
-    data object SetupResetNotApplicable : IdentityImportOutcome
-
-    /**
-     * Local evidence cannot prove a previously signed KeyPackage was never
-     * exposed, so the engine forbids rotation until the host passes an explicit
-     * acknowledgement.
-     */
-    data object SetupRecoveryRequired : IdentityImportOutcome
-}
-
-/**
- * The two engine login entry points behind a direct nsec sign-in. Injectable so
- * a test can count them: which binding a sign-in reaches is the consent
- * guarantee, and a source-text guard cannot see a bypass routed through some
- * other wrapper.
- */
-internal interface IdentityLoginCalls {
-    /** Tests may supply the identity-only result before exercising legacy recovery. */
-    suspend fun beginOnboarding(nsec: String): OnboardingSnapshotFfi? = null
-
-    suspend fun login(
-        nsec: String,
-        relays: List<String>,
-        keyPackageRelays: List<String>,
-    ): AccountSummaryFfi
-
-    suspend fun loginRecoveringIncompleteSetup(
-        nsec: String,
-        relays: List<String>,
-        keyPackageRelays: List<String>,
-        acknowledgePossibleKeyPackageOrphan: Boolean,
-    ): AccountSummaryFfi
-}
-
-internal fun identityImportOutcome(error: Throwable): IdentityImportOutcome =
-    when (error) {
-        is MarmotKitException.AccountSetupRetryRequired -> IdentityImportOutcome.SetupRetryRequired
-        is MarmotKitException.AccountSetupKeyPackageRecoveryAvailable ->
-            IdentityImportOutcome.SetupKeyPackageRecoveryAvailable
-        is MarmotKitException.AccountSetupResetNotApplicable -> IdentityImportOutcome.SetupResetNotApplicable
-        is MarmotKitException.AccountSetupRecoveryRequired -> IdentityImportOutcome.SetupRecoveryRequired
-        else -> IdentityImportOutcome.Failed
-    }
 
 internal fun notificationActionsAllowed(appLockScreenVisible: Boolean): Boolean = !appLockScreenVisible

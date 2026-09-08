@@ -70,6 +70,23 @@ class SignInRecoveryConsentTest {
         composeRule.waitForIdle()
     }
 
+    /** A preflight transport failure cannot fall through to monolithic login or consent-gated recovery. */
+    @Test
+    fun stagedSetupFailureNeverFallsBackToLegacyLoginOrRecovery() {
+        val engine =
+            RecordingIdentityLoginCalls(
+                loginFails = { error("preflight must retain ownership") },
+                beginFails = { MarmotKitException.Runtime("preflight unavailable") },
+            )
+        openSignIn(engine)
+        signIn(nsec)
+        assertEquals(listOf(nsec), engine.setupBegins)
+        assertTrue(engine.logins.isEmpty())
+        assertTrue(engine.recoveries.isEmpty())
+        composeRule.onNodeWithText(string(R.string.sign_in_recovery_title)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.identity_entry_error_import_failed)).assertExists()
+    }
+
     @Test
     fun theSignInAttemptItselfNeverRecovers() {
         val engine = recoveryRequiredEngine()

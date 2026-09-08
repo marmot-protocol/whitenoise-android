@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import android.content.Context
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.OnboardingSnapshotFfi
 
 /** A plain nsec sign-in the surface asked the engine for. */
 internal data class LoginCall(
@@ -26,11 +27,21 @@ internal data class RecoveryCall(
  */
 internal class RecordingIdentityLoginCalls(
     private val loginFails: suspend () -> Throwable,
+    private val beginFails: (suspend () -> Throwable)? = null,
     private val recoveryFails: suspend () -> Throwable = { MarmotKitException.Runtime("recovery failed") },
 ) : IdentityLoginCalls {
+    val setupBegins = mutableListOf<String>()
     val logins = mutableListOf<LoginCall>()
     val recoveries = mutableListOf<RecoveryCall>()
 
+    /** Records identity-only attempts, allowing tests to distinguish preflight failure from legacy fallback. */
+    override suspend fun beginOnboarding(nsec: String): OnboardingSnapshotFfi? {
+        setupBegins += nsec
+        beginFails?.let { throw it() }
+        return null
+    }
+
+    /** Records fallback to the legacy login boundary. */
     override suspend fun login(
         nsec: String,
         relays: List<String>,
@@ -40,6 +51,7 @@ internal class RecordingIdentityLoginCalls(
         throw loginFails()
     }
 
+    /** Records each explicit recovery acknowledgment so callers can assert that preflight cannot imply consent. */
     override suspend fun loginRecoveringIncompleteSetup(
         nsec: String,
         relays: List<String>,

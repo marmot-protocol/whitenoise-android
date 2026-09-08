@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui.onboarding.setup
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -30,19 +32,34 @@ class AccountSetupContentTest {
     private var later = 0
     private var opened = 0
     private var reconnected = 0
+    private var details = 0
 
-    /** The useful profile decision is visible without scrolling through all six checks first. */
+    /** Missing profile metadata has no decision buttons or expanded checklist. */
     @Test
-    fun profileActionsAreVisibleAboveTheDetailedChecklist() {
+    fun missingProfileDoesNotInterruptSetup() {
         show(AccountSetupState(snapshot = setupSnapshot()))
-        composeRule.onNodeWithTag("setup-action-EDIT_PROFILE").assertIsDisplayed()
-        composeRule.onNodeWithTag("setup-action-CONTINUE_WITHOUT").assertIsDisplayed()
-        composeRule.onNodeWithText("0 of 6 checks complete").assertIsDisplayed()
+        composeRule.onNodeWithTag("setup-action-EDIT_PROFILE").assertDoesNotExist()
+        composeRule.onNodeWithTag("setup-action-CONTINUE_WITHOUT").assertDoesNotExist()
+        composeRule.onNodeWithText("Checking your account…").assertIsDisplayed()
+        composeRule.onNodeWithText("Follow list").assertDoesNotExist()
+        composeRule.onNodeWithTag("setup-details").assertIsDisplayed()
     }
 
+    /** Checks that visible actions preserve their native decision revision and invoke the matching callback. */
     @Test
     fun everyOfferedActionHasAWorkingCallbackAndUsesRenderedRevision() {
-        show(AccountSetupState(snapshot = setupSnapshot(actions = OnboardingActionFfi.entries)))
+        val snapshot = setupSnapshot(actions = OnboardingActionFfi.entries)
+        snapshot.proposal =
+            OnboardingRepairProposalFfi(
+                OnboardingStepFfi.PROFILE,
+                3uL,
+                null,
+                emptyList(),
+                emptyList(),
+                null,
+                null,
+            )
+        show(AccountSetupState(snapshot = snapshot, detailsExpanded = true))
         OnboardingActionFfi.entries.filter { it != OnboardingActionFfi.EDIT_FOLLOWS }.forEach { action ->
             composeRule
                 .onNodeWithTag("setup-action-${action.name}")
@@ -58,15 +75,106 @@ class AccountSetupContentTest {
         assertTrue(actions.all { it.revision == 3uL })
     }
 
+    /** A saved repair for another step must not hide profile help or imply publication at this step. */
+    @Test
+    fun unrelatedProposalDoesNotChangeTheCurrentDecision() {
+        val snapshot = setupSnapshot()
+        snapshot.proposal =
+            OnboardingRepairProposalFfi(
+                OnboardingStepFfi.RELAYS,
+                7uL,
+                null,
+                listOf("wss://unrelated.example"),
+                emptyList(),
+                null,
+                null,
+            )
+        show(AccountSetupState(snapshot = snapshot))
+        composeRule.onNodeWithText("Add a name so people recognize you.", substring = true).assertExists()
+        composeRule.onNodeWithText("Review before publishing").assertDoesNotExist()
+        composeRule.onNodeWithText("wss://unrelated.example").assertDoesNotExist()
+        composeRule.onNodeWithText("Your saved change needs to finish.", substring = true).assertDoesNotExist()
+    }
+
+    /** A malformed cross-step approval cannot publish a repair that this screen has not shown. */
+    @Test
+    fun approvalRequiresAProposalForTheDisplayedStep() {
+        val snapshot = setupSnapshot(actions = listOf(OnboardingActionFfi.APPROVE_REPAIR))
+        snapshot.proposal =
+            OnboardingRepairProposalFfi(
+                OnboardingStepFfi.RELAYS,
+                7uL,
+                null,
+                emptyList(),
+                emptyList(),
+                null,
+                null,
+            )
+        show(AccountSetupState(snapshot = snapshot))
+        composeRule.onNodeWithTag("setup-action-APPROVE_REPAIR").assertIsNotEnabled()
+        assertTrue(actions.isEmpty())
+    }
+
+    /** Inbox publication is labeled distinctly from NIP-65 read/write capabilities. */
+    @Test
+    fun inboxEditorUsesTheInboxLabel() {
+        show(
+            AccountSetupState(
+                snapshot = setupSnapshot(OnboardingStepFfi.INBOX_RELAYS),
+                editor = SetupEditor(3uL, OnboardingStepFfi.INBOX_RELAYS, OnboardingActionFfi.EDIT_RELAYS),
+            ),
+        )
+        composeRule.onNode(hasSetTextAction() and hasText("Inbox relays")).assertExists()
+        composeRule.onNodeWithText("Read relays").assertDoesNotExist()
+        composeRule.onNodeWithText("Write relays").assertDoesNotExist()
+    }
+
+    /** Lookup relay overrides retain their own label even while diagnosing an inbox step. */
+    @Test
+    fun inboxDiscoveryEditorKeepsTheDiscoveryLabel() {
+        show(
+            AccountSetupState(
+                snapshot = setupSnapshot(OnboardingStepFfi.INBOX_RELAYS),
+                editor = SetupEditor(3uL, OnboardingStepFfi.INBOX_RELAYS, OnboardingActionFfi.EDIT_DISCOVERY_RELAYS),
+            ),
+        )
+        composeRule.onNodeWithText("Discovery relays").assertExists()
+        composeRule.onNodeWithText("Read relays").assertDoesNotExist()
+    }
+
+    /** Follows have no confirmation screen while the controller advances the optional check. */
+    @Test
+    fun followsAdvanceWithoutAConfirmationOrReplacementEditor() {
+        show(
+            AccountSetupState(
+                snapshot =
+                    setupSnapshot(
+                        OnboardingStepFfi.FOLLOWS,
+                        listOf(
+                            OnboardingActionFfi.EDIT_FOLLOWS,
+                            OnboardingActionFfi.RETRY,
+                            OnboardingActionFfi.CONTINUE_WITHOUT,
+                        ),
+                    ),
+            ),
+        )
+        composeRule.onNodeWithTag("setup-action-EDIT_FOLLOWS").assertDoesNotExist()
+        composeRule.onNodeWithTag("setup-action-CONTINUE_WITHOUT").assertDoesNotExist()
+        composeRule.onNodeWithText("Checking your account…").assertIsDisplayed()
+        assertTrue(actions.isEmpty())
+    }
+
+    /** Prevents duplicate decisions while keeping the non-destructive exit available during work. */
     @Test
     fun busyDecisionsCannotBeTappedButLaterRemainsReachable() {
         show(AccountSetupState(snapshot = setupSnapshot(), busy = true))
-        composeRule.onNodeWithTag("setup-action-CONTINUE_WITHOUT").performScrollTo().assertIsNotEnabled()
+        composeRule.onNodeWithTag("setup-action-CONTINUE_WITHOUT").assertDoesNotExist()
         composeRule.onNodeWithTag("setup-later").performScrollTo().performClick()
         assertEquals(1, later)
         assertTrue(actions.isEmpty())
     }
 
+    /** Ensures an inconclusive relay lookup never silently offers replacement defaults. */
     @Test
     fun incompleteDiscoveryOffersRetryWithoutDefaultReplacement() {
         show(
@@ -83,6 +191,7 @@ class AccountSetupContentTest {
         assertEquals(OnboardingActionFfi.RETRY, actions.single().action)
     }
 
+    /** Requires explicit replacement consequences and the proposed read/write endpoints before publication. */
     @Test
     fun proposalShowsExactCapabilitiesAndReplacementWarningBeforeApproval() {
         val snapshot =
@@ -92,6 +201,7 @@ class AccountSetupContentTest {
                     OnboardingActionFfi.APPROVE_REPAIR,
                     OnboardingActionFfi.CANCEL_REPAIR,
                 ),
+                revision = 5uL,
             )
         snapshot.proposal =
             OnboardingRepairProposalFfi(
@@ -106,12 +216,13 @@ class AccountSetupContentTest {
         show(AccountSetupState(snapshot = snapshot))
         composeRule.onNodeWithText("wss://read.example").performScrollTo().assertExists()
         composeRule.onNodeWithText("wss://write.example").performScrollTo().assertExists()
-        composeRule.onNodeWithText("Publishing replaces this entire relay list.", substring = true).assertExists()
+        composeRule.onNodeWithText("Relays left out of this list will be removed.", substring = true).assertExists()
         assertTrue(actions.isEmpty())
         composeRule.onNodeWithTag("setup-action-APPROVE_REPAIR").performScrollTo().performClick()
         assertEquals(3uL, actions.single().revision)
     }
 
+    /** Exercises signer reconnection independently from the completion route. */
     @Test
     fun signerReconnectAndReadyAfterStreamEndBothHaveWorkingRoutes() {
         show(
@@ -130,6 +241,7 @@ class AccountSetupContentTest {
         assertEquals(1, reconnected)
     }
 
+    /** Keeps a certified account actionable after its native update stream ends. */
     @Test
     fun readyAfterStreamEndStillEnablesOpenChats() {
         show(AccountSetupState(snapshot = setupSnapshot(ready = true), disconnected = true))
@@ -142,6 +254,7 @@ class AccountSetupContentTest {
         assertEquals(1, opened)
     }
 
+    /** Explains saved-publication recovery without pretending an approved repair can be discarded. */
     @Test
     fun interruptedApprovedRepairExplainsWhyOnlyRetryIsAvailable() {
         val snapshot = setupSnapshot(OnboardingStepFfi.RELAYS, listOf(OnboardingActionFfi.RETRY))
@@ -156,23 +269,54 @@ class AccountSetupContentTest {
                 null,
             )
         show(AccountSetupState(snapshot = snapshot))
-        composeRule.onNodeWithText("An approved repair must finish", substring = true).assertExists()
+        composeRule.onNodeWithText("Your saved change needs to finish.", substring = true).assertExists()
         composeRule.onNodeWithTag("setup-action-CANCEL_ONBOARDING").assertDoesNotExist()
         composeRule.onNodeWithTag("setup-action-RETRY").performScrollTo().performClick()
         assertEquals(OnboardingActionFfi.RETRY, actions.single().action)
     }
 
+    /** Distinguishes an interrupted cancellation from an already approved publication. */
     @Test
     fun interruptedCancellationOffersCancellationInsteadOfClaimingARepairWasApproved() {
-        val snapshot = setupSnapshot(actions = listOf(OnboardingActionFfi.CANCEL_ONBOARDING))
+        val snapshot =
+            setupSnapshot(OnboardingStepFfi.INBOX_RELAYS, listOf(OnboardingActionFfi.CANCEL_ONBOARDING))
         snapshot.cancellationPending = true
         show(AccountSetupState(snapshot = snapshot))
-        composeRule.onNodeWithText("Cancellation was interrupted.", substring = true).assertExists()
-        composeRule.onNodeWithText("An approved repair must finish", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Cancellation stopped.", substring = true).assertExists()
+        composeRule.onNodeWithText("Your saved change needs to finish.", substring = true).assertDoesNotExist()
         composeRule.onNodeWithTag("setup-action-CANCEL_ONBOARDING").performScrollTo().performClick()
         assertEquals(OnboardingActionFfi.CANCEL_ONBOARDING, actions.single().action)
+        assertEquals(OnboardingStepFfi.INBOX_RELAYS, actions.single().step)
     }
 
+    /** The routine device notice has one decision, with diagnostics and cancellation kept out of the way. */
+    @Test fun deviceScreenHasOneDecisionAndOptionalDetails() {
+        show(
+            AccountSetupState(
+                snapshot =
+                    setupSnapshot(
+                        OnboardingStepFfi.SINGLE_DEVICE,
+                        listOf(OnboardingActionFfi.CONTINUE_ANYWAY, OnboardingActionFfi.CANCEL_ONBOARDING),
+                    ),
+            ),
+        )
+        composeRule.onNodeWithTag("setup-action-CONTINUE_ANYWAY").assertIsDisplayed()
+        composeRule.onNodeWithTag("setup-action-CANCEL_ONBOARDING").assertDoesNotExist()
+        composeRule.onNodeWithText("Follow list").assertDoesNotExist()
+        composeRule.onNodeWithTag("setup-details").performClick()
+        assertEquals(1, details)
+        assertTrue(actions.isEmpty())
+    }
+
+    /** A ready screen sheds diagnostics and exit links rather than asking the user to finish setup again. */
+    @Test fun completionDoesNotKeepSetupChrome() {
+        show(AccountSetupState(snapshot = setupSnapshot(ready = true)))
+        composeRule.onNodeWithTag("setup-later").assertDoesNotExist()
+        composeRule.onNodeWithTag("setup-details").assertDoesNotExist()
+        composeRule.onNodeWithText("Follow list").assertDoesNotExist()
+    }
+
+    /** Mounts the stateless screen with callback recorders for the supplied native setup state. */
     private fun show(state: AccountSetupState) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -186,6 +330,7 @@ class AccountSetupContentTest {
                     { reconnected++ },
                     { opened++ },
                     { later++ },
+                    { details++ },
                 )
             }
         }

@@ -38,6 +38,7 @@ internal data class AccountSetupState(
     val error: Boolean = false,
     val staleDecision: Boolean = false,
     val editor: SetupEditor? = null,
+    val detailsExpanded: Boolean = false,
 ) {
     val accountLabel: String
         get() = snapshot?.accountIdHex?.let { it.take(12) + "…" + it.takeLast(8) }.orEmpty()
@@ -49,11 +50,16 @@ internal data class AccountSetupState(
             } ?: 0
 
     val currentStep: OnboardingStepStateFfi?
-        get() =
-            snapshot?.steps?.firstOrNull {
-                snapshot.cancellationPending ||
-                    (it.status != OnboardingStatusFfi.PASSED && it.status != OnboardingStatusFfi.SKIPPED)
+        get() {
+            val current = snapshot ?: return null
+            val cancellation =
+                current.steps.firstOrNull {
+                    current.cancellationPending && OnboardingActionFfi.CANCEL_ONBOARDING in it.actions
+                }
+            return cancellation ?: current.steps.firstOrNull {
+                it.status != OnboardingStatusFfi.PASSED && it.status != OnboardingStatusFfi.SKIPPED
             }
+        }
 }
 
 /** Serializes user decisions and fences callbacks to one account and runtime generation. */
@@ -70,6 +76,21 @@ internal class AccountSetupController(
     private val mutableState = MutableStateFlow(AccountSetupState())
     val state = mutableState.asStateFlow()
     private var reader: Job? = null
+    private val automation = AccountSetupAutomation()
+    private var readinessDelivered = false
+
+    init {
+        scope.launch {
+            state.collect { current ->
+                if (isCurrent()) automation.advance(current, ::openChats)
+            }
+        }
+    }
+
+    /** Keeps diagnostics and secondary controls out of the default decision screen. */
+    fun toggleDetails() {
+        mutableState.value = mutableState.value.copy(detailsExpanded = !mutableState.value.detailsExpanded)
+    }
 
     /** Cancels and drains commands/readers before the owning runtime can be released. */
     suspend fun close() {
@@ -95,15 +116,18 @@ internal class AccountSetupController(
                         !it.cancellationPending &&
                         it.revision == mutableState.value.snapshot?.revision
                 } == true
-            if (readyForThisAccount && isCurrent()) onReady()
+            if (readyForThisAccount && isCurrent() && !readinessDelivered) {
+                onReady()
+                readinessDelivered = true
+            }
         }
 
     /** Rejects repeated taps and stale rendered actions before issuing any protocol mutation. */
     fun submit(request: SetupRequest) {
-        if (!canAct(request)) return
+        if (!mutableState.canAct(request, account, isCurrent())) return
         operate {
             val latest = client.snapshot()
-            if (latest == null || latest.accountIdHex != account || latest.revision != request.revision) {
+            if (latest == null || !latest.matchesDecision(account, request)) {
                 latest?.let(::accept)
                 mutableState.value = mutableState.value.copy(staleDecision = true)
             } else {
@@ -112,7 +136,7 @@ internal class AccountSetupController(
                     if (isCurrent()) onCancelled()
                 } else {
                     accept(result)
-                    mutableState.value = mutableState.value.copy(editor = null)
+                    mutableState.value = mutableState.value.copy(editor = null, detailsExpanded = false)
                 }
             }
         }
@@ -125,7 +149,7 @@ internal class AccountSetupController(
         revision: ULong,
     ) {
         val request = SetupRequest(revision, step, action)
-        if (!canAct(request)) return
+        if (!mutableState.canAct(request, account, isCurrent())) return
         operate {
             val existing = mutableState.value.editor
             val profile = if (action == OnboardingActionFfi.EDIT_PROFILE) client.profile() else null
@@ -164,21 +188,6 @@ internal class AccountSetupController(
     /** Closes the editor without changing or publishing any account metadata. */
     fun dismissEditor() {
         if (!mutableState.value.busy) mutableState.value = mutableState.value.copy(editor = null)
-    }
-
-    /** Rejects stale decisions while leaving busy or invalidated controllers inert. */
-    private fun canAct(request: SetupRequest): Boolean {
-        val current = mutableState.value
-        val snapshot = current.snapshot
-        if (!isCurrent() || current.busy || snapshot == null) return false
-        val allowed =
-            snapshot.steps
-                .firstOrNull { it.step == request.step }
-                ?.actions
-                .orEmpty()
-        val valid = snapshot.revision == request.revision && request.action in allowed
-        if (!valid) mutableState.value = current.copy(staleDecision = true)
-        return valid
     }
 
     /** Owns one foreground operation at a time without logging keys or raw engine errors. */
@@ -232,6 +241,25 @@ internal class AccountSetupController(
     }
 }
 
+/** Approval belongs to the reviewed proposal; other decisions belong to the surrounding checkpoint. */
+private fun OnboardingSnapshotFfi.matchesDecision(
+    account: String,
+    request: SetupRequest,
+): Boolean {
+    val actions =
+        steps
+            .firstOrNull { it.step == request.step }
+            ?.actions
+            .orEmpty()
+    val expectedRevision =
+        if (request.action == OnboardingActionFfi.APPROVE_REPAIR) {
+            proposal?.takeIf { it.step == request.step }?.revision
+        } else {
+            revision
+        }
+    return accountIdHex == account && request.action in actions && request.revision == expectedRevision
+}
+
 /** Converts an editor draft into a proposal request without approving publication. */
 internal fun SetupEditor.request(): SetupRequest {
     val editor = this
@@ -256,4 +284,18 @@ internal fun SetupEditor.request(): SetupRequest {
                 about = if (editor.aboutEdited) editor.about.trim() else profile.about,
             ),
     )
+}
+
+/** Checks the rendered native decision before entering the controller's single-flight operation. */
+private fun MutableStateFlow<AccountSetupState>.canAct(
+    request: SetupRequest,
+    account: String,
+    isCurrent: Boolean,
+): Boolean {
+    val current = value
+    val snapshot = current.snapshot
+    if (!isCurrent || current.busy || snapshot == null) return false
+    val valid = snapshot.matchesDecision(account, request)
+    if (!valid) value = current.copy(staleDecision = true)
+    return valid
 }
