@@ -45,6 +45,7 @@ internal fun ConversationBottomBar(
     // Compact-height windows shrink the top bar, so the full-screen composer
     // reserves correspondingly less clearance below it.
     compactHeight: Boolean = false,
+    dictationControlsVisible: Boolean = true,
     selectionMode: Boolean,
     selectionActionAvailability: BatchSelectionActionAvailability,
     selectionForwardBlockedReason: ForwardBlockedReason?,
@@ -229,8 +230,9 @@ internal fun ConversationBottomBar(
                             onPasteImageUris = onPasteImageUris,
                             voiceRecordingController = voiceRecordingController,
                             dictationController = appState.conversationDictation,
-                            dictationAccountRef = appState.activeAccountRef,
+                            dictationAccountRef = controller.boundAccountRef,
                             dictationGroupIdHex = controller.group.groupIdHex,
+                            dictationControlsVisible = dictationControlsVisible,
                             appState = appState,
                             mentionCandidates = mentionCandidates,
                             mentionPickerEnabled = mentionPickerEnabled,

@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.amber.AmberSignerController
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
+import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
@@ -1273,25 +1274,7 @@ class WhiteNoiseAppState private constructor(
             deliveryMode = {
                 conversationDictationPreferences.current().deliveryMode
             },
-            sendTranscriptIfOriginUnchanged = { request ->
-                withGroupCommitLock(request.accountRef, request.groupIdHex) {
-                    val current =
-                        conversationDictationDraftSnapshot(
-                            request.accountRef,
-                            request.groupIdHex,
-                        )
-                    if (
-                        current.revision != request.expectedDraftRevision ||
-                        current.value.text != request.expectedDraftText
-                    ) {
-                        false
-                    } else {
-                        marmotIo {
-                            sendText(request.accountRef, request.groupIdHex, request.payload)
-                        }.messageIds.isNotEmpty()
-                    }
-                }
-            },
+            sendTranscriptIfOriginUnchanged = ::sendDictationTranscriptIfOriginUnchanged,
         )
     }
 
@@ -2431,6 +2414,32 @@ class WhiteNoiseAppState private constructor(
         expectedRevision: Long,
         value: TextFieldValue,
     ): Boolean = composerDraftExpansionBridge.setDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
+
+    /**
+     * Sends only for the unchanged origin and a claimed dispatch, then clears its captured draft and geometry.
+     * Dictation never hides the draft through the shared presentation bridge: its controller empties the composer
+     * with its own conditional write inside [ConversationDictationSendRequest.beginDispatch] and restores that text
+     * on a failed or unknown send, which keeps a newer edit made during the send along with its retained geometry.
+     */
+    internal suspend fun sendDictationTranscriptIfOriginUnchanged(request: ConversationDictationSendRequest): Boolean =
+        withGroupCommitLock(request.accountRef, request.groupIdHex) {
+            val current = conversationDictationDraftSnapshot(request.accountRef, request.groupIdHex)
+            if (
+                current.revision != request.expectedDraftRevision ||
+                current.value.text != request.expectedDraftText ||
+                !request.beginDispatch()
+            ) {
+                false
+            } else {
+                val pendingClear = captureDraftForSend(request.accountRef, request.groupIdHex)
+                val accepted =
+                    marmotIo {
+                        sendText(request.accountRef, request.groupIdHex, request.payload)
+                    }.messageIds.isNotEmpty()
+                if (accepted && pendingClear != null) clearDraftAfterSuccessfulSend(pendingClear)
+                accepted
+            }
+        }
 
     /** Hydrates the selected composer from MDK without retaining attachment plaintext in Android state. */
     fun loadDraft(

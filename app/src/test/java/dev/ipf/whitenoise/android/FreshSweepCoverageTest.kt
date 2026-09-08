@@ -12,6 +12,16 @@ import java.time.Instant
 class FreshSweepCoverageTest {
     /** Pins selection memoization to its own derivation block, independent of earlier reveal effects. */
     @Test
+    fun conversationStreamingDebugRefreshKeepsItsOwnComposableGroup() {
+        val helper = source("ui/conversation/ConversationStreamingDebugRefreshEffect.kt")
+        val screen = source("ui/conversation/ConversationScreen.kt")
+
+        assertTrue(helper.contains("LaunchedEffect(controller, streamingDebugEnabled)"))
+        assertTrue(screen.contains("ConversationStreamingDebugRefreshEffect("))
+        assertFalse(screen.contains("LaunchedEffect(controller, appState.streamingDebugEnabled)"))
+    }
+
+    @Test
     fun conversationSelectionDerivationsAreRememberedByTheirRealInputs() {
         val source = source("ui/conversation/ConversationScreen.kt")
         val block = source.section("val selectableMessageProjections =", "LaunchedEffect(")

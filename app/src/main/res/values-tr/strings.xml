@@ -1642,6 +1642,8 @@
     <string name="dictation_cancel">Dikteyi iptal et</string>
     <string name="dictation_provider_unavailable">Konuşma tanıma kullanılamıyor</string>
     <string name="dictation_permission_denied">Mikrofon izni gerekiyor</string>
+    <string name="dictation_provider_access_rejected">Konuşma hizmeti mikrofon erişimini reddetti</string>
+    <string name="dictation_open_speech_service">Konuşma servisini aç</string>
     <string name="dictation_permission_denied_permanently">Ayarlar’da mikrofon erişimine izin ver</string>
     <string name="dictation_microphone_in_use">Mikrofon zaten kullanılıyor</string>
     <string name="dictation_no_speech">Konuşma algılanmadı</string>

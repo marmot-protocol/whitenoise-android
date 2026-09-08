@@ -1644,6 +1644,8 @@
     <string name="dictation_cancel">Annulla dettatura</string>
     <string name="dictation_provider_unavailable">Il riconoscimento vocale non è disponibile</string>
     <string name="dictation_permission_denied">È necessaria l’autorizzazione per il microfono</string>
+    <string name="dictation_provider_access_rejected">Il servizio vocale ha rifiutato l’accesso al microfono</string>
+    <string name="dictation_open_speech_service">Apri il servizio vocale</string>
     <string name="dictation_permission_denied_permanently">Consenti l’accesso al microfono nelle Impostazioni</string>
     <string name="dictation_microphone_in_use">Il microfono è già in uso</string>
     <string name="dictation_no_speech">Non è stata riconosciuta alcuna voce</string>
