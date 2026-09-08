@@ -21,20 +21,7 @@ class NotificationTimingListenerService : NotificationListenerService() {
 
     /** Records only the package/tag/id tuple armed by the current synthetic probe. */
     override fun onNotificationPosted(notification: StatusBarNotification) {
-        if (!NotificationTimingDeviceEvents.accepts(notification)) return
-        Trace.beginSection("WN notification listener post")
-        try {
-            NotificationTimingDeviceEvents.record(
-                NotificationTimingListenerPost(
-                    tag = notification.tag.orEmpty(),
-                    id = notification.id,
-                    key = notification.key,
-                    elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos(),
-                ),
-            )
-        } finally {
-            Trace.endSection()
-        }
+        NotificationTimingDeviceEvents.recordPost(notification)
     }
 
     /**
@@ -47,21 +34,7 @@ class NotificationTimingListenerService : NotificationListenerService() {
         rankingMap: RankingMap,
         reason: Int,
     ) {
-        if (!NotificationTimingDeviceEvents.accepts(notification)) return
-        Trace.beginSection("WN notification listener removal")
-        try {
-            NotificationTimingDeviceEvents.record(
-                NotificationTimingListenerRemoval(
-                    tag = notification.tag.orEmpty(),
-                    id = notification.id,
-                    key = notification.key,
-                    elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos(),
-                    reason = reason,
-                ),
-            )
-        } finally {
-            Trace.endSection()
-        }
+        NotificationTimingDeviceEvents.recordRemoval(notification, reason)
     }
 }
 
@@ -87,13 +60,13 @@ internal object NotificationTimingDeviceEvents {
     @Volatile
     var listenerConnected: Boolean = false
 
-    @Volatile
     private var expectedTarget: NotificationTimingTarget? = null
 
     private val posts = LinkedBlockingQueue<NotificationTimingListenerPost>()
     private val removals = LinkedBlockingQueue<NotificationTimingListenerRemoval>()
 
     /** Clears prior events and admits only the next exact package/tag/id target. */
+    @Synchronized
     fun arm(
         packageName: String,
         notificationTag: String,
@@ -106,21 +79,53 @@ internal object NotificationTimingDeviceEvents {
     }
 
     /** Rejects every callback not owned by the armed synthetic target. */
-    fun accepts(notification: StatusBarNotification): Boolean {
+    private fun accepts(notification: StatusBarNotification): Boolean {
         val target = expectedTarget ?: return false
         return notification.packageName == target.packageName &&
             notification.tag == target.tag &&
             notification.id == target.id
     }
 
-    /** Enqueues one accepted post/update callback for the device fixture. */
-    fun record(post: NotificationTimingListenerPost) {
-        posts.offer(post)
+    /** Matches and records under the target lock so rearming cannot retain an old callback. */
+    @Synchronized
+    fun recordPost(notification: StatusBarNotification) {
+        if (!accepts(notification)) return
+        Trace.beginSection("WN notification listener post")
+        try {
+            posts.offer(
+                NotificationTimingListenerPost(
+                    tag = notification.tag.orEmpty(),
+                    id = notification.id,
+                    key = notification.key,
+                    elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos(),
+                ),
+            )
+        } finally {
+            Trace.endSection()
+        }
     }
 
-    /** Enqueues one accepted card-removal callback for the device fixture. */
-    fun record(removal: NotificationTimingListenerRemoval) {
-        removals.offer(removal)
+    /** Serializes removal capture with arm/clear, including event materialization and enqueueing. */
+    @Synchronized
+    fun recordRemoval(
+        notification: StatusBarNotification,
+        reason: Int,
+    ) {
+        if (!accepts(notification)) return
+        Trace.beginSection("WN notification listener removal")
+        try {
+            removals.offer(
+                NotificationTimingListenerRemoval(
+                    tag = notification.tag.orEmpty(),
+                    id = notification.id,
+                    key = notification.key,
+                    elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos(),
+                    reason = reason,
+                ),
+            )
+        } finally {
+            Trace.endSection()
+        }
     }
 
     /** Awaits a framework post without interpreting it as visible pixels. */
@@ -130,6 +135,7 @@ internal object NotificationTimingDeviceEvents {
     fun awaitRemoval(timeoutMillis: Long) = removals.poll(timeoutMillis, TimeUnit.MILLISECONDS)
 
     /** Disarms the target and drops all process-local diagnostic events. */
+    @Synchronized
     fun clear() {
         expectedTarget = null
         posts.clear()
