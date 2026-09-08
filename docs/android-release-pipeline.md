@@ -102,6 +102,15 @@ signer transport and need not equal the publishing key. A signed preflight
 checks the returned event author against `ZAPSTORE_PUBLISHER_PUBKEY` before the
 online publication command. Direct nsec signing is not supported by this CI path.
 
+Before the first public release, qualify the pinned real ZSP binary separately
+from the publication workflow. Capture its `--version` output and use a
+throwaway listing and authorized test signer to verify that `publish --offline`
+emits JSON event lines and restores the bunker client identity from
+`$XDG_CONFIG_HOME/zsp/bunker-keys/<transport-pubkey>.key`. Offline mode can contact
+the signer; do not run the online publication command during this rehearsal.
+The automated regression suite uses a fake ZSP and does not establish this
+real-binary contract. Record the result in #2128 before public publication.
+
 First-release Android signing-certificate linking, where needed by Zapstore,
 is a separate publisher-operated prerequisite. CI uses `--skip-linking` and does
 not load the app-signing keystore into the publication job.

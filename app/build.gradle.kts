@@ -775,6 +775,11 @@ fun releaseSigningConfiguredForPackageTask(taskName: String): Boolean =
 
 fun releaseSigningHintForPackageTask(taskName: String): String =
     when {
+        taskName.contains("Production") && requestedProductionPlayBundle ->
+            "WHITENOISE_PLAY_UPLOAD_KEYSTORE_PATH, WHITENOISE_PLAY_UPLOAD_KEYSTORE_PASSWORD, " +
+                "WHITENOISE_PLAY_UPLOAD_KEY_ALIAS, WHITENOISE_PLAY_UPLOAD_KEY_PASSWORD " +
+                "(passwords may use the WHITENOISE_PRODUCTION_* or WHITENOISE_* fallback)"
+
         taskName.contains("Production") ->
             "WHITENOISE_PRODUCTION_KEYSTORE_PATH/PASSWORD/KEY_ALIAS/KEY_PASSWORD " +
                 "(or WHITENOISE_KEYSTORE_* fallback)"
