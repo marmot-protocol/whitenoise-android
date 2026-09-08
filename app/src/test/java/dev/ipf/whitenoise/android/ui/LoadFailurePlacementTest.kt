@@ -66,7 +66,7 @@ class LoadFailurePlacementTest {
         assertTrue("preserveLoadedContent = chatsController.retryGeneration > 0L" in shell)
     }
 
-    /** Keeps startup-failure completion behind the shared paint, accessibility, and telemetry reveal owner. */
+    /** Startup failure releases anchoring while preserving the shared paint, accessibility, and telemetry barriers. */
     @Test
     fun optimisticRowStartupFailureCompletesTheAccessibilityRevealBarrier() {
         val sourceCandidates =
@@ -105,7 +105,11 @@ class LoadFailurePlacementTest {
         assertTrue("initialTimelineAnchored = true" in seededReconciliation)
         assertTrue("initialTimelineAnchored = initialTimelineAnchored" in transcriptVisibilityOwner)
         assertTrue("seededTailAlignmentCommitted = seededTailAlignmentCommitted" in transcriptVisibilityOwner)
-        assertTrue("if (!transcriptVisibilityCommitted) hideFromAccessibility()" in screen)
+        assertTrue(
+            "initialPresentationCommitted =\n" +
+                "                transcriptVisibilityCommitted || authoritativeEmptyPresentationReady" in screen,
+        )
+        assertTrue("if (!transcriptReadyToReveal) hideFromAccessibility()" in screen)
     }
 
     /** Rejects missing, duplicated, or inverted source windows before substring assertions run. */

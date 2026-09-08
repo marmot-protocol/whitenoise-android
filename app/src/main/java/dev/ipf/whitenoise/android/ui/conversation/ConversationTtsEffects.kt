@@ -114,7 +114,7 @@ internal fun ConversationTtsAutoReadEffects(
     chatId: String,
     entryUnreadCount: Int,
     entryFirstUnreadMessageId: String?,
-    initialTimelineAnchored: Boolean,
+    transcriptReadyToReveal: Boolean,
 ) {
     suspend fun projectEntry(record: AppMessageRecordFfi) = projectConversationTtsEntry(appState, controller, record)
 
@@ -144,9 +144,11 @@ internal fun ConversationTtsAutoReadEffects(
         }
     }
 
-    // Auto-read (#1483): once the timeline is anchored, read the unread backlog.
-    LaunchedEffect(controller, chatId, initialTimelineAnchored) {
-        if (!initialTimelineAnchored) return@LaunchedEffect
+    // Auto-read (#1483): once the authoritative transcript can be revealed,
+    // read the unread backlog. The reveal key also restarts a route that was
+    // initially withheld for membership verification.
+    LaunchedEffect(controller, chatId, transcriptReadyToReveal) {
+        if (!transcriptReadyToReveal) return@LaunchedEffect
         val entries = autoReadBacklogEntries()
         if (entries.isNotEmpty()) {
             val started =
@@ -162,7 +164,7 @@ internal fun ConversationTtsAutoReadEffects(
     }
 
     // Live continuation only extends the conversation-owned active session.
-    LaunchedEffect(controller, chatId) {
+    LaunchedEffect(controller, chatId, transcriptReadyToReveal) {
         var seededLastId = false
         snapshotFlow {
             controller.timeline
@@ -172,6 +174,7 @@ internal fun ConversationTtsAutoReadEffects(
         }.distinctUntilChanged()
             .collect { lastId ->
                 if (lastId == null) return@collect
+                if (!transcriptReadyToReveal) return@collect
                 if (!seededLastId) {
                     seededLastId = true
                     return@collect
@@ -193,6 +196,7 @@ internal fun ConversationTtsAutoReadEffects(
             mutableStateOf(conversationAutoReadCursor(controller.timeline))
         }
     var autoReadResumeGeneration by remember(controller, chatId) { mutableLongStateOf(0L) }
+    var handledAutoReadResumeGeneration by remember(controller, chatId) { mutableLongStateOf(0L) }
     val lifecycleOwner = LocalContext.current.lifecycleOwner()
     DisposableEffect(controller, chatId, lifecycleOwner) {
         if (lifecycleOwner == null) {
@@ -218,8 +222,14 @@ internal fun ConversationTtsAutoReadEffects(
             onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
         }
     }
-    LaunchedEffect(controller, chatId, autoReadResumeGeneration) {
+    LaunchedEffect(controller, chatId, autoReadResumeGeneration, transcriptReadyToReveal) {
         if (autoReadResumeGeneration == 0L) return@LaunchedEffect
+        if (autoReadResumeGeneration <= handledAutoReadResumeGeneration) return@LaunchedEffect
+        // Claim before reveal/policy/projection work. A resume while hidden is
+        // owned by the open-time backlog when reveal later changes, and a
+        // cancelled visible attempt cannot resurrect after another hide/reveal.
+        handledAutoReadResumeGeneration = autoReadResumeGeneration
+        if (!transcriptReadyToReveal) return@LaunchedEffect
         if (!appState.ttsHasUsableEngine) return@LaunchedEffect
         if (!appState.isConversationAutoRead(controller.group.groupIdHex)) return@LaunchedEffect
         val cursor = autoReadResumeCursor

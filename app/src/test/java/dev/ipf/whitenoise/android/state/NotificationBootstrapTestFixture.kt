@@ -19,6 +19,7 @@ import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.PushRegistrationShareOutcomeFfi
 import dev.ipf.marmotkit.PushRegistrationShareStatusFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
@@ -67,6 +68,8 @@ internal class NotificationBootstrapTestFixture(
     initialNotificationSettings: NotificationSettingsFfi? = null,
     // Optional behavior hooks so worker/reconciliation tests can steer the FFI
     // boundary per call; every default preserves the fixture's original shape.
+    private val onOnboardingSnapshot: (() -> OnboardingSnapshotFfi?)? = null,
+    private val onAuditLogSettings: (() -> Unit)? = null,
     private val onChatList: ((accountRef: String) -> List<ChatListRowFfi>)? = null,
     private val onGroupMemberIdsPage: ((groupIds: List<String>) -> List<AppGroupMemberIdsFfi>)? = null,
     private val onMarkTimelineMessageRead: (() -> ChatListRowFfi?)? = null,
@@ -167,6 +170,7 @@ internal class NotificationBootstrapTestFixture(
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
             when (method.name) {
+                "onboardingSnapshot" -> onOnboardingSnapshot?.invoke()
                 "start" -> {
                     runtimeStartCalls.incrementAndGet()
                     runtimeStartGate.await()
@@ -186,7 +190,10 @@ internal class NotificationBootstrapTestFixture(
                     emitAtFirstPostStartFfiBoundary()
                     RelayTelemetrySettingsFfi(exportEnabled = false, exportIntervalSeconds = 60uL)
                 }
-                "auditLogSettings" -> AuditLogSettingsFfi(enabled = false)
+                "auditLogSettings" -> {
+                    onAuditLogSettings?.invoke()
+                    AuditLogSettingsFfi(enabled = false)
+                }
                 "setAuditLogSettings" -> arguments?.first()
                 "chatNotificationSettings" ->
                     ChatNotificationSettingsFfi(
