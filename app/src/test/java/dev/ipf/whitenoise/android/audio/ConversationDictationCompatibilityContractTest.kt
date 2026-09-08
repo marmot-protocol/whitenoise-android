@@ -1,7 +1,10 @@
 package dev.ipf.whitenoise.android.audio
 
 import android.content.ComponentName
+import android.media.AudioFormat
+import android.os.ParcelFileDescriptor
 import android.speech.RecognizerIntent
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -102,8 +105,62 @@ class ConversationDictationCompatibilityContractTest {
         assertFalse("checkRecognitionSupport" in controller)
         assertTrue("event=platform_start_listening" in controller)
         val listenerRegistration = controller.indexOf("recognizer.setRecognitionListener(")
-        val platformStart = controller.indexOf("recognizer.startListening(recognitionIntent)")
+        val platformStart = controller.indexOf("recognizer.startListening(intent)")
         assertTrue(listenerRegistration >= 0 && platformStart > listenerRegistration)
+    }
+
+    @Test
+    fun callerAudioSourceDeclaresTheCapturedPcmLayoutAndStaysUnsegmented() {
+        val pipe = ParcelFileDescriptor.createPipe()
+        try {
+            val intent = conversationDictationRecognitionIntent().withConversationDictationAudioSource(pipe[0])
+
+            assertEquals(
+                pipe[0],
+                intent.getParcelableExtra(
+                    RecognizerIntent.EXTRA_AUDIO_SOURCE,
+                    ParcelFileDescriptor::class.java,
+                ),
+            )
+            assertEquals(1, intent.getIntExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, 0))
+            assertEquals(
+                AudioFormat.ENCODING_PCM_16BIT,
+                intent.getIntExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, 0),
+            )
+            assertEquals(
+                16_000,
+                intent.getIntExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, 0),
+            )
+            // A segmented session would route results to onSegmentResults, which the controller
+            // does not read, so the transcript would be lost.
+            assertNull(intent.getStringExtra(RecognizerIntent.EXTRA_SEGMENTED_SESSION))
+        } finally {
+            pipe.forEach(ParcelFileDescriptor::close)
+        }
+    }
+
+    @Test
+    fun capturedSamplesEncodeAsLittleEndianPcm16AndReportTheirPeak() {
+        val samples = shortArrayOf(0, 1, -2, Short.MAX_VALUE, Short.MIN_VALUE)
+        val encoded = ByteArray(samples.size * 2)
+
+        conversationDictationEncodePcm16(samples, samples.size, encoded)
+
+        assertArrayEquals(
+            byteArrayOf(
+                0x00, 0x00,
+                0x01, 0x00,
+                0xFE.toByte(), 0xFF.toByte(),
+                0xFF.toByte(), 0x7F,
+                0x00, 0x80.toByte(),
+            ),
+            encoded,
+        )
+
+        assertEquals(0f, conversationDictationPeak(shortArrayOf(0, 0), 2), 0f)
+        assertEquals(1f, conversationDictationPeak(samples, samples.size), 0.001f)
+        // A count shorter than the array must ignore the untouched tail.
+        assertEquals(0f, conversationDictationPeak(shortArrayOf(0, Short.MAX_VALUE), 1), 0f)
     }
 
     private fun projectFile(relative: String): File =

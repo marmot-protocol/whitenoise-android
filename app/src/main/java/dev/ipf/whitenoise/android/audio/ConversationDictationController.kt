@@ -2194,8 +2194,31 @@ internal class AndroidConversationDictationPlatform(
         return AndroidConversationDictationRecognitionSession(
             context = context,
             recognitionService = selected,
+            callerAudio = openCallerAudioIfProviderCannotRecord(),
             listener = listener,
         )
+    }
+
+    /**
+     * Captures in White Noise when Android has selected no recognizer, which is exactly when the
+     * platform binds the provider without `BIND_INCLUDE_CAPABILITIES` and the session would fail
+     * with `ERROR_INSUFFICIENT_PERMISSIONS` before the provider recorded anything. A
+     * system-selected provider records for itself, so that path is left alone.
+     */
+    private fun openCallerAudioIfProviderCannotRecord(): ConversationDictationCallerAudio? {
+        val systemSelected = selectedRecognitionService() != null
+        val supported = conversationDictationAudioSourceSupported()
+        val source =
+            if (systemSelected || !supported) {
+                null
+            } else {
+                ConversationDictationCallerAudio.open()
+            }
+        conversationDictationDiagnostic(
+            "event=caller_audio_mode enabled=${source != null} " +
+                "system_selected=$systemSelected supported=$supported",
+        )
+        return source
     }
 
     /** Parses Android's secure setting for the currently selected recognition service. */
@@ -2246,6 +2269,7 @@ internal class AndroidConversationDictationPlatform(
 private class AndroidConversationDictationRecognitionSession(
     context: Context,
     recognitionService: ComponentName,
+    private val callerAudio: ConversationDictationCallerAudio?,
     private val listener: ConversationDictationRecognitionListener,
 ) : ConversationDictationRecognitionSession {
     private val recognizer = SpeechRecognizer.createSpeechRecognizer(context, recognitionService)
@@ -2315,20 +2339,49 @@ private class AndroidConversationDictationRecognitionSession(
     override fun start() {
         check(!started && !destroyed)
         started = true
-        conversationDictationDiagnostic("event=platform_start_listening")
-        runCatching { recognizer.startListening(recognitionIntent) }
-            .onFailure { listener.onError(ConversationDictationFailure.Unknown) }
+        val intent = startIntent()
+        conversationDictationDiagnostic(
+            "event=platform_start_listening caller_audio=${intent !== recognitionIntent}",
+        )
+        runCatching { recognizer.startListening(intent) }
+            .onFailure {
+                callerAudio?.cancel()
+                listener.onError(ConversationDictationFailure.Unknown)
+            }
+        // The intent has been marshalled, so drop this side's copy of the descriptor the provider
+        // now holds. The write end stays open until capture ends, which is what signals end of audio.
+        callerAudio?.let { runCatching(it.providerEnd::close) }
+    }
+
+    /**
+     * Adds White Noise's own capture to the request when the provider cannot open the microphone
+     * for this session. Capture that refuses to start falls back to the provider's own microphone
+     * so a configuration that already works keeps working.
+     */
+    private fun startIntent(): Intent {
+        val source = callerAudio
+        return if (source != null && source.start()) {
+            recognitionIntent.withConversationDictationAudioSource(source.providerEnd)
+        } else {
+            if (source != null) {
+                conversationDictationDiagnostic("event=caller_audio_unavailable fallback=provider_microphone")
+            }
+            recognitionIntent
+        }
     }
 
     /** Requests the provider to finish the current utterance and return its final result. */
     override fun stop() {
         conversationDictationDiagnostic("event=platform_stop_listening")
+        // Close the audio first: a provider reading a caller descriptor ends the utterance on EOF.
+        callerAudio?.stop()
         recognizer.stopListening()
     }
 
     /** Cancels provider work when the controller no longer needs a result. */
     override fun cancel() {
         conversationDictationDiagnostic("event=platform_cancel")
+        callerAudio?.cancel()
         recognizer.cancel()
     }
 
@@ -2337,6 +2390,7 @@ private class AndroidConversationDictationRecognitionSession(
         if (destroyed) return
         destroyed = true
         conversationDictationDiagnostic("event=platform_destroy")
+        callerAudio?.cancel()
         recognizer.destroy()
     }
 }
