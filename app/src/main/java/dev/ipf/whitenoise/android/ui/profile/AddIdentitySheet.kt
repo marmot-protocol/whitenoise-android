@@ -75,11 +75,11 @@ internal fun AddIdentitySheet(
     var importErrorRes by remember { mutableStateOf<Int?>(null) }
     val amberSignerAvailable = remember { appState.isAmberSignerInstalled() }
 
-    // Every add path (create / import / external signer) ends by switching the
-    // active account, so the switch is the success signal that closes the sheet.
+    // Imported identities leave this sheet for setup before activation;
+    // newly created and legacy accounts still dismiss when activation completes.
     val activeAtOpen = remember { appState.activeAccountRef }
-    LaunchedEffect(appState.activeAccountRef) {
-        if (appState.activeAccountRef != activeAtOpen) onDismiss()
+    LaunchedEffect(appState.activeAccountRef, appState.accountSetup.controller) {
+        if (appState.activeAccountRef != activeAtOpen || appState.accountSetup.controller != null) onDismiss()
     }
 
     // One guarded entry point for import so the button and the IME Done action
@@ -91,7 +91,11 @@ internal fun AddIdentitySheet(
         appState.launchMutation {
             try {
                 when (val step = signInStepFor(appState.importIdentity(identity), identity)) {
-                    SignInStep.SignedIn -> clearSensitiveClipboard(context)
+                    SignInStep.SignedIn, SignInStep.SetupStarted -> {
+                        clearSensitiveClipboard(context)
+                        identity = ""
+                        onDismiss()
+                    }
                     // Consent-gated setup recovery is offered on the sign-in
                     // screen only, so this surface keeps the generic message
                     // rather than opening a prompt with nowhere to go.

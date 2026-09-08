@@ -663,21 +663,24 @@ internal fun MainShell(
             }
         }
     }
+    // The effect may start after activeAccountRef changes but before the next composition. Keep its
+    // account and defer decision from the same frame so an old effect cannot bind the arriving account.
+    val chatListBindAccountRef = appState.activeAccountRef
     val deferNotificationChatListBind =
-        shouldDeferNotificationChatListBind(notificationFirstFrameGate, appState.activeAccountRef)
+        shouldDeferNotificationChatListBind(notificationFirstFrameGate, chatListBindAccountRef)
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
 
     LaunchedEffect(
         chatsController,
-        appState.activeAccountRef,
+        chatListBindAccountRef,
         appState.runtimeGeneration,
         chatsController.retryGeneration,
         deferNotificationChatListBind,
     ) {
         if (deferNotificationChatListBind) return@LaunchedEffect
         chatsController.bind(
-            accountRef = appState.activeAccountRef,
+            accountRef = chatListBindAccountRef,
             preserveLoadedContent = chatsController.retryGeneration > 0L || chatsController.hasLoadedLocalSnapshot,
         )
     }

@@ -37,6 +37,33 @@ class AddIdentitySheetRecoveryTest {
     private val app = ApplicationProvider.getApplicationContext<Context>()
     private val nsec = "nsec1" + "q".repeat(58)
 
+    /** Adding an identity retains the sheet and existing account when staged setup fails before acceptance. */
+    @Test
+    fun stagedSetupFailureDoesNotDismissOrRunLegacyRecovery() {
+        val engine =
+            RecordingIdentityLoginCalls(
+                loginFails = { error("preflight must retain ownership") },
+                beginFails = { MarmotKitException.Runtime("preflight unavailable") },
+            )
+        val appState = signInTestAppState(app, engine)
+        val previousAccount = appState.activeAccountRef
+        var dismissed = false
+        composeRule.setContent {
+            WhiteNoiseTheme { AddIdentitySheet(appState = appState, onDismiss = { dismissed = true }) }
+        }
+        val importLabel = app.getString(R.string.import_existing_identity)
+        composeRule.onAllNodesWithText(importLabel)[0].performClick()
+        composeRule.onNodeWithText(app.getString(R.string.nsec_or_npub)).performTextInput(nsec)
+        composeRule.onAllNodesWithText(importLabel)[1].performClick()
+        composeRule.waitForIdle()
+        assertEquals(listOf(nsec), engine.setupBegins)
+        assertEquals(0, engine.logins.size)
+        assertEquals(emptyList<RecoveryCall>(), engine.recoveries)
+        assertEquals(previousAccount, appState.activeAccountRef)
+        assertEquals(false, dismissed)
+        composeRule.onNodeWithText(app.getString(R.string.identity_entry_error_import_failed)).assertExists()
+    }
+
     @Test
     fun addingAnAccountNeverRecoversAnIncompleteSetup() {
         val engine =

@@ -509,6 +509,8 @@ class NotificationAccountIsolationNavigationTest {
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
             when (method.name) {
+                // These existing signed-in accounts have no interactive setup checkpoint.
+                "onboardingSnapshot" -> null
                 "groupDetails" -> {
                     gate.rosterReadCount.incrementAndGet()
                     check(!gate.rosterReadFails) { "roster enrichment is unavailable" }

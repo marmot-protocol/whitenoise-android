@@ -8,6 +8,19 @@ import org.junit.Test
 import java.io.File
 
 class NotificationConversationOpenCoverageTest {
+    /** Queued work keeps the account that was used to decide whether notification hydration is deferred. */
+    @Test
+    fun queuedChatListBindUsesTheAccountThatOwnedItsDeferDecision() {
+        val source = mainShellSource()
+        val capture = source.indexOf("val chatListBindAccountRef = appState.activeAccountRef")
+        assertTrue("capture account ownership before queuing the effect", capture >= 0)
+        val guard = source.indexOf("if (deferNotificationChatListBind) return@LaunchedEffect", capture)
+        assertTrue("the captured account must own the defer decision", guard > capture)
+        val bindEffect = source.substring(guard).substringBefore("LaunchedEffect(")
+        assertTrue(bindEffect.contains("accountRef = chatListBindAccountRef"))
+        assertFalse("queued bind must retain its account", bindEffect.contains("appState.activeAccountRef"))
+    }
+
     /** Route state is published only after the awaited card cancellation has returned. */
     @Test
     fun routeCommitAwaitsDismissalBeforePublishingNavigationState() {

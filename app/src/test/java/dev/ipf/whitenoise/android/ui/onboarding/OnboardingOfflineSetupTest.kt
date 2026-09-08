@@ -1,10 +1,6 @@
 package dev.ipf.whitenoise.android.ui.onboarding
 
 import android.content.Context
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -33,7 +29,7 @@ class OnboardingOfflineSetupTest {
     private val nsec = "nsec1" + "q".repeat(58)
 
     @Test
-    fun everySetupActionIsHeldBeforeDispatchWhileOffline() {
+    fun onlyNewIdentityCreationIsHeldWhileOffline() {
         val offline = mutableListOf<OnboardingAction>()
         var starts = 0
 
@@ -47,8 +43,8 @@ class OnboardingOfflineSetupTest {
             )
         }
 
-        assertEquals(setupActions, offline)
-        assertEquals(0, starts)
+        assertEquals(listOf(OnboardingAction.Creating), offline)
+        assertEquals(2, starts)
     }
 
     @Test
@@ -70,8 +66,8 @@ class OnboardingOfflineSetupTest {
             )
         }
 
-        dispatch(OnboardingAction.Importing)
-        assertEquals(OnboardingAction.Importing, pending)
+        dispatch(OnboardingAction.Creating)
+        assertEquals(OnboardingAction.Creating, pending)
         assertEquals(0, starts)
 
         online = true
@@ -95,30 +91,17 @@ class OnboardingOfflineSetupTest {
     }
 
     @Test
-    fun nsecInputAndOwningSurfaceSurviveOfflineThenRetryOnline() {
-        var online = false
+    fun validNsecReachesIdentityAcceptanceEvenWhileOffline() {
         val engine = RecordingIdentityLoginCalls(loginFails = { MarmotKitException.Runtime("expected") })
         val appState = signInTestAppState(context, engine)
         composeRule.setContent {
-            WhiteNoiseTheme {
-                OnboardingScreen(appState = appState, hasValidatedInternet = { online })
-            }
+            WhiteNoiseTheme { OnboardingScreen(appState = appState, hasValidatedInternet = { false }) }
         }
-
         composeRule.onNodeWithText(context.getString(R.string.onboarding_login)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.nostr_nsec)).performTextInput(nsec)
         composeRule.onNodeWithText(context.getString(R.string.sign_in)).performClick()
-
-        composeRule.onNodeWithTag(ONBOARDING_OFFLINE_NOTICE_TAG).assertExists()
-        composeRule
-            .onNodeWithText(context.getString(R.string.onboarding_offline_setup_message))
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
-        assertEquals("offline sign-in must reach no engine call", 0, engine.logins.size)
-
-        online = true
-        composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
         composeRule.waitForIdle()
-
+        composeRule.onNodeWithTag(ONBOARDING_OFFLINE_NOTICE_TAG).assertDoesNotExist()
         assertEquals(1, engine.logins.size)
         assertEquals(nsec, engine.logins.single().nsec)
     }

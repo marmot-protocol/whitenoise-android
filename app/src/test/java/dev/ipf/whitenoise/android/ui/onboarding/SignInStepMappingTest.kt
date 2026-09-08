@@ -7,6 +7,11 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class SignInStepMappingTest {
+    @Test
+    fun acceptedIdentityHasADistinctSetupRoute() {
+        assertEquals(SignInStep.SetupStarted, signInStepFor(IdentityImportOutcome.SetupStarted, ""))
+    }
+
     private val nsec = "nsec1" + "q".repeat(58)
     private val npub = "npub1" + "a".repeat(58)
 

@@ -329,7 +329,11 @@ abstract class NotificationDelayedRosterFixture {
             delayedRosterNotification(context, SOURCE_ACCOUNT),
         )
         if (preloadFinishesFirst) {
+            // The separate state-holder tests cover replacement of a pre-activation controller.
+            // Keep this single-subscription fixture focused on preload, roster, and card ownership.
             awaitCondition { fixture.appState.activeAccountRef == TARGET_ACCOUNT }
+            fixture.gate.releasePreload.countDown()
+            awaitCondition { fixture.handled.get() }
             if (verifyCardOwnership) {
                 awaitNotificationKeys((fixture.sourceKeys + fixture.lateSource).toSet())
             }
@@ -517,6 +521,8 @@ abstract class NotificationDelayedRosterFixture {
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
             when (method.name) {
+                // These signed-in accounts have no pending interactive setup.
+                "onboardingSnapshot" -> null
                 "groupRoster" -> gatedRoster(gate, arguments)
                 "chatListRow" -> gatedProjection(gate, arguments)
                 "subscribeChatList" -> gatedBroadBind(gate, arguments)
@@ -756,7 +762,7 @@ private class RouteOrderGate(
     val preloadStarted = CountDownLatch(1)
     val preloadCompleted = CountDownLatch(1)
     val broadBindStarted = CountDownLatch(1)
-    val releasePreload = CountDownLatch(if (preloadFinishesFirst) 0 else 1)
+    val releasePreload = CountDownLatch(1)
     val releaseActivation = CountDownLatch(if (preloadFinishesFirst) 1 else 0)
     val targetRosterStarted = CountDownLatch(1)
     val releaseTargetRoster = CountDownLatch(1)
