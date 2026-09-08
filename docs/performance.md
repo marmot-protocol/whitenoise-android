@@ -42,6 +42,57 @@ errors. Turn the switch off and repeat an action to confirm no new lines appear.
 White Noise controls future emission only; retention of lines already written to
 Logcat is controlled by Android/GrapheneOS.
 
+## MDK host timing integration (draft)
+
+This integration targets [MDK #1760](https://github.com/marmot-protocol/mdk/pull/1760)
+at `2bb1f2803a697838f1ea32f3891ef9181f6d6eb0`. The checked-in MarmotKit
+0.9.19 pin does **not** provide these APIs. Do not merge or deploy this draft until:
+
+- An immutable Android artifact containing #1760 and `product-analytics-export`
+  is published, pinned with its actual checksum/API counts, and passes both
+  distribution builds and tests.
+- Android integrates MDK's combined usage/diagnostics consent, disclosure,
+  operator and verified retention policy. The legacy relay-telemetry toggle
+  cannot grant the expanded consent; do not reinterpret an existing grant.
+- Each enabled environment supplies its own `WHITENOISE_<ENV>_PRODUCT_EVENTS_ENDPOINT`,
+  `WHITENOISE_<ENV>_PRODUCT_APP_KEY`, and `WHITENOISE_<ENV>_PRODUCT_OPERATOR`
+  through local properties or build environment (`ENV`: `DEV`, `STAGING`,
+  `PRODUCTION`). Previews receive empty values. Endpoint/key configuration
+  never grants consent. Verify revocation and disabled/unconfigured operation
+  before enabling collection in a release.
+
+`MarmotTraceSection.hostTimingRegistry` registers 26 aggregate events with exactly
+`elapsed: DurationBucket` and `outcome: success|failure`. The existing traced
+`marmotIo` overload records these through `recordHostTiming` on the same IO
+worker/runtime as the measured call. No task or unbounded Android event queue is
+created. Native rejection disables this tracer's analytics recording for the
+app-state lifetime and emits one fixed diagnostic warning; application failures
+and cancellation retain their original exception.
+
+| Events (`app_` prefix) | Measured work |
+| --- | --- |
+| `text_send`, `text_reply`, `message_edit`, `message_react` | One native message command attempt |
+| `media_upload`, `media_send`, `media_download`, `media_list` | Native transfer, publication or media listing |
+| `timeline_read`, `message_search` | One timeline page/read, with search pages separated |
+| `chat_list_read`, `chat_row_read`, `member_ids_read` | SQLite-backed chat/member projections |
+| `profile_read`, `display_name_read` | Native profile/name reads |
+| `account_list`, `unread_summary`, `catch_up` | Account listing, unread projection, catch-up |
+| `group_create`, `invite_accept`, `group_roster`, `members_invite`, `members_remove`, `admin_promote`, `admin_demote`, `admin_self_demote` | Existing traced group operations |
+
+Each duration uses Android's monotonic elapsed clock, starts after IO dispatch
+and ends when the block returns or throws. It includes native suspension/queue
+wait, but excludes Android dispatcher admission, surrounding locks, UI decoding,
+layout and rendered frames. Cancellation is a failed host attempt, **not** proof
+that native publication failed. Retries and paginated reads are separate samples.
+Unknown trace names never enter the product registry or timing recorder.
+
+Compare stage duration buckets and outcomes by app version/environment to locate
+slow call paths. Custom host events reach Aptabase only; they do not add OTLP
+series, raw-duration traces or exact percentiles. The upstream native queue,
+projection, acceptance and publication metrics provide the deeper breakdown.
+Do not add their percentiles to these overlapping host measurements. Existing
+Perfetto slices and the local WNPerf toggle remain independent of export consent.
+
 ## Prepare a physical-device fixture
 
 Use a dedicated API 34+ device with animations disabled and a stable power and

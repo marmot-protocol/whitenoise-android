@@ -7244,6 +7244,14 @@
         ]
       },
       {
+        "surface": "host timing configuration and consent boundary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "setProductAnalyticsRuntimeConfig(",
+        "test_ids": [
+          "SEC-011"
+        ]
+      },
+      {
         "surface": "Superseded group-change diagnostic summary and payload privacy",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/core/DiagnosticFormatter.kt",
         "anchor": "is MarmotEventFfi.GroupChangeSuperseded ->",
