@@ -214,12 +214,7 @@ if [[ "$apk_abis" != "arm64-v8a" ]]; then
   exit 1
 fi
 
-jarsigner -verify "$aab_source" >/dev/null
-actual_play_upload_sha="$(keytool -printcert -jarfile "$aab_source" | sed -n 's/^[[:space:]]*SHA256: //p' | normalize_fingerprint)"
-if [[ "$actual_play_upload_sha" != "$expected_play_upload_sha" ]]; then
-  echo "error: Play App Bundle signer does not match the registered upload key" >&2
-  exit 1
-fi
+actual_play_upload_sha="$(bash "$repo_dir/scripts/verify-play-bundle-signature.sh" "$aab_source" "$expected_play_upload_sha")"
 
 java -jar "$bundletool" validate --bundle="$aab_source" >/dev/null
 for field in package android:versionCode android:versionName; do

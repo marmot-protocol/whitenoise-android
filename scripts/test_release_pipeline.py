@@ -10,6 +10,7 @@ from pathlib import Path
 import struct
 import subprocess
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 import zipfile
@@ -121,7 +122,70 @@ class BundleTests(unittest.TestCase):
                 bundle.verify_source_metadata(self.path, self.manifest)
 
 
+    def test_github_draft_exposes_only_apk_manifest_and_matching_checksums(self):
+        published = {}
+        def fake_command(*args):
+            if args[:2] == ('gh', 'api'):
+                return b'[[]]'
+            self.assertEqual(args[:3], ('gh', 'release', 'create'))
+            self.assertIn('--draft', args)
+            for name in args[-3:]:
+                path = Path(name)
+                published[path.name] = path.read_bytes()
+            return b''
+        with patch.object(bundle, 'check_tag'), patch.object(bundle, 'command', side_effect=fake_command):
+            bundle.github_draft(SimpleNamespace(directory=self.path))
+        apk = f'whitenoise-android-{VERSION}-arm64-v8a.apk'
+        self.assertEqual(set(published), {apk, 'release-manifest.json', 'checksums-sha256.txt'})
+        expected = {f'{hashlib.sha256(published[name]).hexdigest()}  ./{name}'
+                    for name in (apk, 'release-manifest.json')}
+        self.assertEqual(set(published['checksums-sha256.txt'].decode().splitlines()), expected)
+
+    def test_github_draft_rejects_published_wrong_source_and_private_assets(self):
+        release = dict(tag_name=f'android-v{VERSION}', draft=True, target_commitish=SOURCE, assets=[])
+        for changes, message in ((dict(draft=False), 'published'),
+                                 (dict(target_commitish='master'), 'target'),
+                                 (dict(assets=[dict(name=f'whitenoise-android-{VERSION}-play.aab')]), 'Unexpected')):
+            with self.subTest(changes=changes), patch.object(bundle, 'check_tag'):
+                with patch.object(bundle, 'command', return_value=json.dumps([[{**release, **changes}]]).encode()) as command:
+                    with self.assertRaisesRegex(ValueError, message):
+                        bundle.github_draft(SimpleNamespace(directory=self.path))
+                    self.assertEqual(command.call_count, 1)
+
+    def test_github_draft_resume_requires_identical_asset_bytes(self):
+        apk = f'whitenoise-android-{VERSION}-arm64-v8a.apk'
+        release = dict(tag_name=f'android-v{VERSION}', draft=True, target_commitish=SOURCE,
+                       assets=[dict(name=apk, id=1)])
+        for matches in (False, True):
+            with self.subTest(matches=matches):
+                def download(*args, stdout, **kwargs):
+                    stdout.write((self.path / apk).read_bytes() if matches else b'other candidate')
+                def command(*args):
+                    return json.dumps([[release]]).encode() if args[:2] == ('gh', 'api') else b''
+                with patch.object(bundle, 'check_tag'), patch.object(bundle, 'command', side_effect=command) as calls:
+                    with patch.object(bundle.subprocess, 'run', side_effect=download):
+                        if matches:
+                            bundle.github_draft(SimpleNamespace(directory=self.path))
+                            self.assertEqual(calls.call_args.args[:3], ('gh', 'release', 'upload'))
+                        else:
+                            with self.assertRaisesRegex(ValueError, 'another candidate'):
+                                bundle.github_draft(SimpleNamespace(directory=self.path))
+                            self.assertEqual(calls.call_count, 1)
+
+
 class ProvenanceTests(unittest.TestCase):
+    def test_policy_reader_normalizes_whitespace_and_rejects_missing_values(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'config').mkdir()
+            policy = root / 'config/android-release.properties'
+            with patch.object(bundle, 'ROOT', root):
+                policy.write_text('  # comment\n APP_SIGNING_SHA256 = abc123  \n\n')
+                self.assertEqual(bundle.properties(), {'APP_SIGNING_SHA256': 'abc123'})
+                policy.write_text('APP_SIGNING_SHA256=\n')
+                with self.assertRaisesRegex(ValueError, 'Invalid release property'):
+                    bundle.properties()
+
     def setUp(self):
         self.run = dict(id=int(RUN_ID), repository={'full_name': bundle.REPOSITORY},
                         head_repository={'full_name': bundle.REPOSITORY}, path=bundle.BUILD_WORKFLOW,
@@ -261,6 +325,42 @@ class ZapstoreIntegrationTests(unittest.TestCase):
                     self.assertIn('signer differs', result.stderr)
 
 
+class BundleSignatureTests(unittest.TestCase):
+    def test_signature_gate_rejects_unsigned_partial_tampered_and_wrong_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            keystore = root / 'fixture.jks'
+            def run(*args):
+                return subprocess.check_output(args, stderr=subprocess.STDOUT)
+            run('keytool', '-genkeypair', '-alias', 'fixture', '-keyalg', 'RSA', '-validity', '3650',
+                '-dname', 'CN=Disposable Release Test', '-keystore', str(keystore),
+                '-storepass', 'fixturepass', '-keypass', 'fixturepass')
+            certificate = run('keytool', '-exportcert', '-alias', 'fixture', '-keystore', str(keystore),
+                              '-storepass', 'fixturepass')
+            fingerprint = hashlib.sha256(certificate).hexdigest()
+            archive = root / 'candidate with spaces.aab'
+            def verify(expected=fingerprint):
+                return subprocess.run(['bash', str(ROOT / 'scripts/verify-play-bundle-signature.sh'),
+                                       str(archive), expected], capture_output=True, text=True)
+            with zipfile.ZipFile(archive, 'w') as z:
+                z.writestr('payload.txt', 'original')
+            self.assertNotEqual(verify().returncode, 0)
+            run('jarsigner', '-keystore', str(keystore), '-storepass', 'fixturepass',
+                '-keypass', 'fixturepass', str(archive), 'fixture')
+            signed = archive.read_bytes()
+            result = verify()
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), fingerprint)
+            self.assertNotEqual(verify('0' * 64).returncode, 0)
+            with zipfile.ZipFile(archive, 'a') as z:
+                z.writestr('unsigned-extra.txt', 'extra')
+            self.assertNotEqual(verify().returncode, 0)
+            with zipfile.ZipFile(io.BytesIO(signed)) as original, zipfile.ZipFile(archive, 'w') as changed:
+                for name in original.namelist():
+                    changed.writestr(name, b'tampered' if name == 'payload.txt' else original.read(name))
+            self.assertNotEqual(verify().returncode, 0)
+
+
 class WorkflowBoundaryTests(unittest.TestCase):
     def test_release_workflows_have_only_manual_entrypoints(self):
         for name in ('android-production-release.yml', 'android-release-distribute.yml', 'android-zapstore-publish.yml'):
@@ -326,10 +426,10 @@ class ScreenshotTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'image.png'
             path.write_bytes(self.png(255))
-            metadata.require_opaque_rgba(path, 1, 1)
+            metadata.require_png(path, dimensions=(1, 1), color_type=2, allow_opaque_rgba=True)
             path.write_bytes(self.png(254))
             with self.assertRaises(SystemExit):
-                metadata.require_opaque_rgba(path, 1, 1)
+                metadata.require_png(path, dimensions=(1, 1), color_type=2, allow_opaque_rgba=True)
 
     def test_generator_preserves_curated_screenshots(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -146,12 +146,8 @@ def require_png(
         )
 
 
-def require_opaque_rgba(image: Path, width: int, height: int, raw: bytes | None = None) -> None:
+def require_opaque_rgba(image: Path, width: int, height: int, raw: bytes) -> None:
     """Accept opaque RGBA exports without modifying the designer's PNG bytes."""
-    if raw is None:
-        actual_width, actual_height, depth, color, raw = read_png(image)
-        if (actual_width, actual_height, depth, color) != (width, height, 8, 6):
-            fail(f"invalid RGBA screenshot format: {image.name}")
     stride = width * 4
     previous = bytearray(stride)
     for y in range(height):

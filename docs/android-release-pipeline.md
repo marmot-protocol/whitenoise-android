@@ -138,7 +138,10 @@ Dispatch **Android Release - GitHub Draft or Play Internal** with the reviewed
 build run ID, version, and manifest SHA-256. Select `github-draft` or
 `play-internal`. No rebuild or signing occurs in this workflow.
 
-GitHub remains draft. Resuming a partial draft is allowed only when its target
+GitHub remains draft, with only the direct APK, the reviewed release manifest,
+and checksums for those public files attached. Play bundles, crash mappings, and
+listing archives remain in the complete CI candidate bundle.
+Resuming a partial draft is allowed only when its target
 and every existing asset match the candidate. Published releases and differing
 candidate bytes are never replaced. Publishing the draft publicly remains a
 separate deliberate action after qualification.
@@ -148,6 +151,11 @@ testing as a completed internal release. Testers may receive it immediately.
 Verify the actual Play track/version and delivered signing lineage in Console.
 If upload fails or a version code was already used, inspect Play before retrying;
 this workflow does not automatically allocate a new code or promote any track.
+
+Complete the Play Console setup tracked in #2127 separately: store listing,
+privacy-policy URL, Data Safety declaration, content rating, and tester access.
+An internal upload does not complete that qualification or authorize production
+promotion.
 
 ## Public Zapstore publication
 

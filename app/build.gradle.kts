@@ -892,7 +892,7 @@ tasks
                 it.name.startsWith("packageProduction") ||
                 it.name.startsWith("bundleProduction")
         ) &&
-            it.name.endsWith("Release")
+            (it.name.endsWith("Release") || it.name.endsWith("ReleaseBundle"))
     }.configureEach {
         dependsOn(verifyProductionFirebaseConfig, verifyProductionPushConfig)
     }
@@ -913,7 +913,7 @@ tasks
 tasks
     .matching {
         it.name.startsWith("package") &&
-            it.name.endsWith("Release") &&
+            (it.name.endsWith("Release") || it.name.endsWith("ReleaseBundle")) &&
             !it.name.contains("BenchmarkRelease") &&
             !it.name.contains("NonMinifiedRelease")
     }.configureEach {
@@ -1069,7 +1069,6 @@ dependencies {
     implementation(libs.play.services.base)
     implementation(libs.play.services.oss.licenses)
     implementation(libs.androidx.security.crypto)
-    implementation(libs.tink.android)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.profileinstaller)

@@ -40,9 +40,15 @@ def api(path):
 
 
 def properties():
-    return dict(line.split("=", 1) for line in
-                (ROOT / "config/android-release.properties").read_text().splitlines()
-                if line and not line.startswith("#"))
+    result = {}
+    for line in (ROOT / "config/android-release.properties").read_text().splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        key, separator, value = stripped.partition("=")
+        require(separator and key.strip() and value.strip(), "Invalid release property")
+        result[key.strip()] = value.strip()
+    return result
 
 
 def validate_version(version):
@@ -185,24 +191,33 @@ def github_draft(args):
                                  f"repos/{REPOSITORY}/releases?per_page=100"))
     existing = [r for page in releases for r in page if r["tag_name"] == tag]
     require(len(existing) <= 1, "Ambiguous release")
-    if existing:
-        release = existing[0]
-        require(release["draft"], "Refusing to modify a published GitHub release")
-        require(release["target_commitish"] == source, "Draft target differs from source")
-        for asset in release["assets"]:
-            path = args.directory / asset["name"]
-            require(path.is_file() and path.parent == args.directory, "Unexpected draft asset")
-            with tempfile.TemporaryFile() as stream:
-                subprocess.run(["gh", "api", "-H", "Accept: application/octet-stream",
-                                f"repos/{REPOSITORY}/releases/assets/{asset['id']}"], stdout=stream, check=True)
-                stream.seek(0)
-                require(hashlib.file_digest(stream, "sha256").hexdigest() == sha256(path), "Existing draft contains another candidate's bytes")
-        command("gh", "release", "upload", tag, "--repo", REPOSITORY, "--clobber",
-                *map(str, sorted(args.directory.iterdir())))
-    else:
-        command("gh", "release", "create", tag, "--repo", REPOSITORY, "--draft", "--target", source,
-                "--title", f"White Noise Android {version}", "--notes-file", str(args.directory / "release-notes-en-US.txt"),
-                *map(str, sorted(args.directory.iterdir())))
+    # The reviewed bundle is larger than the public download surface. Preserve
+    # its manifest for provenance, but keep Play and store inputs in CI artifacts.
+    with tempfile.TemporaryDirectory() as temporary:
+        public = Path(temporary)
+        for name in (f"whitenoise-android-{version}-arm64-v8a.apk", "release-manifest.json"):
+            shutil.copyfile(args.directory / name, public / name)
+        (public / "checksums-sha256.txt").write_text("".join(
+            f"{sha256(path)}  ./{path.name}\n" for path in sorted(public.iterdir())))
+        files = {path.name: path for path in public.iterdir()}
+        if existing:
+            release = existing[0]
+            require(release["draft"], "Refusing to modify a published GitHub release")
+            require(release["target_commitish"] == source, "Draft target differs from source")
+            for asset in release["assets"]:
+                require(asset["name"] in files, "Unexpected draft asset")
+                with tempfile.TemporaryFile() as stream:
+                    subprocess.run(["gh", "api", "-H", "Accept: application/octet-stream",
+                                    f"repos/{REPOSITORY}/releases/assets/{asset['id']}"], stdout=stream, check=True)
+                    stream.seek(0)
+                    require(hashlib.file_digest(stream, "sha256").hexdigest() == sha256(files[asset["name"]]),
+                            "Existing draft contains another candidate's bytes")
+            command("gh", "release", "upload", tag, "--repo", REPOSITORY, "--clobber",
+                    *map(str, sorted(files.values())))
+        else:
+            command("gh", "release", "create", tag, "--repo", REPOSITORY, "--draft", "--target", source,
+                    "--title", f"White Noise Android {version}", "--notes-file", str(args.directory / "release-notes-en-US.txt"),
+                    *map(str, sorted(files.values())))
     print(f"GitHub draft prepared: {tag}. It has not been published.")
 
 
