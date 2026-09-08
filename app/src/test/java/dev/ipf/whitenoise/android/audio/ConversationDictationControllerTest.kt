@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.audio
 
+import android.speech.SpeechRecognizer
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import kotlinx.coroutines.CompletableDeferred
@@ -20,6 +21,28 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 @Suppress("LargeClass")
 class ConversationDictationControllerTest {
+    @Test
+    fun offlineVoiceInputServerFailureOffersProviderSetupInsteadOfNetworkRetry() {
+        listOf("dev.notune.transcribe", "dev.notune.transcribe.callerfix").forEach { providerPackage ->
+            assertEquals(
+                ConversationDictationFailure.ProviderUnavailable,
+                SpeechRecognizer.ERROR_SERVER.toConversationDictationFailure(providerPackage),
+            )
+        }
+    }
+
+    @Test
+    fun serverAndNetworkFailuresFromOtherProvidersKeepNetworkRecovery() {
+        assertEquals(
+            ConversationDictationFailure.Network,
+            SpeechRecognizer.ERROR_SERVER.toConversationDictationFailure("example.network.recognizer"),
+        )
+        assertEquals(
+            ConversationDictationFailure.Network,
+            SpeechRecognizer.ERROR_NETWORK.toConversationDictationFailure("dev.notune.transcribe"),
+        )
+    }
+
     @Test
     fun cancelDuringRecognizerPreparationDestroysSessionAndFencesLateCallbacks() {
         val fixture = fixture(draft = TextFieldValue("Keep", TextRange(4)))

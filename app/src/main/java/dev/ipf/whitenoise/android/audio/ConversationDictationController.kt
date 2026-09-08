@@ -2292,7 +2292,7 @@ private class AndroidConversationDictationRecognitionSession(
                 override fun onEndOfSpeech() = listener.onEndOfSpeech()
 
                 override fun onError(error: Int) {
-                    val mapped = error.toConversationDictationFailure()
+                    val mapped = error.toConversationDictationFailure(recognitionService.packageName)
                     conversationDictationDiagnostic("event=platform_error code=$error failure=${mapped.name}")
                     listener.onError(mapped)
                 }
@@ -2402,9 +2402,16 @@ private fun Bundle?.hasRecognitionText(): Boolean =
         ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
         ?.any { it.isNotBlank() } == true
 
-/** Maps unstable Android speech error codes into the controller's user-facing failure model. */
-private fun Int.toConversationDictationFailure(): ConversationDictationFailure =
-    when (this) {
+/**
+ * Maps unstable Android speech errors without presenting a local model failure as a network error.
+ * Offline Voice Input reports ERROR_SERVER when its engine/model is unavailable; opening that
+ * provider is the only useful recovery. Other providers retain Android's normal network mapping.
+ */
+internal fun Int.toConversationDictationFailure(providerPackage: String? = null): ConversationDictationFailure {
+    if (this == SpeechRecognizer.ERROR_SERVER && providerPackage.isOfflineVoiceInputPackage()) {
+        return ConversationDictationFailure.ProviderUnavailable
+    }
+    return when (this) {
         SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> ConversationDictationFailure.PermissionDenied
         SpeechRecognizer.ERROR_NO_MATCH,
         SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
@@ -2423,6 +2430,13 @@ private fun Int.toConversationDictationFailure(): ConversationDictationFailure =
         -> ConversationDictationFailure.ProviderUnavailable
         else -> ConversationDictationFailure.Unknown
     }
+}
+
+@Suppress("MaxLineLength")
+private fun String?.isOfflineVoiceInputPackage(): Boolean = this == OFFLINE_VOICE_INPUT_PACKAGE || this == OFFLINE_VOICE_INPUT_CALLER_FIX_PACKAGE
+
+private const val OFFLINE_VOICE_INPUT_PACKAGE = "dev.notune.transcribe"
+private const val OFFLINE_VOICE_INPUT_CALLER_FIX_PACKAGE = "dev.notune.transcribe.callerfix"
 
 /** Posts a cancellable main-thread watchdog used to bound recognizer state transitions. */
 private fun scheduleConversationDictationTimeout(
