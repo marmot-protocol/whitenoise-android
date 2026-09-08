@@ -58,6 +58,7 @@ class DiagnosticFormatterTest {
             publicIdentity = IdentityFormatter::short,
         )
 
+    /** Keeps message content out of summaries while retaining useful sender and projection metadata. */
     @Test
     fun describesMessagesAndGroupUpdates() {
         val message =
@@ -121,6 +122,24 @@ class DiagnosticFormatterTest {
         )
     }
 
+    /** Superseded changes use the existing group diagnostic without exposing identifiers or payloads. */
+    @Test
+    fun supersededGroupChangeUsesPrivateGroupDiagnostic() {
+        val event =
+            MarmotEventFfi.GroupChangeSuperseded(
+                accountIdHex = "private-account",
+                accountLabel = "alice",
+                groupIdHex = "private-group",
+                commitIdHex = "private-commit",
+                kind = "group_profile",
+                outcome = "conflict",
+                reason = "private-payload",
+            )
+
+        assertEquals("[alice] group event", DiagnosticFormatter.describe(event, legacyShortHexIdentity))
+    }
+
+    /** Redacts secrets before truncation so long native errors cannot expose their sensitive prefix. */
     @Test
     fun accountErrorsScrubSecretsBeforeTruncating() {
         val secretHex = "a".repeat(64)
