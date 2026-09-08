@@ -2343,14 +2343,15 @@ private class AndroidConversationDictationRecognitionSession(
         conversationDictationDiagnostic(
             "event=platform_start_listening caller_audio=${intent !== recognitionIntent}",
         )
+        // Both descriptors stay open until capture ends. SpeechRecognizer.startListening only
+        // queues the request on the main looper, so the intent, and the descriptor inside it, is
+        // marshalled after this returns; closing here would hand the provider a dead descriptor
+        // and fail the session with ERROR_CLIENT.
         runCatching { recognizer.startListening(intent) }
             .onFailure {
                 callerAudio?.cancel()
                 listener.onError(ConversationDictationFailure.Unknown)
             }
-        // The intent has been marshalled, so drop this side's copy of the descriptor the provider
-        // now holds. The write end stays open until capture ends, which is what signals end of audio.
-        callerAudio?.let { runCatching(it.providerEnd::close) }
     }
 
     /**

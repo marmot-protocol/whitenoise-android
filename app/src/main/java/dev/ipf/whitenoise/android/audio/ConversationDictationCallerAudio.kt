@@ -6,6 +6,10 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import android.system.ErrnoException
+import android.system.Os
+import android.system.OsConstants
+import java.io.FileDescriptor
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
@@ -103,45 +107,79 @@ internal class ConversationDictationCallerAudio private constructor(
         val samples = ShortArray(FRAMES_PER_READ)
         val encoded = ByteArray(FRAMES_PER_READ * BYTES_PER_FRAME)
         val progress = CallerAudioProgress()
+        val sink = writeEnd.fileDescriptor
 
         try {
-            ParcelFileDescriptor.AutoCloseOutputStream(writeEnd).use { sink ->
-                while (streaming.get() && progress.stopReason == null) {
-                    val read = recorder.read(samples, 0, samples.size)
-                    if (read <= 0) {
-                        progress.stopReason = "read=$read"
-                    } else {
-                        writeFrames(sink, samples, encoded, read, progress)
-                    }
+            while (streaming.get() && progress.stopReason == null) {
+                val read = recorder.read(samples, 0, samples.size)
+                if (read <= 0) {
+                    progress.stopReason = "read=$read"
+                } else {
+                    writeFrames(sink, samples, encoded, read, progress)
                 }
             }
         } finally {
             runCatching(recorder::stop)
             runCatching(recorder::release)
+            // Closing the write end is what tells a provider reading the descriptor that the
+            // utterance ended, so it happens before this side's read-end copy goes away.
+            runCatching(writeEnd::close)
             runCatching(providerEnd::close)
             progress.reportClosed()
         }
     }
 
+    /**
+     * Writes one read to the non-blocking pipe, dropping what does not fit.
+     *
+     * A provider that received the descriptor and is not draining it has already lost the
+     * utterance, so audio is dropped and counted instead of blocking here. Blocking would strand
+     * this thread inside `write` where it can no longer see [streaming], which would leave the
+     * microphone open after Cancel or Send.
+     */
     private fun writeFrames(
-        sink: java.io.OutputStream,
+        sink: FileDescriptor,
         samples: ShortArray,
         encoded: ByteArray,
         frames: Int,
         progress: CallerAudioProgress,
     ) {
         conversationDictationEncodePcm16(samples, frames, encoded)
-        val failure =
-            runCatching {
-                sink.write(encoded, 0, frames * BYTES_PER_FRAME)
-                sink.flush()
-            }.exceptionOrNull()
-        if (failure != null) {
-            progress.stopReason = "write_failed=${failure.javaClass.simpleName}"
-        } else {
+        val total = frames * BYTES_PER_FRAME
+        var written = 0
+        var accepted = 1
+        while (accepted > 0 && written < total) {
+            accepted = writeChunk(sink, encoded, written, total - written, progress)
+            written += accepted
+        }
+        if (progress.stopReason == null) {
             progress.record(frames, conversationDictationPeak(samples, frames))
         }
     }
+
+    /**
+     * Writes what the pipe will take right now. Reports the byte count accepted, or zero once the
+     * pipe is full or the write failed, having recorded which of the two happened.
+     */
+    private fun writeChunk(
+        sink: FileDescriptor,
+        encoded: ByteArray,
+        offset: Int,
+        length: Int,
+        progress: CallerAudioProgress,
+    ): Int =
+        try {
+            val accepted = Os.write(sink, encoded, offset, length)
+            if (accepted <= 0) progress.stopReason = "write=$accepted"
+            accepted.coerceAtLeast(0)
+        } catch (errno: ErrnoException) {
+            if (errno.errno == OsConstants.EAGAIN) {
+                progress.drop(length)
+            } else {
+                progress.stopReason = "write_failed=${OsConstants.errnoName(errno.errno)}"
+            }
+            0
+        }
 
     companion object {
         /** Opens a capture pipe, or reports null after logging why the microphone stayed closed. */
@@ -160,13 +198,33 @@ internal class ConversationDictationCallerAudio private constructor(
             }
         }
 
-        private fun openPipe(): Array<ParcelFileDescriptor>? =
-            runCatching { ParcelFileDescriptor.createPipe() }
-                .onFailure {
-                    conversationDictationDiagnostic(
-                        "event=caller_audio_pipe_failed type=${it.javaClass.simpleName}",
-                    )
-                }.getOrNull()
+        private fun openPipe(): Array<ParcelFileDescriptor>? {
+            val pipe = runCatching { ParcelFileDescriptor.createPipe() }.reportPipeFailure() ?: return null
+            return runCatching { markWriteEndNonBlocking(pipe[1]) }
+                .onFailure { pipe.forEach { end -> runCatching(end::close) } }
+                .map { pipe }
+                .reportPipeFailure()
+        }
+
+        private fun <T> Result<T>.reportPipeFailure(): T? =
+            onFailure {
+                conversationDictationDiagnostic(
+                    "event=caller_audio_pipe_failed type=${it.javaClass.simpleName}",
+                )
+            }.getOrNull()
+
+        /**
+         * Makes the capture side of the pipe refuse rather than wait once it is full, so a provider
+         * that stops reading cannot hold the capture thread, and with it the microphone, open.
+         */
+        private fun markWriteEndNonBlocking(writeEnd: ParcelFileDescriptor) {
+            val current = Os.fcntlInt(writeEnd.fileDescriptor, OsConstants.F_GETFL, 0)
+            Os.fcntlInt(
+                writeEnd.fileDescriptor,
+                OsConstants.F_SETFL,
+                current or OsConstants.O_NONBLOCK,
+            )
+        }
 
         private fun openRecorder(): AudioRecord? {
             val recorder = runCatching(::buildRecorder).getOrNull()
@@ -207,7 +265,12 @@ internal class ConversationDictationCallerAudio private constructor(
 private class CallerAudioProgress {
     private val startedAt = SystemClock.elapsedRealtime()
     private var lastReport = startedAt
+
+    /** Audio the microphone produced, whether or not the provider took it. */
     private var totalBytes = 0L
+
+    /** The part of [totalBytes] the provider would not take, so a stall reads as one. */
+    private var droppedBytes = 0L
     private var intervalPeak = 0f
     private var speechReported = false
 
@@ -224,10 +287,15 @@ private class CallerAudioProgress {
         reportInterval()
     }
 
+    /** Counts audio the provider was not reading fast enough to take. */
+    fun drop(bytes: Int) {
+        droppedBytes += bytes.toLong()
+    }
+
     fun reportClosed() {
         conversationDictationDiagnostic(
             "event=caller_audio_closed reason=${stopReason ?: "stopped"} bytes=$totalBytes " +
-                "ms=${elapsed()} heard_speech=$speechReported",
+                "dropped=$droppedBytes ms=${elapsed()} heard_speech=$speechReported",
         )
     }
 
@@ -244,7 +312,8 @@ private class CallerAudioProgress {
         if (now - lastReport < PROGRESS_INTERVAL_MILLIS) return
         lastReport = now
         conversationDictationDiagnostic(
-            "event=caller_audio_progress ms=${elapsed()} bytes=$totalBytes peak=${format(intervalPeak)}",
+            "event=caller_audio_progress ms=${elapsed()} bytes=$totalBytes " +
+                "dropped=$droppedBytes peak=${format(intervalPeak)}",
         )
         intervalPeak = 0f
     }
