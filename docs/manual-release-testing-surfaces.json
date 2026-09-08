@@ -6726,6 +6726,15 @@
     ],
     "notification_content_contracts": [
       {
+        "surface": "same-card avatar enrichment preserves heads-up eligibility without repeat alerts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "private fun buildEnrichedMessagingNotification(",
+        "test_ids": [
+          "NTF-006",
+          "NTF-010"
+        ]
+      },
+      {
         "surface": "group-removal concise notification content",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationFormatter.kt",
         "anchor": "private fun notificationBody(",

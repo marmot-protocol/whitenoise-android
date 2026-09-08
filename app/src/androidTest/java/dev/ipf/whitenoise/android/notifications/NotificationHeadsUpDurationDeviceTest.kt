@@ -5,6 +5,7 @@ import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.ComponentName
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
@@ -34,16 +35,14 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Privacy-safe framework evidence companion for issue #2412.
+ * Records a synthetic initial-only/avatar-enrichment pair for external heads-up frame review.
  *
- * The opted-in API 30 emulator probe leaves its synthetic notification active
- * during a natural observation window. It separately records notification-card
- * removal and SystemUI heads-up diagnostics because the former does not prove
- * when the banner collapses. Missing reason-bearing SystemUI evidence makes the
- * run inconclusive rather than successful.
+ * The default target is a disposable API 30 emulator. Physical API 37 runs require
+ * a separate explicit opt-in and the isolated local preview package. Listener
+ * callbacks establish card lifecycle, never rendered banner duration.
  */
 @RunWith(AndroidJUnit4::class)
-@SdkSuppress(minSdkVersion = Build.VERSION_CODES.R, maxSdkVersion = Build.VERSION_CODES.R)
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.R, maxSdkVersion = 37)
 class NotificationHeadsUpDurationDeviceTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val arguments = InstrumentationRegistry.getArguments()
@@ -51,7 +50,7 @@ class NotificationHeadsUpDurationDeviceTest {
     private val listener = ComponentName(context, NotificationTimingListenerService::class.java)
     private var listenerProvisioned = false
 
-    /** Provisions the diagnostic listener only after explicit API 30 emulator opt-in. */
+    /** Checks every target and permission precondition before moving Home or provisioning listener access. */
     @Before
     fun provisionNotificationAccess() {
         assumeTrue(
@@ -59,19 +58,17 @@ class NotificationHeadsUpDurationDeviceTest {
             arguments.getString(ARG_ALLOW_HEADS_UP_PROBE) == "true",
         )
         assumeTrue(
-            "Heads-up probing is restricted to a disposable emulator",
-            shell("getprop ro.kernel.qemu").trim() == "1",
+            "Select initial_only or enrich_same_key",
+            arguments.getString(ARG_CONTROLLED_ENRICHMENT) in CONTROLLED_ENRICHMENT_MODES,
         )
+        requireSupportedTarget()
         val powerManager = context.getSystemService(PowerManager::class.java)
         val keyguardManager = context.getSystemService(KeyguardManager::class.java)
-        assertTrue("The task emulator screen must already be on", powerManager.isInteractive)
-        assertFalse("The task emulator must already be unlocked", keyguardManager.isKeyguardLocked)
+        assertTrue("The selected test device screen must already be on", powerManager.isInteractive)
+        assertFalse("The selected test device must already be unlocked", keyguardManager.isKeyguardLocked)
         shell("input keyevent KEYCODE_HOME")
         Thread.sleep(HOME_SETTLE_MS)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            shell("pm grant ${context.packageName} ${Manifest.permission.POST_NOTIFICATIONS}")
-        }
         val notificationManager = context.getSystemService(NotificationManager::class.java)
         if (!notificationManager.isNotificationListenerAccessGranted(listener)) {
             NotificationTimingDeviceEvents.listenerConnected = false
@@ -85,7 +82,26 @@ class NotificationHeadsUpDurationDeviceTest {
         )
     }
 
-    /** Drops synthetic events and revokes only access provisioned by this fixture. */
+    /** Rejects physical production/dev installs and leaves runtime permission ownership to the external driver. */
+    private fun requireSupportedTarget() {
+        if (shell("getprop ro.kernel.qemu").trim() == "1") {
+            assumeTrue("The disposable emulator must run API 30", Build.VERSION.SDK_INT == Build.VERSION_CODES.R)
+            return
+        }
+        assumeTrue(
+            "Physical probing requires -e $ARG_ALLOW_PHYSICAL_HEADS_UP_PROBE true",
+            arguments.getString(ARG_ALLOW_PHYSICAL_HEADS_UP_PROBE) == "true",
+        )
+        assumeTrue("Physical probing requires API 37", Build.VERSION.SDK_INT == 37)
+        assumeTrue("Physical probing requires the isolated local preview", context.packageName == ISOLATED_PACKAGE)
+        assertEquals(
+            "Grant notification permission to the isolated preview before running; the driver owns restoration",
+            PackageManager.PERMISSION_GRANTED,
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS),
+        )
+    }
+
+    /** Drops synthetic events and revokes only listener access provisioned by this fixture. */
     @After
     fun revokeNotificationAccess() {
         NotificationTimingDeviceEvents.clear()
@@ -95,41 +111,77 @@ class NotificationHeadsUpDurationDeviceTest {
         }
     }
 
-    /**
-     * Observes natural SystemUI lifetime before cancelling the still-active
-     * shade card and verifying the cleanup callback is `REASON_APP_CANCEL`.
-     */
+    /** Records the same initial hold and observation window in both independently selected modes. */
     @Test
-    fun coldAvatarEnrichmentLeavesCardActiveDuringNaturalHeadsUpObservation() {
+    fun controlledEnrichmentTimelineForExternalCapture() {
+        val mode = checkNotNull(arguments.getString(ARG_CONTROLLED_ENRICHMENT))
         val update = update()
         val target = LocalNotificationFormatter.conversationDismissalKey(update.accountRef, update.groupIdHex)
-        NotificationManagerCompat.from(context).cancel(target.tag, target.id)
         NotificationTimingDeviceEvents.arm(context.packageName, target.tag, target.id)
-        val systemUiBaseline = discoverSystemUiLogSnapshot()
         val probe = HeadsUpProbeState()
         val presenter = presenter(probe)
         presenter.ensureChannels()
-
         try {
-            val delivery = postAndEnrich(presenter, probe, update)
-            assertDeliveryContract(probe, target, delivery)
-            val observation =
-                observeNaturalLifetime(
-                    key = delivery.firstFrameworkPost.key,
-                    target = target,
-                    channelId = checkNotNull(probe.appPosts[0].notification.channelId),
-                    prePostBaseline = systemUiBaseline,
-                )
-            val cleanup = cancelAfterObservation(target, observation.naturalRemoval)
-            val report = HeadsUpProbeReport(probe, delivery, observation, cleanup)
-            reportEvidence(report)
-            assertObservationContract(report)
+            val firstPost = postControlledInitial(presenter, update)
+            instrumentation.sendStatus(0, controlledPhaseStatus("posted", firstPost.key))
+            val initialAppPost = probe.appPosts.single()
+            assertEquals(target.tag, initialAppPost.tag)
+            assertEquals(target.id, initialAppPost.id)
+            assertEquals(0, initialAppPost.notification.flags and Notification.FLAG_ONLY_ALERT_ONCE)
+            Thread.sleep(CONTROLLED_ENRICHMENT_DELAY_MS)
+            instrumentation.sendStatus(0, controlledPhaseStatus("intervention", firstPost.key))
+            val secondPost =
+                if (mode == "enrich_same_key") {
+                    runBlocking { checkNotNull(probe.pendingEnrichment).invoke() }
+                    requireFrameworkPost().also { assertDeliveryContract(probe, target, firstPost, it) }
+                } else {
+                    null
+                }
+            val observationMs = observationWindowMillis()
+            val naturalRemoval = NotificationTimingDeviceEvents.awaitRemoval(observationMs)
+            assertEquals(if (mode == "enrich_same_key") 2 else 1, probe.appPosts.size)
+            assertTrue(
+                context.getSystemService(NotificationManager::class.java).activeNotifications.any {
+                    it.key == firstPost.key
+                },
+            )
+            assertNull("The shade card must survive heads-up removal", naturalRemoval)
+            val cleanup = cancelAfterObservation(target)
+            assertEquals(firstPost.key, cleanup.removal.key)
+            assertEquals(NotificationListenerService.REASON_APP_CANCEL, cleanup.removal.reason)
+            assertTrue(cleanup.removal.elapsedRealtimeNanos >= cleanup.appCancelNanos)
+            instrumentation.sendStatus(
+                0,
+                probe.controlledEvidenceStatus(mode, firstPost, secondPost, cleanup, observationMs),
+            )
+            assumeTrue(
+                "Inconclusive until external capture confirms the initial banner and controlled transition",
+                false,
+            )
         } finally {
             NotificationManagerCompat.from(context).cancel(target.tag, target.id)
         }
     }
 
-    /** Creates a real presenter while retaining only timing and deferred-enrichment state. */
+    /** Posts identical synthetic content while keeping optional enrichment explicitly gated. */
+    private fun postControlledInitial(
+        presenter: LocalNotificationPresenter,
+        update: NotificationUpdateFfi,
+    ): NotificationTimingListenerPost {
+        assertTrue(
+            runBlocking {
+                presenter.show(
+                    update = update,
+                    previewTextOverride = "Notification timing probe",
+                    senderAvatarUrl = "https://example.test/sender.png",
+                    shortNpub = { "npub1timing" },
+                )
+            },
+        )
+        return requireFrameworkPost()
+    }
+
+    /** Creates a real presenter with deterministic synthetic avatars and observable notify boundaries. */
     private fun presenter(probe: HeadsUpProbeState): LocalNotificationPresenter {
         val avatar = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
         return LocalNotificationPresenter(
@@ -138,13 +190,7 @@ class NotificationHeadsUpDurationDeviceTest {
             notificationPoster = { manager, tag, id, notification ->
                 Trace.beginSection("WN heads-up app notify")
                 try {
-                    probe.appPosts +=
-                        AppNotificationPost(
-                            tag = tag,
-                            id = id,
-                            notification = notification,
-                            elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos(),
-                        )
+                    probe.appPosts += AppNotificationPost(tag, id, notification, SystemClock.elapsedRealtimeNanos())
                     manager.notify(tag, id, notification)
                 } finally {
                     Trace.endSection()
@@ -156,37 +202,13 @@ class NotificationHeadsUpDurationDeviceTest {
         )
     }
 
-    /** Posts the alerting card, executes its deferred avatar enrichment, and records both callbacks. */
-    private fun postAndEnrich(
-        presenter: LocalNotificationPresenter,
-        probe: HeadsUpProbeState,
-        update: NotificationUpdateFfi,
-    ): FrameworkDelivery {
-        val posted =
-            runBlocking {
-                presenter.show(
-                    update = update,
-                    previewTextOverride = "Notification timing probe",
-                    senderAvatarUrl = "https://example.test/sender.png",
-                    shortNpub = { "npub1timing" },
-                )
-            }
-        val firstFrameworkPost = requireFrameworkPost()
-        runBlocking { checkNotNull(probe.pendingEnrichment).invoke() }
-        return FrameworkDelivery(
-            posted = posted,
-            firstFrameworkPost = firstFrameworkPost,
-            secondFrameworkPost = requireFrameworkPost(),
-        )
-    }
-
-    /** Verifies stable-card delivery while leaving silent-group behavior as measured evidence. */
+    /** Requires one stable card and suppresses repeat alerts while preserving callback ordering. */
     private fun assertDeliveryContract(
         probe: HeadsUpProbeState,
         target: NotificationDismissalKey,
-        delivery: FrameworkDelivery,
+        firstPost: NotificationTimingListenerPost,
+        secondPost: NotificationTimingListenerPost,
     ) {
-        assertTrue(delivery.posted)
         assertEquals(2, probe.appPosts.size)
         assertEquals(target.tag, probe.appPosts[0].tag)
         assertEquals(target.id, probe.appPosts[0].id)
@@ -194,55 +216,13 @@ class NotificationHeadsUpDurationDeviceTest {
         assertEquals(probe.appPosts[0].id, probe.appPosts[1].id)
         assertEquals(0, probe.appPosts[0].notification.flags and Notification.FLAG_ONLY_ALERT_ONCE)
         assertTrue(probe.appPosts[1].notification.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
-        assertTrue(delivery.firstFrameworkPost.elapsedRealtimeNanos >= probe.appPosts[0].elapsedRealtimeNanos)
-        assertTrue(delivery.secondFrameworkPost.elapsedRealtimeNanos >= probe.appPosts[1].elapsedRealtimeNanos)
-        assertEquals(delivery.firstFrameworkPost.key, delivery.secondFrameworkPost.key)
+        assertTrue(firstPost.elapsedRealtimeNanos >= probe.appPosts[0].elapsedRealtimeNanos)
+        assertTrue(secondPost.elapsedRealtimeNanos >= probe.appPosts[1].elapsedRealtimeNanos)
+        assertEquals(firstPost.key, secondPost.key)
     }
 
-    /** Leaves the card untouched for the natural window, then samples framework and SystemUI state. */
-    private fun observeNaturalLifetime(
-        key: String,
-        target: NotificationDismissalKey,
-        channelId: String,
-        prePostBaseline: SystemUiLogSnapshot,
-    ): NaturalObservation {
-        val initialHeadsUpDump = captureHeadsUpDump(key, prePostBaseline.statusBarDumpable)
-        val observationBaseline = refreshSystemUiLogSnapshot(prePostBaseline)
-        val observationWindowMs = observationWindowMillis()
-        val naturalRemoval: NotificationTimingListenerRemoval?
-        Trace.beginSection("WN heads-up natural observation")
-        try {
-            naturalRemoval = NotificationTimingDeviceEvents.awaitRemoval(observationWindowMs)
-        } finally {
-            Trace.endSection()
-        }
-        val notificationManager = context.getSystemService(NotificationManager::class.java)
-        val channelImportance = notificationManager.getNotificationChannel(channelId)?.importance ?: -1
-        val cardStillActive =
-            notificationManager.activeNotifications.any {
-                it.tag == target.tag && it.id == target.id && it.key == key
-            }
-        return NaturalObservation(
-            observationWindowMs = observationWindowMs,
-            naturalRemoval = naturalRemoval,
-            cardStillActive = cardStillActive,
-            systemUiEvidence =
-                captureSystemUiEvidence(
-                    key = key,
-                    prePostBaseline = prePostBaseline,
-                    observationBaseline = observationBaseline,
-                    initialDumpLines = initialHeadsUpDump,
-                    channelImportance = channelImportance,
-                ),
-            channelImportance = channelImportance,
-        )
-    }
-
-    /** Cancels only after evidence capture and waits for the framework app-cancel removal reason. */
-    private fun cancelAfterObservation(
-        target: NotificationDismissalKey,
-        naturalRemoval: NotificationTimingListenerRemoval?,
-    ): CleanupObservation {
+    /** Cancels only the synthetic card after observation and requires its framework cleanup callback. */
+    private fun cancelAfterObservation(target: NotificationDismissalKey): CleanupObservation {
         val appCancelNanos = SystemClock.elapsedRealtimeNanos()
         Trace.beginSection("WN heads-up test cleanup cancel")
         try {
@@ -250,259 +230,26 @@ class NotificationHeadsUpDurationDeviceTest {
         } finally {
             Trace.endSection()
         }
-        val removal =
-            if (naturalRemoval == null) {
-                NotificationTimingDeviceEvents.awaitRemoval(LISTENER_EVENT_TIMEOUT_MS)
-            } else {
-                null
-            }
-        return CleanupObservation(appCancelNanos, removal)
+        return CleanupObservation(
+            appCancelNanos,
+            checkNotNull(NotificationTimingDeviceEvents.awaitRemoval(LISTENER_EVENT_TIMEOUT_MS)),
+        )
     }
 
-    /** Requires card retention and cleanup ownership before accepting or skipping SystemUI evidence. */
-    private fun assertObservationContract(report: HeadsUpProbeReport) {
-        assertNull(
-            "A heads-up collapse must not remove the notification shade card",
-            report.observation.naturalRemoval,
-        )
-        assertTrue(
-            "The synthetic shade card disappeared during the observation window",
-            report.observation.cardStillActive,
-        )
-        val cleanupRemoval =
-            checkNotNull(report.cleanup.removal) {
-                "Notification listener did not observe explicit test cleanup"
-            }
-        assertEquals(report.delivery.firstFrameworkPost.key, cleanupRemoval.key)
-        assertEquals(NotificationListenerService.REASON_APP_CANCEL, cleanupRemoval.reason)
-        assertTrue(cleanupRemoval.elapsedRealtimeNanos >= report.cleanup.appCancelNanos)
-        val evidence = report.observation.systemUiEvidence
-        assumeTrue(evidence.inconclusiveReason, evidence.isConclusive)
-    }
-
-    /** Waits for one exact-key framework post or fails with a bounded diagnostic. */
+    /** Waits for one exact-key framework post without interpreting the callback as visible pixels. */
     private fun requireFrameworkPost(): NotificationTimingListenerPost =
         checkNotNull(NotificationTimingDeviceEvents.awaitPost(LISTENER_EVENT_TIMEOUT_MS)) {
             "Notification listener did not observe the expected post/update"
         }
 
-    /** Emits only synthetic identifiers, monotonic times, and exact-key SystemUI lines. */
-    private fun reportEvidence(report: HeadsUpProbeReport) {
-        val delivery = report.delivery
-        val observation = report.observation
-        val cleanup = report.cleanup
-        val systemUiEvidence = observation.systemUiEvidence
-        instrumentation.sendStatus(
-            0,
-            Bundle().apply {
-                putInt("app_notify_count", report.probe.appPosts.size)
-                putLong("first_app_notify_elapsed_ns", report.probe.appPosts[0].elapsedRealtimeNanos)
-                putLong("first_listener_post_elapsed_ns", delivery.firstFrameworkPost.elapsedRealtimeNanos)
-                putLong("second_app_notify_elapsed_ns", report.probe.appPosts[1].elapsedRealtimeNanos)
-                putLong("second_listener_post_elapsed_ns", delivery.secondFrameworkPost.elapsedRealtimeNanos)
-                putBoolean(
-                    "second_post_uses_silent_group",
-                    report.probe
-                        .appPosts[1]
-                        .notification.group == NotificationCompat.GROUP_KEY_SILENT,
-                )
-                putString(
-                    "second_post_group_key",
-                    report.probe
-                        .appPosts[1]
-                        .notification.group
-                        .orEmpty(),
-                )
-                putInt(
-                    "second_post_group_alert_behavior",
-                    report.probe
-                        .appPosts[1]
-                        .notification.groupAlertBehavior,
-                )
-                putLong("natural_observation_ms", observation.observationWindowMs)
-                putInt("notification_channel_importance", observation.channelImportance)
-                putBoolean("card_active_after_observation", observation.cardStillActive)
-                putLong("natural_card_removal_elapsed_ns", observation.naturalRemoval?.elapsedRealtimeNanos ?: -1L)
-                putInt("natural_card_removal_reason", observation.naturalRemoval?.reason ?: -1)
-                putString("heads_up_initial_dump_lines", systemUiEvidence.initialDumpLines.asStatusText())
-                putString("heads_up_final_dump_lines", systemUiEvidence.finalDumpLines.asStatusText())
-                putString("heads_up_statusbar_dumpable", systemUiEvidence.statusBarDumpable.orEmpty())
-                putString("heads_up_modern_log_dumpable", systemUiEvidence.modernLogDumpable.orEmpty())
-                putString("heads_up_post_api30_event_lines", systemUiEvidence.postEventLines.asStatusText())
-                putString("heads_up_natural_api30_event_lines", systemUiEvidence.naturalEventLines.asStatusText())
-                putString("heads_up_post_modern_log_lines", systemUiEvidence.postModernLogLines.asStatusText())
-                putString("heads_up_natural_modern_log_lines", systemUiEvidence.naturalModernLogLines.asStatusText())
-                putBoolean("heads_up_evidence_conclusive", systemUiEvidence.isConclusive)
-                putString("heads_up_evidence_note", systemUiEvidence.inconclusiveReason)
-                putLong("app_cleanup_cancel_elapsed_ns", cleanup.appCancelNanos)
-                putLong("cleanup_removal_elapsed_ns", cleanup.removal?.elapsedRealtimeNanos ?: -1L)
-                putInt("cleanup_removal_reason", cleanup.removal?.reason ?: -1)
-                putString(
-                    "measurement_scope",
-                    "Synthetic card lifecycle plus filtered SystemUI diagnostics; NLS removal is not heads-up collapse",
-                )
-            },
-        )
-    }
-
-    /** Discovers only supported StatusBar and reason-capable HUN dump targets before posting. */
-    private fun discoverSystemUiLogSnapshot(): SystemUiLogSnapshot {
-        val registeredDumpables =
-            shell("$SYSTEM_UI_DUMP_COMMAND --list")
-                .lineSequence()
-                .map(String::trim)
-                .toSet()
-        val statusBarDumpable = STATUS_BAR_DUMPABLES.firstOrNull { it in registeredDumpables }
-        val modernLogDumpable =
-            registeredDumpables.firstOrNull { dumpable ->
-                dumpable == MODERN_HEADS_UP_LOG_NAME || dumpable.endsWith(".$MODERN_HEADS_UP_LOG_NAME")
-            }
-        return captureSystemUiLogSnapshot(statusBarDumpable, modernLogDumpable)
-    }
-
-    /** Refreshes the same discovered buffers without accepting a different runtime target. */
-    private fun refreshSystemUiLogSnapshot(baseline: SystemUiLogSnapshot): SystemUiLogSnapshot =
-        captureSystemUiLogSnapshot(baseline.statusBarDumpable, baseline.modernLogDumpable)
-
-    /** Captures event/log buffers while retaining the pre-post dumpable selection. */
-    private fun captureSystemUiLogSnapshot(
-        statusBarDumpable: String?,
-        modernLogDumpable: String?,
-    ): SystemUiLogSnapshot =
-        SystemUiLogSnapshot(
-            statusBarDumpable = statusBarDumpable,
-            modernLogDumpable = modernLogDumpable,
-            api30EventLines = shell(API30_HEADS_UP_EVENT_COMMAND).lineSequence().toList(),
-            modernLogLines =
-                modernLogDumpable
-                    ?.let { shell("$SYSTEM_UI_DUMP_COMMAND $it --tail 200").lineSequence().toList() }
-                    .orEmpty(),
-        )
-
-    /** Extracts exact-key rows, returning null when the expected SystemUI section is unavailable. */
-    private fun captureHeadsUpDump(
-        key: String,
-        statusBarDumpable: String?,
-    ): List<String>? {
-        if (statusBarDumpable == null) return null
-        val statusBarDump = shell("$SYSTEM_UI_DUMP_COMMAND $statusBarDumpable")
-        return HeadsUpSystemUiDiagnostics.headsUpManagerPhoneBlock(statusBarDump)?.filter {
-            HeadsUpSystemUiDiagnostics.lineContainsExactTargetKey(it, key)
-        }
-    }
-
-    /** Correlates exact-key API 30 and newer SystemUI evidence without exporting unrelated entries. */
-    private fun captureSystemUiEvidence(
-        key: String,
-        prePostBaseline: SystemUiLogSnapshot,
-        observationBaseline: SystemUiLogSnapshot,
-        initialDumpLines: List<String>?,
-        channelImportance: Int,
-    ): SystemUiHeadsUpEvidence {
-        val finalDumpLines = captureHeadsUpDump(key, prePostBaseline.statusBarDumpable)
-        val finalSnapshot = refreshSystemUiLogSnapshot(prePostBaseline)
-        val deltas = captureSystemUiLogDeltas(key, prePostBaseline, observationBaseline, finalSnapshot)
-        val incompleteReasons =
-            systemUiEvidenceGaps(deltas, prePostBaseline, initialDumpLines, finalDumpLines, channelImportance)
-        val inconclusiveReason =
-            if (incompleteReasons.isEmpty()) {
-                "SystemUI evidence is conclusive"
-            } else {
-                incompleteReasons.joinToString(
-                    separator = "; ",
-                    prefix = "Inconclusive SystemUI evidence: ",
-                )
-            }
-        return SystemUiHeadsUpEvidence(
-            initialDumpLines = initialDumpLines.orEmpty(),
-            finalDumpLines = finalDumpLines.orEmpty(),
-            statusBarDumpable = prePostBaseline.statusBarDumpable,
-            modernLogDumpable = prePostBaseline.modernLogDumpable,
-            postEventLines = deltas.postEvent.lines,
-            naturalEventLines = deltas.naturalEvent.lines,
-            postModernLogLines = deltas.postModern.lines,
-            naturalModernLogLines = deltas.naturalModern.lines,
-            isConclusive = incompleteReasons.isEmpty(),
-            inconclusiveReason = inconclusiveReason,
-        )
-    }
-
-    /** Separates initial-post activity from transitions occurring during the untouched window. */
-    private fun captureSystemUiLogDeltas(
-        key: String,
-        prePost: SystemUiLogSnapshot,
-        observation: SystemUiLogSnapshot,
-        final: SystemUiLogSnapshot,
-    ): SystemUiLogDeltas =
-        SystemUiLogDeltas(
-            postEvent = exactKeyDelta(prePost.api30EventLines, observation.api30EventLines, key),
-            naturalEvent = exactKeyDelta(observation.api30EventLines, final.api30EventLines, key),
-            postModern = exactKeyDelta(prePost.modernLogLines, observation.modernLogLines, key),
-            naturalModern = exactKeyDelta(observation.modernLogLines, final.modernLogLines, key),
-        )
-
-    /** Returns every condition that prevents a supported visible-lifetime conclusion. */
-    private fun systemUiEvidenceGaps(
-        deltas: SystemUiLogDeltas,
-        baseline: SystemUiLogSnapshot,
-        initialDumpLines: List<String>?,
-        finalDumpLines: List<String>?,
-        channelImportance: Int,
-    ): List<String> {
-        val baselinesStable = deltas.all().all { it.baselineStable }
-        val sawInitialShow = deltas.postEvent.lines.any(::isApi30HeadsUpVisible)
-        val sawNaturalHide = deltas.naturalEvent.lines.any(::isApi30HeadsUpHidden)
-        return buildList {
-            if (!baselinesStable) add("SystemUI buffer baseline rotated")
-            if (baseline.statusBarDumpable == null) add("no supported StatusBar dumpable was registered")
-            if (baseline.modernLogDumpable == null) add("no supported reason-bearing HUN log buffer was registered")
-            if (channelImportance < NotificationManager.IMPORTANCE_HIGH) {
-                add("notification channel importance $channelImportance is below HIGH")
-            }
-            if (initialDumpLines == null) {
-                add("initial HeadsUpManagerPhone section was unavailable")
-            } else if (initialDumpLines.isEmpty()) {
-                add("initial HeadsUpManagerPhone dump did not contain the target key")
-            }
-            if (!sawInitialShow) add("no exact-key heads-up show transition was captured")
-            if (!sawNaturalHide) add("no exact-key natural heads-up removal transition was captured")
-            add("API 30 has no validated reason-bearing removal format; modern log rows are diagnostic only")
-            if (finalDumpLines == null) {
-                add("final HeadsUpManagerPhone section was unavailable")
-            } else if (finalDumpLines.isNotEmpty()) {
-                add("target remained in the final HeadsUpManagerPhone dump")
-            }
-        }
-    }
-
-    /** Keeps only lines appended after a stable baseline and matching the exact synthetic key. */
-    private fun exactKeyDelta(
-        before: List<String>,
-        after: List<String>,
-        key: String,
-    ): FilteredLogDelta {
-        val delta = HeadsUpSystemUiDiagnostics.exactTargetDelta(before, after, key)
-        return FilteredLogDelta(
-            lines = delta.lines,
-            baselineStable = delta.baselineStable,
-        )
-    }
-
-    /** Recognizes the API 30 event-log transition whose visible field is false. */
-    private fun isApi30HeadsUpHidden(line: String): Boolean = API30_HIDDEN_EVENT_REGEX.containsMatchIn(line)
-
-    /** Recognizes the API 30 event-log transition whose visible field is true. */
-    private fun isApi30HeadsUpVisible(line: String): Boolean = API30_VISIBLE_EVENT_REGEX.containsMatchIn(line)
-
-    /** Reads a bounded natural observation window from instrumentation arguments. */
+    /** Bounds the untouched observation interval independently of listener connection readiness. */
     private fun observationWindowMillis(): Long =
         arguments
             .getString(ARG_OBSERVATION_WINDOW_MS)
             ?.toLongOrNull()
-            ?.coerceIn(MIN_OBSERVATION_WINDOW_MS, MAX_OBSERVATION_WINDOW_MS)
-            ?: DEFAULT_OBSERVATION_WINDOW_MS
+            ?.coerceIn(5_000L, 15_000L) ?: 8_000L
 
-    /** Builds a synthetic group message whose identifiers are safe to export as diagnostics. */
+    /** Builds an isolated synthetic group whose identifiers are safe to export as diagnostics. */
     private fun update(): NotificationUpdateFfi {
         val runToken = SystemClock.elapsedRealtimeNanos().toString(radix = 16)
         return NotificationUpdateFfi(
@@ -517,8 +264,8 @@ class NotificationHeadsUpDurationDeviceTest {
             isDm = false,
             isMention = false,
             messageIdHex = runToken,
-            sender = user("heads-up-sender", "Heads-up sender"),
-            receiver = user("heads-up-receiver", "Heads-up receiver"),
+            sender = NotificationUserFfi("heads-up-sender", "Heads-up sender", null),
+            receiver = NotificationUserFfi("heads-up-receiver", "Heads-up receiver", null),
             previewText = "Notification timing probe",
             reactionEmoji = null,
             reactedToPreview = null,
@@ -527,71 +274,79 @@ class NotificationHeadsUpDurationDeviceTest {
         )
     }
 
-    /** Builds one synthetic notification identity without a real profile URL. */
-    private fun user(
-        accountIdHex: String,
-        displayName: String,
-    ): NotificationUserFfi =
-        NotificationUserFfi(
-            accountIdHex = accountIdHex,
-            displayName = displayName,
-            pictureUrl = null,
-        )
-
-    /** Executes a bounded diagnostic shell command and returns its UTF-8 output. */
+    /** Executes a scoped test shell command and closes its returned descriptor. */
     private fun shell(command: String): String =
-        ParcelFileDescriptor
-            .AutoCloseInputStream(
-                instrumentation.uiAutomation.executeShellCommand(command),
-            ).use { output ->
-                output.readBytes().toString(Charsets.UTF_8)
-            }
-
-    /** Polls monotonic time without requiring Compose or Activity synchronization. */
-    private fun waitUntil(
-        timeoutMillis: Long,
-        condition: () -> Boolean,
-    ): Boolean {
-        val deadline = SystemClock.elapsedRealtime() + timeoutMillis
-        while (SystemClock.elapsedRealtime() < deadline) {
-            if (condition()) return true
-            Thread.sleep(50)
+        ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command)).use {
+            it.readBytes().toString(Charsets.UTF_8)
         }
-        return condition()
-    }
-
-    /** Bounds instrumentation status payloads while retaining exact synthetic-key lines. */
-    private fun List<String>.asStatusText(): String = joinToString("\n").take(MAX_STATUS_TEXT_CHARS)
 
     private companion object {
         const val ARG_ALLOW_HEADS_UP_PROBE = "allowHeadsUpProbe"
+        const val ARG_ALLOW_PHYSICAL_HEADS_UP_PROBE = "allowPhysicalHeadsUpProbe"
         const val ARG_OBSERVATION_WINDOW_MS = "headsUpObservationMs"
+        const val ARG_CONTROLLED_ENRICHMENT = "headsUpControlledEnrichment"
+        const val ISOLATED_PACKAGE = "dev.ipf.whitenoise.android.preview.prlocal"
+        val CONTROLLED_ENRICHMENT_MODES = setOf("initial_only", "enrich_same_key")
 
         /** Allows Android 11's ten-second rebind delay after instrumentation restarts a bound listener. */
         const val LISTENER_CONNECT_TIMEOUT_MS = 15_000L
 
         const val LISTENER_EVENT_TIMEOUT_MS = 5_000L
+        const val CONTROLLED_ENRICHMENT_DELAY_MS = 1_500L
         const val HOME_SETTLE_MS = 500L
-        const val DEFAULT_OBSERVATION_WINDOW_MS = 8_000L
-        const val MIN_OBSERVATION_WINDOW_MS = 5_000L
-        const val MAX_OBSERVATION_WINDOW_MS = 15_000L
-        const val MAX_STATUS_TEXT_CHARS = 4_000
-        const val SYSTEM_UI_DUMP_COMMAND =
-            "dumpsys activity service com.android.systemui/.SystemUIService"
-        const val API30_HEADS_UP_EVENT_COMMAND =
-            "logcat -b events -d -v epoch -s sysui_heads_up_status"
-        const val MODERN_HEADS_UP_LOG_NAME = "NotifHeadsUpLog"
-        val STATUS_BAR_DUMPABLES =
-            listOf(
-                "com.google.android.systemui.statusbar.phone.StatusBarGoogle",
-                "com.android.systemui.statusbar.phone.StatusBar",
-                "StatusBarGoogle",
-                "StatusBar",
-            )
-        val API30_HIDDEN_EVENT_REGEX = Regex(""",\s*0\s*]""")
-        val API30_VISIBLE_EVENT_REGEX = Regex(""",\s*1\s*]""")
     }
 }
+
+/** Polls monotonic time without Activity or Compose synchronization. */
+private fun waitUntil(
+    timeoutMillis: Long,
+    condition: () -> Boolean,
+): Boolean {
+    val deadline = SystemClock.elapsedRealtime() + timeoutMillis
+    while (SystemClock.elapsedRealtime() < deadline) {
+        if (condition()) return true
+        Thread.sleep(50)
+    }
+    return condition()
+}
+
+/** Emits a synthetic identity and monotonic phase boundary for external frame alignment. */
+private fun controlledPhaseStatus(
+    phase: String,
+    key: String,
+): Bundle =
+    Bundle().apply {
+        putString("controlled_phase", phase)
+        putString("synthetic_framework_key", key)
+        putLong("controlled_phase_elapsed_ns", SystemClock.elapsedRealtimeNanos())
+    }
+
+/** Reports observed card lifecycle after cleanup without claiming a visible duration or audible alert count. */
+private fun HeadsUpProbeState.controlledEvidenceStatus(
+    mode: String,
+    firstPost: NotificationTimingListenerPost,
+    secondPost: NotificationTimingListenerPost?,
+    cleanup: CleanupObservation,
+    observationMs: Long,
+): Bundle =
+    Bundle().apply {
+        putString("controlled_mode", mode)
+        putInt("app_notify_count", appPosts.size)
+        putLong("first_app_notify_elapsed_ns", appPosts.first().elapsedRealtimeNanos)
+        putLong("second_app_notify_elapsed_ns", appPosts.getOrNull(1)?.elapsedRealtimeNanos ?: -1L)
+        putLong("first_listener_post_elapsed_ns", firstPost.elapsedRealtimeNanos)
+        putLong("second_listener_post_elapsed_ns", secondPost?.elapsedRealtimeNanos ?: -1L)
+        putBoolean(
+            "second_post_uses_silent_group",
+            appPosts.getOrNull(1)?.notification?.group == NotificationCompat.GROUP_KEY_SILENT,
+        )
+        putLong("controlled_initial_hold_ms", 1_500L)
+        putLong("controlled_observation_ms", observationMs)
+        putLong("app_cleanup_cancel_elapsed_ns", cleanup.appCancelNanos)
+        putLong("cleanup_removal_elapsed_ns", cleanup.removal.elapsedRealtimeNanos)
+        putInt("cleanup_removal_reason", cleanup.removal.reason)
+        putString("measurement_scope", "Controlled app timeline; visible duration requires external frame review")
+    }
 
 private data class AppNotificationPost(
     val tag: String,
@@ -605,63 +360,7 @@ private class HeadsUpProbeState {
     var pendingEnrichment: (suspend () -> Unit)? = null
 }
 
-private data class FrameworkDelivery(
-    val posted: Boolean,
-    val firstFrameworkPost: NotificationTimingListenerPost,
-    val secondFrameworkPost: NotificationTimingListenerPost,
-)
-
-private data class NaturalObservation(
-    val observationWindowMs: Long,
-    val naturalRemoval: NotificationTimingListenerRemoval?,
-    val cardStillActive: Boolean,
-    val systemUiEvidence: SystemUiHeadsUpEvidence,
-    val channelImportance: Int,
-)
-
 private data class CleanupObservation(
     val appCancelNanos: Long,
-    val removal: NotificationTimingListenerRemoval?,
-)
-
-private data class HeadsUpProbeReport(
-    val probe: HeadsUpProbeState,
-    val delivery: FrameworkDelivery,
-    val observation: NaturalObservation,
-    val cleanup: CleanupObservation,
-)
-
-private data class SystemUiLogSnapshot(
-    val statusBarDumpable: String?,
-    val modernLogDumpable: String?,
-    val api30EventLines: List<String>,
-    val modernLogLines: List<String>,
-)
-
-private data class FilteredLogDelta(
-    val lines: List<String>,
-    val baselineStable: Boolean,
-)
-
-private data class SystemUiLogDeltas(
-    val postEvent: FilteredLogDelta,
-    val naturalEvent: FilteredLogDelta,
-    val postModern: FilteredLogDelta,
-    val naturalModern: FilteredLogDelta,
-) {
-    /** Returns all phases for one baseline-stability audit. */
-    fun all(): List<FilteredLogDelta> = listOf(postEvent, naturalEvent, postModern, naturalModern)
-}
-
-private data class SystemUiHeadsUpEvidence(
-    val initialDumpLines: List<String>,
-    val finalDumpLines: List<String>,
-    val statusBarDumpable: String?,
-    val modernLogDumpable: String?,
-    val postEventLines: List<String>,
-    val naturalEventLines: List<String>,
-    val postModernLogLines: List<String>,
-    val naturalModernLogLines: List<String>,
-    val isConclusive: Boolean,
-    val inconclusiveReason: String,
+    val removal: NotificationTimingListenerRemoval,
 )

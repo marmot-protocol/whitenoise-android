@@ -47,148 +47,117 @@ vibration, heads-up interruption, badge increment, or duplicated history.
 
 ## Heads-up dwell evidence (#2412)
 
-`NotificationHeadsUpDurationDeviceTest` exercises a cold-avatar notification
-as two framework posts under one `(tag, id)`: an alerting first card and an
-avatar-enriched update carrying `FLAG_ONLY_ALERT_ONCE`. It records app `notify`
-markers, listener post/update callbacks, an eight-second natural observation
-window, and the explicit test-cleanup `cancel`. All identities and content are
-synthetic. The test reports whether the enriched update uses AndroidX's silent
-notification group and its resulting group-alert behavior
-([`NotificationCompat.Builder.setSilent`][androidx-silent]). Those values are
-experimental inputs, not evidence that either one caused a heads-up collapse.
+`NotificationHeadsUpDurationDeviceTest#controlledEnrichmentTimelineForExternalCapture`
+records matched `initial_only` and `enrich_same_key` runs. Both use the same
+synthetic initial card and a 1,500 ms hold; only the latter releases deferred
+avatar enrichment. Each then leaves the card untouched for eight seconds,
+requires the shade card to remain active, and cancels only its exact synthetic
+target. App notify, exact package/tag/id listener callbacks, and explicit cleanup
+times are reported separately. `FLAG_ONLY_ALERT_ONCE` is asserted for enrichment.
 
-This companion is deliberately restricted to an unlocked, interactive API 30
-emulator and requires explicit instrumentation opt-in before it grants listener
-access or moves to Home. Build without Gradle device discovery, verify the exact
-disposable task-emulator serial and image, then install and invoke the runner
-only through `adb -s`. Never run these commands against a physical device or
-uninstall an existing White Noise installation:
+An avatar update preserves the active card's channel and grouping while avoiding
+a repeat alert. AndroidX `setSilent(true)` can change an ungrouped notification
+into its silent group; this is distinct from updating the same notification
+with `setOnlyAlertOnce(true)`. The fixture reports the resulting group choice,
+but only actual SystemUI frames establish whether the banner stayed visible.
+
+### Safe targets
+
+The fixture rejects unsupported targets before moving Home or changing listener
+access. The screen must already be on and unlocked; the fixture never wakes or
+unlocks it or changes display timeout, DND, or accessibility settings.
+
+- Default: disposable API 30 emulator, with `-e allowHeadsUpProbe true`.
+- Physical: API 37, exact isolated package
+  `dev.ipf.whitenoise.android.preview.prlocal`, and both
+  `-e allowHeadsUpProbe true -e allowPhysicalHeadsUpProbe true`.
+  A separate explicit user authorization and verified serial are required.
+  Existing Dev, production, and shared PR-preview installations are not targets.
+
+On a physical target, notification permission must already be granted to that
+isolated package. The external driver must snapshot and restore any permission
+it provisions after the runner exits, including failure/abort paths. Runtime
+permission is never revoked inside instrumentation because revocation can kill
+the runner. Existing listener access is retained; the fixture revokes only a
+listener grant it added. The driver must also verify listener restoration after
+an aborted run. Only the armed synthetic tuple is retained by the debug listener.
+
+### Build and capture
+
+Build without connected-device discovery. The repository normally enables only
+preview release variants; this debug fixture requires a separately reviewed,
+local-only Gradle init script that enables exactly `previewPlayDebug` for the
+isolated local package. Preserve that script and its hash with the evidence;
+do not modify the production variant policy or substitute a Dev installation.
+With that adapter, build the isolated physical preview:
 
 ```sh
-(
-set -eu
-TASK_EMULATOR=emulator-5554
-TASK_AVD=wn_2453_api30_google
-HEADS_UP_TEST=dev.ipf.whitenoise.android.notifications.NotificationHeadsUpDurationDeviceTest
-test "$(adb -s "$TASK_EMULATOR" get-state)" = "device"
-test "$(adb -s "$TASK_EMULATOR" shell getprop ro.kernel.qemu | tr -d '\r')" = "1"
-test "$(adb -s "$TASK_EMULATOR" shell getprop ro.build.version.sdk | tr -d '\r')" = "30"
-test "$(adb -s "$TASK_EMULATOR" emu avd name | tr -d '\r' | head -n 1)" = "$TASK_AVD"
-TASK_ABI="$(adb -s "$TASK_EMULATOR" shell getprop ro.product.cpu.abi | tr -d '\r')"
-case "$TASK_ABI" in
-  arm64-v8a | armeabi-v7a | x86 | x86_64) ;;
-  *) exit 1 ;;
-esac
-
-./gradlew :app:assembleDevPlayDebug :app:assembleDevPlayDebugAndroidTest \
-  -Pandroid.injected.build.abi="$TASK_ABI"
-
-APP_APK="app/build/intermediates/apk/devPlay/debug/app-dev-play-$TASK_ABI-debug.apk"
-TEST_APK="app/build/intermediates/apk/androidTest/devPlay/debug/app-dev-play-debug-androidTest.apk"
-test -f "$APP_APK"
-test -f "$TEST_APK"
-test "$(apkanalyzer manifest application-id "$APP_APK")" = "dev.ipf.whitenoise.android.dev"
-test "$(apkanalyzer manifest application-id "$TEST_APK")" = "dev.ipf.whitenoise.android.dev.test"
-
-adb -s "$TASK_EMULATOR" install -r -t "$APP_APK"
-adb -s "$TASK_EMULATOR" install -r -t "$TEST_APK"
-adb -s "$TASK_EMULATOR" shell am instrument -w -r \
-  -e class "$HEADS_UP_TEST" \
-  -e allowHeadsUpProbe true \
-  -e headsUpObservationMs 8000 \
-  dev.ipf.whitenoise.android.dev.test/androidx.test.runner.AndroidJUnitRunner
-)
+env -u PR_NUMBER PR_PREVIEW_CHANNEL=isolated ./gradlew \
+  --init-script /absolute/path/to/reviewed-isolated-preview.init.gradle \
+  :app:assemblePreviewPlayDebug :app:assemblePreviewPlayDebugAndroidTest \
+  -Pandroid.injected.build.abi=arm64-v8a
 ```
 
-If AGP places either artifact elsewhere, resolve it from that variant's
-`output-metadata.json`, then repeat both `apkanalyzer` package checks before any
-install. `install -r -t` updates the emulator in place; there is intentionally
-no uninstall step.
+Resolve APKs from that build's variant-specific `output-metadata.json`; AGP may
+place injected-ABI builds under `app/build/intermediates/apk/` instead of
+`app/build/outputs/apk/`. Verify metadata and APK freshness against the completed
+build, rather than choosing an older file solely by its directory.
+Check app/test package IDs, target package in the instrumentation manifest,
+signer, ABI, and SHA256 before installing with explicit `adb -s SERIAL install -r -t`.
+Do not use stale intermediate APKs, uninstall, clear data, or run a connected
+Gradle test task against a personal device.
 
-The fixture cancels any stale copy of its exact synthetic target, captures a
-pre-post SystemUI baseline, posts and enriches the card, then leaves the card
-untouched for the observation window. During that window it expects no
-`NotificationListenerService` removal callback and expects the exact card to
-remain in `NotificationManager.activeNotifications`. Only after collecting
-SystemUI evidence does it cancel the card and require listener removal reason
-`REASON_APP_CANCEL`.
+Record the exact device/build, channel importance, DND, accessibility timeout,
+installed hashes, and prior permission/listener state. Start a bounded external
+recording before the first synthetic post; verify encoder readiness and coverage
+of the initial banner, intervention and complete observation window. For each
+mode, invoke only the selected method with:
 
-A listener removal means the shade card left Android's notification collection;
-it is not a heads-up banner-collapse signal. The API 30 probe therefore also
-discovers an allowlisted `StatusBar`/`StatusBarGoogle` dumpable and isolates only
-its indentation-bounded `HeadsUpManagerPhone state:` subsection. This boundary
-matters because a sibling shade section can retain the same key after the
-heads-up view is gone. The probe also filters `sysui_heads_up_status` event-log
-deltas to the exact synthetic key. The event log can expose show/hide transition
-timestamps, but the Android 11 implementation does not guarantee a
-reason-bearing removal record. The fixture probes the newer `NotifHeadsUpLog`
-buffer only when it is registered. If the image exposes no exact-key initial
-state, natural hide transition, or reason-bearing removal line, the run reports
-its filtered evidence and ends as **inconclusive**, never as a pass.
+```text
+-e class dev.ipf.whitenoise.android.notifications.NotificationHeadsUpDurationDeviceTest#controlledEnrichmentTimelineForExternalCapture
+-e allowHeadsUpProbe true
+-e headsUpControlledEnrichment initial_only
+-e headsUpObservationMs 8000
+```
 
-The current API 30 probe has no validated reason-bearing removal format, so its
-duration conclusion is always **inconclusive**, even when card delivery and
-cleanup assertions succeed. Modern buffer rows remain raw diagnostic evidence;
-words such as “remove” or “reason” are not proof of completed removal. A missing
-or failed initial/final SystemUI section is likewise unavailable evidence, not
-proof that the target banner is absent. Existing listener access is retained;
-the fixture revokes only a grant it added for that run. Listener setup allows up
-to 15 seconds because instrumentation restarts the target process and Android
-11 defers rebinding a dead listener by 10 seconds. This readiness allowance is
-separate from notification delivery and the untouched observation window.
+Repeat with `enrich_same_key` on the same APKs/settings. Add the physical opt-in
+only for the verified isolated physical target. The instrumentation runner is
+`<verified-test-package>/androidx.test.runner.AndroidJUnitRunner`. Use a unique
+artifact prefix for each arm; verify installed hashes and restored permissions
+afterward. Keep recordings private and synthetic; discard unrelated personal
+notification content from any shared evidence.
 
-Listener and SystemUI diagnostics still do not prove rendered-pixel dwell. A
-duration claim additionally requires a Perfetto trace containing the test's
-`WN heads-up ...` markers and an external high-frame-rate recording. Record the
-emulator image/build fingerprint, channel importance, DND, and accessibility
-timeout setting. Do not record a real sender, account, group, message, relay, or
-notification payload.
+The test deliberately ends with an assumption status after its real lifecycle
+assertions. This means **external pixel review required**, not an automated
+duration pass. An instrumentation exit code or listener callback alone is not
+pixel evidence. Inspect timestamped original frames in both arms. Report sampled
+intervals and any missing coverage honestly; a screenrecord without audio does
+not establish sound or physical haptic suppression. Use an external recording
+and appropriate platform traces when assessing those boundaries.
 
-The automated probe covers only one isolated cold-avatar group message on Home.
-The following cases remain a manual/device evidence matrix rather than claims
-made by that test:
+The removed SystemUI dump/log classifiers did not establish a validated removal
+reason or rendered membership. They are not needed for this matched experiment;
+do not interpret a missing log or opaque dump object as an absent banner.
 
-Run the following cases independently so a platform avalanche is not mistaken
-for the isolated-message defect:
+### Remaining acceptance matrix
 
-- White Noise chat list foregrounded, launcher/home visible, and another app
-  foregrounded;
-- warm and cold sender/conversation avatars;
-- one isolated message, a rapid same-priority burst, and a higher-priority burst;
-- direct-message, group-message, and mention channels;
-- default and extended accessibility timeouts;
-- the reported GrapheneOS/Pixel build and one supported AOSP-family build.
+The automated fixture covers one synthetic group on Home. It does not close
+the full issue's device/behavior matrix:
 
-For each isolated run, verify that the app emits no cancel before the natural
-observation ends, SystemUI retains the heads-up view for its chosen dwell
-window, and the shade card remains after that view ends. Report burst shortening
-separately. White Noise must not counter platform decisions with
-`setTimeoutAfter`, an ongoing notification, a full-screen intent, or app-owned
-vibration.
+- the reported GrapheneOS/Pixel build and a supported AOSP-family build;
+- chat list, Home and another foreground app;
+- cached/cold sender and conversation avatars;
+- isolated messages, same-priority bursts and higher-priority bursts;
+- DM, group and mention channels;
+- default/extended accessibility timeouts;
+- actual sound/haptics, privacy, account changes, read/mute and dismissal races.
 
-The source-level contract behind this matrix is:
-
-- Android's notification guidance recommends updating the same ID and using
-  `setOnlyAlertOnce()` for non-realerting updates, and warns that update rate is
-  limited ([Android notification updates][android-updates]).
-- `NotificationListenerService` reports collection removal and a framework
-  reason; its callback is not a rendered heads-up lifecycle API
-  ([listener removal API][listener-removal]).
-- Android 11 SystemUI owns heads-up timeout/removal and emits the legacy visible
-  status event without a public reason contract
-  ([HeadsUpManager][aosp-r-manager],
-  [HeadsUpManagerPhone][aosp-r-phone]).
-- Newer SystemUI still owns update/removal scheduling
-  ([HeadsUpCoordinator][aosp-coordinator],
-  [BaseHeadsUpManager][aosp-manager]).
-- AOSP's avalanche controller may deliberately shorten queued heads-up entries
-  ([AvalancheController][aosp-avalanche]).
+Android owns natural banner lifetime. Do not compensate with `setTimeoutAfter`,
+ongoing notifications, full-screen intents, or app-owned vibration. Relevant
+primary contracts are [notification updates][android-updates],
+[AndroidX silent behavior][androidx-silent], and
+[notification-listener collection removal][listener-removal].
 
 [android-updates]: https://developer.android.com/develop/ui/compose/notifications/create-notification#Updating
 [androidx-silent]: https://android.googlesource.com/platform/frameworks/support/+/refs/heads/androidx-main/core/core/src/main/java/androidx/core/app/NotificationCompat.java
 [listener-removal]: https://developer.android.com/reference/android/service/notification/NotificationListenerService#onNotificationRemoved(android.service.notification.StatusBarNotification,%20android.service.notification.NotificationListenerService.RankingMap,%20int)
-[aosp-r-manager]: https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android11-release/packages/SystemUI/src/com/android/systemui/statusbar/policy/HeadsUpManager.java
-[aosp-r-phone]: https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android11-release/packages/SystemUI/src/com/android/systemui/statusbar/phone/HeadsUpManagerPhone.java
-[aosp-coordinator]: https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/packages/SystemUI/src/com/android/systemui/statusbar/notification/collection/coordinator/HeadsUpCoordinator.kt
-[aosp-manager]: https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/packages/SystemUI/src/com/android/systemui/statusbar/policy/BaseHeadsUpManager.java
-[aosp-avalanche]: https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/packages/SystemUI/src/com/android/systemui/statusbar/policy/AvalancheController.kt
