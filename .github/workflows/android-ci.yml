@@ -95,10 +95,15 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Configures the Gradle wrapper and caches dependencies + build state
-      # across runs (read/write on master pushes, read-only on PRs).
+      # Restores dependencies and the local task-output cache across runs
+      # (master and same-repository PR writes; forks read only). Invocations must
+      # also use --build-cache; setup-gradle does not enable task-output caching.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          # Same-repository PR iterations can reuse their own ref-scoped outputs.
+          # Fork jobs retain the default read-only behavior.
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -115,7 +120,7 @@ jobs:
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       - name: Prepare MarmotKit API signature
-        run: ./gradlew :app:stageMarmotKitApiSignature --no-daemon --stacktrace
+        run: ./gradlew :app:stageMarmotKitApiSignature --build-cache --profile --no-daemon --stacktrace
 
       - name: Upload MarmotKit API signature
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -129,12 +134,12 @@ jobs:
         run: ./scripts/test-system-labels.sh
 
       - name: Compile (Kotlin)
-        run: ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --no-daemon --stacktrace
+        run: ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
 
       # Keep this release compilation in its own Gradle process. Compiling it
       # concurrently with the debug matrix can exhaust the hosted runner heap.
       - name: Assemble app for Baseline Profile verification
-        run: ./gradlew :app:assembleDevZapstoreBenchmarkRelease --no-daemon --stacktrace
+        run: ./gradlew :app:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
 
       - name: Verify packaged Baseline Profile assets
         shell: bash
@@ -156,7 +161,7 @@ jobs:
       # restartable/skippable composables using the same optimizations users
       # receive. Keep it opt-in locally; publish it on every CI build.
       - name: Compose compiler metrics and stability reports
-        run: ./gradlew :app:compileStagingZapstoreReleaseKotlin -Pwhitenoise.enableComposeCompilerReports=true --no-daemon --stacktrace
+        run: ./gradlew :app:compileStagingZapstoreReleaseKotlin -Pwhitenoise.enableComposeCompilerReports=true --build-cache --profile --no-daemon --stacktrace
 
       - name: Upload Compose compiler reports
         if: always()
@@ -170,23 +175,23 @@ jobs:
           retention-days: 14
 
       - name: Unit tests
-        run: ./gradlew :app:testDevZapstoreDebugUnitTest :app:testDevPlayDebugUnitTest --no-daemon --stacktrace
+        run: ./gradlew :app:testDevZapstoreDebugUnitTest :app:testDevPlayDebugUnitTest --build-cache --profile --no-daemon --stacktrace
 
       - name: ktlint
-        run: ./gradlew :app:ktlintCheck :benchmark:ktlintCheck --no-daemon --stacktrace
+        run: ./gradlew :app:ktlintCheck :benchmark:ktlintCheck --build-cache --profile --no-daemon --stacktrace
 
       - name: detekt
-        run: ./gradlew :app:detekt --no-daemon --stacktrace
+        run: ./gradlew :app:detekt --build-cache --profile --no-daemon --stacktrace
 
       - name: Android lint
-        run: ./gradlew :app:lintDevZapstoreDebug :app:lintDevPlayDebug --no-daemon --stacktrace
+        run: ./gradlew :app:lintDevZapstoreDebug :app:lintDevPlayDebug --build-cache --profile --no-daemon --stacktrace
 
       # Coverage gate (phase 2): fail CI when overall line coverage drops below the
       # ratchet floor in app/build.gradle.kts. DevZapstoreDebug only — the aggregate
       # kover tasks pull in release variants, whose packaging trips the unsigned-release
       # guard (no signing in CI).
       - name: Coverage gate (Kover)
-        run: ./gradlew :app:koverVerifyDevZapstoreDebug --no-daemon --stacktrace
+        run: ./gradlew :app:koverVerifyDevZapstoreDebug --build-cache --profile --no-daemon --stacktrace
 
       # Coverage visibility (phase 1): generate HTML/XML reports and publish them as
       # an artifact. Non-blocking so report upload still runs when the gate above fails.
@@ -194,7 +199,7 @@ jobs:
       - name: Coverage report (Kover)
         if: always()
         continue-on-error: true
-        run: ./gradlew :app:koverXmlReportDevZapstoreDebug :app:koverHtmlReportDevZapstoreDebug :app:koverXmlReportDevPlayDebug :app:koverHtmlReportDevPlayDebug --no-daemon --stacktrace
+        run: ./gradlew :app:koverXmlReportDevZapstoreDebug :app:koverHtmlReportDevZapstoreDebug :app:koverXmlReportDevPlayDebug :app:koverHtmlReportDevPlayDebug --build-cache --profile --no-daemon --stacktrace
 
       - name: Upload coverage report
         if: always()
@@ -238,7 +243,7 @@ jobs:
             --tests '*MainShellTtsReturnTransitionTest' \
             --tests '*ProfileAddToGroupsFlowTest' \
             --tests '*AutoDownloadBacklogControlTest' \
-            --no-daemon \
+            --build-cache --profile --no-daemon \
             --stacktrace
 
       # Surface failure details (unit-test HTML/XML, lint reports, and Roborazzi
@@ -255,5 +260,16 @@ jobs:
             app/build/reports/
             app/build/test-results/
             app/build/outputs/roborazzi/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Keep task timings on successful runs too; wall-clock timeouts alone do
+      # not show whether compilation, tests, or analysis is doing extra work.
+      - name: Upload Gradle timing reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-ci-gradle-profiles
+          path: build/reports/profile/
           if-no-files-found: ignore
           retention-days: 7

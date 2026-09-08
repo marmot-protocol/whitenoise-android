@@ -63,6 +63,22 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          # Same-repository PR iterations can reuse their own ref-scoped outputs.
+          # Fork jobs retain the default read-only behavior.
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
+      # Activate the task-output cache restored by setup-gradle.
       - name: Lint, compile, and replay fuzz regression corpus
-        run: ./gradlew :fuzz:ktlintCheck :fuzz:replayAllFuzzRegression --no-daemon
+        run: ./gradlew :fuzz:ktlintCheck :fuzz:replayAllFuzzRegression --build-cache --profile --no-daemon
+
+      # Keep task timings on successful runs too; wall-clock timeouts alone do
+      # not show whether compilation, tests, or analysis is doing extra work.
+      - name: Upload Gradle timing reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: fuzz-pr-gradle-profiles
+          path: build/reports/profile/
+          if-no-files-found: ignore
+          retention-days: 7

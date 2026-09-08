@@ -89,6 +89,12 @@ Campaign logs under `fuzz/build/fuzz-campaign-logs/` show the Jazzer wrapper lau
 | `.github/workflows/fuzz-pr.yml` | PR touching harness or parser targets | 10 minutes including setup, compilation, `:fuzz` and eight named app-suite corpus replays, and teardown |
 | `.github/workflows/fuzz-scheduled.yml` | Nightly `master` + `workflow_dispatch` | 15 minutes total (nightly) or 60 minutes (weekly manual) |
 
+The PR gate enables Gradle task-output caching. Same-repository PRs save outputs
+in their own PR cache scope for subsequent iterations; fork jobs remain read-only.
+CI does not cache test-task results, so assertions execute in each fresh job.
+Task-level timing reports are retained in `fuzz-pr-gradle-profiles` for seven days. The larger job limit is a timeout
+allowance, not a performance target; use those reports to investigate slow runs.
+
 Scheduled runs call `:fuzz:fuzzScheduledDryRun` (the shell runner), execute one target at a time, use `-Xmx2g` per worker JVM, `contents: read`, no secrets, and workflow-level concurrency with `cancel-in-progress: true`. Engine input size is capped at 64 KiB via `-max_len=65536`. A failed target stops the campaign immediately; the first deterministic artifact is minimized, replayed, and classified before the campaign exits non-zero. The four 90-second nightly target budgets leave 3.5 minutes of the 15-minute ceiling for setup, compilation, metadata, and artifact upload after the bounded 5.5-minute triage path.
 
 Artifacts retain reviewed minimized reproducers under `fuzz/regression-corpus/`, `fuzz/build/fuzz-engine-metadata.properties`, and digest-only sanitized triage metadata under `fuzz/build/fuzz-triage-metadata/` for 7 days. Evolving corpora (`fuzz/build/cifuzz-corpus/`), legacy JUnit corpus dirs (`fuzz/.cifuzz-corpus/`), Gradle campaign logs (`fuzz/build/fuzz-campaign-logs/`), local minimized review files, and unreviewed crash payloads are never uploaded.
