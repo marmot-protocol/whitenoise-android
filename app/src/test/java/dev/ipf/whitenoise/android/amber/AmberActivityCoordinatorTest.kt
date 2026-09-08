@@ -811,6 +811,43 @@ class AmberActivityCoordinatorTest {
         }
     }
 
+    /** Legacy Amber rejection without an ID cancels the visible group; an unknown explicit ID remains inert. */
+    @Test
+    fun unaddressedRejectionCompletesVisibleGroupButUnknownIdDoesNot() {
+        val outcomes = List(2) { AtomicReference<AmberActivityCoordinator.Outcome>() }
+        val done = CountDownLatch(2)
+        outcomes.forEachIndexed { index, outcome ->
+            Thread {
+                val id = "legacy-rejection-$index"
+                outcome.set(
+                    AmberActivityCoordinator.awaitApproval(
+                        groupedCryptoIntent(id, currentUser = "account-a"),
+                        timeoutMs = 5_000,
+                        requestId = id,
+                        allowGrouping = true,
+                    ),
+                )
+                done.countDown()
+            }.start()
+        }
+        awaitLaunchCount(2)
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data = Intent().putExtra(Nip55.EXTRA_ID, "unknown").putExtra(Nip55.EXTRA_REJECTED, true),
+        )
+        assertFalse(done.await(100, TimeUnit.MILLISECONDS))
+        outcomes.forEach { assertNull(it.get()) }
+
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data = Intent().putExtra(Nip55.EXTRA_REJECTED, true),
+        )
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        outcomes.forEach { outcome ->
+            assertFalse((outcome.get() as AmberActivityCoordinator.Outcome.Completed).resultOk)
+        }
+    }
+
     @Test
     fun cancellationAfterOneTimeoutRejectsTheRemainingVisibleGroupedSession() {
         val staleId = "stale-grouped"

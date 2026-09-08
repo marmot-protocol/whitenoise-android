@@ -256,6 +256,7 @@ object AmberActivityCoordinator {
         }
     }
 
+    /** Correlates addressed results and treats legacy unaddressed rejection as cancellation of the visible session. */
     @Suppress("ReturnCount") // Mutually exclusive wire shapes stop after their own fail-closed correlation path.
     private fun deliverGroupedResult(
         resultOk: Boolean,
@@ -289,10 +290,11 @@ object AmberActivityCoordinator {
             return
         }
 
-        // A null-data cancellation addresses the visible signer session, not an
-        // arbitrary request. The gate guarantees every active grouped request
-        // belongs to the same package/account session.
-        if (!resultOk) {
+        // Amber through 6.6.0 also returns RESULT_OK with rejected=true and no
+        // ID. Like null-data cancellation, this rejects the visible session;
+        // it cannot approve anything. The gate restricts that session to one
+        // package/account, and unknown explicit IDs already returned above.
+        if (!resultOk || readRejectedIntentExtra(data)) {
             groupedPending.keys.toList().forEach { id ->
                 completeGrouped(id, Delivery.Result(resultOk = false, data = null))
             }

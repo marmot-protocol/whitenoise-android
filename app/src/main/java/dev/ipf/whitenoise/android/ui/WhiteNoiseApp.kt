@@ -71,6 +71,7 @@ import dev.ipf.whitenoise.android.ui.navigation.WarmResumeFirstUsefulSurface
 import dev.ipf.whitenoise.android.ui.navigation.shouldComposeProtectedMainShell
 import dev.ipf.whitenoise.android.ui.navigation.warmResumeFirstUsefulSurface
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingScreen
+import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupScreen
 import dev.ipf.whitenoise.android.ui.settings.WipeOutcomeSheet
 import dev.ipf.whitenoise.android.ui.settings.WipeProgressSheet
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -439,61 +440,14 @@ internal fun WhiteNoiseApp(
                         }
                     } else {
                         AppSelfUpdateDialog(appState = appState)
-                        when (val phase = appState.phase) {
-                            AppPhase.Bootstrapping ->
-                                WarmResumeFrameSurface(
-                                    activityToken = warmResumeTraceToken,
-                                    foregroundEpoch = warmResumeEpoch,
-                                    surface = WarmResumeRenderedSurface.StartupLoading,
-                                ) {
-                                    StartupLoadingScreen()
-                                }
-                            AppPhase.Onboarding ->
-                                WarmResumeFrameSurface(
-                                    activityToken = warmResumeTraceToken,
-                                    foregroundEpoch = warmResumeEpoch,
-                                    surface = WarmResumeRenderedSurface.Onboarding,
-                                ) {
-                                    WarmResumeUsefulSurface { OnboardingScreen(appState) }
-                                }
-                            AppPhase.Ready -> {
-                                val firstUsefulSurface =
-                                    warmResumeFirstUsefulSurface(
-                                        appLockScreenVisible = false,
-                                        inboundRoutePending = inboundRoutePending,
-                                        shellReady = firstUsefulFrameReady,
-                                    )
-                                LaunchedEffect(firstUsefulSurface, warmResumeTraceToken, warmResumeEpoch) {
-                                    val foregroundCanRecord =
-                                        !firstUsefulFrameRecorded && warmResumeEpoch > 0
-                                    val inboundFrameCanRecord =
-                                        !inboundRoutePending || visibleShareRequest != null
-                                    if (
-                                        foregroundCanRecord &&
-                                        inboundFrameCanRecord &&
-                                        firstUsefulSurface != WarmResumeFirstUsefulSurface.Startup
-                                    ) {
-                                        withFrameNanos { }
-                                        WarmResumeTrace.firstUsefulFrame(
-                                            activityToken = warmResumeTraceToken,
-                                            foregroundEpoch = warmResumeEpoch,
-                                            surface = firstUsefulSurface,
-                                            localSnapshotReady = firstUsefulFrameReady,
-                                        )
-                                        firstUsefulFrameRecorded = true
-                                    }
-                                }
-                                if (inboundProfilePayload != null) {
-                                    PrepareMainShellFirstFrame(appState, mainShellStateHolder)
-                                    WarmResumeFrameSurface(
-                                        activityToken = warmResumeTraceToken,
-                                        foregroundEpoch = warmResumeEpoch,
-                                        surface = WarmResumeRenderedSurface.FullScreenLoading,
-                                    ) {
-                                        LoadingScreen()
-                                    }
-                                } else if (!shouldComposeProtectedMainShell(firstUsefulSurface)) {
-                                    PrepareMainShellFirstFrame(appState, mainShellStateHolder)
+                        val setupController = appState.accountSetup.controller
+                        if (setupController != null) {
+                            AccountSetupScreen(setupController) {
+                                appState.launchMutation { appState.accountSetup.later() }
+                            }
+                        } else {
+                            when (val phase = appState.phase) {
+                                AppPhase.Bootstrapping ->
                                     WarmResumeFrameSurface(
                                         activityToken = warmResumeTraceToken,
                                         foregroundEpoch = warmResumeEpoch,
@@ -501,50 +455,104 @@ internal fun WhiteNoiseApp(
                                     ) {
                                         StartupLoadingScreen()
                                     }
-                                } else {
-                                    val renderedSurface =
-                                        when {
-                                            visiblePickerRequest != null -> WarmResumeRenderedSurface.SharePicker
-                                            inboundRoutePending -> WarmResumeRenderedSurface.InboundRoute
-                                            mainShellStateHolder.selectedChat.value != null ->
-                                                WarmResumeRenderedSurface.Conversation
-                                            else -> WarmResumeRenderedSurface.ChatList
-                                        }
+                                AppPhase.Onboarding ->
                                     WarmResumeFrameSurface(
                                         activityToken = warmResumeTraceToken,
                                         foregroundEpoch = warmResumeEpoch,
-                                        surface = renderedSurface,
+                                        surface = WarmResumeRenderedSurface.Onboarding,
                                     ) {
-                                        WarmResumeUsefulSurface {
-                                            MainShell(
-                                                appState = appState,
-                                                stateHolder = mainShellStateHolder,
-                                                inboundNotificationTarget = inboundNotificationTarget,
-                                                inboundNotificationRequestId = inboundNotificationRequestId,
-                                                onNotificationTargetHandled = onNotificationTargetHandled,
-                                                inboundShareRequest = inboundShareRequest,
-                                                onShareRequestHandled = onShareRequestHandled,
-                                                inboundAppUpdateTap = inboundAppUpdateTap,
-                                                onAppUpdateTapHandled = onAppUpdateTapHandled,
+                                        WarmResumeUsefulSurface { OnboardingScreen(appState) }
+                                    }
+                                AppPhase.Ready -> {
+                                    val firstUsefulSurface =
+                                        warmResumeFirstUsefulSurface(
+                                            appLockScreenVisible = false,
+                                            inboundRoutePending = inboundRoutePending,
+                                            shellReady = firstUsefulFrameReady,
+                                        )
+                                    LaunchedEffect(firstUsefulSurface, warmResumeTraceToken, warmResumeEpoch) {
+                                        val foregroundCanRecord =
+                                            !firstUsefulFrameRecorded && warmResumeEpoch > 0
+                                        val inboundFrameCanRecord =
+                                            !inboundRoutePending || visibleShareRequest != null
+                                        if (
+                                            foregroundCanRecord &&
+                                            inboundFrameCanRecord &&
+                                            firstUsefulSurface != WarmResumeFirstUsefulSurface.Startup
+                                        ) {
+                                            withFrameNanos { }
+                                            WarmResumeTrace.firstUsefulFrame(
+                                                activityToken = warmResumeTraceToken,
+                                                foregroundEpoch = warmResumeEpoch,
+                                                surface = firstUsefulSurface,
+                                                localSnapshotReady = firstUsefulFrameReady,
                                             )
+                                            firstUsefulFrameRecorded = true
+                                        }
+                                    }
+                                    if (inboundProfilePayload != null) {
+                                        PrepareMainShellFirstFrame(appState, mainShellStateHolder)
+                                        WarmResumeFrameSurface(
+                                            activityToken = warmResumeTraceToken,
+                                            foregroundEpoch = warmResumeEpoch,
+                                            surface = WarmResumeRenderedSurface.FullScreenLoading,
+                                        ) {
+                                            LoadingScreen()
+                                        }
+                                    } else if (!shouldComposeProtectedMainShell(firstUsefulSurface)) {
+                                        PrepareMainShellFirstFrame(appState, mainShellStateHolder)
+                                        WarmResumeFrameSurface(
+                                            activityToken = warmResumeTraceToken,
+                                            foregroundEpoch = warmResumeEpoch,
+                                            surface = WarmResumeRenderedSurface.StartupLoading,
+                                        ) {
+                                            StartupLoadingScreen()
+                                        }
+                                    } else {
+                                        val renderedSurface =
+                                            when {
+                                                visiblePickerRequest != null -> WarmResumeRenderedSurface.SharePicker
+                                                inboundRoutePending -> WarmResumeRenderedSurface.InboundRoute
+                                                mainShellStateHolder.selectedChat.value != null ->
+                                                    WarmResumeRenderedSurface.Conversation
+                                                else -> WarmResumeRenderedSurface.ChatList
+                                            }
+                                        WarmResumeFrameSurface(
+                                            activityToken = warmResumeTraceToken,
+                                            foregroundEpoch = warmResumeEpoch,
+                                            surface = renderedSurface,
+                                        ) {
+                                            WarmResumeUsefulSurface {
+                                                MainShell(
+                                                    appState = appState,
+                                                    stateHolder = mainShellStateHolder,
+                                                    inboundNotificationTarget = inboundNotificationTarget,
+                                                    inboundNotificationRequestId = inboundNotificationRequestId,
+                                                    onNotificationTargetHandled = onNotificationTargetHandled,
+                                                    inboundShareRequest = inboundShareRequest,
+                                                    onShareRequestHandled = onShareRequestHandled,
+                                                    inboundAppUpdateTap = inboundAppUpdateTap,
+                                                    onAppUpdateTapHandled = onAppUpdateTapHandled,
+                                                )
+                                            }
                                         }
                                     }
                                 }
-                            }
-                            is AppPhase.Failed ->
-                                WarmResumeFrameSurface(
-                                    activityToken = warmResumeTraceToken,
-                                    foregroundEpoch = warmResumeEpoch,
-                                    surface = WarmResumeRenderedSurface.Error,
-                                ) {
-                                    WarmResumeUsefulSurface {
-                                        ErrorContent(
-                                            title = stringResource(R.string.white_noise_couldnt_start),
-                                            error = phase.error,
-                                            onRetry = { scope.launch { appState.retryBootstrap() } },
-                                        )
+                                is AppPhase.Failed ->
+                                    WarmResumeFrameSurface(
+                                        activityToken = warmResumeTraceToken,
+                                        foregroundEpoch = warmResumeEpoch,
+                                        surface = WarmResumeRenderedSurface.Error,
+                                    ) {
+                                        WarmResumeUsefulSurface {
+                                            ErrorContent(
+                                                title = stringResource(R.string.white_noise_couldnt_start),
+                                                error = phase.error,
+                                                onRetry = { scope.launch { appState.retryBootstrap() } },
+                                            )
+                                        }
                                     }
-                                }
+                            }
                         }
                         // Sign Out & Wipe chrome (#350) lives above the phase
                         // router but below the lock privacy boundary.

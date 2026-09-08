@@ -32,12 +32,13 @@ class StartupUnreadHydrationCoverageTest {
         val bootstrap = appStateSource().readText().functionBody("bootstrapLocked")
         val activate = bootstrap.indexOf("setActiveAccount(")
         val ready = bootstrap.indexOf("onActivated = { phase = AppPhase.Ready }", startIndex = activate)
-        val requireActivation = bootstrap.indexOf("check(activated)", startIndex = ready)
+        val requireActivation =
+            bootstrap.indexOf("check(activated || accountSetup.controller != null)", startIndex = ready)
 
         assertTrue("bootstrap must select an account before publishing Ready", activate >= 0)
         assertTrue("Ready must be published from the account's local activation callback", ready > activate)
         assertTrue(
-            "bootstrap must fail closed when account activation never reaches that callback",
+            "bootstrap must require local activation or a mounted setup route before completing",
             requireActivation > ready,
         )
         assertFalse(
