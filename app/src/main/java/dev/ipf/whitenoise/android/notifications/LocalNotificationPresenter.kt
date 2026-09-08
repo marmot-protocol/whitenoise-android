@@ -852,13 +852,13 @@ class LocalNotificationPresenter(
         }
     }
 
+    /** Keeps the active card's grouping eligible for heads-up while suppressing repeat alerts for its avatar update. */
     private fun buildEnrichedMessagingNotification(
         active: Notification,
         enrichedStyle: NotificationCompat.MessagingStyle,
     ): Notification =
         NotificationCompat
             .Builder(context, active)
-            .setSilent(true)
             .setOnlyAlertOnce(true)
             .setStyle(enrichedStyle)
             .build()
