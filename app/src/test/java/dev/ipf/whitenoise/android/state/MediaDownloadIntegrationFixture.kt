@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaDownloadResultFfi
+import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
 import kotlinx.coroutines.CompletableDeferred
@@ -73,7 +74,8 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, args ->
-            when (method.name) {
+            when (method.name.substringBefore('-')) {
+                "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "downloadMedia" -> suspendDownload(checkNotNull(args))
                 "toString" -> "SyntheticMediaBoundary"
                 "hashCode" -> System.identityHashCode(proxy)

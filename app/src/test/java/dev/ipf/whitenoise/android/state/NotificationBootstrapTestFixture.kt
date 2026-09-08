@@ -24,6 +24,7 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
+import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.PushRegistrationShareOutcomeFfi
 import dev.ipf.marmotkit.PushRegistrationShareStatusFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
@@ -209,7 +210,8 @@ internal class NotificationBootstrapTestFixture(
                     hook()
                 }
                 "telemetryInstallId" -> "test-install"
-                "setRelayTelemetryRuntimeConfig" -> Unit
+                "setRelayTelemetryRuntimeConfig", "setProductAnalyticsRuntimeConfig" -> Unit
+                "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "setAuditLogTrackerConfig" -> arguments?.first()
                 "relayTelemetrySettings" -> {
                     emitAtFirstPostStartFfiBoundary()

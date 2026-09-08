@@ -3546,6 +3546,7 @@ class WhiteNoiseAppState private constructor(
             marmotBridgeTracer.trace(
                 traceSection,
                 recordTiming = { name, durationMs, outcome ->
+                    // MDK admits under its consent lock; revocation clears pending events atomically.
                     runtime.recordHostTiming(name, durationMs.toULong(), outcome)
                 },
             ) { runtime.block() }

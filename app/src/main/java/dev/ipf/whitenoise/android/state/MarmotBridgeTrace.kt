@@ -58,7 +58,7 @@ internal object MarmotTraceSection {
             MEDIA_DOWNLOAD to "app_media_download",
             MEDIA_LIST to "app_media_list",
             TIMELINE_READ to "app_timeline_read",
-            MESSAGE_SEARCH to "app_message_search",
+            MESSAGE_SEARCH to "app_message_search_page",
             CHAT_LIST_READ to "app_chat_list_read",
             CHAT_ROW_READ to "app_chat_row_read",
             MEMBER_IDS_READ to "app_member_ids_read",

@@ -45,12 +45,10 @@ Logcat is controlled by Android/GrapheneOS.
 ## MDK host timing integration (draft)
 
 This integration targets [MDK #1760](https://github.com/marmot-protocol/mdk/pull/1760)
-at `2bb1f2803a697838f1ea32f3891ef9181f6d6eb0`. The checked-in MarmotKit
-0.9.19 pin does **not** provide these APIs. Do not merge or deploy this draft until:
+through MDK 0.9.20 at `2f44f6b65a19f8818644ccd7027618ba91450c33`. The checked-in
+immutable Android release includes `otlp-export` and `product-analytics-export`,
+with matching generated Kotlin and all four JNI ABIs. Do not deploy this draft until:
 
-- An immutable Android artifact containing #1760 and `product-analytics-export`
-  is published, pinned with its actual checksum/API counts, and passes both
-  distribution builds and tests.
 - Android integrates MDK's combined usage/diagnostics consent, disclosure,
   operator and verified retention policy. The legacy relay-telemetry toggle
   cannot grant the expanded consent; do not reinterpret an existing grant.
@@ -60,6 +58,19 @@ at `2bb1f2803a697838f1ea32f3891ef9181f6d6eb0`. The checked-in MarmotKit
   `PRODUCTION`). Previews receive empty values. Endpoint/key configuration
   never grants consent. Verify revocation and disabled/unconfigured operation
   before enabling collection in a release.
+
+Consent is enforced inside MDK's `record_host_timing` → `record_product_event`
+→ `ProductAnalyticsController::record` path under the native controller lock.
+It returns `IgnoredDisabled` unless the combined decision is granted and
+`IgnoredUnconfigured` when the exporter is unavailable. Revocation invalidates
+pending work and clears queued events. Android does not cache this decision or
+reinterpret the legacy relay-only switch as a combined grant.
+
+`HostTimingConsentDeviceTest` exercises the packaged native library with an
+isolated empty store and loopback-only destination: no consent, legacy-toggle
+rejection, missing configuration, destination-change reacceptance, all 26 stages
+after explicit consent, and revocation. It runs in the PR native smoke suite.
+The expanded consent UI and operator disclosure remain release blockers.
 
 `MarmotTraceSection.hostTimingRegistry` registers 26 aggregate events with exactly
 `elapsed: DurationBucket` and `outcome: success|failure`. The existing traced
@@ -73,7 +84,7 @@ and cancellation retain their original exception.
 | --- | --- |
 | `text_send`, `text_reply`, `message_edit`, `message_react` | One native message command attempt |
 | `media_upload`, `media_send`, `media_download`, `media_list` | Native transfer, publication or media listing |
-| `timeline_read`, `message_search` | One timeline page/read, with search pages separated |
+| `timeline_read`, `message_search_page` | One timeline page/read, with search pages separated |
 | `chat_list_read`, `chat_row_read`, `member_ids_read` | SQLite-backed chat/member projections |
 | `profile_read`, `display_name_read` | Native profile/name reads |
 | `account_list`, `unread_summary`, `catch_up` | Account listing, unread projection, catch-up |

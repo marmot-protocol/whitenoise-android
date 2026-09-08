@@ -69,16 +69,16 @@ class CancellationHandlingTest {
         }
 
         listOf(
-            "runCatching { marmotIo { listAccounts() } }.getOrDefault(emptyList())" to
-                "runCatchingCancellable { marmotIo { listAccounts() } }.getOrDefault(emptyList())",
+            "runCatching { marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() } }.getOrDefault(emptyList())" to
+                "runCatchingCancellable { marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() } }.getOrDefault(emptyList())",
             "runCatching { marmotIo { accountRelayLists(account) } }.getOrNull()" to
                 "runCatchingCancellable { marmotIo { accountRelayLists(account) } }.getOrNull()",
-            "runCatching { marmotIo { displayName(accountIdHex) } }.getOrNull()" to
-                "runCatchingCancellable { marmotIo { displayName(accountIdHex) } }.getOrNull()",
-            "runCatching { marmotIo { userProfile(id) } }.getOrNull()" to
-                "runCatchingCancellable { marmotIo { userProfile(id) } }.getOrNull()",
-            "runCatching { marmotIo { displayName(id) } }.getOrNull()" to
-                "runCatchingCancellable { marmotIo { displayName(id) } }.getOrNull()",
+            "runCatching { marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(accountIdHex) } }.getOrNull()" to
+                "runCatchingCancellable { marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(accountIdHex) } }.getOrNull()",
+            "runCatching { marmotIo(MarmotTraceSection.PROFILE_READ) { userProfile(id) } }.getOrNull()" to
+                "runCatchingCancellable { marmotIo(MarmotTraceSection.PROFILE_READ) { userProfile(id) } }.getOrNull()",
+            "runCatching { marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(id) } }.getOrNull()" to
+                "runCatchingCancellable { marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(id) } }.getOrNull()",
         ).forEach { (unsafe, safe) ->
             assertFalse("unsafe fallback must stay migrated: $unsafe", unsafe in compactAppState)
             assertTrue("missing cancellation-safe fallback: $safe", safe in compactAppState)

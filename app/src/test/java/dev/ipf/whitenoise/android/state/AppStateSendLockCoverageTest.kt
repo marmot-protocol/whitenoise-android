@@ -24,7 +24,7 @@ class AppStateSendLockCoverageTest {
                 """for\s*\(\s*groupIdHex\s+in\s+targets\s*\).*""" +
                     """withGroupCommitLock\s*\(\s*account\s*,\s*groupIdHex\s*\).*""" +
                     """for\s*\(\s*body\s+in\s+bodies\s*\).*""" +
-                    """marmotIo\s*\{\s*sendText\s*\(\s*account\s*,\s*groupIdHex\s*,\s*body\s*\)\s*\}""",
+                    """marmotIo\s*\(MarmotTraceSection\.TEXT_SEND\)\s*\{\s*sendText\s*\(\s*account\s*,\s*groupIdHex\s*,\s*body\s*\)\s*\}""",
                 RegexOption.DOT_MATCHES_ALL,
             ).containsMatchIn(body),
         )
@@ -61,7 +61,7 @@ class AppStateSendLockCoverageTest {
             "notification quick replies must serialize sendText through the per-group commit lock",
             Regex(
                 """withGroupCommitLock\s*\(\s*account\s*,\s*group\s*\).*""" +
-                    """marmotIo\s*\{\s*sendText\s*\(\s*account\s*,\s*group\s*,\s*body\s*\)\s*\}""",
+                    """marmotIo\s*\(MarmotTraceSection\.TEXT_SEND\)\s*\{\s*sendText\s*\(\s*account\s*,\s*group\s*,\s*body\s*\)\s*\}""",
                 RegexOption.DOT_MATCHES_ALL,
             ).containsMatchIn(body),
         )
@@ -70,7 +70,7 @@ class AppStateSendLockCoverageTest {
     @Test
     fun acceptedPendingNotificationReplyPersistsItsCanonicalIdBeforeReturning() {
         val body = appStateFunctionBody("sendNotificationReply")
-        val sendIndex = body.indexOf("val summary = marmotIo { sendText(account, group, body) }")
+        val sendIndex = body.indexOf("val summary = marmotIo(MarmotTraceSection.TEXT_SEND) { sendText(account, group, body) }")
         val persistIndex = body.indexOf("completionStore.markCommittedMessage", startIndex = sendIndex)
         val acceptedPendingIndex = body.indexOf("NotificationReplySendOutcome.AcceptedPending", startIndex = sendIndex)
 
