@@ -58,6 +58,7 @@ class DiagnosticFormatterTest {
             publicIdentity = IdentityFormatter::short,
         )
 
+    /** Keeps message content out of summaries while retaining useful sender and projection metadata. */
     @Test
     fun describesMessagesAndGroupUpdates() {
         val message =
@@ -138,6 +139,7 @@ class DiagnosticFormatterTest {
         assertEquals("[alice] group event", DiagnosticFormatter.describe(event, legacyShortHexIdentity))
     }
 
+    /** Redacts secrets before truncation so long native errors cannot expose their sensitive prefix. */
     @Test
     fun accountErrorsScrubSecretsBeforeTruncating() {
         val secretHex = "a".repeat(64)

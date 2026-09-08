@@ -6615,6 +6615,14 @@
     ],
     "source_coverage": [
       {
+        "surface": "Superseded group-change diagnostic summary and payload privacy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/DiagnosticFormatter.kt",
+        "anchor": "is MarmotEventFfi.GroupChangeSuperseded ->",
+        "test_ids": [
+          "SET-021"
+        ]
+      },
+      {
         "surface": "MarmotKit SDK pin: backed-up in-place upgrade, startup, and sign-in compatibility",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
         "anchor": "mdk-sha=",
