@@ -37,6 +37,10 @@ class ConversationDictationMicrophoneAccessTest {
         // Android 16's effective check includes global sensor privacy, but creating the recognizer
         // is what gives Android the opportunity to present its native microphone-unblock prompt.
         assertEquals(
+            AppOpsManager.MODE_FOREGROUND,
+            appOps.unsafeCheckOpRawNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
+        )
+        assertEquals(
             AppOpsManager.MODE_IGNORED,
             appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
         )
@@ -52,10 +56,14 @@ class ConversationDictationMicrophoneAccessTest {
     }
 
     @Test
-    fun ignoredEffectiveAppOpLeavesGrantedRuntimePermissionUsableForNativeRecovery() {
+    fun rawIgnoredAppOpRemainsActionable() {
         setMode(AppOpsManager.MODE_IGNORED)
 
-        assertEquals(ConversationDictationMicrophoneAccess.Granted, platform.microphoneAccess())
+        assertEquals(
+            AppOpsManager.MODE_IGNORED,
+            appOps.unsafeCheckOpRawNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
+        )
+        assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
     }
 
     @Test
