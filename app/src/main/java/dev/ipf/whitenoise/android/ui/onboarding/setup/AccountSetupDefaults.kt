@@ -53,7 +53,7 @@ internal class AccountSetupDefaults(
                 .orEmpty()
         return if (createsNewList && OnboardingActionFfi.APPROVE_REPAIR in canApprove) {
             check(proposed.accountIdHex == account && !proposed.cancellationPending)
-            marmot.approveOnboardingRepair(account, requireNotNull(proposal).revision)
+            marmot.approveSetupRepair(account, requireNotNull(proposal).revision, proposed.recoveryEpoch)
         } else {
             proposed
         }

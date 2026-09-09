@@ -45,6 +45,21 @@ class AccountSetupDefaultsTest {
             assertEquals(device, result)
         }
 
+    /** A confirmed-missing list approval uses the epoch returned with the proposed repair. */
+    @Test fun missingRelayApprovalRetainsTheProposalEpoch() =
+        runTest {
+            val device = setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.CONTINUE_ANYWAY))
+            val proposed = proposal(OnboardingStepFfi.RELAYS).copy(recoveryEpoch = "proposal-epoch")
+            assertEquals(
+                device,
+                advance(
+                    missing(OnboardingStepFfi.RELAYS),
+                    "proposeOnboardingRecommendedRelays" to proposed,
+                    "approveOnboardingRepairInEpoch" to device,
+                ),
+            )
+        }
+
     /** Mixed, inconclusive, and unhealthy findings must not turn a missing-list hint into permission. */
     @Test fun uncertainOrUnhealthyListsNeverPublishAutomatically() =
         runTest {
@@ -159,7 +174,8 @@ class AccountSetupDefaultsTest {
                 val name = method.name.substringBefore('-')
                 assertEquals(expected.first, name)
                 assertEquals(SETUP_TEST_ACCOUNT, args[0])
-                if (name == "approveOnboardingRepair") assertEquals(9uL, (args[1] as Long).toULong())
+                if (name.startsWith("approveOnboardingRepair")) assertEquals(9uL, (args[1] as Long).toULong())
+                if (name == "approveOnboardingRepairInEpoch") assertEquals("proposal-epoch", args[2])
                 expected.second
             } as MarmotInterface
         val result = AccountSetupDefaults(marmot, SETUP_TEST_ACCOUNT).advance(initial)

@@ -17,6 +17,7 @@ internal fun setupSnapshot(
 ): OnboardingSnapshotFfi =
     OnboardingSnapshotFfi(
         SETUP_TEST_ACCOUNT,
+        null,
         revision,
         ready,
         OnboardingStepFfi.entries.map { item ->

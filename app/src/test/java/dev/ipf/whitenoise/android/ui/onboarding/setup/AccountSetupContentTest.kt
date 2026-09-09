@@ -51,10 +51,10 @@ class AccountSetupContentTest {
         composeRule.onNodeWithTag("setup-details").assertIsDisplayed()
     }
 
-    /** Checks that visible actions preserve their native decision revision and invoke the matching callback. */
+    /** Visible actions preserve their decision revision and recovery epoch and invoke the matching callback. */
     @Test
     fun everyOfferedActionHasAWorkingCallbackAndUsesRenderedRevision() {
-        val snapshot = setupSnapshot(actions = OnboardingActionFfi.entries)
+        val snapshot = setupSnapshot(actions = OnboardingActionFfi.entries).copy(recoveryEpoch = "reviewed-epoch")
         snapshot.proposal =
             OnboardingRepairProposalFfi(
                 OnboardingStepFfi.PROFILE,
@@ -79,6 +79,20 @@ class AccountSetupContentTest {
             actions.map { it.action }.toSet(),
         )
         assertTrue(actions.all { it.revision == 3uL })
+        assertTrue(actions.all { it.recoveryEpoch == "reviewed-epoch" })
+    }
+
+    /** A mutable native record cannot change the epoch paired with an already rendered decision revision. */
+    @Test
+    fun deviceCallbackKeepsTheRenderedEpochWhenTheRecordChanges() {
+        val snapshot =
+            setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.CONTINUE_ANYWAY))
+                .copy(recoveryEpoch = "displayed-epoch")
+        show(AccountSetupState(snapshot = snapshot))
+        composeRule.runOnIdle { snapshot.recoveryEpoch = "later-epoch" }
+        composeRule.onNodeWithTag("setup-action-CONTINUE_ANYWAY").performClick()
+        assertEquals("displayed-epoch", actions.single().recoveryEpoch)
+        assertEquals(3uL, actions.single().revision)
     }
 
     /** A saved repair for another step must not hide profile help or imply publication at this step. */
