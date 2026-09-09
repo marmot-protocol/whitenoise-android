@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.common
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.Dp
 import dev.ipf.marmotkit.AppGroupRecordFfi
@@ -14,6 +13,7 @@ import dev.ipf.whitenoise.android.state.ChatListAvatarSeed
 import dev.ipf.whitenoise.android.state.ChatListAvatarSource
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 
+/** Resolves encrypted pixels only within the current owner, runtime, and authoritative image identity. */
 @Composable
 internal fun rememberEncryptedGroupAvatar(
     appState: WhiteNoiseAppState,
@@ -21,15 +21,15 @@ internal fun rememberEncryptedGroupAvatar(
     accountRef: String? = appState.activeAccountRef,
 ): ImageBitmap? {
     val cacheKey = encryptedGroupAvatarCacheKey(accountRef, group)
-    val image by key(cacheKey) {
-        produceState(GroupAvatarImageLoader.peek(cacheKey)) {
-            if (value == null && cacheKey != null && accountRef != null) {
-                value =
-                    GroupAvatarImageLoader.load(cacheKey) {
-                        appState.marmotIo {
-                            downloadGroupBlossomImage(accountRef, group.groupIdHex)
-                        }
-                    }
+    val image by key(appState, appState.runtimeGeneration, cacheKey) {
+        rememberRecoverableAvatar(
+            initialImage = GroupAvatarImageLoader.peek(cacheKey),
+            enabled = cacheKey != null && accountRef != null,
+        ) {
+            GroupAvatarImageLoader.load(checkNotNull(cacheKey)) {
+                appState.marmotIo {
+                    downloadGroupBlossomImage(checkNotNull(accountRef), group.groupIdHex)
+                }
             }
         }
     }
