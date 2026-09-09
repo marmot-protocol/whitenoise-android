@@ -84,7 +84,7 @@ class CancellationHandlingTest {
             assertTrue("missing cancellation-safe fallback: $safe", safe in compactAppState)
         }
 
-        assertNotificationIdentityReadPreservesCancellation(compactAppState)
+        assertNotificationIdentityReadPreservesCancellation(appState)
 
         val controllers = controllersSource().readText()
         val unsafeRelayHealth = "runCatching { appState.marmotIo { relayHealth() } }.getOrNull()"
@@ -132,11 +132,24 @@ class CancellationHandlingTest {
 
     private fun appStateSource(): File = sourceFile("AppState.kt")
 
-    /** Audits the extracted expression-bodied identity fallback through both catch clauses. */
-    private fun assertNotificationIdentityReadPreservesCancellation(compactAppState: String) {
+    /** Audits owner-adapter wiring and the extracted identity fallback's cancellation boundary. */
+    private fun assertNotificationIdentityReadPreservesCancellation(appState: String) {
+        assertTrue(
+            "AppState must construct notification resolution with its owner-scoped read adapter",
+            "createNotificationContentResolutionServices(appContext, NotificationContentReads())" in appState,
+        )
+        val adapterStart = appState.indexOf("private inner class NotificationContentReads : NotificationContentSource")
+        assertTrue("notification reads must remain scoped to the AppState owner", adapterStart >= 0)
+        val adapter =
+            appState
+                .kotlinBlockFrom(appState.indexOf('{', adapterStart), "notification content read adapter")
+                .replace(Regex("""\s+"""), " ")
+        val expectedRead =
+            "override suspend fun readDisplayName(accountIdHex: String): String? = " +
+                "marmotIo { displayName(accountIdHex) }"
         assertTrue(
             "AppState must keep the local notification identity read on the cancellable MDK boundary",
-            "readDisplayName = { id -> marmotIo { displayName(id) } }" in compactAppState,
+            expectedRead in adapter,
         )
         val resolution = notificationFirstPostResolutionSource().readText()
         val declarationStart =
@@ -153,12 +166,18 @@ class CancellationHandlingTest {
         val declaration = resolution.substring(declarationStart, nextResolverStart)
         assertTrue(
             "the extracted identity resolver must perform the injected display-name read",
-            "readDisplayName(accountIdHex)" in declaration,
+            "source.readDisplayName(accountIdHex)" in declaration,
         )
         assertTrue(
             "the extracted identity resolver must rethrow cancellation",
             "catch (cancellation: CancellationException)" in declaration &&
                 "throw cancellation" in declaration,
+        )
+        val cancellationCatch = declaration.indexOf("catch (cancellation: CancellationException)")
+        val ordinaryFailureCatch = declaration.indexOf("catch (_: Throwable)")
+        assertTrue(
+            "cancellation must be handled before the ordinary binding-failure fallback",
+            cancellationCatch < ordinaryFailureCatch,
         )
     }
 

@@ -57,6 +57,10 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
+private const val ACCOUNT_REF = "account-a"
+private const val GROUP_ID = "group-a"
+private const val RECORDING_TAG = "$ACCOUNT_REF|$GROUP_ID"
+
 /** One cancellation race applied to the production fixture and typed update. */
 private typealias NotificationCancellationAction =
     suspend (NotificationBootstrapTestFixture, NotificationUpdateFfi) -> Unit
@@ -777,7 +781,7 @@ class NotificationFirstPostIntegrationTest {
         context
             .getSystemService(NotificationManager::class.java)
             .activeNotifications
-            .firstOrNull { it.tag == "$ACCOUNT_REF|$GROUP_ID" }
+            .firstOrNull { it.tag == RECORDING_TAG }
             ?.notification
 
     /** Removes only the synthetic issue fixture's conversation card. */
@@ -810,8 +814,6 @@ class NotificationFirstPostIntegrationTest {
     }
 
     private companion object {
-        const val ACCOUNT_REF = "account-a"
-        const val GROUP_ID = "group-a"
         val MESSAGE_ID_HEX = "ab".repeat(32)
         const val AVATAR_URL = "https://profiles.example/alice.png"
         const val MENTION_NPUB = "npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6"
@@ -831,7 +833,7 @@ class FirstPostRecordingNotificationManager : ShadowNotificationManager() {
         id: Int,
         notification: Notification,
     ) {
-        if (tag == "account-a|group-a") posts.add(notification.clone())
+        if (tag == RECORDING_TAG) posts.add(notification.clone())
         super.notify(tag, id, notification)
     }
 

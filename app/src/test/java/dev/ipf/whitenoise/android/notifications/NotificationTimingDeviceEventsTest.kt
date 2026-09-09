@@ -24,11 +24,36 @@ import java.util.concurrent.atomic.AtomicReference
 class NotificationTimingDeviceEventsTest {
     private val listener = NotificationTimingListenerService()
 
+    /** Disarms any prior capture without changing the listener's independently owned binding state. */
     @Before
     fun setUp() = NotificationTimingDeviceEvents.clear()
 
+    /** Removes synthetic capture state so no later test can consume this test's callbacks. */
     @After
     fun tearDown() = NotificationTimingDeviceEvents.clear()
+
+    /** Capture resets preserve an existing binding, while a disconnect invalidates readiness. */
+    @Test
+    fun listenerReadinessTracksConnectionRatherThanCaptureLifetime() {
+        try {
+            listener.onListenerConnected()
+            assertTrue(NotificationTimingDeviceEvents.listenerConnected)
+            NotificationTimingDeviceEvents.clear()
+            NotificationTimingDeviceEvents.arm(PACKAGE, TAG, 1)
+            assertTrue(NotificationTimingDeviceEvents.listenerConnected)
+
+            listener.onListenerDisconnected()
+            assertFalse(NotificationTimingDeviceEvents.listenerConnected)
+            NotificationTimingDeviceEvents.clear()
+            NotificationTimingDeviceEvents.arm(PACKAGE, TAG, 1)
+            assertFalse(NotificationTimingDeviceEvents.listenerConnected)
+
+            listener.onListenerConnected()
+            assertTrue(NotificationTimingDeviceEvents.listenerConnected)
+        } finally {
+            listener.onListenerDisconnected()
+        }
+    }
 
     /** A callback paused after matching the old target cannot leak into the newly armed capture. */
     @Test

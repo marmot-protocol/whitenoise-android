@@ -35,6 +35,7 @@ internal fun markdownDocumentToPreviewProjection(
     return if (flattened.length > maxLength) flattened.previewSubSequence(maxLength) else flattened
 }
 
+/** Flattens visible block children under both the shared depth cap and the document text budget. */
 private fun MarkdownPreviewBuilder.appendPreviewBlock(
     block: MarkdownBlockFfi,
     codeStyle: MarkdownPreviewStyle,
@@ -73,16 +74,19 @@ private fun MarkdownPreviewBuilder.appendPreviewBlock(
 
 private val previewWhitespaceRun = Regex("\\s+")
 
+/** Takes a UTF-16 prefix without leaving a high surrogate at the truncation boundary. */
 internal fun String.previewTake(maxLength: Int): String {
     val end = previewSafeEnd(maxLength)
     return if (end == length) this else substring(0, end)
 }
 
+/** Clips text and its style ranges together at a surrogate-safe prefix boundary. */
 private fun MarkdownPreviewProjection.previewSubSequence(maxLength: Int): MarkdownPreviewProjection {
     val end = text.previewSafeEnd(maxLength)
     return subSequence(0, end)
 }
 
+/** Clamps a requested UTF-16 offset and backs off when truncation would split a surrogate pair. */
 private fun String.previewSafeEnd(maxLength: Int): Int {
     val end = maxLength.coerceIn(0, length)
     return if (end > 0 && end < length && Character.isHighSurrogate(this[end - 1])) {
@@ -92,6 +96,7 @@ private fun String.previewSafeEnd(maxLength: Int): Int {
     }
 }
 
+/** Bounds raw code before sanitizing and collapsing whitespace into a single styled preview segment. */
 private fun MarkdownPreviewBuilder.appendPreviewCodeContent(
     content: String,
     codeStyle: MarkdownPreviewStyle,
@@ -115,6 +120,7 @@ private fun MarkdownPreviewBuilder.appendPreviewCodeContent(
     )
 }
 
+/** Materializes bounded inline content separately so empty leaves cannot introduce block separators. */
 private fun MarkdownPreviewBuilder.appendPreviewInlineSegment(
     inlines: List<MarkdownInlineFfi>,
     codeStyle: MarkdownPreviewStyle,

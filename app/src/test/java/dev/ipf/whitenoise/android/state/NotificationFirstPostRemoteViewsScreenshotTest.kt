@@ -34,7 +34,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.android.controller.ActivityController
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.lang.management.ManagementFactory
+import org.robolectric.shadows.ShadowSystem
 import java.util.TimeZone
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
@@ -54,7 +54,7 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
     @Before
     fun setUp() {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
-        check(SystemClock.setCurrentTimeMillis(hostWallTimeMillis()))
+        check(SystemClock.setCurrentTimeMillis(System.currentTimeMillis()))
         activityController = Robolectric.buildActivity(Activity::class.java).setup()
         ConversationCardPostSynchronizer.testHook = null
         notificationManager().cancelAll()
@@ -190,15 +190,17 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
         return activeNotification().also(::assertAlignedHeaderClock)
     }
 
-    /** Confirms the rendered header shares the Android wall clock aligned by this fixture. */
+    /** Checks the real post timestamp before aligning the paused framework clock for rendering. */
     private fun assertAlignedHeaderClock(notification: Notification) {
-        val androidWallTimeMs = System.currentTimeMillis()
-        val hostWallTimeMs = hostWallTimeMillis()
-        val clockTrace =
-            "notification.when=${notification.`when`}, androidWall=$androidWallTimeMs, " +
-                "hostWall=$hostWallTimeMs"
-        assertTrue(clockTrace, abs(notification.`when` - androidWallTimeMs) < ONE_MINUTE_MS)
-        assertTrue(clockTrace, abs(androidWallTimeMs - hostWallTimeMs) < ONE_MINUTE_MS)
+        val hostWallTimeMs = System.currentTimeMillis()
+        assertTrue(
+            "notification.when=${notification.`when`}, hostWall=$hostWallTimeMs",
+            abs(notification.`when` - hostWallTimeMs) < ONE_MINUTE_MS,
+        )
+        // Only framework code sees Robolectric's paused wall clock. Align it
+        // after the first-write assertions, without rewriting the actual post.
+        check(SystemClock.setCurrentTimeMillis(hostWallTimeMs))
+        assertEquals(hostWallTimeMs, ShadowSystem.currentTimeMillis())
     }
 
     /** Counts only completed platform writes for the issue fixture's conversation card. */
@@ -260,12 +262,6 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
 
     /** Retrieves the process-local platform manager used by Robolectric. */
     private fun notificationManager(): NotificationManager = context.getSystemService(NotificationManager::class.java)
-
-    /** Reads an unshadowed host epoch so Android's paused wall clock can match the presenter timestamp. */
-    private fun hostWallTimeMillis(): Long =
-        ManagementFactory.getRuntimeMXBean().let { runtime ->
-            runtime.startTime + runtime.uptime
-        }
 
     private companion object {
         const val SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_remote_views_api30.png"

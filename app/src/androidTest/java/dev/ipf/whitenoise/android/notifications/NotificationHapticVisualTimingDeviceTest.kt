@@ -78,6 +78,8 @@ class NotificationHapticVisualTimingDeviceTest {
             )
         }
         val notificationManager = context.getSystemService(NotificationManager::class.java)
+        // A pre-granted listener may stay bound across methods. Its callbacks own this flag;
+        // requestRebind does not guarantee a new onListenerConnected callback for an existing binding.
         if (!notificationManager.isNotificationListenerAccessGranted(listener)) {
             NotificationTimingDeviceEvents.listenerConnected = false
             listenerProvisioned = true
