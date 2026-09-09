@@ -547,6 +547,20 @@ android {
             )
         }
 
+        // Each environment has its own product destination/key; previews receive neither.
+        listOf("dev", "preview", "staging", "production").forEach { environment ->
+            named(environment) {
+                listOf("PRODUCT_EVENTS_ENDPOINT", "PRODUCT_APP_KEY", "PRODUCT_OPERATOR").forEach { suffix ->
+                    buildConfigField(
+                        "String",
+                        "WHITENOISE_$suffix",
+                        (if (environment == "preview") "" else environmentRuntimeConfigProperty(environment, suffix))
+                            .asBuildConfigString(),
+                    )
+                }
+            }
+        }
+
         // Distribution channel, orthogonal to environment — zapstore enables the
         // verified direct-APK self-updater (installer source set + Zapstore
         // manifest permissions), play omits it and routes updates to the listing.
