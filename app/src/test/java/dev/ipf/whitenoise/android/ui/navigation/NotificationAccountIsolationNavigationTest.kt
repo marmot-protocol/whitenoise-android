@@ -512,6 +512,7 @@ class NotificationAccountIsolationNavigationTest {
             when (method.name.substringBefore('-')) {
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 // These existing signed-in accounts have no interactive setup checkpoint.
+                "onboardingRecoveryRequired" -> false
                 "onboardingSnapshot" -> null
                 "groupDetails" -> {
                     gate.rosterReadCount.incrementAndGet()

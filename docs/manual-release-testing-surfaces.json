@@ -7443,6 +7443,14 @@
     ],
     "source_coverage": [
       {
+        "surface": "Imported-account setup recovery reads fail closed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupCoordinator.kt",
+        "anchor": "suspend fun accountsState(",
+        "test_ids": [
+          "ONB-024"
+        ]
+      },
+      {
         "surface": "Dictation global microphone privacy recovery",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "override fun microphoneAccess(): ConversationDictationMicrophoneAccess",
