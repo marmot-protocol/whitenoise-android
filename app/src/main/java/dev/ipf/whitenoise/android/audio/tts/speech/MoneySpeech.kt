@@ -20,6 +20,7 @@ internal object MoneySpeech {
             "GBP" to Currency("pound", "pounds", "penny", "pence"),
             "€" to Currency("euro", "euros", "cent", "cents"),
             "EUR" to Currency("euro", "euros", "cent", "cents"),
+            "¥" to Currency("yen", "yen", "", "", 0),
             "JPY" to Currency("yen", "yen", "", "", 0),
             "KWD" to Currency("Kuwaiti dinar", "Kuwaiti dinars", "fils", "fils", DINAR_SCALE),
         )
@@ -67,6 +68,7 @@ internal object MoneySpeech {
                     "$", "USD" -> "dollars"
                     "£", "GBP" -> "pounds"
                     "EUR", "€" -> "euros"
+                    "JPY", "¥" -> "yen"
                     else -> currency
                 }
             EnglishNumbers.digits(raw) + " " + name

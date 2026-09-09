@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
+import dev.ipf.whitenoise.android.audio.tts.speech.DiagramSpeech
 import dev.ipf.whitenoise.android.audio.tts.speech.SpeechRole
 import java.security.MessageDigest
 
@@ -481,15 +482,7 @@ private class SpeakableCollector {
         languageTag: String?,
     ) {
         val language = languageTag?.trim()?.substringBefore(' ')?.takeIf { it.isNotBlank() }
-        val diagram =
-            language == null &&
-                (
-                    content.contains("->") ||
-                        content.contains('→') ||
-                        content.contains('├') ||
-                        content.contains('└') ||
-                        content.contains("---")
-                )
+        val diagram = language == null && DiagramSpeech.recognizes(content)
         speechRoles[leafId] =
             dev.ipf.whitenoise.android.audio.tts.speech.SpeechSourceRun(
                 leafId,

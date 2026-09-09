@@ -241,6 +241,22 @@
       "expected_spoken_core": "one hour two minutes three seconds"
     },
     {
+      "id": "duration_colon_omits_absent_seconds",
+      "family": "duration",
+      "input": "1:30",
+      "voice_locale": "en-US",
+      "semantic_hint": "duration",
+      "expected_spoken_core": "one hour thirty minutes"
+    },
+    {
+      "id": "duration_colon_omits_zero_hours_and_seconds",
+      "family": "duration",
+      "input": "0:30:00",
+      "voice_locale": "en-US",
+      "semantic_hint": "duration",
+      "expected_spoken_core": "thirty minutes"
+    },
+    {
       "id": "duration_colon_runtime_context",
       "family": "duration",
       "input": "Duration: 01:02:03.",
@@ -297,6 +313,14 @@
       "id": "currency_yen_no_minor_units",
       "family": "money",
       "input": "JPY 1500",
+      "voice_locale": "en-US",
+      "expected_contains": ["one thousand five hundred", "yen"],
+      "expected_absent": ["cents", "sen", "and zero"]
+    },
+    {
+      "id": "currency_yen_symbol_no_minor_units",
+      "family": "money",
+      "input": "¥1500",
       "voice_locale": "en-US",
       "expected_contains": ["one thousand five hundred", "yen"],
       "expected_absent": ["cents", "sen", "and zero"]

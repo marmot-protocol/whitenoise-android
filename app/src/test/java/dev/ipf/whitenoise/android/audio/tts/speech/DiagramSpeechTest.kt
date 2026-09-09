@@ -106,6 +106,14 @@ class DiagramSpeechTest {
     }
 
     @Test
+    fun whitespaceOnlyArrowLabelsDoNotCreateEmptySourceSpans() {
+        val narration = narrate("  -> Relay")
+
+        assertFalse(narration.recognized)
+        assertTrue(narration.verbalized.runs.none { run -> run.sources.any { it.start == it.end } })
+    }
+
+    @Test
     fun narratedDiagramTextHasNoUnattributedLexicalContent() {
         val narration = narrate("Client -> Relay -> Receiver")
 

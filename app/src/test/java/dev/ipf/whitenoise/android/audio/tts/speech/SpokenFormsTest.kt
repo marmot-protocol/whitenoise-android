@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio.tts.speech
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Locale
@@ -49,6 +50,24 @@ class SpokenFormsTest {
     @Test
     fun numbersPreserveSourcePrecisionAndScale() {
         assertCorpusCases(SpeechCorpusFixtures.families("number"))
+    }
+
+    @Test
+    fun invalidRatioFragmentsRemainLiteralInsteadOfThrowing() {
+        val source = "Ratio: 2:x"
+        val verbalized =
+            SpokenForms.verbalize(
+                source = source,
+                leafId = CORPUS_LEAF_ID,
+                context = SpeechContext(voiceLocale = Locale.US),
+            )
+
+        assertFalse(verbalized.text.contains("two to"))
+    }
+
+    @Test
+    fun twoPartYearsSpeakASingleDigitRemainderWithOh() {
+        assertEquals("nineteen oh five", EnglishNumbers.year(1905))
     }
 
     @Test

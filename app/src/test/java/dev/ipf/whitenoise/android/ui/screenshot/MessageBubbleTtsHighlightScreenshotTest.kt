@@ -95,6 +95,8 @@ class MessageBubbleTtsHighlightScreenshotTest {
                             TtsVisibleTextSpan(it.leafId, it.visibleStart, it.visibleEnd),
                         )
                     },
+                speechRoles = projection.speechRoles,
+                visibleLeaves = projection.visibleLeaves,
             )
         val prepared = requireNotNull(entry.prepareSpeech(SpeechContext(Locale.US)))
         val chunk = requireNotNull(preparedQueuedMessage(prepared, "alice", "", 4000)).chunks.last()

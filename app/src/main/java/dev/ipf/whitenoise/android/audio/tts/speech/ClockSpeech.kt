@@ -59,7 +59,7 @@ internal object ClockSpeech {
         val invalidComponents = minute > MAX_CLOCK_COMPONENT || (seconds ?: 0) > MAX_CLOCK_COMPONENT
         return when {
             invalidComponents || fraction.length > MAX_FRACTION_DIGITS -> null
-            duration -> durationWords(hour, minute, seconds ?: 0)
+            duration -> durationWords(hour, minute, seconds)
             hour > MAX_CLOCK_HOUR || meridiem.isNotEmpty() && hour !in 1..HALF_DAY_HOURS -> null
             else -> clockWords(hour, minute, seconds, fraction, meridiem)
         }
@@ -68,11 +68,19 @@ internal object ClockSpeech {
     private fun durationWords(
         hour: Int,
         minute: Int,
-        seconds: Int,
-    ): String =
-        listOf(hour to "hour", minute to "minute", seconds to "second").joinToString(" ") { (n, unit) ->
-            "${EnglishNumbers.cardinal(n.toLong())} $unit${if (n == 1) "" else "s"}"
-        }
+        seconds: Int?,
+    ): String {
+        val components =
+            listOfNotNull(
+                hour.takeIf { it != 0 }?.let { it to "hour" },
+                minute.takeIf { it != 0 }?.let { it to "minute" },
+                seconds?.takeIf { it != 0 }?.let { it to "second" },
+            )
+        return components
+            .joinToString(" ") { (n, unit) ->
+                "${EnglishNumbers.cardinal(n.toLong())} $unit${if (n == 1) "" else "s"}"
+            }.ifEmpty { "zero seconds" }
+    }
 
     private fun clockWords(
         hour: Int,

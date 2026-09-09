@@ -14,6 +14,18 @@ data class DiagramNarration(
 )
 
 object DiagramSpeech {
+    private const val LABEL = "[\\p{L}\\p{N}_]+(?: +[\\p{L}\\p{N}_]+)*"
+    private val arrowGrammar = Regex(" *$LABEL(?: *(?:->|→) *$LABEL)+ *")
+    private val treeRootGrammar = Regex(" *$LABEL *")
+    private val treeBranchGrammar = Regex("[ │]*(?:├──|└──) $LABEL *")
+    private val boxBorderGrammar = Regex("\\+[-─]{3,}\\+")
+    private val boxBodyGrammar = Regex("[|│].*[|│]")
+
+    fun recognizes(source: String): Boolean {
+        val lines = source.lines()
+        return arrowGrammar.matches(source) || isTree(lines) || isBox(lines)
+    }
+
     fun narrate(
         source: String,
         leafId: String,
@@ -30,9 +42,7 @@ object DiagramSpeech {
                     emptyList(),
                 )
             languageTag.isNullOrBlank() &&
-                Regex(
-                    "[\\p{L}\\p{N}_ ]+(?: *(?:->|→) *[\\p{L}\\p{N}_ ]+)+",
-                ).matches(source) ->
+                arrowGrammar.matches(source) ->
                 arrows(source, leafId)
             languageTag.isNullOrBlank() && isTree(source.lines()) -> tree(source.lines(), leafId)
             else -> fallback(source, leafId, languageTag, context)
@@ -47,15 +57,17 @@ object DiagramSpeech {
         val labels =
             Regex("[^>→-]+")
                 .findAll(source)
-                .map { match ->
+                .mapNotNull { match ->
                     val leading = match.value.length - match.value.trimStart().length
                     val label = match.value.trim()
-                    label to
-                        SpeechSourceSpan(
-                            leafId,
-                            match.range.first + leading,
-                            match.range.first + leading + label.length,
-                        )
+                    label.takeIf(String::isNotEmpty)?.let {
+                        label to
+                            SpeechSourceSpan(
+                                leafId,
+                                match.range.first + leading,
+                                match.range.first + leading + label.length,
+                            )
+                    }
                 }.toList()
         for (index in 0 until labels.lastIndex) {
             if (index > 0) builder.add(" ")
@@ -73,8 +85,14 @@ object DiagramSpeech {
 
     private fun isTree(lines: List<String>): Boolean =
         lines.size > 1 &&
-            Regex("[\\p{L}\\p{N}_ ]+").matches(lines[0]) &&
-            lines.drop(1).all { Regex("[ │]*(?:├──|└──) [\\p{L}\\p{N}_ ]+").matches(it) }
+            treeRootGrammar.matches(lines[0]) &&
+            lines.drop(1).all(treeBranchGrammar::matches)
+
+    private fun isBox(lines: List<String>): Boolean =
+        lines.size >= 3 &&
+            boxBorderGrammar.matches(lines.first()) &&
+            boxBorderGrammar.matches(lines.last()) &&
+            lines.subList(1, lines.lastIndex).all(boxBodyGrammar::matches)
 
     private fun tree(
         lines: List<String>,

@@ -174,7 +174,9 @@ object SpokenForms {
             context.semanticHint == SpeechSemanticHint.Duration ||
                 Regex("(?i)duration: *$").containsMatchIn(preceding)
         return ClockSpeech.clock(token, duration) ?: if (Regex("(?i)ratio:? *$").containsMatchIn(preceding)) {
-            token.split(':').takeIf { it.size == 2 }?.joinToString(" to ") { EnglishNumbers.cardinal(it.toLong()) }
+            val parts = token.split(':').takeIf { it.size == 2 } ?: return null
+            val values = parts.map { it.toLongOrNull() ?: return null }
+            values.joinToString(" to ") { EnglishNumbers.cardinal(it) }
         } else {
             null
         }

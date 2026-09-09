@@ -89,7 +89,9 @@ internal object EnglishNumbers {
             n in 1100..1999 &&
             n % 100 != 0
         ) {
-            "${cardinal((n / 100).toLong())} ${cardinal((n % 100).toLong())}"
+            val remainder = n % 100
+            "${cardinal((n / 100).toLong())} " +
+                if (remainder in 1..9) "oh ${cardinal(remainder.toLong())}" else cardinal(remainder.toLong())
         } else {
             cardinal(n.toLong())
         }

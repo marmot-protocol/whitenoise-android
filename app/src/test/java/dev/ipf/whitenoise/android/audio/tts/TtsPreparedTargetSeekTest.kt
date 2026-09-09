@@ -68,6 +68,27 @@ class TtsPreparedTargetSeekTest {
         }
 
     @Test
+    fun resolvedTargetSeekDoesNotMakeTheNextEdgeLoadRestartable() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.loadTimeline("m1")
+            harness.pager.newerPages.addLast(listOf(harness.record("m2")))
+            harness.speakConversation("m1")
+            assertTrue(harness.session.requestSentenceSeek("m2", 2uL, 0, ""))
+            advanceUntilIdle()
+            val callsAfterResolvedSeek = harness.pager.loadNewerCalls
+
+            harness.pager.newerPages.addLast(listOf(harness.record("m3")))
+            harness.pager.loadNewerGate = CompletableDeferred()
+            harness.session.nextMessage()
+            runCurrent()
+            harness.session.nextMessage()
+            runCurrent()
+
+            assertEquals(callsAfterResolvedSeek + 1, harness.pager.loadNewerCalls)
+        }
+
+    @Test
     fun revisionMismatchLeavesAudibleCursorUntouched() =
         runTest {
             val harness = SessionHarness(this)

@@ -258,7 +258,13 @@ internal class TtsPlaybackQueue(
      */
     fun append(moreMessages: List<TtsQueuedMessage>): Boolean {
         val current = _state.value
-        val active = current is TtsState.Speaking || current is TtsState.Paused
+        val speaking =
+            when (current) {
+                is TtsState.Speaking -> current
+                is TtsState.Preparing -> current.retained as? TtsState.Speaking
+                else -> null
+            }
+        val active = speaking != null || current is TtsState.Paused
         // A live echo can race a history load that already queued the same
         // message — identity wins over arrival order.
         val queuedIds = messages.mapNotNullTo(hashSetOf()) { it.messageIdHex.takeIf(String::isNotEmpty) }
@@ -270,7 +276,7 @@ internal class TtsPlaybackQueue(
             }
         if (newMessages.isEmpty()) return false
         val appended = appendMessages(newMessages)
-        if (current is TtsState.Speaking) {
+        if (speaking != null) {
             // A parked terminal chunk has already been spoken, so progress has
             // to move onto the appended run instead of waiting on a callback
             // that will never come again.
@@ -318,7 +324,12 @@ internal class TtsPlaybackQueue(
 
     /** Freezes playback at [chunkIndex] after invalidating callbacks from the stopped engine queue. */
     private fun pauseAt(chunkIndex: Int) {
-        val frozenPassage = (_state.value as? TtsState.Speaking)?.passage
+        val frozenPassage =
+            when (val current = _state.value) {
+                is TtsState.Speaking -> current.passage
+                is TtsState.Preparing -> (current.retained as? TtsState.Speaking)?.passage
+                else -> null
+            }
         stopEngine()
         playbackCallbacks.advance()
         progress.clearSpokenPayloads()

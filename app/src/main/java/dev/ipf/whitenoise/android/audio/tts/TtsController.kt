@@ -302,6 +302,7 @@ class TtsController internal constructor(
         val effectiveLocale = activeEngine.effectiveLocale ?: locale
         if (preparedMessages != null && effectiveLocale != locale) {
             audioFocus.release()
+            restorePreviousFocusIfNeeded(focus.wasSpeaking, focus.previousMode)
             lastStartFailure = TtsStartFailure.UnsupportedLanguage
             return null
         }

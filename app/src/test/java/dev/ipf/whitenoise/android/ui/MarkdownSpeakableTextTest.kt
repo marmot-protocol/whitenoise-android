@@ -890,4 +890,30 @@ class MarkdownSpeakableTextTest {
         assertTrue(projected.length <= MARKDOWN_SPEAKABLE_MAX_LENGTH)
         assertTrue(projected.lastOrNull()?.isHighSurrogate() != true)
     }
+
+    @Test
+    fun incompleteArrowAndDashCodeBlocksKeepCodeNarration() {
+        listOf("value -> next\nplain prose", "---").forEach { content ->
+            val projection =
+                markdownDocumentToSpeakableProjection(
+                    MarkdownDocumentFfi(
+                        truncated = false,
+                        blankLinesBefore = byteArrayOf(),
+                        blocks =
+                            listOf(
+                                MarkdownBlockFfi.CodeBlock(
+                                    kind = MarkdownCodeBlockKindFfi.FENCED,
+                                    info = "",
+                                    content = content,
+                                ),
+                            ),
+                    ),
+                )
+
+            assertEquals(
+                dev.ipf.whitenoise.android.audio.tts.speech.SpeechRole.CodeBlock,
+                projection.speechRoles.values.single().role,
+            )
+        }
+    }
 }

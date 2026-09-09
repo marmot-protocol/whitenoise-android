@@ -1491,7 +1491,7 @@ class WhiteNoiseAppState private constructor(
                 TtsPlaybackForegroundService.start(appContext)
             }.also { started ->
                 if (started) {
-                    ttsSpeechAccountRef = activeAccountRef
+                    ttsSpeechAccountRef = ownerAccount
                     ttsAutoReadSessionKey = null
                     ttsHistorySession.onSessionCleared()
                 }
@@ -1507,11 +1507,12 @@ class WhiteNoiseAppState private constructor(
         backgroundPreparation: Boolean,
     ): Boolean {
         if (!backgroundPreparation) return speakAloudAutoRead(groupIdHex, entries, locale, startSentenceIndex)
-        return ttsAutoReadKey(activeAccountRef, groupIdHex)?.let { owner ->
+        val ownerAccount = activeAccountRef
+        return ttsAutoReadKey(ownerAccount, groupIdHex)?.let { owner ->
             speakAloudPrepared(entries, locale, startSentenceIndex, startRenderedHit).also { started ->
                 if (started) {
                     ttsAutoReadSessionKey = owner
-                    ttsHistorySession.onConversationSessionStarted(activeAccountRef, groupIdHex)
+                    ttsHistorySession.onConversationSessionStarted(ownerAccount, groupIdHex)
                 }
             }
         } ?: false

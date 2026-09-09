@@ -980,8 +980,8 @@ internal fun MessageBubble(
                     selected = record,
                 )
             val entries =
-                candidateRecords.mapNotNull { entryRecord -> ttsEntry(entryRecord) }.map { entry ->
-                    if (literalCode) {
+                candidateRecords.mapNotNull { entryRecord -> ttsEntry(entryRecord) }.mapIndexed { index, entry ->
+                    if (index == 0 && literalCode) {
                         entry.copy(
                             speechMode = dev.ipf.whitenoise.android.audio.tts.speech.SpeechMode.LiteralCode,
                         )

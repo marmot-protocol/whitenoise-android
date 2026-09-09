@@ -195,6 +195,7 @@ class TtsHistorySession internal constructor(
                             isCurrent = { historyRequests.isCurrent(generation) },
                         ).load(messageIdHex, timelineAt)
                     historyRequests.runIfCurrent(generation) {
+                        pendingTargetSeek = false
                         if (conversation != source ||
                             controller.state.value.sessionId != source.sessionId
                         ) {
