@@ -525,6 +525,7 @@ abstract class NotificationDelayedRosterFixture {
             when (method.name.substringBefore('-')) {
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 // These signed-in accounts have no pending interactive setup.
+                "onboardingRecoveryRequired" -> false
                 "onboardingSnapshot" -> null
                 "groupRoster" -> gatedRoster(gate, arguments)
                 "groupRecoveryStatus" -> recoveryStatus(arguments)

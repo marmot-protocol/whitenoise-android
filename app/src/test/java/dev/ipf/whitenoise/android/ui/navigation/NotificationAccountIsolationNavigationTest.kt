@@ -504,6 +504,8 @@ class NotificationAccountIsolationNavigationTest {
                 .set(state, AppMarmotRuntime(rootPath = "test", marmot = marmot))
         }
 
+    /** Models the account-isolated native reads used while activating a notification route. */
+    @Suppress("CyclomaticComplexMethod")
     private fun fakeMarmot(gate: RouteOrderGate): MarmotInterface =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
@@ -512,6 +514,7 @@ class NotificationAccountIsolationNavigationTest {
             when (method.name.substringBefore('-')) {
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 // These existing signed-in accounts have no interactive setup checkpoint.
+                "onboardingRecoveryRequired" -> false
                 "onboardingSnapshot" -> null
                 "groupDetails" -> {
                     gate.rosterReadCount.incrementAndGet()

@@ -91,10 +91,47 @@ internal class AccountSetupCoordinator(
     /** Gates all account-selection paths before legacy reactivation or chat preload. */
     suspend fun routeIfPending(account: String): Boolean {
         if (needsRecovery(account)) return true
-        val snapshot = app.marmotIo { onboardingSnapshot(account) }
-        val required = snapshot?.requiresSetup() == true
-        if (required) open(requireNotNull(snapshot))
-        return required
+        val recoveryRead = app.marmotIo { runCatchingCancellable { onboardingRecoveryRequired(account) } }
+        return when {
+            recoveryRead.isFailure -> {
+                pending = pending + account
+                appStateDebug {
+                    "onboarding recovery-state read failed for ${account.take(ACCOUNT_LOG_PREFIX_LENGTH)}"
+                }
+                true
+            }
+
+            recoveryRead.getOrThrow() -> {
+                pending = pending - account
+                recoveryRequired = recoveryRequired + account
+                true
+            }
+
+            else -> {
+                recoveryRequired = recoveryRequired - account
+                val snapshotRead = app.marmotIo { runCatchingCancellable { onboardingSnapshot(account) } }
+                val snapshot = snapshotRead.getOrNull()
+                when {
+                    snapshotRead.isFailure -> {
+                        pending = pending + account
+                        appStateDebug {
+                            "onboarding checkpoint read failed for ${account.take(ACCOUNT_LOG_PREFIX_LENGTH)}"
+                        }
+                        true
+                    }
+
+                    snapshot?.requiresSetup() == true -> {
+                        open(snapshot)
+                        true
+                    }
+
+                    else -> {
+                        pending = pending - account
+                        false
+                    }
+                }
+            }
+        }
     }
 
     /** Replaces an unreadable checkpoint only after the onboarding UI's explicit acknowledgement. */

@@ -823,6 +823,7 @@ abstract class NotificationRouteTimelinePresentationFixture {
     }
 
     /** Gates native projection, roster, and broad-list calls without replacing the production route logic. */
+    @Suppress("CyclomaticComplexMethod")
     private fun notificationRouteMarmot(routeGate: NotificationRouteGate): MarmotInterface =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
@@ -831,6 +832,7 @@ abstract class NotificationRouteTimelinePresentationFixture {
             when (method.name.substringBefore('-')) {
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 // Preserve ordinary notification activation through the setup eligibility check.
+                "onboardingRecoveryRequired" -> false
                 "onboardingSnapshot" -> null
                 "groupDetails" -> {
                     groupDetails()
