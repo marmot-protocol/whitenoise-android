@@ -455,8 +455,9 @@ class ConversationDictationCoordinatorTest {
 
         override fun start() = Unit
 
-        override fun stop() {
+        override fun stop(onAudioCaptureFinished: () -> Unit) {
             stopCalls += 1
+            onAudioCaptureFinished()
         }
 
         override fun cancel() {

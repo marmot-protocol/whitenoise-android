@@ -249,7 +249,7 @@ class ComposerDictationControlTest {
             object : ConversationDictationRecognitionSession {
                 override fun start() = Unit
 
-                override fun stop() = Unit
+                override fun stop(onAudioCaptureFinished: () -> Unit) = onAudioCaptureFinished()
 
                 override fun cancel() = Unit
 

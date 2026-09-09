@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
 private const val DICTATION_DIAGNOSTIC_TAG = "WNDictation"
@@ -226,8 +227,8 @@ internal interface ConversationDictationRecognitionSession {
     /** Begins recognition for this provider generation. */
     fun start()
 
-    /** Requests a final result while preserving provider output already in flight. */
-    fun stop()
+    /** Requests a final result and reports when microphone capture has actually ended. */
+    fun stop(onAudioCaptureFinished: () -> Unit)
 
     /** Abandons recognition without requesting a final result. */
     fun cancel()
@@ -704,9 +705,11 @@ internal class ConversationDictationController internal constructor(
         armGenerationTimeout(sessionId, generationId, PROCESSING_TIMEOUT_MILLIS) {
             failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
         }
-        runCatching { recognitionSession?.stop() }
-            .onSuccess { finishPlaybackInterruption() }
-            .onFailure { failOrRetainTranscript(sessionId, target, ConversationDictationFailure.Unknown) }
+        runCatching {
+            recognitionSession?.stop {
+                if (owns(sessionId, generationId)) finishPlaybackInterruption()
+            }
+        }.onFailure { failOrRetainTranscript(sessionId, target, ConversationDictationFailure.Unknown) }
     }
 
     /** Discards process-memory transcript state and releases every resource held by the session. */
@@ -1291,14 +1294,14 @@ internal class ConversationDictationController internal constructor(
 
                 override fun onEndOfSpeech() {
                     conversationDictationDiagnostic("event=callback_end_of_speech generation=$generationId")
-                    val recognitionActive =
-                        state is ConversationDictationState.Starting || state is ConversationDictationState.Listening
-                    if (!owns(sessionId, generationId) || !recognitionActive) {
-                        return
-                    }
-                    state = ConversationDictationState.Processing(sessionId, target)
-                    armGenerationTimeout(sessionId, generationId, PROCESSING_TIMEOUT_MILLIS) {
-                        failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
+                    if (!owns(sessionId, generationId)) return
+                    when {
+                        state is ConversationDictationState.Starting || state is ConversationDictationState.Listening -> {
+                            state = ConversationDictationState.Processing(sessionId, target)
+                            armGenerationTimeout(sessionId, generationId, PROCESSING_TIMEOUT_MILLIS) {
+                                failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
+                            }
+                        }
                     }
                 }
 
@@ -2683,6 +2686,9 @@ private class AndroidConversationDictationRecognitionSession(
     private val recognitionIntent = conversationDictationRecognitionIntent()
     private var started = false
     private var destroyed = false
+    private var callerAudioCapturing = false
+    private val captureFinished = AtomicReference<(() -> Unit)?>(null)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     init {
         recognizer.setRecognitionListener(
@@ -2696,15 +2702,20 @@ private class AndroidConversationDictationRecognitionSession(
 
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
 
-                override fun onEndOfSpeech() = listener.onEndOfSpeech()
+                override fun onEndOfSpeech() {
+                    if (!callerAudioCapturing) reportCaptureFinished()
+                    listener.onEndOfSpeech()
+                }
 
                 override fun onError(error: Int) {
+                    if (!callerAudioCapturing) reportCaptureFinished()
                     val mapped = error.toConversationDictationFailure(recognitionService.packageName)
                     conversationDictationDiagnostic("event=platform_error code=$error failure=${mapped.name}")
                     listener.onError(mapped)
                 }
 
                 override fun onResults(results: Bundle?) {
+                    if (!callerAudioCapturing) reportCaptureFinished()
                     listener.onResult(
                         results
                             ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
@@ -2747,6 +2758,7 @@ private class AndroidConversationDictationRecognitionSession(
         check(!started && !destroyed)
         started = true
         val capturing = callerAudio?.start() == true
+        callerAudioCapturing = capturing
         conversationDictationDiagnostic("event=platform_start_listening caller_audio=$capturing")
         val intent = startIntent(capturing)
         // Both descriptors stay open until capture ends. SpeechRecognizer.startListening only
@@ -2777,11 +2789,21 @@ private class AndroidConversationDictationRecognitionSession(
     }
 
     /** Requests the provider to finish the current utterance and return its final result. */
-    override fun stop() {
+    override fun stop(onAudioCaptureFinished: () -> Unit) {
         conversationDictationDiagnostic("event=platform_stop_listening")
+        captureFinished.set(onAudioCaptureFinished)
         // Close the audio first: a provider reading a caller descriptor ends the utterance on EOF.
-        callerAudio?.stop()
+        if (callerAudioCapturing) callerAudio?.stop(::reportCaptureFinished)
         recognizer.stopListening()
+    }
+
+    private fun reportCaptureFinished() {
+        val callback = captureFinished.getAndSet(null) ?: return
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            callback()
+        } else {
+            mainHandler.post(callback)
+        }
     }
 
     /** Cancels provider work when the controller no longer needs a result. */

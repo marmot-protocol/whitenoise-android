@@ -12,6 +12,7 @@ import android.system.OsConstants
 import java.io.FileDescriptor
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 import kotlin.math.abs
 import kotlin.math.max
@@ -53,6 +54,8 @@ internal class ConversationDictationCallerAudio private constructor(
 ) {
     private val streaming = AtomicBoolean(false)
     private val finished = AtomicBoolean(false)
+    private val captureClosed = AtomicBoolean(false)
+    private val onCaptureClosed = AtomicReference<(() -> Unit)?>(null)
 
     /** Begins capture and starts streaming to the provider. Reports whether capture is running. */
     fun start(): Boolean {
@@ -76,10 +79,13 @@ internal class ConversationDictationCallerAudio private constructor(
     }
 
     /**
-     * Ends the utterance by closing the audio, which is how a provider reading a caller descriptor
-     * learns the user stopped speaking.
+     * Ends the utterance and reports only after the recorder and both pipe ends are closed.
      */
-    fun stop() = finish("stop")
+    fun stop(onClosed: () -> Unit) {
+        onCaptureClosed.set(onClosed)
+        finish("stop")
+        if (captureClosed.get()) onCaptureClosed.getAndSet(null)?.invoke()
+    }
 
     /** Abandons capture without waiting for a result. */
     fun cancel() = finish("cancel")
@@ -101,6 +107,12 @@ internal class ConversationDictationCallerAudio private constructor(
         runCatching(recorder::release)
         runCatching(writeEnd::close)
         runCatching(providerEnd::close)
+        reportCaptureClosed()
+    }
+
+    private fun reportCaptureClosed() {
+        captureClosed.set(true)
+        onCaptureClosed.getAndSet(null)?.invoke()
     }
 
     private fun stream() {
@@ -126,6 +138,7 @@ internal class ConversationDictationCallerAudio private constructor(
             runCatching(writeEnd::close)
             runCatching(providerEnd::close)
             progress.reportClosed()
+            reportCaptureClosed()
         }
     }
 

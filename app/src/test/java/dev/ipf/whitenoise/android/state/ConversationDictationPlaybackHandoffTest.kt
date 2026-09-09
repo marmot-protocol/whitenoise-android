@@ -128,5 +128,5 @@ class ConversationDictationPlaybackHandoffTest {
             messagePreview = "speech",
         )
 
-    private fun pausedVoice(key: String) = VoicePlaybackController.PausedPlayback(key, Any())
+    private fun pausedVoice(key: String) = VoicePlaybackController.PausedPlayback(key, Any(), 0L)
 }

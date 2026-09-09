@@ -340,12 +340,14 @@ class ConversationDictationControllerTest {
     }
 
     @Test
-    fun doneResumesPlaybackBeforeTranscriptValidation() =
+    fun doneResumesPlaybackAfterCaptureEndsAndBeforeTranscriptValidation() =
         runTest {
             val events = mutableListOf<String>()
+            val platform = FakePlatform(deferCaptureCompletion = true)
             val fixture =
                 fixture(
                     draft = TextFieldValue("", TextRange.Zero),
+                    platform = platform,
                     targetValidator = { _, _ ->
                         events += "validate"
                         true
@@ -357,6 +359,8 @@ class ConversationDictationControllerTest {
 
             fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
             fixture.controller.stop()
+            assertEquals(listOf("pause"), events)
+            platform.session.completeCapture()
             assertEquals(listOf("pause", "resume"), events)
             fixture.platform.listener.onResult("dictated words")
             advanceUntilIdle()
@@ -386,16 +390,18 @@ class ConversationDictationControllerTest {
     }
 
     @Test
-    fun pasteAndSendResumePlaybackBeforeDeliveryWork() =
+    fun pasteAndSendResumePlaybackAfterCaptureEndsAndBeforeDeliveryWork() =
         runTest {
             listOf<(ConversationDictationController) -> Unit>(
                 { it.paste() },
                 { it.send() },
             ).forEach { finish ->
                 val events = mutableListOf<String>()
+                val platform = FakePlatform(deferCaptureCompletion = true)
                 val fixture =
                     fixture(
                         draft = TextFieldValue("", TextRange.Zero),
+                        platform = platform,
                         targetValidator = { _, _ ->
                             events += "validate"
                             true
@@ -410,6 +416,8 @@ class ConversationDictationControllerTest {
 
                 fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
                 finish(fixture.controller)
+                assertEquals(emptyList<String>(), events)
+                platform.session.completeCapture()
                 assertEquals(listOf("resume"), events)
                 fixture.platform.listener.onResult("dictated words")
                 advanceUntilIdle()
@@ -2810,6 +2818,7 @@ class ConversationDictationControllerTest {
         var createFailure: Throwable? = null,
         var microphoneAccessOverride: ConversationDictationMicrophoneAccess? = null,
         private val completePreparationOnStop: Boolean = false,
+        private val deferCaptureCompletion: Boolean = false,
         // Every existing case keeps the default: a platform whose provider records for itself.
         var callerAudio: ConversationDictationCallerAudioRequirement =
             ConversationDictationCallerAudioRequirement.NotNeeded,
@@ -2886,7 +2895,7 @@ class ConversationDictationControllerTest {
             createFailure?.let { throw it }
             this.listener = listener
             listeners += listener
-            session = FakeSession(listener, completePreparationOnStop)
+            session = FakeSession(listener, completePreparationOnStop, deferCaptureCompletion)
             sessions += session
             return session
         }
@@ -2895,6 +2904,7 @@ class ConversationDictationControllerTest {
     private class FakeSession(
         private val listener: ConversationDictationRecognitionListener? = null,
         private val completePreparationOnStop: Boolean = false,
+        private val deferCaptureCompletion: Boolean = false,
     ) : ConversationDictationRecognitionSession {
         var started = false
         var stopped = false
@@ -2902,14 +2912,24 @@ class ConversationDictationControllerTest {
         var destroyed = false
         var cancelCalls = 0
         var destroyCalls = 0
+        private var captureFinished: (() -> Unit)? = null
 
         override fun start() {
             started = true
         }
 
-        override fun stop() {
+        override fun stop(onAudioCaptureFinished: () -> Unit) {
             stopped = true
+            captureFinished = onAudioCaptureFinished
+            if (!deferCaptureCompletion) completeCapture()
             if (completePreparationOnStop) listener?.onResult(null)
+        }
+
+        fun completeCapture() {
+            captureFinished?.let { callback ->
+                captureFinished = null
+                callback()
+            }
         }
 
         override fun cancel() {
