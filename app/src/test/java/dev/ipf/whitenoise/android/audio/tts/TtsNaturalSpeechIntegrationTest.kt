@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.audio.tts
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownCodeBlockKindFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSeekResolver
 import dev.ipf.whitenoise.android.audio.tts.speech.SpeechContext
 import dev.ipf.whitenoise.android.ui.SpeakableTextProjection
 import dev.ipf.whitenoise.android.ui.conversation.messages.preparedHighlightSpeech
@@ -15,6 +17,42 @@ import org.junit.Test
 import java.util.Locale
 
 class TtsNaturalSpeechIntegrationTest {
+    /** Native selection reports the paragraph, while prepared speech owns individual inline leaves. */
+    @Test
+    fun compositeMarkdownSelectionStartsAtThePreparedSecondSentence() {
+        val source = "First sentence. Pay $12.50."
+        val projection =
+            markdownDocumentToSpeakableProjection(
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blankLinesBefore = byteArrayOf(),
+                    blocks =
+                        listOf(
+                            MarkdownBlockFfi.Paragraph(
+                                listOf(
+                                    MarkdownInlineFfi.Text("First sentence. Pay "),
+                                    MarkdownInlineFfi.Strong(
+                                        listOf(MarkdownInlineFfi.Text("$12.50")),
+                                    ),
+                                    MarkdownInlineFfi.Text("."),
+                                ),
+                            ),
+                        ),
+                ),
+            )
+        val hit =
+            requireNotNull(
+                dev.ipf.whitenoise.android.ui.conversation.messages.preparedHitFromRenderedHit(
+                    projection.entry(),
+                    dev.ipf.whitenoise.android.ui.conversation.messages
+                        .RenderedTextHit("b0", source, source.indexOf('$')),
+                ),
+            )
+        val prepared = requireNotNull(projection.entry().prepareSpeech(SpeechContext(Locale.US)))
+        val target = PreparedSeekResolver.resolve(prepared, hit)
+        assertEquals(1, (target as dev.ipf.whitenoise.android.audio.tts.speech.PreparedSeekTarget.Sentence).ordinal)
+    }
+
     @Test
     fun runtimeOmittedUrlDoesNotBorrowTheNeighborSentence() {
         val source = "Read https://example.com now. Next."

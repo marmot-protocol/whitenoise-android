@@ -49,39 +49,9 @@ internal class TtsHighlightProjectionResolver(
         hit: RenderedTextHit,
         allowOmittedLinkNeighbor: Boolean = false,
     ): Int? {
-        if (hit.renderedOffset !in 0..hit.renderedText.length) return null
-        val mappedSpans =
-            mapProjectionSpansToRenderedLeaf(
-                projection = projection,
-                renderedLeafId = hit.leafId,
-                renderedText = hit.renderedText,
-                leafSpanCache = leafSpanCache,
-            ) ?: return null
-        val candidates =
-            mappedSpans.filter { mapped ->
-                val spokenLength = mapped.source.spokenEnd - mapped.source.spokenStart
-                val visibleLength = mapped.source.visibleEnd - mapped.source.visibleStart
-                mapped.source.leafId.belongsToRenderedLeaf(hit.leafId) &&
-                    spokenLength > 0 &&
-                    spokenLength == visibleLength
-            }
-        if (candidates.isEmpty()) return null
-        if (projection.visibleLeaves.isNotEmpty() && !allowOmittedLinkNeighbor) {
-            if (isOmittedHit(hit, candidates)) return null
-        }
-        val mapped =
-            candidates.minByOrNull { candidate ->
-                val end = candidate.renderedStart + candidate.source.spokenEnd - candidate.source.spokenStart
-                when {
-                    hit.renderedOffset < candidate.renderedStart -> candidate.renderedStart - hit.renderedOffset
-                    hit.renderedOffset > end -> hit.renderedOffset - end
-                    else -> 0
-                }
-            } ?: return null
-        val renderedEnd = mapped.renderedStart + mapped.source.spokenEnd - mapped.source.spokenStart
-        val clampedRenderedOffset = hit.renderedOffset.coerceIn(mapped.renderedStart, renderedEnd - 1)
-        val nativeOffset = mapped.source.visibleStart + clampedRenderedOffset - mapped.renderedStart
-        val owner = preparedSpeech.canonicalSentenceIdForSource(mapped.source.leafId, nativeOffset)
+        val (leafId, nativeOffset) =
+            sourceOffsetAtRenderedHit(projection, hit, allowOmittedLinkNeighbor, leafSpanCache) ?: return null
+        val owner = preparedSpeech.canonicalSentenceIdForSource(leafId, nativeOffset)
         return preparedSpeech.sentences.firstOrNull { it.sentenceId == owner }?.ordinal
     }
 
@@ -238,6 +208,79 @@ private fun resolveTtsRenderedHighlights(
     return TtsLeafHighlight(sentenceRanges = sentenceRanges, word = word).takeIf {
         it.sentenceRanges.isNotEmpty() || it.word != null
     }
+}
+
+/** Maps a composite Markdown selection to the source leaf used by background speech preparation. */
+internal fun preparedHitFromRenderedHit(
+    entry: dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry,
+    hit: RenderedTextHit,
+): dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit? {
+    val projection =
+        SpeakableTextProjection(
+            text = entry.text,
+            spans =
+                entry.spokenTextSpans.map { span ->
+                    SpeakableTextProjectionSpan(
+                        span.spoken.start,
+                        span.spoken.end,
+                        span.visible.leafId,
+                        span.visible.start,
+                        span.visible.end,
+                    )
+                },
+            projectionId = entry.projectionId,
+            visibleLeaves = entry.visibleLeaves,
+            speechRoles = entry.speechRoles,
+        )
+    return sourceOffsetAtRenderedHit(projection, hit)?.let { (leafId, offset) ->
+        projection.visibleLeaves[leafId]?.let { original ->
+            dev.ipf.whitenoise.android.audio.tts.speech
+                .PreparedRenderedHit(leafId, original, offset)
+        }
+    }
+}
+
+/** Shares exact rendered-to-source alignment between selection startup and active playback seeking. */
+@Suppress("ReturnCount")
+private fun sourceOffsetAtRenderedHit(
+    projection: SpeakableTextProjection,
+    hit: RenderedTextHit,
+    allowOmittedLinkNeighbor: Boolean = false,
+    leafSpanCache: MutableMap<Pair<String, String>, List<RenderedProjectionSpan>?>? = null,
+): Pair<String, Int>? {
+    if (hit.renderedOffset !in 0..hit.renderedText.length) return null
+    val mappedSpans =
+        mapProjectionSpansToRenderedLeaf(
+            projection = projection,
+            renderedLeafId = hit.leafId,
+            renderedText = hit.renderedText,
+            leafSpanCache = leafSpanCache,
+        ) ?: return null
+    val candidates =
+        mappedSpans.filter { mapped ->
+            val spokenLength = mapped.source.spokenEnd - mapped.source.spokenStart
+            val visibleLength = mapped.source.visibleEnd - mapped.source.visibleStart
+            mapped.source.leafId.belongsToRenderedLeaf(hit.leafId) &&
+                spokenLength > 0 &&
+                spokenLength == visibleLength
+        }
+    if (candidates.isEmpty()) return null
+    if (projection.visibleLeaves.isNotEmpty() && !allowOmittedLinkNeighbor) {
+        if (isOmittedHit(hit, candidates)) return null
+    }
+    val mapped =
+        candidates.minByOrNull { candidate ->
+            val end = candidate.renderedStart + candidate.source.spokenEnd - candidate.source.spokenStart
+            when {
+                hit.renderedOffset < candidate.renderedStart -> candidate.renderedStart - hit.renderedOffset
+                hit.renderedOffset > end -> hit.renderedOffset - end
+                else -> 0
+            }
+        } ?: return null
+    val renderedEnd = mapped.renderedStart + mapped.source.spokenEnd - mapped.source.spokenStart
+    val clampedRenderedOffset = hit.renderedOffset.coerceIn(mapped.renderedStart, renderedEnd - 1)
+    val nativeOffset = mapped.source.visibleStart + clampedRenderedOffset - mapped.renderedStart
+    return mapped.source.leafId to nativeOffset
 }
 
 private data class RenderedProjectionSpan(

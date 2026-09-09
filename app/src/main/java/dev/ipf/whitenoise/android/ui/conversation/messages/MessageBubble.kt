@@ -998,11 +998,7 @@ internal fun MessageBubble(
                     locale,
                     startRenderedHit =
                         startRenderedHit?.let {
-                            dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit(
-                                it.leafId,
-                                it.renderedText,
-                                it.renderedOffset,
-                            )
+                            preparedHitFromRenderedHit(entries.first(), it)
                         },
                     backgroundPreparation = true,
                 )
