@@ -1,5 +1,27 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.UserProfileMetadataFfi
+
+/** Rejects a replaced runtime or an account removed while activation was suspended. */
+internal fun WhiteNoiseAppState.canPublishAccountActivation(
+    label: String,
+    activationRuntimeGeneration: Int,
+): Boolean =
+    runtimeGeneration == activationRuntimeGeneration &&
+        accounts.any { it.label == label && !it.signedOut }
+
+/** Reads local metadata without mutation; a present profile is authoritative even when fields are cleared. */
+internal suspend fun readLocalAccountProfileSeed(
+    id: String,
+    readProfile: suspend (String) -> UserProfileMetadataFfi?,
+    readDisplayName: suspend (String) -> String?,
+): AccountSwitchProfileSeed {
+    val profile = runCatchingCancellable { readProfile(id) }.getOrNull()
+    // A present profile already owns the name, so a second database read cannot improve it.
+    val rawDisplayName = if (profile == null) runCatchingCancellable { readDisplayName(id) }.getOrNull() else null
+    return accountSwitchProfileSeed(id, profile, rawDisplayName)
+}
+
 /** Carries a local read and its starting revision until the account activation fence has passed. */
 internal data class StartupSelfProfilePresentation(
     val revision: ProfileAccountRevision?,

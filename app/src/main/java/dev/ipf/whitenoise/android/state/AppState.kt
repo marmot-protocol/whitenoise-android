@@ -5100,22 +5100,6 @@ class WhiteNoiseAppState private constructor(
         return required
     }
 
-    /** Rejects superseded runtimes, cancelled intents, and accounts removed during suspended activation work. */
-    private fun canPublishAccountActivation(
-        label: String,
-        requestGeneration: Long,
-        activationRuntimeGeneration: Int,
-        shouldActivate: () -> Boolean,
-    ): Boolean {
-        if (!shouldActivate() ||
-            !isAccountSwitchCurrent(requestGeneration) ||
-            runtimeGeneration != activationRuntimeGeneration
-        ) {
-            return false
-        }
-        return accounts.any { it.label == label && !it.signedOut }
-    }
-
     /** Publishes a generation-fenced account switch and releases activation intent on every exit path. */
     @Suppress("ReturnCount") // Sign-in failure and supersession are distinct non-activation outcomes.
     suspend fun setActiveAccount(
@@ -5147,12 +5131,9 @@ class WhiteNoiseAppState private constructor(
             val activationRuntimeGeneration = runtimeGeneration
             // Self metadata remains independent of the chat-row read and its failure boundary.
             val startupProfile =
-                preloadStartupSelfProfile(
-                    preloadPolicy,
-                    target?.accountIdHex,
-                    activationStillWanted,
-                    ::loadAccountSwitchProfileSeed,
-                )
+                preloadStartupSelfProfile(preloadPolicy, target?.accountIdHex, activationStillWanted) {
+                    loadAccountSwitchProfileSeed(it)
+                }
             val localSnapshot =
                 if (preloadPlan.loadLocalRows) {
                     loadAccountSwitchLocalSnapshot(
@@ -5164,7 +5145,9 @@ class WhiteNoiseAppState private constructor(
                     null
                 }
             val activationAllowed = {
-                canPublishAccountActivation(label, requestGeneration, activationRuntimeGeneration, shouldActivate)
+                shouldActivate() &&
+                    isAccountSwitchCurrent(requestGeneration) &&
+                    canPublishAccountActivation(label, activationRuntimeGeneration)
             }
             // A route may outlive the UI intent that requested it while a signed-out
             // account is being restored. Let request-scoped callers reject that late
@@ -10182,29 +10165,13 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Read one persisted profile without mutating the active account caches. */
-    private suspend fun loadAccountSwitchProfileSeed(id: String): AccountSwitchProfileSeed {
-        val profile =
-            if (profileReader != null) {
-                runCatchingCancellable { profileReader.invoke(id) }.getOrNull()
-            } else {
-                runCatchingCancellable { marmotIo(MarmotTraceSection.PROFILE_READ) { userProfile(id) } }.getOrNull()
-            }
-        val rawDisplayName =
-            if (profile != null) {
-                // accountSwitchProfileSeed treats a persisted profile as the
-                // authoritative name state, including an explicit clear. A
-                // separate displayName read cannot affect that result, so do
-                // not add one redundant FFI/database call per warmed identity.
-                null
-            } else if (profileDisplayNameReader != null) {
-                runCatchingCancellable { profileDisplayNameReader.invoke(id) }.getOrNull()
-            } else {
-                runCatchingCancellable {
-                    marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(id) }
-                }.getOrNull()
-            }
-        return accountSwitchProfileSeed(id, profile, rawDisplayName)
-    }
+    private suspend fun loadAccountSwitchProfileSeed(id: String): AccountSwitchProfileSeed =
+        readLocalAccountProfileSeed(
+            id = id,
+            readProfile = profileReader ?: { marmotIo(MarmotTraceSection.PROFILE_READ) { userProfile(it) } },
+            readDisplayName =
+                profileDisplayNameReader ?: { marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(it) } },
+        )
 
     /** Publishes sanitized authoritative metadata, including explicit profile-field removal. */
     internal fun applyAccountSwitchProfileSeed(seed: AccountSwitchProfileSeed) {

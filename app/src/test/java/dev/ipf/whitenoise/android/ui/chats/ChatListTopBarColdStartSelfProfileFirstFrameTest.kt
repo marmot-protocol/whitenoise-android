@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.core.app.ApplicationProvider
@@ -117,6 +118,8 @@ class ChatListTopBarColdStartSelfProfileFirstFrameTest {
                 shadowOf(Looper.getMainLooper()).idle()
                 fixture.appState.phase == AppPhase.Ready
             }
+            // Normal unit runs disable Roborazzi capture; still require an actual draw in that mode.
+            composeRule.onNodeWithTag(TAG).captureToImage()
             composeRule.onNodeWithTag(TAG).captureRoboImage(
                 "src/test/snapshots/startup_self_profile_first_frame_light.png",
             )

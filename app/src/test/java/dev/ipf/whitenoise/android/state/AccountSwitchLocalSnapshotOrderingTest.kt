@@ -103,7 +103,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val preload = body.indexOf("loadAccountSwitchLocalSnapshot(")
         val preloadCall = body.substring(preload, body.indexOf("\n                    )", startIndex = preload))
         val finalGenerationGuard = body.lastIndexOf("if (!activationAllowed())")
-        val guardBody = appStateSource().readText().kotlinFunctionBody("canPublishAccountActivation")
+        val guardBody = body.substringAfter("val activationAllowed = {").substringBefore("}")
         assertTrue(
             "activation must still check the request generation",
             "isAccountSwitchCurrent(requestGeneration)" in guardBody,
