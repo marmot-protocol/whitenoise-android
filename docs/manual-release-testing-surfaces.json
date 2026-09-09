@@ -7451,6 +7451,14 @@
         ]
       },
       {
+        "surface": "Dictation playback handoff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationDictationPlaybackHandoff.kt",
+        "anchor": "internal class ConversationDictationPlaybackHandoff(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
         "surface": "Dictation caller-audio capability routing",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "private fun probeCallerAudioSupport(",

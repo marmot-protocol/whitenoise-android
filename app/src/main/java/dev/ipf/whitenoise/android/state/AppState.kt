@@ -1212,8 +1212,10 @@ class WhiteNoiseAppState private constructor(
             },
             targetValidationScope = mutationsScope,
             onBeforeRecognition = {
-                VoicePlaybackController.pause()
-                stopSpeaking()
+                conversationDictationPlaybackHandoff.pauseActivePlayback()
+            },
+            onAfterAudioCapture = {
+                conversationDictationPlaybackHandoff.resumeInterruptedPlayback()
             },
             tryAcquireMicrophone = { microphoneCaptureCoordinator.tryAcquire(dictationMicrophoneOwner) },
             releaseMicrophone = { microphoneCaptureCoordinator.release(dictationMicrophoneOwner) },
@@ -1413,6 +1415,15 @@ class WhiteNoiseAppState private constructor(
     // Process-wide read-aloud playback: survives navigation between chats and
     // back to the chat list, matching VoicePlaybackController's lifetime.
     val ttsController = createAppTtsController(appContext, ttsRatePreferences, ttsMediaMixPreferences)
+    private val conversationDictationPlaybackHandoff by lazy {
+        ConversationDictationPlaybackHandoff(
+            ttsState = { ttsController.state.value },
+            pauseTts = ttsController::pause,
+            resumeTts = ttsController::resume,
+            pauseVoice = VoicePlaybackController::pauseForInterruption,
+            resumeVoice = VoicePlaybackController::resumeInterrupted,
+        )
+    }
     var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
         private set
     var ttsVoiceResolution by mutableStateOf(TtsVoiceResolution.Empty)

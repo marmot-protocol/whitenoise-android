@@ -80,6 +80,12 @@ object VoicePlaybackController {
         val invalidatesCache: Boolean,
     )
 
+    /** Exact paused player identity retained across a bounded audio interruption. */
+    internal data class PausedPlayback internal constructor(
+        val key: String,
+        internal val playerToken: Any,
+    )
+
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
 
@@ -505,6 +511,47 @@ object VoicePlaybackController {
         // the (potentially indefinite) pause. A transient system pause uses a
         // separate path and deliberately retains focus for the paired gain.
         abandonFocus()
+    }
+
+    /** Pauses active playback and returns the exact player identity that may be resumed. */
+    internal fun pauseForInterruption(): PausedPlayback? {
+        val activePlayer = player
+        val activeKey = currentKey
+        return when {
+            activePlayer == null -> null
+            activeKey == null -> null
+            !_state.value.isPlaying -> null
+            else -> {
+                pause()
+                PausedPlayback(activeKey, activePlayer)
+                    .takeIf { player === activePlayer && !_state.value.isPlaying }
+            }
+        }
+    }
+
+    /** Resumes the exact paused player without preparing its file again. */
+    internal fun resumeInterrupted(interruption: PausedPlayback): Boolean {
+        val pausedState = _state.value
+        val activePlayer = player
+        return when {
+            pausedState.isPlaying -> false
+            pausedState.key != interruption.key -> false
+            currentKey != interruption.key -> false
+            activePlayer !== interruption.playerToken -> false
+            activePlayer == null -> false
+            !requestFocus() -> false
+            !startCurrentPlayer(activePlayer) -> false
+            else -> {
+                nextPlaybackGeneration()
+                _state.value =
+                    pausedState.copy(
+                        isPlaying = true,
+                        durationMs = runCatching { activePlayer.duration }.getOrDefault(pausedState.durationMs),
+                    )
+                startTicker()
+                true
+            }
+        }
     }
 
     /** Seek the active player to [positionMs] (clamped to duration). */

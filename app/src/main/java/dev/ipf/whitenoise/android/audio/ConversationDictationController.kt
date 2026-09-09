@@ -342,6 +342,7 @@ internal class ConversationDictationController internal constructor(
     private val targetValidator: (suspend (accountRef: String, groupIdHex: String) -> Boolean)? = null,
     private val targetValidationScope: CoroutineScope? = null,
     private val onBeforeRecognition: () -> Unit = {},
+    private val onAfterAudioCapture: () -> Unit = {},
     private val tryAcquireMicrophone: () -> Boolean = { true },
     private val releaseMicrophone: () -> Unit = {},
     private val startDurableSession: (String, () -> Unit) -> Boolean = { _, ready ->
@@ -374,6 +375,7 @@ internal class ConversationDictationController internal constructor(
         targetValidator: suspend (accountRef: String, groupIdHex: String) -> Boolean,
         targetValidationScope: CoroutineScope,
         onBeforeRecognition: () -> Unit,
+        onAfterAudioCapture: () -> Unit,
         tryAcquireMicrophone: () -> Boolean,
         releaseMicrophone: () -> Unit,
         finishAfterSilenceMillis: () -> Long? = { null },
@@ -389,6 +391,7 @@ internal class ConversationDictationController internal constructor(
         targetValidator = targetValidator,
         targetValidationScope = targetValidationScope,
         onBeforeRecognition = onBeforeRecognition,
+        onAfterAudioCapture = onAfterAudioCapture,
         tryAcquireMicrophone = tryAcquireMicrophone,
         releaseMicrophone = releaseMicrophone,
         startDurableSession = { token, _ ->
@@ -449,6 +452,7 @@ internal class ConversationDictationController internal constructor(
     private var restartId = 0L
     private var providerDisconnectRetries = 0
     private var permissionRetryUsed = false
+    private var playbackInterruptedForCapture = false
 
     // Entry points, recognition callbacks and timeout callbacks are main-thread confined.
     private var unresolvedRecognitionFailure: ConversationDictationFailure? = null
@@ -675,6 +679,7 @@ internal class ConversationDictationController internal constructor(
             finishRequested = true
             silenceTimeoutHandle?.cancel()
             silenceTimeoutHandle = null
+            finishPlaybackInterruption()
             return
         }
         if (current !is ConversationDictationState.Starting && current !is ConversationDictationState.Listening) return
@@ -700,6 +705,7 @@ internal class ConversationDictationController internal constructor(
             failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
         }
         runCatching { recognitionSession?.stop() }
+            .onSuccess { finishPlaybackInterruption() }
             .onFailure { failOrRetainTranscript(sessionId, target, ConversationDictationFailure.Unknown) }
     }
 
@@ -1232,6 +1238,7 @@ internal class ConversationDictationController internal constructor(
                 return
             }
             microphoneHeld = true
+            playbackInterruptedForCapture = true
             if (runCatching(onBeforeRecognition).isFailure) {
                 fail(sessionId, target, ConversationDictationFailure.Unknown)
                 return
@@ -1600,6 +1607,9 @@ internal class ConversationDictationController internal constructor(
         sessionId: Long,
         target: ConversationDictationTarget,
     ) {
+        // Recognition is finished even though validation, insertion, or send
+        // may still be in flight. Do not extend the audible pause through that work.
+        finishPlaybackInterruption()
         val transcript = accumulatedTranscript.trim()
         if (transcript.isBlank()) {
             fail(sessionId, target, unresolvedRecognitionFailure ?: ConversationDictationFailure.NoSpeech)
@@ -1687,11 +1697,7 @@ internal class ConversationDictationController internal constructor(
         silenceTimeoutHandle = null
         silenceDeadlineElapsedMillis = null
         clearRecognitionGeneration(cancel)
-        if (microphoneHeld) {
-            microphoneHeld = false
-            conversationDictationDiagnostic("event=microphone_lease_released")
-            runCatching(releaseMicrophone)
-        }
+        finishPlaybackInterruption()
         if (durableSession && releaseDurableSession) {
             durableSession = false
             conversationDictationDiagnostic("event=foreground_service_stop_requested")
@@ -1702,6 +1708,18 @@ internal class ConversationDictationController internal constructor(
             durableStartAccepted = false
             promotionReadyReceived = false
         }
+    }
+
+    /** Restores only playback that this recognition session interrupted, at most once. */
+    private fun finishPlaybackInterruption() {
+        if (!playbackInterruptedForCapture) return
+        playbackInterruptedForCapture = false
+        if (microphoneHeld) {
+            microphoneHeld = false
+            conversationDictationDiagnostic("event=microphone_lease_released")
+            runCatching(releaseMicrophone)
+        }
+        runCatching(onAfterAudioCapture)
     }
 
     /** Tears down one recognizer generation without releasing logical-session resources. */

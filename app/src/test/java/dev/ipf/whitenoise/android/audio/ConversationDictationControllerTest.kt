@@ -340,6 +340,85 @@ class ConversationDictationControllerTest {
     }
 
     @Test
+    fun doneResumesPlaybackBeforeTranscriptValidation() =
+        runTest {
+            val events = mutableListOf<String>()
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("", TextRange.Zero),
+                    targetValidator = { _, _ ->
+                        events += "validate"
+                        true
+                    },
+                    targetValidationScope = this,
+                    onBeforeRecognition = { events += "pause" },
+                    onAfterAudioCapture = { events += "resume" },
+                )
+
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.controller.stop()
+            assertEquals(listOf("pause", "resume"), events)
+            fixture.platform.listener.onResult("dictated words")
+            advanceUntilIdle()
+
+            assertEquals(listOf("pause", "resume", "validate"), events)
+        }
+
+    @Test
+    fun cancelAndFailureEachResumePlaybackExactlyOnce() {
+        listOf<(Fixture) -> Unit>(
+            { it.controller.cancel() },
+            { it.platform.listener.onError(ConversationDictationFailure.Unknown) },
+        ).forEach { finish ->
+            var resumes = 0
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("", TextRange.Zero),
+                    onAfterAudioCapture = { resumes += 1 },
+                )
+
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            finish(fixture)
+            fixture.controller.cancel()
+
+            assertEquals(1, resumes)
+        }
+    }
+
+    @Test
+    fun pasteAndSendResumePlaybackBeforeDeliveryWork() =
+        runTest {
+            listOf<(ConversationDictationController) -> Unit>(
+                { it.paste() },
+                { it.send() },
+            ).forEach { finish ->
+                val events = mutableListOf<String>()
+                val fixture =
+                    fixture(
+                        draft = TextFieldValue("", TextRange.Zero),
+                        targetValidator = { _, _ ->
+                            events += "validate"
+                            true
+                        },
+                        targetValidationScope = this,
+                        onAfterAudioCapture = { events += "resume" },
+                        sendTranscriptIfOriginUnchanged = {
+                            events += "send"
+                            true
+                        },
+                    )
+
+                fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+                finish(fixture.controller)
+                assertEquals(listOf("resume"), events)
+                fixture.platform.listener.onResult("dictated words")
+                advanceUntilIdle()
+
+                assertEquals("resume", events.first())
+            }
+        }
+
+    @Test
     fun firstUseDisclosureAndPermissionAreExplicitGates() {
         var disclosureAccepted = false
         var disclosureMarked = false
@@ -2639,6 +2718,7 @@ class ConversationDictationControllerTest {
         targetValidator: (suspend (String, String) -> Boolean)? = null,
         targetValidationScope: CoroutineScope? = null,
         onBeforeRecognition: () -> Unit = {},
+        onAfterAudioCapture: () -> Unit = {},
         platform: FakePlatform = FakePlatform(),
         tryAcquireMicrophone: () -> Boolean = { true },
         releaseMicrophone: () -> Unit = {},
@@ -2682,6 +2762,7 @@ class ConversationDictationControllerTest {
                 targetValidator = targetValidator,
                 targetValidationScope = targetValidationScope,
                 onBeforeRecognition = onBeforeRecognition,
+                onAfterAudioCapture = onAfterAudioCapture,
                 tryAcquireMicrophone = tryAcquireMicrophone,
                 releaseMicrophone = releaseMicrophone,
                 startDurableSession = startDurableSession,
