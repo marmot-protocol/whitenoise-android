@@ -1129,7 +1129,7 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
-    /** Checks provider, runtime permission, and app-op before creating a recognizer generation. */
+    /** Checks provider and White Noise's runtime grant before creating a recognizer generation. */
     private fun startOrRequestPermission(
         sessionId: Long,
         target: ConversationDictationTarget,
@@ -2277,9 +2277,8 @@ internal class AndroidConversationDictationPlatform(
         // Android folds the global microphone toggle into its effective permission result. Do not
         // preflight that result here: starting recognition is what lets Android present its native
         // microphone-unblock prompt while White Noise stays on the current dictation surface.
-        val access = ConversationDictationMicrophoneAccess.Granted
-        conversationDictationDiagnostic("event=effective_record_audio_access access=${access.name}")
-        return access
+        conversationDictationDiagnostic("event=app_record_audio_access access=Granted")
+        return ConversationDictationMicrophoneAccess.Granted
     }
 
     /** Starts a session by resolving the provider afresh, so install and selection changes land. */
