@@ -1469,6 +1469,10 @@
     <string name="tts_voice_unavailable">Çevrimdışı ses kullanılamıyor</string>
     <string name="tts_voice_effective_fallback">Kaydedilen ses kullanılamıyor; %1$s kullanılıyor</string>
     <string name="speak_aloud">Sesli oku</string>
+    <string name="read_code_literally">Kodu harfiyen oku</string>
+    <string name="tts_read_from_sentence">Bu cümleden itibaren oku</string>
+    <string name="tts_choose_sentence">Okunacak cümleyi seç</string>
+    <string name="tts_bar_preparing">Konuşma hazırlanıyor…</string>
     <string name="tts_bar_pause">Okumayı duraklat</string>
     <string name="tts_bar_play">Okumaya devam et</string>
     <string name="tts_bar_skip_previous">Önceki cümle</string>

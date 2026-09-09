@@ -102,7 +102,7 @@ class TtsRichLeafPlacementAndroidTest {
         assertEquals(
             "the marker did not land on \"$WORD_AFTER_URL\"; engine payload was \"$payload\"",
             WORD_AFTER_URL,
-            highlightedWord("payload=\"$payload\""),
+            highlightedWord(WORD_AFTER_URL, "payload=\"$payload\""),
         )
     }
 
@@ -126,7 +126,7 @@ class TtsRichLeafPlacementAndroidTest {
             assertEquals(
                 "the marker did not land on \"$word\" in its rendered leaf",
                 word,
-                highlightedWord("word=\"$word\" chunk=$chunkIndex payload=\"$payload\" offset=$offset"),
+                highlightedWord(word, "word=\"$word\" chunk=$chunkIndex payload=\"$payload\" offset=$offset"),
             )
         }
     }
@@ -134,12 +134,14 @@ class TtsRichLeafPlacementAndroidTest {
     /**
      * The characters the rendered word marker currently covers.
      *
-     * The primary range a leaf publishes is `word ?: sentence`, so in a
-     * multi-leaf message every leaf carrying the sentence band also carries a
-     * primary range. Only the leaf whose primary range differs from its own
-     * sentence range is the one holding the word.
+     * A leaf publishes `word ?: sentence` as its primary range. Match the
+     * expected rendered word directly: a one-word inline-code leaf can
+     * legitimately have identical word and sentence ranges.
      */
-    private fun highlightedWord(diagnostic: String = ""): String {
+    private fun highlightedWord(
+        expected: String,
+        diagnostic: String = "",
+    ): String {
         val candidates =
             composeRule
                 .onRoot(useUnmergedTree = true)
@@ -148,11 +150,11 @@ class TtsRichLeafPlacementAndroidTest {
                 .filter { it.config.getOrNull(TtsReadAloudHighlightRangeKey) != null }
         val leaf =
             candidates.firstOrNull { node ->
-                node.config.getOrNull(TtsReadAloudHighlightRangeKey) !=
-                    node.config.getOrNull(TtsReadAloudSentenceHighlightRangeKey)
+                val range = node.config.getOrNull(TtsReadAloudHighlightRangeKey) ?: return@firstOrNull false
+                node.text().substring(range.first, range.last + 1) == expected
             }
         assertNotNull(
-            "no leaf carried a word range distinct from its sentence band; $diagnostic candidates=" +
+            "no leaf carried the expected word range; $diagnostic candidates=" +
                 candidates.joinToString { node ->
                     val primary = node.config.getOrNull(TtsReadAloudHighlightRangeKey)
                     val sentence = node.config.getOrNull(TtsReadAloudSentenceHighlightRangeKey)

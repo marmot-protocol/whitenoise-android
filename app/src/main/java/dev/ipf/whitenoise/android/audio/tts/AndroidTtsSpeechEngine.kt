@@ -12,6 +12,8 @@ internal class AndroidTtsSpeechEngine(
     private val selectedVoice: () -> TtsVoiceKey? = { null },
     private val onVoiceResolved: (TtsVoiceResolution) -> Unit = {},
 ) : TtsSpeechEngine {
+    override val effectiveLocale: Locale? get() = textToSpeech.voice?.locale
+
     /** Applies the utterance locale and then enforces the saved offline voice policy. */
     override fun setLanguage(locale: Locale): Int {
         val status = textToSpeech.setLanguage(locale)

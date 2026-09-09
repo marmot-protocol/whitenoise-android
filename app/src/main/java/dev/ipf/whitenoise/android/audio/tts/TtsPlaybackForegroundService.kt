@@ -225,14 +225,21 @@ class TtsPlaybackForegroundService : Service() {
             PlaybackState
                 .Builder()
                 .setActions(
-                    PlaybackState.ACTION_PLAY or
-                        PlaybackState.ACTION_PAUSE or
-                        PlaybackState.ACTION_PLAY_PAUSE or
-                        PlaybackState.ACTION_STOP or
-                        PlaybackState.ACTION_SKIP_TO_NEXT or
-                        PlaybackState.ACTION_SKIP_TO_PREVIOUS,
+                    if (model.isPreparing) {
+                        PlaybackState.ACTION_STOP
+                    } else {
+                        PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_PLAY_PAUSE or
+                            PlaybackState.ACTION_STOP or PlaybackState.ACTION_SKIP_TO_NEXT or
+                            PlaybackState.ACTION_SKIP_TO_PREVIOUS
+                    },
                 ).setState(
-                    if (model.isPlaying) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,
+                    if (model.isPreparing) {
+                        PlaybackState.STATE_BUFFERING
+                    } else if (model.isPlaying) {
+                        PlaybackState.STATE_PLAYING
+                    } else {
+                        PlaybackState.STATE_PAUSED
+                    },
                     PlaybackState.PLAYBACK_POSITION_UNKNOWN,
                     1f,
                 ).build()
@@ -243,21 +250,35 @@ class TtsPlaybackForegroundService : Service() {
     private fun buildNotification(model: TtsPlaybackSessionModel): Notification {
         ensureChannel(this)
         val style =
-            Notification.MediaStyle().setShowActionsInCompactView(0, 1, 2)
+            Notification.MediaStyle().apply {
+                if (model.isPreparing) setShowActionsInCompactView(0) else setShowActionsInCompactView(0, 1, 2)
+            }
         mediaSession?.let { style.setMediaSession(it.sessionToken) }
-        return Notification
-            .Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_whitenoise)
-            .setContentTitle(getString(R.string.tts_playback_notification_title))
-            .setContentText(getString(R.string.tts_playback_notification_text))
-            .setContentIntent(openAppIntent())
-            .setDeleteIntent(actionIntent(ACTION_DISMISS))
-            .setStyle(style)
-            // The text is generic by design, so lock-screen transport controls
-            // can show without exposing anything private.
-            .setVisibility(Notification.VISIBILITY_PUBLIC)
-            .setOngoing(model.isPlaying)
-            .setShowWhen(false)
+        val builder =
+            Notification
+                .Builder(this, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_stat_whitenoise)
+                .setContentTitle(getString(R.string.tts_playback_notification_title))
+                .setContentText(getString(R.string.tts_playback_notification_text))
+                .setContentIntent(openAppIntent())
+                .setDeleteIntent(actionIntent(ACTION_DISMISS))
+                .setStyle(style)
+                // The text is generic by design, so lock-screen transport controls
+                // can show without exposing anything private.
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
+                .setOngoing(model.isPlaying || model.isPreparing)
+                .setShowWhen(false)
+        if (model.isPreparing) {
+            return builder
+                .addAction(
+                    action(
+                        android.R.drawable.ic_menu_close_clear_cancel,
+                        R.string.tts_playback_action_stop,
+                        ACTION_STOP,
+                    ),
+                ).build()
+        }
+        return builder
             .addAction(
                 action(
                     android.R.drawable.ic_media_previous,

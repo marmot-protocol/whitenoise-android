@@ -42,6 +42,8 @@ internal suspend fun projectTtsSpeakableEntry(
                 timelineAt = message.recordedAt,
                 spokenTextSpans = projection.toTtsSpans(),
                 projectionId = projection.projectionId,
+                speechRoles = projection.speechRoles,
+                visibleLeaves = projection.visibleLeaves,
             )
         }
 }

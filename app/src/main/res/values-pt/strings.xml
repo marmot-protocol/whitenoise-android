@@ -1471,6 +1471,10 @@
     <string name="tts_voice_unavailable">Nenhuma voz off-line disponível</string>
     <string name="tts_voice_effective_fallback">A voz salva não está disponível; usando %1$s</string>
     <string name="speak_aloud">Ler em voz alta</string>
+    <string name="read_code_literally">Ler o código literalmente</string>
+    <string name="tts_read_from_sentence">Ler a partir desta frase</string>
+    <string name="tts_choose_sentence">Escolher a frase para ler</string>
+    <string name="tts_bar_preparing">Preparando a leitura…</string>
     <string name="tts_bar_pause">Pausar leitura</string>
     <string name="tts_bar_play">Retomar leitura</string>
     <string name="tts_bar_skip_previous">Frase anterior</string>

@@ -1533,6 +1533,10 @@
     <string name="tts_voice_unavailable">Нет доступного офлайн-голоса</string>
     <string name="tts_voice_effective_fallback">Сохранённый голос недоступен; используется %1$s</string>
     <string name="speak_aloud">Прочитать вслух</string>
+    <string name="read_code_literally">Прочитать код буквально</string>
+    <string name="tts_read_from_sentence">Читать с этого предложения</string>
+    <string name="tts_choose_sentence">Выбрать предложение для чтения</string>
+    <string name="tts_bar_preparing">Подготовка озвучивания…</string>
     <string name="tts_bar_pause">Приостановить чтение</string>
     <string name="tts_bar_play">Продолжить чтение</string>
     <string name="tts_bar_skip_previous">Предыдущее предложение</string>

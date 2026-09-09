@@ -1623,6 +1623,7 @@
     <string name="tts_voice_unavailable">No offline voice available</string>
     <string name="tts_voice_effective_fallback">Saved voice unavailable; using %1$s</string>
     <string name="speak_aloud">Speak aloud</string>
+    <string name="read_code_literally">Read code literally</string>
     <string name="tts_bar_pause">Pause reading</string>
     <string name="tts_bar_play">Resume reading</string>
     <string name="tts_bar_skip_previous">Previous sentence</string>
@@ -1868,4 +1869,7 @@
     <string name="setup_details">Details</string>
     <string name="setup_hide_details">Hide details</string>
     <string name="setup_opening_chats">Opening your chats…</string>
+    <string name="tts_read_from_sentence">Read from this sentence</string>
+    <string name="tts_choose_sentence">Choose sentence to read</string>
+    <string name="tts_bar_preparing">Preparing speech…</string>
 </resources>

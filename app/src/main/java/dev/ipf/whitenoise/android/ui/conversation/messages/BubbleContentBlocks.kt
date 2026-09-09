@@ -36,6 +36,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
@@ -56,6 +58,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
+import dev.ipf.whitenoise.android.ui.TtsSentenceActions
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
@@ -77,6 +80,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.SharedUser
 import dev.ipf.whitenoise.android.ui.conversation.share.UserMessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.share.formatCoordinate
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
+import dev.ipf.whitenoise.android.ui.ttsSentenceAccessibilityActions
 import kotlin.math.ceil
 
 internal fun ttsBodyIsCollapsed(
@@ -462,6 +466,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     plainTextSelectionModifier: Modifier,
     onPlainTextLayout: (TextLayoutResult) -> Unit,
     ttsLeafHighlightResolver: TtsLeafHighlightResolver? = null,
+    ttsSentenceActions: TtsSentenceActions? = null,
     ttsSentenceLayoutReporter: TtsSentenceLayoutReporter? = null,
     ttsReadAloudProgress: TtsReadAloudProgress? = null,
     selectionWrapper: @Composable (@Composable () -> Unit) -> Unit,
@@ -630,6 +635,12 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                         onCopyLink = onCopyMarkdownLink,
                         deferLinkActivation = deferMarkdownLinkActivation,
                         ttsLeafHighlightResolver = presentedTtsLeafHighlightResolver,
+                        ttsSentenceActions =
+                            ttsSentenceActions.takeUnless {
+                                textSelectionMode ||
+                                    bodyIsCollapsed ||
+                                    bodyCollapsePending
+                            },
                         ttsReadAloudHighlightStyle = highlightStyle,
                         ttsSentenceLayoutReporter = presentedTtsSentenceLayoutReporter,
                     )
@@ -639,11 +650,22 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                     progress = ttsReadAloudProgress,
                     modifier = bodyMeasurementModifier,
                     messageContent = {
+                        val sentenceActions =
+                            ttsSentenceAccessibilityActions(
+                                "plain",
+                                bodyText,
+                                ttsSentenceActions.takeUnless {
+                                    textSelectionMode ||
+                                        bodyIsCollapsed ||
+                                        bodyCollapsePending
+                                },
+                            )
                         Text(
                             bodyText,
                             style = MaterialTheme.typography.bodyLarge,
                             modifier =
                                 plainTextSelectionModifier
+                                    .semantics { customActions = sentenceActions }
                                     .then(plainHighlightModifier)
                                     .onGloballyPositioned { coordinates ->
                                         plainLayoutCoordinates = coordinates

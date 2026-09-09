@@ -29,7 +29,14 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownListItemFfi
 import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
+import dev.ipf.whitenoise.android.audio.tts.TtsRangeTracker
+import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.TtsSpokenTextSpan
+import dev.ipf.whitenoise.android.audio.tts.TtsTextRange
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
+import dev.ipf.whitenoise.android.audio.tts.prepareSpeech
+import dev.ipf.whitenoise.android.audio.tts.preparedQueuedMessage
+import dev.ipf.whitenoise.android.audio.tts.speech.SpeechContext
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightStyle
@@ -54,6 +61,54 @@ import java.util.Locale
 class MessageBubbleTtsHighlightScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun expandedAmountHighlightsOriginalAtomLight() {
+        renderExpandedAmount(dark = false, large = false)
+        capture("message_bubble_tts_expanded_amount_light")
+    }
+
+    @Test
+    fun expandedAmountHighlightsOriginalAtomDarkLargeFont() {
+        renderExpandedAmount(dark = true, large = true)
+        capture("message_bubble_tts_expanded_amount_dark_large_font")
+    }
+
+    private fun renderExpandedAmount(
+        dark: Boolean,
+        large: Boolean,
+    ) {
+        val text = "Pay $12.50. Then pay $12.50."
+        val projection = legacyTextToSpeakableProjection(text)
+        val entry =
+            TtsSpeakableEntry(
+                "alice",
+                "",
+                projection.text,
+                "m1",
+                projectionId = projection.projectionId,
+                spokenTextSpans =
+                    projection.spans.map {
+                        TtsSpokenTextSpan(
+                            TtsTextRange(it.spokenStart, it.spokenEnd),
+                            TtsVisibleTextSpan(it.leafId, it.visibleStart, it.visibleEnd),
+                        )
+                    },
+            )
+        val prepared = requireNotNull(entry.prepareSpeech(SpeechContext(Locale.US)))
+        val chunk = requireNotNull(preparedQueuedMessage(prepared, "alice", "", 4000)).chunks.last()
+        val tracker = TtsRangeTracker().apply { record(chunk) }
+        val start = chunk.text.indexOf("fifty")
+        val passage = requireNotNull(tracker.passageForRange(chunk, start, start + 5))
+        val resolver = buildTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = dark, amoled = false, fontScale = if (large) 1.3f else 1f) {
+                BubbleFixture(mine = false, tag = TAG) { style ->
+                    HighlightedPlainLeaf(text = text, resolver = resolver, style = style)
+                }
+            }
+        }
+    }
 
     @Test
     fun plainIncomingWordHighlightLight() {

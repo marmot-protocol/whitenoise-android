@@ -156,6 +156,7 @@ internal fun ConversationTtsAutoReadEffects(
                     controller.group.groupIdHex,
                     entries,
                     Locale.getDefault(),
+                    backgroundPreparation = true,
                 )
             if (!started && appState.ttsController.lastStartFailure == TtsStartFailure.MediaNotActive) {
                 appState.present(R.string.tts_media_mix_no_active_media)
@@ -243,13 +244,19 @@ internal fun ConversationTtsAutoReadEffects(
                 }.first { it.isNotEmpty() }
             } ?: return@LaunchedEffect
         val ttsState = appState.ttsController.state.value
-        if (ttsState is TtsState.Speaking || ttsState is TtsState.Paused) return@LaunchedEffect
+        if (ttsState is TtsState.Speaking ||
+            ttsState is TtsState.Paused ||
+            ttsState is TtsState.Preparing
+        ) {
+            return@LaunchedEffect
+        }
         if (!appState.isConversationAutoRead(controller.group.groupIdHex)) return@LaunchedEffect
         val started =
             appState.speakAloudAutoRead(
                 controller.group.groupIdHex,
                 entries,
                 Locale.getDefault(),
+                backgroundPreparation = true,
             )
         if (!started && appState.ttsController.lastStartFailure == TtsStartFailure.MediaNotActive) {
             appState.present(R.string.tts_media_mix_no_active_media)

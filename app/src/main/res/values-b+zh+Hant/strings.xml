@@ -1444,6 +1444,10 @@
     <string name="tts_voice_unavailable">沒有可用的離線語音</string>
     <string name="tts_voice_effective_fallback">已儲存的語音無法使用；目前使用 %1$s</string>
     <string name="speak_aloud">朗讀</string>
+    <string name="read_code_literally">逐字朗讀程式碼</string>
+    <string name="tts_read_from_sentence">從此句開始朗讀</string>
+    <string name="tts_choose_sentence">選擇要朗讀的句子</string>
+    <string name="tts_bar_preparing">正在準備語音…</string>
     <string name="tts_bar_pause">暫停朗讀</string>
     <string name="tts_bar_play">繼續朗讀</string>
     <string name="tts_bar_skip_previous">上一句</string>

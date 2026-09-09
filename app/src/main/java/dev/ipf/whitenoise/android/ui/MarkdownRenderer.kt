@@ -152,6 +152,7 @@ internal fun MarkdownMessageBody(
     ttsLeafHighlightResolver: TtsLeafHighlightResolver? = null,
     ttsReadAloudHighlightStyle: TtsReadAloudHighlightStyle? = null,
     ttsSentenceLayoutReporter: TtsSentenceLayoutReporter? = null,
+    ttsSentenceActions: TtsSentenceActions? = null,
 ) {
     val context = LocalContext.current
     // A tapped spoofable `[label](url)` link parks its destination here until
@@ -196,6 +197,7 @@ internal fun MarkdownMessageBody(
         LocalSelectableTextLayoutReporter provides onSelectableTextLayoutChanged,
         LocalMarkdownLinkTextLayoutReporter provides onLinkTextLayoutChanged,
         LocalMarkdownLinkCopyHandler provides onCopyLink,
+        LocalTtsSentenceActions provides ttsSentenceActions,
         LocalTtsLeafHighlightResolver provides ttsLeafHighlightResolver,
         LocalTtsReadAloudHighlightStyle provides ttsReadAloudHighlightStyle,
         LocalTtsSentenceLayoutReporter provides ttsSentenceLayoutReporter,
@@ -322,6 +324,8 @@ internal data class MarkdownLinkTextLayout(
 private val LocalSelectableTextLayoutReporter =
     staticCompositionLocalOf<SelectableTextLayoutReporter?> { null }
 
+private val LocalTtsSentenceActions = staticCompositionLocalOf<TtsSentenceActions?> { null }
+
 private val LocalTtsLeafHighlightResolver =
     compositionLocalOf<TtsLeafHighlightResolver?> { null }
 
@@ -402,19 +406,20 @@ private fun MarkdownBodyText(
         sentenceLayoutReporter?.invoke(leafId, text.text, measuredLayout, coordinates)
     }
 
+    val speechActions = ttsSentenceAccessibilityActions(leafId, text.text, LocalTtsSentenceActions.current)
     val accessibilityModifier =
-        if (onCopyLink == null || linkDestinations.isEmpty()) {
-            Modifier
-        } else {
-            Modifier.semantics {
-                customActions =
+        Modifier.semantics {
+            customActions = speechActions +
+                if (onCopyLink == null) {
+                    emptyList()
+                } else {
                     linkDestinations.map { destination ->
                         CustomAccessibilityAction("$copyLabel: ${markdownSafeDisplayText(destination)}") {
                             onCopyLink(destination)
                             true
                         }
                     }
-            }
+                }
         }
 
     Text(

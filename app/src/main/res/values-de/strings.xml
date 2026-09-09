@@ -1469,6 +1469,10 @@
     <string name="tts_voice_unavailable">Keine Offline-Stimme verfügbar</string>
     <string name="tts_voice_effective_fallback">Gespeicherte Stimme nicht verfügbar; %1$s wird verwendet</string>
     <string name="speak_aloud">Vorlesen</string>
+    <string name="read_code_literally">Code zeichengetreu vorlesen</string>
+    <string name="tts_read_from_sentence">Ab diesem Satz vorlesen</string>
+    <string name="tts_choose_sentence">Satz zum Vorlesen auswählen</string>
+    <string name="tts_bar_preparing">Sprachausgabe wird vorbereitet…</string>
     <string name="tts_bar_pause">Vorlesen pausieren</string>
     <string name="tts_bar_play">Vorlesen fortsetzen</string>
     <string name="tts_bar_skip_previous">Vorheriger Satz</string>

@@ -2,11 +2,17 @@ package dev.ipf.whitenoise.android.audio.tts
 
 import android.os.SystemClock
 import android.speech.tts.TextToSpeech
-import dev.ipf.whitenoise.android.state.StalenessGuard
+import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSpeechMessage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 internal interface TtsSpeechEngine {
+    val effectiveLocale: Locale? get() = null
+
     fun setLanguage(locale: Locale): Int
 
     fun setSpeechRate(rate: Float)
@@ -77,9 +83,11 @@ internal enum class TtsStartFailure {
  * estimated schedule replays synthetic range callbacks through the exact same
  * queue validation. The first real engine range wins permanently — the
  * estimate never paints another word once the engine has proven it reports
- * timing.
+ * timing. Queue preparation, history navigation, persistence, and pace tracking
+ * live in smaller collaborators; the remaining methods intentionally share the
+ * engine/session lock owned by this class.
  */
-@Suppress("LongParameterList", "TooManyFunctions")
+@Suppress("LargeClass", "LongParameterList", "TooManyFunctions")
 class TtsController internal constructor(
     private val audioFocus: TtsAudioFocus,
     private val maxChunkLength: Int = TextToSpeech.getMaxSpeechInputLength(),
@@ -98,28 +106,15 @@ class TtsController internal constructor(
         const val MAX_SPEECH_VOLUME = 1f
     }
 
+    private val preparation = TtsQueuePreparation(maxChunkLength)
+
     private var engine: TtsSpeechEngine? = null
     private var engineKey: String = ""
     private val rangeProbe = TtsRangeCapabilityProbe()
-    private val paceCalibrator = TtsPaceCalibrator()
+    private val pace = TtsPaceTracker(timingStore, { engineKey }, clock)
     private val utteranceRates = mutableMapOf<String, Float>()
     private var activeTiming: ActiveUtteranceTiming? = null
 
-    // Pace measurement state. Its lifetime is deliberately NOT activeTiming's:
-    // the opener has to survive its own onDone, because the gap it opened is
-    // only closed by the NEXT utterance's onStart. Clearing it alongside
-    // activeTiming would refuse every gap there is.
-    //
-    // engineQueueLifetime counts engine-queue replacements. The queue stops and
-    // re-enqueues the engine on every disruptive path - start, pause, stop,
-    // failure, and every requeue, which is also how a speech-rate change lands
-    // - and it advances its own generation on exactly those paths. So an
-    // opener stamped with the epoch its utterance was submitted under is
-    // rejected by a single equality if anything replaced the queue in between.
-    private val engineQueueLifetime = StalenessGuard()
-    private var gapOpener: TtsPaceGapOpener? = null
-    private var engineHasSpoken = false
-    private var bootstrapRetired = false
     private var activeFocusMode = TtsAudioFocusMode.Full
 
     internal var lastStartFailure: TtsStartFailure = TtsStartFailure.None
@@ -150,7 +145,7 @@ class TtsController internal constructor(
                 // bootstrapRetired survive too: the voice does not go cold
                 // again because a session ended, and re-colding it here would
                 // refuse the only gap a two-sentence message produces.
-                engineQueueLifetime.advance()
+                pace.onQueueReplaced()
                 engine?.stop()
             },
             enqueue = { chunk, utteranceId ->
@@ -177,6 +172,10 @@ class TtsController internal constructor(
             onTerminal = ::releaseTerminalAudioFocus,
         )
 
+    private val preparationRequests =
+        dev.ipf.whitenoise.android.state
+            .StalenessGuard()
+
     val state: StateFlow<TtsState> = queue.state
 
     @Synchronized
@@ -197,10 +196,10 @@ class TtsController internal constructor(
         rangeProbe.restore(null)
         capabilityLocale = null
         rangeVerdictKey = ""
-        paceCalibrator.reset(storedPace())
+        pace.resetCalibration()
         utteranceRates.clear()
         activeTiming = null
-        resetPaceMeasurement()
+        pace.resetMeasurements()
         engine.setCallbacks(::onStart, ::onDone, ::onError, ::onRangeStart, ::onStop)
     }
 
@@ -216,7 +215,7 @@ class TtsController internal constructor(
         rangeVerdictKey = ""
         utteranceRates.clear()
         activeTiming = null
-        resetPaceMeasurement()
+        pace.resetMeasurements()
     }
 
     /** Starts a queue only after engine, media, focus, and language gates succeed. */
@@ -233,34 +232,100 @@ class TtsController internal constructor(
         locale: Locale,
         startSentenceIndex: Int = 0,
     ): Boolean {
+        preparationRequests.advance()
+        return speakPrepared(entries, locale, startSentenceIndex)
+    }
+
+    private fun speakPrepared(
+        entries: List<TtsSpeakableEntry>,
+        locale: Locale,
+        startSentenceIndex: Int,
+        preparedMessages: List<TtsQueuedMessage>? = null,
+    ): Boolean {
         lastStartFailure = TtsStartFailure.None
-        val activeEngine =
-            engine ?: run {
+        val activeEngine = engine
+        val messages =
+            if (activeEngine == null) {
                 lastStartFailure = TtsStartFailure.EngineUnavailable
-                return false
-            }
-        val messages = entries.toQueuedMessages(locale)
-        if (messages.isEmpty()) {
+                null
+            } else {
+                prepareFocus(entries)?.let { focus ->
+                    prepareStartMessages(activeEngine, entries, locale, preparedMessages, focus)?.let { it to focus }
+                }
+            } ?: return false
+        return startPreparedQueue(messages.first, messages.second, locale, startSentenceIndex)
+    }
+
+    private fun startPreparedQueue(
+        messages: List<TtsQueuedMessage>,
+        focus: TtsStartFocus,
+        locale: Locale,
+        startSentenceIndex: Int,
+    ): Boolean {
+        if (capabilityLocale != locale) {
+            rangeVerdictKey = restoreTtsRangeCapability(rangeProbe, timingStore, engineKey, locale)
+        }
+        capabilityLocale = locale
+        activeFocusMode = focus.requestedMode
+        queue.start(messages, startSentenceIndex = startSentenceIndex.coerceAtLeast(0))
+        return state.value !is TtsState.Error
+    }
+
+    private fun prepareFocus(entries: List<TtsSpeakableEntry>): TtsStartFocus? {
+        if (boundedSpeakableEntries(entries).isEmpty()) {
             lastStartFailure = TtsStartFailure.EmptyContent
-            return false
+            return null
         }
         val requestedFocusMode =
             if (mediaMixEnabled()) TtsAudioFocusMode.MediaMix else TtsAudioFocusMode.Full
         val previousFocusMode = activeFocusMode
         val hadSpeakingQueue = state.value is TtsState.Speaking
-        if (requestedFocusMode == TtsAudioFocusMode.MediaMix && !isMediaPlaybackActive()) {
-            lastStartFailure = TtsStartFailure.MediaNotActive
-            return false
+        return when {
+            requestedFocusMode == TtsAudioFocusMode.MediaMix && !isMediaPlaybackActive() -> {
+                lastStartFailure = TtsStartFailure.MediaNotActive
+                null
+            }
+            !acquireAudioFocus(requestedFocusMode) -> {
+                lastStartFailure = TtsStartFailure.AudioFocusDenied
+                restorePreviousFocusIfNeeded(hadSpeakingQueue, previousFocusMode)
+                null
+            }
+            else -> TtsStartFocus(requestedFocusMode, previousFocusMode, hadSpeakingQueue)
         }
-        if (!acquireAudioFocus(requestedFocusMode)) {
-            lastStartFailure = TtsStartFailure.AudioFocusDenied
-            restorePreviousFocusIfNeeded(hadSpeakingQueue, previousFocusMode)
-            return false
-        }
-        queueLocale = locale
+    }
 
+    private fun prepareStartMessages(
+        activeEngine: TtsSpeechEngine,
+        entries: List<TtsSpeakableEntry>,
+        locale: Locale,
+        preparedMessages: List<TtsQueuedMessage>?,
+        focus: TtsStartFocus,
+    ): List<TtsQueuedMessage>? {
         val languageStatus = activeEngine.setLanguage(locale)
-        if (languageStatus < TextToSpeech.LANG_AVAILABLE) {
+        val effectiveLocale = activeEngine.effectiveLocale ?: locale
+        if (preparedMessages != null && effectiveLocale != locale) {
+            audioFocus.release()
+            lastStartFailure = TtsStartFailure.UnsupportedLanguage
+            return null
+        }
+        val messages = preparedMessages ?: with(preparation) { entries.toQueuedMessages(effectiveLocale) }
+        return validateStartMessages(messages, effectiveLocale, languageStatus, focus)
+    }
+
+    private fun validateStartMessages(
+        messages: List<TtsQueuedMessage>,
+        effectiveLocale: Locale,
+        languageStatus: Int,
+        focus: TtsStartFocus,
+    ): List<TtsQueuedMessage>? {
+        if (messages.isEmpty()) {
+            lastStartFailure = TtsStartFailure.EmptyContent
+            audioFocus.release()
+            restorePreviousFocusIfNeeded(focus.wasSpeaking, focus.previousMode)
+            return null
+        }
+        queueLocale = effectiveLocale
+        return if (languageStatus < TextToSpeech.LANG_AVAILABLE) {
             lastStartFailure = TtsStartFailure.UnsupportedLanguage
             val chunkCount = messages.sumOf { it.chunks.size }
             queue.failBeforePlayback(
@@ -269,31 +334,117 @@ class TtsController internal constructor(
                 messageCount = messages.size,
                 messagePreview = messages.first().preview,
             )
-            return false
+            null
+        } else {
+            messages
         }
-        if (capabilityLocale != locale) {
-            rangeVerdictKey = ttsRangeVerdictKey(engineKey, locale)
-            val scopedVerdict = timingStore?.rangeVerdict(rangeVerdictKey)
-            // Older versions persisted one verdict per engine. Use it only as
-            // provisional fallback evidence; the first conclusion in this
-            // locale migrates it to the scoped key without deleting the legacy
-            // value needed by locales that have not yet been observed.
-            val legacyVerdict = if (scopedVerdict == null) timingStore?.rangeVerdict(engineKey) else null
-            rangeProbe.restore(scopedVerdict ?: legacyVerdict)
+    }
+
+    /** Text work runs outside the controller lock; only its current owner can commit. */
+    internal suspend fun speakAsync(
+        entries: List<TtsSpeakableEntry>,
+        locale: Locale,
+        startSentenceIndex: Int = 0,
+        onPreparing: () -> Boolean,
+    ): Boolean {
+        val ticket = synchronized(this) { preparationTicket(entries, locale) } ?: return false
+        try {
+            return if (!onPreparing()) false else completePreparation(ticket, entries, startSentenceIndex)
+        } finally {
+            synchronized(this) {
+                if (preparationRequests.isCurrent(ticket.first) && state.value is TtsState.Preparing) stop()
+            }
         }
-        capabilityLocale = locale
-        activeFocusMode = requestedFocusMode
-        queue.start(messages, startSentenceIndex = startSentenceIndex.coerceAtLeast(0))
-        return state.value !is TtsState.Error
+    }
+
+    private suspend fun completePreparation(
+        ticket: Triple<Long, TtsSpeechEngine, Locale>,
+        entries: List<TtsSpeakableEntry>,
+        startSentenceIndex: Int,
+    ): Boolean {
+        val messages =
+            withContext(Dispatchers.Default) {
+                val job = currentCoroutineContext()
+                with(preparation) {
+                    entries.toQueuedMessages(ticket.third) {
+                        !job.isActive ||
+                            !preparationRequests.isCurrent(ticket.first)
+                    }
+                }
+            }
+        return synchronized(this) {
+            if (!preparationRequests.isCurrent(ticket.first) ||
+                engine !== ticket.second ||
+                (ticket.second.effectiveLocale ?: ticket.third) != ticket.third
+            ) {
+                return@synchronized false
+            }
+            speakPrepared(entries, ticket.third, startSentenceIndex, messages)
+        }
+    }
+
+    private fun validatedEngine(entries: List<TtsSpeakableEntry>): TtsSpeechEngine? {
+        val activeEngine = engine
+        val failure =
+            when {
+                activeEngine == null -> TtsStartFailure.EngineUnavailable
+                boundedSpeakableEntries(entries).isEmpty() -> TtsStartFailure.EmptyContent
+                mediaMixEnabled() && !isMediaPlaybackActive() -> TtsStartFailure.MediaNotActive
+                else -> null
+            }
+        if (failure != null) lastStartFailure = failure
+        return if (failure == null) activeEngine else null
+    }
+
+    private fun preparationTicket(
+        entries: List<TtsSpeakableEntry>,
+        locale: Locale,
+    ): Triple<Long, TtsSpeechEngine, Locale>? {
+        return validatedEngine(entries)?.let { activeEngine ->
+            val requestedMode = if (mediaMixEnabled()) TtsAudioFocusMode.MediaMix else TtsAudioFocusMode.Full
+            val previousMode = activeFocusMode
+            val wasSpeaking = state.value is TtsState.Speaking
+            if (!prepareAsyncLanguage(activeEngine, locale, TtsStartFocus(requestedMode, previousMode, wasSpeaking))) {
+                return null
+            }
+            val effective = activeEngine.effectiveLocale ?: locale
+            val generation = preparationRequests.advance()
+            activeFocusMode = requestedMode
+            queueLocale = effective
+            queue.beginTextPreparation()
+            Triple(generation, activeEngine, effective)
+        }
+    }
+
+    private fun prepareAsyncLanguage(
+        activeEngine: TtsSpeechEngine,
+        locale: Locale,
+        focus: TtsStartFocus,
+    ): Boolean {
+        val failure =
+            when {
+                !acquireAudioFocus(focus.requestedMode) -> TtsStartFailure.AudioFocusDenied
+                activeEngine.setLanguage(locale) < TextToSpeech.LANG_AVAILABLE -> {
+                    audioFocus.release()
+                    TtsStartFailure.UnsupportedLanguage
+                }
+                else -> null
+            }
+        if (failure != null) {
+            lastStartFailure = failure
+            restorePreviousFocusIfNeeded(focus.wasSpeaking, focus.previousMode)
+        }
+        return failure == null
     }
 
     /** Appends more messages to an active read-aloud session (auto-read). */
     @Synchronized
     fun appendSpeech(
         entry: TtsSpeakableEntry,
-        locale: Locale,
+        // Retained for callers; appends must use the active session's resolved locale.
+        @Suppress("UnusedParameter") locale: Locale,
     ): Boolean {
-        val message = entry.toQueuedMessage(locale)
+        val message = with(preparation) { entry.toQueuedMessage(queueLocale) }
         return message != null && queue.append(listOf(message))
     }
 
@@ -330,8 +481,9 @@ class TtsController internal constructor(
 
     @Synchronized
     fun stop() {
+        preparationRequests.advance()
         when (state.value) {
-            is TtsState.Speaking -> {
+            is TtsState.Speaking, is TtsState.Preparing -> {
                 queue.stop()
                 audioFocus.release()
             }
@@ -373,6 +525,21 @@ class TtsController internal constructor(
     fun seekToSentence(
         messageIdHex: String,
         sentenceIndex: Int,
+        expectedProjectionId: String? = null,
+    ): TtsSeekResult {
+        val queued = queue.queuedMessagesSnapshot().firstOrNull { it.messageIdHex == messageIdHex }
+        if (queued != null &&
+            expectedProjectionId != null &&
+            queued.projectionId != expectedProjectionId
+        ) {
+            return TtsSeekResult.SentenceOutOfRange
+        }
+        return seekValidatedSentence(messageIdHex, sentenceIndex)
+    }
+
+    private fun seekValidatedSentence(
+        messageIdHex: String,
+        sentenceIndex: Int,
     ): TtsSeekResult {
         val wasPaused = state.value is TtsState.Paused
         // A tap-to-jump is a playback intent. Do not silently move the paused
@@ -398,11 +565,51 @@ class TtsController internal constructor(
      */
     @Synchronized
     internal fun settleEdgeRequest(settlement: TtsEdgeSettlement) {
-        val wasSpeaking = state.value is TtsState.Speaking
+        val wasSpeaking = state.value is TtsState.Speaking || state.value is TtsState.Preparing
         queue.settleEdgeRequest(settlement)
         // A settle that parks the session has nothing left to speak, so focus
         // goes back exactly as it does for a user-driven pause.
         if (wasSpeaking && state.value is TtsState.Paused) audioFocus.release()
+    }
+
+    @Synchronized
+    internal fun deferForTargetSeek(): Boolean = queue.deferForTargetSeek()
+
+    /** Commit a freshly revalidated seek target without replacing the playback session. */
+    @Synchronized
+    internal fun installSeekTarget(
+        entry: TtsSpeakableEntry,
+        sentenceOrdinal: Int,
+        sessionId: Long,
+        projectionId: String,
+    ): Boolean {
+        if (state.value.sessionId != sessionId || !canNavigate() || entry.projectionId != projectionId) return false
+        return with(preparation) { entry.toQueuedMessage(queueLocale) }
+            ?.takeIf { target -> target.chunks.any { it.sentenceIndex == sentenceOrdinal } }
+            ?.let { target -> installPreparedSeekTarget(entry, sentenceOrdinal, target) } ?: false
+    }
+
+    private fun installPreparedSeekTarget(
+        entry: TtsSpeakableEntry,
+        sentenceOrdinal: Int,
+        target: TtsQueuedMessage,
+    ): Boolean {
+        val current = queue.queuedMessagesSnapshot()
+        val direction =
+            if (entry.timelineAt <
+                (current.firstOrNull()?.timelineAt ?: 0uL)
+            ) {
+                TtsHistoryDirection.Older
+            } else {
+                TtsHistoryDirection.Newer
+            }
+        val merged = TtsHistoryWindow.merge(current, listOf(target), direction, entry.messageIdHex)
+        val wasPaused = state.value is TtsState.Paused
+        if (wasPaused && !acquireAudioFocus()) return false
+        val installed = queue.replaceWindow(merged, entry.messageIdHex, TtsWindowSentenceTarget.First, sentenceOrdinal)
+        if (installed && wasPaused) queue.resume()
+        if (!installed && wasPaused) audioFocus.release()
+        return installed
     }
 
     /** Message ids of the queued window in playback order, empty ids included. */
@@ -428,7 +635,13 @@ class TtsController internal constructor(
         targetSentence: TtsWindowSentenceTarget,
     ): Boolean {
         val incoming =
-            if (canNavigate()) entries.mapNotNull { it.toQueuedMessage(queueLocale) } else emptyList()
+            if (canNavigate()) {
+                with(
+                    preparation,
+                ) { entries.mapNotNull { it.toQueuedMessage(queueLocale) } }
+            } else {
+                emptyList()
+            }
         // An empty extension has nothing to land on, so repositioning onto the
         // existing target would jump playback without adding any history.
         return if (incoming.isEmpty()) {
@@ -445,104 +658,12 @@ class TtsController internal constructor(
         }
     }
 
-    /** Loads the calibrated pace for the active engine voice, falling back to the safe default. */
-    private fun storedPace(): Double {
-        val stored = timingStore?.msPerUnitAt1x(engineKey)
-        return stored ?: TtsWordTimingEstimate.DEFAULT_MS_PER_UNIT_AT_1X
-    }
-
-    /** Starts a new engine-queue lifetime and clears voice-specific pace evidence. */
-    private fun resetPaceMeasurement() {
-        engineQueueLifetime.advance()
-        gapOpener = null
-        engineHasSpoken = false
-        bootstrapRetired = false
-    }
-
-    /**
-     * Records that the opener finished, and how many chunks the queue held when
-     * it did. Read before the queue advances, so the count is the one that was
-     * available to follow this utterance - which is what separates an auto-read
-     * message appended behind a still-speaking opener from one appended long
-     * after the queue ran dry.
-     */
-    private fun closePaceGapOpener(completedChunkIndex: Int) {
-        val opener = gapOpener ?: return
-        if (!engineQueueLifetime.isCurrent(opener.epoch) || opener.chunkIndex != completedChunkIndex) return
-        gapOpener = opener.copy(completed = true, chunkCountAtCompletion = state.value.chunkCount)
-    }
-
-    /**
-     * Closes the gap the previous utterance opened, if it measured anything.
-     *
-     * Only a gap sample is persisted. The bootstrap below is allowed to steer
-     * the estimate within this process, but the number written against a voice
-     * has to be one this app can defend, and a bootstrap sample carries a
-     * deduction nobody has measured. Because every accepted sample blends into
-     * the same field, the calibrator is re-seeded from storage before the FIRST
-     * gap is believed - otherwise the first thing persisted would be
-     * three-quarters bootstrap. The re-seed is only kept if that gap is
-     * actually accepted.
-     */
-    private fun observePaceGap(
-        startingChunkIndex: Int,
-        startingAtMs: Long,
-    ) {
-        val outcome =
-            ttsPaceOutcomeOf(
-                gapOpener,
-                engineQueueLifetime.capture(),
-                startingChunkIndex,
-                startingAtMs,
-            )
-        val sample = (outcome as? TtsPaceOutcome.Measured)?.sample ?: return
-        val bootstrapPace = paceCalibrator.msPerUnitAt1x
-        if (!bootstrapRetired) paceCalibrator.reset(storedPace())
-        val observation = paceCalibrator.observe(sample.units, sample.elapsedMs, sample.rate)
-        if (observation == TtsPaceObservation.Rejected) {
-            if (!bootstrapRetired) paceCalibrator.reset(bootstrapPace)
-            return
-        }
-        bootstrapRetired = true
-        // Persisted on ACCEPTANCE, not on movement: a voice whose pace already
-        // matches the value held has still been measured, and a store that only
-        // remembers changes forgets exactly those voices.
-        timingStore?.setMsPerUnitAt1x(engineKey, paceCalibrator.msPerUnitAt1x)
-    }
-
-    /**
-     * The bootstrap lane: one utterance's own start-to-done interval, minus the
-     * lead-in the estimate assumes.
-     *
-     * It is kept because a single-sentence message is one utterance and closes
-     * no gap, so removing it would leave "read one message" permanently on the
-     * seeded default. It is never persisted, and it is retired for good once a
-     * gap has measured this engine, because the interval it uses contains an
-     * engine-specific offset this process cannot see - see [ttsPaceOutcomeOf].
-     *
-     * Its guards are deliberately left exactly as they were. The deduction it
-     * carries is worth least on a short utterance, and tightening the floor for
-     * that is a real question - but it is a question about the lane this change
-     * supersedes, and it cannot be asserted observably from here, so it is not
-     * smuggled in untested.
-     */
-    private fun observeBootstrapPace(
-        chunk: TtsChunk,
-        timing: ActiveUtteranceTiming,
-    ) {
-        if (bootstrapRetired) return
-        val elapsedSinceStart = clock() - timing.startedAt
-        if (elapsedSinceStart <= TTS_ESTIMATED_AUDIO_LEAD_IN_MS) return
-        paceCalibrator.observe(
-            unitCount = TtsWordTimingEstimate.weightedLengthOf(chunk.text),
-            elapsedMs = elapsedSinceStart - TTS_ESTIMATED_AUDIO_LEAD_IN_MS,
-            rate = timing.rate,
-        )
-    }
-
     // Navigation never acquires audio focus: while paused it only repositions
     // the queue, and speech starts again on resume().
-    private fun canNavigate(): Boolean = state.value is TtsState.Speaking || state.value is TtsState.Paused
+    private fun canNavigate(): Boolean {
+        val current = state.value
+        return current is TtsState.Speaking || current is TtsState.Paused || current is TtsState.Preparing
+    }
 
     /** Reacquires the session's latched focus policy across pause and seek. */
     private fun acquireAudioFocus(mode: TtsAudioFocusMode = activeFocusMode): Boolean =
@@ -581,18 +702,7 @@ class TtsController internal constructor(
         rangeProbe.onUtteranceStart()
         val appliedRate = utteranceRates[activeUtteranceId] ?: speechRate()
         val startedAt = clock()
-        observePaceGap(chunk.index, startedAt)
-        gapOpener =
-            TtsPaceGapOpener(
-                epoch = engineQueueLifetime.capture(),
-                chunkIndex = chunk.index,
-                startedAtMs = startedAt,
-                rate = appliedRate,
-                units = TtsWordTimingEstimate.weightedLengthOf(chunk.text),
-                endsSentence = ttsUtteranceEndsSentence(chunk.text),
-                wasFirstSpokenByEngine = !engineHasSpoken,
-            )
-        engineHasSpoken = true
+        pace.onStart(chunk, appliedRate, startedAt)
         activeTiming = ActiveUtteranceTiming(activeUtteranceId, startedAt, appliedRate)
         if (rangeProbe.reportsRanges != true) {
             // A stored capable verdict is provisional for evidence collection,
@@ -608,7 +718,7 @@ class TtsController internal constructor(
                         text = chunk.text,
                         locale = chunk.locale,
                         rate = appliedRate,
-                        msPerUnitAt1x = paceCalibrator.msPerUnitAt1x,
+                        msPerUnitAt1x = pace.msPerUnitAt1x,
                     ),
                 emit = ::onEstimatedRange,
             )
@@ -638,8 +748,7 @@ class TtsController internal constructor(
             val timing = activeTiming?.takeIf { it.utteranceId == utteranceId }
             if (timing != null) activeTiming = null
             utteranceId?.let(utteranceRates::remove)
-            closePaceGapOpener(chunk.index)
-            if (timing != null) observeBootstrapPace(chunk, timing)
+            pace.onDone(chunk, timing, state.value.chunkCount)
             if (rangeProbe.onUtteranceDone(chunk.answerableLength())) {
                 timingStore?.setRangeVerdict(rangeVerdictKey, false)
             }
@@ -687,22 +796,7 @@ class TtsController internal constructor(
                 retainVisibleWordOnFallback = rangeProbe.reportsRanges != true,
             )
         if (application != TtsPlaybackQueue.RangeApplication.VisibleWord) return
-        // Confirm on EVERY usable range, not only the first: a verdict restored
-        // from storage is provisional, and confirmation is what stops it being
-        // obeyed for the life of the process after the engine has stopped
-        // earning it. The snapshots are read before confirming, because
-        // onRangeStart sets reportsRanges itself - guards evaluated afterwards
-        // would always be false. A first proof retires the estimate and persists
-        // a newly learned verdict. A legacy engine-only true verdict is written
-        // once to this locale's key when the callback confirms it.
-        val wasProven = rangeProbe.hasConfirmedRangeCapability
-        rangeProbe.onRangeStart()
-        if (!wasProven) {
-            wordTicker.stop()
-            if (timingStore?.rangeVerdict(rangeVerdictKey) != true) {
-                timingStore?.setRangeVerdict(rangeVerdictKey, true)
-            }
-        }
+        confirmTtsRangeCapability(rangeProbe, timingStore, rangeVerdictKey, wordTicker::stop)
     }
 
     @Synchronized
@@ -720,8 +814,9 @@ class TtsController internal constructor(
     }
 
     private fun stopForEngineReplacement() {
+        preparationRequests.advance()
         when (state.value) {
-            is TtsState.Speaking -> {
+            is TtsState.Speaking, is TtsState.Preparing -> {
                 queue.stop()
                 audioFocus.release()
             }
@@ -734,80 +829,21 @@ class TtsController internal constructor(
         }
     }
 
-    private fun List<TtsSpeakableEntry>.toQueuedMessages(locale: Locale): List<TtsQueuedMessage> =
-        boundedSpeakableEntries(this).mapNotNull { it.toQueuedMessage(locale) }
+    val effectiveSpeechLocale: Locale? get() = if (canNavigate()) queueLocale else null
 
-    private fun TtsSpeakableEntry.toQueuedMessage(locale: Locale): TtsQueuedMessage? {
-        val trimStart = text.indexOfFirst { !it.isWhitespace() }.takeIf { it >= 0 } ?: return null
-        val trimEnd = text.indexOfLast { !it.isWhitespace() } + 1
-        val trimmed = text.substring(trimStart, trimEnd)
-        val announcementName = senderDisplayName.trim()
-        val sentenceChunks =
-            TtsChunker.chunk(
-                text = trimmed,
-                locale = locale,
-                maxChunkLength = maxChunkLength,
-                leadingChunkReserve = senderAnnouncementReserve(announcementName),
-            )
-        return sentenceChunks.takeIf { it.isNotEmpty() }?.let { chunks ->
-            TtsQueuedMessage(
-                senderKey = senderKey,
-                senderDisplayName = announcementName,
-                preview = trimmed.take(TTS_PREVIEW_MAX_LENGTH),
-                // The queue reflattens indices itself — sentence identity must survive.
-                chunks =
-                    chunks.map { chunk ->
-                        val sourceStart = trimStart + chunk.sourceStart
-                        val sourceEnd = trimStart + chunk.sourceEnd
-                        chunk.copy(
-                            index = 0,
-                            messageIdHex = messageIdHex,
-                            projectionId = projectionId,
-                            timelineAt = timelineAt,
-                            visibleSpans = spokenTextSpans.forChunk(sourceStart, sourceEnd),
-                        )
-                    },
-                messageIdHex = messageIdHex,
-                projectionId = projectionId,
-                timelineAt = timelineAt,
-            )
-        }
-    }
-
-    private fun List<TtsSpokenTextSpan>.forChunk(
-        sourceStart: Int,
-        sourceEnd: Int,
-    ): List<TtsSpokenTextSpan> =
-        mapNotNull { span ->
-            val start = maxOf(sourceStart, span.spoken.start)
-            val end = minOf(sourceEnd, span.spoken.end)
-            if (start >= end) {
-                null
-            } else {
-                val visibleStart = span.visible.start + (start - span.spoken.start)
-                TtsSpokenTextSpan(
-                    spoken = TtsTextRange(start - sourceStart, end - sourceStart),
-                    visible =
-                        TtsVisibleTextSpan(
-                            leafId = span.visible.leafId,
-                            start = visibleStart,
-                            end = visibleStart + (end - start),
-                        ),
-                )
-            }
-        }
-
-    private fun senderAnnouncementReserve(displayName: String): Int =
-        displayName
-            .takeIf(String::isNotEmpty)
-            ?.let { "$it: ".length } ?: 0
+    /** The exact session-owned table used by the engine, shared with visible hit testing. */
+    @Synchronized
+    internal fun preparedSpeechFor(
+        messageIdHex: String,
+        projectionId: String?,
+    ): PreparedSpeechMessage? =
+        queue
+            .queuedMessagesSnapshot()
+            .firstOrNull {
+                it.messageIdHex == messageIdHex &&
+                    it.projectionId == projectionId
+            }?.prepared
 }
-
-private data class ActiveUtteranceTiming(
-    val utteranceId: String?,
-    val startedAt: Long,
-    val rate: Float,
-)
 
 internal const val TTS_PREVIEW_MAX_LENGTH = 120
 

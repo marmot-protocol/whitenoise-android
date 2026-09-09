@@ -97,9 +97,10 @@ internal fun effectiveTtsReadAloudProgress(
 internal fun rememberTtsHighlightProjectionResolver(
     projection: SpeakableTextProjection?,
     locale: Locale,
+    prepared: dev.ipf.whitenoise.android.audio.tts.speech.PreparedSpeechMessage? = null,
 ): TtsHighlightProjectionResolver? =
-    remember(projection, locale) {
-        projection?.let { TtsHighlightProjectionResolver(it, locale) }
+    remember(projection, locale, prepared) {
+        projection?.let { TtsHighlightProjectionResolver(it, locale, prepared) }
     }
 
 @Composable

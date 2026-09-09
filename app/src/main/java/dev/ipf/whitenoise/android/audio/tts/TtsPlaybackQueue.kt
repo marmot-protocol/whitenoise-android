@@ -34,6 +34,12 @@ sealed interface TtsState {
         override val passage: TtsPassage? = null,
     ) : TtsState
 
+    data class Preparing(
+        val retained: TtsState,
+    ) : TtsState by retained {
+        override val passage: TtsPassage? = null
+    }
+
     data class Speaking(
         override val sessionId: Long = 0L,
         override val chunkIndex: Int,
@@ -176,6 +182,7 @@ internal class TtsPlaybackQueue(
     // staleness-exempt: captured playback-guard tokens, not counter owners.
     private var edgeRequestGeneration: Long? = null
     private var parkedTerminalGeneration: Long? = null
+    private var targetSeekGeneration: Long? = null
     private val progress = TtsPlaybackProgress()
 
     /** How a repositioned target treats its message's sender announcement. */
@@ -200,6 +207,12 @@ internal class TtsPlaybackQueue(
         if (_state.value is TtsState.Speaking) refreshAtNextBoundary = true
     }
 
+    fun beginTextPreparation() {
+        stop()
+        playbackSessionId = nextPlaybackSessionId++
+        _state.value = TtsState.Preparing(TtsState.Idle(sessionId = playbackSessionId))
+    }
+
     /** Replaces playback with [messages] and starts a fresh callback lifetime. */
     fun start(
         messages: List<TtsQueuedMessage>,
@@ -208,8 +221,10 @@ internal class TtsPlaybackQueue(
         stopEngine()
         playbackCallbacks.advance()
         messageProgressGeneration += 1
-        playbackSessionId = nextPlaybackSessionId
-        nextPlaybackSessionId += 1
+        if (_state.value !is TtsState.Preparing || _state.value.chunkCount != 0) {
+            playbackSessionId = nextPlaybackSessionId
+            nextPlaybackSessionId += 1
+        }
         rangeTracker.clear()
         refreshAtNextBoundary = false
         replaceMessages(messages)
@@ -457,6 +472,7 @@ internal class TtsPlaybackQueue(
         // An explicit seek supersedes any in-flight history-edge request. Its
         // eventual settlement must not move the freshly chosen cursor.
         edgeRequestGeneration = null
+        targetSeekGeneration = null
         parkedTerminalGeneration = null
         val crossedMessage = projection.messageIndexForChunk(currentIndex) != targetMessage
         val announcement = if (crossedMessage) SenderAnnouncement.Announce else SenderAnnouncement.Suppress
@@ -485,13 +501,17 @@ internal class TtsPlaybackQueue(
         window: List<TtsQueuedMessage>,
         targetMessageIdHex: String,
         targetSentence: TtsWindowSentenceTarget,
+        sentenceOrdinal: Int? = null,
     ): Boolean {
         // An empty target would alias every ad-hoc message in the window.
         require(targetMessageIdHex.isNotEmpty()) { "window replacement needs a concrete target id" }
         val current = _state.value
-        val active = current is TtsState.Speaking || current is TtsState.Paused
+        val active = current is TtsState.Speaking || current is TtsState.Paused || current is TtsState.Preparing
         val targetMessage = window.indexOfFirst { it.messageIdHex == targetMessageIdHex }
-        if (!active || targetMessage < 0) return false
+        val validTarget =
+            targetMessage >= 0 &&
+                (sentenceOrdinal == null || window[targetMessage].chunks.any { it.sentenceIndex == sentenceOrdinal })
+        if (!active || !validTarget) return false
         messageProgressGeneration += 1
         val currentMessageId = messageIdAt(projection.messageIndexForChunk(currentIndex))
         val announcedId = senderAnnouncedAtMessageIndex?.let(::messageIdAt)
@@ -500,7 +520,15 @@ internal class TtsPlaybackQueue(
         rebuildFlatChunks()
         senderAnnouncedAtMessageIndex = announcedId?.let(::messageIndexOf)
         messageIndexAtPause = pausedId?.let(::messageIndexOf)
-        val targetChunk = targetChunkFor(targetMessage, targetSentence)
+        val targetChunk =
+            if (sentenceOrdinal == null) {
+                targetChunkFor(targetMessage, targetSentence)
+            } else {
+                chunks.indices.first {
+                    projection.messageIndexForChunk(it) == targetMessage &&
+                        chunks[it].sentenceIndex == sentenceOrdinal
+                }
+            }
         val announcement =
             if (targetMessageIdHex == currentMessageId) SenderAnnouncement.Suppress else SenderAnnouncement.Announce
         if (current is TtsState.Paused) {
@@ -564,6 +592,7 @@ internal class TtsPlaybackQueue(
         if (edgeRequestGeneration != generation) return
         val parked = parkedTerminalGeneration == generation
         edgeRequestGeneration = null
+        targetSeekGeneration = null
         parkedTerminalGeneration = null
         when (settlement) {
             TtsEdgeSettlement.RestartedWindow -> moveTo(0, announcementForTarget(0))
@@ -602,7 +631,13 @@ internal class TtsPlaybackQueue(
             // An edge request is still hunting for history past this chunk, so
             // the terminal parks: publishing Idle here would tear the session
             // down (and drop audio focus) moments before the page extends it.
-            edgeRequestGeneration == generation -> parkedTerminalGeneration = generation
+            edgeRequestGeneration == generation -> {
+                parkedTerminalGeneration = generation
+                if (targetSeekGeneration == generation) {
+                    val speaking = _state.value as? TtsState.Speaking
+                    if (speaking != null) _state.value = TtsState.Preparing(speaking)
+                }
+            }
             else -> finishPlayback()
         }
     }
@@ -717,10 +752,21 @@ internal class TtsPlaybackQueue(
         }
     }
 
-    private fun isNavigable(): Boolean = _state.value is TtsState.Speaking || _state.value is TtsState.Paused
+    private fun isNavigable(): Boolean {
+        val current = _state.value
+        return current is TtsState.Speaking || current is TtsState.Paused || current is TtsState.Preparing
+    }
+
+    fun deferForTargetSeek(): Boolean {
+        if (!isNavigable()) return false
+        edgeRequestGeneration = generation
+        targetSeekGeneration = generation
+        return true
+    }
 
     /** Arms the edge deferral for the request the caller is about to start. */
     private fun deferToEdge(outcome: TtsNavigationOutcome): TtsNavigationOutcome {
+        targetSeekGeneration = null
         edgeRequestGeneration = generation
         return outcome
     }
@@ -889,8 +935,17 @@ internal class TtsPlaybackQueue(
     }
 
     private fun spokenChunk(chunk: TtsChunk): TtsChunk {
+        if (chunk.senderPrefix != null) return chunk
         val messageIndex = projection.messageIndexForChunk(chunk.index)
         val message = messages[messageIndex]
+        return if (message.announcementsPrepared) chunk else announceChunk(chunk, messageIndex, message)
+    }
+
+    private fun announceChunk(
+        chunk: TtsChunk,
+        messageIndex: Int,
+        message: TtsQueuedMessage,
+    ): TtsChunk {
         val isFirstChunkOfMessage = chunk.index == projection.firstChunkIndexOfMessage(messageIndex)
         // A cross-message sentence skip can target a mid-message sentence, so
         // a forced announcement attaches to the target chunk itself.

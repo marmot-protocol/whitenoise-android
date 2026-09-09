@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.automirrored.filled.Reply
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
@@ -39,6 +40,31 @@ import org.robolectric.annotation.GraphicsMode
 class MessageActionButtonScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun literalCodeActionLargeFont() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, fontScale = 1.3f) {
+                Surface(modifier = Modifier.width(328.dp).testTag(TAG), shape = RoundedCornerShape(12.dp)) {
+                    MessageActionButton(
+                        label = "Read code literally",
+                        icon = {
+                            Icon(
+                                Icons.AutoMirrored.Filled.VolumeUp,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        },
+                        onClick = {},
+                    )
+                }
+            }
+        }
+        composeRule
+            .onNodeWithTag(
+                TAG,
+            ).captureRoboImage("src/test/snapshots/message_action_literal_code_dark_large_font.png")
+    }
 
     @Test
     fun messageActionButtonsLight() {

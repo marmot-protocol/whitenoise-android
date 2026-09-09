@@ -658,8 +658,13 @@ internal fun MessageBubble(
             progress = ttsReadAloudProgress,
         )
     val effectiveTtsPassage = ttsProjectionState.effectivePassage
-    val ttsLocale = LocalLocale.current.platformLocale
-    val ttsProjectionResolver = rememberTtsHighlightProjectionResolver(speakableProjection, ttsLocale)
+    val ttsLocale = appState.ttsController.effectiveSpeechLocale ?: LocalLocale.current.platformLocale
+    val ttsProjectionResolver =
+        rememberTtsHighlightProjectionResolver(
+            speakableProjection,
+            ttsLocale,
+            appState.ttsController.preparedSpeechFor(record.messageIdHex, speakableProjection?.projectionId),
+        )
     val ttsLeafHighlightResolver =
         remember(effectiveTtsPassage, record.messageIdHex, ttsProjectionResolver) {
             if (effectiveTtsPassage == null || effectiveTtsPassage.messageIdHex != record.messageIdHex) {
@@ -964,6 +969,7 @@ internal fun MessageBubble(
     fun startSpeakAloud(
         visibleText: String? = null,
         visibleOffset: Int? = null,
+        literalCode: Boolean = false,
     ) {
         if (deleted) return
         val locale = java.util.Locale.getDefault()
@@ -973,7 +979,16 @@ internal fun MessageBubble(
                     timeline = controller.timeline,
                     selected = record,
                 )
-            val entries = candidateRecords.mapNotNull { entryRecord -> ttsEntry(entryRecord) }
+            val entries =
+                candidateRecords.mapNotNull { entryRecord -> ttsEntry(entryRecord) }.map { entry ->
+                    if (literalCode) {
+                        entry.copy(
+                            speechMode = dev.ipf.whitenoise.android.audio.tts.speech.SpeechMode.LiteralCode,
+                        )
+                    } else {
+                        entry
+                    }
+                }
             if (entries.isEmpty()) {
                 appState.present(R.string.tts_bar_error)
                 return@launchMutation
@@ -995,6 +1010,7 @@ internal fun MessageBubble(
                     entries,
                     locale,
                     startSentenceIndex,
+                    backgroundPreparation = true,
                 )
             if (!started) appState.present(appState.ttsStartFailureMessage())
         }
@@ -1021,32 +1037,64 @@ internal fun MessageBubble(
         startSpeakAloud(visibleText, visibleOffset)
     }
 
+    fun seekActiveSentence(sentenceIndex: Int) {
+        when (
+            appState.ttsController.seekToSentence(
+                record.messageIdHex,
+                sentenceIndex,
+                speakableProjection?.projectionId,
+            )
+        ) {
+            TtsSeekResult.Repositioned,
+            TtsSeekResult.RepositionedAcrossMessages,
+            -> {
+                appState.ttsHistorySession.cancelPendingSeek()
+                ttsLinkTapCoordinator.cancelPendingActivation()
+                onTtsSentenceSeek(appState.ttsController.state.value)
+                return
+            }
+
+            TtsSeekResult.MessageNotInWindow -> {
+                if (appState.ttsHistorySession.requestSentenceSeek(
+                        record.messageIdHex,
+                        record.recordedAt,
+                        sentenceIndex,
+                        speakableProjection?.projectionId.orEmpty(),
+                    )
+                ) {
+                    ttsLinkTapCoordinator.cancelPendingActivation()
+                }
+            }
+            TtsSeekResult.SentenceOutOfRange,
+            TtsSeekResult.SessionInactive,
+            -> Unit
+        }
+    }
+
     @Suppress("ComplexCondition", "ReturnCount")
     fun seekSpeakAloudAt(pressInWindow: Offset) {
         if (deleted || selectionMode || textSelectionMode || !canSpeakAloud) return
         val layouts = selectableTextLayouts.snapshot()
         val activeState = appState.ttsController.state.value
         val ownsActiveSession =
-            (activeState is TtsState.Speaking || activeState is TtsState.Paused) &&
+            (activeState is TtsState.Speaking || activeState is TtsState.Paused || activeState is TtsState.Preparing) &&
                 appState.ownsTtsAutoReadSession(controller.group.groupIdHex)
         if (ownsActiveSession) {
             val hit = renderedTextHitAtWindowPosition(layouts, pressInWindow)
-            val sentenceIndex = hit?.let { ttsProjectionResolver?.sentenceIndexAtRenderedOffset(it) }
-            if (sentenceIndex != null) {
-                when (appState.ttsController.seekToSentence(record.messageIdHex, sentenceIndex)) {
-                    TtsSeekResult.Repositioned,
-                    TtsSeekResult.RepositionedAcrossMessages,
-                    -> {
-                        ttsLinkTapCoordinator.cancelPendingActivation()
-                        onTtsSentenceSeek(appState.ttsController.state.value)
-                        return
-                    }
-
-                    TtsSeekResult.MessageNotInWindow,
-                    TtsSeekResult.SentenceOutOfRange,
-                    TtsSeekResult.SessionInactive,
-                    -> Unit
+            val sentenceIndex =
+                hit?.let {
+                    ttsProjectionResolver?.sentenceIndexAtRenderedOffset(
+                        it,
+                        // Retain the established link double-tap coordination during playback.
+                        allowOmittedLinkNeighbor =
+                            markdownHasLinkAnnotationAt(
+                                markdownLinkLayouts.values,
+                                pressInWindow,
+                            ),
+                    )
                 }
+            if (sentenceIndex != null) {
+                seekActiveSentence(sentenceIndex)
             }
             // An owned session must never be replaced merely because a hit is
             // ambiguous, outside the queue window, or denied audio focus. A
@@ -1065,6 +1113,52 @@ internal fun MessageBubble(
         val visibleText = concatenatedVisibleText(layouts).ifBlank { displayedBody }
         startSpeakAloud(visibleText, visibleOffset)
     }
+
+    val sentenceActionsEnabled =
+        !deleted &&
+            !selectionMode &&
+            !textSelectionMode &&
+            canSpeakAloud &&
+            appState.ttsController.effectiveSpeechLocale != null &&
+            appState.ownsTtsAutoReadSession(controller.group.groupIdHex)
+    val ttsSentenceActions =
+        remember(ttsProjectionResolver, sentenceActionsEnabled, speakableProjection?.projectionId) {
+            if (!sentenceActionsEnabled || ttsProjectionResolver == null) {
+                null
+            } else {
+                dev.ipf.whitenoise.android.ui.TtsSentenceActions(
+                    choices = ttsProjectionResolver::sentenceChoices,
+                    select = { choice ->
+                        if (choice.revision != speakableProjection?.projectionId) {
+                            false
+                        } else {
+                            when (
+                                appState.ttsController.seekToSentence(
+                                    record.messageIdHex,
+                                    choice.ordinal,
+                                    choice.revision,
+                                )
+                            ) {
+                                TtsSeekResult.Repositioned, TtsSeekResult.RepositionedAcrossMessages -> {
+                                    appState.ttsHistorySession.cancelPendingSeek()
+                                    ttsLinkTapCoordinator.cancelPendingActivation()
+                                    onTtsSentenceSeek(appState.ttsController.state.value)
+                                    true
+                                }
+                                TtsSeekResult.MessageNotInWindow ->
+                                    appState.ttsHistorySession.requestSentenceSeek(
+                                        record.messageIdHex,
+                                        record.recordedAt,
+                                        choice.ordinal,
+                                        choice.revision,
+                                    )
+                                else -> false
+                            }
+                        }
+                    },
+                )
+            }
+        }
 
     fun copyMarkdownLink(url: String) {
         if (deleted) return
@@ -1899,6 +1993,7 @@ internal fun MessageBubble(
                                     plainTextSelectionModifier = plainTextSelectionModifier,
                                     onPlainTextLayout = onPlainTextLayout,
                                     ttsLeafHighlightResolver = ttsLeafHighlightResolver,
+                                    ttsSentenceActions = ttsSentenceActions,
                                     ttsSentenceLayoutReporter = ttsSentenceLayoutReporter,
                                     ttsReadAloudProgress = effectiveTtsReadAloudProgress,
                                     selectionWrapper = selectionWrapper,
@@ -1969,6 +2064,7 @@ internal fun MessageBubble(
                                     plainTextSelectionModifier = plainTextSelectionModifier,
                                     onPlainTextLayout = onPlainTextLayout,
                                     ttsLeafHighlightResolver = ttsLeafHighlightResolver,
+                                    ttsSentenceActions = ttsSentenceActions,
                                     ttsSentenceLayoutReporter = ttsSentenceLayoutReporter,
                                     ttsReadAloudProgress = effectiveTtsReadAloudProgress,
                                     selectionWrapper = selectionWrapper,
@@ -2037,6 +2133,7 @@ internal fun MessageBubble(
                             plainTextSelectionModifier = plainTextSelectionModifier,
                             onPlainTextLayout = onPlainTextLayout,
                             ttsLeafHighlightResolver = ttsLeafHighlightResolver,
+                            ttsSentenceActions = ttsSentenceActions,
                             ttsSentenceLayoutReporter = ttsSentenceLayoutReporter,
                             ttsReadAloudProgress = effectiveTtsReadAloudProgress,
                             selectionWrapper = selectionWrapper,
@@ -2086,6 +2183,7 @@ internal fun MessageBubble(
                     // projection, not the display fallback (filenames, placeholders,
                     // reactions, system copy).
                     canSpeak = !deleted && canSpeakAloud,
+                    canSpeakCodeLiterally = speakableProjection?.speechRoles?.isNotEmpty() == true,
                     canSelectText = !deleted && !bodyTextToRender.isNullOrBlank(),
                     canShare = canShareMessage,
                     canSave = !deleted && mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
@@ -2119,6 +2217,10 @@ internal fun MessageBubble(
                     onCopyText = ::copyMessageText,
                     onSpeak = {
                         speakFromHere()
+                        onActionMenuOpenChange(false)
+                    },
+                    onSpeakCodeLiterally = {
+                        startSpeakAloud(literalCode = true)
                         onActionMenuOpenChange(false)
                     },
                     onShare = ::shareMessage,

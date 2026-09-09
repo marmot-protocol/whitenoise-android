@@ -49,9 +49,47 @@ internal class TtsRangeTracker {
         callbackStart: Int,
         callbackEnd: Int,
     ): List<TtsVisibleTextSpan>? {
+        replacementWordForRange(callbackStart, callbackEnd)?.let { return it }
         val sourceWord = sourceWordRange(callbackStart, callbackEnd) ?: return null
         if (!sourceText.isCompleteGraphemeWord(sourceWord, locale)) return null
         return visibleSpans.visibleRange(callbackStart, callbackEnd)
+    }
+
+    private fun TtsChunk.replacementWordForRange(
+        callbackStart: Int,
+        callbackEnd: Int,
+    ): List<TtsVisibleTextSpan>? {
+        val replacements =
+            visibleSpans.filter {
+                it.kind == dev.ipf.whitenoise.android.audio.tts.speech.SpeechMappingKind.Replacement &&
+                    it.spoken.start < callbackEnd &&
+                    it.spoken.end > callbackStart
+            }
+        val replacement = replacements.firstOrNull()
+        if (replacement != null &&
+            replacements.all { it.spoken == replacement.spoken } &&
+            validReplacementRange(replacement, callbackStart, callbackEnd)
+        ) {
+            val words = BreakIterator.getWordInstance(locale).apply { setText(this@replacementWordForRange.text) }
+            if (words.isBoundary(callbackStart) &&
+                words.isBoundary(callbackEnd)
+            ) {
+                return replacements.map { it.visible }.distinct()
+            }
+        }
+        return null
+    }
+
+    private fun TtsChunk.validReplacementRange(
+        span: TtsSpokenTextSpan,
+        start: Int,
+        end: Int,
+    ): Boolean {
+        val inBounds =
+            start >= maxOf(senderPrefix?.end ?: 0, span.spoken.start) &&
+                end <= minOf(text.length, span.spoken.end) &&
+                end > start
+        return inBounds && text.isCharacterBoundary(start, locale) && text.isCharacterBoundary(end, locale)
     }
 
     private fun TtsChunk.sourceWordRange(
@@ -245,3 +283,8 @@ private const val SUPPLEMENTARY_VARIATION_SELECTOR_START = 0xE0100
 private const val SUPPLEMENTARY_VARIATION_SELECTOR_END = 0xE01EF
 private const val EMOJI_MODIFIER_START = 0x1F3FB
 private const val EMOJI_MODIFIER_END = 0x1F3FF
+
+private fun String.isCharacterBoundary(
+    offset: Int,
+    locale: Locale,
+): Boolean = isUtf16Boundary(offset) && isGraphemeBoundary(offset, locale)
