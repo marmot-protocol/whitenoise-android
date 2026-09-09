@@ -66,7 +66,6 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
-import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineResolver
@@ -1416,13 +1415,7 @@ class WhiteNoiseAppState private constructor(
     // back to the chat list, matching VoicePlaybackController's lifetime.
     val ttsController = createAppTtsController(appContext, ttsRatePreferences, ttsMediaMixPreferences)
     private val conversationDictationPlaybackHandoff by lazy {
-        ConversationDictationPlaybackHandoff(
-            ttsState = { ttsController.state.value },
-            pauseTts = ttsController::pause,
-            resumeTts = ttsController::resume,
-            pauseVoice = VoicePlaybackController::pauseForInterruption,
-            resumeVoice = VoicePlaybackController::resumeInterrupted,
-        )
+        createConversationDictationPlaybackHandoff(ttsController)
     }
     var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
         private set

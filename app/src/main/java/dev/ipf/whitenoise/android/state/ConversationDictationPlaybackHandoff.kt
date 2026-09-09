@@ -1,7 +1,20 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.audio.tts.TtsController
 import dev.ipf.whitenoise.android.audio.tts.TtsState
+
+/** Wires the process-wide speech controllers into the dictation playback handoff. */
+internal fun createConversationDictationPlaybackHandoff(
+    ttsController: TtsController,
+): ConversationDictationPlaybackHandoff =
+    ConversationDictationPlaybackHandoff(
+        ttsState = { ttsController.state.value },
+        pauseTts = ttsController::pause,
+        resumeTts = ttsController::resume,
+        pauseVoice = VoicePlaybackController::pauseForInterruption,
+        resumeVoice = VoicePlaybackController::resumeInterrupted,
+    )
 
 /** Pauses active app speech for dictation and restores only those exact sources afterward. */
 internal class ConversationDictationPlaybackHandoff(
