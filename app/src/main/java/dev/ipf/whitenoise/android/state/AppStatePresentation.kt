@@ -309,11 +309,6 @@ internal fun notificationAvatarPreWarmTarget(
         preWarmRemoteImages = !appLockScreenVisible,
     )
 
-internal data class PreWarmedNotificationAvatars(
-    val senderAvatarUrl: String?,
-    val groupAvatarUrl: String?,
-)
-
 /** Posts the privacy-correct fallback card before scheduling optional enrichment. */
 internal suspend fun postBeforeNotificationEnrichment(
     post: suspend () -> Boolean,

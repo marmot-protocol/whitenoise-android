@@ -16,6 +16,7 @@ internal enum class ConversationCardBarrier {
     AFTER_REGISTER,
     AFTER_READ,
     BEFORE_WRITE,
+    AFTER_WRITE,
 }
 
 internal data class ConversationCardShowToken(

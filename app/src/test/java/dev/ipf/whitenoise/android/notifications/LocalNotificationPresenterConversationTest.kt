@@ -41,6 +41,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -352,6 +353,7 @@ class LocalNotificationPresenterConversationTest {
         )
     }
 
+    /** Carries the cached group image in the first payload, before shortcut publication. */
     @Test
     fun cachedAvatarsKeepTheAlertToOnePost() {
         val posts = mutableListOf<Notification>()
@@ -361,6 +363,8 @@ class LocalNotificationPresenterConversationTest {
                 context = context,
                 shortcutPublisher = { shortcut -> publishedShortcut = shortcut },
                 notificationPoster = { notificationManager, tag, id, notification ->
+                    assertNotNull("First group card must already carry its image", notification.getLargeIcon())
+                    assertNull("Shortcut enrichment must remain after first publication", publishedShortcut)
                     posts += notification
                     notificationManager.notify(tag, id, notification)
                 },
@@ -382,6 +386,75 @@ class LocalNotificationPresenterConversationTest {
         )
 
         assertEquals(1, posts.size)
+        assertNotNull(publishedShortcut)
+        assertNotNull(
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(posts.single())
+                ?.messages
+                ?.single()
+                ?.person
+                ?.icon,
+        )
+    }
+
+    /** Bitmap-only changes invalidate shortcut metadata while identical cached pixels reuse it. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun carriedAvatarChangeRepublishesShortcutButUnchangedImageDoesNot() {
+        val first = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        val second = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        presenter.ensureChannels()
+        runBlocking {
+            for (bitmap in listOf(first, first, second)) {
+                presenter.show(
+                    update(isMention = false),
+                    conversationAvatarBitmap = bitmap,
+                    senderAvatarBitmap = bitmap,
+                    shortNpub = { "npub1test" },
+                )
+            }
+        }
+        assertEquals("New carried pixels must invalidate shortcut deduplication", 2, publishedShortcutCount)
+    }
+
+    /** Carries proven avatar bitmaps across cache eviction with one write callback. */
+    @Test
+    fun carriedReadyAvatarsSurviveCacheEvictionWithoutAHiddenSecondWrite() {
+        val posts = mutableListOf<Notification>()
+        var successfulWriteCallbacks = 0
+        val readyAvatar = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        val presenterWithCarriedAvatars =
+            LocalNotificationPresenter(
+                context = context,
+                shortcutPublisher = { shortcut -> publishedShortcut = shortcut },
+                notificationPoster = { notificationManager, tag, id, notification ->
+                    posts += notification
+                    notificationManager.notify(tag, id, notification)
+                },
+                cachedAvatarBitmap = { null },
+                avatarBitmapResolver = { error("a carried bitmap must not be re-fetched") },
+                enrichmentLauncher = { error("a carried bitmap must not launch detached work") },
+            )
+        presenterWithCarriedAvatars.ensureChannels()
+
+        assertTrue(
+            runBlocking {
+                presenterWithCarriedAvatars.show(
+                    update(isMention = false),
+                    conversationAvatarUrl = "https://example.com/group.png",
+                    conversationAvatarBitmap = readyAvatar,
+                    senderAvatarUrl = "https://example.com/alice.png",
+                    senderAvatarBitmap = readyAvatar,
+                    silentUpdate = true,
+                    replaceCurrentMessage = true,
+                    onNotificationWritten = { successfulWriteCallbacks += 1 },
+                    shortNpub = { "npub1test" },
+                )
+            },
+        )
+
+        assertEquals(1, posts.size)
+        assertEquals(1, successfulWriteCallbacks)
         assertNotNull(publishedShortcut)
         assertNotNull(
             NotificationCompat.MessagingStyle
@@ -995,16 +1068,19 @@ class LocalNotificationPresenterConversationTest {
         )
     }
 
+    /** Keeps same-message text correction on the original alert channel and grouping. */
     @Test
     fun silentEnrichmentReplacesCurrentMessageWithoutDuplicatingHistory() {
         presenter.ensureChannels()
         val incoming = update(isMention = false, messageIdHex = "same-message")
+        lateinit var initial: Notification
 
         runBlocking {
             presenter.show(
                 incoming,
                 shortNpub = { "npub1test" },
             )
+            initial = manager.activeNotifications.single().notification
             presenter.show(
                 incoming,
                 senderNameOverride = "Alice Enriched",
@@ -1024,6 +1100,9 @@ class LocalNotificationPresenterConversationTest {
                 ?.map { it.text.toString() },
         )
         assertTrue(notification.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        assertEquals(initial.group, notification.group)
+        assertEquals(initial.groupAlertBehavior, notification.groupAlertBehavior)
+        assertEquals(initial.channelId, notification.channelId)
         assertTrue(presenter.isNotificationUpdateCurrentForEnrichment(incoming))
     }
 
