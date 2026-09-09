@@ -967,6 +967,8 @@ internal fun MessageBubble(
     /** Starts from the selected sentence and preserves a specific start-gate explanation. */
     fun startSpeakAloud(
         startRenderedHit: RenderedTextHit? = null,
+        fallbackVisibleText: String? = null,
+        fallbackVisibleOffset: Int? = null,
         literalCode: Boolean = false,
     ) {
         if (deleted) return
@@ -991,11 +993,23 @@ internal fun MessageBubble(
                 appState.present(R.string.tts_bar_error)
                 return@launchMutation
             }
+            val fallbackSentenceIndex =
+                if (fallbackVisibleText == null || fallbackVisibleOffset == null) {
+                    0
+                } else {
+                    speakableSentenceIndexAtVisibleOffset(
+                        visibleText = fallbackVisibleText,
+                        speakableText = entries.first().text,
+                        visibleOffset = fallbackVisibleOffset,
+                        locale = locale,
+                    )
+                }
             val started =
                 appState.speakAloudAutoRead(
                     controller.group.groupIdHex,
                     entries,
                     locale,
+                    startSentenceIndex = fallbackSentenceIndex,
                     startRenderedHit =
                         startRenderedHit?.let {
                             preparedHitFromRenderedHit(entries.first(), it)
@@ -1013,6 +1027,17 @@ internal fun MessageBubble(
             startSpeakAloud()
             return
         }
+        val visibleText = concatenatedVisibleText(layouts).ifBlank { displayedBody }
+        val visibleOffset =
+            if (record.contentTokens.truncated) {
+                null
+            } else {
+                visibleOffsetFromSelection(
+                    layouts = layouts,
+                    selectedTexts = messageTextSelectionState.selectedTexts,
+                    preferredVisibleOffset = selectionSeedVisibleOffset,
+                )
+            }
         val renderedHit =
             if (record.contentTokens.truncated) {
                 null
@@ -1023,7 +1048,11 @@ internal fun MessageBubble(
                     preferredVisibleOffset = selectionSeedVisibleOffset,
                 )
             }
-        startSpeakAloud(renderedHit)
+        startSpeakAloud(
+            startRenderedHit = renderedHit,
+            fallbackVisibleText = visibleText,
+            fallbackVisibleOffset = visibleOffset,
+        )
     }
 
     fun seekActiveSentence(sentenceIndex: Int) {

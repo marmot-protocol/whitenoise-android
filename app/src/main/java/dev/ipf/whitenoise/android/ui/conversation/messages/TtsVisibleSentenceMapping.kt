@@ -61,7 +61,7 @@ internal fun renderedTextHitFromSelection(
                 matches.singleOrNull { preferred in it.visibleOffset until it.selectionEndOffset }
             }
             ?: return null
-    return RenderedTextHit(match.leafId, match.renderedText, match.localOffset)
+    return match.leafId?.let { leafId -> RenderedTextHit(leafId, match.renderedText, match.localOffset) }
 }
 
 @Suppress("ReturnCount")
@@ -99,7 +99,7 @@ private fun selectionOffsetMatches(
         if (firstLayoutIndex + selectedSegments.lastIndex > ordered.lastIndex) return@flatMap emptyList()
         val candidateLayouts = ordered.drop(firstLayoutIndex).take(selectedSegments.size)
         val firstLayout = candidateLayouts.first()
-        val leafId = firstLayout.key as? String ?: return@flatMap emptyList()
+        val leafId = firstLayout.key as? String
         val renderedText = firstLayout.layoutResult.layoutInput.text.text
         if (
             selectedSegments.indices.any { segmentIndex ->
@@ -230,7 +230,7 @@ private fun visibleLayoutSentence(text: String): String {
 private data class SelectionOffsetMatch(
     val visibleOffset: Int,
     val selectedVisibleLength: Int,
-    val leafId: String,
+    val leafId: String?,
     val renderedText: String,
     val localOffset: Int,
 ) {
