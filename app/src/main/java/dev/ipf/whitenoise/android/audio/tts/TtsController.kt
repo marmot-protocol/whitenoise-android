@@ -315,6 +315,7 @@ class TtsController internal constructor(
         }
     }
 
+    /** Pauses active read-aloud playback and releases its audio-focus lease. */
     @Synchronized
     fun pause() {
         if (state.value !is TtsState.Speaking) return
@@ -326,6 +327,7 @@ class TtsController internal constructor(
     @Synchronized
     internal fun playbackCallbackGeneration(): Long = queue.callbackGeneration
 
+    /** Resumes a paused queue only after audio focus is reacquired. */
     @Synchronized
     fun resume() {
         if (state.value !is TtsState.Paused || !acquireAudioFocus()) return

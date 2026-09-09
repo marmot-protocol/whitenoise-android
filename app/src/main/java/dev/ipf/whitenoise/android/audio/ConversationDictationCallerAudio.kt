@@ -86,6 +86,7 @@ internal class ConversationDictationCallerAudio private constructor(
     /** Abandons capture and reports only after every capture resource is closed. */
     fun cancel(onClosed: () -> Unit) = finish("cancel", onClosed)
 
+    /** Starts AudioRecord and confirms that Android entered the recording state. */
     private fun beginRecording(): Boolean =
         runCatching { recorder.startRecording() }.isSuccess &&
             recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING
@@ -131,6 +132,7 @@ internal class ConversationDictationCallerAudio private constructor(
         }
     }
 
+    /** Copies bounded microphone frames into the provider pipe until capture stops. */
     private fun stream() {
         val samples = ShortArray(FRAMES_PER_READ)
         val encoded = ByteArray(FRAMES_PER_READ * BYTES_PER_FRAME)

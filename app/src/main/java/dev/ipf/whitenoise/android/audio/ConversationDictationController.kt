@@ -2753,8 +2753,10 @@ private class AndroidConversationDictationRecognitionSession(
                 /** Reports the first detected speech frame. */
                 override fun onBeginningOfSpeech() = listener.onBeginningOfSpeech()
 
+                /** Ignores provider volume telemetry because White Noise renders no live meter. */
                 override fun onRmsChanged(rmsdB: Float) = Unit
 
+                /** Ignores provider audio copies because caller-owned audio is never persisted. */
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
 
                 /** Reports provider end-of-speech while capture closure remains callback-owned. */
@@ -2783,26 +2785,31 @@ private class AndroidConversationDictationRecognitionSession(
                     }
                 }
 
+                /** Records only whether a partial hypothesis existed, never its text. */
                 override fun onPartialResults(partialResults: Bundle?) {
                     conversationDictationDiagnostic(
                         "event=platform_partial_results has_text=${partialResults.hasRecognitionText()}",
                     )
                 }
 
+                /** Records only whether a segmented hypothesis existed, never its text. */
                 override fun onSegmentResults(segmentResults: Bundle) {
                     conversationDictationDiagnostic(
                         "event=platform_segment_results has_text=${segmentResults.hasRecognitionText()}",
                     )
                 }
 
+                /** Records completion of a segmented provider session for diagnostics. */
                 override fun onEndOfSegmentedSession() {
                     conversationDictationDiagnostic("event=platform_segmented_session_end")
                 }
 
+                /** Records provider language detection without retaining its payload. */
                 override fun onLanguageDetection(results: Bundle) {
                     conversationDictationDiagnostic("event=platform_language_detection")
                 }
 
+                /** Records unhandled provider events by type without retaining payload data. */
                 override fun onEvent(
                     eventType: Int,
                     params: Bundle?,

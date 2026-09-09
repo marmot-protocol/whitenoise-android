@@ -2918,8 +2918,10 @@ class ConversationDictationControllerTest {
         /** Simulates a platform that cannot even start the question, such as a recognizer refusal. */
         var callerAudioProbeFailure: RuntimeException? = null
 
+        /** Returns the fake runtime permission state. */
         override fun hasRecordAudioPermission(): Boolean = hasPermission
 
+        /** Runs any pending mutation before returning the fake microphone state. */
         override fun microphoneAccess(): ConversationDictationMicrophoneAccess {
             onMicrophoneAccessCheck?.let { callback ->
                 onMicrophoneAccessCheck = null
@@ -2928,11 +2930,13 @@ class ConversationDictationControllerTest {
             return microphoneAccessOverride ?: super.microphoneAccess()
         }
 
+        /** Counts and returns the fake provider configuration state. */
         override fun recognitionConfigured(): Boolean {
             recognitionConfigurationChecks += 1
             return configured
         }
 
+        /** Counts the availability query and optionally injects a platform failure. */
         override fun recognitionAvailable(): Boolean {
             recognitionAvailabilityChecks += 1
             onRecognitionAvailableCheck?.invoke()
@@ -2940,16 +2944,20 @@ class ConversationDictationControllerTest {
             return available
         }
 
+        /** Returns whether the fake provider exposes its recovery activity. */
         override fun recognitionActivityAvailable(): Boolean = activityAvailable
 
+        /** Completes or defers the provider-activity readiness probe. */
         override fun checkRecognitionActivity(callback: (Boolean) -> Unit): ConversationDictationTimeoutHandle {
             activityReadinessCallback = callback
             if (!deferActivityReadiness) callback(activityAvailable)
             return ConversationDictationTimeoutHandle { readinessCancelled = true }
         }
 
+        /** Returns the fake provider's caller-audio requirement. */
         override fun callerAudioRequirement(): ConversationDictationCallerAudioRequirement = callerAudio
 
+        /** Completes or defers the caller-audio compatibility probe. */
         override fun probeCallerAudioSupport(callback: (ConversationDictationCallerAudioRequirement) -> Unit): ConversationDictationTimeoutHandle {
             callerAudioProbes += 1
             callerAudioProbeFailure?.let { throw it }
@@ -2958,6 +2966,7 @@ class ConversationDictationControllerTest {
             return ConversationDictationTimeoutHandle { callerAudioProbeCancelled = true }
         }
 
+        /** Creates and records a fake recognition generation for callback-driven assertions. */
         override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
             createFailure?.let { throw it }
             this.listener = listener
