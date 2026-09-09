@@ -6,14 +6,20 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ConversationDictationPlaybackHandoffTest {
+    /** Verifies an untouched paused TTS session resumes after dictation. */
     @Test
     fun activeTtsResumesOnlyWhenTheSameSessionRemainsPaused() {
         var tts: TtsState = speakingTts(7L)
+        var generation = 0L
         var resumes = 0
         val handoff =
             handoff(
                 ttsState = { tts },
-                pauseTts = { tts = pausedTts(7L) },
+                ttsGeneration = { generation },
+                pauseTts = {
+                    generation += 1
+                    tts = pausedTts(7L)
+                },
                 resumeTts = { resumes += 1 },
             )
 
@@ -23,19 +29,29 @@ class ConversationDictationPlaybackHandoffTest {
         assertEquals(1, resumes)
     }
 
+    /** Verifies user-paused and replacement TTS sessions remain paused. */
     @Test
     fun userPausedAndReplacementTtsSessionsAreNotResumed() {
         listOf<TtsState>(pausedTts(7L), pausedTts(8L)).forEach { stateAtResume ->
-            var tts: TtsState = if (stateAtResume.sessionId == 7L) pausedTts(7L) else speakingTts(7L)
+            var tts: TtsState = speakingTts(7L)
+            var generation = 0L
             var resumes = 0
             val handoff =
                 handoff(
                     ttsState = { tts },
-                    pauseTts = { tts = pausedTts(7L) },
+                    ttsGeneration = { generation },
+                    pauseTts = {
+                        generation += 1
+                        tts = pausedTts(7L)
+                    },
                     resumeTts = { resumes += 1 },
                 )
 
             handoff.pauseActivePlayback()
+            if (stateAtResume.sessionId == 7L) {
+                tts = speakingTts(7L)
+                generation += 1
+            }
             tts = stateAtResume
             handoff.resumeInterruptedPlayback()
 
@@ -43,6 +59,7 @@ class ConversationDictationPlaybackHandoffTest {
         }
     }
 
+    /** Verifies simultaneous TTS and voice playback are restored independently. */
     @Test
     fun simultaneousMixedTtsAndVoicePlaybackAreBothHandedBack() {
         var tts: TtsState = speakingTts(7L)
@@ -68,6 +85,7 @@ class ConversationDictationPlaybackHandoffTest {
         assertEquals(listOf(voice), resumed)
     }
 
+    /** Verifies a replacement voice player cannot claim an earlier interruption token. */
     @Test
     fun sameKeyReplacementReceivesOnlyTheOriginalPlayerToken() {
         val original = pausedVoice("clip-a")
@@ -90,20 +108,24 @@ class ConversationDictationPlaybackHandoffTest {
         assertEquals(0, resumes)
     }
 
+    /** Builds a handoff with independently controlled speech sources. */
     private fun handoff(
         ttsState: () -> TtsState = { TtsState.Idle() },
+        ttsGeneration: () -> Long = { 0L },
         pauseTts: () -> Unit = {},
         resumeTts: () -> Unit = {},
         pauseVoice: () -> VoicePlaybackController.PausedPlayback? = { null },
         resumeVoice: (VoicePlaybackController.PausedPlayback) -> Boolean = { false },
     ) = ConversationDictationPlaybackHandoff(
         ttsState = ttsState,
+        ttsGeneration = ttsGeneration,
         pauseTts = pauseTts,
         resumeTts = resumeTts,
         pauseVoice = pauseVoice,
         resumeVoice = resumeVoice,
     )
 
+    /** Builds a minimal speaking state for [sessionId]. */
     private fun speakingTts(sessionId: Long): TtsState.Speaking =
         TtsState.Speaking(
             sessionId = sessionId,
@@ -116,6 +138,7 @@ class ConversationDictationPlaybackHandoffTest {
             messagePreview = "speech",
         )
 
+    /** Builds a minimal paused state for [sessionId]. */
     private fun pausedTts(sessionId: Long): TtsState.Paused =
         TtsState.Paused(
             sessionId = sessionId,
@@ -128,5 +151,6 @@ class ConversationDictationPlaybackHandoffTest {
             messagePreview = "speech",
         )
 
+    /** Builds a retained voice interruption for [key]. */
     private fun pausedVoice(key: String) = VoicePlaybackController.PausedPlayback(key, Any(), 0L)
 }

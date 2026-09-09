@@ -487,6 +487,7 @@ object VoicePlaybackController {
     }
 
     /** Applies a pause after the caller has invalidated older playback intent. */
+    @Suppress("ReturnCount")
     private fun pauseAfterGenerationAdvance() {
         clearAudioFocusInterruption(restoreVolume = true)
         val mp =

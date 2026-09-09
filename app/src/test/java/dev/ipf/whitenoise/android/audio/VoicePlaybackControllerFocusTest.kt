@@ -23,6 +23,7 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class VoicePlaybackControllerFocusTest {
+    /** Verifies dictation invalidates a clip that is still preparing without retaining a player. */
     @Test
     fun dictationInterruptionInvalidatesPlaybackStillPreparingWithoutAnActivePlayer() {
         val requests = controllerField("playbackRequests") as StalenessGuard
@@ -33,6 +34,7 @@ class VoicePlaybackControllerFocusTest {
         assertFalse(requests.isCurrent(preparing))
     }
 
+    /** Verifies a later explicit playback action makes the dictation interruption stale. */
     @Test
     fun laterUserPlaybackActionsInvalidateTheSavedDictationInterruption() {
         val context = RuntimeEnvironment.getApplication()

@@ -5,6 +5,7 @@ import org.junit.Test
 import java.io.File
 
 class ConversationDictationPlaybackHandoffSourceCoverageTest {
+    /** Verifies AppState wires paired playback pause and resume hooks into dictation. */
     @Test
     fun appStateUsesPairedPauseAndResumeCallbacksForDictationCapture() {
         val source = source("state/AppState.kt")
@@ -23,6 +24,7 @@ class ConversationDictationPlaybackHandoffSourceCoverageTest {
         assertTrue(!wiring.contains("stopSpeaking()"))
     }
 
+    /** Verifies voice restoration validates both the retained player and interruption token. */
     @Test
     fun voiceResumeRequiresTheSamePausedClipAndRetainsItsPlayer() {
         val source = source("audio/VoicePlaybackController.kt")
@@ -42,6 +44,7 @@ class ConversationDictationPlaybackHandoffSourceCoverageTest {
         assertTrue(!resume.contains("prepare"))
     }
 
+    /** Reads production source for structural integration assertions. */
     private fun source(relativePath: String): String =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$relativePath"),

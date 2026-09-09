@@ -615,15 +615,14 @@ class NotificationHapticVisualTimingDeviceTest {
             pictureUrl = null,
         )
 
-    /** Runs the bounded notification-access shell commands required by the fixture. */
-    private fun shell(command: String) {
+    /** Runs a bounded fixture shell command and returns its UTF-8 output. */
+    private fun shell(command: String): String =
         ParcelFileDescriptor
             .AutoCloseInputStream(
                 instrumentation.uiAutomation.executeShellCommand(command),
             ).use { output ->
-                output.readBytes()
+                output.readBytes().toString(Charsets.UTF_8)
             }
-    }
 
     /** Polls a device-owned readiness condition up to a fixed deadline. */
     private fun waitUntil(
