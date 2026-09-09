@@ -67,10 +67,20 @@ class NotificationHapticVisualTimingDeviceTest {
     private val listener = ComponentName(context, NotificationTimingListenerService::class.java)
     private var listenerProvisioned = false
 
-    /** Requires notification permission and provisions listener access without modifying app data. */
+    /** Provisions emulator notification access while preserving permission state on physical devices. */
     @Before
     fun provisionNotificationAccess() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED &&
+                shell("getprop ro.kernel.qemu").trim() == "1"
+            ) {
+                instrumentation.uiAutomation.grantRuntimePermission(
+                    context.packageName,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                )
+            }
             assertEquals(
                 "Grant notification permission on the selected test device before running; the test preserves it",
                 PackageManager.PERMISSION_GRANTED,
@@ -605,15 +615,14 @@ class NotificationHapticVisualTimingDeviceTest {
             pictureUrl = null,
         )
 
-    /** Runs the bounded notification-access shell commands required by the fixture. */
-    private fun shell(command: String) {
+    /** Runs a bounded fixture shell command and returns its UTF-8 output. */
+    private fun shell(command: String): String =
         ParcelFileDescriptor
             .AutoCloseInputStream(
                 instrumentation.uiAutomation.executeShellCommand(command),
             ).use { output ->
-                output.readBytes()
+                output.readBytes().toString(Charsets.UTF_8)
             }
-    }
 
     /** Polls a device-owned readiness condition up to a fixed deadline. */
     private fun waitUntil(

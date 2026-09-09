@@ -11,6 +11,7 @@ import android.system.Os
 import android.system.OsConstants
 import java.io.FileDescriptor
 import java.util.Locale
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlin.math.abs
@@ -53,6 +54,8 @@ internal class ConversationDictationCallerAudio private constructor(
 ) {
     private val streaming = AtomicBoolean(false)
     private val finished = AtomicBoolean(false)
+    private val captureClosed = AtomicBoolean(false)
+    private val captureClosedCallbacks = ConcurrentLinkedQueue<() -> Unit>()
 
     /** Begins capture and starts streaming to the provider. Reports whether capture is running. */
     fun start(): Boolean {
@@ -76,24 +79,39 @@ internal class ConversationDictationCallerAudio private constructor(
     }
 
     /**
-     * Ends the utterance by closing the audio, which is how a provider reading a caller descriptor
-     * learns the user stopped speaking.
+     * Ends the utterance and reports only after the recorder and both pipe ends are closed.
      */
-    fun stop() = finish("stop")
+    fun stop(onClosed: () -> Unit) = finish("stop", onClosed)
 
-    /** Abandons capture without waiting for a result. */
-    fun cancel() = finish("cancel")
+    /** Abandons capture and reports only after every capture resource is closed. */
+    fun cancel(onClosed: () -> Unit) = finish("cancel", onClosed)
 
     private fun beginRecording(): Boolean =
         runCatching { recorder.startRecording() }.isSuccess &&
             recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING
 
-    private fun finish(reason: String) {
-        if (!finished.compareAndSet(false, true)) return
-        conversationDictationDiagnostic("event=caller_audio_finish reason=$reason")
-        // The streaming thread owns the recorder and both descriptors once it is running, so it
-        // does the teardown; clearing the flag is what stops it.
-        if (!streaming.compareAndSet(true, false)) release()
+    /** Starts idempotent teardown after retaining this caller's closure acknowledgement. */
+    private fun finish(
+        reason: String,
+        onClosed: () -> Unit,
+    ) {
+        registerCaptureClosedCallback(onClosed)
+        if (finished.compareAndSet(false, true)) {
+            conversationDictationDiagnostic("event=caller_audio_finish reason=$reason")
+            // The streaming thread owns the recorder and both descriptors once it is running, so
+            // it does the teardown; clearing the flag is what stops it.
+            if (!streaming.compareAndSet(true, false)) release()
+        }
+    }
+
+    /** Registers one close acknowledgement without losing it to a concurrent teardown path. */
+    private fun registerCaptureClosedCallback(callback: () -> Unit) {
+        if (captureClosed.get()) {
+            callback()
+            return
+        }
+        captureClosedCallbacks.add(callback)
+        if (captureClosed.get() && captureClosedCallbacks.remove(callback)) callback()
     }
 
     /** Closes the capture side without streaming, for a session that never started. */
@@ -101,6 +119,16 @@ internal class ConversationDictationCallerAudio private constructor(
         runCatching(recorder::release)
         runCatching(writeEnd::close)
         runCatching(providerEnd::close)
+        reportCaptureClosed()
+    }
+
+    /** Marks physical capture closed and drains every registered acknowledgement exactly once. */
+    private fun reportCaptureClosed() {
+        captureClosed.set(true)
+        while (true) {
+            val callback = captureClosedCallbacks.poll() ?: return
+            callback()
+        }
     }
 
     private fun stream() {
@@ -126,6 +154,7 @@ internal class ConversationDictationCallerAudio private constructor(
             runCatching(writeEnd::close)
             runCatching(providerEnd::close)
             progress.reportClosed()
+            reportCaptureClosed()
         }
     }
 

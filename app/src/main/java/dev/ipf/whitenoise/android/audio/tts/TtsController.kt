@@ -322,6 +322,10 @@ class TtsController internal constructor(
         audioFocus.release()
     }
 
+    /** Returns the callback generation invalidated by later TTS playback actions. */
+    @Synchronized
+    internal fun playbackCallbackGeneration(): Long = queue.callbackGeneration
+
     @Synchronized
     fun resume() {
         if (state.value !is TtsState.Paused || !acquireAudioFocus()) return

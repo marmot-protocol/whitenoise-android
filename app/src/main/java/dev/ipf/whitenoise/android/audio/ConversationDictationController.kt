@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
 private const val DICTATION_DIAGNOSTIC_TAG = "WNDictation"
@@ -229,11 +230,29 @@ internal interface ConversationDictationRecognitionSession {
     /** Requests a final result while preserving provider output already in flight. */
     fun stop()
 
+    /** Requests a final result and reports when microphone capture has actually ended. */
+    fun stop(onAudioCaptureFinished: () -> Unit) {
+        stop()
+        onAudioCaptureFinished()
+    }
+
     /** Abandons recognition without requesting a final result. */
     fun cancel()
 
+    /** Abandons recognition and reports when microphone capture has actually ended. */
+    fun cancel(onAudioCaptureFinished: () -> Unit) {
+        cancel()
+        onAudioCaptureFinished()
+    }
+
     /** Releases the provider resources owned by this generation. */
     fun destroy()
+
+    /** Releases this generation and reports when microphone capture has actually ended. */
+    fun destroy(onAudioCaptureFinished: () -> Unit) {
+        destroy()
+        onAudioCaptureFinished()
+    }
 }
 
 internal class ConversationDictationProviderUnavailableException : IllegalStateException()
@@ -342,6 +361,7 @@ internal class ConversationDictationController internal constructor(
     private val targetValidator: (suspend (accountRef: String, groupIdHex: String) -> Boolean)? = null,
     private val targetValidationScope: CoroutineScope? = null,
     private val onBeforeRecognition: () -> Unit = {},
+    private val onAfterAudioCapture: () -> Unit = {},
     private val tryAcquireMicrophone: () -> Boolean = { true },
     private val releaseMicrophone: () -> Unit = {},
     private val startDurableSession: (String, () -> Unit) -> Boolean = { _, ready ->
@@ -374,6 +394,7 @@ internal class ConversationDictationController internal constructor(
         targetValidator: suspend (accountRef: String, groupIdHex: String) -> Boolean,
         targetValidationScope: CoroutineScope,
         onBeforeRecognition: () -> Unit,
+        onAfterAudioCapture: () -> Unit,
         tryAcquireMicrophone: () -> Boolean,
         releaseMicrophone: () -> Unit,
         finishAfterSilenceMillis: () -> Long? = { null },
@@ -389,6 +410,7 @@ internal class ConversationDictationController internal constructor(
         targetValidator = targetValidator,
         targetValidationScope = targetValidationScope,
         onBeforeRecognition = onBeforeRecognition,
+        onAfterAudioCapture = onAfterAudioCapture,
         tryAcquireMicrophone = tryAcquireMicrophone,
         releaseMicrophone = releaseMicrophone,
         startDurableSession = { token, _ ->
@@ -449,6 +471,7 @@ internal class ConversationDictationController internal constructor(
     private var restartId = 0L
     private var providerDisconnectRetries = 0
     private var permissionRetryUsed = false
+    private var playbackInterruptedForCapture = false
 
     // Entry points, recognition callbacks and timeout callbacks are main-thread confined.
     private var unresolvedRecognitionFailure: ConversationDictationFailure? = null
@@ -653,8 +676,8 @@ internal class ConversationDictationController internal constructor(
     /** Stops recognition and sends only after the existing origin/draft safety checks pass. */
     fun send() = stopWithDeliveryMode(ConversationDictationDeliveryMode.SendOnFinish)
 
-    // Completion ownership checks stay together so every early exit remains fail-closed.
-    @Suppress("CyclomaticComplexMethod")
+    /** Completes the owned session with its captured paste-or-send policy. */
+    @Suppress("CyclomaticComplexMethod", "LongMethod")
     private fun stopWithDeliveryMode(deliveryMode: ConversationDictationDeliveryMode?) {
         val current = state
         if (finishRequested) return
@@ -675,6 +698,20 @@ internal class ConversationDictationController internal constructor(
             finishRequested = true
             silenceTimeoutHandle?.cancel()
             silenceTimeoutHandle = null
+            val sessionId = current.sessionId ?: return
+            val target = current.target ?: return
+            val generationId = activeRecognitionGenerationId
+            if (generationId == null) {
+                finishPlaybackInterruption()
+            } else {
+                runCatching {
+                    recognitionSession?.stop {
+                        if (owns(sessionId, generationId)) finishPlaybackInterruption()
+                    }
+                }.onFailure {
+                    failOrRetainTranscript(sessionId, target, ConversationDictationFailure.Unknown)
+                }
+            }
             return
         }
         if (current !is ConversationDictationState.Starting && current !is ConversationDictationState.Listening) return
@@ -691,7 +728,10 @@ internal class ConversationDictationController internal constructor(
             return
         }
         if (accumulatedTranscript.isNotBlank() && !generationHasSpeech) {
-            clearRecognitionGeneration(cancel = true)
+            clearRecognitionGeneration(
+                cancel = true,
+                onAudioCaptureFinished = ::finishPlaybackInterruption,
+            )
             finalizeAccumulatedTranscript(sessionId, target)
             return
         }
@@ -699,8 +739,11 @@ internal class ConversationDictationController internal constructor(
         armGenerationTimeout(sessionId, generationId, PROCESSING_TIMEOUT_MILLIS) {
             failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
         }
-        runCatching { recognitionSession?.stop() }
-            .onFailure { failOrRetainTranscript(sessionId, target, ConversationDictationFailure.Unknown) }
+        runCatching {
+            recognitionSession?.stop {
+                if (owns(sessionId, generationId)) finishPlaybackInterruption()
+            }
+        }.onFailure { failOrRetainTranscript(sessionId, target, ConversationDictationFailure.Unknown) }
     }
 
     /** Discards process-memory transcript state and releases every resource held by the session. */
@@ -1232,6 +1275,7 @@ internal class ConversationDictationController internal constructor(
                 return
             }
             microphoneHeld = true
+            playbackInterruptedForCapture = true
             if (runCatching(onBeforeRecognition).isFailure) {
                 fail(sessionId, target, ConversationDictationFailure.Unknown)
                 return
@@ -1257,6 +1301,7 @@ internal class ConversationDictationController internal constructor(
         }
         val listener =
             object : ConversationDictationRecognitionListener {
+                /** Promotes only the current generation from starting to listening. */
                 override fun onReady() {
                     conversationDictationDiagnostic("event=callback_ready generation=$generationId")
                     if (!owns(sessionId, generationId) || state !is ConversationDictationState.Starting) return
@@ -1272,6 +1317,7 @@ internal class ConversationDictationController internal constructor(
                         )
                 }
 
+                /** Records speech only for the generation that still owns the session. */
                 override fun onBeginningOfSpeech() {
                     conversationDictationDiagnostic("event=callback_beginning_of_speech generation=$generationId")
                     if (!owns(sessionId, generationId)) return
@@ -1282,19 +1328,22 @@ internal class ConversationDictationController internal constructor(
                     silenceDeadlineElapsedMillis = null
                 }
 
+                /** Moves the owned generation into bounded final-result processing. */
                 override fun onEndOfSpeech() {
                     conversationDictationDiagnostic("event=callback_end_of_speech generation=$generationId")
-                    val recognitionActive =
-                        state is ConversationDictationState.Starting || state is ConversationDictationState.Listening
-                    if (!owns(sessionId, generationId) || !recognitionActive) {
-                        return
-                    }
-                    state = ConversationDictationState.Processing(sessionId, target)
-                    armGenerationTimeout(sessionId, generationId, PROCESSING_TIMEOUT_MILLIS) {
-                        failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
+                    if (!owns(sessionId, generationId)) return
+                    when {
+                        state is ConversationDictationState.Starting ||
+                            state is ConversationDictationState.Listening -> {
+                            state = ConversationDictationState.Processing(sessionId, target)
+                            armGenerationTimeout(sessionId, generationId, PROCESSING_TIMEOUT_MILLIS) {
+                                failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
+                            }
+                        }
                     }
                 }
 
+                /** Commits an owned final segment and either finishes or schedules the next generation. */
                 override fun onResult(transcript: String?) {
                     conversationDictationDiagnostic(
                         "event=callback_result generation=$generationId has_text=${!transcript.isNullOrBlank()}",
@@ -1327,6 +1376,7 @@ internal class ConversationDictationController internal constructor(
                     }
                 }
 
+                /** Applies retry or terminal-failure policy only to the current generation. */
                 override fun onError(error: ConversationDictationFailure) {
                     conversationDictationDiagnostic(
                         "event=callback_error generation=$generationId failure=${error.name}",
@@ -1580,7 +1630,10 @@ internal class ConversationDictationController internal constructor(
                 if (state.sessionId == sessionId && !generationHasSpeech && accumulatedTranscript.isNotBlank()) {
                     finishRequested = true
                     cancelPendingRestart()
-                    clearRecognitionGeneration(cancel = true)
+                    clearRecognitionGeneration(
+                        cancel = true,
+                        onAudioCaptureFinished = ::finishPlaybackInterruption,
+                    )
                     finalizeAccumulatedTranscript(sessionId, target)
                 }
             }
@@ -1686,12 +1739,10 @@ internal class ConversationDictationController internal constructor(
         silenceTimeoutHandle?.cancel()
         silenceTimeoutHandle = null
         silenceDeadlineElapsedMillis = null
-        clearRecognitionGeneration(cancel)
-        if (microphoneHeld) {
-            microphoneHeld = false
-            conversationDictationDiagnostic("event=microphone_lease_released")
-            runCatching(releaseMicrophone)
-        }
+        clearRecognitionGeneration(
+            cancel = cancel,
+            onAudioCaptureFinished = ::finishPlaybackInterruption,
+        )
         if (durableSession && releaseDurableSession) {
             durableSession = false
             conversationDictationDiagnostic("event=foreground_service_stop_requested")
@@ -1704,8 +1755,23 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
-    /** Tears down one recognizer generation without releasing logical-session resources. */
-    private fun clearRecognitionGeneration(cancel: Boolean) {
+    /** Restores only playback that this recognition session interrupted, at most once. */
+    private fun finishPlaybackInterruption() {
+        if (!playbackInterruptedForCapture) return
+        playbackInterruptedForCapture = false
+        if (microphoneHeld) {
+            microphoneHeld = false
+            conversationDictationDiagnostic("event=microphone_lease_released")
+            runCatching(releaseMicrophone)
+        }
+        runCatching(onAfterAudioCapture)
+    }
+
+    /** Tears down one recognizer generation and optionally acknowledges physical capture closure. */
+    private fun clearRecognitionGeneration(
+        cancel: Boolean,
+        onAudioCaptureFinished: () -> Unit = {},
+    ) {
         generationTimeoutHandle?.cancel()
         generationTimeoutHandle = null
         val session = recognitionSession
@@ -1713,8 +1779,16 @@ internal class ConversationDictationController internal constructor(
         activeRecognitionGenerationId = null
         generationHasSpeech = false
         generationReadyAtElapsedMillis = null
-        if (cancel) runCatching { session?.cancel() }
-        runCatching { session?.destroy() }
+        if (session == null) {
+            onAudioCaptureFinished()
+            return
+        }
+        if (cancel) {
+            runCatching { session.cancel(onAudioCaptureFinished) }
+                .onFailure { onAudioCaptureFinished() }
+        }
+        runCatching { session.destroy(onAudioCaptureFinished) }
+            .onFailure { onAudioCaptureFinished() }
     }
 
     /** Applies the captured paste-or-send policy after authoritative origin validation. */
@@ -2665,33 +2739,48 @@ private class AndroidConversationDictationRecognitionSession(
     private val recognitionIntent = conversationDictationRecognitionIntent()
     private var started = false
     private var destroyed = false
+    private var callerAudioCapturing = false
+    private val captureFinished = AtomicReference<(() -> Unit)?>(null)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     init {
         recognizer.setRecognitionListener(
             @Suppress("TooManyFunctions")
             object : RecognitionListener {
+                /** Reports that the platform recognizer is ready for audio. */
                 override fun onReadyForSpeech(params: Bundle?) = listener.onReady()
 
+                /** Reports the first detected speech frame. */
                 override fun onBeginningOfSpeech() = listener.onBeginningOfSpeech()
 
                 override fun onRmsChanged(rmsdB: Float) = Unit
 
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
 
-                override fun onEndOfSpeech() = listener.onEndOfSpeech()
-
-                override fun onError(error: Int) {
-                    val mapped = error.toConversationDictationFailure(recognitionService.packageName)
-                    conversationDictationDiagnostic("event=platform_error code=$error failure=${mapped.name}")
-                    listener.onError(mapped)
+                /** Reports provider end-of-speech while capture closure remains callback-owned. */
+                override fun onEndOfSpeech() {
+                    if (!callerAudioCapturing) reportCaptureFinished()
+                    listener.onEndOfSpeech()
                 }
 
+                /** Defers a terminal platform error until caller-owned audio has closed. */
+                override fun onError(error: Int) {
+                    val mapped = error.toConversationDictationFailure(recognitionService.packageName)
+                    deliverAfterCallerAudioCloses {
+                        conversationDictationDiagnostic("event=platform_error code=$error failure=${mapped.name}")
+                        listener.onError(mapped)
+                    }
+                }
+
+                /** Defers the final transcript until caller-owned audio has closed. */
                 override fun onResults(results: Bundle?) {
-                    listener.onResult(
-                        results
-                            ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                            ?.firstOrNull(),
-                    )
+                    deliverAfterCallerAudioCloses {
+                        listener.onResult(
+                            results
+                                ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                                ?.firstOrNull(),
+                        )
+                    }
                 }
 
                 override fun onPartialResults(partialResults: Bundle?) {
@@ -2729,6 +2818,7 @@ private class AndroidConversationDictationRecognitionSession(
         check(!started && !destroyed)
         started = true
         val capturing = callerAudio?.start() == true
+        callerAudioCapturing = capturing
         conversationDictationDiagnostic("event=platform_start_listening caller_audio=$capturing")
         val intent = startIntent(capturing)
         // Both descriptors stay open until capture ends. SpeechRecognizer.startListening only
@@ -2737,8 +2827,9 @@ private class AndroidConversationDictationRecognitionSession(
         // and fail the session with ERROR_CLIENT.
         runCatching { recognizer.startListening(intent) }
             .onFailure {
-                callerAudio?.cancel()
-                listener.onError(ConversationDictationFailure.Unknown)
+                deliverAfterCallerAudioCloses {
+                    listener.onError(ConversationDictationFailure.Unknown)
+                }
             }
     }
 
@@ -2759,28 +2850,64 @@ private class AndroidConversationDictationRecognitionSession(
     }
 
     /** Requests the provider to finish the current utterance and return its final result. */
-    override fun stop() {
+    override fun stop(onAudioCaptureFinished: () -> Unit) {
         conversationDictationDiagnostic("event=platform_stop_listening")
+        captureFinished.set(onAudioCaptureFinished)
         // Close the audio first: a provider reading a caller descriptor ends the utterance on EOF.
-        callerAudio?.stop()
+        if (callerAudioCapturing) callerAudio?.stop(::reportCaptureFinished)
         recognizer.stopListening()
     }
 
-    /** Cancels provider work when the controller no longer needs a result. */
-    override fun cancel() {
+    /** Requests a final result when no capture acknowledgement is required. */
+    override fun stop() = stop {}
+
+    /** Delivers a terminal provider callback only after caller-owned audio has fully closed. */
+    private fun deliverAfterCallerAudioCloses(delivery: () -> Unit) {
+        if (!callerAudioCapturing) {
+            reportCaptureFinished()
+            delivery()
+            return
+        }
+        callerAudio?.cancel {
+            callerAudioCapturing = false
+            reportCaptureFinished()
+            if (Looper.myLooper() == Looper.getMainLooper()) delivery() else mainHandler.post(delivery)
+        } ?: delivery()
+    }
+
+    /** Delivers the retained capture acknowledgement once on the main thread. */
+    private fun reportCaptureFinished() {
+        val callback = captureFinished.getAndSet(null) ?: return
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            callback()
+        } else {
+            mainHandler.post(callback)
+        }
+    }
+
+    /** Cancels provider work and acknowledges closure of caller-owned capture. */
+    override fun cancel(onAudioCaptureFinished: () -> Unit) {
         conversationDictationDiagnostic("event=platform_cancel")
-        callerAudio?.cancel()
+        captureFinished.set(onAudioCaptureFinished)
+        if (callerAudioCapturing) callerAudio?.cancel(::reportCaptureFinished) else reportCaptureFinished()
         recognizer.cancel()
     }
 
-    /** Releases the platform recognizer exactly once and invalidates further use of this session. */
-    override fun destroy() {
+    /** Cancels provider work when no capture acknowledgement is required. */
+    override fun cancel() = cancel {}
+
+    /** Releases the recognizer and acknowledges closure of caller-owned capture. */
+    override fun destroy(onAudioCaptureFinished: () -> Unit) {
+        captureFinished.set(onAudioCaptureFinished)
+        if (callerAudioCapturing) callerAudio?.cancel(::reportCaptureFinished) else reportCaptureFinished()
         if (destroyed) return
         destroyed = true
         conversationDictationDiagnostic("event=platform_destroy")
-        callerAudio?.cancel()
         recognizer.destroy()
     }
+
+    /** Releases the recognizer when no capture acknowledgement is required. */
+    override fun destroy() = destroy {}
 }
 
 /** Reports only whether a callback contained text, never the recognized content. */

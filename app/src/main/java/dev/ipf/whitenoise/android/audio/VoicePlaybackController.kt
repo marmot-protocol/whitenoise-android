@@ -80,6 +80,13 @@ object VoicePlaybackController {
         val invalidatesCache: Boolean,
     )
 
+    /** Exact paused player identity retained across a bounded audio interruption. */
+    internal data class PausedPlayback internal constructor(
+        val key: String,
+        internal val playerToken: Any,
+        internal val playbackGeneration: Long,
+    )
+
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
 
@@ -157,6 +164,7 @@ object VoicePlaybackController {
      * API 23 onward.
      */
     fun cycleSpeed(): Float {
+        nextPlaybackGeneration()
         var idx = 0
         for (i in speedOptions.indices) {
             if (speedOptions[i] == currentSpeed) {
@@ -222,6 +230,7 @@ object VoicePlaybackController {
         file: File,
         ownerKey: String?,
     ): PlaybackStartResult {
+        val playGeneration = nextPlaybackGeneration()
         // A user tap after transient loss must not wait forever for an OEM to
         // deliver AUDIOFOCUS_GAIN. Drop the retained request so requestFocus()
         // below performs a fresh arbitration and can still deny us cleanly.
@@ -247,7 +256,6 @@ object VoicePlaybackController {
             startTicker()
             return PlaybackStartResult.Resumed
         }
-        val prepareGeneration = nextPlaybackGeneration()
         releasePlayerInternal()
         _state.value = PlaybackState(key = key, isPlaying = false, speed = currentSpeed)
         val mp =
@@ -279,7 +287,7 @@ object VoicePlaybackController {
                 _state.value = PlaybackState()
                 return PlaybackStartResult.PrepareFailed
             }
-        if (!playbackRequests.isCurrent(prepareGeneration)) {
+        if (!playbackRequests.isCurrent(playGeneration)) {
             mp.runCatching { release() }
             return PlaybackStartResult.Superseded
         }
@@ -475,6 +483,12 @@ object VoicePlaybackController {
     /** Pause the active player (no-op if nothing is active). */
     fun pause() {
         nextPlaybackGeneration()
+        pauseAfterGenerationAdvance()
+    }
+
+    /** Applies a pause after the caller has invalidated older playback intent. */
+    @Suppress("ReturnCount")
+    private fun pauseAfterGenerationAdvance() {
         clearAudioFocusInterruption(restoreVolume = true)
         val mp =
             player ?: run {
@@ -507,11 +521,54 @@ object VoicePlaybackController {
         abandonFocus()
     }
 
+    /** Pauses active playback and returns the exact player identity that may be resumed. */
+    internal fun pauseForInterruption(): PausedPlayback? {
+        val interruptionGeneration = nextPlaybackGeneration()
+        val activePlayer = player
+        val activeKey = currentKey
+        return when {
+            activePlayer == null -> null
+            activeKey == null -> null
+            !_state.value.isPlaying -> null
+            else -> {
+                pauseAfterGenerationAdvance()
+                PausedPlayback(activeKey, activePlayer, interruptionGeneration)
+                    .takeIf { player === activePlayer && !_state.value.isPlaying }
+            }
+        }
+    }
+
+    /** Resumes the exact paused player without preparing its file again. */
+    internal fun resumeInterrupted(interruption: PausedPlayback): Boolean {
+        val pausedState = _state.value
+        val activePlayer = player
+        return when {
+            !playbackRequests.isCurrent(interruption.playbackGeneration) -> false
+            pausedState.isPlaying -> false
+            pausedState.key != interruption.key -> false
+            currentKey != interruption.key -> false
+            activePlayer !== interruption.playerToken -> false
+            !requestFocus() -> false
+            !startCurrentPlayer(activePlayer) -> false
+            else -> {
+                nextPlaybackGeneration()
+                _state.value =
+                    pausedState.copy(
+                        isPlaying = true,
+                        durationMs = runCatching { activePlayer.duration }.getOrDefault(pausedState.durationMs),
+                    )
+                startTicker()
+                true
+            }
+        }
+    }
+
     /** Seek the active player to [positionMs] (clamped to duration). */
     fun seekTo(
         key: String,
         positionMs: Int,
     ) {
+        nextPlaybackGeneration()
         val mp = player ?: return
         if (currentKey != key) return
         // Read mp.duration once, inside a guard: if the player has been driven

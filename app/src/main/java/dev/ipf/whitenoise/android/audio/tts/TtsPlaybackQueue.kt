@@ -157,6 +157,10 @@ internal class TtsPlaybackQueue(
     private val generation: Long
         get() = playbackCallbacks.capture()
 
+    /** Returns the generation that a temporary playback handoff must retain. */
+    internal val callbackGeneration: Long
+        get() = generation
+
     // staleness-exempt: observable progress version published to Compose state.
     private var messageProgressGeneration = 0L
     private var playbackSessionId: Long = 0L

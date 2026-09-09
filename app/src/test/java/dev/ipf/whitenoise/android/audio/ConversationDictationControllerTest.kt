@@ -339,6 +339,160 @@ class ConversationDictationControllerTest {
         assertFalse(fixture.controller.state is ConversationDictationState.Failed)
     }
 
+    /** Verifies capture closure restores playback before authoritative transcript validation starts. */
+    @Test
+    fun doneResumesPlaybackAfterCaptureEndsAndBeforeTranscriptValidation() =
+        runTest {
+            val events = mutableListOf<String>()
+            val platform = FakePlatform(deferCaptureCompletion = true)
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("", TextRange.Zero),
+                    platform = platform,
+                    targetValidator = { _, _ ->
+                        events += "validate"
+                        true
+                    },
+                    targetValidationScope = this,
+                    onBeforeRecognition = { events += "pause" },
+                    onAfterAudioCapture = { events += "resume" },
+                )
+
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.controller.stop()
+            assertEquals(listOf("pause"), events)
+            platform.session.completeCapture()
+            assertEquals(listOf("pause", "resume"), events)
+            fixture.platform.listener.onResult("dictated words")
+            advanceUntilIdle()
+
+            assertEquals(listOf("pause", "resume", "validate"), events)
+        }
+
+    /** Verifies provider end-of-speech cannot bypass caller-owned capture closure. */
+    @Test
+    fun stopAfterProviderEndWaitsForCallerOwnedCaptureToClose() =
+        runTest {
+            val platform = FakePlatform(deferCaptureCompletion = true)
+            var resumes = 0
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("", TextRange.Zero),
+                    platform = platform,
+                    onAfterAudioCapture = { resumes += 1 },
+                )
+
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            platform.listener.onEndOfSpeech()
+            fixture.controller.stop()
+
+            assertEquals(0, resumes)
+            platform.session.completeCapture()
+            assertEquals(1, resumes)
+        }
+
+    /** Verifies repeated cancellation or failure cleanup restores interrupted playback once. */
+    @Test
+    fun cancelAndFailureEachResumePlaybackExactlyOnce() {
+        listOf<(Fixture) -> Unit>(
+            { it.controller.cancel() },
+            { it.platform.listener.onError(ConversationDictationFailure.Unknown) },
+        ).forEach { finish ->
+            var resumes = 0
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("", TextRange.Zero),
+                    onAfterAudioCapture = { resumes += 1 },
+                )
+
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            finish(fixture)
+            fixture.controller.cancel()
+
+            assertEquals(1, resumes)
+        }
+    }
+
+    /** Verifies explicit cancellation retains the playback pause until physical capture closes. */
+    @Test
+    fun cancellationDefersPlaybackUntilCallerOwnedCaptureCloses() {
+        val platform = FakePlatform(deferCaptureCompletion = true)
+        var resumes = 0
+        val fixture =
+            fixture(
+                draft = TextFieldValue("", TextRange.Zero),
+                platform = platform,
+                onAfterAudioCapture = { resumes += 1 },
+            )
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.controller.cancel()
+
+        assertEquals(0, resumes)
+        platform.session.completeCapture()
+        fixture.controller.cancel()
+        assertEquals(1, resumes)
+    }
+
+    /** Verifies a terminal provider error is withheld until caller-owned capture closes. */
+    @Test
+    fun providerErrorDefersPlaybackUntilCallerOwnedCaptureCloses() {
+        val platform = FakePlatform(deferCaptureCompletion = true)
+        var resumes = 0
+        val fixture =
+            fixture(
+                draft = TextFieldValue("", TextRange.Zero),
+                platform = platform,
+                onAfterAudioCapture = { resumes += 1 },
+            )
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        platform.session.providerError(ConversationDictationFailure.Unknown)
+
+        assertEquals(0, resumes)
+        platform.session.completeCapture()
+        assertEquals(1, resumes)
+        assertTrue(fixture.controller.state is ConversationDictationState.Failed)
+    }
+
+    /** Verifies Paste and Send restore playback before their longer delivery work begins. */
+    @Test
+    fun pasteAndSendResumePlaybackAfterCaptureEndsAndBeforeDeliveryWork() =
+        runTest {
+            listOf<(ConversationDictationController) -> Unit>(
+                { it.paste() },
+                { it.send() },
+            ).forEach { finish ->
+                val events = mutableListOf<String>()
+                val platform = FakePlatform(deferCaptureCompletion = true)
+                val fixture =
+                    fixture(
+                        draft = TextFieldValue("", TextRange.Zero),
+                        platform = platform,
+                        targetValidator = { _, _ ->
+                            events += "validate"
+                            true
+                        },
+                        targetValidationScope = this,
+                        onAfterAudioCapture = { events += "resume" },
+                        sendTranscriptIfOriginUnchanged = {
+                            events += "send"
+                            true
+                        },
+                    )
+
+                fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+                finish(fixture.controller)
+                assertEquals(emptyList<String>(), events)
+                platform.session.completeCapture()
+                assertEquals(listOf("resume"), events)
+                fixture.platform.listener.onResult("dictated words")
+                advanceUntilIdle()
+
+                assertEquals("resume", events.first())
+            }
+        }
+
     @Test
     fun firstUseDisclosureAndPermissionAreExplicitGates() {
         var disclosureAccepted = false
@@ -2639,6 +2793,7 @@ class ConversationDictationControllerTest {
         targetValidator: (suspend (String, String) -> Boolean)? = null,
         targetValidationScope: CoroutineScope? = null,
         onBeforeRecognition: () -> Unit = {},
+        onAfterAudioCapture: () -> Unit = {},
         platform: FakePlatform = FakePlatform(),
         tryAcquireMicrophone: () -> Boolean = { true },
         releaseMicrophone: () -> Unit = {},
@@ -2682,6 +2837,7 @@ class ConversationDictationControllerTest {
                 targetValidator = targetValidator,
                 targetValidationScope = targetValidationScope,
                 onBeforeRecognition = onBeforeRecognition,
+                onAfterAudioCapture = onAfterAudioCapture,
                 tryAcquireMicrophone = tryAcquireMicrophone,
                 releaseMicrophone = releaseMicrophone,
                 startDurableSession = startDurableSession,
@@ -2729,6 +2885,7 @@ class ConversationDictationControllerTest {
         var createFailure: Throwable? = null,
         var microphoneAccessOverride: ConversationDictationMicrophoneAccess? = null,
         private val completePreparationOnStop: Boolean = false,
+        private val deferCaptureCompletion: Boolean = false,
         // Every existing case keeps the default: a platform whose provider records for itself.
         var callerAudio: ConversationDictationCallerAudioRequirement =
             ConversationDictationCallerAudioRequirement.NotNeeded,
@@ -2805,7 +2962,7 @@ class ConversationDictationControllerTest {
             createFailure?.let { throw it }
             this.listener = listener
             listeners += listener
-            session = FakeSession(listener, completePreparationOnStop)
+            session = FakeSession(listener, completePreparationOnStop, deferCaptureCompletion)
             sessions += session
             return session
         }
@@ -2814,6 +2971,7 @@ class ConversationDictationControllerTest {
     private class FakeSession(
         private val listener: ConversationDictationRecognitionListener? = null,
         private val completePreparationOnStop: Boolean = false,
+        private val deferCaptureCompletion: Boolean = false,
     ) : ConversationDictationRecognitionSession {
         var started = false
         var stopped = false
@@ -2821,24 +2979,76 @@ class ConversationDictationControllerTest {
         var destroyed = false
         var cancelCalls = 0
         var destroyCalls = 0
+        private val captureFinished = mutableListOf<() -> Unit>()
+        private var captureClosed = false
+        private var deferredProviderError: ConversationDictationFailure? = null
 
+        /** Marks this fake recognition generation started. */
         override fun start() {
             started = true
         }
 
-        override fun stop() {
+        /** Requests a final result while retaining the capture-closure callback. */
+        override fun stop(onAudioCaptureFinished: () -> Unit) {
             stopped = true
+            registerCaptureFinished(onAudioCaptureFinished)
             if (completePreparationOnStop) listener?.onResult(null)
         }
 
+        /** Requests a final result without observing capture closure. */
+        override fun stop() = stop {}
+
+        /** Closes the fake capture and delivers callbacks in platform order. */
+        fun completeCapture() {
+            captureClosed = true
+            captureFinished.toList().also { captureFinished.clear() }.forEach { it() }
+            deferredProviderError?.let { error ->
+                deferredProviderError = null
+                listener?.onError(error)
+            }
+        }
+
+        /** Emits a provider error now or after the configured deferred capture close. */
+        fun providerError(error: ConversationDictationFailure) {
+            if (deferCaptureCompletion && !captureClosed) {
+                deferredProviderError = error
+            } else {
+                listener?.onError(error)
+            }
+        }
+
+        /** Registers a close acknowledgement against the fake capture lifecycle. */
+        private fun registerCaptureFinished(callback: () -> Unit) {
+            if (captureClosed) {
+                callback()
+            } else {
+                captureFinished += callback
+                if (!deferCaptureCompletion) completeCapture()
+            }
+        }
+
+        /** Records provider cancellation without changing fake capture state. */
         override fun cancel() {
             cancelled = true
             cancelCalls += 1
         }
 
+        /** Cancels provider work and registers capture closure acknowledgement. */
+        override fun cancel(onAudioCaptureFinished: () -> Unit) {
+            cancel()
+            registerCaptureFinished(onAudioCaptureFinished)
+        }
+
+        /** Records recognizer destruction without changing fake capture state. */
         override fun destroy() {
             destroyed = true
             destroyCalls += 1
+        }
+
+        /** Destroys the recognizer and registers capture closure acknowledgement. */
+        override fun destroy(onAudioCaptureFinished: () -> Unit) {
+            destroy()
+            registerCaptureFinished(onAudioCaptureFinished)
         }
     }
 
