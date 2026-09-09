@@ -14,6 +14,7 @@ data class DiagramNarration(
 )
 
 object DiagramSpeech {
+    private const val MIN_BOX_LINE_COUNT = 3
     private const val LABEL = "[\\p{L}\\p{N}_]+(?: +[\\p{L}\\p{N}_]+)*"
     private val arrowGrammar = Regex(" *$LABEL(?: *(?:->|→) *$LABEL)+ *")
     private val treeRootGrammar = Regex(" *$LABEL *")
@@ -89,7 +90,7 @@ object DiagramSpeech {
             lines.drop(1).all(treeBranchGrammar::matches)
 
     private fun isBox(lines: List<String>): Boolean =
-        lines.size >= 3 &&
+        lines.size >= MIN_BOX_LINE_COUNT &&
             boxBorderGrammar.matches(lines.first()) &&
             boxBorderGrammar.matches(lines.last()) &&
             lines.subList(1, lines.lastIndex).all(boxBodyGrammar::matches)

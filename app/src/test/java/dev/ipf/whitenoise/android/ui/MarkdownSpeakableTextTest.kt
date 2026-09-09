@@ -912,7 +912,11 @@ class MarkdownSpeakableTextTest {
 
             assertEquals(
                 dev.ipf.whitenoise.android.audio.tts.speech.SpeechRole.CodeBlock,
-                projection.speechRoles.values.single().role,
+                projection
+                    .speechRoles
+                    .values
+                    .single()
+                    .role,
             )
         }
     }

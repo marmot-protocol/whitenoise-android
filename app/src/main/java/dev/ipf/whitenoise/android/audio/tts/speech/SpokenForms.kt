@@ -173,13 +173,19 @@ object SpokenForms {
         val duration =
             context.semanticHint == SpeechSemanticHint.Duration ||
                 Regex("(?i)duration: *$").containsMatchIn(preceding)
-        return ClockSpeech.clock(token, duration) ?: if (Regex("(?i)ratio:? *$").containsMatchIn(preceding)) {
-            val parts = token.split(':').takeIf { it.size == 2 } ?: return null
-            val values = parts.map { it.toLongOrNull() ?: return null }
-            values.joinToString(" to ") { EnglishNumbers.cardinal(it) }
-        } else {
-            null
-        }
+        val parts = token.split(':')
+        val values = parts.map(String::toLongOrNull)
+        val ratio =
+            if (
+                Regex("(?i)ratio:? *$").containsMatchIn(preceding) &&
+                parts.size == 2 &&
+                values.all { it != null }
+            ) {
+                values.filterNotNull().joinToString(" to ") { EnglishNumbers.cardinal(it) }
+            } else {
+                null
+            }
+        return ClockSpeech.clock(token, duration) ?: ratio
     }
 
     private fun scientific(
