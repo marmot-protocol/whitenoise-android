@@ -5,9 +5,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsController
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 
 /** Wires the process-wide speech controllers into the dictation playback handoff. */
-internal fun createConversationDictationPlaybackHandoff(
-    ttsController: TtsController,
-): ConversationDictationPlaybackHandoff =
+internal fun createConversationDictationPlaybackHandoff(ttsController: TtsController): ConversationDictationPlaybackHandoff =
     ConversationDictationPlaybackHandoff(
         ttsState = { ttsController.state.value },
         pauseTts = ttsController::pause,

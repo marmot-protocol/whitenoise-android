@@ -29,6 +29,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.R
@@ -791,6 +792,7 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
                 initialMemberSnapshot = conversationTimelineMemberSnapshot(),
                 initialChatListRow = entryProjection,
                 groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
+                groupRecoveryStatusReader = { _, groupIdHex -> emptyVoiceRecoveryStatus(groupIdHex) },
                 startOnConstruction = true,
             )
         appState.attachmentOpens.setDestination(
@@ -1299,6 +1301,16 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
         )
     }
 }
+
+/** Returns the fixture's authoritative empty recovery state for a conversation. */
+private fun emptyVoiceRecoveryStatus(groupIdHex: String): GroupRecoveryStatusFfi =
+    GroupRecoveryStatusFfi(
+        groupIdHex = groupIdHex,
+        automaticRecoveryFailed = false,
+        pendingReinvites = 0u,
+        failedReinvites = 0u,
+        rejoinInvitations = emptyList(),
+    )
 
 /** Routes each message to independent gates while publishing bytes through the real cache. */
 internal class ControlledVoicePresentationRuntime(
