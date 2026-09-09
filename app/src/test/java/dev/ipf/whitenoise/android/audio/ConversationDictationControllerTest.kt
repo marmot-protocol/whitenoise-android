@@ -369,6 +369,27 @@ class ConversationDictationControllerTest {
         }
 
     @Test
+    fun stopAfterProviderEndWaitsForCallerOwnedCaptureToClose() =
+        runTest {
+            val platform = FakePlatform(deferCaptureCompletion = true)
+            var resumes = 0
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("", TextRange.Zero),
+                    platform = platform,
+                    onAfterAudioCapture = { resumes += 1 },
+                )
+
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            platform.listener.onEndOfSpeech()
+            fixture.controller.stop()
+
+            assertEquals(0, resumes)
+            platform.session.completeCapture()
+            assertEquals(1, resumes)
+        }
+
+    @Test
     fun cancelAndFailureEachResumePlaybackExactlyOnce() {
         listOf<(Fixture) -> Unit>(
             { it.controller.cancel() },
