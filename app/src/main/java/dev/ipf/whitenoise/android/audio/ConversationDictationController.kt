@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.audio
 
 import android.Manifest
+import android.app.AppOpsManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -12,6 +13,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
+import android.os.Process
 import android.os.SystemClock
 import android.provider.Settings
 import android.speech.RecognitionListener
@@ -27,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.core.content.ContextCompat
-import androidx.core.content.PermissionChecker
 import androidx.core.content.pm.PackageInfoCompat
 import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrAfter
 import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrBefore
@@ -1130,7 +1131,7 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
-    /** Checks provider, runtime permission, and app-op before creating a recognizer generation. */
+    /** Checks provider and White Noise's runtime grant before creating a recognizer generation. */
     private fun startOrRequestPermission(
         sessionId: Long,
         target: ConversationDictationTarget,
@@ -2272,24 +2273,27 @@ internal class AndroidConversationDictationPlatform(
         return granted
     }
 
-    /** Includes the RECORD_AUDIO app-op so privacy-policy denial cannot masquerade as a usable grant. */
+    /** Leaves global microphone privacy to Android while preserving hard app-op denial. */
+    @Suppress("DEPRECATION")
     override fun microphoneAccess(): ConversationDictationMicrophoneAccess {
         if (!hasRecordAudioPermission()) return ConversationDictationMicrophoneAccess.RuntimePermissionRequired
-        // Android folds device-wide microphone privacy into this effective permission check,
-        // but does not expose the current software-toggle state to ordinary apps. A real app
-        // permission revocation was already handled above, so route any remaining effective
-        // denial to visible privacy recovery without starting a silent recording or changing
-        // the user's privacy toggle.
+        // Android folds the global microphone toggle into its effective permission result. Do not
+        // treat MODE_IGNORED as an app denial: starting recognition is what lets Android present
+        // its native microphone-unblock prompt while White Noise stays on the current surface.
+        // MODE_ERRORED is distinguishable: Android documents it as a hard denial that should fail.
+        val mode =
+            context.getSystemService(AppOpsManager::class.java).unsafeCheckOpNoThrow(
+                AppOpsManager.OPSTR_RECORD_AUDIO,
+                Process.myUid(),
+                context.packageName,
+            )
         val access =
-            if (
-                PermissionChecker.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-                PermissionChecker.PERMISSION_GRANTED
-            ) {
-                ConversationDictationMicrophoneAccess.Granted
+            if (mode == AppOpsManager.MODE_ERRORED) {
+                ConversationDictationMicrophoneAccess.AppOpDenied
             } else {
-                ConversationDictationMicrophoneAccess.MicrophoneMuted
+                ConversationDictationMicrophoneAccess.Granted
             }
-        conversationDictationDiagnostic("event=effective_record_audio_access access=${access.name}")
+        conversationDictationDiagnostic("event=app_record_audio_access mode=$mode access=${access.name}")
         return access
     }
 

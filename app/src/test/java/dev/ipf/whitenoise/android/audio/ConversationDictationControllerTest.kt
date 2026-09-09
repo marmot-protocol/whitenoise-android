@@ -327,6 +327,19 @@ class ConversationDictationControllerTest {
     }
 
     @Test
+    fun grantedRuntimePermissionStartsRecognizerWithoutTreatingEffectivePrivacyDenialAsAppDenial() {
+        val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted)
+        val fixture = fixture(draft = TextFieldValue(""), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        assertTrue(platform.session.started)
+        assertEquals(0L, fixture.controller.permissionRequestId)
+        assertFalse(fixture.controller.state is ConversationDictationState.PermissionRequired)
+        assertFalse(fixture.controller.state is ConversationDictationState.Failed)
+    }
+
+    @Test
     fun firstUseDisclosureAndPermissionAreExplicitGates() {
         var disclosureAccepted = false
         var disclosureMarked = false
