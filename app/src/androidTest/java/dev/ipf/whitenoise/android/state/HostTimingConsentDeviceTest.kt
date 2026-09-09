@@ -24,6 +24,7 @@ class HostTimingConsentDeviceTest {
     @Test
     fun nativeConsentGatesTimings() =
         runBlocking {
+            val metadata = ProductAnalyticsMetadataFfi("1.0", "android", "15", "other", "native", "development", true)
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             MarmotAndroid.initialize(context)
             val root = File(context.cacheDir, "host-timing-consent-${UUID.randomUUID()}").apply { mkdirs() }
@@ -35,7 +36,7 @@ class HostTimingConsentDeviceTest {
                             ProductAnalyticsRuntimeConfigFfi(
                                 eventsEndpoint = null,
                                 appKey = null,
-                                metadata = ProductAnalyticsMetadataFfi("1.0", "android", "15", "other", "native", "development", true),
+                                metadata = metadata,
                                 registry = MarmotTraceSection.hostTimingRegistry,
                                 allowLoopback = true,
                                 operator = "test_operator",
@@ -44,25 +45,34 @@ class HostTimingConsentDeviceTest {
                         marmot.start()
                         try {
                             val name = MarmotTraceSection.hostTimingNames.getValue(MarmotTraceSection.TEXT_SEND)
-                            assertEquals(ProductRecordResultFfi.IGNORED_DISABLED, marmot.recordHostTiming(name, 25uL, HostPerformanceOutcomeFfi.SUCCESS))
+                            assertTiming(marmot, name, ProductRecordResultFfi.IGNORED_DISABLED)
                             val relaySettings = marmot.relayTelemetrySettings()
                             assertThrows(MarmotKitException.ConsentRequired::class.java) {
-                                runBlocking { marmot.setRelayTelemetrySettings(relaySettings.copy(exportEnabled = true)) }
+                                runBlocking {
+                                    marmot.setRelayTelemetrySettings(relaySettings.copy(exportEnabled = true))
+                                }
                             }
-                            marmot.setUsageDiagnosticsConsent(true)
-                            assertEquals(ProductRecordResultFfi.IGNORED_UNCONFIGURED, marmot.recordHostTiming(name, 25uL, HostPerformanceOutcomeFfi.SUCCESS))
+                            // Exercise the same consent command as the existing relay-only settings switch.
+                            marmot.updateTelemetryConsent(true)
+                            assertTiming(marmot, name, ProductRecordResultFfi.IGNORED_UNCONFIGURED)
                             marmot.setProductAnalyticsRuntimeConfig(
-                                config.copy(eventsEndpoint = "http://127.0.0.1:${server.localPort}/api/v0/events", appKey = "A-SH-test"),
+                                config.copy(
+                                    eventsEndpoint = "http://127.0.0.1:${server.localPort}/api/v0/events",
+                                    appKey = "A-SH-test",
+                                ),
                             )
-                            assertEquals(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED, marmot.usageDiagnosticsSettings().decision)
-                            assertEquals(ProductRecordResultFfi.IGNORED_DISABLED, marmot.recordHostTiming(name, 25uL, HostPerformanceOutcomeFfi.SUCCESS))
+                            assertEquals(
+                                UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED,
+                                marmot.usageDiagnosticsSettings().decision,
+                            )
+                            assertTiming(marmot, name, ProductRecordResultFfi.IGNORED_DISABLED)
                             marmot.setUsageDiagnosticsConsent(true)
                             for (stage in MarmotTraceSection.hostTimingNames.values) {
-                                assertEquals(ProductRecordResultFfi.RECORDED, marmot.recordHostTiming(stage, 25uL, HostPerformanceOutcomeFfi.SUCCESS))
+                                assertTiming(marmot, stage, ProductRecordResultFfi.RECORDED)
                             }
                             marmot.setUsageDiagnosticsConsent(false)
                             assertEquals(0uL, marmot.usageDiagnosticsStatus().queuedEvents)
-                            assertEquals(ProductRecordResultFfi.IGNORED_DISABLED, marmot.recordHostTiming(name, 25uL, HostPerformanceOutcomeFfi.FAILURE))
+                            assertTiming(marmot, name, ProductRecordResultFfi.IGNORED_DISABLED)
                         } finally {
                             marmot.shutdown()
                         }
@@ -72,4 +82,12 @@ class HostTimingConsentDeviceTest {
                 root.deleteRecursively()
             }
         }
+
+    private fun assertTiming(
+        marmot: Marmot,
+        name: String,
+        expected: ProductRecordResultFfi,
+    ) {
+        assertEquals(expected, marmot.recordHostTiming(name, 25uL, HostPerformanceOutcomeFfi.SUCCESS))
+    }
 }

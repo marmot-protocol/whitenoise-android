@@ -6418,7 +6418,9 @@ class ConversationController(
     private val textPublisher: suspend (String?, String, String, String) -> SendSummaryFfi =
         { replyTarget, account, groupIdHex, text ->
             if (replyTarget != null) {
-                appState.marmotIo(MarmotTraceSection.TEXT_REPLY) { replyToMessage(account, groupIdHex, replyTarget, text) }
+                appState.marmotIo(MarmotTraceSection.TEXT_REPLY) {
+                    replyToMessage(account, groupIdHex, replyTarget, text)
+                }
             } else {
                 appState.marmotIo(MarmotTraceSection.TEXT_SEND) { sendText(account, groupIdHex, text) }
             }
@@ -6432,7 +6434,9 @@ class ConversationController(
         }
     },
     private val mediaPublisher: MediaPublisher = { account, groupIdHex, references, caption ->
-        appState.marmotIo(MarmotTraceSection.MEDIA_SEND) { sendMediaAttachments(account, groupIdHex, references, caption) }
+        appState.marmotIo(MarmotTraceSection.MEDIA_SEND) {
+            sendMediaAttachments(account, groupIdHex, references, caption)
+        }
     },
     private val markdownParser: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
     private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi =
@@ -8757,7 +8761,9 @@ class ConversationController(
             if (alreadyMine) {
                 retractOwnReaction(account, target, emoji)
             } else {
-                appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) { reactToMessage(account, group.groupIdHex, target, emoji) }
+                appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) {
+                    reactToMessage(account, group.groupIdHex, target, emoji)
+                }
             }
         }
         return !alreadyMine
@@ -8946,7 +8952,9 @@ class ConversationController(
         publishTimelineFromIndexes()
         try {
             appState.withGroupCommitLock(account, group.groupIdHex) {
-                appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) { editMessage(account, group.groupIdHex, target, trimmed) }
+                appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) {
+                    editMessage(account, group.groupIdHex, target, trimmed)
+                }
             }
             // Publish accepted: drop the Pending indicator but keep the text
             // overlay so the bubble doesn't flicker back to the old body in the
@@ -10656,7 +10664,10 @@ class ConversationController(
                                 override suspend fun timelineMessages(
                                     accountRef: String,
                                     query: TimelineMessageQueryFfi,
-                                ): TimelinePageFfi = appState.marmotIo(MarmotTraceSection.TIMELINE_READ) { timelineMessages(accountRef, query) }
+                                ): TimelinePageFfi =
+                                    appState.marmotIo(MarmotTraceSection.TIMELINE_READ) {
+                                        timelineMessages(accountRef, query)
+                                    }
                             },
                         accountRef = account,
                         groupIdHex = group.groupIdHex,

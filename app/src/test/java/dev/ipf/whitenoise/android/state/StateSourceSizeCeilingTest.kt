@@ -43,13 +43,15 @@ class StateSourceSizeCeilingTest {
         // Lowered as `ChatListItem` and then the chat-list sort moved to their own
         // same-package files. Raised to the exact post-#2431 size for its covered
         // chat-list convergence and notification-open fixes; keep this ratchet exact.
-        const val CONTROLLERS_MAX_LINES = 12877
+        // PR #2528 wraps existing timing calls to satisfy Detekt; executable behavior is unchanged.
+        const val CONTROLLERS_MAX_LINES = 12888
 
         // Raised exactly for PR #2498's covered account-fenced draft refresh, live controller handoff,
         // and optimistic-preview routing. The integration tests exercise delayed A-B-A completion,
         // same-account replacement, permanent detach, failure, and ambiguous-pending paths. Corrected
         // to the physical line count already present at that merged revision.
-        const val APP_STATE_MAX_LINES = 10263
+        // PR #2528 wraps timing calls and disables product export pending combined disclosure.
+        const val APP_STATE_MAX_LINES = 10294
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }

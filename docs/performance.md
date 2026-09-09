@@ -47,11 +47,15 @@ Logcat is controlled by Android/GrapheneOS.
 This integration targets [MDK #1760](https://github.com/marmot-protocol/mdk/pull/1760)
 through MDK 0.9.20 at `2f44f6b65a19f8818644ccd7027618ba91450c33`. The checked-in
 immutable Android release includes `otlp-export` and `product-analytics-export`,
-with matching generated Kotlin and all four JNI ABIs. Do not deploy this draft until:
+with matching generated Kotlin and all four JNI ABIs. Android deliberately passes
+no product endpoint or app key, even when build configuration provides them. The
+current relay-only settings disclosure can grant native combined consent, so
+product export must remain unconfigured until that disclosure is replaced.
+Activation requires:
 
 - Android integrates MDK's combined usage/diagnostics consent, disclosure,
   operator and verified retention policy. The legacy relay-telemetry toggle
-  cannot grant the expanded consent; do not reinterpret an existing grant.
+  uses the combined native setter but does not disclose expanded collection.
 - Each enabled environment supplies its own `WHITENOISE_<ENV>_PRODUCT_EVENTS_ENDPOINT`,
   `WHITENOISE_<ENV>_PRODUCT_APP_KEY`, and `WHITENOISE_<ENV>_PRODUCT_OPERATOR`
   through local properties or build environment (`ENV`: `DEV`, `STAGING`,
@@ -63,8 +67,8 @@ Consent is enforced inside MDK's `record_host_timing` → `record_product_event`
 → `ProductAnalyticsController::record` path under the native controller lock.
 It returns `IgnoredDisabled` unless the combined decision is granted and
 `IgnoredUnconfigured` when the exporter is unavailable. Revocation invalidates
-pending work and clears queued events. Android does not cache this decision or
-reinterpret the legacy relay-only switch as a combined grant.
+pending work and clears queued events. Android does not cache this decision.
+Keeping the product destination unset prevents the current relay-only UI from enabling product export.
 
 `HostTimingConsentDeviceTest` exercises the packaged native library with an
 isolated empty store and loopback-only destination: no consent, legacy-toggle

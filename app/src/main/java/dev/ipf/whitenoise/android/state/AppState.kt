@@ -1001,6 +1001,7 @@ internal fun operationalNpub(
     encode: (String) -> String?,
 ): String = cachedNpub ?: runCatching { encode(accountIdHex) }.getOrNull() ?: accountIdHex
 
+private const val PRODUCT_OS_MAJOR_MAX_LENGTH = 4
 private const val APP_STATE_SCOPE_LOG_TAG = "WhiteNoiseAppState"
 private const val FORWARD_BACKGROUND_RETRY_ATTEMPTS = 3
 private const val FORWARD_BACKGROUND_RETRY_DELAY_MS = 1_000L
@@ -2219,7 +2220,9 @@ class WhiteNoiseAppState private constructor(
         ): String? = contactNicknameFor(accountRef, accountIdHex)
 
         override suspend fun readDisplayName(accountIdHex: String): String? =
-            marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(accountIdHex) }
+            marmotIo(
+                MarmotTraceSection.DISPLAY_NAME_READ,
+            ) { displayName(accountIdHex) }
 
         override fun displayNameHint(accountIdHex: String): String? = notificationDisplayNameHints[accountIdHex]
 
@@ -2436,7 +2439,7 @@ class WhiteNoiseAppState private constructor(
             } else {
                 val pendingClear = captureDraftForSend(request.accountRef, request.groupIdHex)
                 val accepted =
-                    marmotIo {
+                    marmotIo(MarmotTraceSection.TEXT_SEND) {
                         sendText(request.accountRef, request.groupIdHex, request.payload)
                     }.messageIds.isNotEmpty()
                 if (accepted && pendingClear != null) clearDraftAfterSuccessfulSend(pendingClear)
@@ -3927,7 +3930,9 @@ class WhiteNoiseAppState private constructor(
         val publicationToken = diskMediaCache.capturePublicationToken()
         val result =
             runCatchingCancellable {
-                marmotIo(MarmotTraceSection.MEDIA_DOWNLOAD) { downloadMedia(request.accountRef, request.groupIdHex, reference) }
+                marmotIo(MarmotTraceSection.MEDIA_DOWNLOAD) {
+                    downloadMedia(request.accountRef, request.groupIdHex, reference)
+                }
             }.onFailure { failure ->
                 logAttachmentDownloadFailure(request, failure)
             }.getOrThrow()
@@ -4687,7 +4692,9 @@ class WhiteNoiseAppState private constructor(
         val previousValues = previous.mapValues { (_, versioned) -> versioned.value }
         val rawCountsByHex =
             runCatchingCancellable {
-                marmotIo(MarmotTraceSection.UNREAD_SUMMARY) { accountUnreadSummary().associate { it.accountIdHex to it.unreadCount } }
+                marmotIo(MarmotTraceSection.UNREAD_SUMMARY) {
+                    accountUnreadSummary().associate { it.accountIdHex to it.unreadCount }
+                }
             }.onFailure { appStateDebug { "account unread summary refresh failed" } }
                 .getOrNull()
         if (!refreshIsCurrent()) return
@@ -5576,7 +5583,10 @@ class WhiteNoiseAppState private constructor(
                     appStateDebug(it) { "editor purge failed after wipe: ${it.readableMessage()}" }
                 }
             }
-            val refreshedAccounts = runCatchingCancellable { marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() } }.getOrDefault(emptyList())
+            val refreshedAccounts =
+                runCatchingCancellable {
+                    marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() }
+                }.getOrDefault(emptyList())
             accountListLifetime.advance {
                 accounts = refreshedAccounts
                 releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
@@ -7655,7 +7665,9 @@ class WhiteNoiseAppState private constructor(
         }
         return runCatchingCancellable {
             withGroupCommitLock(accountRef, groupIdHex) {
-                marmotIo(MarmotTraceSection.MESSAGE_REACT) { reactToMessage(accountRef, groupIdHex, messageIdHex, emoji) }
+                marmotIo(MarmotTraceSection.MESSAGE_REACT) {
+                    reactToMessage(accountRef, groupIdHex, messageIdHex, emoji)
+                }
                 NotificationReactionSendOutcome.Sent
             }
         }.onFailure {
@@ -8705,7 +8717,9 @@ class WhiteNoiseAppState private constructor(
             } else if (profileDisplayNameReader != null) {
                 runCatchingCancellable { profileDisplayNameReader.invoke(accountIdHex) }.getOrNull()
             } else {
-                runCatchingCancellable { marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(accountIdHex) } }.getOrNull()
+                runCatchingCancellable {
+                    marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(accountIdHex) }
+                }.getOrNull()
             }
         if (profile != null || rawDisplayName != null) {
             // Drop the result if an account switch / sign-out cleared the caches
@@ -9125,8 +9139,9 @@ class WhiteNoiseAppState private constructor(
         configureAuditRuntime()
         setProductAnalyticsRuntimeConfig(
             ProductAnalyticsRuntimeConfigFfi(
-                eventsEndpoint = BuildConfig.WHITENOISE_PRODUCT_EVENTS_ENDPOINT.nonBlankOrNull(),
-                appKey = BuildConfig.WHITENOISE_PRODUCT_APP_KEY.nonBlankOrNull(),
+                // Keep export unconfigured until the settings UI discloses combined usage/diagnostics collection.
+                eventsEndpoint = null,
+                appKey = null,
                 metadata =
                     ProductAnalyticsMetadataFfi(
                         appVersion = BuildConfig.VERSION_NAME.substringBefore('-'),
@@ -9135,7 +9150,7 @@ class WhiteNoiseAppState private constructor(
                             Build.VERSION.RELEASE
                                 .substringBefore('.')
                                 .filter(Char::isDigit)
-                                .take(4),
+                                .take(PRODUCT_OS_MAJOR_MAX_LENGTH),
                         deviceClass = "other",
                         hostSurface = "native",
                         environment =
@@ -9205,8 +9220,11 @@ class WhiteNoiseAppState private constructor(
             val matrix = loadMediaAutoDownloadMatrix(update.accountRef)
             if (matrix.shouldAutoDownload(MediaAutoDownloadType.Document, activeNetworkTypes())) {
                 val records =
-                    runCatchingCancellable { marmotIo(MarmotTraceSection.MEDIA_LIST) { listMedia(update.accountRef, update.groupIdHex, null) } }
-                        .getOrNull()
+                    runCatchingCancellable {
+                        marmotIo(MarmotTraceSection.MEDIA_LIST) {
+                            listMedia(update.accountRef, update.groupIdHex, null)
+                        }
+                    }.getOrNull()
                         .orEmpty()
                 records
                     .asSequence()
@@ -10071,7 +10089,9 @@ class WhiteNoiseAppState private constructor(
             } else if (profileDisplayNameReader != null) {
                 runCatchingCancellable { profileDisplayNameReader.invoke(id) }.getOrNull()
             } else {
-                runCatchingCancellable { marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(id) } }.getOrNull()
+                runCatchingCancellable {
+                    marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(id) }
+                }.getOrNull()
             }
         return accountSwitchProfileSeed(id, profile, rawDisplayName)
     }

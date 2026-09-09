@@ -136,7 +136,11 @@ internal class MarmotBridgeTracer(
         val startedAt = if (measure) nowMs() else 0L
         val traceEnabled = backend.isEnabled()
         val cookie =
-            if (traceEnabled) nextCookie.updateAndGet { current -> if (current == Int.MAX_VALUE) 1 else current + 1 } else 0
+            if (traceEnabled) {
+                nextCookie.updateAndGet { current -> if (current == Int.MAX_VALUE) 1 else current + 1 }
+            } else {
+                0
+            }
         if (traceEnabled) {
             backend.beginAsyncSection(sectionName, cookie)
         }
@@ -148,9 +152,9 @@ internal class MarmotBridgeTracer(
             if (traceEnabled) {
                 backend.endAsyncSection(sectionName, cookie)
             }
-            if (measure && recordTiming != null && eventName != null) {
+            if (measure) {
                 try {
-                    recordTiming(eventName, durationMs, outcome)
+                    checkNotNull(recordTiming)(checkNotNull(eventName), durationMs, outcome)
                 } catch (_: MarmotKitException) {
                     // Disable this recorder on schema/runtime rejection, preserving the operation's result.
                     if (timingRejected.compareAndSet(false, true)) {

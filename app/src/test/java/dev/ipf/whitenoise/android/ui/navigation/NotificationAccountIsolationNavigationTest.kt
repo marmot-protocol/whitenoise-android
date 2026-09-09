@@ -24,6 +24,7 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
@@ -508,7 +509,8 @@ class NotificationAccountIsolationNavigationTest {
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
-            when (method.name) {
+            when (method.name.substringBefore('-')) {
+                "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 // These existing signed-in accounts have no interactive setup checkpoint.
                 "onboardingSnapshot" -> null
                 "groupDetails" -> {
@@ -519,7 +521,7 @@ class NotificationAccountIsolationNavigationTest {
                 "chatListRow" -> {
                     val accountRef = arguments?.firstOrNull() as? String
                     val groupIdHex = arguments?.getOrNull(1) as? String
-                    check(accountRef == SOURCE_ACCOUNT || accountRef == TARGET_ACCOUNT) {
+                    check(accountRef in listOf(SOURCE_ACCOUNT, TARGET_ACCOUNT)) {
                         "projection read used an unknown account"
                     }
                     check(groupIdHex == SHARED_GROUP) { "projection read used the wrong group" }

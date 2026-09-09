@@ -38,6 +38,7 @@ import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.EngineTrust
@@ -520,7 +521,8 @@ abstract class NotificationDelayedRosterFixture {
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
-            when (method.name) {
+            when (method.name.substringBefore('-')) {
+                "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 // These signed-in accounts have no pending interactive setup.
                 "onboardingSnapshot" -> null
                 "groupRoster" -> gatedRoster(gate, arguments)
