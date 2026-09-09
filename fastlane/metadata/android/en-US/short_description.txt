@@ -1,0 +1,1 @@
+Private, end-to-end encrypted messaging built on Nostr and MLS

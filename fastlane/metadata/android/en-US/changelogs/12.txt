@@ -1,0 +1,3 @@
+Improved startup, account switching, and notification reliability.
+
+Added safer APK attachment handoff, clearer recipient search, and more responsive group administration.

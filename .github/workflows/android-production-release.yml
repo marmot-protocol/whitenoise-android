@@ -1,0 +1,145 @@
+name: Android Production Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_version:
+        description: Exact app versionName to build (for example 2026.9.9)
+        required: true
+        type: string
+
+concurrency:
+  group: android-production-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/master'
+    name: Build and verify release bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    environment: android-release-signing
+    outputs:
+      version: ${{ steps.version.outputs.name }}
+
+    steps:
+      - name: Checkout exact release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - name: Read and validate version
+        id: version
+        shell: bash
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: |
+          set -euo pipefail
+          version_name="$(awk -F'"' '/^[[:space:]]*versionName = "/ { print $2; exit }' app/build.gradle.kts)"
+          [[ -n "$version_name" ]]
+          if [[ "$version_name" != "$EXPECTED_VERSION" ]]; then
+            printf 'Canonical version is %s, workflow requested %s\n' "$version_name" "$EXPECTED_VERSION" >&2
+            exit 1
+          fi
+          printf 'name=%s\n' "$version_name" >> "$GITHUB_OUTPUT"
+
+      - name: Require production release secrets
+        shell: bash
+        env:
+          GOOGLE_SERVICES: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}
+          PRODUCTION_KEYSTORE: ${{ secrets.WHITENOISE_PRODUCTION_KEYSTORE_BASE64 }}
+          PRODUCTION_KEYSTORE_PASSWORD: ${{ secrets.WHITENOISE_PRODUCTION_KEYSTORE_PASSWORD }}
+          PRODUCTION_KEY_ALIAS: ${{ secrets.WHITENOISE_PRODUCTION_KEY_ALIAS }}
+          PRODUCTION_KEY_PASSWORD: ${{ secrets.WHITENOISE_PRODUCTION_KEY_PASSWORD }}
+          PLAY_UPLOAD_KEYSTORE: ${{ secrets.WHITENOISE_PLAY_UPLOAD_KEYSTORE_BASE64 }}
+          PLAY_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.WHITENOISE_PLAY_UPLOAD_KEYSTORE_PASSWORD }}
+          PLAY_UPLOAD_KEY_ALIAS: ${{ secrets.WHITENOISE_PLAY_UPLOAD_KEY_ALIAS }}
+          PLAY_UPLOAD_KEY_PASSWORD: ${{ secrets.WHITENOISE_PLAY_UPLOAD_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for required_name in \
+            GOOGLE_SERVICES \
+            PRODUCTION_KEYSTORE \
+            PRODUCTION_KEYSTORE_PASSWORD \
+            PRODUCTION_KEY_ALIAS \
+            PRODUCTION_KEY_PASSWORD \
+            PLAY_UPLOAD_KEYSTORE \
+            PLAY_UPLOAD_KEYSTORE_PASSWORD \
+            PLAY_UPLOAD_KEY_ALIAS \
+            PLAY_UPLOAD_KEY_PASSWORD; do
+            [[ -n "${!required_name}" ]] || { printf 'Missing Actions secret for %s\n' "$required_name" >&2; exit 1; }
+          done
+
+      - name: Decode Firebase and signing files
+        shell: bash
+        env:
+          ANDROID_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}
+          WHITENOISE_PRODUCTION_KEYSTORE_BASE64: ${{ secrets.WHITENOISE_PRODUCTION_KEYSTORE_BASE64 }}
+          WHITENOISE_PLAY_UPLOAD_KEYSTORE_BASE64: ${{ secrets.WHITENOISE_PLAY_UPLOAD_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$ANDROID_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/google-services.json
+          production_keystore="$RUNNER_TEMP/whitenoise-production-release.p12"
+          play_upload_keystore="$RUNNER_TEMP/whitenoise-play-upload.p12"
+          printf '%s' "$WHITENOISE_PRODUCTION_KEYSTORE_BASE64" | base64 --decode > "$production_keystore"
+          printf '%s' "$WHITENOISE_PLAY_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$play_upload_keystore"
+          chmod 600 app/google-services.json "$production_keystore" "$play_upload_keystore"
+          {
+            printf 'WHITENOISE_PRODUCTION_KEYSTORE_PATH=%s\n' "$production_keystore"
+            printf 'WHITENOISE_PLAY_UPLOAD_KEYSTORE_PATH=%s\n' "$play_upload_keystore"
+            printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache"
+          } >> "$GITHUB_ENV"
+
+      - name: Build verified APK and Play bundle
+        env:
+          WHITENOISE_PRODUCTION_KEYSTORE_PASSWORD: ${{ secrets.WHITENOISE_PRODUCTION_KEYSTORE_PASSWORD }}
+          WHITENOISE_PRODUCTION_KEY_ALIAS: ${{ secrets.WHITENOISE_PRODUCTION_KEY_ALIAS }}
+          WHITENOISE_PRODUCTION_KEY_PASSWORD: ${{ secrets.WHITENOISE_PRODUCTION_KEY_PASSWORD }}
+          WHITENOISE_PLAY_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.WHITENOISE_PLAY_UPLOAD_KEYSTORE_PASSWORD }}
+          WHITENOISE_PLAY_UPLOAD_KEY_ALIAS: ${{ secrets.WHITENOISE_PLAY_UPLOAD_KEY_ALIAS }}
+          WHITENOISE_PLAY_UPLOAD_KEY_PASSWORD: ${{ secrets.WHITENOISE_PLAY_UPLOAD_KEY_PASSWORD }}
+          WHITENOISE_OTLP_ENDPOINT: ${{ secrets.WHITENOISE_OTLP_ENDPOINT }}
+          WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN: ${{ secrets.WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN }}
+          WHITENOISE_AUDIT_LOG_ENDPOINT: ${{ secrets.WHITENOISE_AUDIT_LOG_ENDPOINT }}
+          WHITENOISE_AUDIT_LOG_AUTH_TOKEN: ${{ secrets.WHITENOISE_AUDIT_LOG_AUTH_TOKEN }}
+          WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX: ${{ secrets.WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX }}
+          WHITENOISE_PUSH_RELAY_HINT: ${{ secrets.WHITENOISE_PUSH_RELAY_HINT }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: ./scripts/prepare-production-release.sh --expected-version "$EXPECTED_VERSION"
+
+      - name: Upload verified release bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-production-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/production-release/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Record candidate identity for review
+        shell: bash
+        run: |
+          python3 - <<'PYCODE'
+          import hashlib, json, os
+          from pathlib import Path
+          path = Path("build/production-release/release-manifest.json")
+          manifest = json.loads(path.read_text())
+          digest = hashlib.sha256(path.read_bytes()).hexdigest()
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write(f"Candidate {manifest['versionName']} / code {manifest['versionCode']}\n\n")
+              summary.write(f"Source: `{manifest['sourceCommit']}`\n\nBuild run: `{os.environ['GITHUB_RUN_ID']}`\n\n")
+              summary.write(f"Manifest SHA-256: `{digest}`\n\n")
+              summary.write("No release or store publication occurred. Review and test these artifacts before distribution.\n")
+          PYCODE

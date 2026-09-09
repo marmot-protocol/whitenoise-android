@@ -1,0 +1,57 @@
+repository: https://github.com/marmot-protocol/whitenoise-android
+release_source: ./build/production-release/*.apk
+match: ".*arm64-v8a\\.apk$"
+
+name: "White Noise: Secure Chat"
+summary: "Private, end-to-end encrypted messaging built on Nostr and MLS"
+description: |
+  Chat with friends and with agents running on your own machines. The keys
+  stay on your device.
+
+  White Noise is a messenger with no phone number, no email, and no account on
+  anyone's server. Your identity is a cryptographic key that belongs to you,
+  and your messages are readable only by the people you send them to.
+
+  Built on the open Nostr network and the Marmot protocol, an implementation
+  of MLS (RFC 9420), the standard for end-to-end encrypted group messaging.
+
+  No phone number. Create an identity in seconds. Use your real name, a
+  pseudonym, or nothing at all, and keep separate profiles for separate parts
+  of your life, in one app.
+
+  Encrypted end to end. Every message, reply, reaction and photo is encrypted
+  with keys that exist only on your devices. Forward secrecy and post-compromise
+  security are built into the protocol, not bolted on.
+
+  No central server. Your messages travel through relays: independent servers
+  you choose, run by anyone, replaceable at any time. You can even run your own.
+  There is no company server to breach, subpoena, or shut down.
+
+  An identity you keep. Your key works across the whole Nostr ecosystem. Switch
+  apps, keep your contacts. No one can lock you out of your own identity.
+
+  Your agents, encrypted too. Agents running on your own machines can hold
+  their own keys and chat with you like any other contact. End-to-end encrypted,
+  with no bot platform in the middle and no phone number to provision. Connectors
+  for OpenClaw, Hermes, Codex, Pi, and OpenCode ship with the Marmot Development Kit.
+
+  Open source, open protocol. Every line of the apps and the protocol is public.
+  Inspect the code, verify our claims, build your own client on Marmot. Trust
+  what you can check, not what we say.
+
+  Learn how the app handles data at https://www.whitenoise.chat/privacy.
+tags:
+  - nostr
+  - messaging
+  - privacy
+  - encrypted
+  - mls
+website: https://www.whitenoise.chat
+icon: ./fastlane/metadata/android/en-US/images/icon.png
+images:
+  - ./fastlane/metadata/android/en-US/images/phoneScreenshots/01-conversations.png
+  - ./fastlane/metadata/android/en-US/images/phoneScreenshots/02-no-phone.png
+  - ./fastlane/metadata/android/en-US/images/phoneScreenshots/03-accounts.png
+  - ./fastlane/metadata/android/en-US/images/phoneScreenshots/04-qr.png
+  - ./fastlane/metadata/android/en-US/images/phoneScreenshots/05-no-servers.png
+release_notes: ./fastlane/metadata/android/en-US/changelogs/12.txt

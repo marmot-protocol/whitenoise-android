@@ -31,6 +31,9 @@ app/src/staging/assets/whitenoise-audit-attestation-v1.json
 # Kotlin incremental/compile artifacts
 .kotlin/
 
+# Python tool and test bytecode is generated, not release source.
+__pycache__/
+
 .env
 
 # Local review-agent reports, never shipped

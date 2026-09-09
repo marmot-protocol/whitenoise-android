@@ -193,14 +193,20 @@ case "$FLAVOR" in
     ;;
 esac
 
-GRADLE_EXTRA_ARGS=()
 if [[ -n "$GRADLE_INIT_SCRIPT" ]]; then
   if [[ ! -f "$GRADLE_INIT_SCRIPT" || -L "$GRADLE_INIT_SCRIPT" ]]; then
     echo "error: Gradle init script must be a regular non-symlink file: $GRADLE_INIT_SCRIPT" >&2
     exit 1
   fi
-  GRADLE_EXTRA_ARGS=(-I "$GRADLE_INIT_SCRIPT")
 fi
+
+run_release_gradle() {
+  if [[ -n "$GRADLE_INIT_SCRIPT" ]]; then
+    ./gradlew "$@" -I "$GRADLE_INIT_SCRIPT"
+  else
+    ./gradlew "$@"
+  fi
+}
 
 if [[ "$FLAVOR" == "all" ]]; then
   BUILD_FLAVORS=(production staging)
@@ -446,12 +452,10 @@ for flavor in "${BUILD_FLAVORS[@]}"; do
     echo "==> Assembling $flavor release APK for $TARGET_ABI"
     rm -f "$APK_DIR"/*.apk
     if [[ "$TARGET_ABI" == "universal" ]]; then
-      ./gradlew ":app:assemble${flavor_task}Release" \
-        "${GRADLE_EXTRA_ARGS[@]}" \
+      run_release_gradle ":app:assemble${flavor_task}Release" \
         -Pandroid.injected.testOnly=false
     else
-      ./gradlew ":app:assemble${flavor_task}Release" \
-        "${GRADLE_EXTRA_ARGS[@]}" \
+      run_release_gradle ":app:assemble${flavor_task}Release" \
         -Pandroid.injected.build.abi="$TARGET_ABI" \
         -Pandroid.injected.testOnly=false
     fi
@@ -481,7 +485,7 @@ for flavor in "${BUILD_FLAVORS[@]}"; do
     selected_apks+=("$selected_apk")
   else
     echo "==> Assembling $flavor release APKs"
-    ./gradlew ":app:assemble${flavor_task}Release" "${GRADLE_EXTRA_ARGS[@]}"
+    run_release_gradle ":app:assemble${flavor_task}Release"
 
     verified_apk_count=0
     for built_apk in "$APK_DIR"/*.apk; do

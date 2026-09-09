@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <rect width="1024" height="500" fill="#0f1112"/>
+  <circle cx="205" cy="250" r="132" fill="#08b8cf"/>
+  <text x="390" y="226" fill="#ffffff" font-family="sans-serif" font-size="70" font-weight="700">White Noise</text>
+  <text x="394" y="292" fill="#a9e8ef" font-family="sans-serif" font-size="34">Private messaging on Nostr</text>
+</svg>
