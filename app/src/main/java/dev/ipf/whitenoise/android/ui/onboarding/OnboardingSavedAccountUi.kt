@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -50,6 +51,7 @@ data class OnboardingSavedAccountUi(
     val displayName: String,
     val shortIdentity: String,
     val avatarUrl: String?,
+    val recoveryRequired: Boolean = false,
 )
 
 internal fun onboardingSavedAccounts(appState: WhiteNoiseAppState): List<OnboardingSavedAccountUi> =
@@ -64,6 +66,7 @@ internal fun onboardingSavedAccounts(appState: WhiteNoiseAppState): List<Onboard
                 displayName = appState.displayName(account.accountIdHex).ifBlank { shortIdentity },
                 shortIdentity = shortIdentity,
                 avatarUrl = appState.avatarUrl(account.accountIdHex),
+                recoveryRequired = appState.onboardingRecoveryRequired(account.label),
             )
         }
 
@@ -76,14 +79,18 @@ internal fun OnboardingSavedAccountActions(
     reactivatingAccountLabel: String?,
     enabled: Boolean,
     onContinue: (String) -> Unit,
+    onRecover: (String) -> Unit = {},
 ) {
     var pickerVisible by remember { mutableStateOf(false) }
+    var recoveryAccount by remember { mutableStateOf<OnboardingSavedAccountUi?>(null) }
     accounts.firstOrNull()?.let { account ->
         OnboardingSavedAccountCard(
             account = account,
             loading = reactivatingAccountLabel == account.label,
             enabled = enabled,
-            onClick = { onContinue(account.label) },
+            onClick = {
+                if (account.recoveryRequired) recoveryAccount = account else onContinue(account.label)
+            },
         )
         if (accounts.size > 1) {
             TextButton(
@@ -101,9 +108,29 @@ internal fun OnboardingSavedAccountActions(
             reactivatingAccountLabel = reactivatingAccountLabel,
             onSelect = { account ->
                 pickerVisible = false
-                onContinue(account.label)
+                if (account.recoveryRequired) recoveryAccount = account else onContinue(account.label)
             },
             onDismiss = { pickerVisible = false },
+        )
+    }
+    recoveryAccount?.let { account ->
+        AlertDialog(
+            onDismissRequest = { recoveryAccount = null },
+            title = { Text(stringResource(R.string.onboarding_recover_setup_title)) },
+            text = { Text(stringResource(R.string.onboarding_recover_setup_explanation)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        recoveryAccount = null
+                        onRecover(account.label)
+                    },
+                ) {
+                    Text(stringResource(R.string.onboarding_recover_setup_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { recoveryAccount = null }) { Text(stringResource(R.string.cancel)) }
+            },
         )
     }
 }
@@ -116,7 +143,12 @@ private fun OnboardingSavedAccountCard(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    val actionLabel = stringResource(R.string.onboarding_continue_as, account.displayName)
+    val actionLabel =
+        if (account.recoveryRequired) {
+            stringResource(R.string.onboarding_recover_setup_for, account.displayName)
+        } else {
+            stringResource(R.string.onboarding_continue_as, account.displayName)
+        }
     Surface(
         onClick = onClick,
         enabled = enabled,
@@ -188,7 +220,12 @@ private fun OnboardingSavedAccountPicker(
             LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
                 items(accounts, key = OnboardingSavedAccountUi::label) { account ->
                     val loading = reactivatingAccountLabel == account.label
-                    val actionLabel = stringResource(R.string.onboarding_continue_as, account.displayName)
+                    val actionLabel =
+                        if (account.recoveryRequired) {
+                            stringResource(R.string.onboarding_recover_setup_for, account.displayName)
+                        } else {
+                            stringResource(R.string.onboarding_continue_as, account.displayName)
+                        }
                     ListItem(
                         headlineContent = {
                             Text(account.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)

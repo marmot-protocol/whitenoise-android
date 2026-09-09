@@ -1722,4 +1722,25 @@
     <string name="setup_details">詳細資訊</string>
     <string name="setup_hide_details">收合詳細資訊</string>
     <string name="setup_opening_chats">正在開啟聊天…</string>
+    <string name="unnamed_group">未命名群組</string>
+    <string name="conversation_unavailable">對話無法使用</string>
+    <string name="onboarding_recover_setup_title">復原登入設定？</string>
+    <string name="onboarding_recover_setup_for">復原 %1$s 的登入設定</string>
+    <string name="onboarding_recover_setup_confirm">復原設定</string>
+    <string name="onboarding_recover_setup_explanation">復原操作會登出此個人檔案，並取代無法讀取的設定檢查點。只會保留最新的復原證據，先前發佈到中繼站的內容不會撤銷。你需要使用私密金鑰重新登入。此操作不會核准任何發佈。</string>
+    <string name="onboarding_recover_setup_success">設定已復原。請輸入此個人檔案的私密金鑰以重新登入。</string>
+    <string name="onboarding_recover_setup_failed">無法復原設定。請再試一次。</string>
+    <string name="group_recovery_automatic_failed">無法復原群組同步。</string>
+    <string name="group_recovery_pending_reinvites">正在自動重試部分邀請。</string>
+    <string name="group_recovery_failed_reinvites">部分邀請無法復原。請從「群組詳細資料」重新邀請這些成員。</string>
+    <string name="group_recovery_review_invitation">檢視重新加入邀請</string>
+    <string name="group_recovery_check_failed">無法檢查群組復原狀態，請再試一次。</string>
+    <string name="group_rejoin_title">重新加入群組？</string>
+    <string name="group_rejoin_invited_by">邀請者：%1$s\n%2$s</string>
+    <string name="group_rejoin_replaces_state">重新加入會以邀請中的副本取代此裝置目前的群組狀態。已儲存的訊息記錄會保留。</string>
+    <string name="group_rejoin_trust_warning">只有在你信任此邀請時才重新加入。僅憑群組版本較新並不能證明邀請可信。</string>
+    <string name="group_rejoin_confirm">重新加入群組</string>
+    <string name="group_rejoin_decline">拒絕邀請</string>
+    <string name="group_rejoin_success">已重新加入群組。</string>
+    <string name="group_rejoin_failed">無法套用此邀請</string>
 </resources>

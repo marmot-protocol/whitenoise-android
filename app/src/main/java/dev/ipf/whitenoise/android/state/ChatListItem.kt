@@ -1,10 +1,16 @@
 package dev.ipf.whitenoise.android.state
 
+import androidx.compose.ui.graphics.ImageBitmap
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.PresentationTextFfi
+import dev.ipf.marmotkit.SelectedAvatarFfi
+import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.MediaPreviewFallback
@@ -12,6 +18,81 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import java.util.Locale
+
+enum class ChatListAvatarSource {
+    LEGACY_URL,
+    ENCRYPTED_GROUP,
+    FALLBACK_URL,
+}
+
+data class ChatListAvatarSeed(
+    val source: ChatListAvatarSource,
+    val key: String,
+    val image: ImageBitmap,
+)
+
+/**
+ * Builds a chat-list item from the engine projection and its selected presentation.
+ * [members] remains the only authoritative source for membership-sensitive fields;
+ * [presentationMembers] supplies display continuity while a newer roster loads.
+ */
+internal fun chatListItemFromProjection(
+    row: ChatListRowFfi,
+    selectedPresentation: ConversationPresentationFfi? = null,
+    group: AppGroupRecordFfi? = null,
+    activeAccountIdHex: String? = null,
+    members: List<AppGroupMemberRecordFfi>? = null,
+    presentationMembers: ChatListMemberPresentation? = null,
+    previewTokens: MarkdownDocumentFfi? = chatRowPreviewTokens(row),
+    resolvedMediaPreviewFallback: MediaPreviewFallback? = null,
+    removed: Boolean = false,
+    activitySequence: ULong = 0uL,
+): ChatListItem {
+    val baseGroup = group ?: emptyGroupRecord(row)
+    val displayGroup = chatListDisplayGroup(row, baseGroup, selectedPresentation)
+    val presentation = members?.let { chatListMemberPresentation(it, activeAccountIdHex) } ?: presentationMembers
+    val selectedPeer = selectedPresentation?.peerId?.takeIf(String::isNotBlank)
+    val selectedMemberCount =
+        (selectedPresentation?.title as? PresentationTextFfi.UnnamedGroup)
+            ?.memberCount
+            ?.coerceAtMost(Int.MAX_VALUE.toULong())
+            ?.toInt()
+    return ChatListItem(
+        group = displayGroup,
+        latest =
+            row.lastMessage?.let { preview ->
+                AppMessageRecordFfi(
+                    messageIdHex = preview.messageIdHex,
+                    direction = "received",
+                    groupIdHex = row.groupIdHex,
+                    sender = preview.sender,
+                    plaintext = preview.plaintext,
+                    contentTokens = EMPTY_MARKDOWN_DOCUMENT,
+                    kind = preview.kind,
+                    tags = emptyList(),
+                    sourceEpoch = null,
+                    retentionSeconds = null,
+                    retentionExpiresAt = null,
+                    recordedAt = preview.timelineAt,
+                    receivedAt = preview.timelineAt,
+                )
+            },
+        otherMemberAccount = members?.let { GroupProjector.otherMemberAccount(it, activeAccountIdHex) },
+        memberCount = members?.let(GroupProjector::uniqueMemberCount) ?: 0,
+        memberSnapshot = members?.let(::GroupMemberSnapshot),
+        presentationOtherMemberAccount = selectedPeer ?: presentation?.otherMemberAccount,
+        presentationMemberCount =
+            selectedMemberCount
+                ?: if (selectedPeer != null) 2 else presentation?.memberCount ?: 0,
+        presentationActiveAccountIsSoleMember = presentation?.activeAccountIsSoleMember == true,
+        projection = row,
+        selectedPresentation = selectedPresentation,
+        previewTokens = previewTokens,
+        resolvedMediaPreviewFallback = resolvedMediaPreviewFallback,
+        removed = removed,
+        activitySequence = activitySequence,
+    )
+}
 
 data class ChatListItem(
     val group: AppGroupRecordFfi,
@@ -31,6 +112,8 @@ data class ChatListItem(
     val presentationMemberCount: Int = memberCount,
     val presentationActiveAccountIsSoleMember: Boolean = false,
     val projection: ChatListRowFfi? = null,
+    /** MDK-selected title/avatar/peer projection for this exact chat row. */
+    val selectedPresentation: ConversationPresentationFfi? = null,
     /**
      * Bounded snapshot of decoded pixels that were already in a presentation
      * loader when this row was published. Holding the hit on the immutable row
@@ -85,6 +168,23 @@ data class ChatListItem(
 
     val projectedTitle: String?
         get() = projection?.title?.takeIf { it.isNotBlank() }
+
+    /** The selected remote avatar URL, sanitized before any network loader sees it. */
+    val selectedAvatarUrl: String?
+        get() =
+            (selectedPresentation?.avatar as? SelectedAvatarFfi.RemoteImage)
+                ?.url
+                ?.let(ProfileSanitizer::protocolImageUrl)
+
+    /** Stable MDK-owned identity used by generated-avatar fallbacks. */
+    val selectedAvatarSeed: String?
+        get() =
+            when (val avatar = selectedPresentation?.avatar) {
+                is SelectedAvatarFfi.RemoteImage -> avatar.cacheKey
+                is SelectedAvatarFfi.EncryptedGroupImage -> avatar.cacheKey
+                is SelectedAvatarFfi.Placeholder -> avatar.stableSeed
+                null -> null
+            }?.takeIf(String::isNotBlank)
 
     /**
      * The title a NAMED group's row displays and sorts by: the projection's

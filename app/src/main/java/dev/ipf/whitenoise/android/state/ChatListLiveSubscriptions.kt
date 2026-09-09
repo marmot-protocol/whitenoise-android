@@ -1,16 +1,15 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupRecordFfi
-import dev.ipf.marmotkit.ChatListRowFfi
-import dev.ipf.marmotkit.ChatListSubscription
-import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatsSubscription
+import dev.ipf.marmotkit.PresentedChatListSubscription
+import dev.ipf.marmotkit.PresentedChatListUpdateFfi
 
 /** Lifecycle seam for the authoritative chat-list projection stream. */
 internal interface ChatListSubscriptionHandle {
-    fun snapshot(): List<ChatListRowFfi>
+    fun snapshot(): PresentedChatListUpdateFfi?
 
-    suspend fun nextUpdate(): ChatListSubscriptionUpdateFfi?
+    suspend fun nextUpdate(): PresentedChatListUpdateFfi?
 
     fun close()
 }
@@ -26,11 +25,11 @@ internal interface ChatsSubscriptionHandle {
 
 /** Production adapter around MarmotKit's chat-list subscription. */
 private class FfiChatListSubscriptionHandle(
-    private val subscription: ChatListSubscription,
+    private val subscription: PresentedChatListSubscription,
 ) : ChatListSubscriptionHandle {
-    override fun snapshot(): List<ChatListRowFfi> = subscription.snapshot()
+    override fun snapshot(): PresentedChatListUpdateFfi? = subscription.snapshot()
 
-    override suspend fun nextUpdate(): ChatListSubscriptionUpdateFfi? = subscription.nextUpdate()
+    override suspend fun nextUpdate(): PresentedChatListUpdateFfi? = subscription.next()
 
     override fun close() = subscription.close()
 }
@@ -57,7 +56,7 @@ internal class ChatListLiveSubscriptions(
             ChatListLiveSubscriptions(
                 openChatList = { account, includeArchived ->
                     appState.marmotIo {
-                        FfiChatListSubscriptionHandle(subscribeChatList(account, includeArchived))
+                        FfiChatListSubscriptionHandle(openPresentedChatList(account, includeArchived))
                     }
                 },
                 openChats = { account, includeArchived ->

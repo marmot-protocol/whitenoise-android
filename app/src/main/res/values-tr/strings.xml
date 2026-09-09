@@ -1747,4 +1747,25 @@
     <string name="setup_details">Ayrıntılar</string>
     <string name="setup_hide_details">Ayrıntıları gizle</string>
     <string name="setup_opening_chats">Sohbetleriniz açılıyor…</string>
+    <string name="unnamed_group">Adsız grup</string>
+    <string name="conversation_unavailable">Sohbet kullanılamıyor</string>
+    <string name="onboarding_recover_setup_title">Oturum açma kurulumu kurtarılsın mı?</string>
+    <string name="onboarding_recover_setup_for">%1$s için oturum açma kurulumunu kurtar</string>
+    <string name="onboarding_recover_setup_confirm">Kurulumu kurtar</string>
+    <string name="onboarding_recover_setup_explanation">Kurtarma işlemi bu profilin oturumunu kapatır ve okunamayan kurulum denetim noktasını değiştirir. Yalnızca en son kurtarma kanıtı saklanır ve daha önce rölelere yapılan yayınlar geri alınmaz. Yeni bir oturum açma işlemi başlatmak için özel anahtar gerekir. Bu işlem herhangi bir yayını onaylamaz.</string>
+    <string name="onboarding_recover_setup_success">Kurulum kurtarıldı. Yeni bir oturum açma işlemi başlatmak için bu profilin özel anahtarını girin.</string>
+    <string name="onboarding_recover_setup_failed">Kurulum kurtarılamadı. Tekrar deneyin.</string>
+    <string name="group_recovery_automatic_failed">Grup eşitlemesi geri yüklenemedi.</string>
+    <string name="group_recovery_pending_reinvites">Bazı davetler otomatik olarak yeniden deneniyor.</string>
+    <string name="group_recovery_failed_reinvites">Bazı davetler geri yüklenemedi. Bu kişileri Grup Ayrıntıları’ndan yeniden davet edin.</string>
+    <string name="group_recovery_review_invitation">Yeniden katılma davetini incele</string>
+    <string name="group_recovery_check_failed">Grup kurtarma denetlenemedi. Tekrar deneyin.</string>
+    <string name="group_rejoin_title">Gruba yeniden katılınsın mı?</string>
+    <string name="group_rejoin_invited_by">Davet eden: %1$s\n%2$s</string>
+    <string name="group_rejoin_replaces_state">Yeniden katılmak, bu cihazdaki mevcut grup durumunu davet edilen kopyayla değiştirir. Kaydedilmiş mesaj geçmişiniz korunur.</string>
+    <string name="group_rejoin_trust_warning">Yalnızca bu davete güveniyorsanız yeniden katılın. Grup sürümünün daha yeni olması tek başına daveti güvenilir yapmaz.</string>
+    <string name="group_rejoin_confirm">Gruba yeniden katıl</string>
+    <string name="group_rejoin_decline">Daveti reddet</string>
+    <string name="group_rejoin_success">Gruba yeniden katıldınız.</string>
+    <string name="group_rejoin_failed">Bu davet uygulanamadı</string>
 </resources>

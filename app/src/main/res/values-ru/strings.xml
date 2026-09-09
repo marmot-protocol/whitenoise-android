@@ -1811,4 +1811,25 @@
     <string name="setup_details">Подробности</string>
     <string name="setup_hide_details">Скрыть подробности</string>
     <string name="setup_opening_chats">Открываем ваши чаты…</string>
+    <string name="unnamed_group">Группа без названия</string>
+    <string name="conversation_unavailable">Чат недоступен</string>
+    <string name="onboarding_recover_setup_title">Восстановить настройку входа?</string>
+    <string name="onboarding_recover_setup_for">Восстановить настройку входа для %1$s</string>
+    <string name="onboarding_recover_setup_confirm">Восстановить настройку</string>
+    <string name="onboarding_recover_setup_explanation">При восстановлении выполняется выход из этого профиля и заменяется нечитаемая контрольная точка настройки. Сохраняются только последние данные восстановления, а предыдущие публикации на ретрансляторах не отменяются. Для нового входа потребуется закрытый ключ. Это действие не подтверждает никакую публикацию.</string>
+    <string name="onboarding_recover_setup_success">Настройка восстановлена. Введите закрытый ключ этого профиля, чтобы начать новый вход.</string>
+    <string name="onboarding_recover_setup_failed">Не удалось восстановить настройку. Повторите попытку.</string>
+    <string name="group_recovery_automatic_failed">Не удалось восстановить синхронизацию группы.</string>
+    <string name="group_recovery_pending_reinvites">Некоторые приглашения повторяются автоматически.</string>
+    <string name="group_recovery_failed_reinvites">Некоторые приглашения не удалось восстановить. Пригласите этих людей снова в разделе сведений о группе.</string>
+    <string name="group_recovery_review_invitation">Проверить приглашение вернуться</string>
+    <string name="group_recovery_check_failed">Не удалось проверить восстановление группы. Повторите попытку.</string>
+    <string name="group_rejoin_title">Вернуться в группу?</string>
+    <string name="group_rejoin_invited_by">Приглашение от %1$s\n%2$s</string>
+    <string name="group_rejoin_replaces_state">При возвращении текущее состояние группы на этом устройстве будет заменено приглашённой копией. Сохранённая история сообщений останется.</string>
+    <string name="group_rejoin_trust_warning">Возвращайтесь, только если доверяете этому приглашению. Более новая версия группы сама по себе не делает его надёжным.</string>
+    <string name="group_rejoin_confirm">Вернуться в группу</string>
+    <string name="group_rejoin_decline">Отклонить приглашение</string>
+    <string name="group_rejoin_success">Вы вернулись в группу.</string>
+    <string name="group_rejoin_failed">Не удалось применить это приглашение</string>
 </resources>

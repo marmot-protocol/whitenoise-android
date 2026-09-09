@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.DiagnosticsExporterStatusFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
 import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
+import dev.ipf.marmotkit.UsageDiagnosticsStatusFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
@@ -17,31 +19,47 @@ class TelemetryConsentTest {
     fun explicitChoiceUsesCurrentConsentAndReturnsEffectiveSettings() {
         for (enabled in listOf(true, false)) {
             val calls = mutableListOf<String>()
-            val settings = RelayTelemetrySettingsFfi(enabled, 120uL)
+            val relaySettings = RelayTelemetrySettingsFfi(enabled, 120uL)
+            val unifiedSettings =
+                UsageDiagnosticsSettingsFfi(
+                    if (enabled) UsageDiagnosticsDecisionFfi.GRANTED else UsageDiagnosticsDecisionFfi.DECLINED,
+                    "policy",
+                    "registry",
+                    0L,
+                    false,
+                )
+            val status =
+                UsageDiagnosticsStatusFfi(
+                    consent = unifiedSettings.decision,
+                    telemetry =
+                        if (enabled) DiagnosticsExporterStatusFfi.READY else DiagnosticsExporterStatusFfi.DISABLED,
+                    productAnalytics = DiagnosticsExporterStatusFfi.UNSUPPORTED_BUILD,
+                    queuedEvents = 0u,
+                    droppedEvents = 0u,
+                    acceptedBatches = 0u,
+                    failedBatches = 0u,
+                )
             val marmot =
                 nativeBoundary { name, arguments ->
                     calls += name
                     when (name) {
                         "setUsageDiagnosticsConsent" -> {
                             assertEquals(enabled, arguments.single())
-                            UsageDiagnosticsSettingsFfi(
-                                if (enabled) {
-                                    UsageDiagnosticsDecisionFfi.GRANTED
-                                } else {
-                                    UsageDiagnosticsDecisionFfi.DECLINED
-                                },
-                                "policy",
-                                "registry",
-                                0L,
-                                false,
-                            )
+                            unifiedSettings
                         }
-                        "relayTelemetrySettings" -> settings
+                        "usageDiagnosticsStatus" -> status
+                        "relayTelemetrySettings" -> relaySettings
                         else -> error("Unexpected native call: $name")
                     }
                 }
-            assertSame(settings, marmot.updateTelemetryConsent(enabled))
-            assertEquals(listOf("setUsageDiagnosticsConsent", "relayTelemetrySettings"), calls)
+            val result = marmot.updateTelemetryConsent(enabled)
+            assertSame(unifiedSettings, result.settings)
+            assertSame(status, result.status)
+            assertSame(relaySettings, result.relayTelemetry)
+            assertEquals(
+                listOf("setUsageDiagnosticsConsent", "usageDiagnosticsStatus", "relayTelemetrySettings"),
+                calls,
+            )
         }
     }
 

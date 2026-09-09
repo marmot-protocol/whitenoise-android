@@ -52,6 +52,9 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
+import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
+import dev.ipf.marmotkit.UsageDiagnosticsStatusFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.BuildConfig
@@ -1868,6 +1871,12 @@ class WhiteNoiseAppState private constructor(
         private set
 
     var relayTelemetrySettings by mutableStateOf<RelayTelemetrySettingsFfi?>(null)
+        private set
+
+    var usageDiagnosticsSettings by mutableStateOf<UsageDiagnosticsSettingsFfi?>(null)
+        private set
+
+    var usageDiagnosticsStatus by mutableStateOf<UsageDiagnosticsStatusFfi?>(null)
         private set
 
     var auditLogSettings by mutableStateOf<AuditLogSettingsFfi?>(null)
@@ -4565,7 +4574,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun refreshAccountSnapshot(): List<AccountSummaryFfi> {
         val requestToken = accountListLifetime.advance()
         val refreshedAccounts = marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() }
-        val pendingAccounts = accountSetup.pendingAccounts(refreshedAccounts)
+        val setupAccounts = accountSetup.accountsState(refreshedAccounts)
         val bubbleColorMigrationSucceeded =
             withContext(Dispatchers.IO) {
                 LegacyBubbleColorMigration.migrate(
@@ -4581,7 +4590,7 @@ class WhiteNoiseAppState private constructor(
         }
         var publishedAccounts = accounts
         accountListLifetime.runIfCurrent(requestToken) {
-            accountSetup.acceptAccounts(pendingAccounts)
+            accountSetup.acceptAccounts(setupAccounts)
             accounts = refreshedAccounts
             releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
             publishedAccounts = refreshedAccounts
@@ -4594,6 +4603,19 @@ class WhiteNoiseAppState private constructor(
         val refreshedAccounts = refreshAccountSnapshot()
         refreshAccountUnreadCounts(refreshedAccounts)
     }
+
+    /** Whether the saved account is blocked on explicit 0.9.20 checkpoint recovery. */
+    internal fun onboardingRecoveryRequired(accountRef: String): Boolean = accountSetup.needsRecovery(accountRef)
+
+    /** Performs the consent-gated checkpoint replacement and refreshes the authoritative account list. */
+    internal suspend fun recoverOnboardingSetup(accountRef: String): Boolean =
+        runCatchingCancellable {
+            if (!accountSetup.recover(accountRef)) return@runCatchingCancellable false
+            refreshAccounts()
+            true
+        }.onFailure { failure ->
+            appStateDebug(failure) { "onboarding checkpoint recovery failed" }
+        }.getOrDefault(false)
 
     /** Rebuilds the account list after sign-out without allowing an earlier refresh to restore it. */
     private suspend fun accountsAfterSignOut(
@@ -5990,7 +6012,9 @@ class WhiteNoiseAppState private constructor(
     }
 
     suspend fun refreshSecurityPrivacySettings() {
-        relayTelemetrySettings = runCatchingCancellable { marmotIo { relayTelemetrySettings() } }.getOrNull()
+        runCatchingCancellable { marmotIo { usageDiagnosticsSnapshot() } }
+            .getOrNull()
+            ?.let(::applyUsageDiagnosticsSnapshot)
         auditLogSettingsMutex.withLock {
             auditLogSettings = runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()
         }
@@ -6000,7 +6024,7 @@ class WhiteNoiseAppState private constructor(
     suspend fun setTelemetryEnabled(enabled: Boolean): Boolean =
         runCatching {
             val updated = marmotIo { updateTelemetryConsent(enabled) }
-            relayTelemetrySettings = updated
+            applyUsageDiagnosticsSnapshot(updated)
             presentTransient(R.string.toast_security_privacy_updated)
             true
         }.getOrElse {
@@ -6008,6 +6032,16 @@ class WhiteNoiseAppState private constructor(
             presentFailure(R.string.toast_couldnt_update_security_privacy, "SECURITY_PRIVACY_UPDATE", it)
             false
         }
+
+    /** Applies a coherent native diagnostics read to all settings surfaces. */
+    private fun applyUsageDiagnosticsSnapshot(snapshot: UsageDiagnosticsSnapshot) {
+        usageDiagnosticsSettings = snapshot.settings
+        usageDiagnosticsStatus = snapshot.status
+        relayTelemetrySettings = snapshot.relayTelemetry
+    }
+
+    /** Whether the user explicitly granted the current unified diagnostics policy. */
+    fun isUsageDiagnosticsGranted(): Boolean = usageDiagnosticsSettings?.decision == UsageDiagnosticsDecisionFfi.GRANTED
 
     suspend fun setAuditLogsEnabled(enabled: Boolean): Boolean =
         runCatching {

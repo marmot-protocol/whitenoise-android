@@ -527,7 +527,7 @@ abstract class NotificationDelayedRosterFixture {
                 "onboardingSnapshot" -> null
                 "groupRoster" -> gatedRoster(gate, arguments)
                 "chatListRow" -> gatedProjection(gate, arguments)
-                "subscribeChatList" -> gatedBroadBind(gate, arguments)
+                "openPresentedChatList" -> gatedBroadBind(gate, arguments)
                 "toString" -> "NotificationDelayedRosterMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.firstOrNull()

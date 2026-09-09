@@ -148,7 +148,7 @@ internal fun DevicePrivacyScreen(
                         GroupSwitchRow(
                             title = stringResource(R.string.telemetry),
                             subtitle = stringResource(R.string.telemetry_settings_subtitle),
-                            checked = appState.relayTelemetrySettings?.exportEnabled == true,
+                            checked = appState.isUsageDiagnosticsGranted(),
                             enabled = !telemetryBusy,
                             busy = telemetryBusy,
                             icon = Icons.Filled.Analytics,

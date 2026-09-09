@@ -434,7 +434,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
         "anchor": "fun ChatListRow(",
         "test_ids": [
-          "CHL-001"
+          "CHL-001",
+          "CHL-016"
         ]
       },
       {
@@ -442,7 +443,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
         "anchor": "fun ChatRow(",
         "test_ids": [
-          "CHL-001"
+          "CHL-001",
+          "CHL-016"
         ]
       },
       {
@@ -1239,7 +1241,16 @@
         "anchor": "fun ConversationScreen(",
         "test_ids": [
           "CON-001",
-          "NTF-009"
+          "NTF-009",
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "GroupRecoveryCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "fun GroupRecoveryCard(",
+        "test_ids": [
+          "GRP-021"
         ]
       },
       {
@@ -3708,7 +3719,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
         "anchor": "fun OnboardingSavedAccountActions(",
         "test_ids": [
-          "ONB-009"
+          "ONB-009",
+          "ONB-024"
         ]
       },
       {
@@ -3716,7 +3728,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
         "anchor": "fun OnboardingSavedAccountCard(",
         "test_ids": [
-          "ONB-009"
+          "ONB-009",
+          "ONB-024"
         ]
       },
       {
@@ -3724,7 +3737,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
         "anchor": "fun OnboardingSavedAccountPicker(",
         "test_ids": [
-          "ONB-009"
+          "ONB-009",
+          "ONB-024"
         ]
       },
       {
@@ -4458,7 +4472,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
         "anchor": "fun DevicePrivacyScreen(",
         "test_ids": [
-          "SEC-001"
+          "SEC-001",
+          "SEC-007"
         ]
       },
       {
@@ -6834,6 +6849,110 @@
         "anchor": "R.string.tts_voice_title",
         "test_ids": [
           "TTS-001"
+        ]
+      },
+      {
+        "surface": "setting:group_rejoin_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.group_rejoin_failed",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:group_rejoin_success",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.group_rejoin_success",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:conversation_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CopyBundles.kt",
+        "anchor": "R.string.conversation_unavailable",
+        "test_ids": [
+          "CHL-016"
+        ]
+      },
+      {
+        "surface": "setting:unnamed_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CopyBundles.kt",
+        "anchor": "R.string.unnamed_group",
+        "test_ids": [
+          "CHL-016"
+        ]
+      },
+      {
+        "surface": "setting:no_messages_yet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.no_messages_yet",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "setting:onboarding_continue_as",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.onboarding_continue_as",
+        "test_ids": [
+          "ONB-009"
+        ]
+      },
+      {
+        "surface": "setting:onboarding_recover_setup_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.onboarding_recover_setup_confirm",
+        "test_ids": [
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "setting:onboarding_recover_setup_explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.onboarding_recover_setup_explanation",
+        "test_ids": [
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "setting:onboarding_recover_setup_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.onboarding_recover_setup_for",
+        "test_ids": [
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "setting:onboarding_recover_setup_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.onboarding_recover_setup_title",
+        "test_ids": [
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "setting:onboarding_recover_setup_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.onboarding_recover_setup_failed",
+        "test_ids": [
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "setting:onboarding_recover_setup_success",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.onboarding_recover_setup_success",
+        "test_ids": [
+          "ONB-024"
         ]
       }
     ],

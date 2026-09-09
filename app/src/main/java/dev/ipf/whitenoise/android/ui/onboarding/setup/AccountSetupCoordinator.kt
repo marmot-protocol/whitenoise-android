@@ -25,20 +25,38 @@ internal class AccountSetupCoordinator(
         private set
     private var generation = 0L
     private var pending = emptySet<String>()
+    private var recoveryRequired = emptySet<String>()
 
-    /** Rebuilds eligibility exclusively from MDK's persisted setup snapshots. */
-    suspend fun pendingAccounts(accounts: List<AccountSummaryFfi>): Set<String> =
+    /** Account-scoped setup eligibility returned from one runtime generation. */
+    internal data class AccountsState(
+        val pending: Set<String>,
+        val recoveryRequired: Set<String>,
+    )
+
+    /** Rebuilds eligibility exclusively from MDK's persisted setup state. */
+    suspend fun accountsState(accounts: List<AccountSummaryFfi>): AccountsState =
         app.marmotIo {
-            accounts.filter { onboardingSnapshot(it.label)?.requiresSetup() == true }.map { it.label }.toSet()
+            val recovery = accounts.filter { onboardingRecoveryRequired(it.label) }.map { it.label }.toSet()
+            val pending =
+                accounts
+                    .filterNot { it.label in recovery }
+                    .filter { onboardingSnapshot(it.label)?.requiresSetup() == true }
+                    .map { it.label }
+                    .toSet()
+            AccountsState(pending = pending, recoveryRequired = recovery)
         }
 
     /** Publishes eligibility together with the account list after its stale-read guard accepts both. */
-    fun acceptAccounts(pendingAccounts: Set<String>) {
-        pending = pendingAccounts
+    fun acceptAccounts(state: AccountsState) {
+        pending = state.pending
+        recoveryRequired = state.recoveryRequired
     }
 
+    /** Whether MDK requires explicit destructive recovery before this account can resume setup. */
+    fun needsRecovery(account: String): Boolean = account in recoveryRequired
+
     /** Pending accounts stay visible in the picker but are excluded from normal background work. */
-    fun eligible(account: AccountSummaryFfi): Boolean = account.label !in pending
+    fun eligible(account: AccountSummaryFfi): Boolean = account.label !in pending && account.label !in recoveryRequired
 
     /** Imports only local identity material and then mounts the saved preflight route. */
     suspend fun begin(nsec: String): OnboardingSnapshotFfi {
@@ -49,10 +67,19 @@ internal class AccountSetupCoordinator(
 
     /** Gates all account-selection paths before legacy reactivation or chat preload. */
     suspend fun routeIfPending(account: String): Boolean {
-        val snapshot = app.marmotIo { onboardingSnapshot(account) } ?: return false
-        val required = snapshot.requiresSetup()
-        if (required) open(snapshot)
+        if (needsRecovery(account)) return true
+        val snapshot = app.marmotIo { onboardingSnapshot(account) }
+        val required = snapshot?.requiresSetup() == true
+        if (required) open(requireNotNull(snapshot))
         return required
+    }
+
+    /** Replaces an unreadable checkpoint only after the onboarding UI's explicit acknowledgement. */
+    suspend fun recover(account: String): Boolean {
+        if (!app.marmotIo { onboardingRecoveryRequired(account) }) return false
+        close()
+        app.marmotIo { recoverOnboarding(account, acknowledgeLatestOnlyEvidence = true) }
+        return true
     }
 
     /** Mounts a controller tied to the current runtime and never changes the active account. */

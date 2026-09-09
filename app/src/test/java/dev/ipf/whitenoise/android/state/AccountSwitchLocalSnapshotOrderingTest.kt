@@ -184,7 +184,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue(presentationGuard > presentationStart)
         assertTrue(snapshot > presentationGuard)
         assertTrue("the pre-activation handoff must defer full groups", "groups = emptyList()" in body)
-        assertFalse("chat-list live admission belongs to the target controller", "subscribeChatList" in body)
+        assertFalse("chat-list live admission belongs to the target controller", "openPresentedChatList" in body)
         assertFalse("full group projection belongs to the target controller", "subscribeChats" in body)
         assertTrue("bounded top-bar profiles must overlap member projection", topBarProfiles in 0..<members)
         assertTrue(membersGuard > members)

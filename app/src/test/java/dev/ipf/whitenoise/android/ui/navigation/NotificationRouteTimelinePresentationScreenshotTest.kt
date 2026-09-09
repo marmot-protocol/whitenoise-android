@@ -858,7 +858,7 @@ abstract class NotificationRouteTimelinePresentationFixture {
                     routeGate.preloadCompleted.countDown()
                     preGapChatListRow()
                 }
-                "subscribeChatList" -> {
+                "openPresentedChatList" -> {
                     val accountRef = arguments?.firstOrNull() as? String
                     if (accountRef == TARGET_ACCOUNT) {
                         check(routeGate.releaseBroadBind.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {

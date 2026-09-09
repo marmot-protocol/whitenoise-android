@@ -1749,4 +1749,25 @@
     <string name="setup_details">Détails</string>
     <string name="setup_hide_details">Masquer les détails</string>
     <string name="setup_opening_chats">Ouverture de vos discussions…</string>
+    <string name="unnamed_group">Groupe sans nom</string>
+    <string name="conversation_unavailable">Conversation indisponible</string>
+    <string name="onboarding_recover_setup_title">Récupérer la configuration de connexion ?</string>
+    <string name="onboarding_recover_setup_for">Récupérer la configuration de connexion de %1$s</string>
+    <string name="onboarding_recover_setup_confirm">Récupérer la configuration</string>
+    <string name="onboarding_recover_setup_explanation">La récupération déconnecte ce profil et remplace son point de contrôle de configuration illisible. Seule la preuve de récupération la plus récente est conservée et les publications précédentes sur les relais ne sont pas annulées. Vous aurez besoin de la clé privée pour lancer une nouvelle connexion. Cette action n’autorise aucune publication.</string>
+    <string name="onboarding_recover_setup_success">Configuration récupérée. Saisissez la clé privée de ce profil pour lancer une nouvelle connexion.</string>
+    <string name="onboarding_recover_setup_failed">Impossible de récupérer la configuration. Réessayez.</string>
+    <string name="group_recovery_automatic_failed">Impossible de rétablir la synchronisation du groupe.</string>
+    <string name="group_recovery_pending_reinvites">Certaines invitations font l’objet de nouvelles tentatives automatiques.</string>
+    <string name="group_recovery_failed_reinvites">Certaines invitations n’ont pas pu être restaurées. Réinvitez ces personnes depuis les détails du groupe.</string>
+    <string name="group_recovery_review_invitation">Examiner l’invitation à rejoindre</string>
+    <string name="group_recovery_check_failed">Impossible de vérifier la récupération du groupe. Réessayez.</string>
+    <string name="group_rejoin_title">Rejoindre à nouveau le groupe ?</string>
+    <string name="group_rejoin_invited_by">Invitation de %1$s\n%2$s</string>
+    <string name="group_rejoin_replaces_state">Rejoindre à nouveau remplace l’état actuel du groupe sur cet appareil par la copie proposée. L’historique de vos messages enregistrés est conservé.</string>
+    <string name="group_rejoin_trust_warning">Ne rejoignez à nouveau que si vous faites confiance à cette invitation. Une version plus récente du groupe ne suffit pas à la rendre fiable.</string>
+    <string name="group_rejoin_confirm">Rejoindre à nouveau</string>
+    <string name="group_rejoin_decline">Refuser l’invitation</string>
+    <string name="group_rejoin_success">Groupe rejoint à nouveau.</string>
+    <string name="group_rejoin_failed">Impossible d’appliquer cette invitation</string>
 </resources>

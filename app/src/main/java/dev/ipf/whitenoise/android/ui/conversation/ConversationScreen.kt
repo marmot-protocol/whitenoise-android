@@ -3464,6 +3464,35 @@ internal fun ConversationScreen(
                 renderedTimeline.isEmpty() && controller.isLoading ->
                     ConversationInitialLoadingOverlay(visible = true)
                 renderedTimeline.isEmpty() &&
+                    (
+                        controller.groupRecoveryReadFailed ||
+                            controller.groupRecoveryStatus?.hasVisibleRecoveryState() == true
+                    ) ->
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        GroupRecoveryCard(
+                            status = controller.groupRecoveryStatus,
+                            busy = controller.groupRecoveryMutationInFlight,
+                            inviterName = appState::displayName,
+                            inviterIdentity = appState::npubForDisplay,
+                            onConfirm = { invitation ->
+                                appState.launchMutation { controller.confirmGroupRejoin(invitation) }
+                            },
+                            onDecline = { invitation ->
+                                appState.launchMutation { controller.declineGroupRejoin(invitation) }
+                            },
+                            readFailed = controller.groupRecoveryReadFailed,
+                            onRetry = {
+                                appState.launchMutation { controller.retryGroupRecoveryStatus() }
+                            },
+                        )
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                stringResource(R.string.no_messages_yet),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                renderedTimeline.isEmpty() &&
                     !controller.hasMoreBefore &&
                     !controller.hasMoreAfterTimeline &&
                     !controller.isLoadingOlder &&
@@ -3538,6 +3567,33 @@ internal fun ConversationScreen(
                             contentPadding = conversationTimelineContentPadding(snackbarContentInset.value),
                         ) {
                             item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
+                            if (
+                                controller.groupRecoveryReadFailed ||
+                                controller.groupRecoveryStatus?.hasVisibleRecoveryState() == true
+                            ) {
+                                item(key = "group-recovery") {
+                                    GroupRecoveryCard(
+                                        status = controller.groupRecoveryStatus,
+                                        busy = controller.groupRecoveryMutationInFlight,
+                                        inviterName = appState::displayName,
+                                        inviterIdentity = appState::npubForDisplay,
+                                        onConfirm = { invitation ->
+                                            appState.launchMutation {
+                                                controller.confirmGroupRejoin(invitation)
+                                            }
+                                        },
+                                        onDecline = { invitation ->
+                                            appState.launchMutation {
+                                                controller.declineGroupRejoin(invitation)
+                                            }
+                                        },
+                                        readFailed = controller.groupRecoveryReadFailed,
+                                        onRetry = {
+                                            appState.launchMutation { controller.retryGroupRecoveryStatus() }
+                                        },
+                                    )
+                                }
+                            }
                             conversationLoadErrorItem(
                                 key = "conversation-load-error-top",
                                 error = controller.error,

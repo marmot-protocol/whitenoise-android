@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.core
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import dev.ipf.marmotkit.ConversationPresentationFfi
+import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
@@ -259,15 +261,27 @@ internal fun chatListItemDisplayTitle(
     item: ChatListItem,
     appState: WhiteNoiseAppState,
     copy: GroupTitleCopy,
-): String {
-    item.sanitizedNamedTitle?.let { return it }
-    return GroupProjector.displayTitle(
-        group = item.group,
-        otherMemberAccount = item.presentationOtherMemberAccount,
-        memberCount = item.presentationMemberCount,
-        memberTitle = { appState.chatMemberTitle(it) },
-        copy = copy,
-        conversationKind = item.projection?.conversationKind,
-        soleSelfMember = item.presentationActiveAccountIsSoleMember,
-    )
-}
+): String =
+    selectedChatPresentationTitle(item.selectedPresentation, copy)
+        ?: item.sanitizedNamedTitle
+        ?: GroupProjector.displayTitle(
+            group = item.group,
+            otherMemberAccount = item.presentationOtherMemberAccount,
+            memberCount = item.presentationMemberCount,
+            memberTitle = { appState.chatMemberTitle(it) },
+            copy = copy,
+            conversationKind = item.projection?.conversationKind,
+            soleSelfMember = item.presentationActiveAccountIsSoleMember,
+        )
+
+/** Localizes and sanitizes MDK's typed selected title without re-resolving identity. */
+internal fun selectedChatPresentationTitle(
+    presentation: ConversationPresentationFfi?,
+    copy: GroupTitleCopy,
+): String? =
+    when (val selected = presentation?.title) {
+        is PresentationTextFfi.Literal -> ProfileSanitizer.displayName(selected.text)
+        is PresentationTextFfi.UnnamedGroup -> copy.unnamedGroupTitle
+        PresentationTextFfi.UnavailableConversation -> copy.unavailableConversationTitle
+        null -> null
+    }

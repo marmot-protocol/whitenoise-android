@@ -8,10 +8,16 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.PresentationResolutionFfi
+import dev.ipf.marmotkit.PresentationSourceFfi
+import dev.ipf.marmotkit.PresentationTextFfi
+import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
+import dev.ipf.whitenoise.android.core.selectedChatPresentationTitle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -38,6 +44,25 @@ class ChatListTitleTest {
             groupOfPeopleFormat = "Group of %1\$d people",
             unknownTitle = "Unknown",
         )
+
+    /** A literal selected title is used directly after hostile-text sanitization. */
+    @Test
+    fun selectedLiteralTitleWinsWithoutProfileLookup() {
+        assertEquals("Alice", selectedChatPresentationTitle(presentation(PresentationTextFfi.Literal("Alice")), copy))
+    }
+
+    /** Typed fallbacks remain localizable instead of leaking group identifiers. */
+    @Test
+    fun selectedFallbackTitlesUseHostCopy() {
+        assertEquals(
+            "Unnamed group",
+            selectedChatPresentationTitle(presentation(PresentationTextFfi.UnnamedGroup(4uL)), copy),
+        )
+        assertEquals(
+            "Conversation unavailable",
+            selectedChatPresentationTitle(presentation(PresentationTextFfi.UnavailableConversation), copy),
+        )
+    }
 
     @Test
     fun namedGroupTitleWinsOverEverything() {
@@ -370,6 +395,16 @@ class ChatListTitleTest {
         account = if (local) accountIdHex else null,
         local = local,
     )
+
+    private fun presentation(title: PresentationTextFfi) =
+        ConversationPresentationFfi(
+            title = title,
+            avatar = SelectedAvatarFfi.Placeholder("stable", PresentationSourceFfi.GROUP_FALLBACK),
+            titleSource = PresentationSourceFfi.GROUP_FALLBACK,
+            avatarSource = PresentationSourceFfi.GROUP_FALLBACK,
+            peerId = null,
+            resolution = PresentationResolutionFfi.FALLBACK,
+        )
 
     private fun encryptedMedia() =
         AppGroupEncryptedMediaComponentFfi(

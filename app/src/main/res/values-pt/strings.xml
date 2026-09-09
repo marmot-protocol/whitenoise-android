@@ -1749,4 +1749,25 @@
     <string name="setup_details">Detalhes</string>
     <string name="setup_hide_details">Ocultar detalhes</string>
     <string name="setup_opening_chats">Abrindo suas conversas…</string>
+    <string name="unnamed_group">Grupo sem nome</string>
+    <string name="conversation_unavailable">Conversa indisponível</string>
+    <string name="onboarding_recover_setup_title">Recuperar a configuração de início de sessão?</string>
+    <string name="onboarding_recover_setup_for">Recuperar a configuração de início de sessão de %1$s</string>
+    <string name="onboarding_recover_setup_confirm">Recuperar configuração</string>
+    <string name="onboarding_recover_setup_explanation">A recuperação termina a sessão deste perfil e substitui o ponto de controlo de configuração ilegível. Apenas é mantida a prova de recuperação mais recente e as publicações anteriores nos relays não são anuladas. Será necessária a chave privada para iniciar uma nova sessão. Esta ação não aprova nenhuma publicação.</string>
+    <string name="onboarding_recover_setup_success">Configuração recuperada. Introduza a chave privada deste perfil para iniciar uma nova sessão.</string>
+    <string name="onboarding_recover_setup_failed">Não foi possível recuperar a configuração. Tente novamente.</string>
+    <string name="group_recovery_automatic_failed">Não foi possível restaurar a sincronização do grupo.</string>
+    <string name="group_recovery_pending_reinvites">Alguns convites estão a ser repetidos automaticamente.</string>
+    <string name="group_recovery_failed_reinvites">Não foi possível restaurar alguns convites. Volte a convidar essas pessoas nos Detalhes do grupo.</string>
+    <string name="group_recovery_review_invitation">Rever convite para voltar a entrar</string>
+    <string name="group_recovery_check_failed">Não foi possível verificar a recuperação do grupo. Tenta novamente.</string>
+    <string name="group_rejoin_title">Voltar a entrar no grupo?</string>
+    <string name="group_rejoin_invited_by">Convite de %1$s\n%2$s</string>
+    <string name="group_rejoin_replaces_state">Ao voltar a entrar, o estado atual do grupo neste dispositivo é substituído pela cópia do convite. O histórico de mensagens guardado é mantido.</string>
+    <string name="group_rejoin_trust_warning">Volte a entrar apenas se confiar neste convite. Uma versão mais recente do grupo, por si só, não o torna fiável.</string>
+    <string name="group_rejoin_confirm">Voltar a entrar no grupo</string>
+    <string name="group_rejoin_decline">Recusar convite</string>
+    <string name="group_rejoin_success">Voltou a entrar no grupo.</string>
+    <string name="group_rejoin_failed">Não foi possível aplicar este convite</string>
 </resources>
