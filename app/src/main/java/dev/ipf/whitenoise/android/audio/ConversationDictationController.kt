@@ -680,7 +680,20 @@ internal class ConversationDictationController internal constructor(
             finishRequested = true
             silenceTimeoutHandle?.cancel()
             silenceTimeoutHandle = null
-            finishPlaybackInterruption()
+            val sessionId = current.sessionId ?: return
+            val target = current.target ?: return
+            val generationId = activeRecognitionGenerationId
+            if (generationId == null) {
+                finishPlaybackInterruption()
+            } else {
+                runCatching {
+                    recognitionSession?.stop {
+                        if (owns(sessionId, generationId)) finishPlaybackInterruption()
+                    }
+                }.onFailure {
+                    failOrRetainTranscript(sessionId, target, ConversationDictationFailure.Unknown)
+                }
+            }
             return
         }
         if (current !is ConversationDictationState.Starting && current !is ConversationDictationState.Listening) return
