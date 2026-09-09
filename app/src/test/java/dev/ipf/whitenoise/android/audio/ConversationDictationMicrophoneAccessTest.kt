@@ -38,7 +38,7 @@ class ConversationDictationMicrophoneAccessTest {
         // is what gives Android the opportunity to present its native microphone-unblock prompt.
         assertEquals(
             AppOpsManager.MODE_IGNORED,
-            appOps.checkOpNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
+            appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
         )
         assertEquals(ConversationDictationMicrophoneAccess.Granted, platform.microphoneAccess())
     }
@@ -52,11 +52,17 @@ class ConversationDictationMicrophoneAccessTest {
     }
 
     @Test
-    fun effectiveAppOpDenialsDoNotOverrideGrantedRuntimePermission() {
-        for (mode in listOf(AppOpsManager.MODE_IGNORED, AppOpsManager.MODE_ERRORED)) {
-            setMode(mode)
-            assertEquals(ConversationDictationMicrophoneAccess.Granted, platform.microphoneAccess())
-        }
+    fun ignoredEffectiveAppOpLeavesGrantedRuntimePermissionUsableForNativeRecovery() {
+        setMode(AppOpsManager.MODE_IGNORED)
+
+        assertEquals(ConversationDictationMicrophoneAccess.Granted, platform.microphoneAccess())
+    }
+
+    @Test
+    fun hardAppOpDenialRemainsActionable() {
+        setMode(AppOpsManager.MODE_ERRORED)
+
+        assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
     }
 
     @Test
@@ -77,7 +83,7 @@ class ConversationDictationMicrophoneAccessTest {
 class PrivacyGatedAppOps : ShadowAppOpsManager() {
     @Implementation
     @Suppress("OVERRIDE_DEPRECATION")
-    public override fun checkOpNoThrow(
+    public override fun unsafeCheckOpNoThrow(
         op: String,
         uid: Int,
         packageName: String,

@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.audio
 
 import android.Manifest
+import android.app.AppOpsManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -12,6 +13,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
+import android.os.Process
 import android.os.SystemClock
 import android.provider.Settings
 import android.speech.RecognitionListener
@@ -2271,14 +2273,28 @@ internal class AndroidConversationDictationPlatform(
         return granted
     }
 
-    /** Leaves device-wide microphone privacy to Android after handling the app runtime grant. */
+    /** Leaves global microphone privacy to Android while preserving hard app-op denial. */
+    @Suppress("DEPRECATION")
     override fun microphoneAccess(): ConversationDictationMicrophoneAccess {
         if (!hasRecordAudioPermission()) return ConversationDictationMicrophoneAccess.RuntimePermissionRequired
         // Android folds the global microphone toggle into its effective permission result. Do not
-        // preflight that result here: starting recognition is what lets Android present its native
-        // microphone-unblock prompt while White Noise stays on the current dictation surface.
-        conversationDictationDiagnostic("event=app_record_audio_access access=Granted")
-        return ConversationDictationMicrophoneAccess.Granted
+        // treat MODE_IGNORED as an app denial: starting recognition is what lets Android present
+        // its native microphone-unblock prompt while White Noise stays on the current surface.
+        // MODE_ERRORED is distinguishable: Android documents it as a hard denial that should fail.
+        val mode =
+            context.getSystemService(AppOpsManager::class.java).unsafeCheckOpNoThrow(
+                AppOpsManager.OPSTR_RECORD_AUDIO,
+                Process.myUid(),
+                context.packageName,
+            )
+        val access =
+            if (mode == AppOpsManager.MODE_ERRORED) {
+                ConversationDictationMicrophoneAccess.AppOpDenied
+            } else {
+                ConversationDictationMicrophoneAccess.Granted
+            }
+        conversationDictationDiagnostic("event=app_record_audio_access mode=$mode access=${access.name}")
+        return access
     }
 
     /** Starts a session by resolving the provider afresh, so install and selection changes land. */
