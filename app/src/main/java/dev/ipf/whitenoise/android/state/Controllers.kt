@@ -4608,6 +4608,7 @@ class ChatsController private constructor(
         val rowKey = chatRowKey(groupIdHex)
         val removedRow = chatRowsByGroup.remove(rowKey)
         if (removedRow != null) {
+            selectedPresentationsByGroup = selectedPresentationsByGroup - rowKey
             activitySequenceByGroup.remove(rowKey)
             optimisticChatListPreviewByGroup.remove(rowKey)
             cancelMemberSnapshotRetry(removedRow.groupIdHex)
@@ -5852,7 +5853,7 @@ class ChatsController private constructor(
     private fun applyAccountSwitchLocalSnapshot(snapshot: AccountSwitchLocalSnapshot) {
         accountRef = snapshot.accountRef
         boundAccountRef = snapshot.accountRef
-        replaceChatRows(snapshot.rows)
+        snapshot.presentedRows?.let(::replacePresentedChatRows) ?: replaceChatRows(snapshot.rows)
         groupRecordsById = snapshot.groups.associateBy { it.groupIdHex }
         applyInitialMemberIdProjections(
             projections = snapshot.memberIds,

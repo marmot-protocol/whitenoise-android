@@ -13,4 +13,5 @@
     <color name="pre_compose_window_background_light">#FFECEEEE</color>
     <color name="pre_compose_window_background_dark">#FF0F1112</color>
     <color name="pre_compose_window_background_amoled">#FF000000</color>
+    <color name="startup_splash_mark">#FF000000</color>
 </resources>

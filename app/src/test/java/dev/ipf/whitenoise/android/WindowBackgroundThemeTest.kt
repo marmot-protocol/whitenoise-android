@@ -38,6 +38,17 @@ class WindowBackgroundThemeTest {
     }
 
     @Test
+    fun launcherSplashUsesAThemeAwareHighContrastMark() {
+        val light = ContextThemeWrapper(RuntimeEnvironment.getApplication().withNightMode(false), R.style.Theme_WhiteNoise_Starting)
+        val dark = ContextThemeWrapper(RuntimeEnvironment.getApplication().withNightMode(true), R.style.Theme_WhiteNoise_Starting)
+
+        assertEquals(R.drawable.ic_splash_mark, light.resolveResourceAttr(android.R.attr.windowSplashScreenAnimatedIcon))
+        assertEquals(R.drawable.ic_splash_mark, dark.resolveResourceAttr(android.R.attr.windowSplashScreenAnimatedIcon))
+        assertEquals(Color.BLACK, light.getColor(R.color.startup_splash_mark))
+        assertEquals(Color.WHITE, dark.getColor(R.color.startup_splash_mark))
+    }
+
+    @Test
     fun explicitThemeVariantsMatchComposeFirstFrameSurface() {
         assertThemeFallback(
             style = R.style.Theme_WhiteNoise_Light,
@@ -103,6 +114,8 @@ class WindowBackgroundThemeTest {
     }
 
     private fun Context.resolveBooleanAttr(attr: Int): Boolean = resolveAttr(attr).data != 0
+
+    private fun Context.resolveResourceAttr(attr: Int): Int = resolveAttr(attr).resourceId
 
     private fun Context.withNightMode(nightMode: Boolean): Context {
         val nightFlag =

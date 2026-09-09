@@ -358,6 +358,10 @@ internal class NotificationBootstrapTestFixture(
                     directChatListCalls.incrementAndGet()
                     onChatList?.invoke(arguments?.get(0) as String) ?: chatListRows
                 }
+                "presentedChatList" -> {
+                    directChatListCalls.incrementAndGet()
+                    presentedChatListSnapshot(onChatList?.invoke(arguments?.get(0) as String) ?: chatListRows)
+                }
                 "timelineMessages" -> {
                     notificationTimelineCalls.incrementAndGet()
                     timelinePage
@@ -495,29 +499,7 @@ internal class NotificationBootstrapTestFixture(
             return PresentedChatListUpdateFfi(
                 subscriptionGeneration = "notification-bootstrap",
                 sequence = 0u,
-                snapshot =
-                    PresentedChatListSnapshotFfi(
-                        rows =
-                            rows.map { row ->
-                                PresentedChatRowFfi(
-                                    row = row,
-                                    presentation =
-                                        ConversationPresentationFfi(
-                                            title = PresentationTextFfi.Literal(row.title.ifBlank { "Chat" }),
-                                            avatar =
-                                                SelectedAvatarFfi.Placeholder(
-                                                    row.groupIdHex,
-                                                    PresentationSourceFfi.GROUP_FALLBACK,
-                                                ),
-                                            titleSource = PresentationSourceFfi.GROUP_FALLBACK,
-                                            avatarSource = PresentationSourceFfi.GROUP_FALLBACK,
-                                            peerId = null,
-                                            resolution = PresentationResolutionFfi.FALLBACK,
-                                        ),
-                                )
-                            },
-                        presentationVersion = PresentationVersionFfi(byteArrayOf(1), 0u),
-                    ),
+                snapshot = presentedChatListSnapshot(rows),
             )
         }
 
@@ -816,3 +798,28 @@ internal class NotificationBootstrapTestFixture(
         }
     }
 }
+
+/** Builds the same selected-presentation shape for one-shot and subscribed fixture reads. */
+private fun presentedChatListSnapshot(rows: List<ChatListRowFfi>) =
+    PresentedChatListSnapshotFfi(
+        rows =
+            rows.map { row ->
+                PresentedChatRowFfi(
+                    row = row,
+                    presentation =
+                        ConversationPresentationFfi(
+                            title = PresentationTextFfi.Literal(row.title.ifBlank { "Chat" }),
+                            avatar =
+                                SelectedAvatarFfi.Placeholder(
+                                    row.groupIdHex,
+                                    PresentationSourceFfi.GROUP_FALLBACK,
+                                ),
+                            titleSource = PresentationSourceFfi.GROUP_FALLBACK,
+                            avatarSource = PresentationSourceFfi.GROUP_FALLBACK,
+                            peerId = null,
+                            resolution = PresentationResolutionFfi.FALLBACK,
+                        ),
+                )
+            },
+        presentationVersion = PresentationVersionFfi(byteArrayOf(1), 0u),
+    )

@@ -4904,7 +4904,11 @@ class WhiteNoiseAppState private constructor(
         includePresentationSeeds: Boolean = true,
     ): AccountSwitchLocalSnapshot? =
         try {
-            val rows = marmotIo(MarmotTraceSection.CHAT_LIST_READ) { chatList(accountRef, includeArchived = true) }
+            val presentedRows =
+                marmotIo(MarmotTraceSection.CHAT_LIST_READ) {
+                    presentedChatList(accountRef, includeArchived = true)
+                }.rows
+            val rows = presentedRows.map { it.row }
             ensureAccountSwitchRequestIsCurrent(generation)
             recordAccountSwitchPreloadStage(accountRef, "cached-chat-rows-ready", rows.size)
             val presentation =
@@ -4923,6 +4927,7 @@ class WhiteNoiseAppState private constructor(
                 groups = emptyList(),
                 memberIds = presentation.memberIds,
                 profiles = presentation.profiles,
+                presentedRows = presentedRows,
             ).also { snapshot ->
                 if (includePresentationSeeds) recordAccountSwitchIdentityState(accountRef, snapshot)
             }
