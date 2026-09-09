@@ -27,7 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.core.content.ContextCompat
-import androidx.core.content.PermissionChecker
 import androidx.core.content.pm.PackageInfoCompat
 import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrAfter
 import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrBefore
@@ -2272,23 +2271,13 @@ internal class AndroidConversationDictationPlatform(
         return granted
     }
 
-    /** Includes the RECORD_AUDIO app-op so privacy-policy denial cannot masquerade as a usable grant. */
+    /** Leaves device-wide microphone privacy to Android after handling the app runtime grant. */
     override fun microphoneAccess(): ConversationDictationMicrophoneAccess {
         if (!hasRecordAudioPermission()) return ConversationDictationMicrophoneAccess.RuntimePermissionRequired
-        // Android folds device-wide microphone privacy into this effective permission check,
-        // but does not expose the current software-toggle state to ordinary apps. A real app
-        // permission revocation was already handled above, so route any remaining effective
-        // denial to visible privacy recovery without starting a silent recording or changing
-        // the user's privacy toggle.
-        val access =
-            if (
-                PermissionChecker.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-                PermissionChecker.PERMISSION_GRANTED
-            ) {
-                ConversationDictationMicrophoneAccess.Granted
-            } else {
-                ConversationDictationMicrophoneAccess.MicrophoneMuted
-            }
+        // Android folds the global microphone toggle into its effective permission result. Do not
+        // preflight that result here: starting recognition is what lets Android present its native
+        // microphone-unblock prompt while White Noise stays on the current dictation surface.
+        val access = ConversationDictationMicrophoneAccess.Granted
         conversationDictationDiagnostic("event=effective_record_audio_access access=${access.name}")
         return access
     }
