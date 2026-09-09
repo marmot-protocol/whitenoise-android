@@ -1,0 +1,771 @@
+{
+  "schema_version": 1,
+  "purpose": "Expected prose verbalization for read-aloud. Expectations are authored independently of the production verbalizer and must never be regenerated from it.",
+  "spoken_core_contract": "expected_spoken_core is the exact lexical core, ignoring only added terminal sentence punctuation and outer whitespace.",
+  "literal_contract": "expected_literal requires the complete source token to survive verbatim in the spoken text, covered by one identity origin run over its whole source span.",
+  "cases": [
+    {
+      "id": "date_iso",
+      "family": "date",
+      "input": "2026-09-08",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "September eighth, twenty twenty-six"
+    },
+    {
+      "id": "date_named_abbreviated",
+      "family": "date",
+      "input": "8 Sep 2026",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "September eighth, twenty twenty-six"
+    },
+    {
+      "id": "date_named_ordinal",
+      "family": "date",
+      "input": "September 8th, 2026",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "September eighth, twenty twenty-six"
+    },
+    {
+      "id": "date_iso_en_gb_voice",
+      "family": "date",
+      "input": "2026-09-08",
+      "voice_locale": "en-GB",
+      "expected_contains": ["September", "eighth", "twenty twenty-six"]
+    },
+    {
+      "id": "date_unambiguous_dmy",
+      "family": "date",
+      "input": "23/04/2026",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "April twenty-third, twenty twenty-six"
+    },
+    {
+      "id": "date_unambiguous_mdy",
+      "family": "date",
+      "input": "04/23/2026",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "April twenty-third, twenty twenty-six"
+    },
+    {
+      "id": "date_ambiguous_no_source_format",
+      "family": "date",
+      "input": "03/04/2026",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "zero three slash zero four slash two zero two six"
+    },
+    {
+      "id": "date_explicit_us",
+      "family": "date",
+      "input": "03/04/2026",
+      "voice_locale": "en-US",
+      "source_format_locale": "en-US",
+      "expected_spoken_core": "March fourth, twenty twenty-six"
+    },
+    {
+      "id": "date_explicit_gb",
+      "family": "date",
+      "input": "03/04/2026",
+      "voice_locale": "en-US",
+      "source_format_locale": "en-GB",
+      "expected_spoken_core": "April third, twenty twenty-six"
+    },
+    {
+      "id": "date_short_year_unknown",
+      "family": "date",
+      "input": "03/04/05",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "zero three slash zero four slash zero five"
+    },
+    {
+      "id": "date_leap_valid",
+      "family": "date",
+      "input": "2024-02-29",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "February twenty-ninth, twenty twenty-four"
+    },
+    {
+      "id": "date_invalid_leap",
+      "family": "date_negative",
+      "input": "2026-02-29",
+      "voice_locale": "en-US",
+      "expected_literal": true,
+      "expected_absent": ["February"]
+    },
+    {
+      "id": "date_invalid_named",
+      "family": "date_negative",
+      "input": "February 30, 2026",
+      "voice_locale": "en-US",
+      "expected_absent": ["thirtieth", "March", "first"]
+    },
+    {
+      "id": "date_range",
+      "family": "date",
+      "input": "September 8–10, 2026",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "September eighth through tenth, twenty twenty-six"
+    },
+    {
+      "id": "date_year_month_hinted",
+      "family": "date",
+      "input": "2026-09",
+      "voice_locale": "en-US",
+      "semantic_hint": "year_month",
+      "expected_spoken_core": "September twenty twenty-six"
+    },
+    {
+      "id": "date_iso_week",
+      "family": "date",
+      "input": "2026-W37-2",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "Tuesday of week thirty-seven, twenty twenty-six"
+    },
+    {
+      "id": "date_invalid_week",
+      "family": "date_negative",
+      "input": "2026-W54-2",
+      "voice_locale": "en-US",
+      "expected_literal": true,
+      "expected_absent": ["week fifty-four"]
+    },
+    {
+      "id": "date_ordinal_hinted",
+      "family": "date",
+      "input": "2026-251",
+      "voice_locale": "en-US",
+      "semantic_hint": "ordinal_date",
+      "expected_contains": ["September", "eighth", "twenty twenty-six"]
+    },
+    {
+      "id": "date_era_hinted",
+      "family": "date",
+      "input": "44 BCE",
+      "voice_locale": "en-US",
+      "semantic_hint": "year",
+      "expected_contains": ["forty-four"],
+      "expected_contains_any": [["BCE", "B C E", "before common era"]],
+      "expected_absent": ["negative", "minus"]
+    },
+    {
+      "id": "date_non_gregorian_calendar",
+      "family": "date",
+      "input": "1 Muharram 1448 AH",
+      "voice_locale": "en-US",
+      "expected_contains": ["Muharram"],
+      "expected_contains_any": [["AH", "A H"]],
+      "expected_absent": ["July", "June", "Gregorian"]
+    },
+    {
+      "id": "month_word_is_not_a_date",
+      "family": "negative",
+      "input": "5 May be revised",
+      "voice_locale": "en-US",
+      "expected_contains": ["May"],
+      "expected_absent": ["fifth"]
+    },
+    {
+      "id": "time_meridiem",
+      "family": "time",
+      "input": "7:05 a.m.",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "seven oh five A M"
+    },
+    {
+      "id": "time_noon",
+      "family": "time",
+      "input": "12:00 p.m.",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "noon"
+    },
+    {
+      "id": "time_midnight_hinted",
+      "family": "time",
+      "input": "00:00",
+      "voice_locale": "en-US",
+      "semantic_hint": "clock",
+      "expected_spoken_core": "midnight"
+    },
+    {
+      "id": "timestamp_utc",
+      "family": "time",
+      "input": "2026-09-08T14:05:09Z",
+      "voice_locale": "en-US",
+      "expected_contains": ["September", "twenty twenty-six", "fourteen oh five", "nine seconds"],
+      "expected_contains_any": [["UTC", "U T C", "Coordinated Universal Time"]],
+      "expected_absent": ["seven oh five", "nine oh five", "local"]
+    },
+    {
+      "id": "timestamp_fraction_offset",
+      "family": "time",
+      "input": "2026-09-08T14:05:09.125+05:30",
+      "voice_locale": "en-US",
+      "expected_contains": ["one two five", "five hours thirty minutes"],
+      "expected_absent": ["minus five hours", "nineteen thirty-five"]
+    },
+    {
+      "id": "time_invalid_meridiem",
+      "family": "time_negative",
+      "input": "13:05 p.m.",
+      "voice_locale": "en-US",
+      "expected_literal": true,
+      "expected_absent": ["one oh five", "thirteen oh five"]
+    },
+    {
+      "id": "timestamp_invalid_zone",
+      "family": "time_negative",
+      "input": "2026-09-08T14:05:09+25:00",
+      "voice_locale": "en-US",
+      "expected_literal": true,
+      "expected_absent": ["September", "fourteen oh five"]
+    },
+    {
+      "id": "duration_unit_words",
+      "family": "duration",
+      "input": "1 h 30 min",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "one hour thirty minutes"
+    },
+    {
+      "id": "duration_iso",
+      "family": "duration",
+      "input": "PT1H30M",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "one hour thirty minutes"
+    },
+    {
+      "id": "duration_colon_hinted",
+      "family": "duration",
+      "input": "01:02:03",
+      "voice_locale": "en-US",
+      "semantic_hint": "duration",
+      "expected_spoken_core": "one hour two minutes three seconds"
+    },
+    {
+      "id": "duration_colon_omits_absent_seconds",
+      "family": "duration",
+      "input": "1:30",
+      "voice_locale": "en-US",
+      "semantic_hint": "duration",
+      "expected_spoken_core": "one hour thirty minutes"
+    },
+    {
+      "id": "duration_colon_omits_zero_hours_and_seconds",
+      "family": "duration",
+      "input": "0:30:00",
+      "voice_locale": "en-US",
+      "semantic_hint": "duration",
+      "expected_spoken_core": "thirty minutes"
+    },
+    {
+      "id": "duration_colon_runtime_context",
+      "family": "duration",
+      "input": "Duration: 01:02:03.",
+      "voice_locale": "en-US",
+      "expected_contains": ["one hour two minutes three seconds"],
+      "expected_absent": ["one oh two"]
+    },
+    {
+      "id": "ratio_is_not_a_clock",
+      "family": "negative",
+      "input": "Ratio 2:1",
+      "voice_locale": "en-US",
+      "expected_contains": ["two to one"],
+      "expected_absent": ["two oh one", "two o'clock"]
+    },
+    {
+      "id": "currency_dollar",
+      "family": "money",
+      "input": "$12.50",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "twelve dollars and fifty cents"
+    },
+    {
+      "id": "currency_pound_single_penny",
+      "family": "money",
+      "input": "£1.01",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "one pound and one penny"
+    },
+    {
+      "id": "currency_pound_single_penny_en_gb_voice",
+      "family": "money",
+      "input": "£1.01",
+      "voice_locale": "en-GB",
+      "expected_spoken_core": "one pound and one penny"
+    },
+    {
+      "id": "currency_usd_code_grouped",
+      "family": "money",
+      "input": "USD 1,234.56",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "one thousand two hundred thirty-four US dollars and fifty-six cents"
+    },
+    {
+      "id": "currency_euro_german_separators",
+      "family": "money",
+      "input": "1.234,56 EUR",
+      "voice_locale": "en-US",
+      "source_format_locale": "de-DE",
+      "expected_contains": ["one thousand two hundred thirty-four", "euros", "fifty-six cents"],
+      "expected_absent": ["one point two three four", "one and twenty-three"]
+    },
+    {
+      "id": "currency_yen_no_minor_units",
+      "family": "money",
+      "input": "JPY 1500",
+      "voice_locale": "en-US",
+      "expected_contains": ["one thousand five hundred", "yen"],
+      "expected_absent": ["cents", "sen", "and zero"]
+    },
+    {
+      "id": "currency_yen_symbol_no_minor_units",
+      "family": "money",
+      "input": "¥1500",
+      "voice_locale": "en-US",
+      "expected_contains": ["one thousand five hundred", "yen"],
+      "expected_absent": ["cents", "sen", "and zero"]
+    },
+    {
+      "id": "currency_kwd_three_decimal_minor_units",
+      "family": "money",
+      "input": "KWD 1.005",
+      "voice_locale": "en-US",
+      "source_format_locale": "en-US",
+      "expected_contains": ["dinar", "five fils"],
+      "expected_absent": ["one thousand five", "five cents"]
+    },
+    {
+      "id": "currency_kwd_without_source_format",
+      "family": "money_negative",
+      "input": "KWD 1.005",
+      "voice_locale": "en-US",
+      "expected_absent": ["fils", "one thousand five", "cents"]
+    },
+    {
+      "id": "currency_signed_negative",
+      "family": "money",
+      "input": "-$5.25",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "negative five dollars and twenty-five cents"
+    },
+    {
+      "id": "currency_accounting_hinted",
+      "family": "money",
+      "input": "($5.25)",
+      "voice_locale": "en-US",
+      "semantic_hint": "accounting_amount",
+      "expected_contains": ["negative", "five dollars", "twenty-five cents"]
+    },
+    {
+      "id": "currency_parentheses_without_hint",
+      "family": "money_negative",
+      "input": "($5.25)",
+      "voice_locale": "en-US",
+      "expected_contains": ["five dollars", "twenty-five cents"],
+      "expected_absent": ["negative", "minus"]
+    },
+    {
+      "id": "currency_precision_beyond_minor_units",
+      "family": "money",
+      "input": "$1.2345",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "one point two three four five dollars"
+    },
+    {
+      "id": "currency_rate_per_period",
+      "family": "money",
+      "input": "$45/mo",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "forty-five dollars per month"
+    },
+    {
+      "id": "currency_unknown_code",
+      "family": "money",
+      "input": "XYZ 12.50",
+      "voice_locale": "en-US",
+      "expected_contains": ["twelve"],
+      "expected_contains_any": [["X Y Z", "XYZ"]],
+      "expected_absent": ["dollars", "euros", "pounds"]
+    },
+    {
+      "id": "currency_ambiguous_symbol",
+      "family": "money_negative",
+      "input": "¥100",
+      "voice_locale": "en-US",
+      "expected_contains": ["one hundred"],
+      "expected_absent": ["Japanese", "Chinese", "renminbi"]
+    },
+    {
+      "id": "crypto_btc_exact_scale",
+      "family": "crypto",
+      "input": "0.00000001 BTC",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "zero point zero zero zero zero zero zero zero one bitcoin"
+    },
+    {
+      "id": "crypto_sats",
+      "family": "crypto",
+      "input": "21 sats",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "twenty-one satoshis"
+    },
+    {
+      "id": "crypto_unknown_asset_code",
+      "family": "crypto",
+      "input": "5 ZZZ",
+      "voice_locale": "en-US",
+      "expected_contains_any": [["Z Z Z", "ZZZ"]],
+      "expected_absent": ["bitcoin", "satoshis"]
+    },
+    {
+      "id": "mass_kg_decimal",
+      "family": "weight",
+      "input": "2.5 kg",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "two point five kilograms"
+    },
+    {
+      "id": "mass_gram_singular",
+      "family": "weight",
+      "input": "1 g",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "one gram"
+    },
+    {
+      "id": "mass_milligram",
+      "family": "weight",
+      "input": "0.5 mg",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "zero point five milligrams"
+    },
+    {
+      "id": "mass_microgram_micro_sign",
+      "family": "weight",
+      "input": "500 µg",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "five hundred micrograms"
+    },
+    {
+      "id": "mass_microgram_greek_mu",
+      "family": "weight",
+      "input": "500 μg",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "five hundred micrograms"
+    },
+    {
+      "id": "mass_microgram_mcg",
+      "family": "weight",
+      "input": "500 mcg",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "five hundred micrograms"
+    },
+    {
+      "id": "mass_compound_imperial",
+      "family": "weight",
+      "input": "5 lb 8 oz",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "five pounds eight ounces"
+    },
+    {
+      "id": "mass_stone",
+      "family": "weight",
+      "input": "2 st",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "two stone"
+    },
+    {
+      "id": "mass_range",
+      "family": "weight",
+      "input": "2–3 kg",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "two to three kilograms"
+    },
+    {
+      "id": "mass_vulgar_fraction",
+      "family": "weight",
+      "input": "1½ kg",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "one and a half kilograms"
+    },
+    {
+      "id": "mass_si_prefix_case",
+      "family": "weight",
+      "input": "1 Mg and 1 mg",
+      "voice_locale": "en-US",
+      "expected_contains": ["one megagram", "one milligram"],
+      "expected_absent": ["one gram and"]
+    },
+    {
+      "id": "mass_ton_stays_ambiguous",
+      "family": "weight_negative",
+      "input": "2 tons",
+      "voice_locale": "en-US",
+      "expected_contains": ["two tons"],
+      "expected_absent": ["metric", "kilograms", "pounds"]
+    },
+    {
+      "id": "mass_ounce_is_not_fluid_ounce",
+      "family": "weight_negative",
+      "input": "8 oz",
+      "voice_locale": "en-US",
+      "expected_contains": ["eight ounces"],
+      "expected_absent": ["fluid"]
+    },
+    {
+      "id": "unit_speed",
+      "family": "measure",
+      "input": "10 km/h",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "ten kilometers per hour"
+    },
+    {
+      "id": "unit_area",
+      "family": "measure",
+      "input": "2 m²",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "two square meters"
+    },
+    {
+      "id": "unit_volume",
+      "family": "measure",
+      "input": "250 mL",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "two hundred fifty milliliters"
+    },
+    {
+      "id": "unit_temperature_minus_sign",
+      "family": "measure",
+      "input": "−5 °C",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "minus five degrees Celsius"
+    },
+    {
+      "id": "unit_frequency",
+      "family": "measure",
+      "input": "50 Hz",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "fifty hertz"
+    },
+    {
+      "id": "unit_power",
+      "family": "measure",
+      "input": "2 kW",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "two kilowatts"
+    },
+    {
+      "id": "unit_voltage",
+      "family": "measure",
+      "input": "12 V",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "twelve volts"
+    },
+    {
+      "id": "unit_current",
+      "family": "measure",
+      "input": "3 mA",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "three milliamperes"
+    },
+    {
+      "id": "unit_energy",
+      "family": "measure",
+      "input": "5 kWh",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "five kilowatt hours"
+    },
+    {
+      "id": "unit_acceleration",
+      "family": "measure",
+      "input": "9.81 m/s²",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "nine point eight one meters per second squared"
+    },
+    {
+      "id": "unit_bits_and_bytes_case",
+      "family": "measure",
+      "input": "5 MB/s and 5 Mb/s",
+      "voice_locale": "en-US",
+      "expected_contains": ["five megabytes per second", "five megabits per second"]
+    },
+    {
+      "id": "unit_length_runtime_context",
+      "family": "measure",
+      "input": "Length: 5 m.",
+      "voice_locale": "en-US",
+      "expected_contains": ["five meters"]
+    },
+    {
+      "id": "unit_inches_need_length_expression",
+      "family": "negative",
+      "input": "Come in May.",
+      "voice_locale": "en-US",
+      "expected_contains": ["May"],
+      "expected_absent": ["inches", "inch"]
+    },
+    {
+      "id": "unit_bare_metre_stays_ambiguous",
+      "family": "negative",
+      "input": "5 m",
+      "voice_locale": "en-US",
+      "semantic_hint": "unknown",
+      "expected_absent": ["meters", "metres", "minutes", "miles"]
+    },
+    {
+      "id": "number_percent_decimal",
+      "family": "number",
+      "input": "0.05%",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "zero point zero five percent"
+    },
+    {
+      "id": "number_scientific_hinted",
+      "family": "number",
+      "input": "1e6",
+      "voice_locale": "en-US",
+      "semantic_hint": "number",
+      "expected_spoken_core": "one times ten to the sixth"
+    },
+    {
+      "id": "number_trailing_zero_precision",
+      "family": "number",
+      "input": "0.0100",
+      "voice_locale": "en-US",
+      "expected_spoken_core": "zero point zero one zero zero"
+    },
+    {
+      "id": "number_fraction_hinted",
+      "family": "number",
+      "input": "3/4",
+      "voice_locale": "en-US",
+      "semantic_hint": "fraction",
+      "expected_contains": ["three quarters"],
+      "expected_absent": ["March", "April", "slash"]
+    },
+    {
+      "id": "number_fraction_without_hint",
+      "family": "negative",
+      "input": "3/4",
+      "voice_locale": "en-US",
+      "expected_absent": ["quarters", "March", "April"]
+    },
+    {
+      "id": "number_mixed_fraction",
+      "family": "number",
+      "input": "2 1/2",
+      "voice_locale": "en-US",
+      "semantic_hint": "fraction",
+      "expected_contains": ["two and a half"]
+    },
+    {
+      "id": "number_negative_cardinal",
+      "family": "number",
+      "input": "-42",
+      "voice_locale": "en-US",
+      "expected_contains": ["negative forty-two"]
+    },
+    {
+      "id": "number_ordinal",
+      "family": "number",
+      "input": "21st",
+      "voice_locale": "en-US",
+      "expected_contains": ["twenty-first"]
+    },
+    {
+      "id": "version_identifier_protected",
+      "family": "negative",
+      "input": "v1.2.3",
+      "voice_locale": "en-US",
+      "expected_contains": ["one point two point three"],
+      "expected_absent": ["one point twenty-three", "one hundred twenty-three"]
+    },
+    {
+      "id": "ip_address_protected",
+      "family": "negative",
+      "input": "192.168.1.1",
+      "voice_locale": "en-US",
+      "expected_contains": ["one nine two", "one six eight"],
+      "expected_absent": ["one hundred ninety-two", "one hundred sixty-eight"]
+    },
+    {
+      "id": "leading_zero_identifier_protected",
+      "family": "negative",
+      "input": "ID 00123",
+      "voice_locale": "en-US",
+      "expected_contains": ["zero zero one two three"],
+      "expected_absent": ["one hundred twenty-three"]
+    },
+    {
+      "id": "separator_comma_ambiguous",
+      "family": "negative",
+      "input": "1,234 kg",
+      "voice_locale": "en-US",
+      "expected_contains": ["kilograms"],
+      "expected_absent": ["one thousand two hundred thirty-four", "one point two three four"]
+    },
+    {
+      "id": "separator_dot_ambiguous",
+      "family": "negative",
+      "input": "1.234 kg",
+      "voice_locale": "en-US",
+      "expected_contains": ["kilograms"],
+      "expected_absent": ["one thousand two hundred thirty-four", "one point two three four"]
+    },
+    {
+      "id": "separator_comma_with_source_format",
+      "family": "number",
+      "input": "1,234 kg",
+      "voice_locale": "en-US",
+      "source_format_locale": "en-US",
+      "expected_spoken_core": "one thousand two hundred thirty-four kilograms"
+    },
+    {
+      "id": "separator_dot_with_source_format",
+      "family": "number",
+      "input": "1.234 kg",
+      "voice_locale": "en-US",
+      "source_format_locale": "de-DE",
+      "expected_spoken_core": "one thousand two hundred thirty-four kilograms"
+    },
+    {
+      "id": "separator_inconsistent_grouping_rejected",
+      "family": "negative",
+      "input": "1,23,456 kg",
+      "voice_locale": "en-US",
+      "expected_absent": ["one hundred twenty-three thousand", "one hundred twenty-three point"]
+    },
+    {
+      "id": "numeric_exponent_bound",
+      "family": "limits",
+      "input": "1e999999999",
+      "voice_locale": "en-US",
+      "expected_literal": true,
+      "expected_absent": ["times ten to the"]
+    },
+    {
+      "id": "numeric_overlong_digits_bound",
+      "family": "limits",
+      "input": "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890",
+      "voice_locale": "en-US",
+      "expected_literal": true
+    },
+    {
+      "id": "locale_unsupported_stays_literal",
+      "family": "locale",
+      "input": "2,5 kg",
+      "voice_locale": "fr-FR",
+      "source_format_locale": "fr-FR",
+      "expected_literal": true,
+      "expected_absent": ["kilograms", "two point five", "kilogrammes"]
+    },
+    {
+      "id": "locale_unsupported_money_stays_literal",
+      "family": "locale",
+      "input": "12,50 €",
+      "voice_locale": "fr-FR",
+      "source_format_locale": "fr-FR",
+      "expected_literal": true,
+      "expected_absent": ["euros", "twelve", "cents"]
+    }
+  ]
+}

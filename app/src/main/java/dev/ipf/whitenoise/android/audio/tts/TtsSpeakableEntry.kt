@@ -1,5 +1,9 @@
 package dev.ipf.whitenoise.android.audio.tts
 
+import dev.ipf.whitenoise.android.audio.tts.speech.SpeechMappingKind
+import dev.ipf.whitenoise.android.audio.tts.speech.SpeechMode
+import dev.ipf.whitenoise.android.audio.tts.speech.SpeechSourceRun
+
 /** Half-open UTF-16 range. Android TTS callbacks use the same coordinate space. */
 data class TtsTextRange(
     val start: Int,
@@ -26,10 +30,14 @@ data class TtsVisibleTextSpan(
 data class TtsSpokenTextSpan(
     val spoken: TtsTextRange,
     val visible: TtsVisibleTextSpan,
+    val kind: SpeechMappingKind = SpeechMappingKind.Identity,
 ) {
     init {
         require(spoken.end > spoken.start) { "spoken spans must be non-empty" }
-        require(spoken.end - spoken.start == visible.end - visible.start) {
+        require(
+            kind != SpeechMappingKind.Identity ||
+                spoken.end - spoken.start == visible.end - visible.start,
+        ) {
             "spoken and visible spans must cover the same UTF-16 length"
         }
     }
@@ -66,6 +74,9 @@ data class TtsSpeakableEntry(
     val spokenTextSpans: List<TtsSpokenTextSpan> = emptyList(),
     /** Changes whenever visible-leaf coordinates for this projection change. */
     val projectionId: String = "",
+    val visibleLeaves: Map<String, String> = emptyMap(),
+    val speechMode: SpeechMode = SpeechMode.Default,
+    val speechRoles: Map<String, SpeechSourceRun> = emptyMap(),
 )
 
 // A hazard bound, not a feature knob: an inflated unread count would anchor

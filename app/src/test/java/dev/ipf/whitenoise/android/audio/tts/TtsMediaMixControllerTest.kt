@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import android.speech.tts.TextToSpeech
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -22,21 +23,22 @@ class TtsMediaMixControllerTest {
         assertEquals(listOf(null), engine.spoken.map { it.volume })
     }
 
-    /** Proves inactive media cannot acquire focus or create private playback state. */
+    /** Regression: enabling media mix must not prevent ordinary playback when no peer media exists. */
     @Test
-    fun absentMediaRefusesBeforeFocusLanguageQueueOrSpeech() {
+    fun absentMediaFallsBackToFullFocusAndSpeaksNormally() {
         val engine = RecordingEngine()
         val focus = RecordingFocus()
         val controller = controller(focus, mixEnabled = { true }, mediaActive = { false })
         controller.attachEngine(engine)
 
-        assertFalse(controller.speak("Do not speak.", Locale.US))
+        assertTrue(controller.speak("Keep reading.", Locale.US))
 
-        assertTrue(focus.modes.isEmpty())
-        assertEquals(0, engine.languageCalls)
-        assertTrue(engine.spoken.isEmpty())
-        assertTrue(controller.state.value is TtsState.Idle)
-        assertEquals(TtsStartFailure.MediaNotActive, controller.lastStartFailure)
+        assertEquals(listOf(TtsAudioFocusMode.Full), focus.modes)
+        assertEquals(1, engine.languageCalls)
+        assertEquals(listOf("Keep reading."), engine.spoken.map { it.text })
+        assertEquals(listOf(null), engine.spoken.map { it.volume })
+        assertTrue(controller.state.value is TtsState.Speaking)
+        assertEquals(TtsStartFailure.None, controller.lastStartFailure)
     }
 
     /** Defensively prevents speech when the injected session-focus policy refuses. */
@@ -54,23 +56,28 @@ class TtsMediaMixControllerTest {
         assertEquals(TtsStartFailure.AudioFocusDenied, controller.lastStartFailure)
     }
 
-    /** Keeps accepted mixed speech alive when media ends at the final start boundary. */
+    /** Samples media activity once when selecting the session's latched focus mode. */
     @Test
-    fun mediaEndingAfterInitialEligibilityDoesNotVetoSpeech() {
-        val activeChecks = ArrayDeque(listOf(true, false))
+    fun activeMediaSelectsMixModeOnceAtTheStartBoundary() {
+        var activeChecks = 0
         val engine = RecordingEngine()
         val focus = RecordingFocus()
         val controller =
             controller(
                 focus,
                 mixEnabled = { true },
-                mediaActive = { activeChecks.removeFirst() },
+                mediaActive = {
+                    activeChecks += 1
+                    true
+                },
             )
         controller.attachEngine(engine)
 
         assertTrue(controller.speak("Race-safe speech.", Locale.US))
 
         assertEquals(1, engine.languageCalls)
+        assertEquals(1, activeChecks)
+        assertEquals(listOf(TtsAudioFocusMode.MediaMix), focus.modes)
         assertEquals(listOf("Race-safe speech."), engine.spoken.map { it.text })
         assertEquals(0, focus.releases)
         assertTrue(controller.state.value is TtsState.Speaking)
@@ -120,30 +127,29 @@ class TtsMediaMixControllerTest {
         assertEquals(listOf(TtsAudioFocusMode.MediaMix, TtsAudioFocusMode.MediaMix), focus.modes)
     }
 
-    /** Initial media ineligibility leaves an already-speaking ordinary queue untouched. */
+    /** Covers the background-preparation path used by auto-read and long messages. */
     @Test
-    fun initialMediaIneligibilityDoesNotStrandTheExistingQueueWithoutFocus() {
-        var mixEnabled = false
-        val engine = RecordingEngine()
-        val focus = RecordingFocus()
-        val controller =
-            controller(
-                focus,
-                mixEnabled = { mixEnabled },
-                mediaActive = { false },
+    fun absentMediaAlsoFallsBackToFullFocusDuringAsyncPreparation() =
+        runTest {
+            val engine = RecordingEngine()
+            val focus = RecordingFocus()
+            val controller = controller(focus, mixEnabled = { true }, mediaActive = { false })
+            controller.attachEngine(engine)
+
+            assertTrue(
+                controller.speakAsync(
+                    entries = listOf(TtsSpeakableEntry("", "", "Prepared speech.")),
+                    locale = Locale.US,
+                    onPreparing = { true },
+                ),
             )
-        controller.attachEngine(engine)
-        assertTrue(controller.speak("Existing queue.", Locale.US))
-        val existingState = controller.state.value
 
-        mixEnabled = true
-        assertFalse(controller.speak("Refused replacement.", Locale.FRANCE))
-
-        assertEquals(existingState, controller.state.value)
-        assertEquals(listOf(TtsAudioFocusMode.Full), focus.modes)
-        assertEquals(listOf(Locale.US), engine.locales)
-        assertEquals(listOf("Existing queue."), engine.spoken.map { it.text })
-    }
+            assertEquals(listOf(TtsAudioFocusMode.Full, TtsAudioFocusMode.Full), focus.modes)
+            assertEquals(listOf("Prepared speech."), engine.spoken.map { it.text })
+            assertEquals(listOf(null), engine.spoken.map { it.volume })
+            assertTrue(controller.state.value is TtsState.Speaking)
+            assertEquals(TtsStartFailure.None, controller.lastStartFailure)
+        }
 
     /** A denied switch to Full focus restores the untouched mixed queue policy. */
     @Test

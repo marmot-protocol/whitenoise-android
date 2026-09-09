@@ -38,6 +38,18 @@ class TtsTransportBarScreenshotTest {
     val composeRule = createComposeRule()
 
     @Test
+    fun ttsTransportBarPreparingLight() {
+        render(TtsState.Preparing(TtsState.Idle(sessionId = 1)), darkTheme = false, amoled = false)
+        capture("tts_transport_bar_preparing_light")
+    }
+
+    @Test
+    fun ttsTransportBarPreparingTargetDark() {
+        render(TtsState.Preparing(speaking()), darkTheme = true, amoled = false)
+        capture("tts_transport_bar_preparing_target_dark")
+    }
+
+    @Test
     fun ttsTransportBarSpeakingLight() {
         render(speaking(), darkTheme = false, amoled = false)
         capture("tts_transport_bar_speaking_light")

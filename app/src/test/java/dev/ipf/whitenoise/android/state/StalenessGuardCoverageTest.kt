@@ -45,7 +45,7 @@ class StalenessGuardCoverageTest {
                 "AttachmentTransferCoordinator.kt" to listOf("terminalLifetimes", "refreshLifetimes"),
                 "ConversationInitialPresentationWarm.kt" to listOf("preparations"),
                 "ConversationCardPostSynchronizer.kt" to listOf("dismissals", "shows"),
-                "TtsController.kt" to listOf("engineQueueLifetime"),
+                "TtsPaceTracker.kt" to listOf("engineQueueLifetime"),
                 "MessageDraftRepository.kt" to listOf("lifetimes"),
             )
         migratedOwners.forEach { (fileName, owners) ->
@@ -392,6 +392,7 @@ class StalenessGuardCoverageTest {
             "ConversationInitialPresentationWarm.kt",
             "ConversationCardPostSynchronizer.kt",
             "TtsController.kt",
+            "TtsPaceTracker.kt",
             "MessageDraftRepository.kt",
             "MessageForwarding.kt",
         ).associateWith(::productionSource)

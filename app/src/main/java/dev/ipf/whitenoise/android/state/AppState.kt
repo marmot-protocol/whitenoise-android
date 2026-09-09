@@ -1435,13 +1435,13 @@ class WhiteNoiseAppState private constructor(
 
     fun ownsTtsAutoReadSession(groupIdHex: String): Boolean {
         val key = ttsAutoReadSessionKey ?: return false
-        return key == ttsAutoReadSessionKeyFor(activeAccountRef, groupIdHex)
+        return key == ttsAutoReadKey(activeAccountRef, groupIdHex)
     }
 
-    private fun ttsAutoReadSessionKeyFor(
-        accountRef: String?,
-        groupIdHex: String,
-    ): String? = accountRef?.let { "$it|${groupIdHex.lowercase()}" }
+    private fun ttsAutoReadKey(
+        account: String?,
+        group: String,
+    ): String? = account?.let { "$it|${group.lowercase()}" }
 
     /** Starts read-aloud for one or more speakable messages. */
     fun speakAloud(
@@ -1451,9 +1451,8 @@ class WhiteNoiseAppState private constructor(
     ): Boolean {
         val started = ttsController.speak(entries, locale, startSentenceIndex)
         if (started) {
-            // Only a speak that actually replaced the queue may end the
-            // previous auto-read session: a failed start (blank text, no
-            // engine) leaves the old queue playing and still owned.
+            // Only successful speech replaces prior auto-read ownership; a failed start
+            // (blank text or no engine) leaves the old queue playing and still owned.
             ttsSpeechAccountRef = activeAccountRef
             ttsAutoReadSessionKey = null
             ttsHistorySession.onSessionCleared()
@@ -1477,13 +1476,53 @@ class WhiteNoiseAppState private constructor(
         locale: java.util.Locale,
         startSentenceIndex: Int = 0,
     ): Boolean {
-        val owner = ttsAutoReadSessionKeyFor(activeAccountRef, groupIdHex) ?: return false
+        val owner = ttsAutoReadKey(activeAccountRef, groupIdHex) ?: return false
         val started = speakAloud(entries, locale, startSentenceIndex)
         if (started) {
             ttsAutoReadSessionKey = owner
             ttsHistorySession.onConversationSessionStarted(activeAccountRef, groupIdHex)
         }
         return started
+    }
+
+    suspend fun speakAloudPrepared(
+        entries: List<TtsSpeakableEntry>,
+        locale: Locale,
+        startSentenceIndex: Int = 0,
+        startRenderedHit: dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit? = null,
+    ): Boolean {
+        val ownerAccount = activeAccountRef
+        return ttsController
+            .speakAsync(entries, locale, startSentenceIndex, startRenderedHit) {
+                ttsSpeechAccountRef = ownerAccount
+                TtsPlaybackForegroundService.start(appContext)
+            }.also { started ->
+                if (started) {
+                    ttsSpeechAccountRef = ownerAccount
+                    ttsAutoReadSessionKey = null
+                    ttsHistorySession.onSessionCleared()
+                }
+            }
+    }
+
+    suspend fun speakAloudAutoRead(
+        groupIdHex: String,
+        entries: List<TtsSpeakableEntry>,
+        locale: java.util.Locale,
+        startSentenceIndex: Int = 0,
+        startRenderedHit: dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit? = null,
+        backgroundPreparation: Boolean,
+    ): Boolean {
+        if (!backgroundPreparation) return speakAloudAutoRead(groupIdHex, entries, locale, startSentenceIndex)
+        val ownerAccount = activeAccountRef
+        return ttsAutoReadKey(ownerAccount, groupIdHex)?.let { owner ->
+            speakAloudPrepared(entries, locale, startSentenceIndex, startRenderedHit).also { started ->
+                if (started) {
+                    ttsAutoReadSessionKey = owner
+                    ttsHistorySession.onConversationSessionStarted(ownerAccount, groupIdHex)
+                }
+            }
+        } ?: false
     }
 
     /**

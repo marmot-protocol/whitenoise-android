@@ -47,7 +47,7 @@ class TtsPassageHighlightMappingTest {
                 projectionId = projection.projectionId,
                 visibleWord = listOf(TtsVisibleTextSpan("b0/i1/b0/n1/n0", 0, 5)),
             )
-        val resolver = createTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
+        val resolver = createTtsLeafHighlightResolver(passage, "m1", projection, preparedHighlightSpeech(projection))
 
         // A marker is never spoken, so it never carries the cue for what is
         // being read, neither its own row's nor a sibling's.
@@ -92,7 +92,7 @@ class TtsPassageHighlightMappingTest {
             )
         val projection = markdownDocumentToSpeakableProjection(document)
         val passage = TtsPassage("m1", sentenceIndex = 1, projectionId = projection.projectionId)
-        val resolver = createTtsLeafHighlightResolver(passage, "m1", projection, Locale.US)
+        val resolver = createTtsLeafHighlightResolver(passage, "m1", projection, preparedHighlightSpeech(projection))
 
         assertNull(resolver("b0/m0", "•"))
         assertNull(resolver("b0/i0/b1/m0", "•"))
@@ -293,7 +293,7 @@ class TtsPassageHighlightMappingTest {
                 passage = passage,
                 messageIdHex = "m1",
                 projection = projection,
-                locale = Locale.US,
+                prepared = preparedHighlightSpeech(projection),
             )("plain", rendered)
 
         // The URL is rendered but never spoken, so the spoken sentence covers

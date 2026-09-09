@@ -130,6 +130,7 @@ internal fun MessageActionMenu(
     canSelect: Boolean,
     canCopyText: Boolean,
     canSpeak: Boolean,
+    canSpeakCodeLiterally: Boolean = false,
     canSelectText: Boolean,
     canShare: Boolean = false,
     canSave: Boolean,
@@ -145,6 +146,7 @@ internal fun MessageActionMenu(
     onSelectText: () -> Unit,
     onCopyText: () -> Unit,
     onSpeak: () -> Unit,
+    onSpeakCodeLiterally: () -> Unit = {},
     onShare: () -> Unit = {},
     onSave: () -> Unit,
     onInfo: () -> Unit,
@@ -163,6 +165,7 @@ internal fun MessageActionMenu(
             canSelectText,
             canCopyText,
             canSpeak,
+            canSpeakCodeLiterally,
             showForwardAction,
             canShare,
             canSave,
@@ -175,6 +178,7 @@ internal fun MessageActionMenu(
                 canSelectText = canSelectText,
                 canCopyText = canCopyText,
                 canSpeak = canSpeak,
+                canSpeakCodeLiterally = canSpeakCodeLiterally,
                 canForward = showForwardAction,
                 canShare = canShare,
                 canSave = canSave,
@@ -414,6 +418,7 @@ internal fun MessageActionMenu(
                                                     MessageActionKind.SelectText -> onSelectText()
                                                     MessageActionKind.CopyText -> onCopyText()
                                                     MessageActionKind.Speak -> onSpeak()
+                                                    MessageActionKind.SpeakCodeLiterally -> onSpeakCodeLiterally()
                                                     MessageActionKind.Forward -> onForward()
                                                     MessageActionKind.Share -> onShare()
                                                     MessageActionKind.Save -> onSave()
@@ -462,7 +467,7 @@ private fun MessageActionIcon(kind: MessageActionKind) {
             MessageActionKind.Select -> Icons.Default.CheckCircle
             MessageActionKind.SelectText -> Icons.Default.TextFields
             MessageActionKind.CopyText -> Icons.Default.ContentCopy
-            MessageActionKind.Speak -> Icons.AutoMirrored.Filled.VolumeUp
+            MessageActionKind.Speak, MessageActionKind.SpeakCodeLiterally -> Icons.AutoMirrored.Filled.VolumeUp
             MessageActionKind.Forward -> Icons.AutoMirrored.Filled.Forward
             MessageActionKind.Share -> Icons.Default.Share
             MessageActionKind.Save -> Icons.Default.Download

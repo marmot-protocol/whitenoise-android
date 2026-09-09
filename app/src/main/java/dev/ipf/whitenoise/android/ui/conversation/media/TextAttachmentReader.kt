@@ -86,7 +86,7 @@ private suspend fun WhiteNoiseAppState.speakTextAttachment(
                 attachmentIndex = attachmentIndex,
             )
         }
-    if (entry.text.isBlank() || !speakAloud(listOf(entry), Locale.getDefault())) {
+    if (entry.text.isBlank() || !speakAloudPrepared(listOf(entry), Locale.getDefault())) {
         present(if (entry.text.isBlank()) R.string.tts_bar_error else ttsStartFailureMessage())
     }
 }

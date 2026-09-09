@@ -49,7 +49,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
-import java.util.Locale
 import java.util.TimeZone
 
 @RunWith(RobolectricTestRunner::class)
@@ -194,7 +193,13 @@ class MessageBubbleEditedMarkdownTest {
                 projectionId = projection.projectionId,
                 visibleWord = listOf(TtsVisibleTextSpan("b0/n1/n0", 0, 5)),
             )
-        val resolver = buildTtsLeafHighlightResolver(passage, MESSAGE_ID, projection, Locale.US)
+        val resolver =
+            buildTtsLeafHighlightResolver(
+                passage,
+                MESSAGE_ID,
+                projection,
+                preparedHighlightSpeech(projection),
+            )
         assertNotNull("resolver must be built for the active passage", resolver)
         assertNotNull(
             "the rendered leaf must resolve to a highlight range",
@@ -427,7 +432,7 @@ private fun EditedMarkdownDisplayHarness(
             passage = effectivePassage,
             messageIdHex = record.messageIdHex,
             projection = projection,
-            locale = Locale.US,
+            prepared = preparedHighlightSpeech(projection),
         )
     Surface(
         color = MaterialTheme.colorScheme.background,

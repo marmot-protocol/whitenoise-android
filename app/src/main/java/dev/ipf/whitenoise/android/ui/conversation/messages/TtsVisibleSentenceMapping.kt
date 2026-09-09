@@ -49,61 +49,82 @@ internal fun speakableSentenceIndexAtVisibleOffset(
     return matches.singleOrNull() ?: 0
 }
 
-@Suppress("ReturnCount") // Guard returns reject partial or ambiguous selection-to-layout matches.
+internal fun renderedTextHitFromSelection(
+    layouts: Collection<SelectableTextLayout>,
+    selectedTexts: List<androidx.compose.ui.text.AnnotatedString>,
+    preferredVisibleOffset: Int? = null,
+): RenderedTextHit? {
+    val matches = selectionOffsetMatches(layouts, selectedTexts)
+    val match =
+        matches.singleOrNull()
+            ?: preferredVisibleOffset?.let { preferred ->
+                matches.singleOrNull { preferred in it.visibleOffset until it.selectionEndOffset }
+            }
+            ?: return null
+    return match.leafId?.let { leafId -> RenderedTextHit(leafId, match.renderedText, match.localOffset) }
+}
+
+@Suppress("ReturnCount")
 internal fun visibleOffsetFromSelection(
     layouts: Collection<SelectableTextLayout>,
     selectedTexts: List<androidx.compose.ui.text.AnnotatedString>,
     preferredVisibleOffset: Int? = null,
 ): Int? {
-    if (selectedTexts.isEmpty()) return null
-    val ordered =
-        layouts
-            .filter { it.coordinates.isAttached }
-            .sortedWith { first, second -> compareSelectableTextLayouts(first, second) }
-    val selectedSegments = selectedTexts.map { it.text }
-    if (ordered.isEmpty() || selectedSegments.any(String::isBlank)) return null
-
-    // SelectionState returns one clipped string per selected Compose Text leaf.
-    // Match that contiguous sequence back onto the rendered leaves instead of
-    // concatenating it: Markdown block separators are not part of those clipped
-    // strings, so concatenation loses every selection spanning two blocks.
-    val matches =
-        ordered.indices.flatMap { firstLayoutIndex ->
-            if (firstLayoutIndex + selectedSegments.lastIndex > ordered.lastIndex) return@flatMap emptyList()
-            val candidateLayouts = ordered.drop(firstLayoutIndex).take(selectedSegments.size)
-            if (
-                selectedSegments.indices.any { segmentIndex ->
-                    !candidateLayouts[segmentIndex]
-                        .layoutResult.layoutInput.text.text
-                        .contains(selectedSegments[segmentIndex])
-                }
-            ) {
-                return@flatMap emptyList()
-            }
-            substringOffsets(
-                text =
-                    candidateLayouts
-                        .first()
-                        .layoutResult.layoutInput.text.text,
-                substring = selectedSegments.first(),
-            ).map { localOffset ->
-                val precedingLength =
-                    ordered
-                        .take(firstLayoutIndex)
-                        .sumOf { visibleLayoutSentence(it.layoutResult.layoutInput.text.text).length } +
-                        firstLayoutIndex
-                val visibleOffset = precedingLength + localOffset
-                SelectionOffsetMatch(
-                    visibleOffset = visibleOffset,
-                    selectedVisibleLength = selectedSegments.sumOf(String::length) + selectedSegments.lastIndex,
-                )
-            }
-        }
+    val matches = selectionOffsetMatches(layouts, selectedTexts)
     matches.singleOrNull()?.let { return it.visibleOffset }
     val preferred = preferredVisibleOffset ?: return null
     return matches
         .singleOrNull { match -> preferred in match.visibleOffset until match.selectionEndOffset }
         ?.visibleOffset
+}
+
+@Suppress("ReturnCount")
+private fun selectionOffsetMatches(
+    layouts: Collection<SelectableTextLayout>,
+    selectedTexts: List<androidx.compose.ui.text.AnnotatedString>,
+): List<SelectionOffsetMatch> {
+    if (selectedTexts.isEmpty()) return emptyList()
+    val ordered =
+        layouts
+            .filter { it.coordinates.isAttached }
+            .sortedWith { first, second -> compareSelectableTextLayouts(first, second) }
+    val selectedSegments = selectedTexts.map { it.text }
+    if (ordered.isEmpty() || selectedSegments.any(String::isBlank)) return emptyList()
+
+    // SelectionState returns one clipped string per selected Compose Text leaf.
+    // Match that contiguous sequence back onto the rendered leaves instead of
+    // concatenating it: Markdown block separators are not part of those clipped
+    // strings, so concatenation loses every selection spanning two blocks.
+    return ordered.indices.flatMap { firstLayoutIndex ->
+        if (firstLayoutIndex + selectedSegments.lastIndex > ordered.lastIndex) return@flatMap emptyList()
+        val candidateLayouts = ordered.drop(firstLayoutIndex).take(selectedSegments.size)
+        val firstLayout = candidateLayouts.first()
+        val leafId = firstLayout.key as? String
+        val renderedText = firstLayout.layoutResult.layoutInput.text.text
+        if (
+            selectedSegments.indices.any { segmentIndex ->
+                !candidateLayouts[segmentIndex]
+                    .layoutResult.layoutInput.text.text
+                    .contains(selectedSegments[segmentIndex])
+            }
+        ) {
+            return@flatMap emptyList()
+        }
+        substringOffsets(renderedText, selectedSegments.first()).map { localOffset ->
+            val precedingLength =
+                ordered
+                    .take(firstLayoutIndex)
+                    .sumOf { visibleLayoutSentence(it.layoutResult.layoutInput.text.text).length } +
+                    firstLayoutIndex
+            SelectionOffsetMatch(
+                visibleOffset = precedingLength + localOffset,
+                selectedVisibleLength = selectedSegments.sumOf(String::length) + selectedSegments.lastIndex,
+                leafId = leafId,
+                renderedText = renderedText,
+                localOffset = localOffset,
+            )
+        }
+    }
 }
 
 internal fun concatenatedVisibleText(layouts: Collection<SelectableTextLayout>): String =
@@ -209,6 +230,9 @@ private fun visibleLayoutSentence(text: String): String {
 private data class SelectionOffsetMatch(
     val visibleOffset: Int,
     val selectedVisibleLength: Int,
+    val leafId: String?,
+    val renderedText: String,
+    val localOffset: Int,
 ) {
     val selectionEndOffset: Int
         get() = visibleOffset + selectedVisibleLength

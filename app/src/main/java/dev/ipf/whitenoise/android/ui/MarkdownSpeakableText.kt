@@ -9,6 +9,8 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
+import dev.ipf.whitenoise.android.audio.tts.speech.DiagramSpeech
+import dev.ipf.whitenoise.android.audio.tts.speech.SpeechRole
 import java.security.MessageDigest
 
 internal const val MARKDOWN_SPEAKABLE_MAX_LENGTH = 32_000
@@ -28,11 +30,15 @@ internal data class SpeakableTextProjection(
     val text: String,
     val spans: List<SpeakableTextProjectionSpan>,
     val projectionId: String = speakableProjectionId(text, spans),
+    val visibleLeaves: Map<String, String> = emptyMap(),
+    val speechRoles: Map<String, dev.ipf.whitenoise.android.audio.tts.speech.SpeechSourceRun> = emptyMap(),
 )
 
 private fun speakableProjectionId(
     text: String,
     spans: List<SpeakableTextProjectionSpan>,
+    leaves: Map<String, String> = emptyMap(),
+    roles: Map<String, dev.ipf.whitenoise.android.audio.tts.speech.SpeechSourceRun> = emptyMap(),
 ): String {
     val digest = MessageDigest.getInstance("SHA-256")
     digest.updateString("whitenoise-speakable-projection-v1")
@@ -44,6 +50,19 @@ private fun speakableProjectionId(
         digest.updateString(span.leafId)
         digest.updateInt(span.visibleStart)
         digest.updateInt(span.visibleEnd)
+    }
+    if (leaves.isNotEmpty() || roles.isNotEmpty()) {
+        digest.updateString("visible-source-and-roles-v1")
+        leaves.toSortedMap().forEach { (id, original) ->
+            digest.updateString(id)
+            digest.updateString(original)
+        }
+        roles.toSortedMap().forEach { (id, run) ->
+            digest.updateString(id)
+            digest.updateString(run.role.name)
+            digest.updateString(run.languageTag.orEmpty())
+            digest.updateString(run.text)
+        }
     }
     return buildString(SHA_256_HEX_LENGTH) {
         digest.digest().forEach { byte ->
@@ -114,6 +133,7 @@ internal fun markdownDocumentToSpeakableProjection(
 internal fun legacyTextToSpeakableProjection(text: String): SpeakableTextProjection {
     val collector = SpeakableCollector()
     val visible = markdownSafeDisplayText(text, MARKDOWN_SPEAKABLE_MAX_LENGTH)
+    collector.recordVisible(visible, "plain")
     MappedText
         .direct(visible, leafId = "plain")
         .lines()
@@ -138,14 +158,17 @@ private fun collectSpeakableBlock(
         is MarkdownBlockFfi.Heading ->
             collectSpeakableInlineSegment(block.inlines, collector, mentionDisplayName, isGroupMember, path)
         MarkdownBlockFfi.ThematicBreak -> Unit
-        is MarkdownBlockFfi.CodeBlock -> collector.addLeafSegment(block.content, "$path/code")
+        is MarkdownBlockFfi.CodeBlock -> collector.addCodeSegment(block.content, "$path/code", block.info)
         is MarkdownBlockFfi.BlockQuote ->
             collectSpeakableBlocks(block.blocks, collector, mentionDisplayName, isGroupMember, depth + 1, "$path/q")
         is MarkdownBlockFfi.ListBlock ->
             collectSpeakableList(block, collector, mentionDisplayName, isGroupMember, depth + 1, path)
         is MarkdownBlockFfi.Table ->
             collectSpeakableTable(block, collector, mentionDisplayName, isGroupMember, path)
-        is MarkdownBlockFfi.MathBlock -> collector.addLeafSegment(block.content, "$path/math")
+        is MarkdownBlockFfi.MathBlock -> {
+            collector.recordCode(block.content, "$path/math", SpeechRole.Math)
+            collector.addLeafSegment(block.content, "$path/math")
+        }
     }
 }
 
@@ -277,10 +300,12 @@ private fun MappedTextBuilder.appendSpeakableInlines(
         val inlinePath = "$path/n$inlineIndex"
         when (inline) {
             is MarkdownInlineFfi.Text ->
-                append(MappedText.visibleLeaf(inline.content, inlinePath, maxChars - length))
+                append(collector.visibleLeaf(inline.content, inlinePath, maxChars - length))
             MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> appendSynthetic("\n")
-            is MarkdownInlineFfi.Code ->
-                append(MappedText.visibleLeaf(inline.content, inlinePath, maxChars - length))
+            is MarkdownInlineFfi.Code -> {
+                collector.recordCode(inline.content, inlinePath, SpeechRole.InlineCode)
+                append(collector.visibleLeaf(inline.content, inlinePath, maxChars - length))
+            }
             is MarkdownInlineFfi.Emph ->
                 appendSpeakableInlines(
                     inline.children,
@@ -337,10 +362,10 @@ private fun MappedTextBuilder.appendSpeakableInlines(
                 )
             is MarkdownInlineFfi.Autolink ->
                 if (inline.kind == MarkdownAutolinkKindFfi.EMAIL) {
-                    append(MappedText.visibleLeaf(inline.url, inlinePath, maxChars - length))
+                    append(collector.visibleLeaf(inline.url, inlinePath, maxChars - length))
                 }
             is MarkdownInlineFfi.Math ->
-                append(MappedText.visibleLeaf(inline.content, inlinePath, maxChars - length))
+                append(collector.visibleLeaf(inline.content, inlinePath, maxChars - length))
             is MarkdownInlineFfi.NostrMention ->
                 appendSpeakableNostrEntity(
                     entity = inline.entity,
@@ -420,6 +445,53 @@ private fun MappedTextBuilder.appendSpeakableNostrEntity(
 private class SpeakableCollector {
     private val output = MappedTextBuilder()
     private var visitedNodes = 0
+    private val visibleLeaves = linkedMapOf<String, String>()
+
+    fun recordVisible(
+        text: String,
+        leafId: String,
+    ) {
+        visibleLeaves[leafId] = text
+    }
+
+    fun visibleLeaf(
+        text: String,
+        leafId: String,
+        maxChars: Int,
+    ): MappedText {
+        val visible = markdownSafeDisplayText(text, maxChars)
+        recordVisible(visible, leafId)
+        return MappedText.visibleLeaf(text, leafId, maxChars)
+    }
+
+    private val speechRoles = linkedMapOf<String, dev.ipf.whitenoise.android.audio.tts.speech.SpeechSourceRun>()
+
+    fun recordCode(
+        content: String,
+        leafId: String,
+        role: dev.ipf.whitenoise.android.audio.tts.speech.SpeechRole,
+    ) {
+        speechRoles[leafId] =
+            dev.ipf.whitenoise.android.audio.tts.speech
+                .SpeechSourceRun(leafId, content.take(MARKDOWN_SPEAKABLE_MAX_LENGTH), role)
+    }
+
+    fun addCodeSegment(
+        content: String,
+        leafId: String,
+        languageTag: String?,
+    ) {
+        val language = languageTag?.trim()?.substringBefore(' ')?.takeIf { it.isNotBlank() }
+        val diagram = language == null && DiagramSpeech.recognizes(content)
+        speechRoles[leafId] =
+            dev.ipf.whitenoise.android.audio.tts.speech.SpeechSourceRun(
+                leafId,
+                content.take(MARKDOWN_SPEAKABLE_MAX_LENGTH),
+                if (diagram) SpeechRole.Diagram else SpeechRole.CodeBlock,
+                languageTag = language,
+            )
+        addLeafSegment(content, leafId)
+    }
 
     val exhausted: Boolean
         get() = output.length >= MARKDOWN_SPEAKABLE_MAX_LENGTH || visitedNodes >= MARKDOWN_SPEAKABLE_MAX_NODES
@@ -437,7 +509,7 @@ private class SpeakableCollector {
         content: String,
         leafId: String,
     ) {
-        addSegment(MappedText.visibleLeaf(content, leafId, remainingChars))
+        addSegment(visibleLeaf(content, leafId, remainingChars))
     }
 
     fun addSegment(segment: MappedText) {
@@ -447,7 +519,18 @@ private class SpeakableCollector {
         output.append(normalized.safePrefix(remainingChars))
     }
 
-    fun build(): SpeakableTextProjection = output.build().trimWhitespace(endOnly = true).toProjection()
+    fun build(): SpeakableTextProjection =
+        output
+            .build()
+            .trimWhitespace(endOnly = true)
+            .toProjection()
+            .let { projection ->
+                projection.copy(
+                    projectionId = speakableProjectionId(projection.text, projection.spans, visibleLeaves, speechRoles),
+                    speechRoles = speechRoles.toMap(),
+                    visibleLeaves = visibleLeaves.toMap(),
+                )
+            }
 }
 
 private data class VisibleSource(

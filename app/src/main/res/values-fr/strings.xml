@@ -1451,7 +1451,7 @@
     <string name="tts_settings_engine_title">Moteur</string>
     <string name="tts_settings_rate_title">Débit de parole</string>
     <string name="tts_media_mix_title">Parler par-dessus un contenu audio en cours de lecture</string>
-    <string name="tts_media_mix_subtitle">Démarre uniquement pendant la lecture d’un autre contenu audio ; White Noise ne contrôle pas cet autre contenu audio</string>
+    <string name="tts_media_mix_subtitle">Se superpose aux autres contenus audio pendant leur lecture ; sinon, la lecture à voix haute continue normalement</string>
     <string name="tts_media_mix_volume_title">Volume de la voix sur le média</string>
     <string name="tts_media_mix_volume_quiet">Faible</string>
     <string name="tts_media_mix_volume_medium">Moyen</string>
@@ -1459,7 +1459,6 @@
     <string name="tts_media_mix_volume_quiet_description">35 pour cent du volume du moteur de synthèse vocale</string>
     <string name="tts_media_mix_volume_medium_description">60 pour cent du volume du moteur de synthèse vocale</string>
     <string name="tts_media_mix_volume_loud_description">85 pour cent du volume du moteur de synthèse vocale</string>
-    <string name="tts_media_mix_no_active_media">Lancez de la musique ou un podcast avant d’utiliser la lecture à voix haute avec un contenu audio en cours de lecture</string>
     <string name="tts_voice_title">Voix</string>
     <string name="tts_voice_automatic">Voix hors ligne automatique</string>
     <string name="tts_voice_automatic_description">Utiliser la meilleure voix hors ligne installée pour la langue du message</string>
@@ -1471,6 +1470,10 @@
     <string name="tts_voice_unavailable">Aucune voix hors ligne disponible</string>
     <string name="tts_voice_effective_fallback">La voix enregistrée est indisponible ; utilisation de %1$s</string>
     <string name="speak_aloud">Lire à voix haute</string>
+    <string name="read_code_literally">Lire le code littéralement</string>
+    <string name="tts_read_from_sentence">Lire à partir de cette phrase</string>
+    <string name="tts_choose_sentence">Choisir la phrase à lire</string>
+    <string name="tts_bar_preparing">Préparation de la lecture…</string>
     <string name="tts_bar_pause">Suspendre la lecture</string>
     <string name="tts_bar_play">Reprendre la lecture</string>
     <string name="tts_bar_skip_previous">Phrase précédente</string>

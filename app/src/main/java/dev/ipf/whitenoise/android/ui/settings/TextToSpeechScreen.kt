@@ -391,7 +391,7 @@ internal fun ttsVoicePickerRow(
     )
 }
 
-/** Accessible opt-in switch for the constrained active-media mode. */
+/** Accessible opt-in switch for mixing when media is active, with ordinary playback otherwise. */
 @Composable
 internal fun ttsMediaMixToggleRow(
     checked: Boolean,
