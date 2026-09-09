@@ -14,6 +14,7 @@ import dev.ipf.marmotkit.ChatNotificationSettingsFfi
 import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.DiagnosticsExporterStatusFfi
+import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
@@ -264,6 +265,14 @@ internal class NotificationBootstrapTestFixture(
                         muted = false,
                         mutedUntilMs = null,
                         updatedAtMs = 0L,
+                    )
+                "groupRecoveryStatus" ->
+                    GroupRecoveryStatusFfi(
+                        groupIdHex = arguments?.get(1) as String,
+                        automaticRecoveryFailed = false,
+                        pendingReinvites = 0u,
+                        failedReinvites = 0u,
+                        rejoinInvitations = emptyList(),
                     )
                 "notificationSettings" -> {
                     val accountRef = arguments?.get(0) as String

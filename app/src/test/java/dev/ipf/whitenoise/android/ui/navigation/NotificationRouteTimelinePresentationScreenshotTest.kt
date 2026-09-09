@@ -29,6 +29,7 @@ import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
+import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
@@ -846,6 +847,14 @@ abstract class NotificationRouteTimelinePresentationFixture {
                     if (routeGate.rosterFails.get()) error("target roster unavailable")
                     targetRoster(includeThirdMember = routeGate.includeThirdMember.get())
                 }
+                "groupRecoveryStatus" ->
+                    GroupRecoveryStatusFfi(
+                        groupIdHex = arguments?.get(1) as String,
+                        automaticRecoveryFailed = false,
+                        pendingReinvites = 0u,
+                        failedReinvites = 0u,
+                        rejoinInvitations = emptyList(),
+                    )
                 "chatListRow" -> {
                     val accountRef = arguments?.firstOrNull() as? String
                     val groupIdHex = arguments?.getOrNull(1) as? String

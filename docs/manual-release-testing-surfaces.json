@@ -1254,6 +1254,14 @@
         ]
       },
       {
+        "surface": "GroupRejoinInvitationDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "fun GroupRejoinInvitationDialog(",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
         "surface": "ConversationStreamingDebugRefreshEffect",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationStreamingDebugRefreshEffect.kt",
         "anchor": "fun ConversationStreamingDebugRefreshEffect(",
@@ -6863,6 +6871,102 @@
         "surface": "setting:group_rejoin_success",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.group_rejoin_success",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:group_recovery_automatic_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "R.string.group_recovery_automatic_failed",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:group_recovery_check_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "R.string.group_recovery_check_failed",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:group_recovery_failed_reinvites",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "R.string.group_recovery_failed_reinvites",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:group_recovery_pending_reinvites",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "R.string.group_recovery_pending_reinvites",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:group_recovery_review_invitation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "R.string.group_recovery_review_invitation",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:group_rejoin_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "R.string.group_rejoin_confirm",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:group_rejoin_decline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "R.string.group_rejoin_decline",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:group_rejoin_invited_by",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "R.string.group_rejoin_invited_by",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:group_rejoin_replaces_state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "R.string.group_rejoin_replaces_state",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:group_rejoin_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "R.string.group_rejoin_title",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:group_rejoin_trust_warning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "R.string.group_rejoin_trust_warning",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "R.string.retry",
         "test_ids": [
           "GRP-021"
         ]

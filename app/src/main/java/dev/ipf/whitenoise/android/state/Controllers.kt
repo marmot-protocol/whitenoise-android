@@ -6230,6 +6230,11 @@ class ConversationController(
             groupRoster(account, groupIdHex)
         }
     },
+    private val groupRecoveryStatusReader: suspend (String, String) -> GroupRecoveryStatusFfi = { account, groupIdHex ->
+        appState.marmotIo {
+            groupRecoveryStatus(account, groupIdHex)
+        }
+    },
     private val textPublisher: suspend (String?, String, String, String) -> SendSummaryFfi =
         { replyTarget, account, groupIdHex, text ->
             if (replyTarget != null) {
@@ -7423,9 +7428,7 @@ class ConversationController(
         val recoveryEpoch = groupRecoveryLifetime.capture()
         val status =
             try {
-                appState.marmotIo {
-                    groupRecoveryStatus(accountRef, groupIdHex)
-                }
+                groupRecoveryStatusReader(accountRef, groupIdHex)
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (_: Throwable) {

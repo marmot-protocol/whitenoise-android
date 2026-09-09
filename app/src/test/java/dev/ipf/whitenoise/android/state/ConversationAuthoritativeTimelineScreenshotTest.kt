@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollTo
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_TIMELINE_TAIL_GAP
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
@@ -79,6 +80,15 @@ class ConversationAuthoritativeTimelineScreenshotTest {
                 initialMemberSnapshot = conversationTimelineMemberSnapshot(),
                 initialChatListRow = entryProjection,
                 groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
+                groupRecoveryStatusReader = { _, groupIdHex ->
+                    GroupRecoveryStatusFfi(
+                        groupIdHex = groupIdHex,
+                        automaticRecoveryFailed = false,
+                        pendingReinvites = 0u,
+                        failedReinvites = 0u,
+                        rejoinInvitations = emptyList(),
+                    )
+                },
                 startOnConstruction = true,
             )
         val chat =
