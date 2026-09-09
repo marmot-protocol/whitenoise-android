@@ -27,6 +27,7 @@ import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -440,7 +441,9 @@ class NotificationHapticVisualTimingDeviceTest {
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
-            when (method.name) {
+            // Kotlin value-class parameters mangle JVM names such as
+            // recordHostTiming-z13BHRw; route the proxy by its source name.
+            when (method.name.substringBefore('-')) {
                 "chatNotificationSettings" ->
                     ChatNotificationSettingsFfi(
                         accountRef = update.accountRef,
@@ -456,6 +459,7 @@ class NotificationHapticVisualTimingDeviceTest {
                 "userProfile" -> null
                 "npub" -> MENTION_NPUB
                 "chatList", "groupMemberIdsPage", "groupMembers" -> emptyList<Any>()
+                "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "toString" -> "NotificationDeviceMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.firstOrNull()
