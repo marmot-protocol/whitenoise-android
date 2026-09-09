@@ -2277,39 +2277,23 @@ internal class AndroidConversationDictationPlatform(
     @Suppress("DEPRECATION")
     override fun microphoneAccess(): ConversationDictationMicrophoneAccess {
         if (!hasRecordAudioPermission()) return ConversationDictationMicrophoneAccess.RuntimePermissionRequired
-        // Android folds the global microphone toggle into its effective permission result. Compare
-        // that effective result with the app's raw policy so only a privacy-overlay denial is
-        // allowed through to Android's native microphone-unblock prompt. An explicit raw app-op
-        // denial remains actionable in White Noise and must not start recognition.
-        val appOps = context.getSystemService(AppOpsManager::class.java)
-        val rawMode =
-            appOps.unsafeCheckOpRawNoThrow(
+        // Android folds the global microphone toggle into its effective permission result. Do not
+        // treat MODE_IGNORED as an app denial: starting recognition is what lets Android present
+        // its native microphone-unblock prompt while White Noise stays on the current surface.
+        // MODE_ERRORED is distinguishable: Android documents it as a hard denial that should fail.
+        val mode =
+            context.getSystemService(AppOpsManager::class.java).unsafeCheckOpNoThrow(
                 AppOpsManager.OPSTR_RECORD_AUDIO,
                 Process.myUid(),
                 context.packageName,
             )
-        val effectiveMode =
-            appOps.unsafeCheckOpNoThrow(
-                AppOpsManager.OPSTR_RECORD_AUDIO,
-                Process.myUid(),
-                context.packageName,
-            )
-        val rawDenied = rawMode == AppOpsManager.MODE_IGNORED || rawMode == AppOpsManager.MODE_ERRORED
-        val privacyOverlayDenied =
-            effectiveMode == AppOpsManager.MODE_IGNORED &&
-                (rawMode == AppOpsManager.MODE_ALLOWED || rawMode == AppOpsManager.MODE_FOREGROUND)
-        val effectiveDenied =
-            effectiveMode == AppOpsManager.MODE_ERRORED ||
-                (effectiveMode == AppOpsManager.MODE_IGNORED && !privacyOverlayDenied)
         val access =
-            if (rawDenied || effectiveDenied) {
+            if (mode == AppOpsManager.MODE_ERRORED) {
                 ConversationDictationMicrophoneAccess.AppOpDenied
             } else {
                 ConversationDictationMicrophoneAccess.Granted
             }
-        conversationDictationDiagnostic(
-            "event=app_record_audio_access raw_mode=$rawMode effective_mode=$effectiveMode access=${access.name}",
-        )
+        conversationDictationDiagnostic("event=app_record_audio_access mode=$mode access=${access.name}")
         return access
     }
 

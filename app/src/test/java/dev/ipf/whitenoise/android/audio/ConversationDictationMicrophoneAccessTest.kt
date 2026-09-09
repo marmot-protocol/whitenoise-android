@@ -37,10 +37,6 @@ class ConversationDictationMicrophoneAccessTest {
         // Android 16's effective check includes global sensor privacy, but creating the recognizer
         // is what gives Android the opportunity to present its native microphone-unblock prompt.
         assertEquals(
-            AppOpsManager.MODE_FOREGROUND,
-            appOps.unsafeCheckOpRawNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
-        )
-        assertEquals(
             AppOpsManager.MODE_IGNORED,
             appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
         )
@@ -56,14 +52,21 @@ class ConversationDictationMicrophoneAccessTest {
     }
 
     @Test
-    fun rawIgnoredAppOpRemainsActionable() {
+    fun globalMicrophonePrivacyMayReportRawAndEffectiveIgnoredForAGrantedPermission() {
         setMode(AppOpsManager.MODE_IGNORED)
+        context.getSystemService(AudioManager::class.java).isMicrophoneMute = true
 
+        // The GrapheneOS Android 17 fixture reports MODE_IGNORED from both queries while global
+        // microphone privacy is active, so raw mode cannot distinguish that overlay from app policy.
         assertEquals(
             AppOpsManager.MODE_IGNORED,
             appOps.unsafeCheckOpRawNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
         )
-        assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
+        assertEquals(
+            AppOpsManager.MODE_IGNORED,
+            appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
+        )
+        assertEquals(ConversationDictationMicrophoneAccess.Granted, platform.microphoneAccess())
     }
 
     @Test
