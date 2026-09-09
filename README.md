@@ -198,8 +198,10 @@ retains the direct-distribution production key as the app-signing key:
 - `WHITENOISE_PLAY_UPLOAD_KEY_PASSWORD` (local Gradle builds fall back to the production password)
 
 The production build workflow requires both Play password secrets explicitly.
-Run `:app:bundleProductionPlayRelease` in its own Gradle invocation, separately
-from APK tasks, so its upload-key signing and packaging settings stay isolated.
+Run `:app:bundleProductionPlayRelease -Pwhitenoise.playBundle=true` separately
+from APK tasks. Explicit bundle mode disables the production Zapstore variant,
+selects the upload key, and disables APK splits. Resolved release APK packaging tasks
+are rejected in bundle mode; abbreviated bundle tasks and `clean` are supported.
 
 Staging release builds use staging-only signing values:
 

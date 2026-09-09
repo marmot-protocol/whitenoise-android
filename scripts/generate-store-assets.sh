@@ -12,13 +12,13 @@ fi
 
 mkdir -p "$image_dir"
 
-# Google Play requires a 512 px 32-bit PNG icon. Use the complete launcher
-# artwork rather than one adaptive-icon layer so Zapstore and Play match the
-# installed app.
+# Google Play requires a 512 px 32-bit PNG icon. Composite both adaptive layers,
+# then crop the 108dp canvas to its central 72dp viewport (288 of 432 px), removing
+# launcher bleed before scaling. Store surfaces apply their own outer mask.
 magick \
   "$repo_dir/app/src/main/res/mipmap-xxxhdpi/ic_launcher_background.png" \
   "$repo_dir/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png" \
-  -composite -filter Lanczos -resize 512x512 \
+  -composite -gravity center -crop 288x288+0+0 +repage -filter Lanczos -resize 512x512 \
   PNG32:"$image_dir/icon.png"
 
 # Play requires a 1024x500 opaque feature graphic.

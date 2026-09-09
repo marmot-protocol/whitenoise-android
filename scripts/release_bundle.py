@@ -39,15 +39,18 @@ def api(path):
     return json.loads(command("gh", "api", f"repos/{REPOSITORY}/{path}"))
 
 
-def properties():
+def properties(path=None):
+    """Read the shared release policy; reject ambiguous or incomplete entries."""
     result = {}
-    for line in (ROOT / "config/android-release.properties").read_text().splitlines():
+    for line in (path or ROOT / "config/android-release.properties").read_text().splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
         key, separator, value = stripped.partition("=")
-        require(separator and key.strip() and value.strip(), "Invalid release property")
-        result[key.strip()] = value.strip()
+        key, value = key.strip(), value.strip()
+        require(separator and re.fullmatch(r"[A-Z][A-Z0-9_]*", key) and value, "Invalid release property")
+        require(key not in result, f"Duplicate release property: {key}")
+        result[key] = value
     return result
 
 
@@ -224,6 +227,8 @@ def github_draft(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
+    property_command = sub.add_parser("property", help="Read one release policy value for shell tooling")
+    property_command.add_argument("name")
     check = sub.add_parser("check-tag")
     check.add_argument("--source", required=True)
     check.add_argument("--version", required=True)
@@ -235,7 +240,11 @@ def main():
     draft = sub.add_parser("github-draft")
     draft.add_argument("--directory", type=Path, default=ROOT / "build/production-release")
     args = parser.parse_args()
-    if args.command == "check-tag":
+    if args.command == "property":
+        policy = properties()
+        require(args.name in policy, f"Unknown release property: {args.name}")
+        print(policy[args.name])
+    elif args.command == "check-tag":
         check_tag(args.source, args.version)
     elif args.command == "fetch":
         fetch(args)

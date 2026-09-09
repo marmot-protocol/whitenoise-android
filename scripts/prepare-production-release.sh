@@ -52,14 +52,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
-release_config="$repo_dir/config/android-release.properties"
 gradle_file="$repo_dir/app/build.gradle.kts"
 output_dir="$repo_dir/build/production-release"
 
-release_property() {
-  local property_name="$1"
-  awk -F= -v requested="$property_name" '$1 == requested { print substr($0, index($0, "=") + 1); exit }' "$release_config"
-}
+# shellcheck source=scripts/release-properties.sh
+source "$repo_dir/scripts/release-properties.sh"
 
 android_build_tool() {
   local tool_name="$1"
@@ -169,7 +166,7 @@ bundletool="$repo_dir/build/tools/bundletool.jar"
 "$repo_dir/scripts/release.sh" --flavor production --abi arm64-v8a
 (
   cd "$repo_dir"
-  ./gradlew :app:bundleProductionPlayRelease -Pandroid.injected.testOnly=false
+  ./gradlew :app:bundleProductionPlayRelease -Pwhitenoise.playBundle=true -Pandroid.injected.testOnly=false
 )
 
 apk_source_dir="$repo_dir/app/build/outputs/apk/productionZapstore/release"

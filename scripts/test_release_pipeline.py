@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 import struct
 import subprocess
+import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -22,6 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 def load(name, path):
     spec = importlib.util.spec_from_file_location(name, ROOT / path)
     module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -185,6 +187,18 @@ class ProvenanceTests(unittest.TestCase):
                 policy.write_text('APP_SIGNING_SHA256=\n')
                 with self.assertRaisesRegex(ValueError, 'Invalid release property'):
                     bundle.properties()
+                policy.write_text('ZSP_VERSION=0.4.17\n ZSP_VERSION = 0.4.18\n')
+                with self.assertRaisesRegex(ValueError, 'Duplicate release property'):
+                    bundle.properties()
+
+    def test_shell_and_metadata_use_the_shared_policy_parser(self):
+        expected = bundle.properties()
+        self.assertEqual(metadata.release_properties(), expected)
+        for name in ('ZSP_VERSION', 'PLAY_UPLOAD_SHA256', 'BUNDLETOOL_SHA256'):
+            result = subprocess.check_output(
+                ['bash', '-c', 'repo_dir="$1"; source "$repo_dir/scripts/release-properties.sh"; release_property "$2"',
+                 'fixture', str(ROOT), name], text=True)
+            self.assertEqual(result.strip(), expected[name])
 
     def setUp(self):
         self.run = dict(id=int(RUN_ID), repository={'full_name': bundle.REPOSITORY},
@@ -260,7 +274,7 @@ class ZapstoreIntegrationTests(unittest.TestCase):
                 (root / 'scripts').mkdir()
                 (root / 'config').mkdir()
                 (root / 'app').mkdir()
-                for name in ('publish-zapstore.sh', 'release_bundle.py'):
+                for name in ('publish-zapstore.sh', 'release_bundle.py', 'release-properties.sh'):
                     (root / 'scripts' / name).write_bytes((ROOT / 'scripts' / name).read_bytes())
                 (root / 'config/android-release.properties').write_bytes((ROOT / 'config/android-release.properties').read_bytes())
                 policy = bundle.properties()
@@ -313,12 +327,14 @@ class ZapstoreIntegrationTests(unittest.TestCase):
                                         env=env, capture_output=True, text=True)
                 calls = (root / 'calls').read_text().splitlines()
                 self.assertIn('--offline', calls[0])
+                self.assertIn('--no-compress', calls[0])
                 if signer_matches:
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(len(calls), 2)
                     self.assertNotIn('--offline', calls[1])
+                    self.assertIn('--no-compress', calls[1])
                     self.assertIn('--skip-metadata', calls[1])
-                    self.assertIn('--skip-linking', calls[1])
+                    self.assertIn('--skip-certificate-linking', calls[1])
                 else:
                     self.assertNotEqual(result.returncode, 0)
                     self.assertEqual(len(calls), 1)

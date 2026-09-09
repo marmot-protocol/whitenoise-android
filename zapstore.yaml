@@ -6,7 +6,7 @@ name: "White Noise: Secure Chat"
 summary: "Private, end-to-end encrypted messaging built on Nostr and MLS"
 description: |
   Chat with friends and with agents running on your own machines. The keys
-  stay on your device. Connectors for OpenClaw, Hermes and Codex, Pi, OpenCode.
+  stay on your device.
 
   White Noise is a messenger with no phone number, no email, and no account on
   anyone's server. Your identity is a cryptographic key that belongs to you,
@@ -33,7 +33,7 @@ description: |
   Your agents, encrypted too. Agents running on your own machines can hold
   their own keys and chat with you like any other contact. End-to-end encrypted,
   with no bot platform in the middle and no phone number to provision. Connectors
-  for OpenClaw, Hermes and opencode ship with the Marmot Development Kit.
+  for OpenClaw, Hermes, Codex, Pi, and OpenCode ship with the Marmot Development Kit.
 
   Open source, open protocol. Every line of the apps and the protocol is public.
   Inspect the code, verify our claims, build your own client on Marmot. Trust

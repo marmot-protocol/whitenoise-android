@@ -8,6 +8,7 @@ import struct
 import sys
 import zlib
 from pathlib import Path
+from release_bundle import properties as read_release_properties
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -35,16 +36,7 @@ def fail(message: str) -> None:
 
 
 def release_properties() -> dict[str, str]:
-    result: dict[str, str] = {}
-    for line in PROPERTIES.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        key, separator, value = stripped.partition("=")
-        if not separator or not key or not value:
-            fail(f"invalid release property: {line!r}")
-        result[key] = value
-    return result
+    return read_release_properties(PROPERTIES)
 
 
 def unique_match(pattern: str, content: str, label: str) -> str:
@@ -148,14 +140,15 @@ def require_png(
 
 def require_opaque_rgba(image: Path, width: int, height: int, raw: bytes) -> None:
     """Accept opaque RGBA exports without modifying the designer's PNG bytes."""
+    # Keep payload/opacity validation in CI: header-only checks accept damaged
+    # exports, and requiring RGB would force a rewrite of curated RGBA images.
     stride = width * 4
     previous = bytearray(stride)
     for y in range(height):
         start = y * (stride + 1)
         kind = raw[start]
         row = bytearray(raw[start + 1:start + 1 + stride])
-        if kind not in range(5):
-            fail(f"invalid PNG filter: {image.name}")
+        # read_png already validates each filter byte before unfiltering.
         for x in range(stride):
             left = row[x - 4] if x >= 4 else 0
             up = previous[x]

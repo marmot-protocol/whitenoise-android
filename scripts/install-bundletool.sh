@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
-version="$(awk -F= '$1 == "BUNDLETOOL_VERSION" {print $2}' "$repo_dir/config/android-release.properties")"
-expected_sha="$(awk -F= '$1 == "BUNDLETOOL_SHA256" {print $2}' "$repo_dir/config/android-release.properties")"
+# shellcheck source=scripts/release-properties.sh
+source "$repo_dir/scripts/release-properties.sh"
+version="$(release_property BUNDLETOOL_VERSION)"
+expected_sha="$(release_property BUNDLETOOL_SHA256)"
 target="${1:-$repo_dir/build/tools/bundletool.jar}"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && "$expected_sha" =~ ^[0-9a-f]{64}$ ]]
 if [[ -f "$target" && "$(shasum -a 256 "$target" | awk '{print $1}')" == "$expected_sha" ]]; then

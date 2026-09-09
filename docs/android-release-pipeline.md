@@ -67,7 +67,8 @@ Zapstore. No image conversion is performed by a release build.
 The candidate's `store-assets-<version>.zip` includes `zapstore.yaml` and the
 entire English metadata directory. Publication uses those archived files,
 verified against the source commit, rather than whatever is on master later.
-ZSP runs with `--skip-metadata` so external metadata cannot replace reviewed copy.
+ZSP runs with `--skip-metadata --no-compress` so external metadata cannot replace
+reviewed copy and image compression cannot rewrite the reviewed assets.
 
 ## Production configuration
 
@@ -102,17 +103,24 @@ signer transport and need not equal the publishing key. A signed preflight
 checks the returned event author against `ZAPSTORE_PUBLISHER_PUBKEY` before the
 online publication command. Direct nsec signing is not supported by this CI path.
 
-Before the first public release, qualify the pinned real ZSP binary separately
-from the publication workflow. Capture its `--version` output and use a
-throwaway listing and authorized test signer to verify that `publish --offline`
-emits JSON event lines and restores the bunker client identity from
-`$XDG_CONFIG_HOME/zsp/bunker-keys/<transport-pubkey>.key`. Offline mode can contact
-the signer; do not run the online publication command during this rehearsal.
-The automated regression suite uses a fake ZSP and does not establish this
-real-binary contract. Record the result in #2128 before public publication.
+`bash scripts/test-zsp-offline.sh` qualifies the checksummed real ZSP binary
+with a synthetic APK, disposable signing keys, and a loopback-only NIP-46 signer.
+It checks the version, JSONL output, event signatures/authors and kinds
+32267/30063/3063, and restoration of the preseeded client identity. No production
+credentials are read, and no online publication command is run. It requires Go,
+JDK 17+, Android SDK platform 36 and build-tools 36.0.0. CI runs it in a separate
+job and retains `zsp-offline-contract` as evidence; local receipts default to
+`build/reports/zsp-offline.json`. Record qualification results in #2128.
+
+ZSP uses the platform config directory: on the Linux publication runner the key
+is `$XDG_CONFIG_HOME/zsp/bunker-keys/<transport-pubkey>.key`; on macOS it is under
+`~/Library/Application Support/zsp/bunker-keys/`. The rehearsal creates and removes
+only its own randomly named test-key file. Offline mode can contact its signer.
+The real production signer connection still needs holder qualification before
+public use; the synthetic rehearsal does not establish access to that signer.
 
 First-release Android signing-certificate linking, where needed by Zapstore,
-is a separate publisher-operated prerequisite. CI uses `--skip-linking` and does
+is a separate publisher-operated prerequisite. CI uses `--skip-certificate-linking` and does
 not load the app-signing keystore into the publication job.
 
 ## Build and review
@@ -135,6 +143,12 @@ run/attempt, runtime completeness, and file hashes. This is a verified inventory
 not a cryptographic reproducible-build attestation or proof of device behavior.
 
 Local `just production-release <version>` always builds fresh outputs.
+It invokes the Play AAB build with `-Pwhitenoise.playBundle=true`. This explicit
+mode selects the upload key and disables APK splits; resolved release APK tasks
+are rejected, and the production Zapstore variant is disabled. Bundle requests
+without the flag fail with a configuration hint, including abbreviated tasks.
+`clean` may accompany a bundle request. `python3 scripts/test-release-gradle.py`
+checks key selection and these task boundaries without building or signing.
 `--allow-dirty` and `--allow-incomplete-runtime` mark local rehearsal bundles as
 non-publishable. There is no `--skip-build` option. Distribution accepts only a
 successful manual master build from the production workflow in this repository,

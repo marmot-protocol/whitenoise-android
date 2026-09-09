@@ -3,13 +3,10 @@
 set -euo pipefail
 
 repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
-release_config="$repo_dir/config/android-release.properties"
 install_target="${1:-${GOBIN:-$HOME/go/bin}/zsp}"
 
-release_property() {
-  local property_name="$1"
-  awk -F= -v requested="$property_name" '$1 == requested { print substr($0, index($0, "=") + 1); exit }' "$release_config"
-}
+# shellcheck source=scripts/release-properties.sh
+source "$repo_dir/scripts/release-properties.sh"
 
 version="$(release_property ZSP_VERSION)"
 os_name="$(uname -s)"

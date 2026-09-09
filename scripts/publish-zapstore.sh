@@ -60,11 +60,13 @@ for apk in bundle.glob('*.apk'):
     shutil.copyfile(apk, apk_dir / apk.name)
 PY
 source_sha="$(python3 -c 'import json; print(json.load(open("build/production-release/release-manifest.json"))["sourceCommit"])')"
-expected_publisher="$(awk -F= '$1 == "ZAPSTORE_PUBLISHER_PUBKEY" { print $2 }' config/android-release.properties)"
+# shellcheck source=scripts/release-properties.sh
+source "$repo_dir/scripts/release-properties.sh"
+expected_publisher="$(release_property ZAPSTORE_PUBLISHER_PUBKEY)"
 cd "$temporary_dir/listing"
 # Offline mode contacts the remote signer but does not upload blobs or publish
 # release events. Capture signer output privately; it can include auth URLs.
-if ! "$zsp" publish --offline --quiet --skip-metadata --commit "$source_sha" zapstore.yaml \
+if ! "$zsp" publish --offline --quiet --skip-metadata --no-compress --commit "$source_sha" zapstore.yaml \
   > "$temporary_dir/preflight.jsonl" 2> "$temporary_dir/preflight.log"; then
   echo 'error: Zapstore signing preflight failed; nothing was publicly published' >&2
   exit 1
@@ -84,7 +86,7 @@ PY
 # PUBLIC SIDE EFFECT: the only online zsp publish invocation in our tooling.
 # Do not fetch external metadata or automatically link the Android signing key.
 # First-release certificate linking is a separate holder-operated prerequisite.
-if ! "$zsp" publish --quiet --skip-metadata --skip-linking --commit "$source_sha" zapstore.yaml \
+if ! "$zsp" publish --quiet --skip-metadata --no-compress --skip-certificate-linking --commit "$source_sha" zapstore.yaml \
   > "$temporary_dir/publication.log" 2>&1; then
   echo 'error: Zapstore publication failed or was partial; inspect public state before retrying' >&2
   exit 1
