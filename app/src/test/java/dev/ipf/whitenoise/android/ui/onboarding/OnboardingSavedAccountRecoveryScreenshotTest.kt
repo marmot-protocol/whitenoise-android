@@ -23,6 +23,7 @@ class OnboardingSavedAccountRecoveryScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Captures the explicit acknowledgement required before replacing an unreadable checkpoint. */
     @Test
     fun unreadableCheckpointRequiresExplicitRecoveryAcknowledgement() {
         composeRule.setContent {

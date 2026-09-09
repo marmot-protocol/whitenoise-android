@@ -10,8 +10,12 @@ import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.appStateDebug
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+
+private const val ACCOUNT_LOG_PREFIX_LENGTH = 8
 
 /** Owns the visible setup route independently of the active Chats account. */
 internal class AccountSetupCoordinator(
@@ -24,8 +28,8 @@ internal class AccountSetupCoordinator(
     var controller by mutableStateOf<AccountSetupController?>(null)
         private set
     private var generation = 0L
-    private var pending = emptySet<String>()
-    private var recoveryRequired = emptySet<String>()
+    private var pending by mutableStateOf(emptySet<String>())
+    private var recoveryRequired by mutableStateOf(emptySet<String>())
 
     /** Account-scoped setup eligibility returned from one runtime generation. */
     internal data class AccountsState(
@@ -36,13 +40,32 @@ internal class AccountSetupCoordinator(
     /** Rebuilds eligibility exclusively from MDK's persisted setup state. */
     suspend fun accountsState(accounts: List<AccountSummaryFfi>): AccountsState =
         app.marmotIo {
-            val recovery = accounts.filter { onboardingRecoveryRequired(it.label) }.map { it.label }.toSet()
-            val pending =
-                accounts
-                    .filterNot { it.label in recovery }
-                    .filter { onboardingSnapshot(it.label)?.requiresSetup() == true }
-                    .map { it.label }
-                    .toSet()
+            val recovery = mutableSetOf<String>()
+            val pending = mutableSetOf<String>()
+            accounts.forEach { account ->
+                val accountRef = account.label
+                val recoveryRead = runCatchingCancellable { onboardingRecoveryRequired(accountRef) }
+                if (recoveryRead.isFailure) {
+                    pending += accountRef
+                    appStateDebug {
+                        "onboarding recovery-state read failed for ${accountRef.take(ACCOUNT_LOG_PREFIX_LENGTH)}"
+                    }
+                    return@forEach
+                }
+                if (recoveryRead.getOrThrow()) {
+                    recovery += accountRef
+                    return@forEach
+                }
+                val snapshotRead = runCatchingCancellable { onboardingSnapshot(accountRef) }
+                if (snapshotRead.isFailure) {
+                    pending += accountRef
+                    appStateDebug {
+                        "onboarding checkpoint read failed for ${accountRef.take(ACCOUNT_LOG_PREFIX_LENGTH)}"
+                    }
+                    return@forEach
+                }
+                if (snapshotRead.getOrNull()?.requiresSetup() == true) pending += accountRef
+            }
             AccountsState(pending = pending, recoveryRequired = recovery)
         }
 

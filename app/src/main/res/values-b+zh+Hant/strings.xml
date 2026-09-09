@@ -1733,7 +1733,7 @@
     <string name="group_recovery_automatic_failed">無法復原群組同步。</string>
     <string name="group_recovery_pending_reinvites">正在自動重試部分邀請。</string>
     <string name="group_recovery_failed_reinvites">部分邀請無法復原。請從「群組詳細資料」重新邀請這些成員。</string>
-    <string name="group_recovery_review_invitation">檢視重新加入邀請</string>
+    <string name="group_recovery_review_invitation_from">檢視 %1$s 的邀請 · 時期 %2$s</string>
     <string name="group_recovery_check_failed">無法檢查群組復原狀態，請再試一次。</string>
     <string name="group_rejoin_title">重新加入群組？</string>
     <string name="group_rejoin_invited_by">邀請者：%1$s\n%2$s</string>

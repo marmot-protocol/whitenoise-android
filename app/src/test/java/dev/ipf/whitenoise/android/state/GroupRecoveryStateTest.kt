@@ -23,6 +23,7 @@ class GroupRecoveryStateTest {
             rejoinInvitations = listOf(invitation),
         )
 
+    /** Every field shown in the confirmation dialog remains part of mutation authorization. */
     @Test
     fun `current offer matches only when all reviewed evidence is unchanged`() {
         assertNotNull(status.matchingRejoinInvitation(invitation.copy()))

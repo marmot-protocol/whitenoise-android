@@ -1776,7 +1776,7 @@
     <string name="group_recovery_automatic_failed">Die Gruppensynchronisierung konnte nicht wiederhergestellt werden.</string>
     <string name="group_recovery_pending_reinvites">Einige Einladungen werden automatisch erneut versucht.</string>
     <string name="group_recovery_failed_reinvites">Einige Einladungen konnten nicht wiederhergestellt werden. Lade diese Personen in den Gruppendetails erneut ein.</string>
-    <string name="group_recovery_review_invitation">Einladung zum erneuten Beitritt prüfen</string>
+    <string name="group_recovery_review_invitation_from">Einladung von %1$s prüfen · Epoche %2$s</string>
     <string name="group_recovery_check_failed">Die Gruppenwiederherstellung konnte nicht geprüft werden. Versuche es erneut.</string>
     <string name="group_rejoin_title">Gruppe erneut beitreten?</string>
     <string name="group_rejoin_invited_by">Eingeladen von %1$s\n%2$s</string>

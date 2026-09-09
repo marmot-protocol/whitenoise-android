@@ -12,6 +12,7 @@ import org.junit.Test
 import java.io.File
 
 class BootstrapSplashHandoffTest {
+    /** The system splash yields quickly to the branded Compose loading surface. */
     @Test
     fun systemSplashHandsSlowBootstrapToComposePromptly() {
         assertTrue(shouldRetainSystemSplash(AppPhase.Bootstrapping, MAX_RETAINED_SYSTEM_SPLASH_MILLIS - 1L))

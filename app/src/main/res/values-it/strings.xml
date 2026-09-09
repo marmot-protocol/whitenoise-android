@@ -1760,7 +1760,7 @@
     <string name="group_recovery_automatic_failed">Impossibile ripristinare la sincronizzazione del gruppo.</string>
     <string name="group_recovery_pending_reinvites">Alcuni inviti vengono ritentati automaticamente.</string>
     <string name="group_recovery_failed_reinvites">Non è stato possibile ripristinare alcuni inviti. Invita di nuovo queste persone da Dettagli gruppo.</string>
-    <string name="group_recovery_review_invitation">Esamina l’invito a rientrare</string>
+    <string name="group_recovery_review_invitation_from">Esamina l’invito di %1$s · epoca %2$s</string>
     <string name="group_recovery_check_failed">Impossibile verificare il recupero del gruppo. Riprova.</string>
     <string name="group_rejoin_title">Rientrare nel gruppo?</string>
     <string name="group_rejoin_invited_by">Invito di %1$s\n%2$s</string>

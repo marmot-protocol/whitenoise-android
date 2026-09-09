@@ -26,6 +26,7 @@ internal fun compareTimelineAtMessageIdHex(
     return leftId.compareTo(rightId)
 }
 
+/** Compares two optional read cursors only when both cursor pairs are complete. */
 @Suppress("ReturnCount") // The two incomplete cursor halves are independent invalid states.
 internal fun compareOptionalTimelineAtMessageIdHex(
     leftAt: ULong?,
@@ -38,6 +39,7 @@ internal fun compareOptionalTimelineAtMessageIdHex(
     return compareTimelineAtMessageIdHex(leftAt, leftId, rightAt, rightId)
 }
 
+/** Returns the newest available timestamp without regressing a stored watermark. */
 internal fun monotonicMaxTimelineAt(
     current: ULong?,
     incoming: ULong?,
@@ -48,6 +50,7 @@ internal fun monotonicMaxTimelineAt(
         else -> maxOf(current, incoming)
     }
 
+/** Keeps the current complete watermark when a mark-read response omits one. */
 private fun mergeMarkReadReadWatermark(
     current: ChatListRowFfi,
     incoming: ChatListRowFfi,
@@ -80,6 +83,7 @@ internal fun mergeMarkReadChatListRow(
     return mergeMarkReadWithAcceptedCursor(current, incoming)
 }
 
+/** Merges an accepted read cursor without allowing an older preview to replace a newer one. */
 private fun mergeMarkReadWithAcceptedCursor(
     current: ChatListRowFfi,
     incoming: ChatListRowFfi,
@@ -114,6 +118,7 @@ private fun mergeMarkReadWithAcceptedCursor(
     )
 }
 
+/** Whether the row's complete read cursor reaches its latest projected message. */
 private fun readWatermarkCoversLastMessage(row: ChatListRowFfi): Boolean {
     val last = row.lastMessage
     val readAt = row.lastReadTimelineAt
@@ -124,6 +129,7 @@ private fun readWatermarkCoversLastMessage(row: ChatListRowFfi): Boolean {
         compareTimelineAtMessageIdHex(readAt, readId, last.timelineAt, last.messageIdHex) >= 0
 }
 
+/** Whether any unread field still claims unread state. */
 private fun hasReadDerivedUnread(row: ChatListRowFfi): Boolean =
     when {
         row.unreadCount > 0uL -> true
@@ -133,6 +139,7 @@ private fun hasReadDerivedUnread(row: ChatListRowFfi): Boolean =
         else -> row.unreadMention
     }
 
+/** Clears contradictory unread fields when the authoritative watermark covers the last message. */
 internal fun reconcileReadDerivedUnread(incoming: ChatListRowFfi): ChatListRowFfi =
     if (readWatermarkCoversLastMessage(incoming) && hasReadDerivedUnread(incoming)) {
         incoming.copy(

@@ -22,11 +22,12 @@ import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+@Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class GroupRecoveryCardScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Captures the recovery summary and the evidence shown before a state-replacing rejoin. */
     @Test
     fun invitationReviewShowsAuthenticatedInviterAndTrustWarning() {
         composeRule.setContent {
@@ -61,19 +62,19 @@ class GroupRecoveryCardScreenshotTest {
         composeRule.onNodeWithTag("group-recovery-card").captureRoboImage(
             "src/test/snapshots/group_recovery_card_light.png",
         )
-        composeRule.onNodeWithText("Review rejoin invitation").performClick()
+        composeRule.onNodeWithText("Review invitation from Marmot Friend · epoch 9").performClick()
         composeRule
             .onNodeWithText(
                 "Only rejoin if you trust this invitation. " +
                     "A newer group version alone does not make it trustworthy.",
             ).assertExists()
-        composeRule.onNodeWithText("Marmot Friend", substring = true).assertExists()
-        composeRule.onNodeWithText("npub1trustedinviter", substring = true).assertExists()
+        composeRule.onNodeWithText("Invited by Marmot Friend\nnpub1trustedinviter").assertExists()
         composeRule.onRoot().captureRoboImage(
             "src/test/snapshots/group_recovery_confirmation_light.png",
         )
     }
 
+    /** Captures the non-blocking retry state for an advisory recovery read failure. */
     @Test
     fun failedStatusReadOffersRetryWithoutHidingTheConversation() {
         composeRule.setContent {

@@ -43,6 +43,8 @@ class ChatListTitleTest {
             inviteFromFormat = "Invite from %1\$s",
             groupOfPeopleFormat = "Group of %1\$d people",
             unknownTitle = "Unknown",
+            unnamedGroupTitle = "Unnamed test group",
+            unavailableConversationTitle = "Unavailable test conversation",
         )
 
     /** A literal selected title is used directly after hostile-text sanitization. */
@@ -55,11 +57,11 @@ class ChatListTitleTest {
     @Test
     fun selectedFallbackTitlesUseHostCopy() {
         assertEquals(
-            "Unnamed group",
+            "Unnamed test group",
             selectedChatPresentationTitle(presentation(PresentationTextFfi.UnnamedGroup(4uL)), copy),
         )
         assertEquals(
-            "Conversation unavailable",
+            "Unavailable test conversation",
             selectedChatPresentationTitle(presentation(PresentationTextFfi.UnavailableConversation), copy),
         )
     }

@@ -21,6 +21,31 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupRejoinInvitationFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+
+/** Wires the conversation-owned recovery actions consistently in empty and populated timelines. */
+@Composable
+@Suppress("FunctionNaming")
+internal fun ConversationGroupRecoveryCard(
+    controller: ConversationController,
+    appState: WhiteNoiseAppState,
+) {
+    GroupRecoveryCard(
+        status = controller.groupRecoveryStatus,
+        busy = controller.groupRecoveryMutationInFlight,
+        inviterName = appState::displayName,
+        inviterIdentity = appState::npubForDisplay,
+        onConfirm = { invitation ->
+            appState.launchMutation { controller.confirmGroupRejoin(invitation) }
+        },
+        onDecline = { invitation ->
+            appState.launchMutation { controller.declineGroupRejoin(invitation) }
+        },
+        readFailed = controller.groupRecoveryReadFailed,
+        onRetry = { appState.launchMutation { controller.retryGroupRecoveryStatus() } },
+    )
+}
 
 /** Whether the engine status contains information that belongs in the conversation UI. */
 internal fun GroupRecoveryStatusFfi.hasVisibleRecoveryState(): Boolean =
@@ -62,11 +87,17 @@ internal fun GroupRecoveryCard(
                 Text(stringResource(R.string.group_recovery_failed_reinvites))
             }
             status?.rejoinInvitations.orEmpty().forEach { invitation ->
+                val reviewLabel =
+                    stringResource(
+                        R.string.group_recovery_review_invitation_from,
+                        inviterName(invitation.welcomerAccountIdHex),
+                        invitation.epoch.toString(),
+                    )
                 OutlinedButton(
                     onClick = { selectedInvitation = invitation },
                     enabled = !busy,
                 ) {
-                    Text(stringResource(R.string.group_recovery_review_invitation))
+                    Text(reviewLabel)
                 }
             }
             if (readFailed) {

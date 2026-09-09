@@ -435,7 +435,7 @@ internal class NotificationBootstrapTestFixture(
             notificationFirstPostTimingObserver = notificationFirstPostTimingObserver,
         )
 
-    /** Supplies an inert local chat-list snapshot without a native pointer. */
+    /** Creates the inert presented-list handle used by bootstrap tests. */
     private fun emptyChatListSubscription(): PresentedChatListSubscription =
         allocateWithoutConstructor(EmptyChatListSubscription::class.java).apply {
             onSnapshot = localSnapshotReadCalls::incrementAndGet
@@ -494,6 +494,7 @@ internal class NotificationBootstrapTestFixture(
         lateinit var onSnapshot: () -> Unit
         lateinit var rows: List<ChatListRowFfi>
 
+        /** Returns the fixture's complete initial selected-presentation frame. */
         override fun snapshot(): PresentedChatListUpdateFfi {
             onSnapshot()
             return PresentedChatListUpdateFfi(
@@ -503,6 +504,7 @@ internal class NotificationBootstrapTestFixture(
             )
         }
 
+        /** Ends immediately because bootstrap cases do not require live list updates. */
         override suspend fun next(): PresentedChatListUpdateFfi? = null
 
         override fun close() = Unit

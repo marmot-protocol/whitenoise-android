@@ -1733,7 +1733,7 @@
     <string name="group_recovery_automatic_failed">无法恢复群组同步。</string>
     <string name="group_recovery_pending_reinvites">正在自动重试部分邀请。</string>
     <string name="group_recovery_failed_reinvites">部分邀请无法恢复。请从“群组详情”重新邀请这些成员。</string>
-    <string name="group_recovery_review_invitation">查看重新加入邀请</string>
+    <string name="group_recovery_review_invitation_from">查看 %1$s 的邀请 · 轮次 %2$s</string>
     <string name="group_recovery_check_failed">无法检查群组恢复状态，请重试。</string>
     <string name="group_rejoin_title">重新加入群组？</string>
     <string name="group_rejoin_invited_by">邀请者：%1$s\n%2$s</string>

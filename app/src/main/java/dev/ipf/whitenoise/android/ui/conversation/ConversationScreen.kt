@@ -3469,22 +3469,7 @@ internal fun ConversationScreen(
                             controller.groupRecoveryStatus?.hasVisibleRecoveryState() == true
                     ) ->
                     Column(modifier = Modifier.fillMaxSize()) {
-                        GroupRecoveryCard(
-                            status = controller.groupRecoveryStatus,
-                            busy = controller.groupRecoveryMutationInFlight,
-                            inviterName = appState::displayName,
-                            inviterIdentity = appState::npubForDisplay,
-                            onConfirm = { invitation ->
-                                appState.launchMutation { controller.confirmGroupRejoin(invitation) }
-                            },
-                            onDecline = { invitation ->
-                                appState.launchMutation { controller.declineGroupRejoin(invitation) }
-                            },
-                            readFailed = controller.groupRecoveryReadFailed,
-                            onRetry = {
-                                appState.launchMutation { controller.retryGroupRecoveryStatus() }
-                            },
-                        )
+                        ConversationGroupRecoveryCard(controller, appState)
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text(
                                 stringResource(R.string.no_messages_yet),
@@ -3572,26 +3557,7 @@ internal fun ConversationScreen(
                                 controller.groupRecoveryStatus?.hasVisibleRecoveryState() == true
                             ) {
                                 item(key = "group-recovery") {
-                                    GroupRecoveryCard(
-                                        status = controller.groupRecoveryStatus,
-                                        busy = controller.groupRecoveryMutationInFlight,
-                                        inviterName = appState::displayName,
-                                        inviterIdentity = appState::npubForDisplay,
-                                        onConfirm = { invitation ->
-                                            appState.launchMutation {
-                                                controller.confirmGroupRejoin(invitation)
-                                            }
-                                        },
-                                        onDecline = { invitation ->
-                                            appState.launchMutation {
-                                                controller.declineGroupRejoin(invitation)
-                                            }
-                                        },
-                                        readFailed = controller.groupRecoveryReadFailed,
-                                        onRetry = {
-                                            appState.launchMutation { controller.retryGroupRecoveryStatus() }
-                                        },
-                                    )
+                                    ConversationGroupRecoveryCard(controller, appState)
                                 }
                             }
                             conversationLoadErrorItem(

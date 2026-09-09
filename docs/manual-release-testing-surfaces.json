@@ -6909,9 +6909,9 @@
         ]
       },
       {
-        "surface": "setting:group_recovery_review_invitation",
+        "surface": "setting:group_recovery_review_invitation_from",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
-        "anchor": "R.string.group_recovery_review_invitation",
+        "anchor": "R.string.group_recovery_review_invitation_from",
         "test_ids": [
           "GRP-021"
         ]

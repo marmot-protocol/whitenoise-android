@@ -1048,7 +1048,7 @@
     <string name="group_recovery_automatic_failed">Unable to restore group synchronization.</string>
     <string name="group_recovery_pending_reinvites">Some invitations are being retried automatically.</string>
     <string name="group_recovery_failed_reinvites">Some invitations could not be restored. Invite those people again from Group Details.</string>
-    <string name="group_recovery_review_invitation">Review rejoin invitation</string>
+    <string name="group_recovery_review_invitation_from">Review invitation from %1$s · epoch %2$s</string>
     <string name="group_recovery_check_failed">Couldn’t check group recovery. Try again.</string>
     <string name="group_rejoin_title">Rejoin group?</string>
     <string name="group_rejoin_invited_by">Invited by %1$s\n%2$s</string>

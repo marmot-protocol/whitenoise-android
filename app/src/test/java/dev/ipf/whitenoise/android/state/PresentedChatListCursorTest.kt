@@ -39,6 +39,7 @@ class PresentedChatListCursorTest {
         assertFalse(cursor.accept(replacement))
     }
 
+    /** Builds a complete snapshot with independently selectable cursor identity fields. */
     private fun update(
         generation: String = "generation",
         sequence: ULong = 0uL,

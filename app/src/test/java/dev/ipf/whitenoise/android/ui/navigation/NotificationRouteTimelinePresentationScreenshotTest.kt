@@ -847,14 +847,7 @@ abstract class NotificationRouteTimelinePresentationFixture {
                     if (routeGate.rosterFails.get()) error("target roster unavailable")
                     targetRoster(includeThirdMember = routeGate.includeThirdMember.get())
                 }
-                "groupRecoveryStatus" ->
-                    GroupRecoveryStatusFfi(
-                        groupIdHex = arguments?.get(1) as String,
-                        automaticRecoveryFailed = false,
-                        pendingReinvites = 0u,
-                        failedReinvites = 0u,
-                        rejoinInvitations = emptyList(),
-                    )
+                "groupRecoveryStatus" -> notificationRecoveryStatus(arguments)
                 "chatListRow" -> {
                     val accountRef = arguments?.firstOrNull() as? String
                     val groupIdHex = arguments?.getOrNull(1) as? String
@@ -883,6 +876,21 @@ abstract class NotificationRouteTimelinePresentationFixture {
                 else -> error("Unexpected Marmot call: ${method.name}")
             }
         } as MarmotInterface
+
+    /** Returns an empty recovery state after asserting the notification route's ownership arguments. */
+    private fun notificationRecoveryStatus(arguments: Array<out Any?>?): GroupRecoveryStatusFfi {
+        val accountRef = arguments?.firstOrNull() as? String
+        val groupIdHex = arguments?.getOrNull(1) as? String
+        check(accountRef == TARGET_ACCOUNT) { "recovery read used an unknown account" }
+        check(groupIdHex == ConversationTimelineTestIds.GROUP_ID) { "recovery read used the wrong group" }
+        return GroupRecoveryStatusFfi(
+            groupIdHex = groupIdHex,
+            automaticRecoveryFailed = false,
+            pendingReinvites = 0u,
+            failedReinvites = 0u,
+            rejoinInvitations = emptyList(),
+        )
+    }
 
     private fun preGapChatListRow() =
         notificationChatListRow().let { row ->

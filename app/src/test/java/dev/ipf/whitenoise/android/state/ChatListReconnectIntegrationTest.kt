@@ -489,8 +489,10 @@ private class TerminatingChatListSubscription : ChatListSubscriptionHandle {
     private val terminated = CompletableDeferred<Unit>()
     val nextUpdateStarted = CompletableDeferred<Unit>()
 
+    /** Returns the empty initial frame for this replacement handle. */
     override fun snapshot(): PresentedChatListUpdateFfi = presentedUpdate(emptyList(), 0uL)
 
+    /** Waits until the test ends this stream normally. */
     override suspend fun nextUpdate(): PresentedChatListUpdateFfi? {
         nextUpdateStarted.complete(Unit)
         terminated.await()
@@ -502,6 +504,7 @@ private class TerminatingChatListSubscription : ChatListSubscriptionHandle {
         terminated.complete(Unit)
     }
 
+    /** Ends any pending wait during fixture teardown. */
     override fun close() {
         terminate()
     }
@@ -521,6 +524,7 @@ private fun presentedUpdate(
         ),
 )
 
+/** Pairs a chat row with deterministic selected title and avatar values. */
 private fun presentedRow(row: ChatListRowFfi) =
     PresentedChatRowFfi(
         row = row,

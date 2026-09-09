@@ -1758,7 +1758,7 @@
     <string name="group_recovery_automatic_failed">Grup eşitlemesi geri yüklenemedi.</string>
     <string name="group_recovery_pending_reinvites">Bazı davetler otomatik olarak yeniden deneniyor.</string>
     <string name="group_recovery_failed_reinvites">Bazı davetler geri yüklenemedi. Bu kişileri Grup Ayrıntıları’ndan yeniden davet edin.</string>
-    <string name="group_recovery_review_invitation">Yeniden katılma davetini incele</string>
+    <string name="group_recovery_review_invitation_from">%1$s kişisinin davetini incele · dönem %2$s</string>
     <string name="group_recovery_check_failed">Grup kurtarma denetlenemedi. Tekrar deneyin.</string>
     <string name="group_rejoin_title">Gruba yeniden katılınsın mı?</string>
     <string name="group_rejoin_invited_by">Davet eden: %1$s\n%2$s</string>

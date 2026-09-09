@@ -1760,7 +1760,7 @@
     <string name="group_recovery_automatic_failed">Impossible de rétablir la synchronisation du groupe.</string>
     <string name="group_recovery_pending_reinvites">Certaines invitations font l’objet de nouvelles tentatives automatiques.</string>
     <string name="group_recovery_failed_reinvites">Certaines invitations n’ont pas pu être restaurées. Réinvitez ces personnes depuis les détails du groupe.</string>
-    <string name="group_recovery_review_invitation">Examiner l’invitation à rejoindre</string>
+    <string name="group_recovery_review_invitation_from">Examiner l’invitation de %1$s · époque %2$s</string>
     <string name="group_recovery_check_failed">Impossible de vérifier la récupération du groupe. Réessayez.</string>
     <string name="group_rejoin_title">Rejoindre à nouveau le groupe ?</string>
     <string name="group_rejoin_invited_by">Invitation de %1$s\n%2$s</string>

@@ -7,19 +7,25 @@ import dev.ipf.marmotkit.PresentedChatListUpdateFfi
 
 /** Lifecycle seam for the authoritative chat-list projection stream. */
 internal interface ChatListSubscriptionHandle {
+    /** Returns the complete first frame captured when this handle opened. */
     fun snapshot(): PresentedChatListUpdateFfi?
 
+    /** Waits for the next authoritative presented-list frame. */
     suspend fun nextUpdate(): PresentedChatListUpdateFfi?
 
+    /** Releases this handle and unblocks any pending update read. */
     fun close()
 }
 
 /** Lifecycle seam for the matching group-record stream. */
 internal interface ChatsSubscriptionHandle {
+    /** Returns the matching initial group-record snapshot. */
     fun snapshot(): List<AppGroupRecordFfi>
 
+    /** Waits for the next group-record update. */
     suspend fun next(): AppGroupRecordFfi?
 
+    /** Releases this handle and unblocks any pending update read. */
     fun close()
 }
 
@@ -27,10 +33,13 @@ internal interface ChatsSubscriptionHandle {
 private class FfiChatListSubscriptionHandle(
     private val subscription: PresentedChatListSubscription,
 ) : ChatListSubscriptionHandle {
+    /** Delegates the initial frame without changing native cursor identity. */
     override fun snapshot(): PresentedChatListUpdateFfi? = subscription.snapshot()
 
+    /** Delegates the next-frame wait to MarmotKit. */
     override suspend fun nextUpdate(): PresentedChatListUpdateFfi? = subscription.next()
 
+    /** Closes the underlying MarmotKit subscription. */
     override fun close() = subscription.close()
 }
 
@@ -38,10 +47,13 @@ private class FfiChatListSubscriptionHandle(
 private class FfiChatsSubscriptionHandle(
     private val subscription: ChatsSubscription,
 ) : ChatsSubscriptionHandle {
+    /** Delegates the initial group-record frame. */
     override fun snapshot(): List<AppGroupRecordFfi> = subscription.snapshot()
 
+    /** Delegates the next group-record wait. */
     override suspend fun next(): AppGroupRecordFfi? = subscription.next()
 
+    /** Closes the underlying MarmotKit subscription. */
     override fun close() = subscription.close()
 }
 

@@ -143,12 +143,7 @@ private fun OnboardingSavedAccountCard(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    val actionLabel =
-        if (account.recoveryRequired) {
-            stringResource(R.string.onboarding_recover_setup_for, account.displayName)
-        } else {
-            stringResource(R.string.onboarding_continue_as, account.displayName)
-        }
+    val actionLabel = onboardingSavedAccountActionLabel(account)
     Surface(
         onClick = onClick,
         enabled = enabled,
@@ -220,12 +215,7 @@ private fun OnboardingSavedAccountPicker(
             LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
                 items(accounts, key = OnboardingSavedAccountUi::label) { account ->
                     val loading = reactivatingAccountLabel == account.label
-                    val actionLabel =
-                        if (account.recoveryRequired) {
-                            stringResource(R.string.onboarding_recover_setup_for, account.displayName)
-                        } else {
-                            stringResource(R.string.onboarding_continue_as, account.displayName)
-                        }
+                    val actionLabel = onboardingSavedAccountActionLabel(account)
                     ListItem(
                         headlineContent = {
                             Text(account.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -270,3 +260,12 @@ private fun OnboardingSavedAccountPicker(
         }
     }
 }
+
+/** Returns the localized action shared by the saved-account card and picker row. */
+@Composable
+private fun onboardingSavedAccountActionLabel(account: OnboardingSavedAccountUi): String =
+    if (account.recoveryRequired) {
+        stringResource(R.string.onboarding_recover_setup_for, account.displayName)
+    } else {
+        stringResource(R.string.onboarding_continue_as, account.displayName)
+    }
