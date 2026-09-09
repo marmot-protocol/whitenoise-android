@@ -4608,14 +4608,7 @@ class WhiteNoiseAppState private constructor(
     internal fun onboardingRecoveryRequired(accountRef: String): Boolean = accountSetup.needsRecovery(accountRef)
 
     /** Performs the consent-gated checkpoint replacement and refreshes the authoritative account list. */
-    internal suspend fun recoverOnboardingSetup(accountRef: String): Boolean =
-        runCatchingCancellable {
-            if (!accountSetup.recover(accountRef)) return@runCatchingCancellable false
-            refreshAccounts()
-            true
-        }.onFailure { failure ->
-            appStateDebug(failure) { "onboarding checkpoint recovery failed" }
-        }.getOrDefault(false)
+    internal suspend fun recoverSetup(ref: String): Boolean = accountSetup.recoverAndRefresh(ref, ::refreshAccounts)
 
     /** Rebuilds the account list after sign-out without allowing an earlier refresh to restore it. */
     private suspend fun accountsAfterSignOut(
@@ -10191,14 +10184,6 @@ class WhiteNoiseAppState private constructor(
         bumpAllProfileAccountRevisions()
     }
 
-    private fun groupMemberSnapshotKey(
-        accountRef: String?,
-        groupIdHex: String,
-    ): String? {
-        val account = accountRef?.takeIf { it.isNotBlank() } ?: return null
-        return "$account:$groupIdHex"
-    }
-
     // Keep platform callbacks at the end of instance initialization. These
     // coroutines can execute immediately on another thread and must not observe
     // fields declared later in this class before their initializers have run.
@@ -10298,36 +10283,3 @@ class WhiteNoiseAppState private constructor(
         private const val MAX_RETAINED_CONVERSATION_STATES = 32
     }
 }
-
-/** Emits operational detail only from debug builds so release logs remain privacy-bounded. */
-internal inline fun appStateDebug(message: () -> String) {
-    // Debug-only: these INFO lines are operational/diagnostic and some carry
-    // sender/group context, so they must not ship in release logcat. See #39.
-    if (BuildConfig.DEBUG) Log.i("DMAppState", message())
-}
-
-private inline fun appStateDebug(
-    error: Throwable,
-    message: () -> String,
-) {
-    if (BuildConfig.DEBUG) {
-        Log.e("DMAppState", message(), error)
-    } else {
-        Log.e("DMAppState", "operation_failed")
-    }
-}
-
-internal suspend fun awaitBootstrapAttempt(
-    attempt: Deferred<Unit>,
-    timeoutMillis: Long,
-): Boolean =
-    withTimeoutOrNull(timeoutMillis) {
-        attempt.await()
-        true
-    } ?: false
-
-private const val BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS = 15_000L
-
-private fun String?.nonBlankOrNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
-
-internal fun notificationActionsAllowed(appLockScreenVisible: Boolean): Boolean = !appLockScreenVisible

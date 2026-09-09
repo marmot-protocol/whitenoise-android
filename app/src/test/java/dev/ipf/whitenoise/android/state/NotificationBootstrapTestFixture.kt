@@ -26,7 +26,6 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
-import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.PresentationResolutionFfi
 import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.PresentationTextFfi
@@ -35,6 +34,7 @@ import dev.ipf.marmotkit.PresentedChatListSnapshotFfi
 import dev.ipf.marmotkit.PresentedChatListSubscription
 import dev.ipf.marmotkit.PresentedChatListUpdateFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
+import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.PushRegistrationShareOutcomeFfi
 import dev.ipf.marmotkit.PushRegistrationShareStatusFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi

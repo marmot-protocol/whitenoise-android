@@ -248,7 +248,7 @@ internal fun OnboardingScreen(
                 inFlightAction = OnboardingAction.Importing
                 appState.launchMutation {
                     try {
-                        val recovered = appState.recoverOnboardingSetup(accountRef)
+                        val recovered = appState.recoverSetup(accountRef)
                         appState.presentTransient(
                             if (recovered) {
                                 R.string.onboarding_recover_setup_success
