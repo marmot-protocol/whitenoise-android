@@ -823,6 +823,7 @@ abstract class NotificationRouteTimelinePresentationFixture {
     }
 
     /** Gates native projection, roster, and broad-list calls without replacing the production route logic. */
+    @Suppress("CyclomaticComplexMethod")
     private fun notificationRouteMarmot(routeGate: NotificationRouteGate): MarmotInterface =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
