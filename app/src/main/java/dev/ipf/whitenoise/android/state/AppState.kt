@@ -1482,10 +1482,11 @@ class WhiteNoiseAppState private constructor(
         entries: List<TtsSpeakableEntry>,
         locale: Locale,
         startSentenceIndex: Int = 0,
+        startRenderedHit: dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit? = null,
     ): Boolean {
         val ownerAccount = activeAccountRef
         return ttsController
-            .speakAsync(entries, locale, startSentenceIndex) {
+            .speakAsync(entries, locale, startSentenceIndex, startRenderedHit) {
                 ttsSpeechAccountRef = ownerAccount
                 TtsPlaybackForegroundService.start(appContext)
             }.also { started ->
@@ -1502,11 +1503,12 @@ class WhiteNoiseAppState private constructor(
         entries: List<TtsSpeakableEntry>,
         locale: java.util.Locale,
         startSentenceIndex: Int = 0,
+        startRenderedHit: dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit? = null,
         backgroundPreparation: Boolean,
     ): Boolean {
         if (!backgroundPreparation) return speakAloudAutoRead(groupIdHex, entries, locale, startSentenceIndex)
         return ttsAutoReadKey(activeAccountRef, groupIdHex)?.let { owner ->
-            speakAloudPrepared(entries, locale, startSentenceIndex).also { started ->
+            speakAloudPrepared(entries, locale, startSentenceIndex, startRenderedHit).also { started ->
                 if (started) {
                     ttsAutoReadSessionKey = owner
                     ttsHistorySession.onConversationSessionStarted(activeAccountRef, groupIdHex)

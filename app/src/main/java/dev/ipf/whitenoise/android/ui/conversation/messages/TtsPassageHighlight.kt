@@ -7,7 +7,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsChunk
 import dev.ipf.whitenoise.android.audio.tts.TtsChunker
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
-import dev.ipf.whitenoise.android.audio.tts.prepareSpeech
+import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSpeechMessage
 import dev.ipf.whitenoise.android.ui.SpeakableTextProjection
 import dev.ipf.whitenoise.android.ui.SpeakableTextProjectionSpan
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlight
@@ -25,21 +25,19 @@ internal fun createTtsLeafHighlightResolver(
     passage: TtsPassage,
     messageIdHex: String,
     projection: SpeakableTextProjection,
-    locale: Locale,
+    prepared: PreparedSpeechMessage,
 ): (String, String) -> TtsLeafHighlight? =
     TtsHighlightProjectionResolver(
         projection = projection,
-        locale = locale,
+        preparedSpeech = prepared,
     ).resolverFor(passage, messageIdHex)
 
 /** Projection-level work shared by every word update in one active message. */
 internal class TtsHighlightProjectionResolver(
     private val projection: SpeakableTextProjection,
-    locale: Locale,
-    prepared: dev.ipf.whitenoise.android.audio.tts.speech.PreparedSpeechMessage? = null,
+    private val preparedSpeech: PreparedSpeechMessage,
 ) {
-    private val preparedSpeech = prepared ?: projection.prepareSpeech(locale)
-    private val sentenceChunks = projectionSentenceChunks(projection, locale, preparedSpeech)
+    private val sentenceChunks = projectionSentenceChunks(projection, preparedSpeech)
     private val leafSpanCache = HashMap<Pair<String, String>, List<RenderedProjectionSpan>?>()
 
     internal val cachedLeafCount: Int
@@ -83,24 +81,22 @@ internal class TtsHighlightProjectionResolver(
         val renderedEnd = mapped.renderedStart + mapped.source.spokenEnd - mapped.source.spokenStart
         val clampedRenderedOffset = hit.renderedOffset.coerceIn(mapped.renderedStart, renderedEnd - 1)
         val nativeOffset = mapped.source.visibleStart + clampedRenderedOffset - mapped.renderedStart
-        val owner = preparedSpeech?.canonicalSentenceIdForSource(mapped.source.leafId, nativeOffset)
-        return preparedSpeech?.sentences?.firstOrNull { it.sentenceId == owner }?.ordinal
+        val owner = preparedSpeech.canonicalSentenceIdForSource(mapped.source.leafId, nativeOffset)
+        return preparedSpeech.sentences.firstOrNull { it.sentenceId == owner }?.ordinal
     }
 
     internal fun sentenceChoices(
         leafId: String,
         original: String,
     ): List<dev.ipf.whitenoise.android.ui.TtsSentenceChoice> =
-        preparedSpeech
-            ?.sentences
-            .orEmpty()
+        preparedSpeech.sentences
             .asSequence()
             .mapNotNull { sentence ->
                 val ownsSource =
                     sentence.utterance.originRuns.any { origin ->
                         origin.sources.any { source ->
                             source.leafId.belongsToRenderedLeaf(leafId) &&
-                                preparedSpeech?.canonicalSentenceIdForSource(source.leafId, source.start) ==
+                                preparedSpeech.canonicalSentenceIdForSource(source.leafId, source.start) ==
                                 sentence.sentenceId
                         }
                     }
@@ -484,40 +480,11 @@ private fun String.belongsToRenderedLeaf(renderedLeafId: String): Boolean {
     return this == renderedLeafId || startsWith(prefix)
 }
 
-/** All consumers derive logical units from the same preparation entry point. */
-private fun SpeakableTextProjection.prepareSpeech(locale: Locale) =
-    dev.ipf.whitenoise.android.audio.tts
-        .TtsSpeakableEntry(
-            senderKey = "",
-            senderDisplayName = "",
-            text = text,
-            projectionId = projectionId,
-            spokenTextSpans =
-                spans
-                    .filter {
-                        it.spokenEnd > it.spokenStart &&
-                            it.visibleEnd > it.visibleStart &&
-                            it.spokenEnd - it.spokenStart == it.visibleEnd - it.visibleStart
-                    }.map { span ->
-                        dev.ipf.whitenoise.android.audio.tts.TtsSpokenTextSpan(
-                            dev.ipf.whitenoise.android.audio.tts
-                                .TtsTextRange(span.spokenStart, span.spokenEnd),
-                            TtsVisibleTextSpan(span.leafId, span.visibleStart, span.visibleEnd),
-                        )
-                    },
-            speechRoles = speechRoles,
-            visibleLeaves = visibleLeaves,
-        ).prepareSpeech(
-            dev.ipf.whitenoise.android.audio.tts.speech
-                .SpeechContext(locale),
-        )
-
 private fun projectionSentenceChunks(
     projection: SpeakableTextProjection,
-    locale: Locale,
-    prepared: dev.ipf.whitenoise.android.audio.tts.speech.PreparedSpeechMessage? = projection.prepareSpeech(locale),
+    prepared: PreparedSpeechMessage,
 ): List<TtsChunk> =
-    prepared?.sentences.orEmpty().flatMap { sentence ->
+    prepared.sentences.flatMap { sentence ->
         sentence.utterance.originRuns.flatMap { it.sources }.distinct().flatMap { source ->
             projection.spans.mapNotNull { span ->
                 if (span.leafId != source.leafId) return@mapNotNull null

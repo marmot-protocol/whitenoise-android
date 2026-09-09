@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.MarkdownCodeBlockKindFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.audio.tts.speech.SpeechContext
 import dev.ipf.whitenoise.android.ui.SpeakableTextProjection
+import dev.ipf.whitenoise.android.ui.conversation.messages.preparedHighlightSpeech
 import dev.ipf.whitenoise.android.ui.legacyTextToSpeakableProjection
 import dev.ipf.whitenoise.android.ui.markdownDocumentToSpeakableProjection
 import org.junit.Assert.assertEquals
@@ -20,7 +21,7 @@ class TtsNaturalSpeechIntegrationTest {
         val projection = legacyTextToSpeakableProjection(source)
         val resolver =
             dev.ipf.whitenoise.android.ui.conversation.messages
-                .TtsHighlightProjectionResolver(projection, Locale.US)
+                .TtsHighlightProjectionResolver(projection, preparedHighlightSpeech(projection))
         assertEquals(
             null,
             resolver.sentenceIndexAtRenderedOffset(

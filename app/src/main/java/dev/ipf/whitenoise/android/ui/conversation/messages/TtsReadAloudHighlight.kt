@@ -31,6 +31,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.speakableProjectionFromDocument
+import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSpeechMessage
 import dev.ipf.whitenoise.android.state.BLUE_FREE_LIGHT_TEXT_ARGB
 import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
 import dev.ipf.whitenoise.android.state.OPAQUE_WHITE_ARGB
@@ -40,7 +41,6 @@ import dev.ipf.whitenoise.android.state.contrastRatio
 import dev.ipf.whitenoise.android.ui.SpeakableTextProjection
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlight
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
-import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -96,11 +96,10 @@ internal fun effectiveTtsReadAloudProgress(
 @Composable
 internal fun rememberTtsHighlightProjectionResolver(
     projection: SpeakableTextProjection?,
-    locale: Locale,
-    prepared: dev.ipf.whitenoise.android.audio.tts.speech.PreparedSpeechMessage? = null,
+    prepared: PreparedSpeechMessage?,
 ): TtsHighlightProjectionResolver? =
-    remember(projection, locale, prepared) {
-        projection?.let { TtsHighlightProjectionResolver(it, locale, prepared) }
+    remember(projection, prepared) {
+        if (projection == null || prepared == null) null else TtsHighlightProjectionResolver(projection, prepared)
     }
 
 @Composable
@@ -108,9 +107,9 @@ internal fun rememberTtsLeafHighlightResolver(
     passage: TtsPassage?,
     messageIdHex: String,
     projection: SpeakableTextProjection?,
-    locale: Locale,
+    prepared: PreparedSpeechMessage?,
 ): TtsLeafHighlightResolver? {
-    val projectionResolver = rememberTtsHighlightProjectionResolver(projection, locale)
+    val projectionResolver = rememberTtsHighlightProjectionResolver(projection, prepared)
     return remember(passage, messageIdHex, projectionResolver) {
         if (passage == null || passage.messageIdHex != messageIdHex) {
             null
@@ -151,18 +150,20 @@ internal fun ttsSentenceBoundsInWindow(
         }
 }
 
+@Suppress("ReturnCount")
 internal fun buildTtsLeafHighlightResolver(
     passage: TtsPassage?,
     messageIdHex: String,
     projection: SpeakableTextProjection?,
-    locale: Locale,
+    prepared: PreparedSpeechMessage?,
 ): TtsLeafHighlightResolver? {
     if (passage == null || projection == null || passage.messageIdHex != messageIdHex) return null
+    if (prepared == null) return null
     return createTtsLeafHighlightResolver(
         passage = passage,
         messageIdHex = messageIdHex,
         projection = projection,
-        locale = locale,
+        prepared = prepared,
     )
 }
 

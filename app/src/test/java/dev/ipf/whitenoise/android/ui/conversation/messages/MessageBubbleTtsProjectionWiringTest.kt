@@ -47,7 +47,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -409,7 +408,7 @@ private fun ActiveEditedMarkdownBubbleBodyHarness(
             passage = effectivePassage,
             messageIdHex = record.messageIdHex,
             projection = projection,
-            locale = Locale.US,
+            prepared = preparedHighlightSpeech(projection),
         )
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.width(320.dp)) {
         Column {

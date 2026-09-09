@@ -37,7 +37,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -62,7 +61,7 @@ class MessageBubbleTtsHighlightTest {
                 passage = passage,
                 messageIdHex = "m1",
                 projection = projection,
-                locale = Locale.US,
+                prepared = preparedHighlightSpeech(projection),
             ) as TtsLeafHighlightResolver
         var captured: TtsLeafHighlight? = null
         composeRule.setContent {
@@ -97,7 +96,7 @@ class MessageBubbleTtsHighlightTest {
                 passage = passage,
                 messageIdHex = "m1",
                 projection = projection,
-                locale = Locale.US,
+                prepared = preparedHighlightSpeech(projection),
             ) as TtsLeafHighlightResolver
         var captured: TtsLeafHighlight? = null
         composeRule.setContent {
@@ -144,7 +143,7 @@ class MessageBubbleTtsHighlightTest {
                         passage = passage,
                         messageIdHex = "m1",
                         projection = projection,
-                        locale = Locale.US,
+                        prepared = preparedHighlightSpeech(projection),
                     ) as TtsLeafHighlightResolver
                 HighlightedPlainText(
                     text = "Hello bright world.",
@@ -187,7 +186,7 @@ class MessageBubbleTtsHighlightTest {
                 passage = passage,
                 messageIdHex = "m1",
                 projection = projection,
-                locale = Locale.US,
+                prepared = preparedHighlightSpeech(projection),
             )
         assertNull(
             activeTtsLeafHighlightResolver(
@@ -249,7 +248,7 @@ class MessageBubbleTtsHighlightTest {
                 passage = passage,
                 messageIdHex = "m1",
                 projection = projection,
-                locale = Locale.US,
+                prepared = preparedHighlightSpeech(projection),
             )
         assertNull(
             activeTtsLeafHighlightResolver(
@@ -312,7 +311,7 @@ class MessageBubbleTtsHighlightTest {
                 passage = passage,
                 messageIdHex = "m1",
                 projection = projection,
-                locale = Locale.US,
+                prepared = preparedHighlightSpeech(projection),
             )
         assertNull(resolver?.invoke("plain", "Hello world."))
     }

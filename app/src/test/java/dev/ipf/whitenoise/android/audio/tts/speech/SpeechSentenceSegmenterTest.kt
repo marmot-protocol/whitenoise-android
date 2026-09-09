@@ -86,6 +86,16 @@ class SpeechSentenceSegmenterTest {
     }
 
     @Test
+    fun literalFallbackUsesLocaleAwareFullWidthSentenceBoundaries() {
+        val source = "你好。世界！真的嗎？"
+
+        val sentences = segment(source, locale = Locale.SIMPLIFIED_CHINESE)
+
+        assertEquals(listOf("你好。", "世界！", "真的嗎？"), sentences.map { source.slice(it) })
+        assertEquals(listOf(0, 1, 2), sentences.map(SpeechSentence::ordinal))
+    }
+
+    @Test
     fun codeLinesAreTheirOwnLogicalNavigationUnits() {
         val source = "if ready:\n    send()\nstop()"
 
@@ -135,11 +145,12 @@ class SpeechSentenceSegmenterTest {
         source: String,
         role: SpeechRole = SpeechRole.Prose,
         revisionId: String = "rev-1",
+        locale: Locale = Locale.US,
     ): List<SpeechSentence> =
         SpeechSentenceSegmenter.segment(
             source = source,
             role = role,
-            context = SpeechContext(voiceLocale = Locale.US),
+            context = SpeechContext(voiceLocale = locale),
             revisionId = revisionId,
         )
 

@@ -55,7 +55,6 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -658,12 +657,12 @@ internal fun MessageBubble(
             progress = ttsReadAloudProgress,
         )
     val effectiveTtsPassage = ttsProjectionState.effectivePassage
-    val ttsLocale = appState.ttsController.effectiveSpeechLocale ?: LocalLocale.current.platformLocale
+    val preparedTtsSpeech =
+        appState.ttsController.preparedSpeechFor(record.messageIdHex, speakableProjection?.projectionId)
     val ttsProjectionResolver =
         rememberTtsHighlightProjectionResolver(
             speakableProjection,
-            ttsLocale,
-            appState.ttsController.preparedSpeechFor(record.messageIdHex, speakableProjection?.projectionId),
+            preparedTtsSpeech,
         )
     val ttsLeafHighlightResolver =
         remember(effectiveTtsPassage, record.messageIdHex, ttsProjectionResolver) {
@@ -967,8 +966,7 @@ internal fun MessageBubble(
 
     /** Starts from the selected sentence and preserves a specific start-gate explanation. */
     fun startSpeakAloud(
-        visibleText: String? = null,
-        visibleOffset: Int? = null,
+        startRenderedHit: RenderedTextHit? = null,
         literalCode: Boolean = false,
     ) {
         if (deleted) return
@@ -993,23 +991,19 @@ internal fun MessageBubble(
                 appState.present(R.string.tts_bar_error)
                 return@launchMutation
             }
-            val startSentenceIndex =
-                if (visibleText == null || visibleOffset == null) {
-                    0
-                } else {
-                    speakableSentenceIndexAtVisibleOffset(
-                        visibleText = visibleText,
-                        speakableText = entries.first().text,
-                        visibleOffset = visibleOffset,
-                        locale = locale,
-                    )
-                }
             val started =
                 appState.speakAloudAutoRead(
                     controller.group.groupIdHex,
                     entries,
                     locale,
-                    startSentenceIndex,
+                    startRenderedHit =
+                        startRenderedHit?.let {
+                            dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit(
+                                it.leafId,
+                                it.renderedText,
+                                it.renderedOffset,
+                            )
+                        },
                     backgroundPreparation = true,
                 )
             if (!started) appState.present(appState.ttsStartFailureMessage())
@@ -1023,18 +1017,17 @@ internal fun MessageBubble(
             startSpeakAloud()
             return
         }
-        val visibleText = concatenatedVisibleText(layouts).ifBlank { displayedBody }
-        val visibleOffset =
+        val renderedHit =
             if (record.contentTokens.truncated) {
                 null
             } else {
-                visibleOffsetFromSelection(
+                renderedTextHitFromSelection(
                     layouts = layouts,
                     selectedTexts = messageTextSelectionState.selectedTexts,
                     preferredVisibleOffset = selectionSeedVisibleOffset,
                 )
             }
-        startSpeakAloud(visibleText, visibleOffset)
+        startSpeakAloud(renderedHit)
     }
 
     fun seekActiveSentence(sentenceIndex: Int) {
@@ -1104,14 +1097,13 @@ internal fun MessageBubble(
         // Outside playback, links retain their immediate activation and do
         // not become a read-aloud gesture target.
         if (markdownHasLinkAnnotationAt(markdownLinkLayouts.values, pressInWindow)) return
-        val visibleOffset =
+        val renderedHit =
             if (record.contentTokens.truncated) {
                 null
             } else {
-                textOffsetAtWindowPosition(layouts, pressInWindow)
+                renderedTextHitAtWindowPosition(layouts, pressInWindow)
             } ?: return
-        val visibleText = concatenatedVisibleText(layouts).ifBlank { displayedBody }
-        startSpeakAloud(visibleText, visibleOffset)
+        startSpeakAloud(renderedHit)
     }
 
     val sentenceActionsEnabled =

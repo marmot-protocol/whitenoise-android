@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.audio.tts.speech
 
 import dev.ipf.whitenoise.android.audio.tts.TtsTextRange
+import java.text.BreakIterator
+import java.util.Locale
 
 data class SpeechSentence(
     val id: String,
@@ -16,6 +18,9 @@ object SpeechSentenceSegmenter {
         context: SpeechContext,
         revisionId: String,
     ): List<SpeechSentence> {
+        if (usesLocaleAwareBoundaries(role, context)) {
+            return localeAwareSegments(source, role, context, revisionId)
+        }
         val ranges = mutableListOf<TtsTextRange>()
         var start = 0
 
@@ -50,6 +55,35 @@ object SpeechSentenceSegmenter {
             ordinal,
             range,
             ->
+            SpeechSentence("$revisionId:${context.verbalizerVersion}:$ordinal:${range.start}", ordinal, range, role)
+        }
+    }
+
+    private fun usesLocaleAwareBoundaries(
+        role: SpeechRole,
+        context: SpeechContext,
+    ): Boolean = role != SpeechRole.CodeBlock && context.voiceLocale.language != Locale.ENGLISH.language
+
+    private fun localeAwareSegments(
+        source: String,
+        role: SpeechRole,
+        context: SpeechContext,
+        revisionId: String,
+    ): List<SpeechSentence> {
+        val iterator = BreakIterator.getSentenceInstance(context.voiceLocale).apply { setText(source) }
+        val ranges = mutableListOf<TtsTextRange>()
+        var start = iterator.first()
+        var end = iterator.next()
+        while (end != BreakIterator.DONE) {
+            var trimmedStart = start
+            var trimmedEnd = end
+            while (trimmedStart < trimmedEnd && source[trimmedStart].isWhitespace()) trimmedStart++
+            while (trimmedEnd > trimmedStart && source[trimmedEnd - 1].isWhitespace()) trimmedEnd--
+            if (trimmedStart < trimmedEnd) ranges += TtsTextRange(trimmedStart, trimmedEnd)
+            start = end
+            end = iterator.next()
+        }
+        return ranges.mapIndexed { ordinal, range ->
             SpeechSentence("$revisionId:${context.verbalizerVersion}:$ordinal:${range.start}", ordinal, range, role)
         }
     }

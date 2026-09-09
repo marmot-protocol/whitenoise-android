@@ -2,6 +2,9 @@ package dev.ipf.whitenoise.android.audio.tts
 
 import android.os.SystemClock
 import android.speech.tts.TextToSpeech
+import dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit
+import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSeekResolver
+import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSeekTarget
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSpeechMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -339,11 +342,16 @@ class TtsController internal constructor(
         entries: List<TtsSpeakableEntry>,
         locale: Locale,
         startSentenceIndex: Int = 0,
+        startRenderedHit: PreparedRenderedHit? = null,
         onPreparing: () -> Boolean,
     ): Boolean {
         val ticket = synchronized(this) { preparationTicket(entries, locale) } ?: return false
         try {
-            return if (!onPreparing()) false else completePreparation(ticket, entries, startSentenceIndex)
+            return if (!onPreparing()) {
+                false
+            } else {
+                completePreparation(ticket, entries, startSentenceIndex, startRenderedHit)
+            }
         } finally {
             synchronized(this) {
                 if (preparationRequests.isCurrent(ticket.first) && state.value is TtsState.Preparing) stop()
@@ -355,17 +363,30 @@ class TtsController internal constructor(
         ticket: Triple<Long, TtsSpeechEngine, Locale>,
         entries: List<TtsSpeakableEntry>,
         startSentenceIndex: Int,
+        startRenderedHit: PreparedRenderedHit?,
     ): Boolean {
-        val messages =
+        val preparedStart =
             withContext(Dispatchers.Default) {
                 val job = currentCoroutineContext()
-                with(preparation) {
-                    entries.toQueuedMessages(ticket.third) {
-                        !job.isActive ||
-                            !preparationRequests.isCurrent(ticket.first)
+                val messages =
+                    with(preparation) {
+                        entries.toQueuedMessages(ticket.third) {
+                            !job.isActive ||
+                                !preparationRequests.isCurrent(ticket.first)
+                        }
                     }
-                }
+                val resolvedStart =
+                    startRenderedHit
+                        ?.let { hit ->
+                            messages.firstOrNull()?.prepared?.let { prepared ->
+                                PreparedSeekResolver.resolve(prepared, hit)
+                            }
+                        }.let { target ->
+                            (target as? PreparedSeekTarget.Sentence)?.ordinal ?: startSentenceIndex
+                        }
+                messages to resolvedStart
             }
+        val (messages, resolvedStart) = preparedStart
         return synchronized(this) {
             if (!preparationRequests.isCurrent(ticket.first) ||
                 engine !== ticket.second ||
@@ -373,7 +394,7 @@ class TtsController internal constructor(
             ) {
                 return@synchronized false
             }
-            speakPrepared(entries, ticket.third, startSentenceIndex, messages)
+            speakPrepared(entries, ticket.third, resolvedStart, messages)
         }
     }
 
