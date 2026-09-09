@@ -831,6 +831,7 @@ abstract class NotificationRouteTimelinePresentationFixture {
             when (method.name.substringBefore('-')) {
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 // Preserve ordinary notification activation through the setup eligibility check.
+                "onboardingRecoveryRequired" -> false
                 "onboardingSnapshot" -> null
                 "groupDetails" -> {
                     groupDetails()
