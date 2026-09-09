@@ -30,16 +30,17 @@ class ConversationDictationMicrophoneAccessTest {
     }
 
     @Test
-    fun globalMicrophoneToggleDoesNotBecomePermanentAppPermissionDenial() {
+    fun globalMicrophoneToggleLeavesGrantedRuntimePermissionUsableForNativeRecovery() {
         setMode(AppOpsManager.MODE_FOREGROUND)
         context.getSystemService(AudioManager::class.java).isMicrophoneMute = true
 
-        // Android 16's effective check also includes global sensor privacy.
+        // Android 16's effective check includes global sensor privacy, but creating the recognizer
+        // is what gives Android the opportunity to present its native microphone-unblock prompt.
         assertEquals(
             AppOpsManager.MODE_IGNORED,
             appOps.checkOpNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
         )
-        assertEquals(ConversationDictationMicrophoneAccess.MicrophoneMuted, platform.microphoneAccess())
+        assertEquals(ConversationDictationMicrophoneAccess.Granted, platform.microphoneAccess())
     }
 
     @Test
@@ -51,10 +52,10 @@ class ConversationDictationMicrophoneAccessTest {
     }
 
     @Test
-    fun effectiveAppOpDenialsOfferSystemPrivacyRecovery() {
+    fun effectiveAppOpDenialsDoNotOverrideGrantedRuntimePermission() {
         for (mode in listOf(AppOpsManager.MODE_IGNORED, AppOpsManager.MODE_ERRORED)) {
             setMode(mode)
-            assertEquals(ConversationDictationMicrophoneAccess.MicrophoneMuted, platform.microphoneAccess())
+            assertEquals(ConversationDictationMicrophoneAccess.Granted, platform.microphoneAccess())
         }
     }
 
