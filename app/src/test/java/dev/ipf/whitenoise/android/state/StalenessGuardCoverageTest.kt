@@ -146,7 +146,11 @@ class StalenessGuardCoverageTest {
                 "Controllers.kt:confirmGroupRejoin" to
                     listOf("groupRecoveryLifetime.capture", "groupRecoveryLifetime.runIfCurrent"),
                 "Controllers.kt:declineGroupRejoin" to
-                    listOf("groupRecoveryLifetime.capture", "groupRecoveryLifetime.runIfCurrent"),
+                    listOf(
+                        "groupRecoveryLifetime.capture",
+                        "groupRecoveryLifetime.runIfCurrent",
+                        "refreshGroupRecoveryStatus",
+                    ),
             )
         guardedPaths.forEach { (path, markers) ->
             val (fileName, functionName) = path.split(':', limit = 2)

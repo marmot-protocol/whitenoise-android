@@ -7508,6 +7508,7 @@ class ConversationController(
                         )
                 }
             }
+            refreshGroupRecoveryStatus()
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (throwable: Throwable) {
