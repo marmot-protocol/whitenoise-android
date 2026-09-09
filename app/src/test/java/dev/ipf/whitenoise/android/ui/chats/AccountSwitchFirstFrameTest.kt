@@ -17,7 +17,13 @@ import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListAvatarFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
+import dev.ipf.marmotkit.PresentationResolutionFfi
+import dev.ipf.marmotkit.PresentationSourceFfi
+import dev.ipf.marmotkit.PresentationTextFfi
+import dev.ipf.marmotkit.PresentedChatRowFfi
+import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
@@ -95,6 +101,51 @@ class AccountSwitchFirstFrameTest {
         composeRule
             .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
             .assertCountEquals(0)
+
+        controller.onCleared()
+    }
+
+    /** The atomic 0.9.20 presentation is visible before live convergence can emit. */
+    @Test
+    fun selectedPresentationOwnsTheFirstAccountSwitchFrame() {
+        val appState = testAppState()
+        val rawRow = row(title = "").copy(groupName = "")
+        val presentation =
+            ConversationPresentationFfi(
+                title = PresentationTextFfi.Literal(PRESENTED_TITLE),
+                avatar = SelectedAvatarFfi.Placeholder(GROUP_ID, PresentationSourceFfi.GROUP_FALLBACK),
+                titleSource = PresentationSourceFfi.GROUP_FALLBACK,
+                avatarSource = PresentationSourceFfi.GROUP_FALLBACK,
+                peerId = null,
+                resolution = PresentationResolutionFfi.FALLBACK,
+            )
+        val controller =
+            ChatsController(
+                appState = appState,
+                initialAccountRef = TARGET_ACCOUNT,
+                memberSnapshotLoader = { _, _ -> emptyList() },
+                initialLocalSnapshot =
+                    snapshot(rawRow).copy(
+                        presentedRows = listOf(PresentedChatRowFfi(rawRow, presentation)),
+                    ),
+            )
+        appState.attachChatsController(controller)
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    ChatsScreen(
+                        appState = appState,
+                        controller = controller,
+                        onOpenSettings = {},
+                        onOpenGroup = { _, _, _, _ -> },
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText(PRESENTED_TITLE).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.unknown)).assertDoesNotExist()
 
         controller.onCleared()
     }
@@ -478,6 +529,7 @@ class AccountSwitchFirstFrameTest {
         val MEMBER_GROUP_ID = "4".repeat(64)
         const val CACHED_TITLE = "Target cached chat"
         const val CONVERGED_TITLE = "Target converged chat"
+        const val PRESENTED_TITLE = "Target presented chat"
         const val TARGET_NAMED_TITLE = "Target planning"
         const val TARGET_NAMED_AVATAR = "https://profiles.example/target-group.png"
         const val TARGET_MEMBER_AVATAR_HASH = "target-member-avatar-hash"

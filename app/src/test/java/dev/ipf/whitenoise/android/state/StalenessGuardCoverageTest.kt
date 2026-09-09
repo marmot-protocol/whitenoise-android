@@ -38,6 +38,7 @@ class StalenessGuardCoverageTest {
                         "memberRosterRefreshGeneration",
                         "timelineWindowGeneration",
                         "managementStateLifetime",
+                        "groupRecoveryLifetime",
                     ),
                 "AccountUnreadStore.kt" to listOf("refreshes"),
                 "AttachmentOpenCoordinator.kt" to listOf("openRequests"),
@@ -140,6 +141,16 @@ class StalenessGuardCoverageTest {
                     listOf("shouldAcceptMediaUploadForAccount", "mediaUploadSessionEpoch"),
                 "Controllers.kt:refreshManagementState" to
                     listOf("managementStateLifetime.advance", "managementStateLifetime.runIfCurrent"),
+                "Controllers.kt:refreshGroupRecoveryStatus" to
+                    listOf("groupRecoveryLifetime.capture", "groupRecoveryLifetime.runIfCurrent"),
+                "Controllers.kt:confirmGroupRejoin" to
+                    listOf("groupRecoveryLifetime.capture", "groupRecoveryLifetime.runIfCurrent"),
+                "Controllers.kt:declineGroupRejoin" to
+                    listOf(
+                        "groupRecoveryLifetime.capture",
+                        "groupRecoveryLifetime.runIfCurrent",
+                        "refreshGroupRecoveryStatus",
+                    ),
             )
         guardedPaths.forEach { (path, markers) ->
             val (fileName, functionName) = path.split(':', limit = 2)

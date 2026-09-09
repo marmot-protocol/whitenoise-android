@@ -1765,4 +1765,25 @@
     <string name="setup_details">Details</string>
     <string name="setup_hide_details">Details ausblenden</string>
     <string name="setup_opening_chats">Deine Chats werden geöffnet…</string>
+    <string name="unnamed_group">Unbenannte Gruppe</string>
+    <string name="conversation_unavailable">Unterhaltung nicht verfügbar</string>
+    <string name="onboarding_recover_setup_title">Anmeldeeinrichtung wiederherstellen?</string>
+    <string name="onboarding_recover_setup_for">Anmeldeeinrichtung für %1$s wiederherstellen</string>
+    <string name="onboarding_recover_setup_confirm">Einrichtung wiederherstellen</string>
+    <string name="onboarding_recover_setup_explanation">Bei der Wiederherstellung wird dieses Profil abgemeldet und der nicht lesbare Einrichtungsstand ersetzt. Nur der neueste Wiederherstellungsnachweis bleibt erhalten; frühere Veröffentlichungen auf Relays werden nicht rückgängig gemacht. Du benötigst den privaten Schlüssel, um eine neue Anmeldung zu beginnen. Diese Aktion genehmigt keine Veröffentlichung.</string>
+    <string name="onboarding_recover_setup_success">Einrichtung wiederhergestellt. Gib den privaten Schlüssel dieses Profils ein, um eine neue Anmeldung zu beginnen.</string>
+    <string name="onboarding_recover_setup_failed">Einrichtung konnte nicht wiederhergestellt werden. Versuche es erneut.</string>
+    <string name="group_recovery_automatic_failed">Die Gruppensynchronisierung konnte nicht wiederhergestellt werden.</string>
+    <string name="group_recovery_pending_reinvites">Einige Einladungen werden automatisch erneut versucht.</string>
+    <string name="group_recovery_failed_reinvites">Einige Einladungen konnten nicht wiederhergestellt werden. Lade diese Personen in den Gruppendetails erneut ein.</string>
+    <string name="group_recovery_review_invitation_from">Einladung von %1$s prüfen · Epoche %2$s</string>
+    <string name="group_recovery_check_failed">Die Gruppenwiederherstellung konnte nicht geprüft werden. Versuche es erneut.</string>
+    <string name="group_rejoin_title">Gruppe erneut beitreten?</string>
+    <string name="group_rejoin_invited_by">Eingeladen von %1$s\n%2$s</string>
+    <string name="group_rejoin_replaces_state">Beim erneuten Beitritt wird der aktuelle Gruppenstand dieses Geräts durch die eingeladene Kopie ersetzt. Dein gespeicherter Nachrichtenverlauf bleibt erhalten.</string>
+    <string name="group_rejoin_trust_warning">Tritt nur erneut bei, wenn du dieser Einladung vertraust. Eine neuere Gruppenversion allein macht sie nicht vertrauenswürdig.</string>
+    <string name="group_rejoin_confirm">Gruppe erneut beitreten</string>
+    <string name="group_rejoin_decline">Einladung ablehnen</string>
+    <string name="group_rejoin_success">Gruppe erneut beigetreten.</string>
+    <string name="group_rejoin_failed">Einladung konnte nicht angewendet werden</string>
 </resources>

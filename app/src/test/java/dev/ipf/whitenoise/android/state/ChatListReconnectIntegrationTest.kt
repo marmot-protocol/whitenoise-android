@@ -10,6 +10,15 @@ import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.marmotkit.ConversationPresentationFfi
+import dev.ipf.marmotkit.PresentationResolutionFfi
+import dev.ipf.marmotkit.PresentationSourceFfi
+import dev.ipf.marmotkit.PresentationTextFfi
+import dev.ipf.marmotkit.PresentationVersionFfi
+import dev.ipf.marmotkit.PresentedChatListSnapshotFfi
+import dev.ipf.marmotkit.PresentedChatListUpdateFfi
+import dev.ipf.marmotkit.PresentedChatRowFfi
+import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -395,21 +404,29 @@ private fun awaitChatListCondition(condition: () -> Boolean) {
 private class ScriptedChatListSubscription(
     private val initialRow: ChatListRowFfi,
 ) : ChatListSubscriptionHandle {
-    private val updates = Channel<ChatListSubscriptionUpdateFfi>(Channel.UNLIMITED)
+    private val updates = Channel<PresentedChatListUpdateFfi>(Channel.UNLIMITED)
+    private var sequence = 0uL
     val nextUpdateStarted = CompletableDeferred<Unit>()
 
     /** Returns the local projection present before reconnect. */
-    override fun snapshot(): List<ChatListRowFfi> = listOf(initialRow)
+    override fun snapshot(): PresentedChatListUpdateFfi = presentedUpdate(listOf(initialRow), sequence)
 
     /** Waits for the test-controlled authoritative recovery update. */
-    override suspend fun nextUpdate(): ChatListSubscriptionUpdateFfi? {
+    override suspend fun nextUpdate(): PresentedChatListUpdateFfi? {
         nextUpdateStarted.complete(Unit)
         return updates.receiveCatching().getOrNull()
     }
 
     /** Delivers one authoritative update without blocking the test thread. */
     fun emit(update: ChatListSubscriptionUpdateFfi) {
-        check(updates.trySend(update).isSuccess)
+        val rows =
+            when (update) {
+                is ChatListSubscriptionUpdateFfi.Row -> listOf(update.row)
+                is ChatListSubscriptionUpdateFfi.Snapshot -> update.rows
+                is ChatListSubscriptionUpdateFfi.RemoveRow -> emptyList()
+            }
+        sequence += 1uL
+        check(updates.trySend(presentedUpdate(rows, sequence)).isSuccess)
     }
 
     /** Ends the scripted stream. */
@@ -472,9 +489,11 @@ private class TerminatingChatListSubscription : ChatListSubscriptionHandle {
     private val terminated = CompletableDeferred<Unit>()
     val nextUpdateStarted = CompletableDeferred<Unit>()
 
-    override fun snapshot(): List<ChatListRowFfi> = emptyList()
+    /** Returns the empty initial frame for this replacement handle. */
+    override fun snapshot(): PresentedChatListUpdateFfi = presentedUpdate(emptyList(), 0uL)
 
-    override suspend fun nextUpdate(): ChatListSubscriptionUpdateFfi? {
+    /** Waits until the test ends this stream normally. */
+    override suspend fun nextUpdate(): PresentedChatListUpdateFfi? {
         nextUpdateStarted.complete(Unit)
         terminated.await()
         return null
@@ -485,10 +504,40 @@ private class TerminatingChatListSubscription : ChatListSubscriptionHandle {
         terminated.complete(Unit)
     }
 
+    /** Ends any pending wait during fixture teardown. */
     override fun close() {
         terminate()
     }
 }
+
+/** Complete selected-presentation frame matching MarmotKit 0.9.20's subscription contract. */
+private fun presentedUpdate(
+    rows: List<ChatListRowFfi>,
+    sequence: ULong,
+) = PresentedChatListUpdateFfi(
+    subscriptionGeneration = "test-generation",
+    sequence = sequence,
+    snapshot =
+        PresentedChatListSnapshotFfi(
+            rows = rows.map(::presentedRow),
+            presentationVersion = PresentationVersionFfi(byteArrayOf(1), sequence),
+        ),
+)
+
+/** Pairs a chat row with deterministic selected title and avatar values. */
+private fun presentedRow(row: ChatListRowFfi) =
+    PresentedChatRowFfi(
+        row = row,
+        presentation =
+            ConversationPresentationFfi(
+                title = PresentationTextFfi.Literal(row.title.ifBlank { "Chat" }),
+                avatar = SelectedAvatarFfi.Placeholder(row.groupIdHex, PresentationSourceFfi.GROUP_FALLBACK),
+                titleSource = PresentationSourceFfi.GROUP_FALLBACK,
+                avatarSource = PresentationSourceFfi.GROUP_FALLBACK,
+                peerId = null,
+                resolution = PresentationResolutionFfi.FALLBACK,
+            ),
+    )
 
 /** Live-source fixture that fails its first chat-list open and holds the second open. */
 private class FailFirstChatListSubscriptions {

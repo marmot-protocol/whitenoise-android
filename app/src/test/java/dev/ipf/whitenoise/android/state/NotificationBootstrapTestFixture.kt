@@ -10,9 +10,11 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.ChatListRowFfi
-import dev.ipf.marmotkit.ChatListSubscription
 import dev.ipf.marmotkit.ChatNotificationSettingsFfi
 import dev.ipf.marmotkit.ChatsSubscription
+import dev.ipf.marmotkit.ConversationPresentationFfi
+import dev.ipf.marmotkit.DiagnosticsExporterStatusFfi
+import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
@@ -24,12 +26,24 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
+import dev.ipf.marmotkit.PresentationResolutionFfi
+import dev.ipf.marmotkit.PresentationSourceFfi
+import dev.ipf.marmotkit.PresentationTextFfi
+import dev.ipf.marmotkit.PresentationVersionFfi
+import dev.ipf.marmotkit.PresentedChatListSnapshotFfi
+import dev.ipf.marmotkit.PresentedChatListSubscription
+import dev.ipf.marmotkit.PresentedChatListUpdateFfi
+import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.PushRegistrationShareOutcomeFfi
 import dev.ipf.marmotkit.PushRegistrationShareStatusFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
+import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
+import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
+import dev.ipf.marmotkit.UsageDiagnosticsStatusFfi
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -196,6 +210,7 @@ internal class NotificationBootstrapTestFixture(
             // on the source-level Marmot method so these real bridge calls reach
             // their intended fakes.
             when (method.name.substringBefore('-')) {
+                "onboardingRecoveryRequired" -> false
                 "onboardingSnapshot" -> onOnboardingSnapshot?.invoke()
                 "start" -> {
                     runtimeStartCalls.incrementAndGet()
@@ -213,6 +228,26 @@ internal class NotificationBootstrapTestFixture(
                 "setRelayTelemetryRuntimeConfig", "setProductAnalyticsRuntimeConfig" -> Unit
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "setAuditLogTrackerConfig" -> arguments?.first()
+                "usageDiagnosticsSettings" -> {
+                    emitAtFirstPostStartFfiBoundary()
+                    UsageDiagnosticsSettingsFfi(
+                        decision = UsageDiagnosticsDecisionFfi.DECLINED,
+                        policyRevision = "test-policy",
+                        registryRevision = "test-registry",
+                        updatedAtMs = 0L,
+                        previouslyEnabled = false,
+                    )
+                }
+                "usageDiagnosticsStatus" ->
+                    UsageDiagnosticsStatusFfi(
+                        consent = UsageDiagnosticsDecisionFfi.DECLINED,
+                        telemetry = DiagnosticsExporterStatusFfi.DISABLED,
+                        productAnalytics = DiagnosticsExporterStatusFfi.UNSUPPORTED_BUILD,
+                        queuedEvents = 0uL,
+                        droppedEvents = 0uL,
+                        acceptedBatches = 0uL,
+                        failedBatches = 0uL,
+                    )
                 "relayTelemetrySettings" -> {
                     emitAtFirstPostStartFfiBoundary()
                     RelayTelemetrySettingsFfi(exportEnabled = false, exportIntervalSeconds = 60uL)
@@ -230,6 +265,14 @@ internal class NotificationBootstrapTestFixture(
                         muted = false,
                         mutedUntilMs = null,
                         updatedAtMs = 0L,
+                    )
+                "groupRecoveryStatus" ->
+                    GroupRecoveryStatusFfi(
+                        groupIdHex = arguments?.get(1) as String,
+                        automaticRecoveryFailed = false,
+                        pendingReinvites = 0u,
+                        failedReinvites = 0u,
+                        rejoinInvitations = emptyList(),
                     )
                 "notificationSettings" -> {
                     val accountRef = arguments?.get(0) as String
@@ -303,7 +346,7 @@ internal class NotificationBootstrapTestFixture(
                     "npub1coldidentityfallback"
                 }
                 "listAccounts" -> accounts
-                "subscribeChatList" -> {
+                "openPresentedChatList" -> {
                     localSnapshotSubscriptionCalls.incrementAndGet()
                     emptyChatListSubscription()
                 }
@@ -314,6 +357,10 @@ internal class NotificationBootstrapTestFixture(
                 "chatList" -> {
                     directChatListCalls.incrementAndGet()
                     onChatList?.invoke(arguments?.get(0) as String) ?: chatListRows
+                }
+                "presentedChatList" -> {
+                    directChatListCalls.incrementAndGet()
+                    presentedChatListSnapshot(onChatList?.invoke(arguments?.get(0) as String) ?: chatListRows)
                 }
                 "timelineMessages" -> {
                     notificationTimelineCalls.incrementAndGet()
@@ -388,8 +435,8 @@ internal class NotificationBootstrapTestFixture(
             notificationFirstPostTimingObserver = notificationFirstPostTimingObserver,
         )
 
-    /** Supplies an inert local chat-list snapshot without a native pointer. */
-    private fun emptyChatListSubscription(): ChatListSubscription =
+    /** Creates the inert presented-list handle used by bootstrap tests. */
+    private fun emptyChatListSubscription(): PresentedChatListSubscription =
         allocateWithoutConstructor(EmptyChatListSubscription::class.java).apply {
             onSnapshot = localSnapshotReadCalls::incrementAndGet
             rows = chatListRows
@@ -443,14 +490,22 @@ internal class NotificationBootstrapTestFixture(
         return unsafeClass.getMethod("allocateInstance", Class::class.java).invoke(unsafe, type) as T
     }
 
-    private class EmptyChatListSubscription : ChatListSubscription(NoPointer) {
+    private class EmptyChatListSubscription : PresentedChatListSubscription(NoPointer) {
         lateinit var onSnapshot: () -> Unit
         lateinit var rows: List<ChatListRowFfi>
 
-        override fun snapshot(): List<ChatListRowFfi> {
+        /** Returns the fixture's complete initial selected-presentation frame. */
+        override fun snapshot(): PresentedChatListUpdateFfi {
             onSnapshot()
-            return rows
+            return PresentedChatListUpdateFfi(
+                subscriptionGeneration = "notification-bootstrap",
+                sequence = 0u,
+                snapshot = presentedChatListSnapshot(rows),
+            )
         }
+
+        /** Ends immediately because bootstrap cases do not require live list updates. */
+        override suspend fun next(): PresentedChatListUpdateFfi? = null
 
         override fun close() = Unit
     }
@@ -745,3 +800,28 @@ internal class NotificationBootstrapTestFixture(
         }
     }
 }
+
+/** Builds the same selected-presentation shape for one-shot and subscribed fixture reads. */
+private fun presentedChatListSnapshot(rows: List<ChatListRowFfi>) =
+    PresentedChatListSnapshotFfi(
+        rows =
+            rows.map { row ->
+                PresentedChatRowFfi(
+                    row = row,
+                    presentation =
+                        ConversationPresentationFfi(
+                            title = PresentationTextFfi.Literal(row.title.ifBlank { "Chat" }),
+                            avatar =
+                                SelectedAvatarFfi.Placeholder(
+                                    row.groupIdHex,
+                                    PresentationSourceFfi.GROUP_FALLBACK,
+                                ),
+                            titleSource = PresentationSourceFfi.GROUP_FALLBACK,
+                            avatarSource = PresentationSourceFfi.GROUP_FALLBACK,
+                            peerId = null,
+                            resolution = PresentationResolutionFfi.FALLBACK,
+                        ),
+                )
+            },
+        presentationVersion = PresentationVersionFfi(byteArrayOf(1), 0u),
+    )

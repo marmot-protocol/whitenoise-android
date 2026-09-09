@@ -9,6 +9,8 @@ data class GroupTitleCopy(
     val groupOfPeopleFormat: String,
     val unknownTitle: String,
     val soleMemberTitle: String = "Just you",
+    val unnamedGroupTitle: String = "Unnamed group",
+    val unavailableConversationTitle: String = "Conversation unavailable",
 ) {
     fun inviteFrom(name: String): String = String.format(inviteFromFormat, name)
 

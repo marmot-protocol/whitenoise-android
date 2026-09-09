@@ -1,37 +1,45 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupRecordFfi
-import dev.ipf.marmotkit.ChatListRowFfi
-import dev.ipf.marmotkit.ChatListSubscription
-import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatsSubscription
+import dev.ipf.marmotkit.PresentedChatListSubscription
+import dev.ipf.marmotkit.PresentedChatListUpdateFfi
 
 /** Lifecycle seam for the authoritative chat-list projection stream. */
 internal interface ChatListSubscriptionHandle {
-    fun snapshot(): List<ChatListRowFfi>
+    /** Returns the complete first frame captured when this handle opened. */
+    fun snapshot(): PresentedChatListUpdateFfi?
 
-    suspend fun nextUpdate(): ChatListSubscriptionUpdateFfi?
+    /** Waits for the next authoritative presented-list frame. */
+    suspend fun nextUpdate(): PresentedChatListUpdateFfi?
 
+    /** Releases this handle and unblocks any pending update read. */
     fun close()
 }
 
 /** Lifecycle seam for the matching group-record stream. */
 internal interface ChatsSubscriptionHandle {
+    /** Returns the matching initial group-record snapshot. */
     fun snapshot(): List<AppGroupRecordFfi>
 
+    /** Waits for the next group-record update. */
     suspend fun next(): AppGroupRecordFfi?
 
+    /** Releases this handle and unblocks any pending update read. */
     fun close()
 }
 
 /** Production adapter around MarmotKit's chat-list subscription. */
 private class FfiChatListSubscriptionHandle(
-    private val subscription: ChatListSubscription,
+    private val subscription: PresentedChatListSubscription,
 ) : ChatListSubscriptionHandle {
-    override fun snapshot(): List<ChatListRowFfi> = subscription.snapshot()
+    /** Delegates the initial frame without changing native cursor identity. */
+    override fun snapshot(): PresentedChatListUpdateFfi? = subscription.snapshot()
 
-    override suspend fun nextUpdate(): ChatListSubscriptionUpdateFfi? = subscription.nextUpdate()
+    /** Delegates the next-frame wait to MarmotKit. */
+    override suspend fun nextUpdate(): PresentedChatListUpdateFfi? = subscription.next()
 
+    /** Closes the underlying MarmotKit subscription. */
     override fun close() = subscription.close()
 }
 
@@ -39,10 +47,13 @@ private class FfiChatListSubscriptionHandle(
 private class FfiChatsSubscriptionHandle(
     private val subscription: ChatsSubscription,
 ) : ChatsSubscriptionHandle {
+    /** Delegates the initial group-record frame. */
     override fun snapshot(): List<AppGroupRecordFfi> = subscription.snapshot()
 
+    /** Delegates the next group-record wait. */
     override suspend fun next(): AppGroupRecordFfi? = subscription.next()
 
+    /** Closes the underlying MarmotKit subscription. */
     override fun close() = subscription.close()
 }
 
@@ -57,7 +68,7 @@ internal class ChatListLiveSubscriptions(
             ChatListLiveSubscriptions(
                 openChatList = { account, includeArchived ->
                     appState.marmotIo {
-                        FfiChatListSubscriptionHandle(subscribeChatList(account, includeArchived))
+                        FfiChatListSubscriptionHandle(openPresentedChatList(account, includeArchived))
                     }
                 },
                 openChats = { account, includeArchived ->

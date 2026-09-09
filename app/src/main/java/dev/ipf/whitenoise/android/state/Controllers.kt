@@ -11,7 +11,6 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AgentStreamSubscription
 import dev.ipf.marmotkit.AgentStreamUpdateFfi
 import dev.ipf.marmotkit.AppGroupMemberIdsFfi
@@ -26,11 +25,14 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
+import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
 import dev.ipf.marmotkit.GroupMutationResultFfi
 import dev.ipf.marmotkit.GroupPushDebugInfoFfi
+import dev.ipf.marmotkit.GroupRecoveryStatusFfi
+import dev.ipf.marmotkit.GroupRejoinInvitationFfi
 import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotKitException
@@ -39,6 +41,8 @@ import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.PresentedChatListUpdateFfi
+import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -124,221 +128,6 @@ import java.util.Locale
 import java.util.UUID
 import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
-
-enum class ChatListAvatarSource {
-    LEGACY_URL,
-    ENCRYPTED_GROUP,
-    FALLBACK_URL,
-}
-
-data class ChatListAvatarSeed(
-    val source: ChatListAvatarSource,
-    val key: String,
-    val image: ImageBitmap,
-)
-
-/**
- * Build a `ChatListItem` from the FFI projection. [members] is the current
- * authoritative roster used for membership-sensitive fields. The optional
- * [presentationMembers] supplies only last-known, display-shaped values while
- * a newer authoritative roster is loading; it never populates
- * [ChatListItem.memberSnapshot] or exposes a stale roster to callers.
- */
-internal fun chatListItemFromProjection(
-    row: ChatListRowFfi,
-    group: AppGroupRecordFfi? = null,
-    activeAccountIdHex: String? = null,
-    members: List<AppGroupMemberRecordFfi>? = null,
-    presentationMembers: ChatListMemberPresentation? = null,
-    previewTokens: MarkdownDocumentFfi? = chatRowPreviewTokens(row),
-    resolvedMediaPreviewFallback: MediaPreviewFallback? = null,
-    removed: Boolean = false,
-    activitySequence: ULong = 0uL,
-): ChatListItem {
-    val baseGroup = group ?: emptyGroupRecord(row)
-    val displayGroup = chatListDisplayGroup(row, baseGroup)
-    val presentation = members?.let { chatListMemberPresentation(it, activeAccountIdHex) } ?: presentationMembers
-    return ChatListItem(
-        group = displayGroup,
-        latest =
-            row.lastMessage?.let { preview ->
-                AppMessageRecordFfi(
-                    messageIdHex = preview.messageIdHex,
-                    direction = "received",
-                    groupIdHex = row.groupIdHex,
-                    sender = preview.sender,
-                    plaintext = preview.plaintext,
-                    // Deliberately empty: the projected Markdown document rides
-                    // [ChatListItem.previewTokens], not this synthesized record.
-                    // Legacy projections with an empty document use the
-                    // controller's bounded asynchronous fallback parser.
-                    contentTokens = EMPTY_MARKDOWN_DOCUMENT,
-                    kind = preview.kind,
-                    tags = emptyList(),
-                    sourceEpoch = null,
-                    retentionSeconds = null,
-                    retentionExpiresAt = null,
-                    recordedAt = preview.timelineAt,
-                    receivedAt = preview.timelineAt,
-                )
-            },
-        otherMemberAccount =
-            members?.let { GroupProjector.otherMemberAccount(it, activeAccountIdHex) },
-        memberCount = members?.let(GroupProjector::uniqueMemberCount) ?: 0,
-        memberSnapshot = members?.let(::GroupMemberSnapshot),
-        presentationOtherMemberAccount = presentation?.otherMemberAccount,
-        presentationMemberCount = presentation?.memberCount ?: 0,
-        presentationActiveAccountIsSoleMember = presentation?.activeAccountIsSoleMember == true,
-        projection = row,
-        previewTokens = previewTokens,
-        resolvedMediaPreviewFallback = resolvedMediaPreviewFallback,
-        removed = removed,
-        activitySequence = activitySequence,
-    )
-}
-
-internal fun rollbackOptimisticChatListPreview(
-    current: ChatListRowFfi,
-    previous: ChatListRowFfi,
-    optimisticMessageIdHex: String,
-): ChatListRowFfi =
-    if (current.lastMessage?.messageIdHex == optimisticMessageIdHex) {
-        previous
-    } else {
-        current
-    }
-
-internal fun compareTimelineAtMessageIdHex(
-    leftAt: ULong,
-    leftId: String,
-    rightAt: ULong,
-    rightId: String,
-): Int {
-    val atCompare = leftAt.compareTo(rightAt)
-    if (atCompare != 0) return atCompare
-    return leftId.compareTo(rightId)
-}
-
-private fun compareOptionalTimelineAtMessageIdHex(
-    leftAt: ULong?,
-    leftId: String?,
-    rightAt: ULong?,
-    rightId: String?,
-): Int? {
-    if (leftAt == null || rightAt == null) return null
-    if (leftId == null || rightId == null) return null
-    return compareTimelineAtMessageIdHex(leftAt, leftId, rightAt, rightId)
-}
-
-private fun monotonicMaxTimelineAt(
-    current: ULong?,
-    incoming: ULong?,
-): ULong? {
-    if (incoming == null) return current
-    if (current == null) return incoming
-    return maxOf(current, incoming)
-}
-
-private fun mergeMarkReadReadWatermark(
-    current: ChatListRowFfi,
-    incoming: ChatListRowFfi,
-): Pair<ULong?, String?> {
-    val incomingAt = incoming.lastReadTimelineAt
-    val incomingId = incoming.lastReadMessageIdHex
-    if (incomingAt == null || incomingId == null) {
-        return current.lastReadTimelineAt to current.lastReadMessageIdHex
-    }
-    return incomingAt to incomingId
-}
-
-/**
- * Reconcile a [markTimelineMessageRead] return row with the in-memory row.
- * Returns null when the incoming projection is strictly older than what is
- * already folded (a superseded concurrent mark-read).
- */
-internal fun mergeMarkReadChatListRow(
-    current: ChatListRowFfi,
-    incoming: ChatListRowFfi,
-): ChatListRowFfi? {
-    val readCompare =
-        compareOptionalTimelineAtMessageIdHex(
-            incoming.lastReadTimelineAt,
-            incoming.lastReadMessageIdHex,
-            current.lastReadTimelineAt,
-            current.lastReadMessageIdHex,
-        )
-    if (readCompare != null && readCompare < 0) {
-        return null
-    }
-    val incomingLast = incoming.lastMessage
-    val currentLast = current.lastMessage
-    if (currentLast != null && incomingLast != null) {
-        val lastCompare =
-            compareTimelineAtMessageIdHex(
-                incomingLast.timelineAt,
-                incomingLast.messageIdHex,
-                currentLast.timelineAt,
-                currentLast.messageIdHex,
-            )
-        if (lastCompare < 0) {
-            val (readTimelineAt, readMessageIdHex) = mergeMarkReadReadWatermark(current, incoming)
-            return reconcileReadDerivedUnread(
-                current.copy(
-                    lastReadMessageIdHex = readMessageIdHex,
-                    lastReadTimelineAt = readTimelineAt,
-                ),
-            )
-        }
-    }
-    val (readTimelineAt, readMessageIdHex) = mergeMarkReadReadWatermark(current, incoming)
-    return reconcileReadDerivedUnread(
-        incoming.copy(
-            lastMessage = incoming.lastMessage ?: current.lastMessage,
-            lastReadMessageIdHex = readMessageIdHex,
-            lastReadTimelineAt = readTimelineAt,
-        ),
-    )
-}
-
-private fun readWatermarkCoversLastMessage(row: ChatListRowFfi): Boolean {
-    val last = row.lastMessage
-    val readAt = row.lastReadTimelineAt
-    val readId = row.lastReadMessageIdHex
-    return last != null &&
-        readAt != null &&
-        readId != null &&
-        compareTimelineAtMessageIdHex(
-            readAt,
-            readId,
-            last.timelineAt,
-            last.messageIdHex,
-        ) >= 0
-}
-
-private fun hasReadDerivedUnread(row: ChatListRowFfi): Boolean =
-    when {
-        row.unreadCount > 0uL -> true
-        row.hasUnread -> true
-        row.firstUnreadMessageIdHex != null -> true
-        row.unreadMentionCount > 0uL -> true
-        else -> row.unreadMention
-    }
-
-private fun reconcileReadDerivedUnread(incoming: ChatListRowFfi): ChatListRowFfi =
-    if (
-        readWatermarkCoversLastMessage(incoming) &&
-        hasReadDerivedUnread(incoming)
-    ) {
-        incoming.copy(
-            unreadCount = 0uL,
-            hasUnread = false,
-            firstUnreadMessageIdHex = null,
-            unreadMentionCount = 0uL,
-            unreadMention = false,
-        )
-    } else {
-        incoming
-    }
 
 /**
  * Field-wise reducer for live chat-list subscription rows. Subscription rows
@@ -3242,6 +3031,7 @@ class ChatsController private constructor(
     }
 
     private val chatRowsByGroup = LinkedHashMap<String, ChatListRowFfi>()
+    private var selectedPresentationsByGroup = emptyMap<String, ConversationPresentationFfi>()
     private val chatRows: Collection<ChatListRowFfi>
         get() = chatRowsByGroup.values
     private var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
@@ -3493,13 +3283,12 @@ class ChatsController private constructor(
                             activeChatsSubscription = chatStream
                         }
                     }
-                    replaceChatRows(
-                        withContext(Dispatchers.IO) {
-                            chatListStream.snapshot()
-                        },
-                    )
+                    val initialPresentedUpdate =
+                        withContext(Dispatchers.IO) { chatListStream.snapshot() }
+                            .requirePresentedChatListSnapshot()
+                    val presentedCursor = PresentedChatListCursor(initialPresentedUpdate)
+                    replacePresentedChatRows(initialPresentedUpdate.snapshot.rows)
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
-                    chatRows.forEach(::requestChatRowProfiles)
                     groupRecordsById =
                         withContext(Dispatchers.IO) {
                             chatStream.snapshot()
@@ -3542,9 +3331,11 @@ class ChatsController private constructor(
                                         ?.let { generation ->
                                             pendingRecoveryProjectionGeneration.publish(generation)
                                         }
+                                    if (presentedCursor.requiresReopen(update)) break
+                                    if (!presentedCursor.accept(update)) continue
                                     receivedLiveUpdate = true
                                     connectionOwner.noteLiveUpdate(connectionAttempt)
-                                    applyChatListSubscriptionUpdate(accountRef, update)
+                                    applyPresentedChatListUpdate(accountRef, update)
                                 }
                             },
                             second = {
@@ -4355,6 +4146,7 @@ class ChatsController private constructor(
             val row = optimisticArchiveRow(authoritativeRow)
             chatListItemFromProjection(
                 row = row,
+                selectedPresentation = selectedPresentationsByGroup[chatRowKey(row.groupIdHex)],
                 group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
                 activeAccountIdHex = activeAccountIdHex,
                 members = memberCacheByGroup[row.groupIdHex],
@@ -4378,6 +4170,7 @@ class ChatsController private constructor(
         val row = optimisticArchiveRow(authoritativeRow)
         return chatListItemFromProjection(
             row = row,
+            selectedPresentation = selectedPresentationsByGroup[chatRowKey(row.groupIdHex)],
             group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
             activeAccountIdHex = activeAccountIdHex,
             members = memberCacheByGroup[row.groupIdHex],
@@ -4637,6 +4430,27 @@ class ChatsController private constructor(
         }
     }
 
+    /** Applies a complete, cursor-validated presented snapshot from MDK. */
+    @VisibleForTesting
+    internal fun applyPresentedChatListUpdate(
+        accountRef: String,
+        update: PresentedChatListUpdateFfi,
+    ) {
+        chatsDebug {
+            "presented chat list snapshot account=${accountRef.take(8)} rows=${update.snapshot.rows.size}"
+        }
+        replacePresentedChatRows(update.snapshot.rows)
+        scheduleRecompute()
+    }
+
+    /** Atomically replaces both base rows and their matching selected presentation. */
+    private fun replacePresentedChatRows(rows: List<PresentedChatRowFfi>) {
+        selectedPresentationsByGroup =
+            rows.associate { presented -> chatRowKey(presented.row.groupIdHex) to presented.presentation }
+        rows.forEach { requestChatRowProfiles(it.row) }
+        replaceChatRows(rows.map(PresentedChatRowFfi::row))
+    }
+
     /** Folds one authoritative row and mirrors it into any mounted conversation. */
     private fun foldChatRow(
         row: ChatListRowFfi,
@@ -4794,6 +4608,7 @@ class ChatsController private constructor(
         val rowKey = chatRowKey(groupIdHex)
         val removedRow = chatRowsByGroup.remove(rowKey)
         if (removedRow != null) {
+            selectedPresentationsByGroup = selectedPresentationsByGroup - rowKey
             activitySequenceByGroup.remove(rowKey)
             optimisticChatListPreviewByGroup.remove(rowKey)
             cancelMemberSnapshotRetry(removedRow.groupIdHex)
@@ -5618,6 +5433,7 @@ class ChatsController private constructor(
 
     private fun resetBackingState() {
         replaceChatRows(emptyList())
+        selectedPresentationsByGroup = emptyMap()
         groupRecordsById = emptyMap()
         activitySequenceByGroup.clear()
         nextActivitySequence = 0uL
@@ -6037,7 +5853,7 @@ class ChatsController private constructor(
     private fun applyAccountSwitchLocalSnapshot(snapshot: AccountSwitchLocalSnapshot) {
         accountRef = snapshot.accountRef
         boundAccountRef = snapshot.accountRef
-        replaceChatRows(snapshot.rows)
+        snapshot.presentedRows?.let(::replacePresentedChatRows) ?: replaceChatRows(snapshot.rows)
         groupRecordsById = snapshot.groups.associateBy { it.groupIdHex }
         applyInitialMemberIdProjections(
             projections = snapshot.memberIds,
@@ -6413,6 +6229,11 @@ class ConversationController(
     private val groupRosterReader: suspend (String, String) -> GroupRosterFfi = { account, groupIdHex ->
         appState.marmotIo(MarmotTraceSection.REFRESH_GROUP_ROSTER) {
             groupRoster(account, groupIdHex)
+        }
+    },
+    private val groupRecoveryStatusReader: suspend (String, String) -> GroupRecoveryStatusFfi = { account, groupIdHex ->
+        appState.marmotIo {
+            groupRecoveryStatus(account, groupIdHex)
         }
     },
     private val textPublisher: suspend (String?, String, String, String) -> SendSummaryFfi =
@@ -6819,6 +6640,19 @@ class ConversationController(
 
     /** The engine proved this conversation is no longer available to the account. */
     var terminalConversationUnavailable by mutableStateOf(false)
+        private set
+
+    /** Current engine-owned recovery evidence for this conversation. */
+    var groupRecoveryStatus by mutableStateOf<GroupRecoveryStatusFfi?>(null)
+        private set
+    private val groupRecoveryLifetime = StalenessGuard()
+
+    /** Whether the latest recovery-status read failed while prior evidence stays inspectable. */
+    var groupRecoveryReadFailed by mutableStateOf(false)
+        private set
+
+    /** Prevents duplicate accept/decline actions while MDK verifies the selected invitation. */
+    var groupRecoveryMutationInFlight by mutableStateOf(false)
         private set
     private val projectedMessageIds = appState.projectedMessageIds(conversationAccountRef, initialGroup.groupIdHex)
     private val localTimelineOrderOverrides = appState.timelineOrderOverrides(conversationAccountRef, initialGroup.groupIdHex)
@@ -7475,6 +7309,7 @@ class ConversationController(
                     groupStream.snapshot()
                 }
             groupSnapshot?.let(::applyGroupState)
+            refreshGroupRecoveryStatus()
             refreshMembers()
             isLoading = false
             subscriptionError = null
@@ -7558,6 +7393,7 @@ class ConversationController(
     /** Applies a canonical group update while retaining only a still-unresolved stale action fence. */
     private fun applyGroupState(update: AppGroupRecordFfi) {
         val previousGroup = group
+        groupRecoveryLifetime.advance()
         val previousRetention = group.disappearingMessageSecs
         groupAuthorityEpoch += 1L
         val reconciled =
@@ -7586,6 +7422,106 @@ class ConversationController(
         }
     }
 
+    /** Re-reads group recovery after each authoritative group-state edge. */
+    private suspend fun refreshGroupRecoveryStatus() {
+        val accountRef = conversationAccountRef ?: return
+        val groupIdHex = group.groupIdHex
+        val recoveryEpoch = groupRecoveryLifetime.capture()
+        val status =
+            try {
+                groupRecoveryStatusReader(accountRef, groupIdHex)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (_: Throwable) {
+                groupRecoveryLifetime.runIfCurrent(recoveryEpoch) { groupRecoveryReadFailed = true }
+                return
+            }
+        groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
+            if (ownsGroupRecoveryGroup(groupIdHex) && status.groupIdHex == groupIdHex) {
+                groupRecoveryStatus = status
+                groupRecoveryReadFailed = false
+            }
+        }
+    }
+
+    /** Explicit retry for an advisory recovery-status read failure. */
+    suspend fun retryGroupRecoveryStatus() = refreshGroupRecoveryStatus()
+
+    /** Accepts exactly the still-present invitation that the user confirmed. */
+    suspend fun confirmGroupRejoin(invitation: GroupRejoinInvitationFfi) {
+        if (groupRecoveryMutationInFlight) return
+        val accountRef = conversationAccountRef
+        val current = groupRecoveryStatus?.matchingRejoinInvitation(invitation)
+        if (accountRef == null || current == null) return
+        val groupIdHex = group.groupIdHex
+        val recoveryEpoch = groupRecoveryLifetime.capture()
+        groupRecoveryMutationInFlight = true
+        try {
+            val status =
+                appState.marmotIo {
+                    confirmGroupRejoin(accountRef, current.welcomeIdHex, current.localStateToken)
+                }
+            var published = false
+            groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
+                if (ownsGroupRecoveryGroup(groupIdHex) && status.groupIdHex == groupIdHex) {
+                    groupRecoveryStatus = status
+                    groupRecoveryReadFailed = false
+                    presentConversationTransient(R.string.group_rejoin_success)
+                    published = true
+                }
+            }
+            if (published) {
+                runCatchingCancellable { refreshMembers() }
+                runCatchingCancellable { refreshCurrentTimeline(accountRef) }
+            }
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (throwable: Throwable) {
+            refreshGroupRecoveryStatus()
+            recordMutationFailure(R.string.group_rejoin_failed, "GROUP_REJOIN_CONFIRM", throwable)
+        } finally {
+            groupRecoveryMutationInFlight = false
+        }
+    }
+
+    /** Declines exactly the still-present invitation selected by the user. */
+    suspend fun declineGroupRejoin(invitation: GroupRejoinInvitationFfi) {
+        if (groupRecoveryMutationInFlight) return
+        val accountRef = conversationAccountRef
+        val current = groupRecoveryStatus?.matchingRejoinInvitation(invitation)
+        if (accountRef == null || current == null) return
+        val groupIdHex = group.groupIdHex
+        val recoveryEpoch = groupRecoveryLifetime.capture()
+        groupRecoveryMutationInFlight = true
+        try {
+            appState.marmotIo {
+                declineGroupRejoin(accountRef, current.welcomeIdHex)
+            }
+            groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
+                if (ownsGroupRecoveryGroup(groupIdHex)) {
+                    groupRecoveryStatus =
+                        groupRecoveryStatus?.copy(
+                            rejoinInvitations =
+                                groupRecoveryStatus?.rejoinInvitations.orEmpty().filterNot {
+                                    it.welcomeIdHex == current.welcomeIdHex
+                                },
+                        )
+                }
+            }
+            refreshGroupRecoveryStatus()
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (throwable: Throwable) {
+            refreshGroupRecoveryStatus()
+            recordMutationFailure(R.string.group_rejoin_failed, "GROUP_REJOIN_DECLINE", throwable)
+        } finally {
+            groupRecoveryMutationInFlight = false
+        }
+    }
+
+    /** Whether this controller still owns UI publication for the captured group. */
+    private fun ownsGroupRecoveryGroup(groupIdHex: String): Boolean = !controllerCleared && !isAccountTeardownRequested() && group.groupIdHex == groupIdHex
+
     private suspend fun runGroupStateSubscriptionLoop(groupStream: ConversationGroupStateSubscriptionHandle) {
         while (coroutineContext.isActive) {
             val update =
@@ -7594,6 +7530,7 @@ class ConversationController(
                 } ?: break
             val previousGroup = group
             applyGroupState(update)
+            refreshGroupRecoveryStatus()
             if (groupStateUpdateRemovesSelf(previousGroup, update)) {
                 conversationAccountRef?.let(::markActiveAccountRemovedFromMembers)
             }

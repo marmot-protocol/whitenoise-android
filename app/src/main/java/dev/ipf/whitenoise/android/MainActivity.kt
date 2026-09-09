@@ -582,7 +582,7 @@ internal class ForegroundConversationDismissalCoordinator {
     fun shouldDismissAfterUnlock(): Boolean = !currentForegroundNotificationOwned
 }
 
-internal const val MAX_RETAINED_SYSTEM_SPLASH_MILLIS = 1_500L
+internal const val MAX_RETAINED_SYSTEM_SPLASH_MILLIS = 300L
 
 /**
  * The platform splash is deliberately brief for ordinary startup. An unresolved

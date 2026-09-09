@@ -159,7 +159,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val source = appStateSource().readText()
         val body = source.kotlinFunctionBody("loadAccountSwitchLocalSnapshot")
         val presentation = source.kotlinFunctionBody("loadAccountSwitchPresentationSeeds")
-        val rows = body.indexOf("chatList(accountRef, includeArchived = true)")
+        val rows = body.indexOf("presentedChatList(accountRef, includeArchived = true)")
         val rowsGuard = body.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = rows)
         val rowsReady = body.indexOf("\"cached-chat-rows-ready\"", startIndex = rowsGuard)
         val presentationStart = body.indexOf("loadAccountSwitchPresentationSeeds", startIndex = rowsReady)
@@ -177,14 +177,18 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val topBarAwait = presentation.indexOf("topBarProfilesDeferred.await()", startIndex = directProfilesGuard)
         val topBarGuard = presentation.indexOf("ensureAccountSwitchRequestIsCurrent", startIndex = topBarAwait)
 
-        assertTrue("one authoritative row read must replace temporary subscription admission", rows >= 0)
+        assertTrue("one authoritative presented-row read must replace temporary subscription admission", rows >= 0)
         assertTrue(rowsGuard > rows)
         assertTrue("row readiness must be recorded after the generation guard", rowsReady > rowsGuard)
         assertTrue("identity presentation must follow the authoritative rows", presentationStart > rowsReady)
         assertTrue(presentationGuard > presentationStart)
         assertTrue(snapshot > presentationGuard)
+        assertTrue(
+            "the handoff must retain MDK's selected presentations for the first frame",
+            "presentedRows = presentedRows" in body,
+        )
         assertTrue("the pre-activation handoff must defer full groups", "groups = emptyList()" in body)
-        assertFalse("chat-list live admission belongs to the target controller", "subscribeChatList" in body)
+        assertFalse("chat-list live admission belongs to the target controller", "openPresentedChatList" in body)
         assertFalse("full group projection belongs to the target controller", "subscribeChats" in body)
         assertTrue("bounded top-bar profiles must overlap member projection", topBarProfiles in 0..<members)
         assertTrue(membersGuard > members)

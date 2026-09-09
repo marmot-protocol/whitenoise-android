@@ -1722,4 +1722,25 @@
     <string name="setup_details">详情</string>
     <string name="setup_hide_details">收起详情</string>
     <string name="setup_opening_chats">正在打开聊天…</string>
+    <string name="unnamed_group">未命名群组</string>
+    <string name="conversation_unavailable">对话不可用</string>
+    <string name="onboarding_recover_setup_title">恢复登录设置？</string>
+    <string name="onboarding_recover_setup_for">恢复 %1$s 的登录设置</string>
+    <string name="onboarding_recover_setup_confirm">恢复设置</string>
+    <string name="onboarding_recover_setup_explanation">恢复操作会退出此个人资料，并替换无法读取的设置检查点。仅保留最新的恢复证据，之前发布到中继的内容不会撤销。你需要使用私钥重新登录。此操作不会批准任何发布。</string>
+    <string name="onboarding_recover_setup_success">设置已恢复。请输入此个人资料的私钥以重新登录。</string>
+    <string name="onboarding_recover_setup_failed">无法恢复设置。请重试。</string>
+    <string name="group_recovery_automatic_failed">无法恢复群组同步。</string>
+    <string name="group_recovery_pending_reinvites">正在自动重试部分邀请。</string>
+    <string name="group_recovery_failed_reinvites">部分邀请无法恢复。请从“群组详情”重新邀请这些成员。</string>
+    <string name="group_recovery_review_invitation_from">查看 %1$s 的邀请 · 轮次 %2$s</string>
+    <string name="group_recovery_check_failed">无法检查群组恢复状态，请重试。</string>
+    <string name="group_rejoin_title">重新加入群组？</string>
+    <string name="group_rejoin_invited_by">邀请者：%1$s\n%2$s</string>
+    <string name="group_rejoin_replaces_state">重新加入会用邀请中的副本替换此设备当前的群组状态。已保存的消息历史会保留。</string>
+    <string name="group_rejoin_trust_warning">仅在你信任此邀请时重新加入。仅凭群组版本较新并不能证明邀请可信。</string>
+    <string name="group_rejoin_confirm">重新加入群组</string>
+    <string name="group_rejoin_decline">拒绝邀请</string>
+    <string name="group_rejoin_success">已重新加入群组。</string>
+    <string name="group_rejoin_failed">无法应用此邀请</string>
 </resources>

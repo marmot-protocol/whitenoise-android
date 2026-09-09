@@ -12,11 +12,12 @@ import org.junit.Test
 import java.io.File
 
 class BootstrapSplashHandoffTest {
+    /** The system splash yields quickly to the branded Compose loading surface. */
     @Test
-    fun systemSplashHandsSlowBootstrapToComposeBeforeTwoSeconds() {
+    fun systemSplashHandsSlowBootstrapToComposePromptly() {
         assertTrue(shouldRetainSystemSplash(AppPhase.Bootstrapping, MAX_RETAINED_SYSTEM_SPLASH_MILLIS - 1L))
         assertFalse(shouldRetainSystemSplash(AppPhase.Bootstrapping, MAX_RETAINED_SYSTEM_SPLASH_MILLIS))
-        assertTrue(MAX_RETAINED_SYSTEM_SPLASH_MILLIS < 2_000L)
+        assertTrue(MAX_RETAINED_SYSTEM_SPLASH_MILLIS <= 300L)
     }
 
     /** A share launch never hands off to the ordinary startup surface or an unseeded picker. */

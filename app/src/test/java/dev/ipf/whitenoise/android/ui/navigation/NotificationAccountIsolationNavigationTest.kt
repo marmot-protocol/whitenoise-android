@@ -538,7 +538,7 @@ class NotificationAccountIsolationNavigationTest {
                     }
                     chatListRow(requireNotNull(groupIdHex))
                 }
-                "subscribeChatList" -> {
+                "openPresentedChatList" -> {
                     val accountRef = arguments?.firstOrNull() as? String
                     if (accountRef == SOURCE_ACCOUNT) {
                         check(gate.releaseSourceBroadList.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
