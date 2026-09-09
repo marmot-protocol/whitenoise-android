@@ -5580,6 +5580,15 @@
         ]
       },
       {
+        "surface": "TTS start failure fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateTtsVoiceMedia.kt",
+        "anchor": "R.string.tts_bar_error",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      },
+      {
         "surface": "setting:error_no_safe_key_package_source_relay",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/KeyPackageDeletionResult.kt",
         "anchor": "R.string.error_no_safe_key_package_source_relay",
