@@ -17,10 +17,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TTS_AUTO_READ_MAX_MESSAGES
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
-import dev.ipf.whitenoise.android.audio.tts.TtsStartFailure
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -151,16 +149,12 @@ internal fun ConversationTtsAutoReadEffects(
         if (!transcriptReadyToReveal) return@LaunchedEffect
         val entries = autoReadBacklogEntries()
         if (entries.isNotEmpty()) {
-            val started =
-                appState.speakAloudAutoRead(
-                    controller.group.groupIdHex,
-                    entries,
-                    Locale.getDefault(),
-                    backgroundPreparation = true,
-                )
-            if (!started && appState.ttsController.lastStartFailure == TtsStartFailure.MediaNotActive) {
-                appState.present(R.string.tts_media_mix_no_active_media)
-            }
+            appState.speakAloudAutoRead(
+                controller.group.groupIdHex,
+                entries,
+                Locale.getDefault(),
+                backgroundPreparation = true,
+            )
         }
     }
 
@@ -251,16 +245,12 @@ internal fun ConversationTtsAutoReadEffects(
             return@LaunchedEffect
         }
         if (!appState.isConversationAutoRead(controller.group.groupIdHex)) return@LaunchedEffect
-        val started =
-            appState.speakAloudAutoRead(
-                controller.group.groupIdHex,
-                entries,
-                Locale.getDefault(),
-                backgroundPreparation = true,
-            )
-        if (!started && appState.ttsController.lastStartFailure == TtsStartFailure.MediaNotActive) {
-            appState.present(R.string.tts_media_mix_no_active_media)
-        }
+        appState.speakAloudAutoRead(
+            controller.group.groupIdHex,
+            entries,
+            Locale.getDefault(),
+            backgroundPreparation = true,
+        )
     }
 }
 

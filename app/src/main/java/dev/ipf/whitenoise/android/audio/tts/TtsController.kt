@@ -67,7 +67,6 @@ internal enum class TtsAudioFocusMode {
 /** User-relevant reason the most recent start request did not begin. */
 internal enum class TtsStartFailure {
     None,
-    MediaNotActive,
     AudioFocusDenied,
     EngineUnavailable,
     UnsupportedLanguage,
@@ -218,7 +217,7 @@ class TtsController internal constructor(
         pace.resetMeasurements()
     }
 
-    /** Starts a queue only after engine, media, focus, and language gates succeed. */
+    /** Starts a queue only after engine, focus, and language gates succeed. */
     @Synchronized
     fun speak(
         text: String,
@@ -276,15 +275,10 @@ class TtsController internal constructor(
             lastStartFailure = TtsStartFailure.EmptyContent
             return null
         }
-        val requestedFocusMode =
-            if (mediaMixEnabled()) TtsAudioFocusMode.MediaMix else TtsAudioFocusMode.Full
+        val requestedFocusMode = requestedFocusMode()
         val previousFocusMode = activeFocusMode
         val hadSpeakingQueue = state.value is TtsState.Speaking
         return when {
-            requestedFocusMode == TtsAudioFocusMode.MediaMix && !isMediaPlaybackActive() -> {
-                lastStartFailure = TtsStartFailure.MediaNotActive
-                null
-            }
             !acquireAudioFocus(requestedFocusMode) -> {
                 lastStartFailure = TtsStartFailure.AudioFocusDenied
                 restorePreviousFocusIfNeeded(hadSpeakingQueue, previousFocusMode)
@@ -389,7 +383,6 @@ class TtsController internal constructor(
             when {
                 activeEngine == null -> TtsStartFailure.EngineUnavailable
                 boundedSpeakableEntries(entries).isEmpty() -> TtsStartFailure.EmptyContent
-                mediaMixEnabled() && !isMediaPlaybackActive() -> TtsStartFailure.MediaNotActive
                 else -> null
             }
         if (failure != null) lastStartFailure = failure
@@ -401,7 +394,7 @@ class TtsController internal constructor(
         locale: Locale,
     ): Triple<Long, TtsSpeechEngine, Locale>? {
         return validatedEngine(entries)?.let { activeEngine ->
-            val requestedMode = if (mediaMixEnabled()) TtsAudioFocusMode.MediaMix else TtsAudioFocusMode.Full
+            val requestedMode = requestedFocusMode()
             val previousMode = activeFocusMode
             val wasSpeaking = state.value is TtsState.Speaking
             if (!prepareAsyncLanguage(activeEngine, locale, TtsStartFocus(requestedMode, previousMode, wasSpeaking))) {
@@ -664,6 +657,14 @@ class TtsController internal constructor(
         val current = state.value
         return current is TtsState.Speaking || current is TtsState.Paused || current is TtsState.Preparing
     }
+
+    /** Mixes only when peer media is active; otherwise read-aloud uses its ordinary focus contract. */
+    private fun requestedFocusMode(): TtsAudioFocusMode =
+        if (mediaMixEnabled() && isMediaPlaybackActive()) {
+            TtsAudioFocusMode.MediaMix
+        } else {
+            TtsAudioFocusMode.Full
+        }
 
     /** Reacquires the session's latched focus policy across pause and seek. */
     private fun acquireAudioFocus(mode: TtsAudioFocusMode = activeFocusMode): Boolean =

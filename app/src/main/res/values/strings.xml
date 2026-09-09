@@ -1603,7 +1603,7 @@
     <string name="tts_settings_engine_title">Engine</string>
     <string name="tts_settings_rate_title">Speech rate</string>
     <string name="tts_media_mix_title">Speak over playing media</string>
-    <string name="tts_media_mix_subtitle">Only starts while other audio is playing; White Noise does not control the other audio</string>
+    <string name="tts_media_mix_subtitle">Mixes with other audio while it is playing; otherwise read aloud continues normally</string>
     <string name="tts_media_mix_volume_title">Speech-over-media volume</string>
     <string name="tts_media_mix_volume_quiet">Quiet</string>
     <string name="tts_media_mix_volume_medium">Medium</string>
@@ -1611,7 +1611,6 @@
     <string name="tts_media_mix_volume_quiet_description">35 percent of the text-to-speech engine volume</string>
     <string name="tts_media_mix_volume_medium_description">60 percent of the text-to-speech engine volume</string>
     <string name="tts_media_mix_volume_loud_description">85 percent of the text-to-speech engine volume</string>
-    <string name="tts_media_mix_no_active_media">Start music or a podcast before using speech-over-media</string>
     <string name="tts_voice_title">Voice</string>
     <string name="tts_voice_automatic">Automatic offline voice</string>
     <string name="tts_voice_automatic_description">Use the best installed offline voice for the message language</string>

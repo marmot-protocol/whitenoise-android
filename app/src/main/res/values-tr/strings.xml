@@ -1449,7 +1449,7 @@
     <string name="tts_settings_engine_title">Motor</string>
     <string name="tts_settings_rate_title">Konuşma hızı</string>
     <string name="tts_media_mix_title">Çalan medyanın üzerinden konuş</string>
-    <string name="tts_media_mix_subtitle">Yalnızca başka ses çalarken başlar; White Noise diğer sesi kontrol etmez</string>
+    <string name="tts_media_mix_subtitle">Başka ses çalarken onunla birlikte oynatılır; aksi takdirde sesli okuma normal şekilde devam eder</string>
     <string name="tts_media_mix_volume_title">Medya üzeri konuşma ses düzeyi</string>
     <string name="tts_media_mix_volume_quiet">Düşük</string>
     <string name="tts_media_mix_volume_medium">Orta</string>
@@ -1457,7 +1457,6 @@
     <string name="tts_media_mix_volume_quiet_description">Metin okuma motoru ses düzeyinin yüzde 35’i</string>
     <string name="tts_media_mix_volume_medium_description">Metin okuma motoru ses düzeyinin yüzde 60’ı</string>
     <string name="tts_media_mix_volume_loud_description">Metin okuma motoru ses düzeyinin yüzde 85’i</string>
-    <string name="tts_media_mix_no_active_media">Medya üzerinde konuşmayı kullanmadan önce müzik veya podcast başlatın</string>
     <string name="tts_voice_title">Ses</string>
     <string name="tts_voice_automatic">Otomatik çevrimdışı ses</string>
     <string name="tts_voice_automatic_description">Mesaj dili için yüklü en iyi çevrimdışı sesi kullan</string>

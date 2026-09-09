@@ -1451,7 +1451,7 @@
     <string name="tts_settings_engine_title">Motore</string>
     <string name="tts_settings_rate_title">Velocità del parlato</string>
     <string name="tts_media_mix_title">Parla sopra i contenuti multimediali in riproduzione</string>
-    <string name="tts_media_mix_subtitle">Si avvia solo mentre è in riproduzione un altro audio; White Noise non controlla l’altro audio</string>
+    <string name="tts_media_mix_subtitle">Si sovrappone ad altro audio durante la riproduzione; altrimenti la lettura ad alta voce continua normalmente</string>
     <string name="tts_media_mix_volume_title">Volume della voce sui contenuti multimediali</string>
     <string name="tts_media_mix_volume_quiet">Basso</string>
     <string name="tts_media_mix_volume_medium">Medio</string>
@@ -1459,7 +1459,6 @@
     <string name="tts_media_mix_volume_quiet_description">35 per cento del volume del motore di sintesi vocale</string>
     <string name="tts_media_mix_volume_medium_description">60 per cento del volume del motore di sintesi vocale</string>
     <string name="tts_media_mix_volume_loud_description">85 per cento del volume del motore di sintesi vocale</string>
-    <string name="tts_media_mix_no_active_media">Avvia musica o un podcast prima di usare la voce sui contenuti multimediali</string>
     <string name="tts_voice_title">Voce</string>
     <string name="tts_voice_automatic">Voce offline automatica</string>
     <string name="tts_voice_automatic_description">Usa la migliore voce offline installata per la lingua del messaggio</string>
