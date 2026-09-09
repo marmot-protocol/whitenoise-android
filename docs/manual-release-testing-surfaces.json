@@ -1247,6 +1247,14 @@
         ]
       },
       {
+        "surface": "ConversationGroupRecoveryCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "fun ConversationGroupRecoveryCard(",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
         "surface": "GroupRecoveryCard",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
         "anchor": "fun GroupRecoveryCard(",
