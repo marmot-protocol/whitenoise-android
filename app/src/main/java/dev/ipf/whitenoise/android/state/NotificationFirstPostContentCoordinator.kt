@@ -39,6 +39,7 @@ internal data class NotificationFirstPost(
     val shouldPost: Boolean,
     val content: NotificationFirstPostContent?,
     val presentation: NotificationContentPresentation,
+    val avatars: PreWarmedNotificationAvatars = PreWarmedNotificationAvatars(null, null),
     val lateCorrectionPermit: NotificationLateCorrectionPermit = NotificationLateCorrectionPermit(),
 )
 
@@ -106,19 +107,16 @@ internal fun NotificationFirstPostContentResult<*>.timingOutcome(): String =
 /** The sole optional write permitted after a notification's first successful post. */
 internal enum class NotificationLateCorrectionPlan {
     Content,
-    Avatar,
     None,
 }
 
-/** Selects at most one late write, giving changed text priority over imagery. */
+/** Allows a late write only when user-visible text changed, never for cosmetic imagery. */
 internal fun notificationLateCorrectionPlan(
     firstPresentation: NotificationContentPresentation,
     resolvedPresentation: NotificationContentPresentation,
-    hasReadyAvatar: Boolean,
 ): NotificationLateCorrectionPlan =
     when {
         firstPresentation != resolvedPresentation -> NotificationLateCorrectionPlan.Content
-        hasReadyAvatar -> NotificationLateCorrectionPlan.Avatar
         else -> NotificationLateCorrectionPlan.None
     }
 

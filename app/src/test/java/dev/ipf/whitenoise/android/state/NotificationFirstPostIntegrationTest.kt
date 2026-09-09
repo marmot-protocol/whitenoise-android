@@ -5,6 +5,7 @@ import android.app.Application
 import android.app.Notification
 import android.app.NotificationManager
 import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.app.NotificationCompat
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -29,13 +30,13 @@ import dev.ipf.whitenoise.android.notifications.ConversationCardPostSynchronizer
 import dev.ipf.whitenoise.android.notifications.ConversationCardTestHook
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
+import dev.ipf.whitenoise.android.ui.chats.AvatarScreenshotFixtures
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -45,6 +46,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
+import org.robolectric.shadows.ShadowNotificationManager
 import java.time.Duration
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
@@ -58,7 +63,7 @@ private typealias NotificationCancellationAction =
 
 /** End-to-end typed-update coverage for the #2453 first-post and one-correction contract. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [34], shadows = [FirstPostRecordingNotificationManager::class])
 @Suppress("LargeClass") // Typed first-post and correction scenarios share one process-global notification fixture.
 class NotificationFirstPostIntegrationTest {
     private val context: Application = RuntimeEnvironment.getApplication()
@@ -68,6 +73,7 @@ class NotificationFirstPostIntegrationTest {
     fun setUp() {
         shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         cancelMessageCard()
+        FirstPostRecordingNotificationManager.posts.clear()
         AvatarImageLoader.clear()
         AvatarImageLoader.resetProfileImageFetcherForTests()
     }
@@ -290,36 +296,44 @@ class NotificationFirstPostIntegrationTest {
             )
         }
 
-    /** Carries a proven cached avatar across eviction without a hidden third write. */
+    /** The first card owns cached pixels across eviction and receives no cosmetic rewrite. */
     @Test
-    fun cachedAvatarIsCarriedAcrossEvictionInExactlyOneSilentCorrection() =
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun cachedAvatarIsCarriedAcrossEvictionOnTheOnlyFirstWrite() =
         runBlocking {
             val avatar = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
-            AvatarImageLoader.putCached(AVATAR_URL, avatar.asImageBitmap())
             val fixture =
                 NotificationBootstrapTestFixture(
                     context = context,
                     isDm = true,
                     senderPictureUrl = AVATAR_URL,
+                    delayFirstNotificationDispatchAfterRuntimeStart = true,
                 )
             try {
                 withNotificationWriteCount(
-                    beforeSecondWrite = { AvatarImageLoader.clear() },
+                    beforeFirstWrite = { AvatarImageLoader.clear() },
                 ) { writes ->
                     fixture.bootstrap()
+                    AvatarImageLoader.putCached(AVATAR_URL, avatar.asImageBitmap())
+                    fixture.releaseNotificationDispatch()
                     fixture.awaitNotificationPosted()
-                    awaitWrites(writes, 2)
                     delay(NO_ADDITIONAL_WRITE_WINDOW_MS)
 
-                    assertNotNull(
-                        fixture
-                            .activeMessagingStyle()
-                            .messages
-                            .single()
-                            .person
-                            ?.icon,
-                    )
-                    assertEquals(2, writes.get())
+                    val icon =
+                        requireNotNull(
+                            requireNotNull(
+                                NotificationCompat.MessagingStyle
+                                    .extractMessagingStyleFromNotification(
+                                        FirstPostRecordingNotificationManager.posts.single(),
+                                    ),
+                            ).messages
+                                .single()
+                                .person
+                                ?.icon,
+                        )
+                    val rendered = (icon.loadDrawable(context) as BitmapDrawable).bitmap
+                    assertTrue("First payload must retain the cached pixels", avatar.sameAs(rendered))
+                    assertEquals(1, writes.get())
                 }
             } finally {
                 fixture.close()
@@ -345,7 +359,7 @@ class NotificationFirstPostIntegrationTest {
                         writesAtFetch.compareAndSet(-1, observedWrites.get())
                         fetchStarted.countDown()
                         releaseFetch.await(5, TimeUnit.SECONDS)
-                        byteArrayOf(0)
+                        AvatarScreenshotFixtures.onePixelPngBytes()
                     },
                 )
             fixture.appState.applyAccountSwitchProfileSeed(
@@ -373,6 +387,12 @@ class NotificationFirstPostIntegrationTest {
                         if (contentEvent.outcome == "resolved_before_deadline") 1 else 2
                     assertEquals(expectedWritesBeforeAvatar, writesAtFetch.get())
                     assertEquals(expectedWritesBeforeAvatar, writes.get())
+                    releaseFetch.countDown()
+                    withTimeout(5_000L) {
+                        while (AvatarImageLoader.peekBitmap(AVATAR_URL) == null) delay(10L)
+                    }
+                    delay(NO_ADDITIONAL_WRITE_WINDOW_MS)
+                    assertEquals(expectedWritesBeforeAvatar, FirstPostRecordingNotificationManager.posts.size)
                 }
             } finally {
                 releaseFetch.countDown()
@@ -606,9 +626,9 @@ class NotificationFirstPostIntegrationTest {
             }
         }
 
-    /** Counts successful serialized writes and optionally evicts state before replacement. */
+    /** Counts successful serialized writes and optionally evicts state before the first write. */
     private suspend fun withNotificationWriteCount(
-        beforeSecondWrite: () -> Unit = {},
+        beforeFirstWrite: () -> Unit = {},
         block: suspend (AtomicInteger) -> Unit,
     ) {
         val writes = AtomicInteger(0)
@@ -622,7 +642,7 @@ class NotificationFirstPostIntegrationTest {
                     notificationId: Int,
                 ) {
                     if (op == ConversationCardOp.SHOW_NOTIFY && barrier == ConversationCardBarrier.BEFORE_WRITE) {
-                        if (writes.get() == 1 && cleared.compareAndSet(false, true)) beforeSecondWrite()
+                        if (writes.get() == 0 && cleared.compareAndSet(false, true)) beforeFirstWrite()
                     }
                     if (op == ConversationCardOp.SHOW_NOTIFY && barrier == ConversationCardBarrier.AFTER_WRITE) {
                         writes.incrementAndGet()
@@ -798,5 +818,24 @@ class NotificationFirstPostIntegrationTest {
         const val MENTION_ACCOUNT_ID_HEX = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         const val FIRST_POST_CONTENT_DEADLINE_MS = 100L
         const val NO_ADDITIONAL_WRITE_WINDOW_MS = 250L
+    }
+}
+
+/** Captures every platform write to the synthetic card, including detached presenter enrichment. */
+@Implements(NotificationManager::class)
+class FirstPostRecordingNotificationManager : ShadowNotificationManager() {
+    /** Records the immutable payload before delegating to normal platform-shadow behavior. */
+    @Implementation
+    override fun notify(
+        tag: String?,
+        id: Int,
+        notification: Notification,
+    ) {
+        if (tag == "account-a|group-a") posts.add(notification.clone())
+        super.notify(tag, id, notification)
+    }
+
+    companion object {
+        val posts = CopyOnWriteArrayList<Notification>()
     }
 }

@@ -71,9 +71,13 @@ completion before that boundary does not prove when the caller resumed, when
 `ContentComplete` was sampled, when `notify` returned, or when pixels rendered;
 those later observations retain their real scheduling overhead.
 
-Verify the first card is immediately useful and correctly redacted. When an
-avatar later enriches it, verify the same card updates without another sound,
-vibration, heads-up interruption, badge increment, or duplicated history.
+Verify the first card is immediately useful and correctly redacted. The typed
+AppState path uses already-decoded local imagery or a stable monogram; remote
+image loading primes future cards and must not cause a cosmetic second write.
+When bounded text resolution requires a late correction, verify that it keeps
+the same grouping/channel without another sound, vibration, heads-up interruption,
+badge increment, or duplicated history. Do not confuse the lower-level avatar
+fixture below with this production AppState behavior.
 
 ## Heads-up dwell evidence (#2412)
 

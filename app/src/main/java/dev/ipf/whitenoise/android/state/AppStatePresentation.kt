@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import android.graphics.Bitmap
 import androidx.annotation.StringRes
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
@@ -309,14 +308,6 @@ internal fun notificationAvatarPreWarmTarget(
         resolveGroupAvatar = !update.isDm,
         preWarmRemoteImages = !appLockScreenVisible,
     )
-
-/** Sanitized avatar URLs plus the exact decoded bitmaps proven ready for a late write. */
-internal data class PreWarmedNotificationAvatars(
-    val senderAvatarUrl: String?,
-    val groupAvatarUrl: String?,
-    val senderAvatarBitmap: Bitmap? = null,
-    val groupAvatarBitmap: Bitmap? = null,
-)
 
 /** Posts the privacy-correct fallback card before scheduling optional enrichment. */
 internal suspend fun postBeforeNotificationEnrichment(

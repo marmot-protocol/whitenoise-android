@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.text.input.TextFieldValue
 import com.google.firebase.messaging.FirebaseMessaging
 import dev.ipf.marmotkit.AccountKeyPackageFfi
@@ -90,6 +91,7 @@ import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
+import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
@@ -2201,30 +2203,52 @@ class WhiteNoiseAppState private constructor(
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private val notificationFirstPostContentCoordinator =
         NotificationFirstPostContentCoordinator(notificationScope, notificationDispatcher, SystemClock::elapsedRealtime)
+
     private val notificationContentResolution by lazy {
-        createNotificationContentResolutionServices(
-            context = appContext,
-            contactNickname = ::contactNicknameFor,
-            readDisplayName = { id -> marmotIo { displayName(id) } },
-            displayNameHint = { id -> notificationDisplayNameHints[id] },
-            cachedShortNpub = ::cachedShortNpubOrUnknown,
-            hydratedDisplayName = { id ->
-                synchronized(profilePresentationLock) { profilePresentations[id]?.displayName }
-            },
-            requestProfile = ::requestProfile,
-            accountIdHex = ::accountIdHex,
-            parseMarkdown = ::parseMarkdownOrEmpty,
-            recipientAccountIdHex = { ref -> accounts.firstOrNull { it.label == ref }?.accountIdHex },
-            timelineRecord = ::notificationTimelineRecord,
-            groupMembers = { update ->
-                runCatchingCancellable { marmotIo { groupMembers(update.accountRef, update.groupIdHex) } }
-                    .getOrNull()
-                    .orEmpty()
-            },
-            mediaKind = { update -> resolveNotificationMediaKind(update, ::notificationMessageRecord) },
-            signedInAccountCount = { accounts.count { it.isSignedInSigningAccount() } },
-        )
+        createNotificationContentResolutionServices(appContext, NotificationContentReads())
     }
+
+    /** Delegates live notification reads without creating a callback class for each dependency. */
+    @Suppress("TooManyFunctions")
+    private inner class NotificationContentReads : NotificationContentSource {
+        override fun contactNickname(
+            accountRef: String?,
+            accountIdHex: String,
+        ): String? = contactNicknameFor(accountRef, accountIdHex)
+
+        override suspend fun readDisplayName(accountIdHex: String): String? = marmotIo { displayName(accountIdHex) }
+
+        override fun displayNameHint(accountIdHex: String): String? = notificationDisplayNameHints[accountIdHex]
+
+        override fun cachedShortNpub(accountIdHex: String): String = cachedShortNpubOrUnknown(accountIdHex)
+
+        override fun hydratedDisplayName(accountIdHex: String): String? =
+            synchronized(profilePresentationLock) { profilePresentations[accountIdHex]?.displayName }
+
+        override fun requestProfile(accountIdHex: String) = this@WhiteNoiseAppState.requestProfile(accountIdHex)
+
+        override suspend fun accountIdHex(bech32: String): String? = this@WhiteNoiseAppState.accountIdHex(bech32)
+
+        override suspend fun parseMarkdown(raw: String) = parseMarkdownOrEmpty(raw)
+
+        override fun recipientAccountIdHex(ref: String) = accounts.firstOrNull { it.label == ref }?.accountIdHex
+
+        override suspend fun timelineRecord(update: NotificationUpdateFfi) = notificationTimelineRecord(update)
+
+        override suspend fun groupMembers(update: NotificationUpdateFfi): List<AppGroupMemberRecordFfi> =
+            runCatchingCancellable { marmotIo { groupMembers(update.accountRef, update.groupIdHex) } }
+                .getOrNull()
+                .orEmpty()
+
+        override suspend fun mediaKind(update: NotificationUpdateFfi): ReplyMediaKind =
+            resolveNotificationMediaKind(
+                update,
+                ::notificationMessageRecord,
+            )
+
+        override fun signedInAccountCount(): Int = accounts.count { it.isSignedInSigningAccount() }
+    }
+
     private val notificationAvatarCoordinator by lazy {
         NotificationAvatarCoordinator(
             appLocked = { appLockScreenVisible },
@@ -9275,10 +9299,6 @@ class WhiteNoiseAppState private constructor(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
         content: NotificationFirstPostContent,
-        conversationAvatarUrl: String? = null,
-        conversationAvatarBitmap: Bitmap? = null,
-        senderAvatarUrl: String? = null,
-        senderAvatarBitmap: Bitmap? = null,
     ): Boolean {
         if (
             !isNotificationEnrichmentAllowed(
@@ -9304,10 +9324,8 @@ class WhiteNoiseAppState private constructor(
                         mediaKind = content.mediaKind,
                         recipientAccountSubtext = content.recipientAccountSubtext,
                         directShareEligible = update.accountRef == activeAccountRef,
-                        conversationAvatarUrl = conversationAvatarUrl,
-                        conversationAvatarBitmap = conversationAvatarBitmap,
-                        senderAvatarUrl = senderAvatarUrl,
-                        senderAvatarBitmap = senderAvatarBitmap,
+                        conversationAvatarBitmap = firstPost.avatars.conversationBitmap(update.isDm),
+                        senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap,
                         silentUpdate = true,
                         replaceCurrentMessage = true,
                         shortNpub = ::shortNpub,
@@ -9328,8 +9346,8 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Publishes at most one silent late write: corrected text wins over imagery,
-     * while a complete first draw may receive one fully cached avatar update.
+     * Publishes at most one silent text correction. Imagery is fixed on first
+     * publication so a completed card never repaints solely for an avatar.
      */
     private suspend fun enrichPostedNotificationUpdate(
         update: NotificationUpdateFfi,
@@ -9369,12 +9387,12 @@ class WhiteNoiseAppState private constructor(
             notificationLateCorrectionPlan(
                 firstPresentation = firstPost.presentation,
                 resolvedPresentation = resolvedPresentation,
-                hasReadyAvatar = false,
             ) == NotificationLateCorrectionPlan.Content
         ) {
             postNotificationContentCorrection(update, firstPost, content)
         } else {
-            postNotificationAvatarCorrection(update, firstPost, content)
+            notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
+            NotificationLateCorrectionOutcome.Unchanged
         }
     }
 
@@ -9392,45 +9410,6 @@ class WhiteNoiseAppState private constructor(
             NotificationLateCorrectionOutcome.ContentPosted
         } else {
             NotificationLateCorrectionOutcome.Stale
-        }
-    }
-
-    /** Carries the exact decoded avatar into the only late platform write. */
-    private suspend fun postNotificationAvatarCorrection(
-        update: NotificationUpdateFfi,
-        firstPost: NotificationFirstPost,
-        content: NotificationFirstPostContent,
-    ): NotificationLateCorrectionOutcome {
-        val avatars =
-            notificationAvatarCoordinator.awaitReady(
-                notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted),
-                shouldContinue = {
-                    isNotificationEnrichmentAllowed(update, firstPost)
-                },
-            )
-        val senderAvatarBitmap = avatars.senderAvatarBitmap
-        val conversationAvatarBitmap = if (update.isDm) senderAvatarBitmap else avatars.groupAvatarBitmap
-        val senderAvatarUrl = avatars.senderAvatarUrl.takeIf { senderAvatarBitmap != null }
-        val conversationAvatarUrl =
-            (if (update.isDm) avatars.senderAvatarUrl else avatars.groupAvatarUrl)
-                .takeIf { conversationAvatarBitmap != null }
-        val hasReadyAvatar = senderAvatarBitmap != null || conversationAvatarBitmap != null
-        return if (!hasReadyAvatar) {
-            NotificationLateCorrectionOutcome.Unchanged
-        } else {
-            // A lock can arrive during any suspending enrichment above. The
-            // posting helper rechecks every fence after these lookups.
-            val posted =
-                postNotificationLateCorrection(
-                    update = update,
-                    firstPost = firstPost,
-                    content = content,
-                    conversationAvatarUrl = conversationAvatarUrl,
-                    conversationAvatarBitmap = conversationAvatarBitmap,
-                    senderAvatarUrl = senderAvatarUrl,
-                    senderAvatarBitmap = senderAvatarBitmap,
-                )
-            if (posted) NotificationLateCorrectionOutcome.AvatarPosted else NotificationLateCorrectionOutcome.Stale
         }
     }
 
@@ -9481,6 +9460,8 @@ class WhiteNoiseAppState private constructor(
             reactedToPreviewOverride = firstPost.content?.reactedToPreview,
             mediaKind = firstPost.content?.mediaKind ?: ReplyMediaKind.None,
             recipientAccountSubtext = firstPost.content?.recipientAccountSubtext,
+            conversationAvatarBitmap = firstPost.avatars.conversationBitmap(update.isDm),
+            senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap,
             redactContent = redactContent,
             directShareEligible = !redactContent && update.accountRef == activeAccountRef,
             shortNpub = ::cachedShortNpubOrUnknown,
@@ -9713,6 +9694,27 @@ class WhiteNoiseAppState private constructor(
             shouldPost = shouldPost,
             content = content,
             presentation = notificationContentPresentation(appContext, update, content, ::cachedShortNpubOrUnknown),
+            avatars = readyNotificationAvatars(update),
+        )
+    }
+
+    /** Snapshots decoded local imagery without hydration; the existing monogram covers misses. */
+    internal fun readyNotificationAvatars(update: NotificationUpdateFfi): PreWarmedNotificationAvatars {
+        if (appLockScreenVisible) return PreWarmedNotificationAvatars(null, null)
+        val senderUrl =
+            synchronized(profilePresentationLock) {
+                profilePresentations[update.sender.accountIdHex]?.avatarUrl
+            } ?: update.sender.pictureUrl
+        val group =
+            chatsController
+                ?.takeIf { it.boundAccountRef == update.accountRef && update.accountRef == activeAccountRef }
+                ?.items
+                ?.firstOrNull { it.id.equals(update.groupIdHex, ignoreCase = true) }
+                ?.group
+        val ready = readyNotificationAvatarSnapshot(senderUrl, group?.avatarUrl)
+        val encryptedKey = group?.let { encryptedGroupAvatarCacheKey(update.accountRef, it) }
+        return ready.copy(
+            groupAvatarBitmap = ready.groupAvatarBitmap ?: GroupAvatarImageLoader.peek(encryptedKey)?.asAndroidBitmap(),
         )
     }
 

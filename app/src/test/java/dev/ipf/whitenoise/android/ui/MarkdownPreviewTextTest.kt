@@ -33,11 +33,16 @@ class MarkdownPreviewTextTest {
     private fun build(
         blocks: List<MarkdownBlockFfi>,
         maxLength: Int = 200,
-    ) = markdownDocumentToPreviewAnnotatedString(
-        MarkdownDocumentFfi(blocks = blocks, truncated = false, blankLinesBefore = ByteArray(0)),
-        codeStyle,
-        maxLength,
-    )
+    ): androidx.compose.ui.text.AnnotatedString {
+        val document = MarkdownDocumentFfi(blocks = blocks, truncated = false, blankLinesBefore = ByteArray(0))
+        val annotated = markdownDocumentToPreviewAnnotatedString(document, codeStyle, maxLength)
+        assertEquals(
+            "Plain notifications and styled rows must agree",
+            annotated.text,
+            markdownDocumentToPreviewText(document, maxLength),
+        )
+        return annotated
+    }
 
     private fun paragraph(text: String) = MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text(text)))
 

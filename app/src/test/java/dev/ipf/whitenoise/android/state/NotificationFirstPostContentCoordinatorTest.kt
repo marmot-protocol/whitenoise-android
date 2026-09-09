@@ -106,29 +106,24 @@ class NotificationFirstPostContentCoordinatorTest {
             assertFalse(permit.acquire())
         }
 
-    /** Enforces one shared late-write budget across content and avatar lanes. */
+    /** Reserves the sole correction for changed text rather than cosmetic imagery. */
     @Test
-    fun lateCorrectionUsesOneContentWriteOrOneAvatarWriteButNeverBoth() {
+    fun lateCorrectionRequiresChangedContent() {
         val complete = presentation(body = "final")
 
         assertEquals(
             NotificationLateCorrectionPlan.None,
-            notificationLateCorrectionPlan(complete, complete, hasReadyAvatar = false),
-        )
-        assertEquals(
-            NotificationLateCorrectionPlan.Avatar,
-            notificationLateCorrectionPlan(complete, complete, hasReadyAvatar = true),
+            notificationLateCorrectionPlan(complete, complete),
         )
         assertEquals(
             NotificationLateCorrectionPlan.Content,
-            notificationLateCorrectionPlan(presentation(body = "fallback"), complete, hasReadyAvatar = true),
+            notificationLateCorrectionPlan(presentation(body = "fallback"), complete),
         )
         assertEquals(
             NotificationLateCorrectionPlan.Content,
             notificationLateCorrectionPlan(
                 complete,
                 presentation(body = "final", recipientAccountSubtext = "Work"),
-                hasReadyAvatar = false,
             ),
         )
     }

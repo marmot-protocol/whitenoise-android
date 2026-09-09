@@ -7271,7 +7271,7 @@
         ]
       },
       {
-        "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "surface": "Notification first draw: bounded text and stable ready-local imagery or monogram",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
         "anchor": "class NotificationFirstPostResolver",
         "test_ids": [
@@ -8545,6 +8545,15 @@
       }
     ],
     "notification_content_contracts": [
+      {
+        "surface": "Compose-free notification preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownPreviewText.kt",
+        "anchor": "fun markdownDocumentToPreviewText(",
+        "test_ids": [
+          "NTF-006",
+          "RDR-001"
+        ]
+      },
       {
         "surface": "same-card avatar enrichment preserves heads-up eligibility without repeat alerts",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",

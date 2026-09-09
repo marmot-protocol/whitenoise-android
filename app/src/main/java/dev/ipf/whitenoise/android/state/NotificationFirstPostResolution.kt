@@ -1,12 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
-import android.graphics.Bitmap
-import androidx.compose.ui.text.SpanStyle
-import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
-import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -18,18 +14,14 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
-import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
+import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewText
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withTimeoutOrNull
 
 /** Privacy-safe completion state for the detached late-correction lane. */
 internal enum class NotificationLateCorrectionOutcome(
     val timingValue: String,
 ) {
     ContentPosted("content_posted"),
-    AvatarPosted("avatar_posted"),
     Unchanged("unchanged"),
     Stale("stale"),
     Failed("failed"),
@@ -89,11 +81,10 @@ internal suspend fun resolveNotificationPreviewText(
         for (bech32 in markdownDocumentMentionBech32s(document)) {
             mentionNames[bech32] = mentionDisplayName(bech32)
         }
-        markdownDocumentToPreviewAnnotatedString(
+        markdownDocumentToPreviewText(
             document = document,
-            codeStyle = SpanStyle(),
             mentionDisplayName = mentionNames::get,
-        ).text.takeIf { it.isNotBlank() }
+        ).takeIf { it.isNotBlank() }
     }
 
 /** Resolved localized group-system title and body for one notification. */
@@ -139,25 +130,16 @@ internal suspend fun notificationSenderAvatarUrl(
         ?: ProfileSanitizer.protocolImageUrl(update.sender.pictureUrl)
 
 /** Local identity and Markdown reads shared by first-draw and late notification resolution. */
-@Suppress("LongParameterList")
 internal class NotificationIdentityResolver(
-    private val contactNickname: (String?, String) -> String?,
-    private val readDisplayName: suspend (String) -> String?,
-    private val displayNameHint: (String) -> String?,
-    private val cachedShortNpub: (String) -> String,
-    private val hydratedDisplayName: (String) -> String?,
-    private val requestProfile: (String) -> Unit,
-    private val accountIdHex: suspend (String) -> String?,
-    private val parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
-    private val recipientAccountIdHex: (String) -> String?,
+    private val source: NotificationContentSource,
 ) {
     /** Reads the best local sender label without starting network hydration. */
     suspend fun senderName(update: NotificationUpdateFfi): String? {
         val senderIdHex = update.sender.accountIdHex
         if (senderIdHex.isBlank()) return null
-        val nickname = notificationSenderNameOverride(contactNickname(update.accountRef, senderIdHex), null)
+        val nickname = notificationSenderNameOverride(source.contactNickname(update.accountRef, senderIdHex), null)
         val localName = if (nickname == null) bestEffortDisplayName(senderIdHex) else null
-        return nickname ?: notificationSenderNameOverride(null, localName) ?: displayNameHint(senderIdHex)
+        return nickname ?: notificationSenderNameOverride(null, localName) ?: source.displayNameHint(senderIdHex)
     }
 
     /** Returns the best current label and optionally starts post-deadline profile hydration. */
@@ -167,8 +149,8 @@ internal class NotificationIdentityResolver(
         requestMissingProfile: Boolean,
     ): String {
         val localName = localDisplayNameForAccount(accountRef, accountIdHex)
-        val hydratedName = if (requestMissingProfile) hydratedDisplayName(accountIdHex) else null
-        if (requestMissingProfile && hydratedName == null) requestProfile(accountIdHex)
+        val hydratedName = if (requestMissingProfile) source.hydratedDisplayName(accountIdHex) else null
+        if (requestMissingProfile && hydratedName == null) source.requestProfile(accountIdHex)
         return hydratedName ?: localName
     }
 
@@ -177,7 +159,7 @@ internal class NotificationIdentityResolver(
         accountRef: String,
         localOnly: Boolean,
     ): String? =
-        recipientAccountIdHex(accountRef)?.let { id ->
+        source.recipientAccountIdHex(accountRef)?.let { id ->
             displayNameForAccount(accountRef, id, requestMissingProfile = !localOnly)
         }
 
@@ -188,7 +170,7 @@ internal class NotificationIdentityResolver(
     ): String? =
         resolveNotificationPreviewText(
             raw = raw,
-            parseMarkdown = parseMarkdown,
+            parseMarkdown = source::parseMarkdown,
             mentionDisplayName = { mentionDisplayName(it, requestMissingProfiles) },
         )
 
@@ -197,12 +179,12 @@ internal class NotificationIdentityResolver(
         accountRef: String?,
         accountIdHex: String,
     ): String {
-        val nickname = contactNickname(accountRef, accountIdHex)
+        val nickname = source.contactNickname(accountRef, accountIdHex)
         val localName = if (nickname == null) bestEffortDisplayName(accountIdHex) else null
         return nickname
             ?: localName?.let(ProfileSanitizer::displayName)
-            ?: displayNameHint(accountIdHex)
-            ?: cachedShortNpub(accountIdHex)
+            ?: source.displayNameHint(accountIdHex)
+            ?: source.cachedShortNpub(accountIdHex)
     }
 
     /** Resolves one NIP-19 mention and starts hydration only on the post-deadline pass. */
@@ -212,16 +194,16 @@ internal class NotificationIdentityResolver(
     ): String? =
         resolveNotificationMentionDisplayName(
             bech32 = bech32,
-            accountIdHex = accountIdHex,
-            profileDisplayName = hydratedDisplayName,
+            accountIdHex = source::accountIdHex,
+            profileDisplayName = source::hydratedDisplayName,
             readDisplayName = ::bestEffortDisplayName,
-            requestProfile = { if (requestMissingProfile) requestProfile(it) },
+            requestProfile = { if (requestMissingProfile) source.requestProfile(it) },
         )
 
     /** Converts binding failures to a missing local label while preserving cancellation. */
     private suspend fun bestEffortDisplayName(accountIdHex: String): String? =
-        hydratedDisplayName(accountIdHex) ?: try {
-            readDisplayName(accountIdHex)
+        source.hydratedDisplayName(accountIdHex) ?: try {
+            source.readDisplayName(accountIdHex)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Throwable) {
@@ -232,8 +214,8 @@ internal class NotificationIdentityResolver(
 /** Localized structured group-system projection for notifications. */
 internal class NotificationGroupSystemTextResolver(
     private val context: Context,
-    private val timelineRecord: suspend (NotificationUpdateFfi) -> TimelineMessageRecordFfi?,
-    private val displayNameForAccount: suspend (String?, String, Boolean) -> String,
+    private val source: NotificationContentSource,
+    private val identity: NotificationIdentityResolver,
 ) {
     /** Resolves structured group-system text, never the raw event payload. */
     suspend fun resolve(
@@ -241,7 +223,8 @@ internal class NotificationGroupSystemTextResolver(
         senderName: String?,
         localOnly: Boolean,
     ): NotificationSystemText? =
-        timelineRecord(update)
+        source
+            .timelineRecord(update)
             ?.takeIf { MessageProjector.isGroupSystemKind(it.kind) }
             ?.let { record ->
                 GroupSystemEvents.resolve(record)?.let { event ->
@@ -307,7 +290,7 @@ internal class NotificationGroupSystemTextResolver(
         localOnly: Boolean,
     ): String? =
         try {
-            displayNameForAccount(accountRef, accountIdHex, !localOnly)
+            identity.displayNameForAccount(accountRef, accountIdHex, !localOnly)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Throwable) {
@@ -365,9 +348,8 @@ internal fun notificationGroupSystemCopy(context: Context) =
 /** Chat-list-equivalent deterministic conversation title resolution. */
 internal class NotificationConversationTitleResolver(
     private val context: Context,
-    private val groupMembers: suspend (NotificationUpdateFfi) -> List<AppGroupMemberRecordFfi>,
-    private val displayNameForAccount: suspend (String?, String, Boolean) -> String,
-    private val cachedShortNpub: (String) -> String,
+    private val source: NotificationContentSource,
+    private val identity: NotificationIdentityResolver,
 ) {
     /** Resolves a group title locally; DMs let MessagingStyle own the title. */
     suspend fun resolve(
@@ -377,13 +359,14 @@ internal class NotificationConversationTitleResolver(
         if (update.isDm) {
             null
         } else {
-            update.groupName?.let(ProfileSanitizer::displayName) ?: groupMembers(update)
+            update.groupName?.let(ProfileSanitizer::displayName) ?: source
+                .groupMembers(update)
                 .takeIf { it.isNotEmpty() }
                 ?.let { members ->
                     val otherMemberAccount = GroupProjector.otherMemberAccount(members, update.accountIdHex)
                     val otherMemberTitle =
                         otherMemberAccount?.let {
-                            displayNameForAccount(update.accountRef, it, !localOnly)
+                            identity.displayNameForAccount(update.accountRef, it, !localOnly)
                         }
                     GroupProjector.displayTitle(
                         name = "",
@@ -391,7 +374,7 @@ internal class NotificationConversationTitleResolver(
                         groupIdHex = update.groupIdHex,
                         otherMemberAccount = otherMemberAccount,
                         memberCount = GroupProjector.uniqueMemberCount(members),
-                        memberTitle = { otherMemberTitle ?: cachedShortNpub(it) },
+                        memberTitle = { otherMemberTitle ?: source.cachedShortNpub(it) },
                         copy = notificationGroupTitleCopy(context),
                     )
                 }
@@ -412,8 +395,7 @@ internal class NotificationFirstPostResolver(
     private val identity: NotificationIdentityResolver,
     private val systemText: NotificationGroupSystemTextResolver,
     private val conversationTitle: NotificationConversationTitleResolver,
-    private val mediaKind: suspend (NotificationUpdateFfi) -> ReplyMediaKind,
-    private val signedInAccountCount: () -> Int,
+    private val source: NotificationContentSource,
 ) {
     /** Resolves all text/subtext fields without starting remote work when [localOnly]. */
     suspend fun resolve(
@@ -440,10 +422,11 @@ internal class NotificationFirstPostResolver(
                 LocalNotificationFormatter.needsPreviewTextResolution(update) &&
                 preview.isNullOrBlank()
             ) {
-                mediaKind(update)
+                source.mediaKind(update)
             } else {
                 ReplyMediaKind.None
             }
+        val signedInAccounts = source.signedInAccountCount()
         return NotificationFirstPostContent(
             conversationTitle = system?.title ?: conversationTitle.resolve(update, localOnly),
             senderName = senderName,
@@ -452,54 +435,29 @@ internal class NotificationFirstPostResolver(
             mediaKind = resolvedMediaKind,
             recipientAccountSubtext =
                 LocalNotificationFormatter.recipientAccountSubtext(
-                    signedInAccountCount = signedInAccountCount(),
-                    recipientLabel = identity.recipientName(update.accountRef, localOnly),
+                    signedInAccountCount = signedInAccounts,
+                    recipientLabel =
+                        if (signedInAccounts > 1) identity.recipientName(update.accountRef, localOnly) else null,
                 ),
         )
     }
 }
 
-/** Constructs the identity, system-text, title, and first-post projection graph. */
-@Suppress("LongParameterList")
+/** Constructs projections around one owner adapter without allocating per-read callbacks. */
 internal fun createNotificationContentResolutionServices(
     context: Context,
-    contactNickname: (String?, String) -> String?,
-    readDisplayName: suspend (String) -> String?,
-    displayNameHint: (String) -> String?,
-    cachedShortNpub: (String) -> String,
-    hydratedDisplayName: (String) -> String?,
-    requestProfile: (String) -> Unit,
-    accountIdHex: suspend (String) -> String?,
-    parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
-    recipientAccountIdHex: (String) -> String?,
-    timelineRecord: suspend (NotificationUpdateFfi) -> TimelineMessageRecordFfi?,
-    groupMembers: suspend (NotificationUpdateFfi) -> List<AppGroupMemberRecordFfi>,
-    mediaKind: suspend (NotificationUpdateFfi) -> ReplyMediaKind,
-    signedInAccountCount: () -> Int,
+    source: NotificationContentSource,
 ): NotificationContentResolutionServices {
-    val identity =
-        NotificationIdentityResolver(
-            contactNickname = contactNickname,
-            readDisplayName = readDisplayName,
-            displayNameHint = displayNameHint,
-            cachedShortNpub = cachedShortNpub,
-            hydratedDisplayName = hydratedDisplayName,
-            requestProfile = requestProfile,
-            accountIdHex = accountIdHex,
-            parseMarkdown = parseMarkdown,
-            recipientAccountIdHex = recipientAccountIdHex,
-        )
-    val systemText = NotificationGroupSystemTextResolver(context, timelineRecord, identity::displayNameForAccount)
-    val conversationTitle =
-        NotificationConversationTitleResolver(context, groupMembers, identity::displayNameForAccount, cachedShortNpub)
+    val identity = NotificationIdentityResolver(source)
+    val systemText = NotificationGroupSystemTextResolver(context, source, identity)
+    val conversationTitle = NotificationConversationTitleResolver(context, source, identity)
     return NotificationContentResolutionServices(
         identity = identity,
-        firstPost =
-            NotificationFirstPostResolver(identity, systemText, conversationTitle, mediaKind, signedInAccountCount),
+        firstPost = NotificationFirstPostResolver(identity, systemText, conversationTitle, source),
     )
 }
 
-/** Post-first-draw remote avatar work with exact decoded bitmap handoff. */
+/** Post-first-draw remote avatar work primes future cards without repainting the current card. */
 internal class NotificationAvatarCoordinator(
     private val appLocked: () -> Boolean,
     private val shouldPost: (NotificationUpdateFfi, Boolean) -> Boolean,
@@ -534,35 +492,10 @@ internal class NotificationAvatarCoordinator(
         return PreWarmedNotificationAvatars(sender, group)
     }
 
-    /** Awaits sender and group caches concurrently and returns the exact proven bitmaps. */
-    suspend fun awaitReady(
-        avatars: PreWarmedNotificationAvatars,
-        shouldContinue: () -> Boolean,
-    ): PreWarmedNotificationAvatars =
-        coroutineScope {
-            val sender = async { awaitCache(avatars.senderAvatarUrl, shouldContinue) }
-            val group = async { awaitCache(avatars.groupAvatarUrl, shouldContinue) }
-            avatars.copy(senderAvatarBitmap = sender.await(), groupAvatarBitmap = group.await())
-        }
-
     /** Prevents decrypted imagery from entering memory while the app lock is visible. */
     private fun preWarmIfUnlocked(url: String?) {
         if (!appLocked()) AvatarImageLoader.preWarm(url)
     }
-
-    /** Returns the exact decoded bitmap only while every post-generation fence remains valid. */
-    private suspend fun awaitCache(
-        url: String?,
-        shouldContinue: () -> Boolean,
-    ): Bitmap? =
-        url
-            ?.takeUnless(String::isBlank)
-            ?.takeIf { !appLocked() && shouldContinue() }
-            ?.let { candidate ->
-                withTimeoutOrNull(AVATAR_CORRECTION_TIMEOUT_MILLIS) {
-                    if (shouldContinue()) AvatarImageLoader.loadBitmap(candidate) else null
-                }
-            }?.takeIf { !appLocked() && shouldContinue() }
 
     /** Isolates optional avatar lookup failures without swallowing structured cancellation. */
     private suspend fun <T> bestEffort(block: suspend () -> T?): T? =
@@ -573,8 +506,4 @@ internal class NotificationAvatarCoordinator(
         } catch (_: Throwable) {
             null
         }
-
-    private companion object {
-        const val AVATAR_CORRECTION_TIMEOUT_MILLIS = 2_500L
-    }
 }

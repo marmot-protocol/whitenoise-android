@@ -780,7 +780,7 @@ class NotificationStartupOrderingTest {
                     notificationTag: String,
                     notificationId: Int,
                 ) {
-                    if (op == ConversationCardOp.SHOW_NOTIFY && barrier == ConversationCardBarrier.BEFORE_WRITE) {
+                    if (op == ConversationCardOp.SHOW_NOTIFY && barrier == ConversationCardBarrier.AFTER_WRITE) {
                         writes.incrementAndGet()
                     }
                 }

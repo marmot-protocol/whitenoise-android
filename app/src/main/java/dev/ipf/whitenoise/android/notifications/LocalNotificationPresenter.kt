@@ -423,7 +423,10 @@ class LocalNotificationPresenter(
                     .setAutoCancel(true)
                     .setOnlyAlertOnce(silentUpdate)
                     .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-                    .setSilent(silentUpdate)
+                    // Matching corrections keep their original grouping. setSilent(true)
+                    // moves an ungrouped card into the platform's silent group and can
+                    // remove its heads-up banner; onlyAlertOnce suppresses repeat alerts.
+                    .setSilent(silentUpdate && !replaceCurrentMessage)
             // Name the recipient identity in the header when multi-account (#836).
             if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) builder.setSubText(recipientAccountSubtext)
             if (
@@ -476,6 +479,11 @@ class LocalNotificationPresenter(
                                     )
                                 },
                         )
+                    // Supply the group fallback icon in the first payload; shortcut publication
+                    // stays off the initial-post path and must not be needed to complete its image.
+                    if (notificationContent.isGroupConversation && !redactContent) {
+                        builder.setLargeIcon(resolvedConversationAvatarBitmap)
+                    }
                     if (!redactContent && messagingShortcutId != null) {
                         val locusId = LocusIdCompat(messagingShortcutId)
                         builder
@@ -1400,9 +1408,9 @@ class LocalNotificationPresenter(
                     senderName = content.senderName,
                     senderKey = content.senderKey,
                     avatarUrl = conversationAvatarUrl,
-                    avatarApplied = conversationAvatarBitmap != null,
+                    avatarGenerationId = conversationAvatarBitmap?.generationId,
                     senderAvatarUrl = senderAvatarUrl,
-                    senderAvatarApplied = senderAvatarBitmap != null,
+                    senderAvatarGenerationId = senderAvatarBitmap?.generationId,
                     directShareEligible = directShareEligible,
                 )
             shortcutLastUsed[shortcutId] = shortcutAccessClock.incrementAndGet()
@@ -1600,6 +1608,7 @@ private data class MessagingPostContext(
                 (!senderAvatarUrl.isNullOrBlank() && senderAvatarBitmap == null)
 }
 
+/** Pixel generations invalidate image-only changes without retaining another copy of bitmap memory. */
 private data class ConversationShortcutSnapshot(
     val shortcutId: String,
     val accountScope: String,
@@ -1609,9 +1618,9 @@ private data class ConversationShortcutSnapshot(
     val senderName: String,
     val senderKey: String,
     val avatarUrl: String?,
-    val avatarApplied: Boolean,
+    val avatarGenerationId: Int?,
     val senderAvatarUrl: String?,
-    val senderAvatarApplied: Boolean,
+    val senderAvatarGenerationId: Int?,
     val directShareEligible: Boolean,
 )
 

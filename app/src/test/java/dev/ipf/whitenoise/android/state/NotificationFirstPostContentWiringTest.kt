@@ -58,7 +58,6 @@ class NotificationFirstPostContentWiringTest {
                 .substringAfter("private suspend fun enrichResolvedNotificationUpdate")
                 .substringBefore("private suspend fun postNotificationContentCorrection")
         val contentCorrection = source.functionBody("postNotificationContentCorrection")
-        val avatarCorrection = source.functionBody("postNotificationAvatarCorrection")
         val firstResolve =
             enrichment.indexOf("notificationContentResolution.firstPost.resolve(update, localOnly = false)")
         val avatarPreWarm =
@@ -75,7 +74,7 @@ class NotificationFirstPostContentWiringTest {
             "notificationLateCorrectionPlan(" in routing &&
                 "NotificationLateCorrectionPlan.Content" in routing &&
                 "postNotificationContentCorrection" in routing &&
-                "postNotificationAvatarCorrection" in routing,
+                "NotificationLateCorrectionOutcome.Unchanged" in routing,
         )
         assertTrue(
             "the post-deadline content resolver must run even after a fast local first draw",
@@ -84,7 +83,7 @@ class NotificationFirstPostContentWiringTest {
         )
         assertTrue(
             "avatar lookup must remain behind the content-routing decision",
-            "notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)" in avatarCorrection,
+            "notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)" in routing,
         )
     }
 
@@ -134,21 +133,20 @@ class NotificationFirstPostContentWiringTest {
         )
     }
 
-    /** Requires a proven cached Bitmap to cross the presenter boundary intact. */
+    /** Initial and corrected text share the exact first-card imagery without a cosmetic rewrite. */
     @Test
-    fun readyAvatarCorrectionCarriesTheProvenBitmapsIntoThePresenter() {
-        val enrichment = appStateSource().readText().functionBody("postNotificationAvatarCorrection")
-        val latePost = appStateSource().readText().functionBody("postNotificationLateCorrection")
-
-        assertTrue(
-            "avatar readiness must depend on decoded bitmaps",
-            "hasReadyAvatar = senderAvatarBitmap != null" in enrichment,
-        )
-        assertTrue(
-            "the exact ready bitmaps must cross the final presenter boundary",
-            "conversationAvatarBitmap = conversationAvatarBitmap" in latePost &&
-                "senderAvatarBitmap = senderAvatarBitmap" in latePost,
-        )
+    fun readyAvatarSnapshotReachesBothWritesWithoutRemoteLoading() {
+        val source = appStateSource().readText()
+        val firstPost =
+            source
+                .substringAfter("private suspend fun showInitialNotificationUpdate")
+                .substringBefore("private suspend fun showRedactedNotificationUpdate")
+        val latePost = source.functionBody("postNotificationLateCorrection")
+        for (post in listOf(firstPost, latePost)) {
+            assertTrue("conversationAvatarBitmap = firstPost.avatars.conversationBitmap(update.isDm)" in post)
+            assertTrue("senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap" in post)
+        }
+        assertTrue("postNotificationAvatarCorrection" !in source)
     }
 
     /** Locates production AppState source from Gradle's module working directory. */
