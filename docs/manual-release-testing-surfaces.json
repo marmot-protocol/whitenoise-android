@@ -817,7 +817,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Avatar.kt",
         "anchor": "fun Avatar(",
         "test_ids": [
-          "AXY-001"
+          "AXY-001",
+          "INT-011"
         ]
       },
       {
@@ -857,7 +858,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/GroupAvatar.kt",
         "anchor": "fun GroupAvatar(",
         "test_ids": [
-          "GRP-003"
+          "GRP-003",
+          "INT-011"
         ]
       },
       {

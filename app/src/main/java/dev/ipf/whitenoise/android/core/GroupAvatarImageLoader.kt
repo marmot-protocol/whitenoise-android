@@ -66,6 +66,7 @@ internal object GroupAvatarImageLoader {
         )
     private val inFlight = mutableMapOf<String, CompletableDeferred<ImageBitmap?>>()
     private val cacheLifetime = StalenessGuard()
+    private val requestLifetime = StalenessGuard()
 
     fun peek(key: String?): ImageBitmap? =
         key?.let {
@@ -98,26 +99,27 @@ internal object GroupAvatarImageLoader {
                 val deferred = CompletableDeferred<ImageBitmap?>()
                 inFlight[key] = deferred
                 val launchedGeneration = cacheLifetime.capture()
+                val launchedRequest = requestLifetime.capture()
                 scope.launch {
                     val image =
                         runCatching {
                             loadPermits.withPermit {
-                                if (!isCurrentGeneration(launchedGeneration)) return@withPermit null
+                                if (!isCurrentGeneration(launchedGeneration, launchedRequest)) return@withPermit null
                                 val bytes = fetchBytes()
-                                if (!isCurrentGeneration(launchedGeneration) || !isGroupAvatarPayloadAccepted(bytes)) {
-                                    return@withPermit null
-                                }
+                                if (!isCurrentGeneration(launchedGeneration, launchedRequest)) return@withPermit null
+                                if (!isGroupAvatarPayloadAccepted(bytes)) return@withPermit null
                                 MediaPipeline
                                     .decodeSampledBitmap(bytes, MAX_EDGE_PX)
                                     ?.asImageBitmap()
                             }
                         }.getOrNull()
                     synchronized(lock) {
-                        if (cacheLifetime.isCurrent(launchedGeneration) && image != null) {
+                        val current = isCurrentGeneration(launchedGeneration, launchedRequest)
+                        if (current && image != null) {
                             cache.put(key, image)
                         }
                         inFlight.remove(key, deferred)
-                        deferred.complete(if (cacheLifetime.isCurrent(launchedGeneration)) image else null)
+                        deferred.complete(if (current) image else null)
                     }
                 }
                 PendingGroupAvatarRequest(deferred)
@@ -125,11 +127,26 @@ internal object GroupAvatarImageLoader {
         return request.await()
     }
 
-    /** Checks the cache-lifetime token captured by a suspended caller. */
-    private fun isCurrentGeneration(candidate: Long): Boolean =
+    /** Rejects work retired by either an account clear or a connectivity recovery. */
+    private fun isCurrentGeneration(
+        candidate: Long,
+        request: Long,
+    ): Boolean =
         synchronized(lock) {
-            cacheLifetime.isCurrent(candidate)
+            cacheLifetime.isCurrent(candidate) && requestLifetime.isCurrent(request)
         }
+
+    /** Releases old waiters without canceling a detached download or discarding useful pixels. */
+    internal fun prepareForRecovery() {
+        synchronized(lock) { retireRequestsLocked() }
+    }
+
+    /** Invalidates queued work before making a new request discoverable under the same image key. */
+    private fun retireRequestsLocked() {
+        requestLifetime.advance()
+        inFlight.values.forEach { it.complete(null) }
+        inFlight.clear()
+    }
 
     /** Clears cached group avatars and invalidates every pending completion. */
     fun clear() {
@@ -137,8 +154,7 @@ internal object GroupAvatarImageLoader {
             cacheLifetime.advance()
             scope.coroutineContext.cancelChildren()
             cache.clear()
-            inFlight.values.forEach { it.complete(null) }
-            inFlight.clear()
+            retireRequestsLocked()
         }
     }
 }

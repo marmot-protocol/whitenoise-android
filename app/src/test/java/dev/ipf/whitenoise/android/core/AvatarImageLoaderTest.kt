@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.core
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -10,6 +11,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -18,6 +20,132 @@ import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
 class AvatarImageLoaderTest {
+    /** A pre-recovery socket failure cannot recreate the old minute-long cooldown afterward. */
+    @Test
+    fun lateFailureCannotPoisonRecoveredRequest() =
+        runBlocking {
+            val oldCalls = AtomicInteger()
+            val started = AtomicInteger()
+            val bothStarted = CompletableDeferred<Unit>()
+            val releaseOld = CompletableDeferred<Unit>()
+            val releaseOther = CompletableDeferred<Unit>()
+            val barrierStarted = CompletableDeferred<Unit>()
+            val oldUrl = "https://profiles.example/late-old"
+            AvatarImageLoader.attachProfileImageFetcher { url, _ ->
+                if (url == oldUrl && oldCalls.incrementAndGet() == 1) {
+                    if (started.incrementAndGet() == 2) bothStarted.complete(Unit)
+                    releaseOld.await()
+                    error("late offline failure")
+                }
+                if (url.endsWith("held")) {
+                    if (started.incrementAndGet() == 2) bothStarted.complete(Unit)
+                    releaseOther.await()
+                    error("other offline failure")
+                }
+                if (url.endsWith("barrier")) barrierStarted.complete(Unit)
+                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+            }
+            try {
+                AvatarImageLoader.preWarm(oldUrl)
+                AvatarImageLoader.preWarm("https://profiles.example/held")
+                withTimeout(5_000) { bothStarted.await() }
+                AvatarLoadRecovery.onNetworkRestored()
+                AvatarImageLoader.preWarm("https://profiles.example/barrier")
+                releaseOld.complete(Unit)
+                // Prewarm holds its admission until detached completion has published. This
+                // later prewarm therefore proves the old failure finished before the assertion.
+                withTimeout(5_000) { barrierStarted.await() }
+                assertNotNull(withTimeout(5_000) { AvatarImageLoader.load(oldUrl) })
+                assertEquals(2, oldCalls.get())
+            } finally {
+                releaseOld.complete(Unit)
+                releaseOther.complete(Unit)
+            }
+        }
+
+    /** Recovering connectivity never turns a successful picture back into an empty placeholder. */
+    @Test
+    fun recoveryPreservesDecodedPixelsWithoutFetchingAgain() =
+        runBlocking {
+            val calls = AtomicInteger()
+            AvatarImageLoader.attachProfileImageFetcher { _, _ ->
+                calls.incrementAndGet()
+                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+            }
+            val url = "https://profiles.example/cached"
+            val image = AvatarImageLoader.load(url)
+            assertNotNull(image)
+            AvatarLoadRecovery.onNetworkRestored()
+            assertSame(image, AvatarImageLoader.peek(url))
+            assertSame(image, AvatarImageLoader.load(url))
+            assertEquals(1, calls.get())
+        }
+
+    /** Recovery retires queued requests before new callers can join them or duplicate their sockets. */
+    @Test
+    fun recoveryDetachesOldWaitersAndSkipsTheirQueuedFetches() =
+        runBlocking {
+            val occupied = AtomicInteger()
+            val bothOccupied = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val targetCalls = AtomicInteger()
+            AvatarImageLoader.attachProfileImageFetcher { url, _ ->
+                if (url.contains("blocker")) {
+                    if (occupied.incrementAndGet() == 2) bothOccupied.complete(Unit)
+                    release.await()
+                    error("old offline socket")
+                }
+                targetCalls.incrementAndGet()
+                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+            }
+            val blockers =
+                List(2) { index ->
+                    async { AvatarImageLoader.load("https://profiles.example/blocker$index") }
+                }
+            try {
+                withTimeout(5_000) { bothOccupied.await() }
+                val oldQueued =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        AvatarImageLoader.load("https://profiles.example/queued")
+                    }
+                AvatarLoadRecovery.onNetworkRestored()
+                assertNull(withTimeout(5_000) { oldQueued.await() })
+                val current =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        AvatarImageLoader.load("https://profiles.example/queued")
+                    }
+                release.complete(Unit)
+                assertNotNull(withTimeout(5_000) { current.await() })
+                assertEquals(1, targetCalls.get())
+                blockers.awaitAll().forEach { assertNull(it) }
+            } finally {
+                release.complete(Unit)
+            }
+        }
+
+    /** A validated recovery retries a failed URL immediately, without its minute-long cooldown. */
+    @Test
+    fun validatedRecoveryMakesFailedAvatarAvailableImmediately() =
+        runBlocking {
+            var online = false
+            val attempts = AtomicInteger()
+            AvatarImageLoader.attachProfileImageFetcher { _, _ ->
+                attempts.incrementAndGet()
+                check(online) { "synthetic offline fetch" }
+                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+            }
+            val url = "https://profiles.example/recovery.png"
+            assertNull(AvatarImageLoader.load(url))
+            online = true
+            assertNull(AvatarImageLoader.load(url))
+            assertEquals(1, attempts.get())
+
+            AvatarLoadRecovery.onNetworkRestored()
+
+            assertNotNull(AvatarImageLoader.load(url))
+            assertEquals(2, attempts.get())
+        }
+
     @After
     fun tearDownProfileImageFetcher() {
         AvatarImageLoader.resetProfileImageFetcherForTests()

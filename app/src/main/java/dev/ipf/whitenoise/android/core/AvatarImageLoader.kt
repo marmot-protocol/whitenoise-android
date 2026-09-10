@@ -41,7 +41,7 @@ object AvatarImageLoader {
         }
     private val inFlight = mutableMapOf<String, AvatarInFlightRequest>()
 
-    // staleness-exempt: captured cache-lifetime tokens for bounded queued work, not a counter owner.
+    // staleness-exempt: captured request-lifetime tokens for bounded queued work, not a counter owner.
     private val preWarmQueuedGeneration = mutableMapOf<String, Long>()
     private val failureExpiresAt = AvatarFailureExpiryCache(FAILURE_CACHE_MAX_ENTRIES)
     private var profileImageFetcher: (suspend (String, ULong) -> ByteArray)? = null
@@ -50,6 +50,7 @@ object AvatarImageLoader {
     // their results so a logout/account-switch can't be re-polluted by an
     // in-flight request that was already on the network.
     private val cacheLifetime = StalenessGuard()
+    private val requestLifetime = StalenessGuard()
 
     /**
      * Attach the process-owned Marmot profile-image fetch. MDK owns URL
@@ -58,9 +59,13 @@ object AvatarImageLoader {
      * cache used by Android presentation surfaces.
      */
     internal fun attachProfileImageFetcher(fetcher: suspend (String, ULong) -> ByteArray) {
-        synchronized(lock) {
-            profileImageFetcher = fetcher
-        }
+        val becameAvailable =
+            synchronized(lock) {
+                val wasUnavailable = profileImageFetcher == null
+                profileImageFetcher = fetcher
+                wasUnavailable
+            }
+        if (becameAvailable) AvatarLoadRecovery.onFetcherAvailable()
     }
 
     /** Test-only lifecycle boundary for the process-global MDK fetch adapter. */
@@ -97,7 +102,7 @@ object AvatarImageLoader {
                 ) {
                     return
                 }
-                cacheLifetime.capture().also { preWarmQueuedGeneration[key] = it }
+                requestLifetime.capture().also { preWarmQueuedGeneration[key] = it }
             }
         scope.launch {
             try {
@@ -134,7 +139,7 @@ object AvatarImageLoader {
         cached(url)?.let { return it }
         val request =
             synchronized(lock) {
-                if (expectedGeneration != null && !cacheLifetime.isCurrent(expectedGeneration)) {
+                if (expectedGeneration != null && !requestLifetime.isCurrent(expectedGeneration)) {
                     return@synchronized CompletedAvatarRequest(null)
                 }
                 cache.get(url)?.let { return@synchronized CompletedAvatarRequest(it) }
@@ -154,6 +159,7 @@ object AvatarImageLoader {
                 val deferred = inFlightRequest.result
                 inFlight[url] = inFlightRequest
                 val launchedGeneration = cacheLifetime.capture()
+                val launchedRequest = requestLifetime.capture()
                 scope.launch {
                     try {
                         // Gate the detached fetch itself, not the caller awaiting
@@ -163,7 +169,7 @@ object AvatarImageLoader {
                         val fetchResult =
                             runCatching {
                                 fetchGate.withPermit(fetchLane) {
-                                    if (synchronized(lock) { !cacheLifetime.isCurrent(launchedGeneration) }) {
+                                    if (!isCurrentRequest(launchedGeneration, launchedRequest)) {
                                         AvatarImageFetchResult.Unavailable
                                     } else {
                                         fetch(url)
@@ -172,8 +178,8 @@ object AvatarImageLoader {
                             }.getOrElse { AvatarImageFetchResult.Failed }
                         val image = (fetchResult as? AvatarImageFetchResult.Success)?.image
                         synchronized(lock) {
-                            if (!cacheLifetime.isCurrent(launchedGeneration)) {
-                                // clear() ran while we were in flight; drop the result.
+                            if (!isCurrentRequest(launchedGeneration, launchedRequest)) {
+                                // Teardown or recovery retired this work, including late failures.
                                 inFlight.remove(url, inFlightRequest)
                                 deferred.complete(null)
                                 return@launch
@@ -255,12 +261,32 @@ object AvatarImageLoader {
         synchronized(lock) {
             cacheLifetime.advance()
             cache.evictAll()
-            failureExpiresAt.clear()
-            preWarmQueuedGeneration.clear()
-            inFlight.values.forEach { it.result.complete(null) }
-            inFlight.clear()
+            retireRequestsLocked()
         }
     }
+
+    /** Retires failed/pending work but preserves decoded pixels and detached socket permits. */
+    internal fun prepareForRecovery() {
+        synchronized(lock) { retireRequestsLocked() }
+    }
+
+    /** Advance before waking waiters so queued work and late failures cannot enter the new lifetime. */
+    private fun retireRequestsLocked() {
+        requestLifetime.advance()
+        failureExpiresAt.clear()
+        preWarmQueuedGeneration.clear()
+        inFlight.values.forEach { it.result.complete(null) }
+        inFlight.clear()
+    }
+
+    /** Checks both account teardown and request retirement while holding the loader publication lock. */
+    private fun isCurrentRequest(
+        cacheGeneration: Long,
+        requestGeneration: Long,
+    ): Boolean =
+        synchronized(lock) {
+            cacheLifetime.isCurrent(cacheGeneration) && requestLifetime.isCurrent(requestGeneration)
+        }
 
     private fun cached(url: String): ImageBitmap? = synchronized(lock) { cache.get(url) }
 

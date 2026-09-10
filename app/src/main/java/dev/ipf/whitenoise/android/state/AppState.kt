@@ -82,6 +82,7 @@ import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
 import dev.ipf.whitenoise.android.audio.tts.runtimeTrustForSelectionWarning
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.AvatarLoadRecovery
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
@@ -7078,6 +7079,7 @@ class WhiteNoiseAppState private constructor(
             )
         updateConnectivitySignals(hasValidatedInternet = recovery.hasUsableInternet)
         if (!recovery.restored) return
+        AvatarLoadRecovery.onNetworkRestored()
         validatedConnectivityRecoveryGenerationMutable.update { generation -> generation + 1 }
         notificationNetworkRecovery.noteNetworkRestored(validatedConnectivityRecoveryGenerationMutable.value)
     }

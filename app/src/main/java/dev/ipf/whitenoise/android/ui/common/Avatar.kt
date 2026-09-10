@@ -12,7 +12,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +37,7 @@ private val AvatarPalette =
         Color(0xFF9A4055),
     )
 
+/** Shows identity-scoped cached pixels or initials, recovering missing URL images while visible. */
 @Composable
 internal fun Avatar(
     title: String,
@@ -56,10 +56,11 @@ internal fun Avatar(
     // state holder itself must also be recreated to re-seed from the new cache
     // key instead of displaying the old bitmap transiently.
     val loadedUrlImage by key(seed, pictureUrl, picture) {
-        produceState(AvatarImageLoader.peek(pictureUrl)) {
-            if (value == null && pictureUrl != null && picture == null) {
-                value = AvatarImageLoader.load(pictureUrl)
-            }
+        rememberRecoverableAvatar(
+            initialImage = AvatarImageLoader.peek(pictureUrl),
+            enabled = pictureUrl != null && picture == null,
+        ) {
+            AvatarImageLoader.load(checkNotNull(pictureUrl))
         }
     }
     val image = picture ?: loadedUrlImage
