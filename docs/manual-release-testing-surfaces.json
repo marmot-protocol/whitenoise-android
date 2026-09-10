@@ -7648,6 +7648,14 @@
         ]
       },
       {
+        "surface": "Long dictation capture, stop, and caller-audio drain",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun sealAndDrainCallerAudio(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
         "surface": "Dictation caller-audio capability probe",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "private class ConversationDictationCallerAudioProbe(",
