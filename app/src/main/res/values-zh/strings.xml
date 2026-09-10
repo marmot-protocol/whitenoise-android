@@ -1625,6 +1625,7 @@
     <string name="dictation_no_speech">未识别到语音</string>
     <string name="dictation_network_error">语音服务无法连接</string>
     <string name="dictation_recognizer_busy">语音服务正忙</string>
+    <string name="dictation_audio_buffer_full">语音服务处理速度不足，听写已停止</string>
     <string name="dictation_timed_out">语音识别超时</string>
     <string name="dictation_failed">无法转写语音</string>
     <string name="dictation_review_required">草稿已更改 — 请检查听写文本</string>

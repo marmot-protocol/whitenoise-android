@@ -1714,6 +1714,7 @@
     <string name="dictation_no_speech">Речь не распознана</string>
     <string name="dictation_network_error">Не удалось подключиться к службе распознавания речи</string>
     <string name="dictation_recognizer_busy">Служба распознавания речи занята</string>
+    <string name="dictation_audio_buffer_full">Диктовка остановлена, потому что сервис распознавания речи не успевал обрабатывать звук</string>
     <string name="dictation_timed_out">Время ожидания распознавания речи истекло</string>
     <string name="dictation_failed">Не удалось расшифровать речь</string>
     <string name="dictation_review_required">Черновик изменён — проверьте продиктованный текст</string>

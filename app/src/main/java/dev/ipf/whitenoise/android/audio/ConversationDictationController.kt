@@ -327,6 +327,9 @@ internal interface ConversationDictationPlatform {
     /** Whether capture still owns sealed, partial, or in-flight caller audio for the logical session. */
     fun callerAudioHasPending(): Boolean = false
 
+    /** Capture-side quiet time, or null when the provider owns microphone capture. */
+    fun callerAudioSilenceMillis(): Long? = null
+
     /** Seals the current caller-audio tail when no provider generation currently owns it. */
     fun finishCallerAudioCapture(onClosed: () -> Unit): Boolean = false
 
@@ -704,6 +707,9 @@ internal class ConversationDictationController internal constructor(
         ) {
             return
         }
+        if (platform.callerAudioHasPending()) {
+            armCallerAudioDrainTimeout(requireNotNull(current.sessionId), requireNotNull(current.target))
+        }
         requestedDeliveryMode = deliveryMode
         if (durableSession && !durableSessionReady) {
             finishRequested = true
@@ -772,11 +778,7 @@ internal class ConversationDictationController internal constructor(
         target: ConversationDictationTarget,
     ) {
         state = ConversationDictationState.Processing(sessionId, target)
-        armSessionTimeout(sessionId, CALLER_AUDIO_DRAIN_TIMEOUT_MILLIS) {
-            if (state is ConversationDictationState.Processing && state.sessionId == sessionId) {
-                failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
-            }
-        }
+        armCallerAudioDrainTimeout(sessionId, target)
         val platformOwnsClosure =
             runCatching {
                 platform.finishCallerAudioCapture {
@@ -791,6 +793,18 @@ internal class ConversationDictationController internal constructor(
                 }
             }.getOrDefault(false)
         if (!platformOwnsClosure) finalizeAccumulatedTranscript(sessionId, target)
+    }
+
+    /** Keeps one drain deadline active while replacement recognizers move through their states. */
+    private fun armCallerAudioDrainTimeout(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+    ) {
+        armSessionTimeout(sessionId, CALLER_AUDIO_DRAIN_TIMEOUT_MILLIS) {
+            if (finishRequested && state.sessionId == sessionId) {
+                failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
+            }
+        }
     }
 
     /** Discards process-memory transcript state and releases every resource held by the session. */
@@ -1314,7 +1328,8 @@ internal class ConversationDictationController internal constructor(
         if (state.sessionId != sessionId) return
         clearRecognitionGeneration(cancel = false)
         if (!ensureDurableSession(sessionId, target)) return
-        if (!microphoneHeld) {
+        // Drain generations use sealed PCM; reacquiring capture would replace their drain deadline.
+        if (!microphoneHeld && !finishRequested) {
             val acquired = tryAcquireMicrophone()
             conversationDictationDiagnostic("event=microphone_lease acquired=$acquired")
             if (!acquired) {
@@ -1687,7 +1702,10 @@ internal class ConversationDictationController internal constructor(
         silenceTimeoutHandle?.cancel()
         silenceTimeoutHandle =
             scheduleTimeout(remainingMillis) {
-                if (state.sessionId == sessionId && !generationHasSpeech && accumulatedTranscript.isNotBlank()) {
+                val capturedSilence = platform.callerAudioSilenceMillis()
+                if (state.sessionId == sessionId && capturedSilence != null) {
+                    finishAfterCallerAudioSilence(sessionId, target, silenceMillis, capturedSilence)
+                } else if (state.sessionId == sessionId && !generationHasSpeech && accumulatedTranscript.isNotBlank()) {
                     finishRequested = true
                     cancelPendingRestart()
                     clearRecognitionGeneration(
@@ -1697,6 +1715,21 @@ internal class ConversationDictationController internal constructor(
                     finalizeAccumulatedTranscript(sessionId, target)
                 }
             }
+    }
+
+    /** Rechecks actual microphone activity and drains the tail before automatic completion. */
+    private fun finishAfterCallerAudioSilence(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        thresholdMillis: Long,
+        capturedSilenceMillis: Long,
+    ) {
+        if (capturedSilenceMillis < thresholdMillis) {
+            silenceDeadlineElapsedMillis = elapsedRealtime() + thresholdMillis - capturedSilenceMillis
+            armSilenceDeadline(sessionId, target)
+        } else {
+            stop()
+        }
     }
 
     /** Appends one provider-final segment; generation ownership rejects duplicate callbacks. */
@@ -2536,11 +2569,22 @@ internal class AndroidConversationDictationPlatform(
         return source
     }
 
+    /** Reports retained audio even after microphone closure. */
     override fun callerAudioHasPending(): Boolean = callerAudioCapture?.hasPending() == true
 
+    /** Uses capture activity rather than recognizer callbacks delayed by chunk buffering. */
+    override fun callerAudioSilenceMillis(): Long? = callerAudioCapture?.silenceMillis()
+
+    /** Returns recorder closure on the main thread before creating another recognizer. */
     override fun finishCallerAudioCapture(onClosed: () -> Unit): Boolean {
         val capture = callerAudioCapture ?: return false
-        capture.finish(onClosed)
+        capture.finish {
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                onClosed()
+            } else {
+                Handler(Looper.getMainLooper()).post(onClosed)
+            }
+        }
         return true
     }
 

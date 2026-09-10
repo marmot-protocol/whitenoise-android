@@ -1346,6 +1346,40 @@ class ConversationDictationControllerTest {
         }
     }
 
+    /** Buffered live speech must not be mistaken for provider silence between 30-second chunks. */
+    @Test
+    fun bufferedSpeechDefersAutomaticFinishUntilCaptureIsQuietAndTailIsRecognized() {
+        val platform =
+            FakePlatform().apply {
+                pendingCallerAudio = true
+                capturedSilenceMillis = 0L
+            }
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                platform = platform,
+                finishAfterSilenceMillis = { 3_000L },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        platform.listener.onResult("first chunk")
+        fixture.scheduler.runDelay(250L)
+        platform.listener.onReady()
+
+        fixture.scheduler.runDelay(3_000L)
+
+        assertEquals(0, fixture.writes)
+        assertTrue(fixture.controller.state is ConversationDictationState.Listening)
+        platform.capturedSilenceMillis = 3_000L
+        fixture.scheduler.runDelay(3_000L)
+        assertTrue(fixture.controller.state is ConversationDictationState.Processing)
+        assertEquals(0, fixture.writes)
+        platform.pendingCallerAudio = false
+        platform.listener.onResult("last chunk")
+
+        assertEquals("first chunk last chunk", fixture.drafts.getValue(key()).text)
+        assertEquals(1, fixture.writes)
+    }
+
     /** Verifies segment spacing, punctuation attachment, and repeated speech across generations. */
     @Test
     fun segmentAccumulatorPreservesPunctuationAndRepeatedSpeechAcrossGenerations() {
@@ -1469,6 +1503,36 @@ class ConversationDictationControllerTest {
         val sessionsBeforeLateClose = fixture.platform.sessions.size
         checkNotNull(fixture.platform.callerAudioFinishCallback).invoke()
         assertEquals(sessionsBeforeLateClose, fixture.platform.sessions.size)
+    }
+
+    /** The total drain bound survives a ready callback, both during active capture and restart gaps. */
+    @Test
+    fun drainWatchdogSurvivesReplacementRecognizerReady() {
+        listOf(false, true).forEach { stopInRestartGap ->
+            var microphoneAcquisitions = 0
+            val fixture =
+                fixture(
+                    draft = TextFieldValue(""),
+                    tryAcquireMicrophone = {
+                        microphoneAcquisitions += 1
+                        true
+                    },
+                )
+            fixture.platform.pendingCallerAudio = true
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onReady()
+            if (stopInRestartGap) fixture.platform.listener.onResult("first")
+            fixture.controller.stop()
+            if (!stopInRestartGap) fixture.platform.listener.onResult("first")
+            fixture.platform.listener.onReady()
+
+            fixture.scheduler.runThrough(90_000L)
+
+            val review = fixture.controller.state as ConversationDictationState.ReviewRequired
+            assertEquals("first", review.transcript)
+            assertEquals(0, fixture.writes)
+            assertEquals(1, microphoneAcquisitions)
+        }
     }
 
     /** A one-hour capture remains admitted, while the 65-minute safety bound still fails closed. */
@@ -3025,6 +3089,7 @@ class ConversationDictationControllerTest {
         lateinit var callerAudioProbeCallback: (ConversationDictationCallerAudioRequirement) -> Unit
             private set
         var pendingCallerAudio = false
+        var capturedSilenceMillis: Long? = null
         var deferCallerAudioFinish = false
         var callerAudioFinishCallback: (() -> Unit)? = null
 
@@ -3064,6 +3129,9 @@ class ConversationDictationControllerTest {
         override fun callerAudioRequirement(): ConversationDictationCallerAudioRequirement = callerAudio
 
         override fun callerAudioHasPending(): Boolean = pendingCallerAudio
+
+        /** Supplies capture activity independently of provider callbacks. */
+        override fun callerAudioSilenceMillis(): Long? = capturedSilenceMillis
 
         override fun finishCallerAudioCapture(onClosed: () -> Unit): Boolean {
             if (!pendingCallerAudio) return false

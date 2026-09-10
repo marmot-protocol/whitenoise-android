@@ -1625,6 +1625,7 @@
     <string name="dictation_no_speech">未辨識到語音</string>
     <string name="dictation_network_error">語音服務無法連線</string>
     <string name="dictation_recognizer_busy">語音服務忙碌中</string>
+    <string name="dictation_audio_buffer_full">語音服務處理速度不足，聽寫已停止</string>
     <string name="dictation_timed_out">語音辨識逾時</string>
     <string name="dictation_failed">無法轉寫語音</string>
     <string name="dictation_review_required">草稿已變更 — 請檢查聽寫文字</string>

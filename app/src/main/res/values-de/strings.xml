@@ -1650,6 +1650,7 @@
     <string name="dictation_no_speech">Keine Sprache erkannt</string>
     <string name="dictation_network_error">Der Sprachdienst konnte keine Verbindung herstellen</string>
     <string name="dictation_recognizer_busy">Der Sprachdienst ist ausgelastet</string>
+    <string name="dictation_audio_buffer_full">Das Diktat wurde beendet, weil der Sprachdienst nicht mithalten konnte</string>
     <string name="dictation_timed_out">Zeitüberschreitung bei der Spracherkennung</string>
     <string name="dictation_failed">Sprache konnte nicht transkribiert werden</string>
     <string name="dictation_review_required">Entwurf geändert — diktierten Text prüfen</string>

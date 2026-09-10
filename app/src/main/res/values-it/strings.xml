@@ -1652,6 +1652,7 @@
     <string name="dictation_no_speech">Non è stata riconosciuta alcuna voce</string>
     <string name="dictation_network_error">Il servizio vocale non è riuscito a connettersi</string>
     <string name="dictation_recognizer_busy">Il servizio vocale è occupato</string>
+    <string name="dictation_audio_buffer_full">La dettatura è stata interrotta perché il servizio vocale non riusciva a tenere il passo</string>
     <string name="dictation_timed_out">Tempo scaduto per il riconoscimento vocale</string>
     <string name="dictation_failed">Impossibile trascrivere la voce</string>
     <string name="dictation_review_required">Bozza modificata — controlla il testo dettato</string>

@@ -7664,6 +7664,14 @@
         ]
       },
       {
+        "surface": "Dictation automatic completion observes captured speech and drains the tail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun finishAfterCallerAudioSilence(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
         "surface": "Dictation caller-audio capability probe",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "private class ConversationDictationCallerAudioProbe(",

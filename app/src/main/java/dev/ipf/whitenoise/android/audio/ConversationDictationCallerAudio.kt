@@ -14,6 +14,7 @@ import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 import kotlin.math.abs
@@ -99,6 +100,7 @@ internal class ConversationDictationCallerAudio internal constructor(
             Os.write(descriptor, source, offset, length)
         },
 ) {
+    private val lastSpeechAt = AtomicLong(SystemClock.elapsedRealtime())
     private val recording = AtomicBoolean(false)
     private val finishing = AtomicBoolean(false)
     private val captureClosed = AtomicBoolean(false)
@@ -106,10 +108,11 @@ internal class ConversationDictationCallerAudio internal constructor(
     private val captureClosedCallbacks = ConcurrentLinkedQueue<() -> Unit>()
     private val activeStream = AtomicReference<ConversationDictationCallerAudioStream?>(null)
 
-    /** Starts the recorder once; later recognition generations reuse the same capture. */
+    /** Starts capture once, or permits buffered audio to drain after the recorder has stopped. */
     @Suppress("ReturnCount")
     fun start(): Boolean {
-        if (captureClosed.get() || finishing.get()) return false
+        if (discarded.get()) return false
+        if (captureClosed.get() || finishing.get()) return buffer.hasPending
         if (recording.get()) return true
         if (!recording.compareAndSet(false, true)) return recording.get()
         val started =
@@ -133,7 +136,7 @@ internal class ConversationDictationCallerAudio internal constructor(
     /** Opens the only serial provider stream. The recorder itself is not restarted. */
     @Suppress("MaxLineLength", "ReturnCount")
     fun openProviderStream(onFailure: (ConversationDictationCallerAudioFailure) -> Unit = {}): ConversationDictationCallerAudioStream? {
-        if (captureClosed.get() || discarded.get()) return null
+        if (discarded.get()) return null
         val pipe = openPipe() ?: return null
         val stream = ConversationDictationCallerAudioStream(this, pipe[1], pipe[0], buffer, pipeWriter, onFailure)
         return if (activeStream.compareAndSet(null, stream)) {
@@ -165,12 +168,17 @@ internal class ConversationDictationCallerAudio internal constructor(
         if (finishing.compareAndSet(false, true) && !recording.compareAndSet(true, false)) releaseRecorder()
     }
 
+    /** Includes partial, queued, and in-flight audio until acknowledged or discarded. */
     fun hasPending(): Boolean = buffer.hasPending
+
+    /** Measures quiet capture time independently of delayed provider speech callbacks. */
+    fun silenceMillis(): Long = (SystemClock.elapsedRealtime() - lastSpeechAt.get()).coerceAtLeast(0L)
 
     internal fun streamSettled(stream: ConversationDictationCallerAudioStream) {
         activeStream.compareAndSet(stream, null)
     }
 
+    /** Records continuously across provider generations and seals the last read before closure. */
     private fun capture() {
         val samples = ShortArray(FRAMES_PER_READ)
         val encoded = ByteArray(FRAMES_PER_READ * BYTES_PER_FRAME)
@@ -190,7 +198,7 @@ internal class ConversationDictationCallerAudio internal constructor(
                         )
                         activeStream.get()?.reportFailure(ConversationDictationCallerAudioFailure.BufferFull)
                     } else {
-                        progress.record(read, conversationDictationPeak(samples, read), buffer.bufferedBytes)
+                        recordCaptureActivity(samples, read, progress)
                     }
                 }
             }
@@ -201,6 +209,17 @@ internal class ConversationDictationCallerAudio internal constructor(
             releaseRecorder()
             progress.reportClosed(buffer.bufferedBytes)
         }
+    }
+
+    /** Tracks capture-side speech before a provider receives the next sealed chunk. */
+    private fun recordCaptureActivity(
+        samples: ShortArray,
+        read: Int,
+        progress: CallerAudioProgress,
+    ) {
+        val peak = conversationDictationPeak(samples, read)
+        if (peak >= SPEECH_PEAK) lastSpeechAt.set(SystemClock.elapsedRealtime())
+        progress.record(read, peak, buffer.bufferedBytes)
     }
 
     private fun registerCaptureClosedCallback(callback: () -> Unit) {
