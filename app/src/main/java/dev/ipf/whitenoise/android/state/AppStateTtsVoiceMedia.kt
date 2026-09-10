@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.state
 import androidx.annotation.StringRes
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineChoice
-import dev.ipf.whitenoise.android.audio.tts.TtsStartFailure
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceKey
 import kotlinx.coroutines.launch
 
@@ -32,11 +31,7 @@ internal fun WhiteNoiseAppState.setTtsMediaMixVolume(volume: TtsMediaMixVolume) 
 
 /** Provides accessible copy for the latest read-aloud start refusal. */
 @StringRes
-internal fun WhiteNoiseAppState.ttsStartFailureMessage(): Int =
-    when (ttsController.lastStartFailure) {
-        TtsStartFailure.MediaNotActive -> R.string.tts_media_mix_no_active_media
-        else -> R.string.tts_bar_error
-    }
+internal fun WhiteNoiseAppState.ttsStartFailureMessage(): Int = R.string.tts_bar_error
 
 /** Saves a voice for the active engine and safely swaps in a newly configured handle. */
 internal fun WhiteNoiseAppState.selectTtsVoice(voice: TtsVoiceKey?) {

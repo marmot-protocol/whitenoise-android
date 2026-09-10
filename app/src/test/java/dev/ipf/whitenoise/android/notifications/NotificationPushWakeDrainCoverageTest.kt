@@ -120,6 +120,7 @@ class NotificationPushWakeDrainCoverageTest {
             var pendingResolver: (suspend () -> Unit)? = null
             val listener = appStateFunctionBody("runNotificationListenerLoop")
             val updateProcessing = appStateFunctionBody("processNotificationUpdate")
+            val firstPostResolution = appStateFunctionBody("resolveNotificationFirstPost")
 
             val posted =
                 postBeforeNotificationEnrichment(
@@ -138,14 +139,20 @@ class NotificationPushWakeDrainCoverageTest {
             checkNotNull(pendingResolver).invoke()
             assertEquals(listOf("post", "schedule-enrichment", "resolver-finished"), calls)
             assertTrue(
-                "the subscription may resolve bounded local identity before posting, " +
-                    "but must schedule optional enrichment afterward",
+                "the subscription must resolve bounded local content before posting, " +
+                    "then schedule optional enrichment afterward",
                 "processNotificationUpdate(update)" in listener &&
                     "postBeforeNotificationEnrichment(" in updateProcessing &&
                     "val postEpoch = notificationPostEpoch.capture()" in updateProcessing &&
                     "val engineMuted = engineNotificationMuted(update)" in updateProcessing &&
+                    "notificationFirstPostContentCoordinator.resolve" in firstPostResolution &&
+                    "notificationContentResolution.firstPost.resolve(update, localOnly = true)" in
+                    firstPostResolution &&
                     "val firstPost" in updateProcessing &&
-                    "post = { postInitialNotificationUpdate(update, firstPost) }" in updateProcessing &&
+                    (
+                        "post = { postInitialNotificationUpdate(update, " +
+                            "firstPost, receivedAtElapsedMs) }"
+                    ) in updateProcessing &&
                     "scheduleNotificationEnrichment(update, firstPost, receivedAtElapsedMs)" in
                     updateProcessing,
             )

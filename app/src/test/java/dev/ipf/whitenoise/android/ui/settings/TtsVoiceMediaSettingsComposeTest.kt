@@ -35,7 +35,7 @@ class TtsVoiceMediaSettingsComposeTest {
 
     private val app: Application = ApplicationProvider.getApplicationContext()
 
-    /** Ensures TalkBack announces the active-media constraint on the switch. */
+    /** Ensures TalkBack announces the active-media behavior and normal fallback on the switch. */
     @Test
     fun mediaMixSwitchExplainsItsConstraintAndToggles() {
         var changed: Boolean? = null

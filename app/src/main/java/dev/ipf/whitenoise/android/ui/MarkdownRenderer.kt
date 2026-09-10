@@ -152,6 +152,7 @@ internal fun MarkdownMessageBody(
     ttsLeafHighlightResolver: TtsLeafHighlightResolver? = null,
     ttsReadAloudHighlightStyle: TtsReadAloudHighlightStyle? = null,
     ttsSentenceLayoutReporter: TtsSentenceLayoutReporter? = null,
+    ttsSentenceActions: TtsSentenceActions? = null,
 ) {
     val context = LocalContext.current
     // A tapped spoofable `[label](url)` link parks its destination here until
@@ -196,6 +197,7 @@ internal fun MarkdownMessageBody(
         LocalSelectableTextLayoutReporter provides onSelectableTextLayoutChanged,
         LocalMarkdownLinkTextLayoutReporter provides onLinkTextLayoutChanged,
         LocalMarkdownLinkCopyHandler provides onCopyLink,
+        LocalTtsSentenceActions provides ttsSentenceActions,
         LocalTtsLeafHighlightResolver provides ttsLeafHighlightResolver,
         LocalTtsReadAloudHighlightStyle provides ttsReadAloudHighlightStyle,
         LocalTtsSentenceLayoutReporter provides ttsSentenceLayoutReporter,
@@ -250,33 +252,6 @@ internal fun MarkdownMessageBody(
     }
 }
 
-/**
- * Maximum block-nesting depth the renderer will descend before it stops
- * recursing. Block quotes and lists render their children via
- * [MarkdownBlockView] again, so a peer-crafted message with thousands of
- * nested quotes/lists would otherwise overflow the stack and crash the app on
- * open (a DoS — the body renders as soon as the conversation is shown). No
- * legitimate chat message nests anywhere near this deep. See #156.
- */
-internal const val MARKDOWN_MAX_BLOCK_DEPTH = 24
-
-internal fun markdownDepthExceeded(depth: Int): Boolean = depth >= MARKDOWN_MAX_BLOCK_DEPTH
-
-/**
- * Maximum number of Markdown siblings rendered or walked at any one untrusted
- * container boundary. Depth caps stop recursive stack DoS, but breadth DoS can
- * also hide under one top-level quote/list/table whose children are all depth 1.
- * 256 leaves ample room for legitimate chat formatting while bounding render,
- * mention, and preview work. See #942.
- */
-internal const val MARKDOWN_MAX_CONTAINER_SIBLINGS = 256
-
-/** Wide tables are unreadable in a chat bubble and expensive to lay out. */
-internal const val MARKDOWN_MAX_TABLE_COLUMNS = 12
-
-/** One table shares a single cell budget across its header and all body rows. */
-internal const val MARKDOWN_MAX_TABLE_CELLS = MARKDOWN_MAX_CONTAINER_SIBLINGS
-
 /** Vertical gap between adjacent top-level Markdown blocks. */
 internal val MARKDOWN_BLOCK_SPACING = 6.dp
 
@@ -292,75 +267,6 @@ internal val MARKDOWN_BLANK_LINE_HEIGHT = 10.dp
  * tall (#1719).
  */
 internal const val MARKDOWN_MAX_EXTRA_BLANK_LINES = 6
-
-internal fun <T> markdownVisibleSiblings(items: List<T>): List<T> =
-    if (items.size <= MARKDOWN_MAX_CONTAINER_SIBLINGS) items else items.take(MARKDOWN_MAX_CONTAINER_SIBLINGS)
-
-internal fun markdownSiblingsElided(items: List<*>): Boolean = items.size > MARKDOWN_MAX_CONTAINER_SIBLINGS
-
-internal data class MarkdownTableRowWindow<T>(
-    val cells: List<T>,
-    val cellsElided: Boolean,
-)
-
-internal data class MarkdownTableWindow<T>(
-    val header: MarkdownTableRowWindow<T>,
-    val rows: List<MarkdownTableRowWindow<T>>,
-    val rowsElided: Boolean,
-)
-
-/** Applies one area budget to a table instead of independently capping both dimensions. */
-internal fun <T> markdownVisibleTable(
-    header: List<T>,
-    rows: List<List<T>>,
-): MarkdownTableWindow<T> {
-    var remainingCells = MARKDOWN_MAX_TABLE_CELLS
-
-    fun visibleRow(cells: List<T>): MarkdownTableRowWindow<T> {
-        val visibleCount = minOf(cells.size, MARKDOWN_MAX_TABLE_COLUMNS, remainingCells)
-        remainingCells -= visibleCount
-        return MarkdownTableRowWindow(
-            cells = cells.take(visibleCount),
-            cellsElided = visibleCount < cells.size,
-        )
-    }
-
-    val visibleHeader = visibleRow(header)
-    val visibleRows = ArrayList<MarkdownTableRowWindow<T>>()
-    val rowLimit = minOf(rows.size, MARKDOWN_MAX_CONTAINER_SIBLINGS)
-    for (index in 0 until rowLimit) {
-        if (remainingCells <= 0) break
-        visibleRows += visibleRow(rows[index])
-    }
-    return MarkdownTableWindow(
-        header = visibleHeader,
-        rows = visibleRows,
-        rowsElided = visibleRows.size < rows.size,
-    )
-}
-
-/**
- * Maximum inline-nesting depth. Inline nodes (emphasis, strong, strikethrough,
- * link, image alt) carry child inlines, so the inline walkers recurse too — a
- * peer-crafted tree of repeated nested emphasis/links would overflow the stack
- * or burn CPU just like deep block nesting. Real formatting nests a handful of
- * levels (bold-italic-link); 64 is generous headroom. See #156.
- */
-internal const val MARKDOWN_MAX_INLINE_DEPTH = 64
-
-internal fun markdownInlineDepthExceeded(depth: Int): Boolean = depth >= MARKDOWN_MAX_INLINE_DEPTH
-
-internal const val MARKDOWN_LINK_CONFIRM_DISPLAY_MAX_LENGTH = 500
-
-internal fun markdownSafeDisplayText(
-    value: String,
-    maxLength: Int = MARKDOWN_LINK_CONFIRM_DISPLAY_MAX_LENGTH,
-): String {
-    val sanitized = ProfileSanitizer.stripUnsafe(value)
-    if (sanitized.codePointCount(0, sanitized.length) <= maxLength) return sanitized
-    val end = sanitized.offsetByCodePoints(0, maxLength)
-    return sanitized.substring(0, end)
-}
 
 /** Per-document inputs threaded through every block view. */
 private data class MarkdownBodyContext(
@@ -417,6 +323,8 @@ internal data class MarkdownLinkTextLayout(
 
 private val LocalSelectableTextLayoutReporter =
     staticCompositionLocalOf<SelectableTextLayoutReporter?> { null }
+
+private val LocalTtsSentenceActions = staticCompositionLocalOf<TtsSentenceActions?> { null }
 
 private val LocalTtsLeafHighlightResolver =
     compositionLocalOf<TtsLeafHighlightResolver?> { null }
@@ -498,19 +406,20 @@ private fun MarkdownBodyText(
         sentenceLayoutReporter?.invoke(leafId, text.text, measuredLayout, coordinates)
     }
 
+    val speechActions = ttsSentenceAccessibilityActions(leafId, text.text, LocalTtsSentenceActions.current)
     val accessibilityModifier =
-        if (onCopyLink == null || linkDestinations.isEmpty()) {
-            Modifier
-        } else {
-            Modifier.semantics {
-                customActions =
+        Modifier.semantics {
+            customActions = speechActions +
+                if (onCopyLink == null) {
+                    emptyList()
+                } else {
                     linkDestinations.map { destination ->
                         CustomAccessibilityAction("$copyLabel: ${markdownSafeDisplayText(destination)}") {
                             onCopyLink(destination)
                             true
                         }
                     }
-            }
+                }
         }
 
     Text(
@@ -1401,58 +1310,6 @@ private fun resolveMentionNames(
     return bech32s.associateWith(resolve)
 }
 
-internal fun markdownInlineMentionBech32s(inlines: List<MarkdownInlineFfi>): Set<String> =
-    mutableSetOf<String>()
-        .also { collectMentionBech32s(inlines, it, depth = 0) }
-
-private fun collectMentionBech32s(
-    inlines: List<MarkdownInlineFfi>,
-    out: MutableSet<String>,
-    depth: Int,
-) {
-    if (markdownInlineDepthExceeded(depth)) return
-    markdownVisibleSiblings(inlines).forEach { inline ->
-        when (inline) {
-            is MarkdownInlineFfi.NostrMention -> out += inline.entity.bech32
-            is MarkdownInlineFfi.Emph -> collectMentionBech32s(inline.children, out, depth + 1)
-            is MarkdownInlineFfi.Strong -> collectMentionBech32s(inline.children, out, depth + 1)
-            is MarkdownInlineFfi.Strikethrough -> collectMentionBech32s(inline.children, out, depth + 1)
-            is MarkdownInlineFfi.Link -> collectMentionBech32s(inline.children, out, depth + 1)
-            is MarkdownInlineFfi.Image -> collectMentionBech32s(inline.alt, out, depth + 1)
-            else -> Unit
-        }
-    }
-}
-
-private fun collectBlockMentionBech32s(
-    blocks: List<MarkdownBlockFfi>,
-    out: MutableSet<String>,
-    depth: Int,
-) {
-    if (markdownDepthExceeded(depth)) return
-    markdownVisibleSiblings(blocks).forEach { block ->
-        when (block) {
-            is MarkdownBlockFfi.Paragraph -> collectMentionBech32s(block.inlines, out, depth = 0)
-            is MarkdownBlockFfi.Heading -> collectMentionBech32s(block.inlines, out, depth = 0)
-            is MarkdownBlockFfi.BlockQuote -> collectBlockMentionBech32s(block.blocks, out, depth + 1)
-            is MarkdownBlockFfi.ListBlock ->
-                markdownVisibleSiblings(block.items).forEach { collectBlockMentionBech32s(it.blocks, out, depth + 1) }
-            is MarkdownBlockFfi.Table -> {
-                val visibleTable = markdownVisibleTable(block.header, block.rows)
-                visibleTable.header.cells.forEach { cell -> collectMentionBech32s(cell.inlines, out, depth = 0) }
-                visibleTable.rows.forEach { row ->
-                    row.cells.forEach { cell -> collectMentionBech32s(cell.inlines, out, depth = 0) }
-                }
-            }
-            else -> Unit
-        }
-    }
-}
-
-internal fun markdownDocumentMentionBech32s(document: MarkdownDocumentFfi): Set<String> =
-    mutableSetOf<String>()
-        .also { collectBlockMentionBech32s(document.blocks, it, depth = 0) }
-
 /**
  * True when [document] contains a `NostrMention` that resolves to
  * [accountIdHex] — i.e. the current account was @-mentioned in the message.
@@ -1720,17 +1577,6 @@ private fun AnnotatedString.Builder.appendNostrEntity(
     }
 }
 
-/**
- * `npub1qqqq…qqqq` style truncation for bech32 entities: first 12 + ellipsis
- * + last 6, leaving short strings untouched. 12 leading characters keep the
- * HRP plus a recognizable run of the body even for `nprofile1`.
- */
-internal fun shortenedBech32(bech32: String): String {
-    val trimmed = bech32.trim()
-    if (trimmed.length <= 19) return trimmed
-    return trimmed.take(12) + "…" + trimmed.takeLast(6)
-}
-
 private const val PLAINTEXT_BECH32_BODY_CHARS = "ac-hj-np-z02-9"
 private const val PLAINTEXT_NPUB = "npub1[$PLAINTEXT_BECH32_BODY_CHARS]{58}"
 private const val PLAINTEXT_NPROFILE = "nprofile1[$PLAINTEXT_BECH32_BODY_CHARS]+"
@@ -1900,13 +1746,6 @@ internal fun markdownInlinePlainText(inlines: List<MarkdownInlineFfi>): String =
         walk(inlines)
     }
 
-/**
- * Chat-list previews cap the flattened string here: the row is one ellipsized
- * line, so anything past a couple hundred characters can never paint and
- * building it would only burn allocation on every list recomposition.
- */
-internal const val MARKDOWN_PREVIEW_MAX_LENGTH = 200
-
 /** [markdownDocumentToPreviewAnnotatedString] with the chat-row code-chip style. */
 @Composable
 internal fun rememberMarkdownPreviewText(
@@ -1965,218 +1804,18 @@ internal fun markdownDocumentToPreviewAnnotatedString(
     maxLength: Int = MARKDOWN_PREVIEW_MAX_LENGTH,
     mentionDisplayName: ((String) -> String?)? = null,
 ): AnnotatedString {
-    val flattened =
-        buildAnnotatedString {
-            for (block in markdownVisibleSiblings(document.blocks)) {
-                if (length >= maxLength) break
-                appendPreviewBlock(block, codeStyle, maxLength, mentionDisplayName, depth = 0)
-            }
-        }
-    return if (flattened.length > maxLength) flattened.previewSubSequence(maxLength) else flattened
-}
-
-private fun AnnotatedString.Builder.appendPreviewBlock(
-    block: MarkdownBlockFfi,
-    codeStyle: SpanStyle,
-    maxLength: Int,
-    mentionDisplayName: ((String) -> String?)?,
-    depth: Int,
-) {
-    // Budget check inside the recursion too: the top-level loop only guards
-    // between siblings, so a deep quote/list subtree would otherwise keep
-    // flattening long after the row's budget is spent.
-    if (length >= maxLength) return
-    // Structural depth cap: a deeply-nested subtree with NO text content never
-    // spends the length budget, so the budget alone can't bound the recursion
-    // — a peer could overflow the stack while building a one-line preview. See #156.
-    if (markdownDepthExceeded(depth)) return
-    when (block) {
-        is MarkdownBlockFfi.Paragraph -> appendPreviewInlineSegment(block.inlines, codeStyle, maxLength, mentionDisplayName)
-        is MarkdownBlockFfi.Heading -> appendPreviewInlineSegment(block.inlines, codeStyle, maxLength, mentionDisplayName)
-        MarkdownBlockFfi.ThematicBreak -> Unit
-        is MarkdownBlockFfi.CodeBlock -> appendPreviewCodeContent(block.content, codeStyle, maxLength)
-        is MarkdownBlockFfi.MathBlock -> appendPreviewCodeContent(block.content, codeStyle, maxLength)
-        is MarkdownBlockFfi.BlockQuote ->
-            markdownVisibleSiblings(block.blocks).forEach {
-                appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName, depth + 1)
-            }
-        is MarkdownBlockFfi.ListBlock ->
-            markdownVisibleSiblings(block.items).forEach { item ->
-                markdownVisibleSiblings(item.blocks).forEach {
-                    appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName, depth + 1)
+    val projection = markdownDocumentToPreviewProjection(document, maxLength, mentionDisplayName, captureStyles = true)
+    return buildAnnotatedString {
+        append(projection.text)
+        projection.ranges.forEach { range ->
+            val style =
+                when (range.style) {
+                    MarkdownPreviewStyle.Code -> codeStyle
+                    MarkdownPreviewStyle.Bold -> SpanStyle(fontWeight = FontWeight.Bold)
+                    MarkdownPreviewStyle.Italic -> SpanStyle(fontStyle = FontStyle.Italic)
+                    MarkdownPreviewStyle.Strike -> SpanStyle(textDecoration = TextDecoration.LineThrough)
                 }
-            }
-        is MarkdownBlockFfi.Table -> {
-            val visibleTable = markdownVisibleTable(block.header, block.rows)
-            visibleTable.header.cells.forEach { cell ->
-                if (length >= maxLength) return
-                appendPreviewInlineSegment(cell.inlines, codeStyle, maxLength, mentionDisplayName)
-            }
-            visibleTable.rows.forEach { row ->
-                if (length >= maxLength) return
-                row.cells.forEach { cell ->
-                    if (length >= maxLength) return
-                    appendPreviewInlineSegment(cell.inlines, codeStyle, maxLength, mentionDisplayName)
-                }
-            }
-        }
-    }
-}
-
-private val previewWhitespaceRun = Regex("\\s+")
-
-private fun String.previewTake(maxLength: Int): String {
-    val end = previewSafeEnd(maxLength)
-    return if (end == length) this else substring(0, end)
-}
-
-private fun AnnotatedString.previewSubSequence(maxLength: Int): AnnotatedString {
-    val end = text.previewSafeEnd(maxLength)
-    return subSequence(0, end)
-}
-
-private fun String.previewSafeEnd(maxLength: Int): Int {
-    val end = maxLength.coerceIn(0, length)
-    return if (end > 0 && end < length && Character.isHighSurrogate(this[end - 1])) {
-        end - 1
-    } else {
-        end
-    }
-}
-
-private fun AnnotatedString.Builder.appendPreviewCodeContent(
-    content: String,
-    codeStyle: SpanStyle,
-    maxLength: Int,
-) {
-    // Bound the work BEFORE the whitespace collapse: a megabyte code block
-    // must not be regex-processed for a one-line row. The window is generous
-    // because collapsing only shrinks text; a pathological mostly-whitespace
-    // prefix just yields a shorter preview, which the row can afford.
-    // Bound the RAW content BEFORE sanitizing, so stripUnsafe never scans a
-    // peer-crafted megabyte block in full for a one-line row. Sanitizing only
-    // shrinks, so the pre-clip window stays a safe upper bound (#1031 review).
-    val bounded = markdownSafeDisplayText(content.previewTake(maxLength * 8), Int.MAX_VALUE)
-    // A code block is a multi-line region; the preview is one line. Collapse
-    // every whitespace run (incl. newlines and indentation) to a single space
-    // so `fun main() {\n  hi()\n}` reads as `fun main() { hi() }`.
-    val singleLine = bounded.trim().replace(previewWhitespaceRun, " ")
-    appendPreviewSegment(
-        buildAnnotatedString { withStyle(codeStyle) { append(singleLine) } },
-        maxLength,
-    )
-}
-
-private fun AnnotatedString.Builder.appendPreviewInlineSegment(
-    inlines: List<MarkdownInlineFfi>,
-    codeStyle: SpanStyle,
-    maxLength: Int,
-    mentionDisplayName: ((String) -> String?)?,
-) {
-    if (length >= maxLength) return
-    appendPreviewSegment(
-        buildAnnotatedString { appendPreviewInlines(inlines, codeStyle, maxLength, mentionDisplayName, depth = 0) },
-        maxLength,
-    )
-}
-
-/**
- * Joins a leaf segment to the builder with the single-space block separator,
- * spending at most the remaining [maxLength] budget. The segment is
- * materialized first so an empty contribution (blank paragraph, empty table
- * cell) commits neither text nor a stray separator; a segment that overflows
- * the budget is cut at the boundary instead of being appended whole.
- */
-private fun AnnotatedString.Builder.appendPreviewSegment(
-    segment: AnnotatedString,
-    maxLength: Int,
-) {
-    if (segment.isEmpty()) return
-    val separator = if (length > 0) 1 else 0
-    val remaining = maxLength - length - separator
-    if (remaining <= 0) return
-    val chunk = if (segment.length > remaining) segment.previewSubSequence(remaining) else segment
-    if (chunk.isEmpty()) return
-    if (separator == 1) append(' ')
-    append(chunk)
-}
-
-private fun AnnotatedString.Builder.appendPreviewInlines(
-    inlines: List<MarkdownInlineFfi>,
-    codeStyle: SpanStyle,
-    maxLength: Int,
-    mentionDisplayName: ((String) -> String?)?,
-    depth: Int,
-) {
-    // Structural depth cap as well as the budget: a deeply-nested EMPTY inline
-    // tree (e.g. emphasis nested thousands deep with no text) never spends the
-    // length budget, so the budget alone can't bound this recursion. See #156.
-    if (markdownInlineDepthExceeded(depth)) return
-    for (inline in markdownVisibleSiblings(inlines)) {
-        // This builds a segment (own builder, length starts at 0), so the
-        // whole-document budget bounds each segment: stop walking once spent
-        // and cap the unbounded leaf appends (text/code/math/autolink) so one
-        // giant run can't blow past it either.
-        if (length >= maxLength) return
-        when (inline) {
-            is MarkdownInlineFfi.Text -> append(markdownSafeDisplayText(inline.content.previewTake(maxLength - length), Int.MAX_VALUE))
-            // One-line preview: the author's line breaks flatten to spaces
-            // (unlike the bubble renderer, which preserves them).
-            MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> append(' ')
-            is MarkdownInlineFfi.Code ->
-                withStyle(codeStyle) {
-                    append(markdownSafeDisplayText(inline.content.previewTake((maxLength - length).coerceAtLeast(0)), Int.MAX_VALUE))
-                }
-            is MarkdownInlineFfi.Emph ->
-                withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
-                    appendPreviewInlines(inline.children, codeStyle, maxLength, mentionDisplayName, depth + 1)
-                }
-            is MarkdownInlineFfi.Strong ->
-                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                    appendPreviewInlines(inline.children, codeStyle, maxLength, mentionDisplayName, depth + 1)
-                }
-            is MarkdownInlineFfi.Strikethrough ->
-                withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) {
-                    appendPreviewInlines(inline.children, codeStyle, maxLength, mentionDisplayName, depth + 1)
-                }
-            // Visible text only — no annotation, no link styling. A label-less
-            // link still shows its destination so the preview isn't blank.
-            is MarkdownInlineFfi.Link ->
-                appendPreviewInlines(
-                    inline.children.ifEmpty { listOf(MarkdownInlineFfi.Text(inline.dest.trim())) },
-                    codeStyle,
-                    maxLength,
-                    mentionDisplayName,
-                    depth + 1,
-                )
-            is MarkdownInlineFfi.Image ->
-                appendPreviewInlines(
-                    inline.alt.ifEmpty { listOf(MarkdownInlineFfi.Text(inline.dest.trim())) },
-                    codeStyle,
-                    maxLength,
-                    mentionDisplayName,
-                    depth + 1,
-                )
-            is MarkdownInlineFfi.Autolink -> append(markdownSafeDisplayText(inline.url.previewTake(maxLength - length), Int.MAX_VALUE))
-            is MarkdownInlineFfi.Math ->
-                withStyle(codeStyle) {
-                    append(markdownSafeDisplayText(inline.content.previewTake((maxLength - length).coerceAtLeast(0)), Int.MAX_VALUE))
-                }
-            // Same visible text as the bubble (name or shortened bech32) but
-            // inert: the row's only tap target is the chat itself.
-            is MarkdownInlineFfi.NostrMention -> {
-                val name = mentionDisplayName?.invoke(inline.entity.bech32)
-                if (name != null) {
-                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("@$name") }
-                } else {
-                    withStyle(codeStyle) {
-                        append('@')
-                        append(shortenedBech32(inline.entity.bech32))
-                    }
-                }
-            }
-            is MarkdownInlineFfi.NostrUri ->
-                withStyle(codeStyle) { append(shortenedBech32(inline.entity.bech32)) }
+            addStyle(style, range.start, range.end)
         }
     }
 }

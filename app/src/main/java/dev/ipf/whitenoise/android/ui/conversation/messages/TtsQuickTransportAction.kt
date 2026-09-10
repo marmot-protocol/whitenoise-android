@@ -48,6 +48,7 @@ internal fun ttsQuickTransportActionFor(
     canSpeakMessage: Boolean,
 ): TtsQuickTransportAction =
     when {
+        ownsSession && state is TtsState.Preparing -> TtsQuickTransportAction.Ignore
         ownsSession && state is TtsState.Speaking -> TtsQuickTransportAction.Pause
         ownsSession && state is TtsState.Paused -> TtsQuickTransportAction.Resume
         canSpeakMessage -> TtsQuickTransportAction.StartReadingMessage

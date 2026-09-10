@@ -6,11 +6,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
@@ -58,13 +62,13 @@ class SettingsScreenScreenshotTest {
                             ),
                         appUpdateInfo =
                             AppUpdateInfo(
-                                installedVersion = "2026.9.5",
+                                installedVersion = "2026.9.10",
                                 latestVersion = null,
                                 checkedAtMillis = null,
                                 dismissedVersion = null,
                                 releasesBehind = null,
                             ),
-                        versionName = "2026.9.5",
+                        versionName = "2026.9.10",
                         mdkShortSha = "abc1234",
                         staging = false,
                         onBackToChats = {},
@@ -100,6 +104,26 @@ class SettingsScreenScreenshotTest {
         composeRule
             .onNodeWithTag(SETTINGS_WITH_CONFIRMATION_TAG)
             .captureRoboImage("src/test/snapshots/settings_screen_global_confirmation_dark.png")
+    }
+
+    /** Captures the release version footer below the initial settings viewport. */
+    @Test
+    fun settingsScreenVersionFooterDark() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    settingsHomeContent()
+                }
+            }
+        }
+
+        composeRule
+            .onNode(hasScrollToNodeAction())
+            .performScrollToNode(hasText("Version 2026.9.10"))
+        composeRule.onNodeWithText("Version 2026.9.10").assertIsDisplayed()
+        composeRule
+            .onNodeWithTag(SETTINGS_HOME_CONTENT_TAG)
+            .captureRoboImage("src/test/snapshots/settings_screen_version_footer_dark.png")
     }
 
     /** Captures the privacy-preserving dictation defaults on the light settings surface. */
@@ -153,13 +177,13 @@ class SettingsScreenScreenshotTest {
                 ),
             appUpdateInfo =
                 AppUpdateInfo(
-                    installedVersion = "2026.9.5",
+                    installedVersion = "2026.9.10",
                     latestVersion = null,
                     checkedAtMillis = null,
                     dismissedVersion = null,
                     releasesBehind = null,
                 ),
-            versionName = "2026.9.5",
+            versionName = "2026.9.10",
             mdkShortSha = "abc1234",
             staging = false,
             onBackToChats = {},

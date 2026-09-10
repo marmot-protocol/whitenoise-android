@@ -30,6 +30,7 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
+import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -640,6 +641,7 @@ private fun instrumentedConversationFixture(
             initialGroup = group,
             initialMemberSnapshot = members,
             groupRosterReader = { _, _ -> instrumentedRoster() },
+            groupRecoveryStatusReader = { _, groupIdHex -> emptyInstrumentedRecoveryStatus(groupIdHex) },
             startOnConstruction = true,
         )
     appState.attachmentOpens.setDestination(
@@ -667,6 +669,16 @@ private fun instrumentedConversationFixture(
         idOffset = idOffset,
     )
 }
+
+/** Returns the fixture's authoritative empty recovery state for a conversation. */
+private fun emptyInstrumentedRecoveryStatus(groupIdHex: String): GroupRecoveryStatusFfi =
+    GroupRecoveryStatusFfi(
+        groupIdHex = groupIdHex,
+        automaticRecoveryFailed = false,
+        pendingReinvites = 0u,
+        failedReinvites = 0u,
+        rejoinInvitations = emptyList(),
+    )
 
 /** Captures a real history restore target using production list-index ownership. */
 private fun instrumentedHistorySnapshot(

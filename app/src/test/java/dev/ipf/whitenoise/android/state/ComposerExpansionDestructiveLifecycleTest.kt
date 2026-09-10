@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
@@ -16,10 +17,12 @@ import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.marmotkit.MessageDraftSummaryFfi
+import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorStringStore
 import dev.ipf.whitenoise.android.media.editor.MessageDraftGateway
@@ -44,6 +47,190 @@ import kotlin.coroutines.resumeWithException
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ComposerExpansionDestructiveLifecycleTest {
+    @Test
+    fun acceptedDictationSendClearsOnlyItsOriginDraftAndGeometry() =
+        runBlocking {
+            val fixture = fixture()
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            val request = dictationRequest(fixture.appState, "typed")
+            retainExpansion(fixture.appState, draftGeneration = request.expectedDraftRevision)
+            val other = retainExpansion(fixture.appState, OTHER_GROUP)
+
+            assertTrue(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(1, fixture.calls.send.get())
+            assertTrue(fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID).isNullOrEmpty())
+            assertNull(fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(
+                other,
+                fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, OTHER_GROUP),
+            )
+        }
+
+    @Test
+    fun unacceptedDictationSendRetainsDraftAndGeometry() =
+        runBlocking {
+            val fixture = fixture(sendResult = { successfulSendSummary().copy(messageIds = emptyList()) })
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            val request = dictationRequest(fixture.appState, "typed")
+            val retained = retainExpansion(fixture.appState, draftGeneration = request.expectedDraftRevision)
+
+            assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(1, fixture.calls.send.get())
+            assertEquals("typed", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(
+                retained,
+                fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+            )
+        }
+
+    @Test
+    fun throwingDictationSendRetainsDraftAndGeometry() =
+        runBlocking {
+            val fixture = fixture(sendResult = { throw IllegalStateException("send rejected") })
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            val request = dictationRequest(fixture.appState, "typed")
+            val retained = retainExpansion(fixture.appState, draftGeneration = request.expectedDraftRevision)
+
+            assertTrue(
+                runCatching {
+                    fixture.appState.sendDictationTranscriptIfOriginUnchanged(request)
+                }.isFailure,
+            )
+
+            assertEquals(1, fixture.calls.send.get())
+            assertEquals("typed", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(
+                retained,
+                fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+            )
+        }
+
+    @Test
+    fun staleDictationOriginNeverDispatchesOrClearsGeometry() =
+        runBlocking {
+            val fixture = fixture()
+            val request = dictationRequest(fixture.appState)
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("newer"))
+            val retained =
+                retainExpansion(
+                    fixture.appState,
+                    draftGeneration = fixture.appState.composerDraftGeneration(ACCOUNT_REF, GROUP_ID),
+                )
+
+            assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(0, fixture.calls.send.get())
+            assertEquals("newer", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(
+                retained,
+                fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+            )
+        }
+
+    @Test
+    fun cancelledDispatchNeverSendsOrClearsGeometry() =
+        runBlocking {
+            val fixture = fixture()
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            val request = dictationRequest(fixture.appState, "typed").copy(beginDispatch = { false })
+            val retained = retainExpansion(fixture.appState, draftGeneration = request.expectedDraftRevision)
+
+            assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(0, fixture.calls.send.get())
+            assertEquals("typed", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(
+                retained,
+                fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+            )
+        }
+
+    @Test
+    fun acceptedDictationSendAdvancesTheDraftFenceWithoutCreatingGeometry() =
+        runBlocking {
+            val fixture = fixture()
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            val request = dictationRequest(fixture.appState, "typed")
+            val other = retainExpansion(fixture.appState, OTHER_GROUP)
+
+            assertTrue(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertTrue(fixture.appState.composerDraftGeneration(ACCOUNT_REF, GROUP_ID) > request.expectedDraftRevision)
+            assertTrue(fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID).isNullOrEmpty())
+            assertNull(fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(
+                other,
+                fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, OTHER_GROUP),
+            )
+        }
+
+    @Test
+    fun newerDraftDuringDictationSendPreservesItsGeometry() =
+        runBlocking {
+            lateinit var appState: WhiteNoiseAppState
+            val fixture =
+                fixture(sendResult = {
+                    appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("newer"))
+                    successfulSendSummary()
+                })
+            appState = fixture.appState
+            val request = dictationRequest(appState)
+            val retained = retainExpansion(appState, draftGeneration = request.expectedDraftRevision)
+
+            assertTrue(appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(1, fixture.calls.send.get())
+            assertEquals("newer", appState.draftFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(retained, appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+        }
+
+    @Test
+    fun newerResizeDuringDictationSendPreservesTheNewGeometry() =
+        runBlocking {
+            lateinit var appState: WhiteNoiseAppState
+            val newer = RetainedComposerExpansion(RetainedComposerExpansionMode.Manual, 320f)
+            val fixture =
+                fixture(sendResult = {
+                    appState.composerExpansionStateRetention.update(
+                        ACCOUNT_REF,
+                        GROUP_ID,
+                        newer,
+                        appState.composerDraftGeneration(ACCOUNT_REF, GROUP_ID),
+                    )
+                    successfulSendSummary()
+                })
+            appState = fixture.appState
+            val request = dictationRequest(appState)
+            retainExpansion(appState, draftGeneration = request.expectedDraftRevision)
+
+            assertTrue(appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(1, fixture.calls.send.get())
+            assertTrue(appState.draftFor(ACCOUNT_REF, GROUP_ID).isNullOrEmpty())
+            assertEquals(newer, appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+        }
+
+    private fun dictationRequest(
+        appState: WhiteNoiseAppState,
+        text: String = "",
+    ) = ConversationDictationSendRequest(
+        accountRef = ACCOUNT_REF,
+        groupIdHex = GROUP_ID,
+        expectedDraftRevision = appState.composerDraftGeneration(ACCOUNT_REF, GROUP_ID),
+        expectedDraftText = text,
+        payload = "$text spoken".trim(),
+    )
+
+    private fun successfulSendSummary() =
+        SendSummaryFfi(
+            published = 1u,
+            messageIds = listOf("dictation-commit"),
+            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+        )
+
     @Test
     fun successfulChatListLeaveClearsOnlyTheRemovedConversationGeometry() =
         runBlocking {
@@ -136,6 +323,7 @@ class ComposerExpansionDestructiveLifecycleTest {
     private fun fixture(
         failLeave: Boolean = false,
         failDelete: Boolean = false,
+        sendResult: () -> SendSummaryFfi = ::successfulSendSummary,
     ): LifecycleFixture {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appState =
@@ -148,7 +336,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                 messageDraftRepository = draftRepository(),
             )
         val calls = LifecycleCalls()
-        val marmot = lifecycleMarmot(failLeave, failDelete, calls)
+        val marmot = lifecycleMarmot(failLeave, failDelete, calls, sendResult)
         WhiteNoiseAppState::class.java
             .getDeclaredField("marmotRuntime")
             .apply { isAccessible = true }
@@ -160,13 +348,14 @@ class ComposerExpansionDestructiveLifecycleTest {
     private fun retainExpansion(
         appState: WhiteNoiseAppState,
         groupIdHex: String = GROUP_ID,
+        draftGeneration: Long = 1L,
     ): RetainedComposerExpansion =
         RetainedComposerExpansion(RetainedComposerExpansionMode.Manual, 240f).also { preference ->
             appState.composerExpansionStateRetention.update(
                 accountRef = ACCOUNT_REF,
                 groupIdHex = groupIdHex,
                 preference = preference,
-                draftGeneration = 1L,
+                draftGeneration = draftGeneration,
             )
         }
 
@@ -176,6 +365,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         failLeave: Boolean,
         failDelete: Boolean,
         calls: LifecycleCalls,
+        sendResult: () -> SendSummaryFfi,
     ): MarmotInterface =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
@@ -188,6 +378,11 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
 
             when (method.name.substringBefore('-')) {
+                "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
+                "sendText" -> {
+                    calls.send.incrementAndGet()
+                    sendResult()
+                }
                 "groupMembers" -> members()
                 "listMedia" -> emptyList<Any>()
                 "leaveGroup" -> {
@@ -214,12 +409,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                 "toString" -> "ComposerExpansionLifecycleMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.firstOrNull()
-                else ->
-                    if (arguments?.lastOrNull() is Continuation<*>) {
-                        suspendFailure(UnsupportedOperationException("Unexpected Marmot call: ${method.name}"))
-                    } else {
-                        throw UnsupportedOperationException("Unexpected Marmot call: ${method.name}")
-                    }
+                else -> throw UnsupportedOperationException("Unexpected Marmot call: ${method.name}")
             }
         } as MarmotInterface
 
@@ -270,6 +460,7 @@ class ComposerExpansionDestructiveLifecycleTest {
 
     /** Counts authoritative native mutations so false results cannot pass via an earlier guard. */
     private class LifecycleCalls {
+        val send = AtomicInteger()
         val leave = AtomicInteger()
         val delete = AtomicInteger()
     }

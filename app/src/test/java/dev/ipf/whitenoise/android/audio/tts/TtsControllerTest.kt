@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import android.speech.tts.TextToSpeech
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -273,6 +274,27 @@ class TtsControllerTest {
         assertEquals(pausedBeforeSeek, controller.state.value)
         assertEquals(spokenBeforeSeek, engine.spoken.size)
     }
+
+    @Test
+    fun preparedLocaleDriftRestoresThePreviousQueuesAudioFocus() =
+        runTest {
+            val focus = FakeTtsAudioFocus()
+            val engine =
+                FakeTtsSpeechEngine(
+                    effectiveLocales = ArrayDeque(listOf(Locale.US, Locale.US, Locale.US, Locale.UK)),
+                )
+            val controller = controller(focus)
+            controller.attachEngine(engine)
+            assertTrue(controller.speak("Existing queue.", Locale.US))
+
+            assertFalse(
+                controller.speakAsync(listOf(TtsSpeakableEntry("", "", "Replacement.")), Locale.US) { true },
+            )
+
+            assertEquals(3, focus.acquireCalls)
+            assertEquals(2, focus.releaseCalls)
+            assertEquals(TtsStartFailure.UnsupportedLanguage, controller.lastStartFailure)
+        }
 
     @Test
     fun sentenceNavigationDelegatesWhileSpeaking() {
@@ -759,6 +781,7 @@ class TtsControllerTest {
     private class FakeTtsSpeechEngine(
         private val speakResult: Int = TextToSpeech.SUCCESS,
         private val languageResult: Int = TextToSpeech.LANG_AVAILABLE,
+        private val effectiveLocales: ArrayDeque<Locale> = ArrayDeque(),
     ) : TtsSpeechEngine {
         val spoken = mutableListOf<Spoken>()
         var stopCalls = 0
@@ -769,6 +792,9 @@ class TtsControllerTest {
         var errorCallback: ((String?, Int) -> Unit)? = null
         var rangeCallback: ((String?, Int, Int, Int) -> Unit)? = null
         var stopCallback: ((String?, Boolean) -> Unit)? = null
+
+        override val effectiveLocale: Locale?
+            get() = effectiveLocales.removeFirstOrNull()
 
         override fun setLanguage(locale: Locale): Int {
             this.locale = locale

@@ -107,6 +107,7 @@ internal fun TtsTransportBarContent(
     onBodyClick: (() -> Unit)? = null,
 ) {
     val isError = state is TtsState.Error
+    val isPreparing = state is TtsState.Preparing
     val actionableBodyClick = onBodyClick.takeUnless { isError }
     val navigationEnabled = ttsNavigationEnabled(state, historyEdge)
     Surface(modifier = modifier.fillMaxWidth(), tonalElevation = 3.dp) {
@@ -143,59 +144,7 @@ internal fun TtsTransportBarContent(
                         modifier = Modifier.size(20.dp),
                     )
                     Column(modifier = Modifier.weight(1f)) {
-                        val preview = if (isError) stringResource(R.string.tts_bar_error) else state.messagePreview
-                        if (preview.isNotBlank()) {
-                            Text(
-                                text = preview,
-                                style = MaterialTheme.typography.bodySmall,
-                                color =
-                                    if (isError) {
-                                        MaterialTheme.colorScheme.error
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        if (!isError && ttsSentenceCount(state) > 0 && ttsMessageCount(state) > 0) {
-                            Text(
-                                text =
-                                    stringResource(
-                                        R.string.tts_bar_progress,
-                                        ttsSentenceIndex(state) + 1,
-                                        ttsSentenceCount(state),
-                                        ttsMessageIndex(state) + 1,
-                                        ttsMessageCount(state),
-                                    ),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        if (!isError && ttsMessageCount(state) > 0) {
-                            val targetProgress = ttsMessageProgressFraction(state)
-                            val animatedProgress =
-                                key(ttsProgressAnimationKey(state)) {
-                                    val progress by animateFloatAsState(
-                                        targetValue = targetProgress,
-                                        animationSpec = tween(durationMillis = 200),
-                                        label = "ttsMessageProgress",
-                                    )
-                                    progress
-                                }
-                            // The progress text above already narrates the position.
-                            LinearProgressIndicator(
-                                progress = { animatedProgress },
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 4.dp)
-                                        .clearAndSetSemantics {},
-                            )
-                        }
-                        HistoryEdgeStatus(historyEdge)
+                        TtsTransportPreview(state, isError, isPreparing, historyEdge)
                     }
                 }
                 if (!isError) {
@@ -286,4 +235,71 @@ private fun HistoryEdgeStatus(historyEdge: TtsHistoryEdgeState?) {
                 .padding(top = 2.dp)
                 .semantics { liveRegion = LiveRegionMode.Polite },
     )
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun TtsTransportPreview(
+    state: TtsState,
+    isError: Boolean,
+    isPreparing: Boolean,
+    historyEdge: TtsHistoryEdgeState?,
+) {
+    val showProgress = !isError && !isPreparing && ttsMessageCount(state) > 0
+    val preview =
+        if (isPreparing) {
+            stringResource(R.string.tts_bar_preparing)
+        } else if (isError) {
+            stringResource(R.string.tts_bar_error)
+        } else {
+            state.messagePreview
+        }
+    if (preview.isNotBlank()) {
+        val colors = MaterialTheme.colorScheme
+        Text(
+            text = preview,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (isError) colors.error else colors.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+    if (showProgress && ttsSentenceCount(state) > 0) {
+        Text(
+            text =
+                stringResource(
+                    R.string.tts_bar_progress,
+                    ttsSentenceIndex(state) + 1,
+                    ttsSentenceCount(state),
+                    ttsMessageIndex(state) + 1,
+                    ttsMessageCount(state),
+                ),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+    if (showProgress) {
+        val targetProgress = ttsMessageProgressFraction(state)
+        val animatedProgress =
+            key(ttsProgressAnimationKey(state)) {
+                val progress by animateFloatAsState(
+                    targetValue = targetProgress,
+                    animationSpec = tween(durationMillis = 200),
+                    label = "ttsMessageProgress",
+                )
+                progress
+            }
+        // The progress text above already narrates the position.
+        LinearProgressIndicator(
+            progress = { animatedProgress },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp)
+                    .clearAndSetSemantics {},
+        )
+    }
+    HistoryEdgeStatus(historyEdge)
 }

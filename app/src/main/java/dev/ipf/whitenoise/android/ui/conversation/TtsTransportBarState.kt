@@ -69,7 +69,8 @@ internal fun rememberTtsTransportDisplayState(incoming: TtsState): TtsState? {
     }
 }
 
-internal fun ttsNavigationEnabled(state: TtsState): Boolean = state !is TtsState.Error && state !is TtsState.Idle
+internal fun ttsNavigationEnabled(state: TtsState): Boolean =
+    state !is TtsState.Error && state !is TtsState.Idle && (state !is TtsState.Preparing || state.chunkCount > 0)
 
 // A pending edge load owns the cursor: every navigation action disables so
 // duplicate or conflicting requests can't queue up behind it.

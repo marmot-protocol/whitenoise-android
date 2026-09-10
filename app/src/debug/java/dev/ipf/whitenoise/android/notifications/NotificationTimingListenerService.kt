@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
+import android.app.Notification
 import android.os.SystemClock
 import android.os.Trace
 import android.service.notification.NotificationListenerService
@@ -44,7 +45,17 @@ internal data class NotificationTimingListenerPost(
     val id: Int,
     val key: String,
     val elapsedRealtimeNanos: Long,
+    val contentText: String?,
+    val contentRevision: NotificationTimingContentRevision,
+    val onlyAlertOnce: Boolean,
 )
+
+/** Classification of an explicitly armed synthetic notification body; no real content is reported. */
+internal enum class NotificationTimingContentRevision {
+    Fallback,
+    Resolved,
+    Other,
+}
 
 /** Privacy-safe identity, monotonic time, and framework reason for one card removal. */
 internal data class NotificationTimingListenerRemoval(
@@ -71,11 +82,14 @@ internal object NotificationTimingDeviceEvents {
         packageName: String,
         notificationTag: String,
         notificationId: Int,
+        fallbackContent: String? = null,
+        resolvedContent: String? = null,
     ) {
         expectedTarget = null
         posts.clear()
         removals.clear()
-        expectedTarget = NotificationTimingTarget(packageName, notificationTag, notificationId)
+        expectedTarget =
+            NotificationTimingTarget(packageName, notificationTag, notificationId, fallbackContent, resolvedContent)
     }
 
     /** Rejects every callback not owned by the armed synthetic target. */
@@ -92,12 +106,20 @@ internal object NotificationTimingDeviceEvents {
         if (!accepts(notification)) return
         Trace.beginSection("WN notification listener post")
         try {
+            val content =
+                notification.notification.extras
+                    .getCharSequence(Notification.EXTRA_TEXT)
+                    ?.toString()
+            val revision = contentRevision(content)
             posts.offer(
                 NotificationTimingListenerPost(
                     tag = notification.tag.orEmpty(),
                     id = notification.id,
                     key = notification.key,
                     elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos(),
+                    contentText = content.takeIf { revision != NotificationTimingContentRevision.Other },
+                    contentRevision = revision,
+                    onlyAlertOnce = notification.notification.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0,
                 ),
             )
         } finally {
@@ -128,6 +150,18 @@ internal object NotificationTimingDeviceEvents {
         }
     }
 
+    /** Called under the capture monitor and matches only explicitly supplied fixture bodies. */
+    private fun contentRevision(content: String?): NotificationTimingContentRevision {
+        val target = expectedTarget ?: return NotificationTimingContentRevision.Other
+        return when {
+            target.fallbackContent != null && content == target.fallbackContent ->
+                NotificationTimingContentRevision.Fallback
+            target.resolvedContent != null && content == target.resolvedContent ->
+                NotificationTimingContentRevision.Resolved
+            else -> NotificationTimingContentRevision.Other
+        }
+    }
+
     /** Awaits a framework post without interpreting it as visible pixels. */
     fun awaitPost(timeoutMillis: Long) = posts.poll(timeoutMillis, TimeUnit.MILLISECONDS)
 
@@ -146,5 +180,7 @@ internal object NotificationTimingDeviceEvents {
         val packageName: String,
         val tag: String,
         val id: Int,
+        val fallbackContent: String?,
+        val resolvedContent: String?,
     )
 }

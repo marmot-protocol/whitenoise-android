@@ -166,6 +166,28 @@ class TtsAutoReadWiringCoverageTest {
         )
     }
 
+    @Test
+    fun asynchronousSpeechOwnershipUsesTheAccountCapturedBeforePreparation() {
+        val source = source("state/AppState.kt")
+
+        assertTrue(
+            "both asynchronous manual-speech ownership writes must use the captured account",
+            Regex("ttsSpeechAccountRef = ownerAccount").findAll(source).count() >= 2,
+        )
+        assertTrue(
+            "auto-read history ownership must use the captured account",
+            "ttsHistorySession.onConversationSessionStarted(ownerAccount, groupIdHex)" in source,
+        )
+    }
+
+    @Test
+    fun literalCodeModeAppliesOnlyToTheSelectedSpeakFromHereEntry() {
+        val body = source("ui/conversation/messages/MessageBubble.kt").functionBody("startSpeakAloud")
+
+        assertTrue("the entry position must participate in mode selection", "mapIndexed" in body)
+        assertTrue("only the selected first entry may become literal code", "index == 0 && literalCode" in body)
+    }
+
     private fun source(relativePath: String): String =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$relativePath"),

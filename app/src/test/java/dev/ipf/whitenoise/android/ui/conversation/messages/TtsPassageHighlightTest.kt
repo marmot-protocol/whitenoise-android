@@ -23,7 +23,7 @@ class TtsPassageHighlightTest {
                 text = text,
                 spans = listOf(SpeakableTextProjectionSpan(0, text.length, "plain", 0, text.length)),
             )
-        val resolver = TtsHighlightProjectionResolver(projection, Locale.US)
+        val resolver = TtsHighlightProjectionResolver(projection, preparedHighlightSpeech(projection))
 
         assertEquals(0, resolver.sentenceIndexAtRenderedOffset(RenderedTextHit("plain", text, 1)))
         assertEquals(1, resolver.sentenceIndexAtRenderedOffset(RenderedTextHit("plain", text, 9)))
@@ -43,7 +43,7 @@ class TtsPassageHighlightTest {
                         SpeakableTextProjectionSpan(9, 15, "plain", 29, 35),
                     ),
             )
-        val resolver = TtsHighlightProjectionResolver(projection, Locale.US)
+        val resolver = TtsHighlightProjectionResolver(projection, preparedHighlightSpeech(projection))
 
         assertEquals(0, resolver.sentenceIndexAtRenderedOffset(RenderedTextHit("plain", rendered, 12)))
         assertEquals(1, resolver.sentenceIndexAtRenderedOffset(RenderedTextHit("plain", rendered, 32)))
@@ -60,7 +60,7 @@ class TtsPassageHighlightTest {
                         SpeakableTextProjectionSpan(0, 6, "plain", 0, 5),
                     ),
             )
-        val resolver = TtsHighlightProjectionResolver(projection, Locale.US)
+        val resolver = TtsHighlightProjectionResolver(projection, preparedHighlightSpeech(projection))
 
         assertNull(resolver.sentenceIndexAtRenderedOffset(RenderedTextHit("plain", "Hello", 2)))
     }
@@ -76,7 +76,7 @@ class TtsPassageHighlightTest {
                         SpeakableTextProjectionSpan(6, 12, "b1", 0, 6),
                     ),
             )
-        val resolver = TtsHighlightProjectionResolver(projection, Locale.US)
+        val resolver = TtsHighlightProjectionResolver(projection, preparedHighlightSpeech(projection))
 
         val first = resolver.sentenceLayoutFor(sentenceIndex = 0, renderedLeafId = "b0", renderedText = "Hello ")
         val second = resolver.sentenceLayoutFor(sentenceIndex = 0, renderedLeafId = "b1", renderedText = "world.")
@@ -93,7 +93,7 @@ class TtsPassageHighlightTest {
     @Test
     fun projectionResolverReusesRenderedLeafMappingAcrossWordUpdates() {
         val projection = legacyTextToSpeakableProjection("Hello bright world.")
-        val projectionResolver = TtsHighlightProjectionResolver(projection, Locale.US)
+        val projectionResolver = TtsHighlightProjectionResolver(projection, preparedHighlightSpeech(projection))
         val firstPassage =
             TtsPassage(
                 messageIdHex = "m1",
@@ -317,7 +317,7 @@ class TtsPassageHighlightTest {
             )
 
         val highlight =
-            TtsHighlightProjectionResolver(projection, Locale.US)
+            TtsHighlightProjectionResolver(projection, preparedHighlightSpeech(projection))
                 .resolverFor(passage, "m1")
                 .invoke("b0", "Alpha")
 

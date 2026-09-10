@@ -117,7 +117,7 @@ class MessageBubbleTextSelectionSpeakTest {
         assertTrue(actionMenuOpen)
 
         composeRule.onNodeWithText(app.getString(R.string.speak_aloud)).performClick()
-        waitForTts(engine)
+        waitForTts(engine, appState)
 
         assertTrue(
             engine.spoken
@@ -126,6 +126,27 @@ class MessageBubbleTextSelectionSpeakTest {
                 .endsWith("First sentence."),
         )
     }
+
+    @Test
+    fun preparedAutoReadStartsFromTheAppStateIntegration() =
+        runBlocking {
+            val engine = FakeSessionEngine()
+            val appState = appStateWithTts(engine)
+            val item = timelineMessage("First sentence. Second sentence.")
+            val started =
+                appState.speakAloudAutoRead(
+                    GROUP_ID,
+                    listOf(projectedTtsEntry(item)),
+                    Locale.US,
+                    backgroundPreparation = true,
+                )
+
+            assertTrue(
+                "state=${appState.ttsController.state.value}; failure=${appState.ttsController.lastStartFailure}",
+                started,
+            )
+            assertTrue(engine.spoken.isNotEmpty())
+        }
 
     @Test
     fun doubleTapMessageTextSeeksToThePressedSentence() {
@@ -153,7 +174,7 @@ class MessageBubbleTextSelectionSpeakTest {
         composeRule.waitForIdle()
 
         doubleTapOnMessageText("First sentence")
-        waitForTts(engine)
+        waitForTts(engine, appState)
         val originalSessionId = appState.ttsController.state.value.sessionId
         val submissionsBeforeSeek = engine.spoken.size
         assertTrue(appState.ownsTtsAutoReadSession(GROUP_ID))
@@ -194,7 +215,7 @@ class MessageBubbleTextSelectionSpeakTest {
         composeRule.waitForIdle()
         longPressOnMessageText("First sentence")
         composeRule.onNodeWithText(app.getString(R.string.speak_aloud)).performClick()
-        waitForTts(engine)
+        waitForTts(engine, appState)
         val originalSessionId = appState.ttsController.state.value.sessionId
 
         doubleTapOnMessageText("Second sentence")
@@ -225,7 +246,7 @@ class MessageBubbleTextSelectionSpeakTest {
                 Locale.getDefault(),
             ),
         )
-        waitForTts(engine)
+        waitForTts(engine, appState)
         assertTrue(appState.ownsTtsAutoReadSession(GROUP_ID))
         composeRule.mainClock.autoAdvance = false
 
@@ -263,7 +284,7 @@ class MessageBubbleTextSelectionSpeakTest {
                 Locale.getDefault(),
             ),
         )
-        waitForTts(engine)
+        waitForTts(engine, appState)
         composeRule.mainClock.autoAdvance = false
         val sessionId = appState.ttsController.state.value.sessionId
         val submissionsBeforeSeek = engine.spoken.size
@@ -302,7 +323,7 @@ class MessageBubbleTextSelectionSpeakTest {
                 Locale.getDefault(),
             ),
         )
-        waitForTts(engine)
+        waitForTts(engine, appState)
         val sessionId = appState.ttsController.state.value.sessionId
         composeRule.mainClock.autoAdvance = false
 
@@ -355,7 +376,7 @@ class MessageBubbleTextSelectionSpeakTest {
         assertNativeSpeakDisplayed()
 
         clickNativeSpeak()
-        waitForTts(engine)
+        waitForTts(engine, appState)
 
         composeRule.runOnIdle {
             assertFalse(textSelectionMode)
@@ -410,7 +431,7 @@ class MessageBubbleTextSelectionSpeakTest {
         assertNativeSpeakDisplayed()
 
         clickNativeSpeak()
-        waitForTts(engine)
+        waitForTts(engine, appState)
 
         assertTrue(
             engine.spoken
@@ -592,9 +613,21 @@ class MessageBubbleTextSelectionSpeakTest {
         return pressOnHost
     }
 
-    private fun waitForTts(engine: FakeSessionEngine) {
-        composeRule.waitForIdle()
-        assertTrue(engine.spoken.isNotEmpty())
+    private fun waitForTts(
+        engine: FakeSessionEngine,
+        appState: WhiteNoiseAppState,
+    ) {
+        try {
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                shadowOf(android.os.Looper.getMainLooper()).idle()
+                engine.spoken.isNotEmpty()
+            }
+        } catch (timeout: androidx.compose.ui.test.ComposeTimeoutException) {
+            throw AssertionError(
+                "state=${appState.ttsController.state.value}; failure=${appState.ttsController.lastStartFailure}",
+                timeout,
+            )
+        }
     }
 
     @Composable

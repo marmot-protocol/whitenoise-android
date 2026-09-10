@@ -227,8 +227,11 @@ class NotificationNetworkReconnectCoverageTest {
         )
     }
 
-    /** Pins teardown ordering so recovery cannot reinstall work across a wipe. */
-    @Suppress("LongMethod") // One source-ordering scenario is clearer as a single regression contract.
+    /**
+     * Pins teardown ordering so recovery cannot reinstall work across a wipe.
+     * One source-ordering scenario is clearer as a single regression contract.
+     */
+    @Suppress("CyclomaticComplexMethod", "LongMethod")
     @Test
     fun accountTeardownCancelsReconnectOwnersBeforeTheListener() {
         val appState = appStateSource().readText()
@@ -293,14 +296,22 @@ class NotificationNetworkReconnectCoverageTest {
                 wipe.indexOf("prepareForDestructiveAccountWipe(wipedRef)") < wipe.lastIndexOf("} finally {") &&
                 wipe.lastIndexOf("networkNotificationRecoverySuppressed = false") > wipe.lastIndexOf("} finally {"),
         )
-        val post = appState.functionBody("enrichPostedNotificationUpdate")
+        val enrichment =
+            appState
+                .substringAfter("private suspend fun enrichPostedNotificationUpdate")
+                .substringBefore("private suspend fun postNotificationContentCorrection")
+        val latePost = appState.functionBody("postNotificationLateCorrection")
         val notificationGates =
             appState
                 .substringAfter("private fun isNotificationGenerationPostAllowed")
                 .substringBefore("/**")
         assertTrue(
             "a wipe that starts during notification enrichment must block the final presenter write",
-            "isNotificationEnrichmentAllowed(update, firstPost.epoch, firstPost.engineMuted)" in post &&
+            "isNotificationEnrichmentAllowed(update, firstPost)" in enrichment &&
+                "isNotificationEnrichmentAllowed(" in latePost &&
+                "firstPost.epoch" in latePost &&
+                "firstPost.accountCacheEpoch" in latePost &&
+                "firstPost.engineMuted" in latePost &&
                 "isNotificationGenerationPostAllowed(" in notificationGates &&
                 "!networkNotificationRecoverySuppressed" in notificationGates,
         )

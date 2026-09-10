@@ -1,0 +1,84 @@
+name: Android Zapstore - PUBLIC Publication
+
+# This is the ONLY public store-publication entry point. No build, push, tag, or
+# workflow completion triggers it. Dispatch and environment approval are separate.
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Successful Android Production Build run ID whose artifacts were reviewed
+        required: true
+        type: string
+      expected_version:
+        description: Exact versionName of the reviewed candidate
+        required: true
+        type: string
+      manifest_sha256:
+        description: SHA-256 of the reviewed release-manifest.json from that build
+        required: true
+        type: string
+      confirmation:
+        description: 'Public release: type PUBLISH ZAPSTORE followed by a space and the exact versionName'
+        required: true
+        type: string
+
+concurrency:
+  group: android-zapstore-publication
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  confirm-publication:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require explicit public publication intent
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: |
+          [[ "$GITHUB_REF" == refs/heads/master ]] || { echo 'Only master may publish'; exit 1; }
+          [[ "$EXPECTED_VERSION" =~ ^20[0-9]{2}\.[0-9]{1,2}\.[0-9]{1,2}$ ]] || exit 1
+          [[ "$CONFIRMATION" == "PUBLISH ZAPSTORE $EXPECTED_VERSION" ]] || {
+            echo 'Confirmation does not match the public release version'; exit 1;
+          }
+          echo "Public Zapstore publication of $EXPECTED_VERSION requires environment approval." >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    needs: confirm-publication
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: zapstore-production
+    steps:
+      - name: Checkout trusted workflow tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Fetch and verify the reviewed candidate
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN_ID: ${{ inputs.build_run_id }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+          MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
+        run: >-
+          python3 scripts/release_bundle.py fetch
+          --run-id "$BUILD_RUN_ID" --version "$EXPECTED_VERSION"
+          --manifest-sha256 "$MANIFEST_SHA256"
+      - name: Install pinned ZSP
+        run: ./scripts/install-zsp.sh "$RUNNER_TEMP/bin/zsp"
+
+      - name: Publish reviewed candidate publicly to Zapstore
+        env:
+          SIGN_WITH: ${{ secrets.ZAPSTORE_SIGN_WITH }}
+          BUNKER_CLIENT_KEY: ${{ secrets.ZAPSTORE_BUNKER_CLIENT_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+          MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
+        run: ./scripts/publish-zapstore.sh "$RUNNER_TEMP/bin/zsp"

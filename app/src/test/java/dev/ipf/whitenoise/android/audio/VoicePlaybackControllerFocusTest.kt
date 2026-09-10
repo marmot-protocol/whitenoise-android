@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.audio
 
 import android.media.AudioManager
 import android.media.MediaPlayer
+import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -22,6 +23,38 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class VoicePlaybackControllerFocusTest {
+    /** Verifies dictation invalidates a clip that is still preparing without retaining a player. */
+    @Test
+    fun dictationInterruptionInvalidatesPlaybackStillPreparingWithoutAnActivePlayer() {
+        val requests = controllerField("playbackRequests") as StalenessGuard
+        val preparing = requests.capture()
+
+        assertNull(VoicePlaybackController.pauseForInterruption())
+
+        assertFalse(requests.isCurrent(preparing))
+    }
+
+    /** Verifies a later explicit playback action makes the dictation interruption stale. */
+    @Test
+    fun laterUserPlaybackActionsInvalidateTheSavedDictationInterruption() {
+        val context = RuntimeEnvironment.getApplication()
+        VoicePlaybackController.attach(context)
+        val mediaPlayer = TrackingMediaPlayer()
+        primeActivePlayer(mediaPlayer)
+        val interruption = VoicePlaybackController.pauseForInterruption()
+        assertNotNull(interruption)
+
+        val userResume =
+            runBlocking {
+                VoicePlaybackController.play("voice-key", File("unused.amr"), ownerKey = "owner")
+            }
+        VoicePlaybackController.pause()
+
+        assertEquals(VoicePlaybackController.PlaybackStartResult.Resumed, userResume)
+        assertFalse(VoicePlaybackController.resumeInterrupted(checkNotNull(interruption)))
+        assertEquals(1, mediaPlayer.startCount)
+    }
+
     @After
     fun tearDown() {
         VoicePlaybackController.stop()

@@ -32,12 +32,14 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
+import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.EngineTrust
@@ -520,18 +522,36 @@ abstract class NotificationDelayedRosterFixture {
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
-            when (method.name) {
+            when (method.name.substringBefore('-')) {
+                "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 // These signed-in accounts have no pending interactive setup.
+                "onboardingRecoveryRequired" -> false
                 "onboardingSnapshot" -> null
                 "groupRoster" -> gatedRoster(gate, arguments)
+                "groupRecoveryStatus" -> recoveryStatus(arguments)
                 "chatListRow" -> gatedProjection(gate, arguments)
-                "subscribeChatList" -> gatedBroadBind(gate, arguments)
+                "openPresentedChatList" -> gatedBroadBind(gate, arguments)
                 "toString" -> "NotificationDelayedRosterMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.firstOrNull()
                 else -> error("Unexpected Marmot call: ${method.name}")
             }
         } as MarmotInterface
+
+    /** Returns an empty recovery state only for the account-owned route under test. */
+    private fun recoveryStatus(arguments: Array<out Any?>?): GroupRecoveryStatusFfi {
+        val accountRef = arguments?.firstOrNull() as? String
+        val groupIdHex = arguments?.getOrNull(1) as? String
+        check(accountRef == SOURCE_ACCOUNT || accountRef == TARGET_ACCOUNT) { "unknown recovery account" }
+        check(groupIdHex == SHARED_GROUP) { "wrong recovery group" }
+        return GroupRecoveryStatusFfi(
+            groupIdHex = SHARED_GROUP,
+            automaticRecoveryFailed = false,
+            pendingReinvites = 0u,
+            failedReinvites = 0u,
+            rejoinInvitations = emptyList(),
+        )
+    }
 
     /** Blocks only the target roster and returns an account-owned two-member result. */
     private fun gatedRoster(

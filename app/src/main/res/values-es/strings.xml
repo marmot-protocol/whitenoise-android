@@ -1451,7 +1451,7 @@
     <string name="tts_settings_engine_title">Motor</string>
     <string name="tts_settings_rate_title">Velocidad de voz</string>
     <string name="tts_media_mix_title">Hablar sobre contenido multimedia en reproducción</string>
-    <string name="tts_media_mix_subtitle">Solo se inicia mientras se reproduce otro audio; White Noise no controla el otro audio</string>
+    <string name="tts_media_mix_subtitle">Se mezcla con otro audio mientras se reproduce; de lo contrario, la lectura continúa con normalidad</string>
     <string name="tts_media_mix_volume_title">Volumen de voz sobre contenido multimedia</string>
     <string name="tts_media_mix_volume_quiet">Bajo</string>
     <string name="tts_media_mix_volume_medium">Medio</string>
@@ -1459,7 +1459,6 @@
     <string name="tts_media_mix_volume_quiet_description">35 por ciento del volumen del motor de texto a voz</string>
     <string name="tts_media_mix_volume_medium_description">60 por ciento del volumen del motor de texto a voz</string>
     <string name="tts_media_mix_volume_loud_description">85 por ciento del volumen del motor de texto a voz</string>
-    <string name="tts_media_mix_no_active_media">Inicia música o un pódcast antes de usar voz sobre contenido multimedia</string>
     <string name="tts_voice_title">Voz</string>
     <string name="tts_voice_automatic">Voz sin conexión automática</string>
     <string name="tts_voice_automatic_description">Usar la mejor voz sin conexión instalada para el idioma del mensaje</string>
@@ -1471,6 +1470,10 @@
     <string name="tts_voice_unavailable">No hay una voz sin conexión disponible</string>
     <string name="tts_voice_effective_fallback">La voz guardada no está disponible; se usa %1$s</string>
     <string name="speak_aloud">Leer en voz alta</string>
+    <string name="read_code_literally">Leer el código literalmente</string>
+    <string name="tts_read_from_sentence">Leer desde esta oración</string>
+    <string name="tts_choose_sentence">Elegir la oración que se leerá</string>
+    <string name="tts_bar_preparing">Preparando la lectura…</string>
     <string name="tts_bar_pause">Pausar lectura</string>
     <string name="tts_bar_play">Reanudar lectura</string>
     <string name="tts_bar_skip_previous">Frase anterior</string>
@@ -1644,6 +1647,8 @@
     <string name="dictation_cancel">Cancelar dictado</string>
     <string name="dictation_provider_unavailable">El reconocimiento de voz no está disponible</string>
     <string name="dictation_permission_denied">Se necesita permiso para usar el micrófono</string>
+    <string name="dictation_provider_access_rejected">El servicio de voz rechazó el acceso al micrófono</string>
+    <string name="dictation_open_speech_service">Abrir el servicio de voz</string>
     <string name="dictation_permission_denied_permanently">Permite el acceso al micrófono en Ajustes</string>
     <string name="dictation_microphone_in_use">El micrófono ya está en uso</string>
     <string name="dictation_no_speech">No se reconoció ninguna voz</string>
@@ -1747,4 +1752,25 @@
     <string name="setup_details">Detalles</string>
     <string name="setup_hide_details">Ocultar detalles</string>
     <string name="setup_opening_chats">Abriendo tus chats…</string>
+    <string name="unnamed_group">Grupo sin nombre</string>
+    <string name="conversation_unavailable">Conversación no disponible</string>
+    <string name="onboarding_recover_setup_title">¿Recuperar la configuración de acceso?</string>
+    <string name="onboarding_recover_setup_for">Recuperar la configuración de acceso de %1$s</string>
+    <string name="onboarding_recover_setup_confirm">Recuperar configuración</string>
+    <string name="onboarding_recover_setup_explanation">La recuperación cierra la sesión de este perfil y sustituye su punto de control de configuración ilegible. Solo se conserva la evidencia de recuperación más reciente y no se deshacen las publicaciones anteriores en relés. Necesitarás la clave privada para iniciar un nuevo acceso. Esta acción no aprueba ninguna publicación.</string>
+    <string name="onboarding_recover_setup_success">Configuración recuperada. Introduce la clave privada de este perfil para iniciar un nuevo acceso.</string>
+    <string name="onboarding_recover_setup_failed">No se pudo recuperar la configuración. Inténtalo de nuevo.</string>
+    <string name="group_recovery_automatic_failed">No se pudo restaurar la sincronización del grupo.</string>
+    <string name="group_recovery_pending_reinvites">Algunas invitaciones se están reintentando automáticamente.</string>
+    <string name="group_recovery_failed_reinvites">No se pudieron restaurar algunas invitaciones. Vuelve a invitar a esas personas desde Detalles del grupo.</string>
+    <string name="group_recovery_review_invitation_from">Revisar invitación de %1$s · época %2$s</string>
+    <string name="group_recovery_check_failed">No se pudo comprobar la recuperación del grupo. Inténtalo de nuevo.</string>
+    <string name="group_rejoin_title">¿Volver a unirse al grupo?</string>
+    <string name="group_rejoin_invited_by">Invitación de %1$s\n%2$s</string>
+    <string name="group_rejoin_replaces_state">Al volver a unirte, el estado actual del grupo en este dispositivo se sustituirá por la copia invitada. Se conservará el historial de mensajes guardado.</string>
+    <string name="group_rejoin_trust_warning">Vuelve a unirte solo si confías en esta invitación. Que la versión del grupo sea más reciente no la hace fiable por sí sola.</string>
+    <string name="group_rejoin_confirm">Volver a unirse al grupo</string>
+    <string name="group_rejoin_decline">Rechazar invitación</string>
+    <string name="group_rejoin_success">Te has vuelto a unir al grupo.</string>
+    <string name="group_rejoin_failed">No se pudo aplicar esta invitación</string>
 </resources>

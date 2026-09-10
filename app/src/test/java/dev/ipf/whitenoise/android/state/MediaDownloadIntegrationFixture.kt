@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaDownloadResultFfi
+import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
 import kotlinx.coroutines.CompletableDeferred
@@ -23,7 +24,8 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import javax.crypto.spec.SecretKeySpec
 import kotlin.coroutines.Continuation
-import kotlin.coroutines.intrinsics.startCoroutineUninterceptedOrReturn
+import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+import kotlin.coroutines.startCoroutine
 
 /** Real host download/cache plumbing with a controllable, network-free native boundary. */
 internal class MediaDownloadIntegrationFixture : AutoCloseable {
@@ -72,7 +74,8 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, args ->
-            when (method.name) {
+            when (method.name.substringBefore('-')) {
+                "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "downloadMedia" -> suspendDownload(checkNotNull(args))
                 "toString" -> "SyntheticMediaBoundary"
                 "hashCode" -> System.identityHashCode(proxy)
@@ -98,7 +101,8 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
                 active.decrementAndGet()
             }
         }
-        return operation.startCoroutineUninterceptedOrReturn(args.last() as Continuation<MediaDownloadResultFfi>)
+        operation.startCoroutine(args.last() as Continuation<MediaDownloadResultFfi>)
+        return COROUTINE_SUSPENDED
     }
 
     /** Discards the encrypted index as after restart; an optional key callback can hold test-owned reads. */

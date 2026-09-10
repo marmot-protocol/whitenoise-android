@@ -26,3 +26,18 @@ internal fun conversationDictationRecognitionServiceAvailable(
     selected: ComponentName?,
     discovered: Collection<ComponentName>,
 ): Boolean = selected != null && discovered.any { it == selected }
+
+/**
+ * Resolves an in-app recognition service without choosing arbitrarily. Android's secure selected-service
+ * setting can be empty even when one provider exposes both the standard recognition Activity and service.
+ */
+internal fun conversationDictationRecognitionService(
+    selected: ComponentName?,
+    recognitionActivity: ComponentName?,
+    discovered: Collection<ComponentName>,
+): ComponentName? {
+    if (selected != null) return selected.takeIf { conversationDictationRecognitionServiceAvailable(it, discovered) }
+    return recognitionActivity
+        ?.let { activity -> discovered.filter { it.packageName == activity.packageName }.singleOrNull() }
+        ?: discovered.singleOrNull()
+}

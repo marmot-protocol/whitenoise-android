@@ -175,7 +175,7 @@ fun ReleaseSigning.isConfigured(): Boolean =
         !keyPassword.isNullOrBlank() &&
         file(keystorePath!!).exists()
 
-val productionReleaseSigning =
+val directProductionReleaseSigning =
     ReleaseSigning(
         keystorePath =
             signingProperty(
@@ -198,6 +198,34 @@ val productionReleaseSigning =
                 "WHITENOISE_KEY_PASSWORD",
             ),
     )
+val playUploadSigning =
+    ReleaseSigning(
+        keystorePath = signingProperty("WHITENOISE_PLAY_UPLOAD_KEYSTORE_PATH"),
+        keystorePassword =
+            signingProperty(
+                "WHITENOISE_PLAY_UPLOAD_KEYSTORE_PASSWORD",
+                "WHITENOISE_PRODUCTION_KEYSTORE_PASSWORD",
+                "WHITENOISE_KEYSTORE_PASSWORD",
+            ),
+        keyAlias = signingProperty("WHITENOISE_PLAY_UPLOAD_KEY_ALIAS"),
+        keyPassword =
+            signingProperty(
+                "WHITENOISE_PLAY_UPLOAD_KEY_PASSWORD",
+                "WHITENOISE_PRODUCTION_KEY_PASSWORD",
+                "WHITENOISE_KEY_PASSWORD",
+            ),
+    )
+// AGP's APK split setting is global. Explicit bundle mode isolates the Play
+// variant and upload key without depending on Gradle task-name abbreviations.
+val productionPlayBundleBuild =
+    providers
+        .gradleProperty("whitenoise.playBundle")
+        .map { value ->
+            require(value == "true" || value == "false") { "whitenoise.playBundle must be true or false" }
+            value.toBoolean()
+        }.getOrElse(false)
+val productionReleaseSigning =
+    if (productionPlayBundleBuild) playUploadSigning else directProductionReleaseSigning
 val stagingReleaseSigning =
     ReleaseSigning(
         keystorePath = signingProperty("WHITENOISE_STAGING_KEYSTORE_PATH"),
@@ -254,8 +282,8 @@ android {
         applicationId = "dev.ipf.whitenoise.android"
         minSdk = 30
         targetSdk = 36
-        versionCode = 12
-        versionName = "2026.9.5"
+        versionCode = 13
+        versionName = "2026.9.10"
         manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
         manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_round"
 
@@ -519,6 +547,20 @@ android {
             )
         }
 
+        // Each environment has its own product destination/key; previews receive neither.
+        listOf("dev", "preview", "staging", "production").forEach { environment ->
+            named(environment) {
+                listOf("PRODUCT_EVENTS_ENDPOINT", "PRODUCT_APP_KEY", "PRODUCT_OPERATOR").forEach { suffix ->
+                    buildConfigField(
+                        "String",
+                        "WHITENOISE_$suffix",
+                        (if (environment == "preview") "" else environmentRuntimeConfigProperty(environment, suffix))
+                            .asBuildConfigString(),
+                    )
+                }
+            }
+        }
+
         // Distribution channel, orthogonal to environment — zapstore enables the
         // verified direct-APK self-updater (installer source set + Zapstore
         // manifest permissions), play omits it and routes updates to the listing.
@@ -608,7 +650,10 @@ android {
     }
     splits {
         abi {
-            isEnable = true
+            // App bundles carry every ABI and let Play generate optimized APKs.
+            // Enabling APK splits for the same task produces multiple shrunk
+            // resource archives, which AGP cannot package into one AAB.
+            isEnable = !productionPlayBundleBuild
             reset()
             include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
             isUniversalApk = true
@@ -646,7 +691,9 @@ androidComponents {
                 "production", "staging" -> variantBuilder.buildType == "release"
                 else -> true
             }
-        variantBuilder.enable = enabled
+        variantBuilder.enable =
+            enabled &&
+            (!productionPlayBundleBuild || environment != "production" || variantBuilder.name == "productionPlayRelease")
     }
 
     // Embed short commit SHA + build date into every release APK filename so
@@ -677,6 +724,19 @@ androidComponents {
             }
         }
     }
+}
+
+// Validate resolved tasks, including abbreviations and aggregate entry points,
+// before any task runs. Bundle mode must never emit an upload-key-signed APK.
+gradle.taskGraph.whenReady {
+    val appTasks = allTasks.filter { it.project == project }
+    require(
+        productionPlayBundleBuild || appTasks.none { it.name == "packageProductionPlayReleaseBundle" },
+    ) { "Play AAB builds require -Pwhitenoise.playBundle=true; APK builds must omit it." }
+    require(
+        !productionPlayBundleBuild ||
+            appTasks.none { it.name.startsWith("package") && it.name.endsWith("Release") },
+    ) { "Play bundle mode cannot package APKs; run APK tasks separately without -Pwhitenoise.playBundle=true." }
 }
 
 // Compose compiler reports are opt-in because they add work and generate a
@@ -743,6 +803,11 @@ fun releaseSigningConfiguredForPackageTask(taskName: String): Boolean =
 
 fun releaseSigningHintForPackageTask(taskName: String): String =
     when {
+        taskName.contains("Production") && productionPlayBundleBuild ->
+            "WHITENOISE_PLAY_UPLOAD_KEYSTORE_PATH, WHITENOISE_PLAY_UPLOAD_KEYSTORE_PASSWORD, " +
+                "WHITENOISE_PLAY_UPLOAD_KEY_ALIAS, WHITENOISE_PLAY_UPLOAD_KEY_PASSWORD " +
+                "(passwords may use the WHITENOISE_PRODUCTION_* or WHITENOISE_* fallback)"
+
         taskName.contains("Production") ->
             "WHITENOISE_PRODUCTION_KEYSTORE_PATH/PASSWORD/KEY_ALIAS/KEY_PASSWORD " +
                 "(or WHITENOISE_KEYSTORE_* fallback)"
@@ -860,7 +925,7 @@ tasks
                 it.name.startsWith("packageProduction") ||
                 it.name.startsWith("bundleProduction")
         ) &&
-            it.name.endsWith("Release")
+            (it.name.endsWith("Release") || it.name.endsWith("ReleaseBundle"))
     }.configureEach {
         dependsOn(verifyProductionFirebaseConfig, verifyProductionPushConfig)
     }
@@ -881,7 +946,7 @@ tasks
 tasks
     .matching {
         it.name.startsWith("package") &&
-            it.name.endsWith("Release") &&
+            (it.name.endsWith("Release") || it.name.endsWith("ReleaseBundle")) &&
             !it.name.contains("BenchmarkRelease") &&
             !it.name.contains("NonMinifiedRelease")
     }.configureEach {

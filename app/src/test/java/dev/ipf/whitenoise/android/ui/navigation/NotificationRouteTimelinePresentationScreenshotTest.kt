@@ -29,12 +29,14 @@ import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
+import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
@@ -821,13 +823,16 @@ abstract class NotificationRouteTimelinePresentationFixture {
     }
 
     /** Gates native projection, roster, and broad-list calls without replacing the production route logic. */
+    @Suppress("CyclomaticComplexMethod")
     private fun notificationRouteMarmot(routeGate: NotificationRouteGate): MarmotInterface =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
-            when (method.name) {
+            when (method.name.substringBefore('-')) {
+                "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 // Preserve ordinary notification activation through the setup eligibility check.
+                "onboardingRecoveryRequired" -> false
                 "onboardingSnapshot" -> null
                 "groupDetails" -> {
                     groupDetails()
@@ -844,6 +849,7 @@ abstract class NotificationRouteTimelinePresentationFixture {
                     if (routeGate.rosterFails.get()) error("target roster unavailable")
                     targetRoster(includeThirdMember = routeGate.includeThirdMember.get())
                 }
+                "groupRecoveryStatus" -> notificationRecoveryStatus(arguments)
                 "chatListRow" -> {
                     val accountRef = arguments?.firstOrNull() as? String
                     val groupIdHex = arguments?.getOrNull(1) as? String
@@ -856,7 +862,7 @@ abstract class NotificationRouteTimelinePresentationFixture {
                     routeGate.preloadCompleted.countDown()
                     preGapChatListRow()
                 }
-                "subscribeChatList" -> {
+                "openPresentedChatList" -> {
                     val accountRef = arguments?.firstOrNull() as? String
                     if (accountRef == TARGET_ACCOUNT) {
                         check(routeGate.releaseBroadBind.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
@@ -872,6 +878,21 @@ abstract class NotificationRouteTimelinePresentationFixture {
                 else -> error("Unexpected Marmot call: ${method.name}")
             }
         } as MarmotInterface
+
+    /** Returns an empty recovery state after asserting the notification route's ownership arguments. */
+    private fun notificationRecoveryStatus(arguments: Array<out Any?>?): GroupRecoveryStatusFfi {
+        val accountRef = arguments?.firstOrNull() as? String
+        val groupIdHex = arguments?.getOrNull(1) as? String
+        check(accountRef == TARGET_ACCOUNT) { "recovery read used an unknown account" }
+        check(groupIdHex == ConversationTimelineTestIds.GROUP_ID) { "recovery read used the wrong group" }
+        return GroupRecoveryStatusFfi(
+            groupIdHex = groupIdHex,
+            automaticRecoveryFailed = false,
+            pendingReinvites = 0u,
+            failedReinvites = 0u,
+            rejoinInvitations = emptyList(),
+        )
+    }
 
     private fun preGapChatListRow() =
         notificationChatListRow().let { row ->

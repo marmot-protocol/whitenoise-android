@@ -1424,7 +1424,7 @@
     <string name="tts_settings_engine_title">引擎</string>
     <string name="tts_settings_rate_title">语速</string>
     <string name="tts_media_mix_title">在播放媒体时朗读</string>
-    <string name="tts_media_mix_subtitle">仅在其他音频播放时启动；White Noise 不会控制其他音频</string>
+    <string name="tts_media_mix_subtitle">有其他音频播放时与其混音；否则照常继续朗读</string>
     <string name="tts_media_mix_volume_title">媒体播放时的朗读音量</string>
     <string name="tts_media_mix_volume_quiet">低</string>
     <string name="tts_media_mix_volume_medium">中</string>
@@ -1432,7 +1432,6 @@
     <string name="tts_media_mix_volume_quiet_description">文字转语音引擎音量的 35%</string>
     <string name="tts_media_mix_volume_medium_description">文字转语音引擎音量的 60%</string>
     <string name="tts_media_mix_volume_loud_description">文字转语音引擎音量的 85%</string>
-    <string name="tts_media_mix_no_active_media">请先播放音乐或播客，再使用媒体播放时朗读</string>
     <string name="tts_voice_title">语音</string>
     <string name="tts_voice_automatic">自动离线语音</string>
     <string name="tts_voice_automatic_description">为消息语言使用已安装的最佳离线语音</string>
@@ -1444,6 +1443,10 @@
     <string name="tts_voice_unavailable">没有可用的离线语音</string>
     <string name="tts_voice_effective_fallback">已保存的语音不可用；正在使用 %1$s</string>
     <string name="speak_aloud">朗读</string>
+    <string name="read_code_literally">逐字朗读代码</string>
+    <string name="tts_read_from_sentence">从此句开始朗读</string>
+    <string name="tts_choose_sentence">选择要朗读的句子</string>
+    <string name="tts_bar_preparing">正在准备语音…</string>
     <string name="tts_bar_pause">暂停朗读</string>
     <string name="tts_bar_play">继续朗读</string>
     <string name="tts_bar_skip_previous">上一句</string>
@@ -1617,6 +1620,8 @@
     <string name="dictation_cancel">取消听写</string>
     <string name="dictation_provider_unavailable">语音识别不可用</string>
     <string name="dictation_permission_denied">需要麦克风权限</string>
+    <string name="dictation_provider_access_rejected">语音服务拒绝访问麦克风</string>
+    <string name="dictation_open_speech_service">打开语音服务</string>
     <string name="dictation_permission_denied_permanently">请在设置中允许使用麦克风</string>
     <string name="dictation_microphone_in_use">麦克风正被使用</string>
     <string name="dictation_no_speech">未识别到语音</string>
@@ -1720,4 +1725,25 @@
     <string name="setup_details">详情</string>
     <string name="setup_hide_details">收起详情</string>
     <string name="setup_opening_chats">正在打开聊天…</string>
+    <string name="unnamed_group">未命名群组</string>
+    <string name="conversation_unavailable">对话不可用</string>
+    <string name="onboarding_recover_setup_title">恢复登录设置？</string>
+    <string name="onboarding_recover_setup_for">恢复 %1$s 的登录设置</string>
+    <string name="onboarding_recover_setup_confirm">恢复设置</string>
+    <string name="onboarding_recover_setup_explanation">恢复操作会退出此个人资料，并替换无法读取的设置检查点。仅保留最新的恢复证据，之前发布到中继的内容不会撤销。你需要使用私钥重新登录。此操作不会批准任何发布。</string>
+    <string name="onboarding_recover_setup_success">设置已恢复。请输入此个人资料的私钥以重新登录。</string>
+    <string name="onboarding_recover_setup_failed">无法恢复设置。请重试。</string>
+    <string name="group_recovery_automatic_failed">无法恢复群组同步。</string>
+    <string name="group_recovery_pending_reinvites">正在自动重试部分邀请。</string>
+    <string name="group_recovery_failed_reinvites">部分邀请无法恢复。请从“群组详情”重新邀请这些成员。</string>
+    <string name="group_recovery_review_invitation_from">查看 %1$s 的邀请 · 轮次 %2$s</string>
+    <string name="group_recovery_check_failed">无法检查群组恢复状态，请重试。</string>
+    <string name="group_rejoin_title">重新加入群组？</string>
+    <string name="group_rejoin_invited_by">邀请者：%1$s\n%2$s</string>
+    <string name="group_rejoin_replaces_state">重新加入会用邀请中的副本替换此设备当前的群组状态。已保存的消息历史会保留。</string>
+    <string name="group_rejoin_trust_warning">仅在你信任此邀请时重新加入。仅凭群组版本较新并不能证明邀请可信。</string>
+    <string name="group_rejoin_confirm">重新加入群组</string>
+    <string name="group_rejoin_decline">拒绝邀请</string>
+    <string name="group_rejoin_success">已重新加入群组。</string>
+    <string name="group_rejoin_failed">无法应用此邀请</string>
 </resources>

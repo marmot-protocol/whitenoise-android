@@ -290,9 +290,13 @@ internal fun ChatRow(
                         appState = appState,
                         group = item.group,
                         title = title,
-                        seed = avatarAccount ?: item.group.groupIdHex,
+                        seed = item.selectedAvatarSeed ?: avatarAccount ?: item.group.groupIdHex,
                         size = 48.dp,
-                        fallbackPictureUrl = avatarAccount?.let { appState.avatarUrl(it) },
+                        fallbackPictureUrl =
+                            item.selectedAvatarUrl
+                                ?: avatarAccount
+                                    ?.takeIf { item.selectedPresentation == null }
+                                    ?.let { appState.avatarUrl(it) },
                         firstFrameAvatar = item.firstFrameAvatar,
                     )
                     if (isMuted) {

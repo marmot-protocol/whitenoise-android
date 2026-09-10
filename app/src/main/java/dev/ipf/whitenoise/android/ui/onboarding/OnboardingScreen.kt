@@ -107,6 +107,7 @@ internal const val ONBOARDING_OFFLINE_NOTICE_TAG = "onboarding-offline-notice"
 internal val OnboardingMaxContentWidth = 440.dp
 
 @Composable
+@Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod") // Owns the short-lived sign-in state machine.
 internal fun OnboardingScreen(
     appState: WhiteNoiseAppState,
     hasValidatedInternet: () -> Boolean = appState::hasValidatedInternet,
@@ -242,6 +243,25 @@ internal fun OnboardingScreen(
         savedAccounts = savedAccounts,
         reactivatingAccountLabel = appState.retainedAccountReactivationRef,
         onContinueWithSavedAccount = appState::reactivateRetainedAccount,
+        onRecoverSavedAccount = { accountRef ->
+            if (inFlightAction == OnboardingAction.Idle) {
+                inFlightAction = OnboardingAction.Importing
+                appState.launchMutation {
+                    try {
+                        val recovered = appState.recoverSetup(accountRef)
+                        appState.presentTransient(
+                            if (recovered) {
+                                R.string.onboarding_recover_setup_success
+                            } else {
+                                R.string.onboarding_recover_setup_failed
+                            },
+                        )
+                    } finally {
+                        inFlightAction = OnboardingAction.Idle
+                    }
+                }
+            }
+        },
     )
 }
 
@@ -351,6 +371,7 @@ fun OnboardingContent(
     savedAccounts: List<OnboardingSavedAccountUi> = emptyList(),
     reactivatingAccountLabel: String? = null,
     onContinueWithSavedAccount: (String) -> Unit = {},
+    onRecoverSavedAccount: (String) -> Unit = {},
 ) {
     var signingIn by remember { mutableStateOf(signingInBusy) }
     val busy = creatingIdentity || signingInBusy || loggingInWithAmber || reactivatingAccountLabel != null
@@ -451,6 +472,7 @@ fun OnboardingContent(
                         reactivatingAccountLabel = reactivatingAccountLabel,
                         enabled = !busy,
                         onContinue = onContinueWithSavedAccount,
+                        onRecover = onRecoverSavedAccount,
                     )
                     FilledTonalButton(
                         onClick = {

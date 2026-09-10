@@ -1513,7 +1513,7 @@
     <string name="tts_settings_engine_title">Движок</string>
     <string name="tts_settings_rate_title">Скорость речи</string>
     <string name="tts_media_mix_title">Озвучивать поверх воспроизводимого медиа</string>
-    <string name="tts_media_mix_subtitle">Запускается только при воспроизведении другого аудио; White Noise не управляет другим аудио</string>
+    <string name="tts_media_mix_subtitle">Микшируется с другим аудио во время его воспроизведения; в противном случае чтение вслух продолжается как обычно</string>
     <string name="tts_media_mix_volume_title">Громкость речи поверх медиа</string>
     <string name="tts_media_mix_volume_quiet">Тихо</string>
     <string name="tts_media_mix_volume_medium">Средне</string>
@@ -1521,7 +1521,6 @@
     <string name="tts_media_mix_volume_quiet_description">35 процентов громкости движка синтеза речи</string>
     <string name="tts_media_mix_volume_medium_description">60 процентов громкости движка синтеза речи</string>
     <string name="tts_media_mix_volume_loud_description">85 процентов громкости движка синтеза речи</string>
-    <string name="tts_media_mix_no_active_media">Включите музыку или подкаст перед озвучиванием поверх медиа</string>
     <string name="tts_voice_title">Голос</string>
     <string name="tts_voice_automatic">Автоматический офлайн-голос</string>
     <string name="tts_voice_automatic_description">Использовать лучший установленный офлайн-голос для языка сообщения</string>
@@ -1533,6 +1532,10 @@
     <string name="tts_voice_unavailable">Нет доступного офлайн-голоса</string>
     <string name="tts_voice_effective_fallback">Сохранённый голос недоступен; используется %1$s</string>
     <string name="speak_aloud">Прочитать вслух</string>
+    <string name="read_code_literally">Прочитать код буквально</string>
+    <string name="tts_read_from_sentence">Читать с этого предложения</string>
+    <string name="tts_choose_sentence">Выбрать предложение для чтения</string>
+    <string name="tts_bar_preparing">Подготовка озвучивания…</string>
     <string name="tts_bar_pause">Приостановить чтение</string>
     <string name="tts_bar_play">Продолжить чтение</string>
     <string name="tts_bar_skip_previous">Предыдущее предложение</string>
@@ -1706,6 +1709,8 @@
     <string name="dictation_cancel">Отменить диктовку</string>
     <string name="dictation_provider_unavailable">Распознавание речи недоступно</string>
     <string name="dictation_permission_denied">Требуется доступ к микрофону</string>
+    <string name="dictation_provider_access_rejected">Служба распознавания речи отклонила доступ к микрофону</string>
+    <string name="dictation_open_speech_service">Открыть сервис распознавания речи</string>
     <string name="dictation_permission_denied_permanently">Разрешите доступ к микрофону в настройках</string>
     <string name="dictation_microphone_in_use">Микрофон уже используется</string>
     <string name="dictation_no_speech">Речь не распознана</string>
@@ -1809,4 +1814,25 @@
     <string name="setup_details">Подробности</string>
     <string name="setup_hide_details">Скрыть подробности</string>
     <string name="setup_opening_chats">Открываем ваши чаты…</string>
+    <string name="unnamed_group">Группа без названия</string>
+    <string name="conversation_unavailable">Беседа недоступна</string>
+    <string name="onboarding_recover_setup_title">Восстановить настройку входа?</string>
+    <string name="onboarding_recover_setup_for">Восстановить настройку входа для %1$s</string>
+    <string name="onboarding_recover_setup_confirm">Восстановить настройку</string>
+    <string name="onboarding_recover_setup_explanation">При восстановлении выполняется выход из этого профиля и заменяется нечитаемая контрольная точка настройки. Сохраняются только последние данные восстановления, а предыдущие публикации на ретрансляторах не отменяются. Для нового входа потребуется закрытый ключ. Это действие не подтверждает никакую публикацию.</string>
+    <string name="onboarding_recover_setup_success">Настройка восстановлена. Введите закрытый ключ этого профиля, чтобы начать новый вход.</string>
+    <string name="onboarding_recover_setup_failed">Не удалось восстановить настройку. Повторите попытку.</string>
+    <string name="group_recovery_automatic_failed">Не удалось восстановить синхронизацию группы.</string>
+    <string name="group_recovery_pending_reinvites">Некоторые приглашения повторяются автоматически.</string>
+    <string name="group_recovery_failed_reinvites">Некоторые приглашения не удалось восстановить. Пригласите этих людей снова в разделе сведений о группе.</string>
+    <string name="group_recovery_review_invitation_from">Проверить приглашение от %1$s · эпоха %2$s</string>
+    <string name="group_recovery_check_failed">Не удалось проверить восстановление группы. Повторите попытку.</string>
+    <string name="group_rejoin_title">Вернуться в группу?</string>
+    <string name="group_rejoin_invited_by">Приглашение от %1$s\n%2$s</string>
+    <string name="group_rejoin_replaces_state">При возвращении текущее состояние группы на этом устройстве будет заменено приглашённой копией. Сохранённая история сообщений останется.</string>
+    <string name="group_rejoin_trust_warning">Возвращайтесь, только если доверяете этому приглашению. Более новая версия группы сама по себе не делает его надёжным.</string>
+    <string name="group_rejoin_confirm">Вернуться в группу</string>
+    <string name="group_rejoin_decline">Отклонить приглашение</string>
+    <string name="group_rejoin_success">Вы вернулись в группу.</string>
+    <string name="group_rejoin_failed">Не удалось применить это приглашение</string>
 </resources>

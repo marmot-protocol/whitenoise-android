@@ -13,10 +13,12 @@ internal data class TtsPlaybackSessionModel(
     val isActive: Boolean,
     val isPlaying: Boolean,
     val navigationEnabled: Boolean,
+    val isPreparing: Boolean = false,
 ) {
     companion object {
         fun from(state: TtsState): TtsPlaybackSessionModel =
             when (state) {
+                is TtsState.Preparing -> TtsPlaybackSessionModel(true, false, state.chunkCount > 0, isPreparing = true)
                 is TtsState.Speaking ->
                     TtsPlaybackSessionModel(isActive = true, isPlaying = true, navigationEnabled = true)
 

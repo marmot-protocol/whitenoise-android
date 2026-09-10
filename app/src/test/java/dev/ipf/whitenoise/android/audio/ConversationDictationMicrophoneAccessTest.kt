@@ -30,16 +30,17 @@ class ConversationDictationMicrophoneAccessTest {
     }
 
     @Test
-    fun globalMicrophoneToggleDoesNotBecomePermanentAppPermissionDenial() {
+    fun globalMicrophoneToggleLeavesGrantedRuntimePermissionUsableForNativeRecovery() {
         setMode(AppOpsManager.MODE_FOREGROUND)
         context.getSystemService(AudioManager::class.java).isMicrophoneMute = true
 
-        // Android 16's effective check also includes global sensor privacy.
+        // Android 16's effective check includes global sensor privacy, but creating the recognizer
+        // is what gives Android the opportunity to present its native microphone-unblock prompt.
         assertEquals(
             AppOpsManager.MODE_IGNORED,
-            appOps.checkOpNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
+            appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
         )
-        assertEquals(ConversationDictationMicrophoneAccess.MicrophoneMuted, platform.microphoneAccess())
+        assertEquals(ConversationDictationMicrophoneAccess.Granted, platform.microphoneAccess())
     }
 
     @Test
@@ -51,11 +52,28 @@ class ConversationDictationMicrophoneAccessTest {
     }
 
     @Test
-    fun effectiveAppOpDenialsOfferSystemPrivacyRecovery() {
-        for (mode in listOf(AppOpsManager.MODE_IGNORED, AppOpsManager.MODE_ERRORED)) {
-            setMode(mode)
-            assertEquals(ConversationDictationMicrophoneAccess.MicrophoneMuted, platform.microphoneAccess())
-        }
+    fun globalMicrophonePrivacyMayReportRawAndEffectiveIgnoredForAGrantedPermission() {
+        setMode(AppOpsManager.MODE_IGNORED)
+        context.getSystemService(AudioManager::class.java).isMicrophoneMute = true
+
+        // The GrapheneOS Android 17 fixture reports MODE_IGNORED from both queries while global
+        // microphone privacy is active, so raw mode cannot distinguish that overlay from app policy.
+        assertEquals(
+            AppOpsManager.MODE_IGNORED,
+            appOps.unsafeCheckOpRawNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
+        )
+        assertEquals(
+            AppOpsManager.MODE_IGNORED,
+            appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
+        )
+        assertEquals(ConversationDictationMicrophoneAccess.Granted, platform.microphoneAccess())
+    }
+
+    @Test
+    fun hardAppOpDenialRemainsActionable() {
+        setMode(AppOpsManager.MODE_ERRORED)
+
+        assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
     }
 
     @Test
@@ -76,7 +94,7 @@ class ConversationDictationMicrophoneAccessTest {
 class PrivacyGatedAppOps : ShadowAppOpsManager() {
     @Implementation
     @Suppress("OVERRIDE_DEPRECATION")
-    public override fun checkOpNoThrow(
+    public override fun unsafeCheckOpNoThrow(
         op: String,
         uid: Int,
         packageName: String,

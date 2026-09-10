@@ -15,4 +15,6 @@ internal data class TtsQueuedMessage(
     // walks anchor recovery on it when the loaded window no longer holds
     // the anchor id.
     val timelineAt: ULong = 0uL,
+    val announcementsPrepared: Boolean = false,
+    val prepared: dev.ipf.whitenoise.android.audio.tts.speech.PreparedSpeechMessage? = null,
 )

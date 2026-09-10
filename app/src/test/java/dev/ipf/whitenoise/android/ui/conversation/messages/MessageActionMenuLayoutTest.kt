@@ -34,6 +34,18 @@ class MessageActionMenuLayoutTest {
     val composeRule = createComposeRule()
 
     @Test
+    fun literalCodeMenuIsAccessibleWithLargeRtlText() {
+        val callbacks = mutableListOf<String>()
+        renderMenu(fontScale = 1.3f, layoutDirection = LayoutDirection.Rtl, callbacks = callbacks, literalCode = true)
+        composeRule.onNodeWithText("Read code literally").performScrollTo().assertIsDisplayed()
+        composeRule
+            .onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/message_action_menu_literal_code_rtl_large_font.png")
+        composeRule.onNodeWithText("Read code literally").performClick()
+        assertEquals(listOf("literalCode"), callbacks)
+    }
+
+    @Test
     fun actionModelPreservesCapabilityOrder() {
         assertEquals(
             listOf(
@@ -439,6 +451,7 @@ class MessageActionMenuLayoutTest {
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
         callbacks: MutableList<String> = mutableListOf(),
         canReact: Boolean = false,
+        literalCode: Boolean = false,
         quickReactionEmojis: List<String> = if (canReact) listOf("👍") else emptyList(),
     ) {
         composeRule.setContent {
@@ -460,6 +473,7 @@ class MessageActionMenuLayoutTest {
                         canSelect = true,
                         canCopyText = true,
                         canSpeak = true,
+                        canSpeakCodeLiterally = literalCode,
                         canSelectText = true,
                         canShare = true,
                         canSave = true,
@@ -474,6 +488,7 @@ class MessageActionMenuLayoutTest {
                         onSelectText = { callbacks += "selectText" },
                         onCopyText = { callbacks += "copy" },
                         onSpeak = { callbacks += "speak" },
+                        onSpeakCodeLiterally = { callbacks += "literalCode" },
                         onShare = { callbacks += "share" },
                         onSave = { callbacks += "save" },
                         onInfo = { callbacks += "info" },

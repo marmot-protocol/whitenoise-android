@@ -84,10 +84,31 @@ internal fun textAttachmentTtsEntry(
     senderDisplayName: String,
     messageIdHex: String,
     attachmentIndex: Int,
-): TtsSpeakableEntry =
-    TtsSpeakableEntry(
+): TtsSpeakableEntry {
+    val projection =
+        preview.markdownDocument
+            ?.takeIf { it.blocks.isNotEmpty() }
+            ?.let {
+                dev.ipf.whitenoise.android.ui
+                    .markdownDocumentToSpeakableProjection(it)
+            }
+            ?: legacyTextToSpeakableProjection(preview.text)
+    return TtsSpeakableEntry(
         senderKey = senderKey,
         senderDisplayName = "$senderDisplayName · ${preview.candidate.displayName}",
-        text = textAttachmentSpeakableText(preview),
+        text = projection.text,
         messageIdHex = "attachment:$messageIdHex:$attachmentIndex",
+        projectionId = projection.projectionId,
+        speechRoles = projection.speechRoles,
+        visibleLeaves = projection.visibleLeaves,
+        spokenTextSpans =
+            projection.spans.map { span ->
+                dev.ipf.whitenoise.android.audio.tts.TtsSpokenTextSpan(
+                    dev.ipf.whitenoise.android.audio.tts
+                        .TtsTextRange(span.spokenStart, span.spokenEnd),
+                    dev.ipf.whitenoise.android.audio.tts
+                        .TtsVisibleTextSpan(span.leafId, span.visibleStart, span.visibleEnd),
+                )
+            },
     )
+}

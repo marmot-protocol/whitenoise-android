@@ -38,13 +38,14 @@ class StalenessGuardCoverageTest {
                         "memberRosterRefreshGeneration",
                         "timelineWindowGeneration",
                         "managementStateLifetime",
+                        "groupRecoveryLifetime",
                     ),
                 "AccountUnreadStore.kt" to listOf("refreshes"),
                 "AttachmentOpenCoordinator.kt" to listOf("openRequests"),
                 "AttachmentTransferCoordinator.kt" to listOf("terminalLifetimes", "refreshLifetimes"),
                 "ConversationInitialPresentationWarm.kt" to listOf("preparations"),
                 "ConversationCardPostSynchronizer.kt" to listOf("dismissals", "shows"),
-                "TtsController.kt" to listOf("engineQueueLifetime"),
+                "TtsPaceTracker.kt" to listOf("engineQueueLifetime"),
                 "MessageDraftRepository.kt" to listOf("lifetimes"),
             )
         migratedOwners.forEach { (fileName, owners) ->
@@ -81,7 +82,14 @@ class StalenessGuardCoverageTest {
                 "AppState.kt:materializeProfileLocally" to
                     listOf("profileCacheLifetime.capture", "profileCacheLifetime.isCurrent"),
                 "AppState.kt:processNotificationUpdate" to
-                    listOf("notificationPostEpoch.capture", "epoch = postEpoch", "postInitialNotificationUpdate"),
+                    listOf(
+                        "notificationPostEpoch.capture",
+                        "resolveNotificationFirstPost",
+                        "postEpoch,",
+                        "postInitialNotificationUpdate",
+                    ),
+                "AppState.kt:resolveNotificationFirstPost" to
+                    listOf("postEpoch: Long", "epoch = postEpoch"),
                 "AppState.kt:reconcileUnavailableNativePushFallback" to
                     listOf(
                         "captureNativePushFallbackOwner",
@@ -133,6 +141,16 @@ class StalenessGuardCoverageTest {
                     listOf("shouldAcceptMediaUploadForAccount", "mediaUploadSessionEpoch"),
                 "Controllers.kt:refreshManagementState" to
                     listOf("managementStateLifetime.advance", "managementStateLifetime.runIfCurrent"),
+                "Controllers.kt:refreshGroupRecoveryStatus" to
+                    listOf("groupRecoveryLifetime.capture", "groupRecoveryLifetime.runIfCurrent"),
+                "Controllers.kt:confirmGroupRejoin" to
+                    listOf("groupRecoveryLifetime.capture", "groupRecoveryLifetime.runIfCurrent"),
+                "Controllers.kt:declineGroupRejoin" to
+                    listOf(
+                        "groupRecoveryLifetime.capture",
+                        "groupRecoveryLifetime.runIfCurrent",
+                        "refreshGroupRecoveryStatus",
+                    ),
             )
         guardedPaths.forEach { (path, markers) ->
             val (fileName, functionName) = path.split(':', limit = 2)
@@ -374,6 +392,7 @@ class StalenessGuardCoverageTest {
             "ConversationInitialPresentationWarm.kt",
             "ConversationCardPostSynchronizer.kt",
             "TtsController.kt",
+            "TtsPaceTracker.kt",
             "MessageDraftRepository.kt",
             "MessageForwarding.kt",
         ).associateWith(::productionSource)

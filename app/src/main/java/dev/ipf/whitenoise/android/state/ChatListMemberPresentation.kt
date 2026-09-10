@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ConversationPresentationFfi
+import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 
 /** Display-only roster summary; never substitutes for the authoritative member snapshot. */
@@ -34,23 +36,43 @@ internal fun chatListMemberPresentation(
 internal fun chatListDisplayGroup(
     row: ChatListRowFfi,
     baseGroup: AppGroupRecordFfi,
+    selectedPresentation: ConversationPresentationFfi? = null,
 ): AppGroupRecordFfi {
     val rowHasAvatarSignal = row.avatarUrl != null || row.avatar != null
     val avatarUrl = if (rowHasAvatarSignal) row.avatarUrl else baseGroup.avatarUrl
-    return reconcileTerminalSelfMembership(
-        update =
-            baseGroup.copy(
-                name = row.groupName.ifBlank { baseGroup.name },
-                avatarUrl = avatarUrl,
-                avatarDim = baseGroup.avatarDim.takeIf { avatarUrl == baseGroup.avatarUrl },
-                avatarThumbhash = baseGroup.avatarThumbhash.takeIf { avatarUrl == baseGroup.avatarUrl },
-                imageHashHex = if (rowHasAvatarSignal) row.avatar?.imageHashHex else baseGroup.imageHashHex,
-                archived = row.archived,
-                pendingConfirmation = row.pendingConfirmation,
-                selfMembership = row.selfMembership,
-            ),
-        previous = baseGroup,
-    )
+    val projected =
+        reconcileTerminalSelfMembership(
+            update =
+                baseGroup.copy(
+                    name = row.groupName.ifBlank { baseGroup.name },
+                    avatarUrl = avatarUrl,
+                    avatarDim = baseGroup.avatarDim.takeIf { avatarUrl == baseGroup.avatarUrl },
+                    avatarThumbhash = baseGroup.avatarThumbhash.takeIf { avatarUrl == baseGroup.avatarUrl },
+                    imageHashHex = if (rowHasAvatarSignal) row.avatar?.imageHashHex else baseGroup.imageHashHex,
+                    archived = row.archived,
+                    pendingConfirmation = row.pendingConfirmation,
+                    selfMembership = row.selfMembership,
+                ),
+            previous = baseGroup,
+        )
+    return when (val avatar = selectedPresentation?.avatar) {
+        is SelectedAvatarFfi.RemoteImage -> projected.copy(avatarUrl = avatar.url, imageHashHex = null)
+        is SelectedAvatarFfi.EncryptedGroupImage ->
+            projected.copy(
+                avatarUrl = null,
+                avatarDim = null,
+                avatarThumbhash = null,
+                imageHashHex = avatar.image.imageHashHex,
+            )
+        is SelectedAvatarFfi.Placeholder ->
+            projected.copy(
+                avatarUrl = null,
+                avatarDim = null,
+                avatarThumbhash = null,
+                imageHashHex = null,
+            )
+        null -> projected
+    }
 }
 
 /** Applies a local mutation only to its pinned account; null preserves legacy attached-controller routing. */

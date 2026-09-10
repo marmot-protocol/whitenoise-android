@@ -74,6 +74,7 @@ class TtsHistorySession internal constructor(
     private var conversation: TtsConversationSource? = null
     private val historyRequests = StalenessGuard()
     private var pendingLoad: Job? = null
+    private var pendingTargetSeek = false
     private var liveTailAttached = true
 
     /** Optional barrier used by concurrency tests at the guarded settlement boundary. */
@@ -160,46 +161,100 @@ class TtsHistorySession internal constructor(
         return accepted
     }
 
+    /** Latest target wins; the old audible cursor remains untouched while loading. */
+    fun requestSentenceSeek(
+        messageIdHex: String,
+        timelineAt: ULong,
+        sentenceOrdinal: Int,
+        projectionId: String,
+    ): Boolean {
+        val source =
+            conversation?.takeIf {
+                it.sessionId == controller.state.value.sessionId && sentenceOrdinal >= 0
+            } ?: return false
+        invalidatePending()
+        val generation = historyRequests.advance()
+        return if (!controller.deferForTargetSeek()) {
+            false
+        } else {
+            pendingTargetSeek = true
+            val direction =
+                if (timelineAt <
+                    (controller.queuedMessagesSnapshot().firstOrNull()?.timelineAt ?: 0uL)
+                ) {
+                    TtsHistoryDirection.Older
+                } else {
+                    TtsHistoryDirection.Newer
+                }
+            _edgeState.value = TtsHistoryEdgeState.Loading(direction)
+            pendingLoad =
+                scope.launch {
+                    val entry =
+                        TtsSentenceSeekLoader(
+                            resolvePager = { resolvePager(source.accountRef, source.groupIdHex) },
+                            isCurrent = { historyRequests.isCurrent(generation) },
+                        ).load(messageIdHex, timelineAt)
+                    historyRequests.runIfCurrent(generation) {
+                        pendingTargetSeek = false
+                        if (conversation != source ||
+                            controller.state.value.sessionId != source.sessionId
+                        ) {
+                            return@runIfCurrent
+                        }
+                        val committed =
+                            entry != null &&
+                                controller.installSeekTarget(entry, sentenceOrdinal, source.sessionId, projectionId)
+                        controller.settleEdgeRequest(
+                            if (committed) TtsEdgeSettlement.Resolved else TtsEdgeSettlement.Retained,
+                        )
+                        _edgeState.value = if (committed) null else TtsHistoryEdgeState.Failed(direction)
+                        if (committed) liveTailAttached = false
+                    }
+                }
+            true
+        }
+    }
+
+    fun cancelPendingSeek() {
+        if (pendingTargetSeek) controller.settleEdgeRequest(TtsEdgeSettlement.Retained)
+        invalidatePending()
+    }
+
     fun nextMessage() {
-        navigate(TtsWindowSentenceTarget.First) { defer -> controller.skipNextMessage(defer) }
+        navigation.navigate(TtsWindowSentenceTarget.First) { defer -> controller.skipNextMessage(defer) }
     }
 
     fun previousMessage() {
-        navigate(TtsWindowSentenceTarget.First) { defer -> controller.skipPreviousMessage(defer) }
+        navigation.navigate(TtsWindowSentenceTarget.First) { defer -> controller.skipPreviousMessage(defer) }
     }
 
     fun nextSentence() {
-        navigate(TtsWindowSentenceTarget.First) { defer -> controller.skipNextSentence(defer) }
+        navigation.navigate(TtsWindowSentenceTarget.First) { defer -> controller.skipNextSentence(defer) }
     }
 
     fun previousSentence() {
-        navigate(TtsWindowSentenceTarget.Last) { defer -> controller.skipPreviousSentence(defer) }
+        navigation.navigate(TtsWindowSentenceTarget.Last) { defer -> controller.skipPreviousSentence(defer) }
     }
 
     /** Applies an in-window navigation immediately or starts the matching bounded edge walk. */
-    private fun navigate(
-        targetSentence: TtsWindowSentenceTarget,
-        skip: (Boolean) -> TtsNavigationOutcome,
-    ) {
-        if (_edgeState.value is TtsHistoryEdgeState.Loading) return
-        val convo = conversation
-        if (convo == null) {
-            skip(false)
-            return
-        }
-        // The edge decision happens inside the controller lock, so a racing
-        // engine callback can never turn "try to load" into an early
-        // completion or an interior move into a bogus page request.
-        when (skip(true)) {
-            TtsNavigationOutcome.AtOlderEdge ->
-                startEdgeLoad(convo, TtsHistoryDirection.Older, targetSentence)
-
-            TtsNavigationOutcome.AtNewerEdge ->
-                startEdgeLoad(convo, TtsHistoryDirection.Newer, targetSentence)
-
-            else -> _edgeState.value = null
-        }
-    }
+    private val navigation =
+        TtsHistoryNavigation(
+            conversation = { conversation },
+            beforeNavigate = {
+                if (_edgeState.value is TtsHistoryEdgeState.Loading) {
+                    if (pendingTargetSeek) {
+                        invalidatePending()
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    true
+                }
+            },
+            startEdgeLoad = ::startEdgeLoad,
+            clearEdge = { _edgeState.value = null },
+        )
 
     /** Starts one edge walk and rejects its settlement after a newer history request. */
     private fun startEdgeLoad(
@@ -211,30 +266,13 @@ class TtsHistorySession internal constructor(
         _edgeState.value = TtsHistoryEdgeState.Loading(direction)
         pendingLoad =
             scope.launch {
-                var pager: TtsHistoryPager? = null
-                val result =
-                    try {
-                        pager = resolvePager(convo.accountRef, convo.groupIdHex)
-                        val queued = controller.queuedMessagesSnapshot().filter { it.messageIdHex.isNotEmpty() }
-                        val anchor =
-                            if (direction == TtsHistoryDirection.Older) {
-                                queued.firstOrNull()
-                            } else {
-                                queued.lastOrNull()
-                            }
-                        val resolvedPager = pager
-                        if (resolvedPager == null || anchor == null) {
-                            TtsHistoryEdgeWalk.Result.Failed
-                        } else {
-                            TtsHistoryEdgeWalk(resolvedPager, direction) {
-                                !historyRequests.isCurrent(startedGeneration)
-                            }.run(anchor.messageIdHex, anchor.timelineAt)
-                        }
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (_: Exception) {
-                        TtsHistoryEdgeWalk.Result.Failed
-                    }
+                val (pager, result) =
+                    loadHistoryEdge(
+                        resolvePager = { resolvePager(convo.accountRef, convo.groupIdHex) },
+                        queuedMessages = controller::queuedMessagesSnapshot,
+                        direction = direction,
+                        isStale = { !historyRequests.isCurrent(startedGeneration) },
+                    )
                 historyRequests.runIfCurrent(startedGeneration) {
                     settlementAwaiterForTests?.invoke()
                     if (conversation != convo) return@runIfCurrent
@@ -245,7 +283,20 @@ class TtsHistorySession internal constructor(
                         is TtsHistoryEdgeWalk.Result.Found ->
                             try {
                                 // Found is only reachable through a resolved pager.
-                                pager?.let { applyProjection(it, direction, targetSentence, result) }
+                                pager?.let {
+                                    val tail =
+                                        TtsHistoryProjection(controller).apply(
+                                            it,
+                                            direction,
+                                            targetSentence,
+                                            result.entries,
+                                            liveTailAttached,
+                                        )
+                                    if (tail != null) {
+                                        liveTailAttached = tail.attached
+                                        tail.knownTailId?.let { id -> lastKnownTimelineTailId = id }
+                                    }
+                                }
                             } finally {
                                 // An extension that landed already repositioned the
                                 // parked terminal, one that was refused has nothing
@@ -281,44 +332,12 @@ class TtsHistorySession internal constructor(
             }
     }
 
-    /** Extends the queue with a current edge-walk projection and updates live-tail ownership. */
-    private fun applyProjection(
-        pager: TtsHistoryPager,
-        direction: TtsHistoryDirection,
-        targetSentence: TtsWindowSentenceTarget,
-        found: TtsHistoryEdgeWalk.Result.Found,
-    ) {
-        // The requested target is the nearest speakable message beyond the
-        // edge: last in window order for older paging, first for newer.
-        val targetId =
-            when (direction) {
-                TtsHistoryDirection.Older -> found.entries.last().messageIdHex
-                TtsHistoryDirection.Newer -> found.entries.first().messageIdHex
-            }
-        val tailBefore = controller.queuedMessageIds().lastOrNull()
-        if (!controller.extendReadAloudWindow(direction, found.entries, targetId, targetSentence)) return
-        val tailAfter = controller.queuedMessageIds().lastOrNull()
-        liveTailAttached =
-            when (direction) {
-                // Evicting the newest edge detaches the session from the live tail.
-                TtsHistoryDirection.Older -> liveTailAttached && tailAfter == tailBefore
-                // Reattached only when the queue tail is the timeline's live
-                // tail RIGHT NOW — a walk-time snapshot would miss an arrival
-                // that landed between the walk and this apply.
-                TtsHistoryDirection.Newer -> {
-                    val timelineTailId = pager.timelineRecords().lastOrNull()?.messageIdHex
-                    val attached = !pager.hasMoreAfter && timelineTailId != null && timelineTailId == tailAfter
-                    if (attached) lastKnownTimelineTailId = timelineTailId
-                    attached
-                }
-            }
-    }
-
     /** Cancels the current edge walk and invalidates any completion already queued. */
     private fun invalidatePending() {
         historyRequests.advance()
         pendingLoad?.cancel()
         pendingLoad = null
+        pendingTargetSeek = false
         _edgeState.value = null
     }
 }
@@ -451,3 +470,38 @@ private const val EDGE_FILL_TARGET_MESSAGES = 10
 // cannot pile up projection work on the main thread per tap. Exhausting it
 // reads exactly like finding nothing more nearby.
 private const val MAX_PROJECTION_ATTEMPTS_PER_REQUEST = 200
+
+private suspend fun loadHistoryEdge(
+    resolvePager: () -> TtsHistoryPager?,
+    queuedMessages: () -> List<TtsQueuedMessage>,
+    direction: TtsHistoryDirection,
+    isStale: () -> Boolean,
+): Pair<TtsHistoryPager?, TtsHistoryEdgeWalk.Result> {
+    var pager: TtsHistoryPager? = null
+    val result =
+        try {
+            pager = resolvePager()
+            val queued = queuedMessages().filter { it.messageIdHex.isNotEmpty() }
+            val anchor =
+                if (direction == TtsHistoryDirection.Older) {
+                    queued.firstOrNull()
+                } else {
+                    queued.lastOrNull()
+                }
+            val resolvedPager = pager
+            if (resolvedPager == null || anchor == null) {
+                TtsHistoryEdgeWalk.Result.Failed
+            } else {
+                TtsHistoryEdgeWalk(
+                    resolvedPager,
+                    direction,
+                    isStale,
+                ).run(anchor.messageIdHex, anchor.timelineAt)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            TtsHistoryEdgeWalk.Result.Failed
+        }
+    return pager to result
+}

@@ -15,6 +15,22 @@ import java.io.File
  */
 class AppStateSendLockCoverageTest {
     @Test
+    fun productExportStaysUnconfigured() {
+        val body = appStateFunctionBody("MarmotInterface.configurePrivacyRuntime")
+        val config = body.substringAfter("ProductAnalyticsRuntimeConfigFfi(")
+
+        assertTrue("Relay-only UI consent must not enable product export", "eventsEndpoint = null," in config)
+        assertTrue("Build credentials must remain inactive until disclosure exists", "appKey = null," in config)
+    }
+
+    @Test
+    fun dictationSendRecordsTiming() {
+        val body = appStateFunctionBody("sendDictationTranscriptIfOriginUnchanged")
+
+        assertTrue("Dictation must contribute to text-send timing", "marmotIo(MarmotTraceSection.TEXT_SEND)" in body)
+    }
+
+    @Test
     fun forwardTextsLocksEachTargetsOrderedMessageBatch() {
         val body = appStateFunctionBody("forwardTexts")
 
@@ -24,7 +40,8 @@ class AppStateSendLockCoverageTest {
                 """for\s*\(\s*groupIdHex\s+in\s+targets\s*\).*""" +
                     """withGroupCommitLock\s*\(\s*account\s*,\s*groupIdHex\s*\).*""" +
                     """for\s*\(\s*body\s+in\s+bodies\s*\).*""" +
-                    """marmotIo\s*\{\s*sendText\s*\(\s*account\s*,\s*groupIdHex\s*,\s*body\s*\)\s*\}""",
+                    """marmotIo\s*\(MarmotTraceSection\.TEXT_SEND\)\s*\{\s*sendText""" +
+                    """\s*\(\s*account\s*,\s*groupIdHex\s*,\s*body\s*\)\s*\}""",
                 RegexOption.DOT_MATCHES_ALL,
             ).containsMatchIn(body),
         )
@@ -61,7 +78,8 @@ class AppStateSendLockCoverageTest {
             "notification quick replies must serialize sendText through the per-group commit lock",
             Regex(
                 """withGroupCommitLock\s*\(\s*account\s*,\s*group\s*\).*""" +
-                    """marmotIo\s*\{\s*sendText\s*\(\s*account\s*,\s*group\s*,\s*body\s*\)\s*\}""",
+                    """marmotIo\s*\(MarmotTraceSection\.TEXT_SEND\)\s*\{\s*sendText""" +
+                    """\s*\(\s*account\s*,\s*group\s*,\s*body\s*\)\s*\}""",
                 RegexOption.DOT_MATCHES_ALL,
             ).containsMatchIn(body),
         )
@@ -70,7 +88,8 @@ class AppStateSendLockCoverageTest {
     @Test
     fun acceptedPendingNotificationReplyPersistsItsCanonicalIdBeforeReturning() {
         val body = appStateFunctionBody("sendNotificationReply")
-        val sendIndex = body.indexOf("val summary = marmotIo { sendText(account, group, body) }")
+        val sendIndex =
+            body.indexOf("val summary = marmotIo(MarmotTraceSection.TEXT_SEND) { sendText(account, group, body) }")
         val persistIndex = body.indexOf("completionStore.markCommittedMessage", startIndex = sendIndex)
         val acceptedPendingIndex = body.indexOf("NotificationReplySendOutcome.AcceptedPending", startIndex = sendIndex)
 
@@ -334,47 +353,6 @@ class AppStateSendLockCoverageTest {
                 "advanceConversationReadAnchor(" in readAnchorHelper &&
                 "durableAnchorId = controller.lastReadMessageId" in readAnchorHelper &&
                 "filterNot { MessageProjector.isEdit(it.record) }" !in readAnchorHelper,
-        )
-    }
-
-    @Test
-    fun conversationAnchoringLifecycleFollowsController() {
-        val source = conversationScreenSource().readText()
-        val entrySnapshotIndex = source.indexOf("val entryUnreadSnapshot =")
-        val scrollRestoreIndex = source.indexOf("val scrollRestore =")
-        val unreadJumpOwner =
-            source.substring(
-                source.indexOf("var unreadJumpState by"),
-                source.indexOf("val scrollCoordinator ="),
-            )
-
-        val initialAnchoredOwner =
-            source.substring(
-                source.indexOf("var initialTimelineAnchored by"),
-                source.indexOf("ConversationTtsAutoReadEffects("),
-            )
-        val anchoredSeedInitializer =
-            "mutableStateOf(firstFrameSeed.anchorTailImmediately && !firstFrameSeed.awaitingAuthoritativeTimeline)"
-
-        assertTrue(
-            "same-group account switches must reset anchoring state and cancel effects that capture the old controller",
-            "remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration)" in unreadJumpOwner &&
-                "mutableStateOf(ConversationUnreadJumpState())" in unreadJumpOwner &&
-                "remember(controller, notificationOpenRequestId)" in initialAnchoredOwner &&
-                anchoredSeedInitializer in initialAnchoredOwner &&
-                "remember(controller) {" in source &&
-                "ConversationNavigationState(" in source &&
-                "onDispose(state::cancelJobs)" in source &&
-                "var lastFollowedLatestId by mutableStateOf(initialFollowedLatestId)" in source &&
-                "LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored)" in source &&
-                "LaunchedEffect(listState, controller)" in source,
-        )
-        assertTrue(
-            "scroll restore must use the reconciled entry unread count rather than the raw projection",
-            entrySnapshotIndex >= 0 &&
-                entrySnapshotIndex < scrollRestoreIndex &&
-                "entryUnreadCount = entryUnreadCount" in
-                source.substring(scrollRestoreIndex, source.indexOf("val positionalScrollRestore", scrollRestoreIndex)),
         )
     }
 

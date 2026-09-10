@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
@@ -245,6 +246,8 @@ internal data class AccountSwitchLocalSnapshot(
     val groups: List<AppGroupRecordFfi>,
     val memberIds: List<AppGroupMemberIdsFfi>,
     internal val profiles: List<AccountSwitchProfileSeed>,
+    /** Atomic 0.9.20 row/presentation pairs for the target account's first frame. */
+    val presentedRows: List<PresentedChatRowFfi>? = null,
 )
 
 internal data class AccountSwitchProfileSeed(

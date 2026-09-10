@@ -16,7 +16,7 @@ import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 
-/** Orders presentation only: every offered action retains its exact native revision and callback. */
+/** Orders presentation only: every offered action retains its exact native revision, recovery epoch, and callback. */
 @Composable
 internal fun SetupActionButtons(
     state: AccountSetupState,
@@ -25,6 +25,7 @@ internal fun SetupActionButtons(
 ) {
     val snapshot = state.snapshot ?: return
     val step = state.currentStep ?: return
+    val recoveryEpoch = snapshot.recoveryEpoch
     val ordered =
         setupOrderedActions(step.actions).filterNot {
             it == OnboardingActionFfi.RETRY && state.routineDeviceNotice
@@ -47,7 +48,7 @@ internal fun SetupActionButtons(
             if (action in setupEditorActions) {
                 onEdit(step.step, action, revision)
             } else {
-                onAction(SetupRequest(revision, step.step, action))
+                onAction(SetupRequest(revision, step.step, action, recoveryEpoch = recoveryEpoch))
             }
         }
     }

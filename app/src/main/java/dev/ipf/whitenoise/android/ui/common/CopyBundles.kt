@@ -30,6 +30,8 @@ internal fun rememberGroupTitleCopy(): GroupTitleCopy =
         groupOfPeopleFormat = stringResource(R.string.group_title_people_count),
         unknownTitle = stringResource(R.string.unknown),
         soleMemberTitle = stringResource(R.string.just_you),
+        unnamedGroupTitle = stringResource(R.string.unnamed_group),
+        unavailableConversationTitle = stringResource(R.string.conversation_unavailable),
     )
 
 @Composable

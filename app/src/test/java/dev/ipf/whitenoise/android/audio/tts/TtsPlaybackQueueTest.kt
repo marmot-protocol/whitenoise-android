@@ -148,6 +148,24 @@ class TtsPlaybackQueueTest {
     }
 
     @Test
+    fun retainedPreparingStatePreservesTheFrozenPassageWhenSeekFails() {
+        val harness = TtsQueueHarness()
+        val queue = harness.queue
+        queue.start(listOf(mappedMessage("m1", "", "Word.")))
+        queue.onRangeStart(harness.utteranceId(0), 0, 4, 0)
+        val visibleWord = queue.state.value.passage
+
+        assertTrue(queue.deferForTargetSeek())
+        queue.onDone(harness.utteranceId(0))
+        assertTrue(queue.state.value is TtsState.Preparing)
+
+        queue.settleEdgeRequest(TtsEdgeSettlement.Retained)
+
+        assertTrue(queue.state.value is TtsState.Paused)
+        assertEquals(visibleWord, queue.state.value.passage)
+    }
+
+    @Test
     fun completionErrorStopAndRequeueClearWordRangeState() {
         val harness = TtsQueueHarness()
         val queue = harness.queue
