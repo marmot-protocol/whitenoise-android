@@ -143,6 +143,7 @@ internal fun legacyTextToSpeakableProjection(text: String): SpeakableTextProject
     return collector.build()
 }
 
+/** Projects native blocks, including disclosure headers and bodies, onto their renderer leaf paths. */
 private fun collectSpeakableBlock(
     block: MarkdownBlockFfi,
     collector: SpeakableCollector,
@@ -163,6 +164,10 @@ private fun collectSpeakableBlock(
             collectSpeakableBlocks(block.blocks, collector, mentionDisplayName, isGroupMember, depth + 1, "$path/q")
         is MarkdownBlockFfi.ListBlock ->
             collectSpeakableList(block, collector, mentionDisplayName, isGroupMember, depth + 1, path)
+        is MarkdownBlockFfi.Details -> {
+            collectSpeakableInlineSegment(block.summary, collector, mentionDisplayName, isGroupMember, "$path/summary")
+            collectSpeakableBlocks(block.body, collector, mentionDisplayName, isGroupMember, depth + 1, "$path/d")
+        }
         is MarkdownBlockFfi.Table ->
             collectSpeakableTable(block, collector, mentionDisplayName, isGroupMember, path)
         is MarkdownBlockFfi.MathBlock -> {

@@ -149,6 +149,38 @@ class NostrEventReferenceTest {
         )
     }
 
+    /** Typed disclosure summaries and bodies both retain their embedded event references. */
+    @Test
+    fun documentWalkFindsDetailsReferences() {
+        val summary = encode("note", List(32) { 1 })
+        val body = encode("note", List(32) { 2 })
+        val summaryEntity = MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NOTE, summary)
+        val bodyEntity = MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NOTE, body)
+        val document =
+            MarkdownDocumentFfi(
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Details(
+                            summary = listOf(MarkdownInlineFfi.NostrUri(summaryEntity)),
+                            open = false,
+                            body =
+                                listOf(
+                                    MarkdownBlockFfi.Paragraph(
+                                        listOf(MarkdownInlineFfi.NostrUri(bodyEntity)),
+                                    ),
+                                ),
+                            blankLinesBefore = byteArrayOf(),
+                        ),
+                    ),
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+            )
+        assertEquals(
+            listOf("event:${List(32) { 1 }.hex()}", "event:${List(32) { 2 }.hex()}"),
+            nostrEventReferences(document).map { it.reference.stableId },
+        )
+    }
+
     @Test
     fun documentWalkDoesNotScanCodeBlocks() {
         val nevent = encode("nevent", tlv(0, List(32) { 5 }))

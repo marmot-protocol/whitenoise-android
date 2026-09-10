@@ -125,10 +125,12 @@ object RecipientSearch {
                 val id = candidate.accountIdHex.normalized()
                 id.isNotEmpty() && id != active && id !in excluded && seen.add(id)
             }.map { candidate ->
-                // The follow list covers everyone, not just whoever the directory
-                // happened to return, so a followed local contact ranks and reads
-                // the same as a followed remote.
-                if (candidate.isFollowing || candidate.accountIdHex.normalized() !in followed) {
+                // Streamed rows carry the searcher's authoritative relationship.
+                // The separately loaded follow list only enriches local-only contacts.
+                if (candidate.accountIdHex.normalized() in discoveredById ||
+                    candidate.isFollowing ||
+                    candidate.accountIdHex.normalized() !in followed
+                ) {
                     candidate
                 } else {
                     candidate.copy(isFollowing = true)
@@ -157,12 +159,9 @@ object RecipientSearch {
             preMatchedAccountIdHexes = discovered.mapTo(HashSet()) { it.accountIdHex.normalized() },
         )
 
-    fun discoveredCandidates(
-        results: List<UserDirectorySearchResultFfi>,
-        followedAccountIds: Set<String>,
-    ): List<Candidate> {
-        val followed = followedAccountIds.mapTo(HashSet()) { it.normalized() }
-        return sortedUniqueResults(results, followed).map { result ->
+    /** Maps directory matches using the selected searcher's explicit direct-follow flag. */
+    fun discoveredCandidates(results: List<UserDirectorySearchResultFfi>): List<Candidate> =
+        sortedUniqueResults(results).map { result ->
             Candidate(
                 accountIdHex = result.accountIdHex.normalized(),
                 displayName =
@@ -172,20 +171,16 @@ object RecipientSearch {
                 npub = result.npub,
                 searchProfile = result.profile,
                 searchRadius = result.radius,
-                isFollowing = result.accountIdHex.normalized() in followed,
+                isFollowing = result.isFollowedBySearcher,
             )
         }
-    }
 
-    internal fun sortedUniqueResults(
-        results: List<UserDirectorySearchResultFfi>,
-        followedAccountIds: Set<String>,
-    ): List<UserDirectorySearchResultFfi> {
-        val followed = followedAccountIds.mapTo(HashSet()) { it.normalized() }
+    /** Orders unique current rows by explicit follow status, distance, and match quality. */
+    internal fun sortedUniqueResults(results: List<UserDirectorySearchResultFfi>): List<UserDirectorySearchResultFfi> {
         val seen = HashSet<String>()
         return results
             .sortedWith(
-                compareByDescending<UserDirectorySearchResultFfi> { it.accountIdHex.normalized() in followed }
+                compareByDescending<UserDirectorySearchResultFfi> { it.isFollowedBySearcher }
                     .thenBy { it.radius }
                     .thenByDescending { it.providerRank ?: Double.NEGATIVE_INFINITY }
                     .thenBy { matchQualityRank(it.matchQuality) }

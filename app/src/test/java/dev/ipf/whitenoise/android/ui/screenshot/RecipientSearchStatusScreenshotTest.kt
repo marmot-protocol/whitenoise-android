@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -17,12 +18,22 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.MatchQualityFfi
+import dev.ipf.marmotkit.MatchedFieldFfi
+import dev.ipf.marmotkit.SearchUpdateTriggerFfi
+import dev.ipf.marmotkit.UserDirectorySearchResultFfi
+import dev.ipf.marmotkit.UserProfileMetadataFfi
+import dev.ipf.marmotkit.UserSearchUpdateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.chats.AvatarScreenshotFixtures
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FOLLOWED_PERSON_BADGE_TEST_TAG
+import dev.ipf.whitenoise.android.ui.chats.newchat.RecipientUserSearchState
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
+import dev.ipf.whitenoise.android.ui.chats.newchat.aggregateRecipientSearchUpdates
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -69,6 +80,68 @@ class RecipientSearchStatusScreenshotTest {
         render(darkTheme = false, amoled = false, fontScale = 2f, width = 280)
         capture("recipient_follow_indicator_narrow_large_font.png")
     }
+
+    /** Cached matches render without follow badges, then one refreshed row gains its explicit badge. */
+    @Test
+    fun cachedProfileThenExplicitFollowReplacement() =
+        runTest {
+            val cached =
+                UserDirectorySearchResultFfi(
+                    accountIdHex = "a".repeat(64),
+                    npub = "npub1synthetic",
+                    radius = 1u,
+                    isFollowedBySearcher = false,
+                    matchedField = MatchedFieldFfi.DISPLAY_NAME,
+                    matchQuality = MatchQualityFfi.PREFIX,
+                    providerRank = null,
+                    profile = UserProfileMetadataFfi(null, "Cached Ada", null, null, null, null, null),
+                )
+            val refreshed =
+                cached.copy(
+                    isFollowedBySearcher = true,
+                    profile = cached.profile!!.copy(displayName = "Ada Lovelace"),
+                )
+            val updates =
+                ArrayDeque(
+                    listOf(
+                        UserSearchUpdateFfi(SearchUpdateTriggerFfi.CachedResultsFound, listOf(cached), emptyList(), 1u),
+                        UserSearchUpdateFfi(SearchUpdateTriggerFfi.SearchCompleted, emptyList(), listOf(refreshed), 1u),
+                    ),
+                )
+            val states = mutableListOf<RecipientUserSearchState>()
+            aggregateRecipientSearchUpdates({ updates.removeFirstOrNull() }, emptySet(), states::add)
+            val state = mutableStateOf(states.first())
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = false) {
+                    Surface {
+                        Column(Modifier.width(360.dp).testTag(ROOT_TAG)) {
+                            for (candidate in state.value.candidates) {
+                                ContactRow(
+                                    title = candidate.displayName,
+                                    subtitle =
+                                        context.getString(
+                                            if (candidate.isFollowing) {
+                                                R.string.user_search_you_follow
+                                            } else {
+                                                R.string.user_search_result
+                                            },
+                                        ),
+                                    avatarSeed = candidate.accountIdHex,
+                                    avatarUrl = null,
+                                    isFollowed = candidate.isFollowing,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            composeRule.onAllNodesWithTag(FOLLOWED_PERSON_BADGE_TEST_TAG, useUnmergedTree = true).assertCountEquals(0)
+            capture("recipient_cached_profile.png")
+            composeRule.runOnIdle { state.value = states.last() }
+            assertEquals(1, states.last().candidates.size)
+            composeRule.onAllNodesWithTag(FOLLOWED_PERSON_BADGE_TEST_TAG, useUnmergedTree = true).assertCountEquals(1)
+            capture("recipient_updated_profile_followed.png")
+        }
 
     /** Builds the deterministic followed/unfollowed fixture shared by all theme variants. */
     private fun render(

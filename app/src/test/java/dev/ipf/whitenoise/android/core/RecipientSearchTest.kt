@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.UserDirectorySearchResultFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.core.RecipientSearch.Candidate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -267,7 +268,6 @@ class RecipientSearchTest {
         val discovered =
             RecipientSearch.discoveredCandidates(
                 results = listOf(searchResult(hex, radius = 1u, quality = MatchQualityFfi.EXACT, profile = null)),
-                followedAccountIds = emptySet(),
             )
 
         val matches =
@@ -325,18 +325,19 @@ class RecipientSearchTest {
         assertEquals(RecipientSearch.Source.InDm, matches.first().source)
     }
 
+    /** The stream identifies follows even when a separate accountFollows read was unavailable. */
     @Test
-    fun discoveryFollowFlagIgnoresCasingOfTheFollowList() {
+    fun explicitDiscoveryFollowFlagWorksWithoutSeparateFollowList() {
         val bob = "b".repeat(64)
         val candidates =
             RecipientSearch.discoveredCandidates(
-                results = listOf(searchResult(bob, radius = 1u, quality = MatchQualityFfi.EXACT)),
-                followedAccountIds = setOf(bob.uppercase()),
+                results = listOf(searchResult(bob, radius = 255u, quality = MatchQualityFfi.EXACT, followed = true)),
             )
 
         assertTrue(candidates.single().isFollowing)
     }
 
+    /** Explicit follows outrank closer non-follows while duplicate input retains its best match. */
     @Test
     fun discoveryResultsDeduplicateBestRadiusAndPrioritizeFollows() {
         val alice = "a".repeat(64)
@@ -347,9 +348,8 @@ class RecipientSearchTest {
                     listOf(
                         searchResult(alice, radius = 2u, quality = MatchQualityFfi.PREFIX),
                         searchResult(alice.uppercase(), radius = 1u, quality = MatchQualityFfi.EXACT),
-                        searchResult(bob, radius = 2u, quality = MatchQualityFfi.CONTAINS),
+                        searchResult(bob, radius = 2u, quality = MatchQualityFfi.CONTAINS, followed = true),
                     ),
-                followedAccountIds = setOf(bob),
             )
 
         assertEquals(listOf(bob, alice), candidates.map { it.accountIdHex })
@@ -357,15 +357,43 @@ class RecipientSearchTest {
         assertTrue(candidates.first().isFollowing)
     }
 
+    /** Shared-group radius one is not proof of a direct follow. */
+    @Test
+    fun radiusOneDoesNotImplyFollowed() {
+        val result = searchResult("a".repeat(64), radius = 1u, quality = MatchQualityFfi.EXACT)
+        assertFalse(RecipientSearch.discoveredCandidates(listOf(result)).single().isFollowing)
+    }
+
+    /** A streamed relationship correction wins over the earlier local follow-list snapshot. */
+    @Test
+    fun streamedUnfollowOverridesStaleLocalFollowList() {
+        val alice = "a".repeat(64)
+        val discovered =
+            RecipientSearch.discoveredCandidates(
+                listOf(searchResult(alice.uppercase(), radius = 1u, quality = MatchQualityFfi.EXACT)),
+            )
+        val merged =
+            RecipientSearch.merge(
+                known = listOf(candidate(alice, "Alice").copy(isFollowing = true)),
+                discovered = discovered,
+                activeAccountIdHex = null,
+                followedAccountIds = setOf(alice),
+            )
+        assertFalse(merged.single().isFollowing)
+    }
+
+    /** Builds directory matches whose social distance and direct-follow state vary independently. */
     private fun searchResult(
         hex: String,
         radius: UByte,
         quality: MatchQualityFfi,
         profile: UserProfileMetadataFfi? = profile(displayName = "Person"),
+        followed: Boolean = false,
     ) = UserDirectorySearchResultFfi(
         accountIdHex = hex,
         npub = "npub1${hex.lowercase()}",
         radius = radius,
+        isFollowedBySearcher = followed,
         matchedField = MatchedFieldFfi.DISPLAY_NAME,
         matchQuality = quality,
         providerRank = null,
