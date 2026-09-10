@@ -1650,6 +1650,7 @@
     <string name="dictation_no_speech">Konuşma algılanmadı</string>
     <string name="dictation_network_error">Konuşma hizmeti bağlantı kuramadı</string>
     <string name="dictation_recognizer_busy">Konuşma hizmeti meşgul</string>
+    <string name="dictation_audio_buffer_full">Konuşma hizmeti yetişemediği için dikte durduruldu</string>
     <string name="dictation_timed_out">Konuşma tanıma zaman aşımına uğradı</string>
     <string name="dictation_failed">Konuşma metne dönüştürülemedi</string>
     <string name="dictation_review_required">Taslak değişti — dikte edilen metni gözden geçir</string>

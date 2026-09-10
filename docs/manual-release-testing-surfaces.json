@@ -1574,6 +1574,14 @@
         ]
       },
       {
+        "surface": "ConversationDictationAudioBufferFull",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_audio_buffer_full",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
         "surface": "ConversationDictationCompactActions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
         "anchor": "fun ConversationDictationCompactActions(",
@@ -7645,6 +7653,22 @@
         "test_ids": [
           "DIC-002",
           "DIC-003"
+        ]
+      },
+      {
+        "surface": "Long dictation capture, stop, and caller-audio drain",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun sealAndDrainCallerAudio(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Dictation automatic completion observes captured speech and drains the tail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun finishAfterCallerAudioSilence(",
+        "test_ids": [
+          "DIC-002"
         ]
       },
       {

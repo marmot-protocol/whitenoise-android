@@ -1652,6 +1652,7 @@
     <string name="dictation_no_speech">Aucune parole n’a été reconnue</string>
     <string name="dictation_network_error">Le service vocal n’a pas pu se connecter</string>
     <string name="dictation_recognizer_busy">Le service vocal est occupé</string>
+    <string name="dictation_audio_buffer_full">La dictée s’est arrêtée car le service vocal ne parvenait pas à suivre</string>
     <string name="dictation_timed_out">Le délai de reconnaissance vocale a expiré</string>
     <string name="dictation_failed">Impossible de transcrire la parole</string>
     <string name="dictation_review_required">Brouillon modifié — vérifiez le texte dicté</string>

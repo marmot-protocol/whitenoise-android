@@ -1347,6 +1347,7 @@
     <string name="dictation_no_speech">No speech was recognized</string>
     <string name="dictation_network_error">Speech service couldn’t connect</string>
     <string name="dictation_recognizer_busy">Speech service is busy</string>
+    <string name="dictation_audio_buffer_full">Dictation stopped because the speech service fell behind</string>
     <string name="dictation_timed_out">Speech recognition timed out</string>
     <string name="dictation_failed">Couldn’t transcribe speech</string>
     <string name="dictation_review_required">Draft changed — review dictated text</string>
