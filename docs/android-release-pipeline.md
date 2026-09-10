@@ -142,7 +142,7 @@ The production workflow checks both keystore certificates against the pinned
 fingerprints before compiling. A mismatch reports only public certificate
 fingerprints; passwords remain environment inputs. The finished APK and AAB
 still undergo their separate signature checks before artifact upload. APK verification
-recognizes numbered signers and the SDK-range signers emitted for v3.1 signatures;
+recognizes numbered, scheme-prefixed, and SDK-range signer labels;
 every reported APK signing certificate must match the pinned identity. Source
 stamp certificates do not count as APK signing certificates.
 
