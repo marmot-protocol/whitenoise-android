@@ -120,15 +120,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Restores dependencies and the local task-output cache across runs
-      # (master and same-repository PR writes; forks read only). Invocations must
-      # also use --build-cache; setup-gradle does not enable task-output caching.
+      # Reuse cached dependencies and task outputs without publishing another
+      # job-specific Gradle home. The Play test leg is the sole cache writer.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
-          # Same-repository PR iterations can reuse their own ref-scoped outputs.
-          # Fork jobs retain the default read-only behavior.
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          cache-read-only: true
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -245,15 +242,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Restores dependencies and the local task-output cache across runs
-      # (master and same-repository PR writes; forks read only). Invocations must
-      # also use --build-cache; setup-gradle does not enable task-output caching.
+      # Reuse cached dependencies and task outputs without publishing another
+      # job-specific Gradle home. The Play test leg is the sole cache writer.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
-          # Same-repository PR iterations can reuse their own ref-scoped outputs.
-          # Fork jobs retain the default read-only behavior.
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          cache-read-only: true
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -327,15 +321,16 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Restores dependencies and the local task-output cache across runs
-      # (master and same-repository PR writes; forks read only). Invocations must
-      # also use --build-cache; setup-gradle does not enable task-output caching.
+      # Share cached dependencies and task outputs, but publish Gradle state
+      # from only the Play leg to avoid multiplying job/matrix cache entries.
+      # Fork PRs remain read-only, including their Play leg.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
-          # Same-repository PR iterations can reuse their own ref-scoped outputs.
-          # Fork jobs retain the default read-only behavior.
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          cache-read-only: >-
+            ${{ matrix.flavor != 'Play' ||
+                (github.event_name == 'pull_request' &&
+                 github.event.pull_request.head.repo.full_name != github.repository) }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit

@@ -85,7 +85,11 @@ Coverage artifacts are `kover-coverage-report-Zapstore` and
 `android-ci-reports-<job>` and `android-ci-gradle-profiles-<job>`, where `<job>` is
 `build-contracts`, `static-analysis`, `Zapstore`, or `Play`. Separate runners
 reduce the serial critical path but repeat some setup/compilation; compare both
-wall time and summed job durations when measuring CI performance.
+wall time and summed job durations when measuring CI performance. Only the Play
+test job writes Gradle cache state on master pushes and same-repository PRs;
+build contracts, static analysis, Zapstore tests, and all fork PR jobs restore
+caches read-only. This avoids publishing a separate Gradle cache state from
+every parallel job.
 
 Two security workflows run separately from the main Gradle validation so their
 permissions and results stay explicit:
