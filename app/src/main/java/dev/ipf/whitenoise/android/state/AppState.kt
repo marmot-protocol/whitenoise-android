@@ -5155,8 +5155,7 @@ class WhiteNoiseAppState private constructor(
             // Shortcut cleanup suspends: reject supersession/deletion again before publishing seeds.
             if (!activationAllowed()) return false
             val currentStartupProfiles = startupSeeds(startupProfile)
-            // Clear and publish without suspending, so a rejected activation retains the current profile.
-            // Account-keyed disk media survives ordinary switches.
+            // Publish without suspension to retain profiles on rejection; account-keyed disk media survives switches.
             if (switchingAccounts) {
                 clearInMemoryMediaCaches()
                 clearCrossAccountCaches()
@@ -5185,7 +5184,8 @@ class WhiteNoiseAppState private constructor(
         activationRuntimeGeneration: Int,
     ) {
         val isCurrent = {
-            runtimeGeneration == activationRuntimeGeneration && isCurrentPostActivationAccountSwitch(label, requestGeneration)
+            runtimeGeneration == activationRuntimeGeneration &&
+                isCurrentPostActivationAccountSwitch(label, requestGeneration)
         }
         if (!isCurrent()) return
         accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
