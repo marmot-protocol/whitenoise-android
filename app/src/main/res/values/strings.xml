@@ -806,8 +806,6 @@
     <string name="remove_relay">Remove relay</string>
     <string name="add_relay">Add relay</string>
     <string name="error_invalid_relay_url">Enter a valid secure relay URL beginning with wss://.</string>
-    <string name="error_external_relay_not_supported">Only White Noise-managed relays are supported in this release.</string>
-    <string name="unsupported_relays_cleanup_notice">External relays imported from another app aren’t supported in this release. Editing this list removes all unsupported relays.</string>
     <string name="nip_65">Where I post</string>
     <string name="inbox">Where I receive</string>
     <string name="relay_posting_help">Others fetch your key from these relays to add you to groups.</string>
@@ -1349,6 +1347,7 @@
     <string name="dictation_no_speech">No speech was recognized</string>
     <string name="dictation_network_error">Speech service couldn’t connect</string>
     <string name="dictation_recognizer_busy">Speech service is busy</string>
+    <string name="dictation_audio_buffer_full">Dictation stopped because the speech service fell behind</string>
     <string name="dictation_timed_out">Speech recognition timed out</string>
     <string name="dictation_failed">Couldn’t transcribe speech</string>
     <string name="dictation_review_required">Draft changed — review dictated text</string>

@@ -592,8 +592,6 @@
     <string name="remove_relay">Удалить реле</string>
     <string name="add_relay">Добавить Реле</string>
     <string name="error_invalid_relay_url">Введите допустимый безопасный URL ретранслятора, начинающийся с wss://.</string>
-    <string name="error_external_relay_not_supported">В этой версии поддерживаются только ретрансляторы, управляемые White Noise.</string>
-    <string name="unsupported_relays_cleanup_notice">Внешние ретрансляторы, импортированные из другого приложения, не поддерживаются в этой версии. При изменении списка все неподдерживаемые ретрансляторы будут удалены.</string>
     <string name="nip_65">Куда я публикую</string>
     <string name="inbox">Откуда я получаю</string>
     <string name="relay_posting_help">Другие получают ваш ключ с этих реле, чтобы добавить вас в группы.</string>
@@ -1716,6 +1714,7 @@
     <string name="dictation_no_speech">Речь не распознана</string>
     <string name="dictation_network_error">Не удалось подключиться к службе распознавания речи</string>
     <string name="dictation_recognizer_busy">Служба распознавания речи занята</string>
+    <string name="dictation_audio_buffer_full">Диктовка остановлена, потому что сервис распознавания речи не успевал обрабатывать звук</string>
     <string name="dictation_timed_out">Время ожидания распознавания речи истекло</string>
     <string name="dictation_failed">Не удалось расшифровать речь</string>
     <string name="dictation_review_required">Черновик изменён — проверьте продиктованный текст</string>

@@ -549,8 +549,6 @@
     <string name="remove_relay">移除中繼站</string>
     <string name="add_relay">新增中繼站</string>
     <string name="error_invalid_relay_url">請輸入以 wss:// 開頭的有效安全中繼 URL。</string>
-    <string name="error_external_relay_not_supported">此版本僅支援由 White Noise 管理的中繼站。</string>
-    <string name="unsupported_relays_cleanup_notice">此版本不支援從其他應用程式匯入的外部中繼站。編輯此清單會移除所有不支援的中繼站。</string>
     <string name="nip_65">我發布到哪裡</string>
     <string name="inbox">我在哪裡接收</string>
     <string name="relay_posting_help">其他人從這些中繼取得你的金鑰，以便將你加入群組。</string>
@@ -1627,6 +1625,7 @@
     <string name="dictation_no_speech">未辨識到語音</string>
     <string name="dictation_network_error">語音服務無法連線</string>
     <string name="dictation_recognizer_busy">語音服務忙碌中</string>
+    <string name="dictation_audio_buffer_full">語音服務處理速度不足，聽寫已停止</string>
     <string name="dictation_timed_out">語音辨識逾時</string>
     <string name="dictation_failed">無法轉寫語音</string>
     <string name="dictation_review_required">草稿已變更 — 請檢查聽寫文字</string>

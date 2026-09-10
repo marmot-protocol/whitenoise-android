@@ -1346,6 +1346,40 @@ class ConversationDictationControllerTest {
         }
     }
 
+    /** Buffered live speech must not be mistaken for provider silence between 30-second chunks. */
+    @Test
+    fun bufferedSpeechDefersAutomaticFinishUntilCaptureIsQuietAndTailIsRecognized() {
+        val platform =
+            FakePlatform().apply {
+                pendingCallerAudio = true
+                capturedSilenceMillis = 0L
+            }
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                platform = platform,
+                finishAfterSilenceMillis = { 3_000L },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        platform.listener.onResult("first chunk")
+        fixture.scheduler.runDelay(250L)
+        platform.listener.onReady()
+
+        fixture.scheduler.runDelay(3_000L)
+
+        assertEquals(0, fixture.writes)
+        assertTrue(fixture.controller.state is ConversationDictationState.Listening)
+        platform.capturedSilenceMillis = 3_000L
+        fixture.scheduler.runDelay(3_000L)
+        assertTrue(fixture.controller.state is ConversationDictationState.Processing)
+        assertEquals(0, fixture.writes)
+        platform.pendingCallerAudio = false
+        platform.listener.onResult("last chunk")
+
+        assertEquals("first chunk last chunk", fixture.drafts.getValue(key()).text)
+        assertEquals(1, fixture.writes)
+    }
+
     /** Verifies segment spacing, punctuation attachment, and repeated speech across generations. */
     @Test
     fun segmentAccumulatorPreservesPunctuationAndRepeatedSpeechAcrossGenerations() {
@@ -1387,6 +1421,133 @@ class ConversationDictationControllerTest {
         fixture.controller.stop()
 
         assertEquals("Hello", fixture.drafts.getValue(key()).text)
+    }
+
+    /** Stopping capture drains every sealed caller-audio chunk before committing the transcript. */
+    @Test
+    fun stopDrainsPendingCallerAudioChunksBeforeFinalizing() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        fixture.controller.stop()
+        fixture.platform.listener.onResult("first")
+
+        assertEquals(2, fixture.platform.sessions.size)
+        val draftText = fixture.drafts.getValue(key()).text
+        assertTrue(draftText.isEmpty())
+        val firstSession = fixture.platform.sessions.first()
+        assertEquals(1, firstSession.acknowledgedCallerAudio)
+
+        fixture.platform.pendingCallerAudio = false
+        fixture.platform.listener.onResult("second")
+
+        assertEquals("first second", fixture.drafts.getValue(key()).text)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        val lastSession = fixture.platform.sessions.last()
+        assertEquals(1, lastSession.acknowledgedCallerAudio)
+    }
+
+    /** Captured tail audio survives a stop request that lands between provider generations. */
+    @Test
+    fun stopDuringRestartGapSealsAndDrainsCallerAudioTail() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        fixture.platform.listener.onResult("first")
+        fixture.controller.stop()
+
+        assertEquals(2, fixture.platform.sessions.size)
+        fixture.platform.pendingCallerAudio = false
+        fixture.platform.listener.onResult("tail")
+        assertEquals("first tail", fixture.drafts.getValue(key()).text)
+    }
+
+    /** A stop before the next provider's speech callback still drains its captured caller-audio chunk. */
+    @Test
+    fun stopBeforeSpeechCallbackDoesNotDiscardCallerAudioTail() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("first")
+        fixture.scheduler.runDelay(250L)
+
+        fixture.controller.stop()
+
+        assertEquals(
+            0,
+            fixture.platform.sessions
+                .last()
+                .cancelCalls,
+        )
+        fixture.platform.pendingCallerAudio = false
+        fixture.platform.listener.onResult("tail")
+        assertEquals("first tail", fixture.drafts.getValue(key()).text)
+    }
+
+    /** A stuck capture close fails within the drain bound and its late callback cannot restart recognition. */
+    @Test
+    fun stuckCallerAudioCloseTimesOutAndFencesItsLateCallback() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.platform.deferCallerAudioFinish = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("first")
+
+        fixture.controller.stop()
+        fixture.scheduler.runThrough(90_000L)
+
+        val review = fixture.controller.state as ConversationDictationState.ReviewRequired
+        assertEquals("first", review.transcript)
+        val sessionsBeforeLateClose = fixture.platform.sessions.size
+        checkNotNull(fixture.platform.callerAudioFinishCallback).invoke()
+        assertEquals(sessionsBeforeLateClose, fixture.platform.sessions.size)
+    }
+
+    /** The total drain bound survives a ready callback, both during active capture and restart gaps. */
+    @Test
+    fun drainWatchdogSurvivesReplacementRecognizerReady() {
+        listOf(false, true).forEach { stopInRestartGap ->
+            var microphoneAcquisitions = 0
+            val fixture =
+                fixture(
+                    draft = TextFieldValue(""),
+                    tryAcquireMicrophone = {
+                        microphoneAcquisitions += 1
+                        true
+                    },
+                )
+            fixture.platform.pendingCallerAudio = true
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onReady()
+            if (stopInRestartGap) fixture.platform.listener.onResult("first")
+            fixture.controller.stop()
+            if (!stopInRestartGap) fixture.platform.listener.onResult("first")
+            fixture.platform.listener.onReady()
+
+            fixture.scheduler.runThrough(90_000L)
+
+            val review = fixture.controller.state as ConversationDictationState.ReviewRequired
+            assertEquals("first", review.transcript)
+            assertEquals(0, fixture.writes)
+            assertEquals(1, microphoneAcquisitions)
+        }
+    }
+
+    /** A one-hour capture remains admitted, while the 65-minute safety bound still fails closed. */
+    @Test
+    fun oneHourSessionRemainsActiveUntilTheSixtyFiveMinuteDeadline() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onReady()
+
+        fixture.scheduler.runThrough(60L * 60L * 1_000L)
+
+        assertTrue(fixture.controller.state is ConversationDictationState.Listening)
+        fixture.scheduler.runThrough(5L * 60L * 1_000L)
+        assertTrue(fixture.controller.state is ConversationDictationState.Processing)
+        assertTrue(fixture.platform.session.stopped)
     }
 
     /** Verifies that recognizer churn retains one microphone lease and releases it only at logical teardown. */
@@ -2576,6 +2737,20 @@ class ConversationDictationControllerTest {
         assertTrue(platform.session.started)
     }
 
+    /** A typed capture overflow must destroy the recognizer and surface its cause in the visible session. */
+    @Test
+    fun callerAudioBufferOverflowFailsTheVisibleSession() {
+        val platform = FakePlatform(callerAudio = ConversationDictationCallerAudioRequirement.Supported)
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        platform.listener.onError(ConversationDictationFailure.AudioBufferFull)
+
+        val failed = fixture.controller.state as ConversationDictationState.Failed
+        assertEquals(ConversationDictationFailure.AudioBufferFull, failed.reason)
+        assertTrue(platform.session.destroyed)
+    }
+
     @Test
     fun aProviderThatCannotUseCallerAudioIsRoutedToItsOwnUiBeforeAnythingStarts() {
         val platform =
@@ -2914,6 +3089,10 @@ class ConversationDictationControllerTest {
             private set
         lateinit var callerAudioProbeCallback: (ConversationDictationCallerAudioRequirement) -> Unit
             private set
+        var pendingCallerAudio = false
+        var capturedSilenceMillis: Long? = null
+        var deferCallerAudioFinish = false
+        var callerAudioFinishCallback: (() -> Unit)? = null
 
         /** Simulates a platform that cannot even start the question, such as a recognizer refusal. */
         var callerAudioProbeFailure: RuntimeException? = null
@@ -2950,6 +3129,23 @@ class ConversationDictationControllerTest {
 
         override fun callerAudioRequirement(): ConversationDictationCallerAudioRequirement = callerAudio
 
+        /** Lets lifecycle tests retain caller PCM independently of recognizer readiness. */
+        override fun callerAudioHasPending(): Boolean = pendingCallerAudio
+
+        /** Supplies capture activity independently of provider callbacks. */
+        override fun callerAudioSilenceMillis(): Long? = capturedSilenceMillis
+
+        /** Simulates recorder closure separately from draining the retained caller-audio queue. */
+        override fun finishCallerAudioCapture(onClosed: () -> Unit): Boolean {
+            if (!pendingCallerAudio) return false
+            if (deferCallerAudioFinish) {
+                callerAudioFinishCallback = onClosed
+            } else {
+                onClosed()
+            }
+            return true
+        }
+
         override fun probeCallerAudioSupport(callback: (ConversationDictationCallerAudioRequirement) -> Unit): ConversationDictationTimeoutHandle {
             callerAudioProbes += 1
             callerAudioProbeFailure?.let { throw it }
@@ -2979,6 +3175,7 @@ class ConversationDictationControllerTest {
         var destroyed = false
         var cancelCalls = 0
         var destroyCalls = 0
+        var acknowledgedCallerAudio = 0
         private val captureFinished = mutableListOf<() -> Unit>()
         private var captureClosed = false
         private var deferredProviderError: ConversationDictationFailure? = null
@@ -3049,6 +3246,12 @@ class ConversationDictationControllerTest {
         override fun destroy(onAudioCaptureFinished: () -> Unit) {
             destroy()
             registerCaptureFinished(onAudioCaptureFinished)
+        }
+
+        /** Tracks final-result acknowledgments so tests can verify serial chunk ownership. */
+        override fun acknowledgeCallerAudio(): Boolean {
+            acknowledgedCallerAudio += 1
+            return true
         }
     }
 

@@ -1574,6 +1574,14 @@
         ]
       },
       {
+        "surface": "ConversationDictationAudioBufferFull",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_audio_buffer_full",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
         "surface": "ConversationDictationCompactActions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
         "anchor": "fun ConversationDictationCompactActions(",
@@ -5664,6 +5672,39 @@
         ]
       },
       {
+        "surface": "setting:error_invalid_relay_url",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.error_invalid_relay_url",
+        "test_ids": [
+          "SYS-002"
+        ]
+      },
+      {
+        "surface": "setting:error_remove_invalid_relay_urls_first",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.error_remove_invalid_relay_urls_first",
+        "test_ids": [
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "setting:toast_relay_list_updated",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_relay_list_updated",
+        "test_ids": [
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "setting:toast_relay_update_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_relay_update_failed",
+        "test_ids": [
+          "SYS-003"
+        ]
+      },
+      {
         "surface": "TTS start failure fallback",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateTtsVoiceMedia.kt",
         "anchor": "R.string.tts_bar_error",
@@ -7830,6 +7871,22 @@
         "test_ids": [
           "DIC-002",
           "DIC-003"
+        ]
+      },
+      {
+        "surface": "Long dictation capture, stop, and caller-audio drain",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun sealAndDrainCallerAudio(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Dictation automatic completion observes captured speech and drains the tail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun finishAfterCallerAudioSilence(",
+        "test_ids": [
+          "DIC-002"
         ]
       },
       {

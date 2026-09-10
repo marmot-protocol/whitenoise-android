@@ -173,30 +173,35 @@ class RelayListSettingsContentTest {
     }
 
     @Test
-    fun releaseExplainsWhyExternalRelayCannotBeAdded() {
+    fun externalRelayCanBeAdded() {
         val pendingUrl = "wss://external.example.com"
 
         render(
             lists = relayLists(nip65 = listOf("wss://relay.us.whitenoise.chat"), inbox = emptyList()),
             pendingUrl = pendingUrl,
-            allowExternalRelayHosts = false,
         )
 
-        composeRule.onNodeWithText(app.getString(R.string.error_external_relay_not_supported)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(app.getString(R.string.add_relay)).assertIsNotEnabled()
+        composeRule.onNodeWithText(pendingUrl).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(app.getString(R.string.add_relay)).assertIsEnabled()
     }
 
     @Test
-    fun releaseAllowsCleanupWhenOnlyImportedExternalRelayExists() {
+    fun importedExternalRelayRemainsAnOrdinaryListEntry() {
         val externalRelay = "wss://external.example.com"
 
         render(
-            lists = relayLists(nip65 = listOf(externalRelay), inbox = emptyList()),
-            allowExternalRelayHosts = false,
+            lists =
+                relayLists(
+                    nip65 = listOf(externalRelay, "wss://relay.us.whitenoise.chat"),
+                    inbox = emptyList(),
+                ),
         )
 
-        composeRule.onNodeWithText(app.getString(R.string.unsupported_relays_cleanup_notice)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(app.getString(R.string.remove_relay)).assertIsEnabled()
+        composeRule.onNodeWithText(externalRelay).assertIsDisplayed()
+        val removeActions = composeRule.onAllNodesWithContentDescription(app.getString(R.string.remove_relay))
+        removeActions.assertCountEquals(2)
+        removeActions[0].assertIsEnabled()
+        removeActions[1].assertIsEnabled()
     }
 
     private fun render(
@@ -204,7 +209,6 @@ class RelayListSettingsContentTest {
         canEdit: Boolean = true,
         pendingUrl: String = "",
         mutation: RelayMutation? = null,
-        allowExternalRelayHosts: Boolean = true,
         onAddRelay: (RelayListKind, String, () -> Unit) -> Unit = { _, _, _ -> },
         onRemoveRelay: (RelayListKind, String) -> Unit = { _, _ -> },
     ) {
@@ -222,7 +226,6 @@ class RelayListSettingsContentTest {
                             onPendingUrlChange = { currentPendingUrl = it },
                             mutation = mutation,
                             canEdit = canEdit,
-                            allowExternalRelayHosts = allowExternalRelayHosts,
                             onAddRelay = onAddRelay,
                             onRemoveRelay = onRemoveRelay,
                         )

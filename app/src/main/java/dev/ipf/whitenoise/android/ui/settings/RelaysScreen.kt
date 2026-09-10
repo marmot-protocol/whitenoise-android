@@ -43,7 +43,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.MissingRelayListKindFfi
-import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.RelayListKind
 import dev.ipf.whitenoise.android.state.RelayUrlValidationResult
@@ -181,7 +180,6 @@ internal fun RelayListSettingsContent(
     onPendingUrlChange: (String) -> Unit,
     mutation: RelayMutation?,
     canEdit: Boolean,
-    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
     onAddRelay: (RelayListKind, String, onSuccess: () -> Unit) -> Unit,
     onRemoveRelay: (RelayListKind, String) -> Unit,
 ) {
@@ -213,7 +211,6 @@ internal fun RelayListSettingsContent(
         mutation = mutation,
         canEdit = canEdit,
         busy = busy,
-        allowExternalRelayHosts = allowExternalRelayHosts,
         onRemoveRelay = onRemoveRelay,
     )
     RelayAddEditor(
@@ -224,7 +221,6 @@ internal fun RelayListSettingsContent(
         mutation = mutation,
         canEdit = canEdit,
         busy = busy,
-        allowExternalRelayHosts = allowExternalRelayHosts,
         onAddRelay = onAddRelay,
     )
 }
@@ -237,22 +233,10 @@ private fun RelayRows(
     mutation: RelayMutation?,
     canEdit: Boolean,
     busy: Boolean,
-    allowExternalRelayHosts: Boolean,
     onRemoveRelay: (RelayListKind, String) -> Unit,
 ) {
     if (currentRelays.isEmpty()) {
         Text(stringResource(R.string.no_relays), color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    if (
-        currentRelays.any {
-            relayUrlValidationResult(it, allowExternalRelayHosts) != RelayUrlValidationResult.Acceptable
-        }
-    ) {
-        Text(
-            text = stringResource(R.string.unsupported_relays_cleanup_notice),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
-        )
     }
     currentRelays.forEach { relay ->
         val removing = mutation == RelayMutation.Removing(selectedKind, relay)
@@ -264,7 +248,7 @@ private fun RelayRows(
                 enabled =
                     canEdit &&
                         !busy &&
-                        canRemoveRelay(currentRelays, relay, allowExternalRelayHosts),
+                        canRemoveRelay(currentRelays, relay),
             ) {
                 if (removing) {
                     CircularProgressIndicator(
@@ -292,14 +276,13 @@ private fun RelayAddEditor(
     mutation: RelayMutation?,
     canEdit: Boolean,
     busy: Boolean,
-    allowExternalRelayHosts: Boolean,
     onAddRelay: (RelayListKind, String, onSuccess: () -> Unit) -> Unit,
 ) {
     val trimmedPendingUrl = pendingUrl.trim()
     val pendingValidation =
         trimmedPendingUrl
             .takeIf { it.isNotEmpty() }
-            ?.let { relayUrlValidationResult(it, allowExternalRelayHosts) }
+            ?.let(::relayUrlValidationResult)
     val inputErrorRes = pendingRelayErrorRes(pendingValidation)
     val adding = mutation is RelayMutation.Adding && mutation.kind == selectedKind
     val addingDescription = stringResource(R.string.add_relay)
@@ -351,7 +334,6 @@ private fun RelayAddEditor(
 
 private fun pendingRelayErrorRes(validation: RelayUrlValidationResult?): Int? =
     when (validation) {
-        RelayUrlValidationResult.UnsupportedHost -> R.string.error_external_relay_not_supported
         RelayUrlValidationResult.Invalid -> R.string.error_invalid_relay_url
         RelayUrlValidationResult.Acceptable,
         null,

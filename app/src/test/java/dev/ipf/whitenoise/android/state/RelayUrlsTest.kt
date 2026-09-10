@@ -1,7 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.RelayEndpointClassificationFfi
+import dev.ipf.marmotkit.RelayEndpointPolicyFfi
 import dev.ipf.whitenoise.android.core.MarmotClient
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -55,76 +56,61 @@ class RelayUrlsTest {
     }
 
     @Test
-    fun releaseRelayUrlValidationAllowsOnlyBootstrapHosts() {
-        assertTrue(
-            isAcceptableRelayUrl("wss://relay.us.whitenoise.chat", allowExternalRelayHosts = false),
-        )
-        assertTrue(
-            isAcceptableRelayUrl("wss://relay.eu.whitenoise.chat", allowExternalRelayHosts = false),
-        )
-        assertFalse(
-            isAcceptableRelayUrl("wss://relay.example", allowExternalRelayHosts = false),
-        )
-        assertEquals(
-            emptyList<String>(),
-            normalizeRelayUrls(listOf("wss://relay.example"), allowExternalRelayHosts = false),
-        )
-    }
-
-    @Test
-    fun debugRelayUrlValidationKeepsSelfHostedRelaysAvailable() {
-        assertTrue(
-            isAcceptableRelayUrl("wss://relay.example", allowExternalRelayHosts = true),
-        )
+    fun relayUrlValidationAllowsWhiteNoiseAndExternalPublicHosts() {
+        assertTrue(isAcceptableRelayUrl("wss://relay.us.whitenoise.chat"))
+        assertTrue(isAcceptableRelayUrl("wss://relay.eu.whitenoise.chat"))
+        assertTrue(isAcceptableRelayUrl("wss://relay.example"))
         assertEquals(
             listOf("wss://relay.example"),
-            normalizeRelayUrls(listOf("wss://relay.example"), allowExternalRelayHosts = true),
+            normalizeRelayUrls(listOf("wss://relay.example")),
         )
     }
 
     @Test
-    fun releaseDistinguishesUnsupportedExternalHostFromInvalidUrl() {
-        assertEquals(
-            RelayUrlValidationResult.UnsupportedHost,
-            relayUrlValidationResult("wss://relay.example", allowExternalRelayHosts = false),
-        )
+    fun relayUrlValidationDistinguishesValidExternalHostFromInvalidUrl() {
         assertEquals(
             RelayUrlValidationResult.Invalid,
-            relayUrlValidationResult("https://relay.example", allowExternalRelayHosts = false),
+            relayUrlValidationResult("https://relay.example"),
         )
         assertEquals(
             RelayUrlValidationResult.Acceptable,
-            relayUrlValidationResult("wss://relay.us.whitenoise.chat", allowExternalRelayHosts = false),
+            relayUrlValidationResult("wss://relay.example"),
         )
     }
 
     @Test
-    fun releaseAdditionCleansImportedExternalRelaysBeforePublishing() {
+    fun additionPreservesImportedExternalRelaysWhenAppendingWhiteNoiseRelay() {
         assertEquals(
             RelayListEditPlan(
-                relays = listOf("wss://relay.us.whitenoise.chat"),
+                relays = listOf("wss://external.example", "wss://relay.us.whitenoise.chat"),
+                requiredRelay = "wss://relay.us.whitenoise.chat",
             ),
             relayListAfterAddition(
                 currentRelays = listOf("wss://external.example"),
                 relayToAdd = "wss://relay.us.whitenoise.chat",
-                allowExternalRelayHosts = false,
-            ),
-        )
-        assertEquals(
-            null,
-            relayListAfterAddition(
-                currentRelays = listOf("wss://relay.us.whitenoise.chat"),
-                relayToAdd = "wss://external.example",
-                allowExternalRelayHosts = false,
             ),
         )
     }
 
     @Test
-    fun releaseRemovalCleansAllImportedExternalRelays() {
+    fun additionAcceptsExternalRelayAndPreservesWhiteNoiseRelay() {
         assertEquals(
             RelayListEditPlan(
-                relays = listOf("wss://relay.us.whitenoise.chat"),
+                relays = listOf("wss://relay.us.whitenoise.chat", "wss://external.example"),
+                requiredRelay = "wss://external.example",
+            ),
+            relayListAfterAddition(
+                currentRelays = listOf("wss://relay.us.whitenoise.chat"),
+                relayToAdd = "wss://external.example",
+            ),
+        )
+    }
+
+    @Test
+    fun removalPreservesUnselectedImportedExternalRelays() {
+        assertEquals(
+            RelayListEditPlan(
+                relays = listOf("wss://relay.us.whitenoise.chat", "wss://two.external.example"),
             ),
             relayListAfterRemoval(
                 currentRelays =
@@ -134,27 +120,12 @@ class RelayUrlsTest {
                         "wss://two.external.example",
                     ),
                 relayToRemove = "wss://one.external.example",
-                allowExternalRelayHosts = false,
             ),
         )
     }
 
     @Test
-    fun releaseRemovalFallsBackToWhiteNoiseRelaysWhenOnlyExternalRelaysRemain() {
-        assertEquals(
-            RelayListEditPlan(
-                relays = MarmotClient.bootstrapRelays,
-            ),
-            relayListAfterRemoval(
-                currentRelays = listOf("wss://one.external.example", "wss://two.external.example"),
-                relayToRemove = "wss://one.external.example",
-                allowExternalRelayHosts = false,
-            ),
-        )
-    }
-
-    @Test
-    fun debugRemovalKeepsOtherExternalRelays() {
+    fun removalKeepsRemainingExternalRelayWithoutReplacingItWithDefaults() {
         assertEquals(
             RelayListEditPlan(
                 relays = listOf("wss://two.external.example"),
@@ -162,27 +133,87 @@ class RelayUrlsTest {
             relayListAfterRemoval(
                 currentRelays = listOf("wss://one.external.example", "wss://two.external.example"),
                 relayToRemove = "wss://one.external.example",
-                allowExternalRelayHosts = true,
             ),
         )
     }
 
     @Test
-    fun releaseKeepsLastSupportedRelayButAllowsExternalCleanup() {
-        val relays = listOf("wss://relay.us.whitenoise.chat", "wss://external.example")
-
-        assertFalse(
-            canRemoveRelay(
-                currentRelays = relays,
-                relay = "wss://relay.us.whitenoise.chat",
-                allowExternalRelayHosts = false,
+    fun removalFallsBackToWhiteNoiseRelaysWhenNoRelayRemains() {
+        assertEquals(
+            RelayListEditPlan(
+                relays = MarmotClient.bootstrapRelays,
+            ),
+            relayListAfterRemoval(
+                currentRelays = listOf("wss://one.external.example"),
+                relayToRemove = "wss://one.external.example",
             ),
         )
-        assertTrue(
-            canRemoveRelay(
-                currentRelays = relays,
-                relay = "wss://external.example",
-                allowExternalRelayHosts = false,
+    }
+
+    @Test
+    fun externalRelayKeepsWhiteNoiseRelayRemovable() {
+        val relays = listOf("wss://relay.us.whitenoise.chat", "wss://external.example")
+
+        assertTrue(canRemoveRelay(currentRelays = relays, relay = "wss://relay.us.whitenoise.chat"))
+        assertTrue(canRemoveRelay(currentRelays = relays, relay = "wss://external.example"))
+        assertFalse(canRemoveRelay(currentRelays = listOf(relays.first()), relay = relays.first()))
+    }
+
+    @Test
+    fun publishClassificationPreservesAllowedExternalRelaysAndDropsUnsafeImports() {
+        val plan =
+            RelayListEditPlan(
+                relays = listOf("wss://external.example", "wss://retired.example", "wss://relay.us.whitenoise.chat"),
+                requiredRelay = "wss://relay.us.whitenoise.chat",
+            )
+
+        assertEquals(
+            listOf("wss://external.example", "wss://relay.us.whitenoise.chat"),
+            allowedRelayUrlsForPublish(
+                plan,
+                listOf(
+                    classified("wss://external.example", RelayEndpointPolicyFfi.ALLOWED),
+                    classified("wss://retired.example", RelayEndpointPolicyFfi.RETIRED),
+                    classified("wss://relay.us.whitenoise.chat", RelayEndpointPolicyFfi.ALLOWED),
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun publishClassificationRejectsNewRelayThatMarmotKitBlocks() {
+        val newRelay = "wss://unsafe.example"
+
+        assertEquals(
+            null,
+            allowedRelayUrlsForPublish(
+                RelayListEditPlan(
+                    relays = listOf("wss://external.example", newRelay),
+                    requiredRelay = newRelay,
+                ),
+                listOf(
+                    classified("wss://external.example", RelayEndpointPolicyFfi.ALLOWED),
+                    classified(newRelay, RelayEndpointPolicyFfi.UNSAFE),
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun publishClassificationAcceptsMarmotKitTrailingSlashNormalization() {
+        val newRelay = "wss://external.example"
+
+        assertEquals(
+            listOf("wss://external.example/"),
+            allowedRelayUrlsForPublish(
+                RelayListEditPlan(relays = listOf(newRelay), requiredRelay = newRelay),
+                listOf(
+                    classified(
+                        endpoint = newRelay,
+                        policy = RelayEndpointPolicyFfi.ALLOWED,
+                        normalizedEndpoint = "$newRelay/",
+                    ),
+                ),
             ),
         )
     }
@@ -210,13 +241,6 @@ class RelayUrlsTest {
             relayUrlResolveTimeCheckResult("wss://rebind.example", resolveToLoopback),
         )
         assertFalse(relayUrlPassesResolveTimeCheck("wss://rebind.example", resolveToLoopback))
-        runBlocking {
-            assertEquals(
-                RelayResolveTimeCheckResult.Blocked,
-                relayUrlsResolveTimeCheckResult(listOf("wss://rebind.example"), resolveToLoopback),
-            )
-            assertFalse(relayUrlsPassResolveTimeChecks(listOf("wss://rebind.example"), resolveToLoopback))
-        }
     }
 
     @Test
@@ -227,13 +251,6 @@ class RelayUrlsTest {
             relayUrlResolveTimeCheckResult("wss://relay.example", failResolve),
         )
         assertFalse(relayUrlPassesResolveTimeCheck("wss://relay.example", failResolve))
-        runBlocking {
-            assertEquals(
-                RelayResolveTimeCheckResult.Unavailable,
-                relayUrlsResolveTimeCheckResult(listOf("wss://relay.example"), failResolve),
-            )
-            assertFalse(relayUrlsPassResolveTimeChecks(listOf("wss://relay.example"), failResolve))
-        }
     }
 
     @Test
@@ -244,13 +261,6 @@ class RelayUrlsTest {
             relayUrlResolveTimeCheckResult("wss://relay.example", resolveToPublic),
         )
         assertTrue(relayUrlPassesResolveTimeCheck("wss://relay.example", resolveToPublic))
-        runBlocking {
-            assertEquals(
-                RelayResolveTimeCheckResult.Passed,
-                relayUrlsResolveTimeCheckResult(listOf("wss://relay.example"), resolveToPublic),
-            )
-            assertTrue(relayUrlsPassResolveTimeChecks(listOf("wss://relay.example"), resolveToPublic))
-        }
     }
 
     @Test
@@ -262,6 +272,61 @@ class RelayUrlsTest {
         assertFalse(relayUrlPassesResolveTimeCheck("wss://rebind.example", resolveToLoopback))
     }
 
+    @Test
+    fun requiredRelayResolveTimeCheckChecksOnlyNewAddition() {
+        val resolvedHosts = mutableListOf<String>()
+        val resolveToPublic: RelayHostResolver = { host ->
+            resolvedHosts += host
+            arrayOf(ipv4(8, 8, 8, 8))
+        }
+
+        assertEquals(
+            RelayResolveTimeCheckResult.Passed,
+            requiredRelayResolveTimeCheckResult(
+                RelayListEditPlan(
+                    relays = listOf("wss://unreachable-import.example", "wss://new-relay.example"),
+                    requiredRelay = "wss://new-relay.example",
+                ),
+                resolveToPublic,
+            ),
+        )
+        assertEquals(listOf("new-relay.example"), resolvedHosts)
+    }
+
+    @Test
+    fun requiredRelayResolveTimeCheckRejectsPrivateNewAddition() {
+        val resolveToLoopback: RelayHostResolver = { arrayOf(ipv4(127, 0, 0, 1)) }
+
+        assertEquals(
+            RelayResolveTimeCheckResult.Blocked,
+            requiredRelayResolveTimeCheckResult(
+                RelayListEditPlan(
+                    relays = listOf("wss://existing.example", "wss://rebind.example"),
+                    requiredRelay = "wss://rebind.example",
+                ),
+                resolveToLoopback,
+            ),
+        )
+    }
+
+    @Test
+    fun requiredRelayResolveTimeCheckSkipsRemovalPlan() {
+        var resolveCalls = 0
+        val failIfCalled: RelayHostResolver = {
+            resolveCalls += 1
+            null
+        }
+
+        assertEquals(
+            RelayResolveTimeCheckResult.Passed,
+            requiredRelayResolveTimeCheckResult(
+                RelayListEditPlan(relays = listOf("wss://unreachable-import.example")),
+                failIfCalled,
+            ),
+        )
+        assertEquals(0, resolveCalls)
+    }
+
     private fun ipv4(
         a: Int,
         b: Int,
@@ -269,13 +334,20 @@ class RelayUrlsTest {
         d: Int,
     ): InetAddress = InetAddress.getByAddress(byteArrayOf(a.toByte(), b.toByte(), c.toByte(), d.toByte()))
 
+    private fun classified(
+        endpoint: String,
+        policy: RelayEndpointPolicyFfi,
+        normalizedEndpoint: String? = endpoint,
+    ): RelayEndpointClassificationFfi =
+        RelayEndpointClassificationFfi(
+            endpoint = endpoint,
+            normalizedEndpoint = normalizedEndpoint,
+            policy = policy,
+        )
+
     @Test
     fun bootstrapRelaysSatisfyRelayUrlValidation() {
         assertEquals(emptyList<String>(), MarmotClient.bootstrapRelays.filterNot { isAcceptableRelayUrl(it) })
-        assertEquals(
-            emptyList<String>(),
-            MarmotClient.bootstrapRelays.filterNot { isAcceptableRelayUrl(it, allowExternalRelayHosts = false) },
-        )
     }
 
     @Test

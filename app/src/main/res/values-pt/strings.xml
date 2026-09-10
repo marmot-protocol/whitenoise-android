@@ -560,8 +560,6 @@
     <string name="remove_relay">Remover Relay?</string>
     <string name="add_relay">Adicionar Relay</string>
     <string name="error_invalid_relay_url">Insira um URL de relay seguro e válido que comece por wss://.</string>
-    <string name="error_external_relay_not_supported">Esta versão suporta apenas relays geridos pelo White Noise.</string>
-    <string name="unsupported_relays_cleanup_notice">Os relays externos importados de outra aplicação não são suportados nesta versão. Editar esta lista remove todos os relays não suportados.</string>
     <string name="nip_65">Onde publico</string>
     <string name="inbox">Onde recebo</string>
     <string name="relay_posting_help">Outras pessoas obtêm a sua chave destes relays para adicionar você a grupos.</string>
@@ -1654,6 +1652,7 @@
     <string name="dictation_no_speech">Nenhuma fala foi reconhecida</string>
     <string name="dictation_network_error">O serviço de voz não conseguiu se conectar</string>
     <string name="dictation_recognizer_busy">O serviço de voz está ocupado</string>
+    <string name="dictation_audio_buffer_full">O ditado foi interrompido porque o serviço de voz não conseguiu acompanhar</string>
     <string name="dictation_timed_out">O reconhecimento de voz atingiu o limite de tempo</string>
     <string name="dictation_failed">Não foi possível transcrever a fala</string>
     <string name="dictation_review_required">O rascunho mudou — revise o texto ditado</string>
