@@ -46,17 +46,22 @@ internal interface ConversationDictationAudioCaptureDevice {
     val initialized: Boolean
     val recording: Boolean
 
+    /** Begins microphone acquisition; the capture owner prevents duplicate starts. */
     fun start()
 
+    /** Reads mono PCM16 samples into the caller buffer and returns a sample count or device status. */
     fun read(target: ShortArray): Int
 
+    /** Stops acquiring microphone samples without acknowledging any buffered audio. */
     fun stop()
 
+    /** Releases native recorder resources after capture stops or initialization fails. */
     fun release()
 }
 
 /** Injectable pipe boundary used to exercise provider disconnects without mocked session state. */
 internal fun interface ConversationDictationAudioPipeWriter {
+    /** Writes at most [length] bytes from [offset], returning progress or throwing a pipe I/O failure. */
     fun write(
         descriptor: FileDescriptor,
         source: ByteArray,
@@ -75,12 +80,16 @@ private class AndroidConversationDictationAudioCaptureDevice(
     override val recording: Boolean
         get() = recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING
 
+    /** Begins native microphone recording after the owner has checked device initialization. */
     override fun start() = recorder.startRecording()
 
+    /** Reads mono PCM16 samples into the caller buffer and returns a sample count or device status. */
     override fun read(target: ShortArray): Int = recorder.read(target, 0, target.size)
 
+    /** Stops acquiring microphone samples without acknowledging any buffered audio. */
     override fun stop() = recorder.stop()
 
+    /** Releases native recorder resources after capture stops or initialization fails. */
     override fun release() = recorder.release()
 }
 
@@ -92,6 +101,7 @@ private class AndroidConversationDictationAudioCaptureDevice(
  * created. Queued and in-flight PCM is bounded to 90 seconds; overflow stops capture instead of
  * silently dropping a read.
  */
+@Suppress("TooManyFunctions")
 internal class ConversationDictationCallerAudio internal constructor(
     private val device: ConversationDictationAudioCaptureDevice,
     private val buffer: ConversationDictationAudioChunkBuffer,
@@ -107,6 +117,9 @@ internal class ConversationDictationCallerAudio internal constructor(
     private val discarded = AtomicBoolean(false)
     private val captureClosedCallbacks = ConcurrentLinkedQueue<() -> Unit>()
     private val activeStream = AtomicReference<ConversationDictationCallerAudioStream?>(null)
+
+    // Guarded by this capture's monitor together with stream attachment and settlement.
+    private var pendingFailure: ConversationDictationCallerAudioFailure? = null
 
     /** Starts capture once, or permits buffered audio to drain after the recorder has stopped. */
     @Suppress("ReturnCount")
@@ -134,12 +147,17 @@ internal class ConversationDictationCallerAudio internal constructor(
     }
 
     /** Opens the only serial provider stream. The recorder itself is not restarted. */
+    @Synchronized
     @Suppress("MaxLineLength", "ReturnCount")
     fun openProviderStream(onFailure: (ConversationDictationCallerAudioFailure) -> Unit = {}): ConversationDictationCallerAudioStream? {
         if (discarded.get()) return null
         val pipe = openPipe() ?: return null
         val stream = ConversationDictationCallerAudioStream(this, pipe[1], pipe[0], buffer, pipeWriter, onFailure)
         return if (activeStream.compareAndSet(null, stream)) {
+            pendingFailure?.let { failure ->
+                pendingFailure = null
+                stream.reportFailure(failure)
+            }
             stream
         } else {
             pipe.forEach { runCatching(it::close) }
@@ -160,9 +178,11 @@ internal class ConversationDictationCallerAudio internal constructor(
     }
 
     /** Destroys volatile PCM after cancellation or logical-session completion. */
+    @Synchronized
     fun discard(onClosed: () -> Unit = {}) {
         registerCaptureClosedCallback(onClosed)
         discarded.set(true)
+        pendingFailure = null
         buffer.discard()
         activeStream.getAndSet(null)?.cancel(requeue = false)
         if (finishing.compareAndSet(false, true) && !recording.compareAndSet(true, false)) releaseRecorder()
@@ -174,8 +194,22 @@ internal class ConversationDictationCallerAudio internal constructor(
     /** Measures quiet capture time independently of delayed provider speech callbacks. */
     fun silenceMillis(): Long = (SystemClock.elapsedRealtime() - lastSpeechAt.get()).coerceAtLeast(0L)
 
+    /** Releases the generation lease without clearing a capture failure waiting for its successor. */
+    @Synchronized
     internal fun streamSettled(stream: ConversationDictationCallerAudioStream) {
         activeStream.compareAndSet(stream, null)
+    }
+
+    /** Keeps a terminal failure until a stream can receive it, atomically with generation changes. */
+    @Synchronized
+    private fun reportCaptureFailure(failure: ConversationDictationCallerAudioFailure) {
+        if (discarded.get()) return
+        val stream = activeStream.get()
+        if (stream == null) {
+            pendingFailure = failure
+        } else {
+            stream.reportFailure(failure)
+        }
     }
 
     /** Records continuously across provider generations and seals the last read before closure. */
@@ -196,7 +230,7 @@ internal class ConversationDictationCallerAudio internal constructor(
                         conversationDictationDiagnostic(
                             "event=caller_audio_backpressure bytes=${buffer.bufferedBytes} action=stop_capture",
                         )
-                        activeStream.get()?.reportFailure(ConversationDictationCallerAudioFailure.BufferFull)
+                        reportCaptureFailure(ConversationDictationCallerAudioFailure.BufferFull)
                     } else {
                         recordCaptureActivity(samples, read, progress)
                     }
@@ -222,6 +256,7 @@ internal class ConversationDictationCallerAudio internal constructor(
         progress.record(read, peak, buffer.bufferedBytes)
     }
 
+    /** Runs a closure observer once, including registration racing with recorder release. */
     private fun registerCaptureClosedCallback(callback: () -> Unit) {
         if (captureClosed.get()) {
             callback()
@@ -231,6 +266,7 @@ internal class ConversationDictationCallerAudio internal constructor(
         if (captureClosed.get() && captureClosedCallbacks.remove(callback)) callback()
     }
 
+    /** Releases the device and delivers closure observers once across stop and cancellation races. */
     private fun releaseRecorder() {
         runCatching(device::release)
         if (!captureClosed.compareAndSet(false, true)) return
@@ -247,6 +283,7 @@ internal class ConversationDictationCallerAudio internal constructor(
                 )
             }
 
+        /** Creates a provider pipe with a nonblocking writer; closes both ends if configuration fails. */
         internal fun openPipe(): Array<ParcelFileDescriptor>? {
             val pipe = runCatching { ParcelFileDescriptor.createPipe() }.reportPipeFailure() ?: return null
             return runCatching { markWriteEndNonBlocking(pipe[1]) }
@@ -255,16 +292,19 @@ internal class ConversationDictationCallerAudio internal constructor(
                 .reportPipeFailure()
         }
 
+        /** Returns the pipe operation result or records its failure type without logging audio. */
         private fun <T> Result<T>.reportPipeFailure(): T? =
             onFailure {
                 conversationDictationDiagnostic("event=caller_audio_pipe_failed type=${it.javaClass.simpleName}")
             }.getOrNull()
 
+        /** Allows the feeder to detect stalled providers instead of blocking indefinitely in a write. */
         private fun markWriteEndNonBlocking(writeEnd: ParcelFileDescriptor) {
             val current = Os.fcntlInt(writeEnd.fileDescriptor, OsConstants.F_GETFL, 0)
             Os.fcntlInt(writeEnd.fileDescriptor, OsConstants.F_SETFL, current or OsConstants.O_NONBLOCK)
         }
 
+        /** Returns only an initialized microphone recorder and releases failed allocations. */
         private fun openRecorder(): AudioRecord? {
             val recorder = runCatching(::buildRecorder).getOrNull()
             val ready = recorder?.state == AudioRecord.STATE_INITIALIZED
@@ -275,6 +315,7 @@ internal class ConversationDictationCallerAudio internal constructor(
             return recorder?.takeIf { ready }
         }
 
+        /** Configures mono 16 kHz PCM16 capture with at least the platform minimum buffer size. */
         @SuppressLint("MissingPermission")
         private fun buildRecorder(): AudioRecord {
             val minimum =
@@ -313,14 +354,17 @@ internal class ConversationDictationCallerAudioStream(
     private val failureReported = AtomicBoolean(false)
     private val chunk = AtomicReference<ConversationDictationAudioChunk?>(null)
 
+    /** Starts the device or feeder once; a sealed capture may only drain retained PCM. */
     fun start(): Boolean {
         if (!capture.start() || !feeding.compareAndSet(false, true)) return false
         thread(name = "dictation-caller-audio-feed", isDaemon = true, block = ::feed)
         return true
     }
 
+    /** Seals the logical capture while this generation continues feeding its owned chunk. */
     fun finishCapture(onClosed: () -> Unit) = capture.finish(onClosed)
 
+    /** Registers an exactly-once observer, including when the feeder has already closed. */
     fun onFeedClosed(callback: () -> Unit) {
         if (feedClosed.get()) {
             callback()
@@ -330,10 +374,13 @@ internal class ConversationDictationCallerAudioStream(
         }
     }
 
+    /** Releases this generation’s chunk after a final transcript makes its audio expendable. */
     fun acknowledge(): Boolean = settle(requeue = false)
 
+    /** Returns this generation’s chunk to the front of the queue without duplicating its byte accounting. */
     fun retry(): Boolean = settle(requeue = true)
 
+    /** Closes the feeder and relinquishes its lease, retaining unacknowledged PCM by default. */
     fun cancel(requeue: Boolean = true) {
         cancelled.set(true)
         settle(requeue)
@@ -345,6 +392,7 @@ internal class ConversationDictationCallerAudioStream(
         if (failureReported.compareAndSet(false, true)) onFailure(failure)
     }
 
+    /** Claims one chunk, feeds its PCM, and requeues ownership on interruption or provider disconnection. */
     private fun feed() {
         try {
             var owned: ConversationDictationAudioChunk? = null
@@ -371,6 +419,7 @@ internal class ConversationDictationCallerAudioStream(
         }
     }
 
+    /** Logs only the failure type and makes the unacknowledged chunk available to a replacement stream. */
     private fun reportFeedFailure(failure: Exception) {
         conversationDictationDiagnostic(
             "event=caller_audio_feed_failed type=${failure.javaClass.simpleName} action=requeue",
@@ -378,6 +427,7 @@ internal class ConversationDictationCallerAudioStream(
         settle(requeue = true)
     }
 
+    /** Feeds an owned chunk until completion, cancellation, or a bounded nonblocking-write stall. */
     private fun writeChunk(owned: ConversationDictationAudioChunk) {
         val sink = writeEnd.fileDescriptor
         var offset = 0
@@ -423,12 +473,14 @@ internal class ConversationDictationCallerAudioStream(
         return changed
     }
 
+    /** Closes the writer and notifies feeder observers once even when cancellation races with completion. */
     private fun closePipe() {
         runCatching(writeEnd::close)
         if (!feedClosed.compareAndSet(false, true)) return
         while (true) feedClosedCallbacks.poll()?.invoke() ?: return
     }
 
+    /** Releases the provider-facing descriptor independently of writer and capture ownership. */
     fun closeProviderEnd() = runCatching(providerEnd::close)
 }
 
@@ -441,6 +493,7 @@ private class CallerAudioProgress {
     private var speechReported = false
     var stopReason: String? = null
 
+    /** Accumulates byte counts and peak levels, emitting periodic diagnostics without storing speech content. */
     fun record(
         frames: Int,
         peak: Float,
@@ -466,6 +519,7 @@ private class CallerAudioProgress {
         }
     }
 
+    /** Reports the capture stop cause and retained-byte count without exposing PCM or transcript text. */
     fun reportClosed(bufferedBytes: Int) {
         conversationDictationDiagnostic(
             "event=caller_audio_closed reason=${stopReason ?: "stopped"} bytes=$totalBytes " +
@@ -473,8 +527,10 @@ private class CallerAudioProgress {
         )
     }
 
+    /** Uses the monotonic clock to measure capture duration independently of wall-clock changes. */
     private fun elapsed(): Long = SystemClock.elapsedRealtime() - startedAt
 
+    /** Formats diagnostic peak levels with a stable decimal separator across device locales. */
     private fun format(peak: Float): String = String.format(Locale.US, "%.3f", peak)
 }
 

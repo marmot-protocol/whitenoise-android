@@ -77,12 +77,16 @@ class ConversationDictationCallerAudioDrainTest {
         override val initialized: Boolean = true
         override val recording: Boolean = false
 
+        /** Rejects any attempt to reacquire the microphone while draining a sealed capture. */
         override fun start(): Unit = error("Draining must not restart microphone capture")
 
+        /** Exposes no live samples because this fixture represents a recorder that is already stopped. */
         override fun read(target: ShortArray): Int = 0
 
+        /** Requires no native cleanup for the already-stopped fixture. */
         override fun stop() = Unit
 
+        /** Keeps repeated cleanup safe for the recorder-free drain fixture. */
         override fun release() = Unit
     }
 }

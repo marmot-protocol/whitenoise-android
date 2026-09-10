@@ -8,6 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationDictationAudioChunkBufferTest {
+    /** Verifies an hour of bounded capture preserves every ordered sample range across 120 acknowledgments. */
     @Test
     fun oneHourOfAcknowledgedAudioKeepsExactOrderedSampleRangesWithinTheBound() {
         val bytesPerSecond = CALLER_AUDIO_SAMPLE_RATE_HZ * 2
@@ -44,6 +45,7 @@ class ConversationDictationAudioChunkBufferTest {
         assertFalse(buffer.hasPending)
     }
 
+    /** A retry must preserve chunk identity, PCM, and byte accounting until successful acknowledgment. */
     @Test
     fun retryRequeuesTheSameChunkWithoutDuplicatingItsAccounting() {
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 11L, chunkBytes = 4, maxBufferedBytes = 8)
@@ -61,6 +63,7 @@ class ConversationDictationAudioChunkBufferTest {
         assertFalse(buffer.acknowledge(retried.chunkId))
     }
 
+    /** A rejected read must leave earlier queued and partial PCM intact for recovery. */
     @Test
     fun overflowRejectsTheWholeWriteWithoutSilentlyChangingBufferedAudio() {
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 1L, chunkBytes = 4, maxBufferedBytes = 8)
@@ -79,6 +82,7 @@ class ConversationDictationAudioChunkBufferTest {
         assertEquals(0, buffer.bufferedBytes)
     }
 
+    /** Repeated stop requests must seal a partial tail once and reject further capture writes. */
     @Test
     fun finishSealsOnePartialChunkAndIsIdempotent() {
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 3L, chunkBytes = 8, maxBufferedBytes = 16)
@@ -95,6 +99,7 @@ class ConversationDictationAudioChunkBufferTest {
         assertFalse(buffer.append(byteArrayOf(7, 6), 2))
     }
 
+    /** Rejects odd byte counts that would split a PCM16 sample in configuration or input. */
     @Test
     fun pcm16AlignmentIsRequiredForConfigurationAndAppends() {
         assertFails<IllegalArgumentException> {
@@ -105,6 +110,7 @@ class ConversationDictationAudioChunkBufferTest {
         assertFails<IllegalArgumentException> { buffer.append(byteArrayOf(1), 1) }
     }
 
+    /** Prevents parallel provider requests from claiming different chunks out of sequence. */
     @Test
     fun onlyOneChunkCanBeInFlightAtATime() {
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 5L, chunkBytes = 4, maxBufferedBytes = 8)
@@ -116,6 +122,7 @@ class ConversationDictationAudioChunkBufferTest {
         assertArrayEquals(byteArrayOf(5, 6, 7, 8), checkNotNull(buffer.poll()).pcm)
     }
 
+    /** Cancellation must clear queued, partial, and in-flight PCM and prevent further appends. */
     @Test
     fun discardClearsCurrentQueuedAndInFlightAudio() {
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 9L, chunkBytes = 4, maxBufferedBytes = 12)
@@ -130,6 +137,7 @@ class ConversationDictationAudioChunkBufferTest {
         assertFalse(buffer.append(byteArrayOf(7, 8), 2))
     }
 
+    /** Checks the failure type and propagates unexpected exceptions instead of hiding test defects. */
     private inline fun <reified T : Throwable> assertFails(block: () -> Unit) {
         try {
             block()

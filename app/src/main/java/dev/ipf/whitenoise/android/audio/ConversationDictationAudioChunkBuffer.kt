@@ -109,6 +109,7 @@ internal class ConversationDictationAudioChunkBuffer(
         finished = true
     }
 
+    /** Copies the partial buffer into an immutable chunk and advances its non-overlapping sample range. */
     @Synchronized
     private fun sealCurrent() {
         val pcm = current.copyOf(currentSize)

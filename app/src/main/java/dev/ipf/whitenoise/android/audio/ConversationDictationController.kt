@@ -2588,12 +2588,14 @@ internal class AndroidConversationDictationPlatform(
         return true
     }
 
+    /** Allocates and retains one capture identity shared by all recognizer generations in the session. */
     private fun createCallerAudioCapture(): ConversationDictationCallerAudio? {
         val capture = ConversationDictationCallerAudio.open(++nextCallerAudioSessionId)
         callerAudioCapture = capture
         return capture
     }
 
+    /** Detaches the logical capture before discarding PCM and notifying the caller of recorder closure. */
     override fun discardCallerAudio(onClosed: () -> Unit): Boolean {
         val capture = callerAudioCapture
         callerAudioCapture = null
@@ -3049,8 +3051,10 @@ private class AndroidConversationDictationRecognitionSession(
         reportCaptureFinished()
     }
 
+    /** Acknowledges only this recognizer generation’s caller-audio chunk after its final result. */
     override fun acknowledgeCallerAudio(): Boolean = callerAudio?.acknowledge() == true
 
+    /** Returns this recognizer generation’s unacknowledged caller audio for a replacement request. */
     override fun retryCallerAudio(): Boolean = callerAudio?.retry() == true
 
     /** Releases the recognizer when no capture acknowledgement is required. */

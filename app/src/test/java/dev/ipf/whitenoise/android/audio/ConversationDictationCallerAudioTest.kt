@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.audio
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,6 +15,7 @@ import java.util.concurrent.TimeUnit
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ConversationDictationCallerAudioTest {
+    /** Cancelling a stream before it claims PCM must still free the lease for a replacement. */
     @Test
     fun cancelBeforePollReleasesTheStreamLease() {
         val capture = callerAudio(FakeCaptureDevice())
@@ -25,6 +27,7 @@ class ConversationDictationCallerAudioTest {
         capture.discard {}
     }
 
+    /** A disconnected pipe must retain its unacknowledged chunk and release the generation lease. */
     @Test
     fun pipeWriteFailureRequeuesAudioAndReleasesTheStreamLease() {
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 2L, chunkBytes = 4, maxBufferedBytes = 8)
@@ -45,6 +48,7 @@ class ConversationDictationCallerAudioTest {
         capture.discard {}
     }
 
+    /** An attached provider must receive the typed overflow error when continuous capture exhausts its bound. */
     @Test
     fun bufferOverflowReportsTypedFailureInsteadOfLeavingCaptureApparentlyActive() {
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 3L, chunkBytes = 4, maxBufferedBytes = 4)
@@ -72,6 +76,53 @@ class ConversationDictationCallerAudioTest {
         capture.discard {}
     }
 
+    /** An overflow between generations must reach the next stream once, never the settled stream. */
+    @Test
+    fun overflowBetweenStreamsIsReportedOnceToTheNextGeneration() {
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 4L, chunkBytes = 4, maxBufferedBytes = 4)
+        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4), 4))
+        val allowRead = CountDownLatch(1)
+        val captureClosed = CountDownLatch(1)
+        val device =
+            object : ConversationDictationAudioCaptureDevice by FakeCaptureDevice() {
+                /** Blocks the overflow read until the previous provider stream has released its lease. */
+                override fun read(target: ShortArray): Int {
+                    check(allowRead.await(2, TimeUnit.SECONDS))
+                    target[0] = 5
+                    return 1
+                }
+
+                /** Signals that the overflow read has finished and the recorder is closed. */
+                override fun release() = captureClosed.countDown()
+            }
+        val failures = CopyOnWriteArrayList<ConversationDictationCallerAudioFailure>()
+        val settledFailures = CopyOnWriteArrayList<ConversationDictationCallerAudioFailure>()
+        val capture = callerAudio(device, buffer)
+        val first = checkNotNull(capture.openProviderStream(settledFailures::add))
+        try {
+            assertTrue(capture.start())
+            first.cancel()
+            first.closeProviderEnd()
+            allowRead.countDown()
+            assertTrue(captureClosed.await(2, TimeUnit.SECONDS))
+            assertTrue(settledFailures.isEmpty())
+
+            val next = checkNotNull(capture.openProviderStream(failures::add))
+            assertEquals(listOf(ConversationDictationCallerAudioFailure.BufferFull), failures)
+            next.cancel()
+            next.closeProviderEnd()
+            val last = checkNotNull(capture.openProviderStream(failures::add))
+            assertEquals(1, failures.size)
+            last.cancel()
+            last.closeProviderEnd()
+        } finally {
+            allowRead.countDown()
+            capture.discard {}
+            first.closeProviderEnd()
+        }
+    }
+
+    /** Builds a real capture with small bounded PCM storage and an injectable device and writer. */
     private fun callerAudio(
         device: ConversationDictationAudioCaptureDevice = FakeCaptureDevice(),
         buffer: ConversationDictationAudioChunkBuffer =
@@ -80,6 +131,7 @@ class ConversationDictationCallerAudioTest {
             ConversationDictationAudioPipeWriter { _, _, _, length -> length },
     ): ConversationDictationCallerAudio = ConversationDictationCallerAudio(device, buffer, writer)
 
+    /** Bounds asynchronous capture assertions so a missing callback fails instead of hanging the suite. */
     private fun await(predicate: () -> Boolean) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
         while (!predicate() && System.nanoTime() < deadline) Thread.sleep(5)
@@ -97,8 +149,10 @@ class ConversationDictationCallerAudioTest {
 
         override val recording: Boolean = true
 
+        /** Uses an already-ready fake device to exercise capture without acquiring a physical microphone. */
         override fun start() = Unit
 
+        /** Returns queued test samples, or a terminal read after the finite test input is consumed. */
         override fun read(target: ShortArray): Int {
             val next = synchronized(queuedReads) { queuedReads.removeFirstOrNull() }
             if (next != null) {
@@ -109,10 +163,12 @@ class ConversationDictationCallerAudioTest {
             return 0
         }
 
+        /** Stops the fake device’s wait path after capture completion or cancellation. */
         override fun stop() {
             running = false
         }
 
+        /** Marks the test device closed so capture completion is observable without native recorder resources. */
         override fun release() {
             running = false
         }

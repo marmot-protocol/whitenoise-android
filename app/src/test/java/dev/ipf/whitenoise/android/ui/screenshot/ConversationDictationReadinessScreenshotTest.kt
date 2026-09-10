@@ -107,6 +107,7 @@ class ConversationDictationReadinessScreenshotTest {
         capture(fixture, "dictation_bottom_bar_error_large_font_rtl.png")
     }
 
+    /** Keeps overflow recovery controls visible at large font scale in the RTL dark theme. */
     @Test
     fun callerAudioBufferOverflowShowsVisibleFailure() {
         val fixture = fixture(appOwned = true)

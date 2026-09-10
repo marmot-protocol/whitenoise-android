@@ -2737,6 +2737,7 @@ class ConversationDictationControllerTest {
         assertTrue(platform.session.started)
     }
 
+    /** A typed capture overflow must destroy the recognizer and surface its cause in the visible session. */
     @Test
     fun callerAudioBufferOverflowFailsTheVisibleSession() {
         val platform = FakePlatform(callerAudio = ConversationDictationCallerAudioRequirement.Supported)
@@ -3128,11 +3129,13 @@ class ConversationDictationControllerTest {
 
         override fun callerAudioRequirement(): ConversationDictationCallerAudioRequirement = callerAudio
 
+        /** Lets lifecycle tests retain caller PCM independently of recognizer readiness. */
         override fun callerAudioHasPending(): Boolean = pendingCallerAudio
 
         /** Supplies capture activity independently of provider callbacks. */
         override fun callerAudioSilenceMillis(): Long? = capturedSilenceMillis
 
+        /** Simulates recorder closure separately from draining the retained caller-audio queue. */
         override fun finishCallerAudioCapture(onClosed: () -> Unit): Boolean {
             if (!pendingCallerAudio) return false
             if (deferCallerAudioFinish) {
@@ -3245,6 +3248,7 @@ class ConversationDictationControllerTest {
             registerCaptureFinished(onAudioCaptureFinished)
         }
 
+        /** Tracks final-result acknowledgments so tests can verify serial chunk ownership. */
         override fun acknowledgeCallerAudio(): Boolean {
             acknowledgedCallerAudio += 1
             return true
