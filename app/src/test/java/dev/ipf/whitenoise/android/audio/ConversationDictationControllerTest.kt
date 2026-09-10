@@ -2674,6 +2674,19 @@ class ConversationDictationControllerTest {
     }
 
     @Test
+    fun callerAudioBufferOverflowFailsTheVisibleSession() {
+        val platform = FakePlatform(callerAudio = ConversationDictationCallerAudioRequirement.Supported)
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        platform.listener.onError(ConversationDictationFailure.AudioBufferFull)
+
+        val failed = fixture.controller.state as ConversationDictationState.Failed
+        assertEquals(ConversationDictationFailure.AudioBufferFull, failed.reason)
+        assertTrue(platform.session.destroyed)
+    }
+
+    @Test
     fun aProviderThatCannotUseCallerAudioIsRoutedToItsOwnUiBeforeAnythingStarts() {
         val platform =
             FakePlatform(

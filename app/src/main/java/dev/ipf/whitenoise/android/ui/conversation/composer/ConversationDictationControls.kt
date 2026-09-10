@@ -336,6 +336,7 @@ private fun dictationFailureLabel(reason: ConversationDictationFailure): String 
             ConversationDictationFailure.Network -> R.string.dictation_network_error
             ConversationDictationFailure.ProviderDisconnected -> R.string.dictation_provider_unavailable
             ConversationDictationFailure.RecognizerBusy -> R.string.dictation_recognizer_busy
+            ConversationDictationFailure.AudioBufferFull -> R.string.dictation_audio_buffer_full
             ConversationDictationFailure.TimedOut -> R.string.dictation_timed_out
             ConversationDictationFailure.Unknown -> R.string.dictation_failed
         },

@@ -108,6 +108,7 @@ internal enum class ConversationDictationFailure {
     Network,
     ProviderDisconnected,
     RecognizerBusy,
+    AudioBufferFull,
     TimedOut,
     Unknown,
 }
@@ -2500,7 +2501,7 @@ internal class AndroidConversationDictationPlatform(
         return AndroidConversationDictationRecognitionSession(
             context = context,
             recognitionService = selected,
-            callerAudio = openCallerAudioStreamIfProviderCannotRecord(),
+            callerAudio = openCallerAudioStreamIfProviderCannotRecord(listener),
             listener = listener,
         )
     }
@@ -2509,7 +2510,8 @@ internal class AndroidConversationDictationPlatform(
      * Captures in White Noise for an ordinary unselected provider, whose binding lacks the
      * microphone capability. Selected and preinstalled providers keep their own capture path.
      */
-    private fun openCallerAudioStreamIfProviderCannotRecord(): ConversationDictationCallerAudioStream? {
+    @Suppress("MaxLineLength")
+    private fun openCallerAudioStreamIfProviderCannotRecord(listener: ConversationDictationRecognitionListener): ConversationDictationCallerAudioStream? {
         val systemSelected = selectedRecognitionService() != null
         val providerRecords = providerCanRecord(sessionRecognitionService)
         val supported = conversationDictationAudioSourceSupported()
@@ -2519,7 +2521,14 @@ internal class AndroidConversationDictationPlatform(
             } else {
                 callerAudioCapture ?: createCallerAudioCapture()
             }
-        val source = capture?.openProviderStream()
+        val source =
+            capture?.openProviderStream { failure ->
+                val reason =
+                    when (failure) {
+                        ConversationDictationCallerAudioFailure.BufferFull -> ConversationDictationFailure.AudioBufferFull
+                    }
+                Handler(Looper.getMainLooper()).post { listener.onError(reason) }
+            }
         conversationDictationDiagnostic(
             "event=caller_audio_mode enabled=${source != null} " +
                 "system_selected=$systemSelected provider_records=$providerRecords supported=$supported",
