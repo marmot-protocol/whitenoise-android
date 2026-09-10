@@ -95,18 +95,19 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue("only a later subscription iteration may present Connecting", retryAttempt > initialValidation)
     }
 
-    /** Guards the source ordering that stages a current local snapshot before publishing the account. */
+    /** The final activation fence must precede cache clearing and publication of the target account. */
     @Test
     fun targetLocalSnapshotIsLoadedAndGenerationFencedBeforeAccountPublication() {
         val body = setActiveAccountSection()
         val generation = body.indexOf("val requestGeneration = accountSwitchHandoff.beginRequest(label)")
         val preload = body.indexOf("loadAccountSwitchLocalSnapshot(")
         val preloadCall = body.substring(preload, body.indexOf("\n                    )", startIndex = preload))
-        val finalGenerationGuard =
-            body.indexOf(
-                "isAccountSwitchCurrent(requestGeneration)",
-                startIndex = preload,
-            )
+        val finalGenerationGuard = body.lastIndexOf("if (!activationAllowed())")
+        val guardBody = body.substringAfter("val activationAllowed = {").substringBefore("}")
+        assertTrue(
+            "activation must still check the request generation",
+            "isAccountSwitchCurrent(requestGeneration)" in guardBody,
+        )
         val cacheClear = body.indexOf("clearCrossAccountCaches()", startIndex = finalGenerationGuard)
         val stageSnapshot = body.indexOf("stageAccountSwitchLocalSnapshot", startIndex = cacheClear)
         val publishAccount = body.indexOf("activeAccountRef = label", startIndex = stageSnapshot)
@@ -347,6 +348,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertFalse("push-wake recovery must not bypass coordination", "catchUpAccountsBestEffort()" in body)
     }
 
+    /** The final supersession fence precedes self-profile publication and the Ready callback. */
     @Test
     fun activationCallbackPrecedesBestEffortPostSwitchWork() {
         val source = appStateSource().readText()
@@ -356,9 +358,14 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val body = source.substring(start, end)
         val activationGuard =
             body.indexOf(
-                "if (!shouldActivate() || !isAccountSwitchCurrent(requestGeneration)) return",
+                "if (!activationAllowed())",
             )
         val activeRef = body.indexOf("activeAccountRef = label")
+        val selfProfile = body.indexOf("currentStartupProfiles.forEach(::applyAccountSwitchProfileSeed)")
+        assertTrue(
+            "startup self identity must precede account publication",
+            selfProfile in (activationGuard + 1)..<activeRef,
+        )
         val localUiState = body.indexOf("reloadMediaAutoDownloadMatrix()", startIndex = activeRef)
         val activated = body.indexOf("onActivated()", startIndex = localUiState)
         val profile = body.indexOf("warmProfile(it)", startIndex = activated)
@@ -383,13 +390,14 @@ class AccountSwitchLocalSnapshotOrderingTest {
         }
     }
 
+    /** Notification activation still skips broad reads while startup owns only its self-profile read. */
     @Test
     fun notificationPriorityPolicySkipsBroadPreloadAndDefersBestEffortWork() {
         val body = setActiveAccountSection()
         val policyGate = body.indexOf("val preloadPlan = accountSwitchPreloadPlan(")
         val rowGate = body.indexOf("if (preloadPlan.loadLocalRows)", startIndex = policyGate)
         val broadSnapshot = body.indexOf("loadAccountSwitchLocalSnapshot(")
-        val policyElse = body.indexOf("} else {", startIndex = policyGate)
+        val policyElse = body.indexOf("} else {", startIndex = rowGate)
         val activated = body.indexOf("onActivated()")
         val firstFrameGate = body.indexOf("awaitPostActivationWork()", startIndex = activated)
         val staleGuard =
@@ -408,7 +416,9 @@ class AccountSwitchLocalSnapshotOrderingTest {
             policyGate >= 0 && rowGate > policyGate && broadSnapshot > rowGate && policyElse > broadSnapshot,
         )
         assertTrue("the target account must activate before waiting for its readable frame", firstFrameGate > activated)
-        assertTrue("superseded deferred work must be rejected after the wait", staleGuard > firstFrameGate)
+        val refreshCall = body.indexOf("refreshActivatedAccount(label, requestGeneration, activationRuntimeGeneration)")
+        assertTrue("refreshes must wait for the target frame", refreshCall > firstFrameGate)
+        assertTrue("superseded deferred work must be rejected after the wait", staleGuard > refreshCall)
         assertTrue("profile warming must stay outside the target first-frame path", profile > staleGuard)
     }
 

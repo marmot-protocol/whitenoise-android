@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.kotlinBlockFrom
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
@@ -78,23 +79,72 @@ class CancellationHandlingTest {
                 "marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(accountIdHex) } }.getOrNull()" to
                 "runCatchingCancellable { " +
                 "marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(accountIdHex) } }.getOrNull()",
-            "runCatching { marmotIo(MarmotTraceSection.PROFILE_READ) { userProfile(id) } }.getOrNull()" to
-                "runCatchingCancellable { marmotIo(MarmotTraceSection.PROFILE_READ) { userProfile(id) } }.getOrNull()",
-            "runCatching { marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(id) } }.getOrNull()" to
-                "runCatchingCancellable { " +
-                "marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(id) } }.getOrNull()",
         ).forEach { (unsafe, safe) ->
             assertFalse("unsafe fallback must stay migrated: $unsafe", unsafe in compactAppState)
             assertTrue("missing cancellation-safe fallback: $safe", safe in compactAppState)
         }
 
         assertNotificationIdentityReadPreservesCancellation(appState)
+        assertLocalProfileReadUsesExtractedBoundary(appState)
 
         val controllers = controllersSource().readText()
         val unsafeRelayHealth = "runCatching { appState.marmotIo { relayHealth() } }.getOrNull()"
         val safeRelayHealth = "runCatchingCancellable { appState.marmotIo { relayHealth() } }.getOrNull()"
         assertFalse("relay-health fallback must stay migrated", unsafeRelayHealth in controllers)
         assertTrue("relay-health fallback must propagate cancellation", safeRelayHealth in controllers)
+    }
+
+    /** A cancelled primary read must escape without invoking the display-name fallback. */
+    @Test
+    fun localProfileCancellationDoesNotBecomeAMiss() {
+        val cancellation = CancellationException("cancelled profile read")
+        val thrown =
+            assertThrows(CancellationException::class.java) {
+                runBlocking {
+                    readLocalAccountProfileSeed(
+                        id = "synthetic",
+                        readProfile = { throw cancellation },
+                        readDisplayName = { error("Cancellation must not reach fallback") },
+                    )
+                }
+            }
+        assertSame(cancellation, thrown)
+    }
+
+    /** Cancellation in the secondary read must escape instead of publishing an empty seed. */
+    @Test
+    fun localDisplayNameCancellationDoesNotBecomeAMiss() {
+        val cancellation = CancellationException("cancelled display-name read")
+        val thrown =
+            assertThrows(CancellationException::class.java) {
+                runBlocking {
+                    readLocalAccountProfileSeed(
+                        id = "synthetic",
+                        readProfile = { null },
+                        readDisplayName = { throw cancellation },
+                    )
+                }
+            }
+        assertSame(cancellation, thrown)
+    }
+
+    /** Pins production adapter wiring while executable tests audit the extracted fallback behavior. */
+    private fun assertLocalProfileReadUsesExtractedBoundary(appState: String) {
+        assertTrue("local profile adapter must exist", "private suspend fun loadAccountSwitchProfileSeed(" in appState)
+        val adapter =
+            appState
+                .substringAfter("private suspend fun loadAccountSwitchProfileSeed(")
+                .substringBefore("/**")
+                .replace(Regex("""\s+"""), " ")
+        assertTrue("local profile reads must use the audited helper", "readLocalAccountProfileSeed(" in adapter)
+        assertTrue(
+            "profile reads must remain off-main",
+            "marmotIo(MarmotTraceSection.PROFILE_READ) { userProfile(it) }" in adapter,
+        )
+        assertTrue(
+            "display-name reads must remain off-main",
+            "marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(it) }" in adapter,
+        )
     }
 
     @Test

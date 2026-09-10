@@ -5129,6 +5129,12 @@ class WhiteNoiseAppState private constructor(
             val activationStillWanted =
                 shouldActivate() && isAccountSwitchCurrent(requestGeneration)
             val preloadPlan = accountSwitchPreloadPlan(switchingAccounts, activationStillWanted, preloadPolicy)
+            val activationRuntimeGeneration = runtimeGeneration
+            // Self metadata remains independent of the chat-row read and its failure boundary.
+            val startupProfile =
+                preloadStartupSelfProfile(preloadPolicy, target?.accountIdHex, activationStillWanted) {
+                    loadAccountSwitchProfileSeed(it)
+                }
             val localSnapshot =
                 if (preloadPlan.loadLocalRows) {
                     loadAccountSwitchLocalSnapshot(
@@ -5139,46 +5145,57 @@ class WhiteNoiseAppState private constructor(
                 } else {
                     null
                 }
-            // A route may outlive the UI intent that requested it while a signed-out
-            // account is being restored. Let request-scoped callers reject that late
-            // activation without cancelling the process-lifetime sign-in work.
-            if (!shouldActivate() || !isAccountSwitchCurrent(requestGeneration)) return false
-            // Account switch: drop in-process plaintext so account A's bytes
-            // aren't reachable from account B's UI loops, but keep L2 (disk)
-            // intact. The disk cache key is `mediaCacheKey(account, msg)`, so
-            // switching to B can never read A's files — and switching BACK to
-            // A re-hydrates L1 from L2 with a single file read instead of a
-            // re-download. Sign-out (signOutActiveAccount) is what actually
-            // wipes disk; switching is just a UI context flip.
+            val activationAllowed = {
+                shouldActivate() &&
+                    isAccountSwitchCurrent(requestGeneration) &&
+                    canPublishAccountActivation(label, activationRuntimeGeneration)
+            }
+            // Reject expired UI intent without cancelling process-lifetime sign-in work.
+            if (!activationAllowed()) return false
+            if (switchingAccounts) hideConversationShortcutsFromDirectShare()
+            // Shortcut cleanup suspends: reject supersession/deletion again before publishing seeds.
+            if (!activationAllowed()) return false
+            val currentStartupProfiles = startupSeeds(startupProfile)
+            // Publish without suspension to retain profiles on rejection; account-keyed disk media survives switches.
             if (switchingAccounts) {
                 clearInMemoryMediaCaches()
                 clearCrossAccountCaches()
-                hideConversationShortcutsFromDirectShare()
             }
             stageAccountSwitchLocalSnapshot(label, switchingAccounts, requestGeneration, localSnapshot)
+            currentStartupProfiles.forEach(::applyAccountSwitchProfileSeed)
             activeAccountRef = label
             preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
             reloadMediaAutoDownloadMatrix()
-            // This is the local-ready boundary for account switching. UI callers can
-            // dismiss/reset navigation now, while the process-lifetime mutation keeps
-            // the profile/privacy/notification/push work below alive in the background.
+            // Local-ready lets callers reset navigation before process-lifetime background refreshes.
             onActivated()
-            // An inactive-account notification already owns a precise local target.
-            // Its first readable transcript must not compete with broad profile,
-            // notification, or push refreshes. Ordinary account switches use the
-            // immediate default; the notification route releases this after the
-            // target frame, on failure, or when superseded.
+            // Notification routes wait for their target frame, failure, or supersession; ordinary switches do not wait.
             awaitPostActivationWork()
-            if (isCurrentPostActivationAccountSwitch(label, requestGeneration)) {
-                accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
-                configurePrivacyRuntime()
-                refreshLocalNotificationSettings()
-                syncNativePushRegistrationIfEnabled()
-            }
+            refreshActivatedAccount(label, requestGeneration, activationRuntimeGeneration)
             return true
         } finally {
             accountSwitchHandoff.finishRequest(requestGeneration)
         }
+    }
+
+    /** Rechecks activation and runtime ownership before each best-effort step after the first-frame wait. */
+    @Suppress("ReturnCount") // Every suspending step is a separate stale-owner admission boundary.
+    private suspend fun refreshActivatedAccount(
+        label: String,
+        requestGeneration: Long,
+        activationRuntimeGeneration: Int,
+    ) {
+        val isCurrent = {
+            runtimeGeneration == activationRuntimeGeneration &&
+                isCurrentPostActivationAccountSwitch(label, requestGeneration)
+        }
+        if (!isCurrent()) return
+        accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
+        if (!isCurrent()) return
+        configurePrivacyRuntime()
+        if (!isCurrent()) return
+        refreshLocalNotificationSettings()
+        if (!isCurrent()) return
+        syncNativePushRegistrationIfEnabled()
     }
 
     /**
@@ -10149,30 +10166,15 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Read one persisted profile without mutating the active account caches. */
-    private suspend fun loadAccountSwitchProfileSeed(id: String): AccountSwitchProfileSeed {
-        val profile =
-            if (profileReader != null) {
-                runCatchingCancellable { profileReader.invoke(id) }.getOrNull()
-            } else {
-                runCatchingCancellable { marmotIo(MarmotTraceSection.PROFILE_READ) { userProfile(id) } }.getOrNull()
-            }
-        val rawDisplayName =
-            if (profile != null) {
-                // accountSwitchProfileSeed treats a persisted profile as the
-                // authoritative name state, including an explicit clear. A
-                // separate displayName read cannot affect that result, so do
-                // not add one redundant FFI/database call per warmed identity.
-                null
-            } else if (profileDisplayNameReader != null) {
-                runCatchingCancellable { profileDisplayNameReader.invoke(id) }.getOrNull()
-            } else {
-                runCatchingCancellable {
-                    marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(id) }
-                }.getOrNull()
-            }
-        return accountSwitchProfileSeed(id, profile, rawDisplayName)
-    }
+    private suspend fun loadAccountSwitchProfileSeed(id: String): AccountSwitchProfileSeed =
+        readLocalAccountProfileSeed(
+            id = id,
+            readProfile = profileReader ?: { marmotIo(MarmotTraceSection.PROFILE_READ) { userProfile(it) } },
+            readDisplayName =
+                profileDisplayNameReader ?: { marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(it) } },
+        )
 
+    /** Publishes sanitized authoritative metadata, including explicit profile-field removal. */
     internal fun applyAccountSwitchProfileSeed(seed: AccountSwitchProfileSeed) {
         applyProfilePresentation(
             accountIdHex = seed.accountIdHex,

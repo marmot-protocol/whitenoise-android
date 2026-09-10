@@ -264,6 +264,7 @@ jobs:
             --tests '*ChatActionSheetTest' \
             --tests '*ChatListPinnedBoundaryTest' \
             --tests '*ChatListTtsTransportLayoutTest' \
+            --tests '*ChatListTopBarColdStartSelfProfileFirstFrameTest' \
             --tests '*ConversationTtsFollowComposeTest' \
             --tests '*BubbleCollapsibleFooterLayoutTest' \
             --tests '*MessageBubbleEditedMarkdownTest' \
