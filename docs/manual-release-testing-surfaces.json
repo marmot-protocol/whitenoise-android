@@ -7558,6 +7558,22 @@
     ],
     "source_coverage": [
       {
+        "surface": "First-use event-card client initialization stays off the conversation UI thread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardResolver.kt",
+        "anchor": "internal fun defaultNostrEventQuery(",
+        "test_ids": [
+          "CHL-005"
+        ]
+      },
+      {
+        "surface": "Pending-forward storage initializes within serialized off-main access",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PendingForwardRequestStore.kt",
+        "anchor": "internal class SerializedPendingForwardRequestStore(",
+        "test_ids": [
+          "CHL-005"
+        ]
+      },
+      {
         "surface": "Imported-account setup recovery reads fail closed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupCoordinator.kt",
         "anchor": "suspend fun accountsState(",

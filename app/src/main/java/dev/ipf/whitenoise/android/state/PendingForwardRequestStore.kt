@@ -58,13 +58,21 @@ internal interface PendingForwardRequestStore {
 
 /**
  * Serializes store access before dispatching blocking encryption and disk
- * work, so a newer request or dismissal always lands after an in-flight write
- * instead of being overwritten by stale work.
+ * work, including first-use store creation, so a newer request or dismissal
+ * always lands after an in-flight write instead of being overwritten by stale work.
  */
 internal class SerializedPendingForwardRequestStore(
-    private val delegate: PendingForwardRequestStore,
+    delegateProvider: () -> PendingForwardRequestStore,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
+    private val delegate by lazy(delegateProvider)
+
+    /** Wraps an already-owned store without changing its existing lifetime. */
+    constructor(
+        delegate: PendingForwardRequestStore,
+        ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    ) : this({ delegate }, ioDispatcher)
+
     /** Serializes one save behind the process mutex on the IO dispatcher. */
     suspend fun save(request: PendingForwardRequest): Boolean =
         processMutex.withLock {
@@ -174,7 +182,7 @@ internal class EncryptedPendingForwardRequestStore(
         /** One process-wide store: every picker surface shares the single unresolved entry. */
         fun forContext(context: Context): SerializedPendingForwardRequestStore =
             processInstance ?: synchronized(this) {
-                processInstance ?: SerializedPendingForwardRequestStore(create(context))
+                processInstance ?: SerializedPendingForwardRequestStore(delegateProvider = { create(context) })
                     .also { processInstance = it }
             }
 

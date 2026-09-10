@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -279,9 +280,19 @@ internal class NostrEventCardResolver(
     }
 }
 
-private fun defaultNostrEventQuery(): suspend (List<String>, JSONObject) -> List<NostrEvent> {
-    val client = NostrRelayQueryClient()
-    return { relays, filter -> client.query(relays, filter, maxEvents = EVENT_CARD_QUERY_LIMIT).events }
+/** Defers client and TLS initialization until a query needs them, away from the composition thread. */
+internal fun defaultNostrEventQuery(
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    clientFactory: () -> NostrRelayQueryClient = { NostrRelayQueryClient() },
+): suspend (List<String>, JSONObject) -> List<NostrEvent> {
+    val client by lazy(clientFactory)
+    return { relays, filter ->
+        withContext(ioDispatcher) {
+            val initializedClient = client
+            coroutineContext.ensureActive()
+            initializedClient.query(relays, filter, maxEvents = EVENT_CARD_QUERY_LIMIT).events
+        }
+    }
 }
 
 internal suspend fun WhiteNoiseAppState.publicEventCardRelays(): List<String> {
