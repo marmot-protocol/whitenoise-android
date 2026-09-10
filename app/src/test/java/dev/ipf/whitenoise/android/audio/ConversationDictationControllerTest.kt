@@ -1414,6 +1414,78 @@ class ConversationDictationControllerTest {
         assertEquals(1, lastSession.acknowledgedCallerAudio)
     }
 
+    /** Captured tail audio survives a stop request that lands between provider generations. */
+    @Test
+    fun stopDuringRestartGapSealsAndDrainsCallerAudioTail() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        fixture.platform.listener.onResult("first")
+        fixture.controller.stop()
+
+        assertEquals(2, fixture.platform.sessions.size)
+        fixture.platform.pendingCallerAudio = false
+        fixture.platform.listener.onResult("tail")
+        assertEquals("first tail", fixture.drafts.getValue(key()).text)
+    }
+
+    /** A stop before the next provider's speech callback still drains its captured caller-audio chunk. */
+    @Test
+    fun stopBeforeSpeechCallbackDoesNotDiscardCallerAudioTail() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("first")
+        fixture.scheduler.runDelay(250L)
+
+        fixture.controller.stop()
+
+        assertEquals(
+            0,
+            fixture.platform.sessions
+                .last()
+                .cancelCalls,
+        )
+        fixture.platform.pendingCallerAudio = false
+        fixture.platform.listener.onResult("tail")
+        assertEquals("first tail", fixture.drafts.getValue(key()).text)
+    }
+
+    /** A stuck capture close fails within the drain bound and its late callback cannot restart recognition. */
+    @Test
+    fun stuckCallerAudioCloseTimesOutAndFencesItsLateCallback() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.platform.deferCallerAudioFinish = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("first")
+
+        fixture.controller.stop()
+        fixture.scheduler.runThrough(90_000L)
+
+        val review = fixture.controller.state as ConversationDictationState.ReviewRequired
+        assertEquals("first", review.transcript)
+        val sessionsBeforeLateClose = fixture.platform.sessions.size
+        checkNotNull(fixture.platform.callerAudioFinishCallback).invoke()
+        assertEquals(sessionsBeforeLateClose, fixture.platform.sessions.size)
+    }
+
+    /** A one-hour capture remains admitted, while the 65-minute safety bound still fails closed. */
+    @Test
+    fun oneHourSessionRemainsActiveUntilTheSixtyFiveMinuteDeadline() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onReady()
+
+        fixture.scheduler.runThrough(60L * 60L * 1_000L)
+
+        assertTrue(fixture.controller.state is ConversationDictationState.Listening)
+        fixture.scheduler.runThrough(5L * 60L * 1_000L)
+        assertTrue(fixture.controller.state is ConversationDictationState.Processing)
+        assertTrue(fixture.platform.session.stopped)
+    }
+
     /** Verifies that recognizer churn retains one microphone lease and releases it only at logical teardown. */
     @Test
     fun microphoneLeaseSurvivesGenerationsAndReleasesOnceAtLogicalTeardown() {
@@ -2940,6 +3012,8 @@ class ConversationDictationControllerTest {
         lateinit var callerAudioProbeCallback: (ConversationDictationCallerAudioRequirement) -> Unit
             private set
         var pendingCallerAudio = false
+        var deferCallerAudioFinish = false
+        var callerAudioFinishCallback: (() -> Unit)? = null
 
         /** Simulates a platform that cannot even start the question, such as a recognizer refusal. */
         var callerAudioProbeFailure: RuntimeException? = null
@@ -2977,6 +3051,16 @@ class ConversationDictationControllerTest {
         override fun callerAudioRequirement(): ConversationDictationCallerAudioRequirement = callerAudio
 
         override fun callerAudioHasPending(): Boolean = pendingCallerAudio
+
+        override fun finishCallerAudioCapture(onClosed: () -> Unit): Boolean {
+            if (!pendingCallerAudio) return false
+            if (deferCallerAudioFinish) {
+                callerAudioFinishCallback = onClosed
+            } else {
+                onClosed()
+            }
+            return true
+        }
 
         override fun probeCallerAudioSupport(callback: (ConversationDictationCallerAudioRequirement) -> Unit): ConversationDictationTimeoutHandle {
             callerAudioProbes += 1
