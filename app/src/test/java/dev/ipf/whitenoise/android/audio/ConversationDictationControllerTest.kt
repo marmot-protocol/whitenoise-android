@@ -1389,6 +1389,31 @@ class ConversationDictationControllerTest {
         assertEquals("Hello", fixture.drafts.getValue(key()).text)
     }
 
+    /** Stopping capture drains every sealed caller-audio chunk before committing the transcript. */
+    @Test
+    fun stopDrainsPendingCallerAudioChunksBeforeFinalizing() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        fixture.controller.stop()
+        fixture.platform.listener.onResult("first")
+
+        assertEquals(2, fixture.platform.sessions.size)
+        val draftText = fixture.drafts.getValue(key()).text
+        assertTrue(draftText.isEmpty())
+        val firstSession = fixture.platform.sessions.first()
+        assertEquals(1, firstSession.acknowledgedCallerAudio)
+
+        fixture.platform.pendingCallerAudio = false
+        fixture.platform.listener.onResult("second")
+
+        assertEquals("first second", fixture.drafts.getValue(key()).text)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        val lastSession = fixture.platform.sessions.last()
+        assertEquals(1, lastSession.acknowledgedCallerAudio)
+    }
+
     /** Verifies that recognizer churn retains one microphone lease and releases it only at logical teardown. */
     @Test
     fun microphoneLeaseSurvivesGenerationsAndReleasesOnceAtLogicalTeardown() {
@@ -2914,6 +2939,7 @@ class ConversationDictationControllerTest {
             private set
         lateinit var callerAudioProbeCallback: (ConversationDictationCallerAudioRequirement) -> Unit
             private set
+        var pendingCallerAudio = false
 
         /** Simulates a platform that cannot even start the question, such as a recognizer refusal. */
         var callerAudioProbeFailure: RuntimeException? = null
@@ -2950,6 +2976,8 @@ class ConversationDictationControllerTest {
 
         override fun callerAudioRequirement(): ConversationDictationCallerAudioRequirement = callerAudio
 
+        override fun callerAudioHasPending(): Boolean = pendingCallerAudio
+
         override fun probeCallerAudioSupport(callback: (ConversationDictationCallerAudioRequirement) -> Unit): ConversationDictationTimeoutHandle {
             callerAudioProbes += 1
             callerAudioProbeFailure?.let { throw it }
@@ -2979,6 +3007,7 @@ class ConversationDictationControllerTest {
         var destroyed = false
         var cancelCalls = 0
         var destroyCalls = 0
+        var acknowledgedCallerAudio = 0
         private val captureFinished = mutableListOf<() -> Unit>()
         private var captureClosed = false
         private var deferredProviderError: ConversationDictationFailure? = null
@@ -3049,6 +3078,11 @@ class ConversationDictationControllerTest {
         override fun destroy(onAudioCaptureFinished: () -> Unit) {
             destroy()
             registerCaptureFinished(onAudioCaptureFinished)
+        }
+
+        override fun acknowledgeCallerAudio(): Boolean {
+            acknowledgedCallerAudio += 1
+            return true
         }
     }
 

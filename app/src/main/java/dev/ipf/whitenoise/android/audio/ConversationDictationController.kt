@@ -253,6 +253,12 @@ internal interface ConversationDictationRecognitionSession {
         destroy()
         onAudioCaptureFinished()
     }
+
+    /** Releases the exact caller-audio chunk only after this generation's final was accepted. */
+    fun acknowledgeCallerAudio(): Boolean = false
+
+    /** Requeues the exact caller-audio chunk when this generation failed before a usable final. */
+    fun retryCallerAudio(): Boolean = false
 }
 
 internal class ConversationDictationProviderUnavailableException : IllegalStateException()
@@ -316,6 +322,12 @@ internal interface ConversationDictationPlatform {
         callback(callerAudioRequirement())
         return ConversationDictationTimeoutHandle {}
     }
+
+    /** Whether capture still owns sealed, partial, or in-flight caller audio for the logical session. */
+    fun callerAudioHasPending(): Boolean = false
+
+    /** Releases volatile caller audio at logical-session teardown. */
+    fun discardCallerAudio(onClosed: () -> Unit): Boolean = false
 
     /** Creates one recognition generation whose callbacks are owned by [listener]. */
     fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession
@@ -1351,11 +1363,12 @@ internal class ConversationDictationController internal constructor(
                     if (!owns(sessionId, generationId)) return
                     val readyAt = generationReadyAtElapsedMillis
                     val recognized = transcript?.trim().orEmpty()
+                    recognitionSession?.acknowledgeCallerAudio()
                     if (recognized.isNotBlank()) unresolvedRecognitionFailure = null
                     if (recognized.isBlank()) {
                         clearRecognitionGeneration(cancel = false)
                         if (finishRequested) {
-                            finalizeAccumulatedTranscript(sessionId, target)
+                            continueOrFinalizeCallerAudioDrain(sessionId, target)
                         } else {
                             restartAfterNoSpeech(sessionId, target, readyAt)
                         }
@@ -1370,7 +1383,7 @@ internal class ConversationDictationController internal constructor(
                     clearRecognitionGeneration(cancel = false)
                     commitSegment(recognized)
                     if (finishRequested) {
-                        finalizeAccumulatedTranscript(sessionId, target)
+                        continueOrFinalizeCallerAudioDrain(sessionId, target)
                     } else {
                         scheduleRestart(sessionId, target, SUCCESS_RESULT_RESTART_DELAY_MILLIS, "result")
                     }
@@ -1426,6 +1439,18 @@ internal class ConversationDictationController internal constructor(
                     },
                 )
             }
+        }
+    }
+
+    /** Keeps the logical session fenced while every captured chunk is recognized exactly once. */
+    private fun continueOrFinalizeCallerAudioDrain(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+    ) {
+        if (runCatching(platform::callerAudioHasPending).getOrDefault(false)) {
+            startRecognition(sessionId, target)
+        } else {
+            finalizeAccumulatedTranscript(sessionId, target)
         }
     }
 
@@ -1739,9 +1764,11 @@ internal class ConversationDictationController internal constructor(
         silenceTimeoutHandle?.cancel()
         silenceTimeoutHandle = null
         silenceDeadlineElapsedMillis = null
+        val platformOwnsCaptureClosure =
+            runCatching { platform.discardCallerAudio(::finishPlaybackInterruption) }.getOrDefault(false)
         clearRecognitionGeneration(
             cancel = cancel,
-            onAudioCaptureFinished = ::finishPlaybackInterruption,
+            onAudioCaptureFinished = if (platformOwnsCaptureClosure) ({}) else ::finishPlaybackInterruption,
         )
         if (durableSession && releaseDurableSession) {
             durableSession = false
@@ -2322,6 +2349,8 @@ internal class AndroidConversationDictationPlatform(
     private val context: Context,
 ) : ConversationDictationPlatform {
     private var sessionRecognitionService: ComponentName? = null
+    private var callerAudioCapture: ConversationDictationCallerAudio? = null
+    private var nextCallerAudioSessionId = 0L
 
     /**
      * Remembers what each provider build answered about caller-supplied audio.
@@ -2436,7 +2465,7 @@ internal class AndroidConversationDictationPlatform(
         return AndroidConversationDictationRecognitionSession(
             context = context,
             recognitionService = selected,
-            callerAudio = openCallerAudioIfProviderCannotRecord(),
+            callerAudio = openCallerAudioStreamIfProviderCannotRecord(),
             listener = listener,
         )
     }
@@ -2445,21 +2474,38 @@ internal class AndroidConversationDictationPlatform(
      * Captures in White Noise for an ordinary unselected provider, whose binding lacks the
      * microphone capability. Selected and preinstalled providers keep their own capture path.
      */
-    private fun openCallerAudioIfProviderCannotRecord(): ConversationDictationCallerAudio? {
+    private fun openCallerAudioStreamIfProviderCannotRecord(): ConversationDictationCallerAudioStream? {
         val systemSelected = selectedRecognitionService() != null
         val providerRecords = providerCanRecord(sessionRecognitionService)
         val supported = conversationDictationAudioSourceSupported()
-        val source =
+        val capture =
             if (providerRecords || !supported) {
                 null
             } else {
-                ConversationDictationCallerAudio.open()
+                callerAudioCapture ?: createCallerAudioCapture()
             }
+        val source = capture?.openProviderStream()
         conversationDictationDiagnostic(
             "event=caller_audio_mode enabled=${source != null} " +
                 "system_selected=$systemSelected provider_records=$providerRecords supported=$supported",
         )
         return source
+    }
+
+    override fun callerAudioHasPending(): Boolean = callerAudioCapture?.hasPending() == true
+
+    private fun createCallerAudioCapture(): ConversationDictationCallerAudio? {
+        val capture = ConversationDictationCallerAudio.open(++nextCallerAudioSessionId)
+        callerAudioCapture = capture
+        return capture
+    }
+
+    override fun discardCallerAudio(onClosed: () -> Unit): Boolean {
+        val capture = callerAudioCapture
+        callerAudioCapture = null
+        if (capture == null) return false
+        capture.discard(onClosed)
+        return true
     }
 
     /** Reports what is already known about the resolved provider build, without asking it. */
@@ -2732,7 +2778,7 @@ private class ConversationDictationCallerAudioProbe(
 private class AndroidConversationDictationRecognitionSession(
     context: Context,
     recognitionService: ComponentName,
-    private val callerAudio: ConversationDictationCallerAudio?,
+    private val callerAudio: ConversationDictationCallerAudioStream?,
     private val listener: ConversationDictationRecognitionListener,
 ) : ConversationDictationRecognitionSession {
     private val recognizer = SpeechRecognizer.createSpeechRecognizer(context, recognitionService)
@@ -2853,9 +2899,12 @@ private class AndroidConversationDictationRecognitionSession(
     override fun stop(onAudioCaptureFinished: () -> Unit) {
         conversationDictationDiagnostic("event=platform_stop_listening")
         captureFinished.set(onAudioCaptureFinished)
-        // Close the audio first: a provider reading a caller descriptor ends the utterance on EOF.
-        if (callerAudioCapturing) callerAudio?.stop(::reportCaptureFinished)
-        recognizer.stopListening()
+        // Caller-audio requests finish on descriptor EOF; stopListening would race the final chunk.
+        if (callerAudioCapturing) {
+            callerAudio?.finishCapture(::reportCaptureFinished)
+        } else {
+            recognizer.stopListening()
+        }
     }
 
     /** Requests a final result when no capture acknowledgement is required. */
@@ -2868,9 +2917,7 @@ private class AndroidConversationDictationRecognitionSession(
             delivery()
             return
         }
-        callerAudio?.cancel {
-            callerAudioCapturing = false
-            reportCaptureFinished()
+        callerAudio?.onFeedClosed {
             if (Looper.myLooper() == Looper.getMainLooper()) delivery() else mainHandler.post(delivery)
         } ?: delivery()
     }
@@ -2889,7 +2936,7 @@ private class AndroidConversationDictationRecognitionSession(
     override fun cancel(onAudioCaptureFinished: () -> Unit) {
         conversationDictationDiagnostic("event=platform_cancel")
         captureFinished.set(onAudioCaptureFinished)
-        if (callerAudioCapturing) callerAudio?.cancel(::reportCaptureFinished) else reportCaptureFinished()
+        if (callerAudioCapturing) callerAudio?.cancel() else reportCaptureFinished()
         recognizer.cancel()
     }
 
@@ -2899,12 +2946,18 @@ private class AndroidConversationDictationRecognitionSession(
     /** Releases the recognizer and acknowledges closure of caller-owned capture. */
     override fun destroy(onAudioCaptureFinished: () -> Unit) {
         captureFinished.set(onAudioCaptureFinished)
-        if (callerAudioCapturing) callerAudio?.cancel(::reportCaptureFinished) else reportCaptureFinished()
+        if (callerAudioCapturing) callerAudio?.cancel() else reportCaptureFinished()
         if (destroyed) return
         destroyed = true
         conversationDictationDiagnostic("event=platform_destroy")
         recognizer.destroy()
+        callerAudio?.closeProviderEnd()
+        reportCaptureFinished()
     }
+
+    override fun acknowledgeCallerAudio(): Boolean = callerAudio?.acknowledge() == true
+
+    override fun retryCallerAudio(): Boolean = callerAudio?.retry() == true
 
     /** Releases the recognizer when no capture acknowledgement is required. */
     override fun destroy() = destroy {}

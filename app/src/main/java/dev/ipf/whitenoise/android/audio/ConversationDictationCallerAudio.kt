@@ -9,10 +9,10 @@ import android.os.SystemClock
 import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
-import java.io.FileDescriptor
 import java.util.Locale
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 import kotlin.math.abs
 import kotlin.math.max
@@ -30,81 +30,125 @@ private const val SHORT_FULL_SCALE = 32_768f
 private const val BUFFER_READS = 4
 private const val BYTE_MASK = 0xFF
 private const val HIGH_BYTE_SHIFT = 8
+private const val PIPE_RETRY_MILLIS = 10L
+private const val PIPE_STALL_TIMEOUT_MILLIS = 2_000L
 
 /**
- * Captures dictation audio in White Noise and streams it to the speech provider through
- * [android.speech.RecognizerIntent.EXTRA_AUDIO_SOURCE].
+ * Owns one continuous microphone capture for a logical dictation session.
  *
- * A provider Android has not selected in `voice_recognition_service` is bound without
- * `BIND_INCLUDE_CAPABILITIES`, so it never holds the while-in-use microphone capability that an
- * "only while using the app" RECORD_AUDIO grant needs, and `RecognitionService` fails the session
- * with `ERROR_INSUFFICIENT_PERMISSIONS` before the provider records anything. White Noise is the
- * app the user is looking at and runs a microphone-typed foreground service, so it holds that
- * capability itself. Capturing here and handing the provider a descriptor moves the microphone to
- * the side of the boundary that is allowed to open it.
- *
- * Closing the write end ends the utterance, so the provider sees the same end of audio it would
- * get from its own recorder stopping.
+ * Recognition generations attach one provider stream at a time. Capture is split into immutable
+ * 30-second chunks and remains active while the provider returns a final and the next recognizer is
+ * created. Queued and in-flight PCM is bounded to 90 seconds; overflow stops capture instead of
+ * silently dropping a read.
  */
 internal class ConversationDictationCallerAudio private constructor(
     private val recorder: AudioRecord,
-    private val writeEnd: ParcelFileDescriptor,
-    /** The descriptor handed to the provider through the recognizer intent. */
-    val providerEnd: ParcelFileDescriptor,
+    private val buffer: ConversationDictationAudioChunkBuffer,
 ) {
-    private val streaming = AtomicBoolean(false)
-    private val finished = AtomicBoolean(false)
+    private val recording = AtomicBoolean(false)
+    private val finishing = AtomicBoolean(false)
     private val captureClosed = AtomicBoolean(false)
+    private val discarded = AtomicBoolean(false)
     private val captureClosedCallbacks = ConcurrentLinkedQueue<() -> Unit>()
+    private val activeStream = AtomicReference<ConversationDictationCallerAudioStream?>(null)
 
-    /** Begins capture and starts streaming to the provider. Reports whether capture is running. */
+    /** Starts the recorder once; later recognition generations reuse the same capture. */
+    @Suppress("ReturnCount")
     fun start(): Boolean {
-        if (!streaming.compareAndSet(false, true)) return false
-
-        val recording = beginRecording()
-        if (recording) {
-            conversationDictationDiagnostic(
-                "event=caller_audio_started sample_rate=$CALLER_AUDIO_SAMPLE_RATE_HZ " +
-                    "channels=$CALLER_AUDIO_CHANNEL_COUNT encoding=pcm16",
-            )
-            thread(name = "dictation-caller-audio", isDaemon = true) { stream() }
-        } else {
+        if (captureClosed.get() || finishing.get()) return false
+        if (recording.get()) return true
+        if (!recording.compareAndSet(false, true)) return recording.get()
+        val started =
+            runCatching { recorder.startRecording() }.isSuccess &&
+                recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING
+        if (!started) {
+            recording.set(false)
             conversationDictationDiagnostic(
                 "event=caller_audio_start_failed recording_state=${recorder.recordingState}",
             )
-            streaming.set(false)
-            release()
+            releaseRecorder()
+            return false
         }
-        return recording
+        conversationDictationDiagnostic(
+            "event=caller_audio_started sample_rate=$CALLER_AUDIO_SAMPLE_RATE_HZ " +
+                "channels=$CALLER_AUDIO_CHANNEL_COUNT encoding=pcm16 chunk_seconds=30 buffer_seconds=90",
+        )
+        thread(name = "dictation-caller-audio-capture", isDaemon = true, block = ::capture)
+        return true
     }
 
-    /**
-     * Ends the utterance and reports only after the recorder and both pipe ends are closed.
-     */
-    fun stop(onClosed: () -> Unit) = finish("stop", onClosed)
+    /** Opens the only serial provider stream. The recorder itself is not restarted. */
+    @Suppress("ReturnCount")
+    fun openProviderStream(): ConversationDictationCallerAudioStream? {
+        if (captureClosed.get() || discarded.get()) return null
+        val pipe = openPipe() ?: return null
+        val stream = ConversationDictationCallerAudioStream(this, pipe[1], pipe[0], buffer)
+        return if (activeStream.compareAndSet(null, stream)) {
+            stream
+        } else {
+            pipe.forEach { runCatching(it::close) }
+            null
+        }
+    }
 
-    /** Abandons capture and reports only after every capture resource is closed. */
-    fun cancel(onClosed: () -> Unit) = finish("cancel", onClosed)
-
-    private fun beginRecording(): Boolean =
-        runCatching { recorder.startRecording() }.isSuccess &&
-            recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING
-
-    /** Starts idempotent teardown after retaining this caller's closure acknowledgement. */
-    private fun finish(
-        reason: String,
-        onClosed: () -> Unit,
-    ) {
+    /** Stops microphone capture and seals the final short chunk, while queued audio keeps draining. */
+    fun finish(onClosed: () -> Unit) {
         registerCaptureClosedCallback(onClosed)
-        if (finished.compareAndSet(false, true)) {
-            conversationDictationDiagnostic("event=caller_audio_finish reason=$reason")
-            // The streaming thread owns the recorder and both descriptors once it is running, so
-            // it does the teardown; clearing the flag is what stops it.
-            if (!streaming.compareAndSet(true, false)) release()
+        if (finishing.compareAndSet(false, true)) {
+            conversationDictationDiagnostic("event=caller_audio_finish reason=stop")
+            if (!recording.compareAndSet(true, false)) {
+                buffer.finish()
+                releaseRecorder()
+            }
         }
     }
 
-    /** Registers one close acknowledgement without losing it to a concurrent teardown path. */
+    /** Destroys volatile PCM after cancellation or logical-session completion. */
+    fun discard(onClosed: () -> Unit = {}) {
+        registerCaptureClosedCallback(onClosed)
+        discarded.set(true)
+        buffer.discard()
+        activeStream.getAndSet(null)?.cancel(requeue = false)
+        if (finishing.compareAndSet(false, true) && !recording.compareAndSet(true, false)) releaseRecorder()
+    }
+
+    fun hasPending(): Boolean = buffer.hasPending
+
+    internal fun streamSettled(stream: ConversationDictationCallerAudioStream) {
+        activeStream.compareAndSet(stream, null)
+    }
+
+    private fun capture() {
+        val samples = ShortArray(FRAMES_PER_READ)
+        val encoded = ByteArray(FRAMES_PER_READ * BYTES_PER_FRAME)
+        val progress = CallerAudioProgress()
+        try {
+            while (recording.get() && progress.stopReason == null) {
+                val read = recorder.read(samples, 0, samples.size)
+                if (read <= 0) {
+                    progress.stopReason = "read=$read"
+                } else {
+                    conversationDictationEncodePcm16(samples, read, encoded)
+                    val bytes = read * BYTES_PER_FRAME
+                    if (!buffer.append(encoded, bytes)) {
+                        progress.stopReason = "buffer_full"
+                        conversationDictationDiagnostic(
+                            "event=caller_audio_backpressure bytes=${buffer.bufferedBytes} action=stop_capture",
+                        )
+                    } else {
+                        progress.record(read, conversationDictationPeak(samples, read), buffer.bufferedBytes)
+                    }
+                }
+            }
+        } finally {
+            recording.set(false)
+            if (!discarded.get()) buffer.finish()
+            runCatching(recorder::stop)
+            releaseRecorder()
+            progress.reportClosed(buffer.bufferedBytes)
+        }
+    }
+
     private fun registerCaptureClosedCallback(callback: () -> Unit) {
         if (captureClosed.get()) {
             callback()
@@ -114,120 +158,23 @@ internal class ConversationDictationCallerAudio private constructor(
         if (captureClosed.get() && captureClosedCallbacks.remove(callback)) callback()
     }
 
-    /** Closes the capture side without streaming, for a session that never started. */
-    private fun release() {
+    private fun releaseRecorder() {
         runCatching(recorder::release)
-        runCatching(writeEnd::close)
-        runCatching(providerEnd::close)
-        reportCaptureClosed()
+        if (!captureClosed.compareAndSet(false, true)) return
+        while (true) captureClosedCallbacks.poll()?.invoke() ?: return
     }
-
-    /** Marks physical capture closed and drains every registered acknowledgement exactly once. */
-    private fun reportCaptureClosed() {
-        captureClosed.set(true)
-        while (true) {
-            val callback = captureClosedCallbacks.poll() ?: return
-            callback()
-        }
-    }
-
-    private fun stream() {
-        val samples = ShortArray(FRAMES_PER_READ)
-        val encoded = ByteArray(FRAMES_PER_READ * BYTES_PER_FRAME)
-        val progress = CallerAudioProgress()
-        val sink = writeEnd.fileDescriptor
-
-        try {
-            while (streaming.get() && progress.stopReason == null) {
-                val read = recorder.read(samples, 0, samples.size)
-                if (read <= 0) {
-                    progress.stopReason = "read=$read"
-                } else {
-                    writeFrames(sink, samples, encoded, read, progress)
-                }
-            }
-        } finally {
-            runCatching(recorder::stop)
-            runCatching(recorder::release)
-            // Closing the write end is what tells a provider reading the descriptor that the
-            // utterance ended, so it happens before this side's read-end copy goes away.
-            runCatching(writeEnd::close)
-            runCatching(providerEnd::close)
-            progress.reportClosed()
-            reportCaptureClosed()
-        }
-    }
-
-    /**
-     * Writes one read to the non-blocking pipe, dropping what does not fit.
-     *
-     * A provider that received the descriptor and is not draining it has already lost the
-     * utterance, so audio is dropped and counted instead of blocking here. Blocking would strand
-     * this thread inside `write` where it can no longer see [streaming], which would leave the
-     * microphone open after Cancel or Send.
-     */
-    private fun writeFrames(
-        sink: FileDescriptor,
-        samples: ShortArray,
-        encoded: ByteArray,
-        frames: Int,
-        progress: CallerAudioProgress,
-    ) {
-        conversationDictationEncodePcm16(samples, frames, encoded)
-        val total = frames * BYTES_PER_FRAME
-        var written = 0
-        var accepted = 1
-        while (accepted > 0 && written < total) {
-            accepted = writeChunk(sink, encoded, written, total - written, progress)
-            written += accepted
-        }
-        if (progress.stopReason == null) {
-            progress.record(frames, conversationDictationPeak(samples, frames))
-        }
-    }
-
-    /**
-     * Writes what the pipe will take right now. Reports the byte count accepted, or zero once the
-     * pipe is full or the write failed, having recorded which of the two happened.
-     */
-    private fun writeChunk(
-        sink: FileDescriptor,
-        encoded: ByteArray,
-        offset: Int,
-        length: Int,
-        progress: CallerAudioProgress,
-    ): Int =
-        try {
-            val accepted = Os.write(sink, encoded, offset, length)
-            if (accepted <= 0) progress.stopReason = "write=$accepted"
-            accepted.coerceAtLeast(0)
-        } catch (errno: ErrnoException) {
-            if (errno.errno == OsConstants.EAGAIN) {
-                progress.drop(length)
-            } else {
-                progress.stopReason = "write_failed=${OsConstants.errnoName(errno.errno)}"
-            }
-            0
-        }
 
     companion object {
-        /** Opens a capture pipe, or reports null after logging why the microphone stayed closed. */
-        fun open(): ConversationDictationCallerAudio? {
-            val pipe = openPipe() ?: return null
-            val recorder = openRecorder()
-            return if (recorder == null) {
-                pipe.forEach { runCatching(it::close) }
-                null
-            } else {
+        /** Opens one logical capture without allocating a provider pipe yet. */
+        fun open(sessionId: Long): ConversationDictationCallerAudio? =
+            openRecorder()?.let { recorder ->
                 ConversationDictationCallerAudio(
                     recorder = recorder,
-                    writeEnd = pipe[1],
-                    providerEnd = pipe[0],
+                    buffer = ConversationDictationAudioChunkBuffer(sessionId = sessionId),
                 )
             }
-        }
 
-        private fun openPipe(): Array<ParcelFileDescriptor>? {
+        internal fun openPipe(): Array<ParcelFileDescriptor>? {
             val pipe = runCatching { ParcelFileDescriptor.createPipe() }.reportPipeFailure() ?: return null
             return runCatching { markWriteEndNonBlocking(pipe[1]) }
                 .onFailure { pipe.forEach { end -> runCatching(end::close) } }
@@ -237,37 +184,25 @@ internal class ConversationDictationCallerAudio private constructor(
 
         private fun <T> Result<T>.reportPipeFailure(): T? =
             onFailure {
-                conversationDictationDiagnostic(
-                    "event=caller_audio_pipe_failed type=${it.javaClass.simpleName}",
-                )
+                conversationDictationDiagnostic("event=caller_audio_pipe_failed type=${it.javaClass.simpleName}")
             }.getOrNull()
 
-        /**
-         * Makes the capture side of the pipe refuse rather than wait once it is full, so a provider
-         * that stops reading cannot hold the capture thread, and with it the microphone, open.
-         */
         private fun markWriteEndNonBlocking(writeEnd: ParcelFileDescriptor) {
             val current = Os.fcntlInt(writeEnd.fileDescriptor, OsConstants.F_GETFL, 0)
-            Os.fcntlInt(
-                writeEnd.fileDescriptor,
-                OsConstants.F_SETFL,
-                current or OsConstants.O_NONBLOCK,
-            )
+            Os.fcntlInt(writeEnd.fileDescriptor, OsConstants.F_SETFL, current or OsConstants.O_NONBLOCK)
         }
 
         private fun openRecorder(): AudioRecord? {
             val recorder = runCatching(::buildRecorder).getOrNull()
             val ready = recorder?.state == AudioRecord.STATE_INITIALIZED
             if (!ready) {
-                conversationDictationDiagnostic(
-                    "event=caller_audio_open_failed state=${recorder?.state ?: "none"}",
-                )
+                conversationDictationDiagnostic("event=caller_audio_open_failed state=${recorder?.state ?: "none"}")
                 recorder?.let { runCatching(it::release) }
             }
             return recorder?.takeIf { ready }
         }
 
-        @SuppressLint("MissingPermission") // The session checks the grant before creating a source.
+        @SuppressLint("MissingPermission")
         private fun buildRecorder(): AudioRecord {
             val minimum =
                 AudioRecord.getMinBufferSize(
@@ -287,64 +222,157 @@ internal class ConversationDictationCallerAudio private constructor(
     }
 }
 
-/**
- * Running totals for one capture, reported at a fixed cadence so a log shows whether White Noise
- * heard anything without recording what was said.
- */
+/** One provider request backed by one exact, retryable caller-audio chunk. */
+internal class ConversationDictationCallerAudioStream(
+    private val capture: ConversationDictationCallerAudio,
+    private val writeEnd: ParcelFileDescriptor,
+    val providerEnd: ParcelFileDescriptor,
+    private val buffer: ConversationDictationAudioChunkBuffer,
+) {
+    private val feeding = AtomicBoolean(false)
+    private val settled = AtomicBoolean(false)
+    private val feedClosed = AtomicBoolean(false)
+    private val feedClosedCallbacks = ConcurrentLinkedQueue<() -> Unit>()
+    private val cancelled = AtomicBoolean(false)
+    private val chunk = AtomicReference<ConversationDictationAudioChunk?>(null)
+
+    fun start(): Boolean {
+        if (!capture.start() || !feeding.compareAndSet(false, true)) return false
+        thread(name = "dictation-caller-audio-feed", isDaemon = true, block = ::feed)
+        return true
+    }
+
+    fun finishCapture(onClosed: () -> Unit) = capture.finish(onClosed)
+
+    fun onFeedClosed(callback: () -> Unit) {
+        if (feedClosed.get()) {
+            callback()
+        } else {
+            feedClosedCallbacks.add(callback)
+            if (feedClosed.get() && feedClosedCallbacks.remove(callback)) callback()
+        }
+    }
+
+    @Suppress("ReturnCount")
+    fun acknowledge(): Boolean {
+        val owned = chunk.get() ?: return false
+        if (!settled.compareAndSet(false, true)) return false
+        val acknowledged = buffer.acknowledge(owned.chunkId)
+        capture.streamSettled(this)
+        return acknowledged
+    }
+
+    @Suppress("ReturnCount")
+    fun retry(): Boolean {
+        val owned = chunk.get() ?: return false
+        if (!settled.compareAndSet(false, true)) return false
+        val retried = buffer.retry(owned.chunkId)
+        capture.streamSettled(this)
+        return retried
+    }
+
+    fun cancel(requeue: Boolean = true) {
+        cancelled.set(true)
+        if (requeue) retry() else capture.streamSettled(this)
+        closePipe()
+    }
+
+    private fun feed() {
+        try {
+            var owned: ConversationDictationAudioChunk? = null
+            while (!cancelled.get() && owned == null) {
+                owned = buffer.poll()
+                if (owned == null) Thread.sleep(PIPE_RETRY_MILLIS)
+            }
+            if (owned == null || cancelled.get()) return
+            chunk.set(owned)
+            writeChunk(owned)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        } finally {
+            closePipe()
+        }
+    }
+
+    private fun writeChunk(owned: ConversationDictationAudioChunk) {
+        val sink = writeEnd.fileDescriptor
+        var offset = 0
+        var stalledAt: Long? = null
+        while (!cancelled.get() && offset < owned.pcm.size) {
+            try {
+                val written = Os.write(sink, owned.pcm, offset, owned.pcm.size - offset)
+                if (written > 0) {
+                    offset += written
+                    stalledAt = null
+                }
+            } catch (failure: ErrnoException) {
+                if (failure.errno != OsConstants.EAGAIN) throw failure
+                val now = SystemClock.elapsedRealtime()
+                val since = stalledAt ?: now.also { stalledAt = it }
+                if (now - since >= PIPE_STALL_TIMEOUT_MILLIS) {
+                    conversationDictationDiagnostic(
+                        "event=caller_audio_write_stalled chunk=${owned.chunkId} bytes=$offset",
+                    )
+                    retry()
+                    return
+                }
+                Thread.sleep(PIPE_RETRY_MILLIS)
+            }
+        }
+        conversationDictationDiagnostic(
+            "event=caller_audio_chunk_fed chunk=${owned.chunkId} first_sample=${owned.firstSample} " +
+                "last_sample=${owned.lastSampleExclusive} bytes=$offset",
+        )
+    }
+
+    private fun closePipe() {
+        runCatching(writeEnd::close)
+        if (!feedClosed.compareAndSet(false, true)) return
+        while (true) feedClosedCallbacks.poll()?.invoke() ?: return
+    }
+
+    fun closeProviderEnd() = runCatching(providerEnd::close)
+}
+
+/** Privacy-safe running totals for one logical capture. */
 private class CallerAudioProgress {
     private val startedAt = SystemClock.elapsedRealtime()
     private var lastReport = startedAt
-
-    /** Audio the microphone produced, whether or not the provider took it. */
     private var totalBytes = 0L
-
-    /** The part of [totalBytes] the provider would not take, so a stall reads as one. */
-    private var droppedBytes = 0L
     private var intervalPeak = 0f
     private var speechReported = false
-
-    /** Set once the capture loop should end, and named in the closing event. */
     var stopReason: String? = null
 
     fun record(
         frames: Int,
         peak: Float,
+        bufferedBytes: Int,
     ) {
         totalBytes += frames.toLong() * BYTES_PER_FRAME
         intervalPeak = max(intervalPeak, peak)
-        reportFirstSpeech()
-        reportInterval()
+        if (!speechReported && intervalPeak >= SPEECH_PEAK) {
+            speechReported = true
+            conversationDictationDiagnostic(
+                "event=caller_audio_speech_detected ms=${elapsed()} " +
+                    "peak=${format(intervalPeak)}",
+            )
+        }
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastReport >= PROGRESS_INTERVAL_MILLIS) {
+            lastReport = now
+            conversationDictationDiagnostic(
+                "event=caller_audio_progress ms=${elapsed()} bytes=$totalBytes buffered=$bufferedBytes " +
+                    "peak=${format(intervalPeak)}",
+            )
+            intervalPeak = 0f
+        }
     }
 
-    /** Counts audio the provider was not reading fast enough to take. */
-    fun drop(bytes: Int) {
-        droppedBytes += bytes.toLong()
-    }
-
-    fun reportClosed() {
+    fun reportClosed(bufferedBytes: Int) {
         conversationDictationDiagnostic(
             "event=caller_audio_closed reason=${stopReason ?: "stopped"} bytes=$totalBytes " +
-                "dropped=$droppedBytes ms=${elapsed()} heard_speech=$speechReported",
+                "buffered=$bufferedBytes ms=${elapsed()} heard_speech=$speechReported",
         )
-    }
-
-    private fun reportFirstSpeech() {
-        if (speechReported || intervalPeak < SPEECH_PEAK) return
-        speechReported = true
-        conversationDictationDiagnostic(
-            "event=caller_audio_speech_detected ms=${elapsed()} peak=${format(intervalPeak)}",
-        )
-    }
-
-    private fun reportInterval() {
-        val now = SystemClock.elapsedRealtime()
-        if (now - lastReport < PROGRESS_INTERVAL_MILLIS) return
-        lastReport = now
-        conversationDictationDiagnostic(
-            "event=caller_audio_progress ms=${elapsed()} bytes=$totalBytes " +
-                "dropped=$droppedBytes peak=${format(intervalPeak)}",
-        )
-        intervalPeak = 0f
     }
 
     private fun elapsed(): Long = SystemClock.elapsedRealtime() - startedAt
@@ -365,14 +393,12 @@ internal fun conversationDictationEncodePcm16(
     }
 }
 
-/** Loudest sample in the range, normalised to 0..1, so a log can separate silence from speech. */
+/** Loudest sample in the range, normalised to 0..1, so logs can distinguish silence from speech. */
 internal fun conversationDictationPeak(
     samples: ShortArray,
     count: Int,
 ): Float {
     var peak = 0
-    for (index in 0 until count) {
-        peak = max(peak, abs(samples[index].toInt()))
-    }
+    for (index in 0 until count) peak = max(peak, abs(samples[index].toInt()))
     return peak / SHORT_FULL_SCALE
 }
