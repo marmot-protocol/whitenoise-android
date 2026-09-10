@@ -2,8 +2,8 @@ package dev.ipf.whitenoise.android.state
 
 import android.os.Build
 import android.util.Log
-import dev.ipf.marmotkit.AuditLogTrackerConfigFfi
-import dev.ipf.marmotkit.AuditLogUploadSourceFfi
+import dev.ipf.marmotkit.AuditLogTrackerConfigV4Ffi
+import dev.ipf.marmotkit.AuditLogUploadSourceV4Ffi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.BuildConfig
 import java.util.concurrent.atomic.AtomicBoolean
@@ -46,17 +46,18 @@ internal class AuditRuntimeReadinessMarker(
 private val processAuditRuntimeReadinessMarker =
     AuditRuntimeReadinessMarker { marker -> Log.i("WhiteNoiseAudit", marker) }
 
+/** Configures v4 uploads with system model metadata, never user-assigned device labels. */
 internal suspend fun MarmotInterface.configureAuditRuntime() {
     val auditEndpoint = BuildConfig.WHITENOISE_AUDIT_LOG_ENDPOINT.trim().takeIf(String::isNotEmpty)
     val auditAuthorizationBearerToken =
         BuildConfig.WHITENOISE_AUDIT_LOG_AUTH_TOKEN.trim().takeIf(String::isNotEmpty)
     setAuditLogTrackerConfig(
-        AuditLogTrackerConfigFfi(
+        AuditLogTrackerConfigV4Ffi(
             endpoint = auditEndpoint,
             authorizationBearerToken = auditAuthorizationBearerToken,
             source =
-                AuditLogUploadSourceFfi(
-                    deviceLabel = Build.MODEL.trim().takeIf(String::isNotEmpty),
+                AuditLogUploadSourceV4Ffi(
+                    hardwareModel = Build.MODEL.trim().takeIf(String::isNotEmpty),
                     platform = "android",
                     appVersion = BuildConfig.VERSION_NAME,
                 ),

@@ -1783,13 +1783,13 @@
     <string name="usage_diagnostics_renew">La condivisione ora include l’utilizzo delle funzionalità. Consulta queste informazioni ed esprimi una nuova scelta.</string>
     <string name="usage_diagnostics_status">Utilizzo: %1$s. Diagnostica: %2$s.</string>
     <string name="usage_diagnostics_error">Impossibile confermare le impostazioni di condivisione. Riprova. Nessuna nuova scelta è stata confermata.</string>
-    <string name="usage_diagnostics_off">Disattivato</string>
+    <string name="usage_diagnostics_off">Condivisione disattivata</string>
     <string name="usage_diagnostics_permission_needed">Consenso necessario</string>
-    <string name="usage_diagnostics_unconfigured">Non configurato</string>
+    <string name="usage_diagnostics_unconfigured">Configurazione assente</string>
     <string name="usage_diagnostics_unsupported">Non disponibile in questa versione</string>
-    <string name="usage_diagnostics_ready">Pronto per la condivisione</string>
+    <string name="usage_diagnostics_ready">Condivisione pronta</string>
     <string name="usage_diagnostics_rejected">Configurazione rifiutata</string>
-    <string name="usage_diagnostics_unknown">Non caricato</string>
+    <string name="usage_diagnostics_unknown">Stato non disponibile</string>
     <string name="usage_diagnostics_done">Fine</string>
     <string name="usage_diagnostics_loading">Caricamento delle impostazioni di condivisione…</string>
 </resources>

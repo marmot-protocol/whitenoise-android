@@ -2931,6 +2931,7 @@ class WhiteNoiseAppState private constructor(
         )
         reloadMediaAutoDownloadMatrix()
         configurePrivacyRuntime()
+        diagnostics.refresh(marmot())
         refreshLocalNotificationSettings()
         networkNotificationRecoverySuppressed = false
         if (restartNotifications) startNotificationListener()
@@ -5700,6 +5701,7 @@ class WhiteNoiseAppState private constructor(
             if (restartNotifications) startNotificationListener()
             notificationNetworkRecovery.resumeIfPending()
             refreshLocalNotificationSettings()
+            diagnostics.refresh(marmot())
             return outcome
         } finally {
             // Backstop: the suppression bracket must not outlive this call

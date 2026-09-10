@@ -575,7 +575,12 @@ internal fun ConversationScreen(
     surfaceState: ConversationSurfaceState? = null,
     dictationControlsVisible: Boolean = true,
 ) {
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    androidx.compose.runtime.LaunchedEffect(
+        controller,
+        chat.id,
+        appState.runtimeGeneration,
+        notificationOpenRequestId,
+    ) {
         appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.CONVERSATION)
     }
     WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)

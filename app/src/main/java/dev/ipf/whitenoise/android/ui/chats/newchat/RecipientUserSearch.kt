@@ -83,21 +83,23 @@ internal suspend fun <T> awaitCurrentRecipientSearchValue(load: suspend () -> T)
     return value
 }
 
-/** Fold the streamed batches into one aggregate view, emitting after each step. */
+/** Emits cache hits immediately and replaces each identity before re-ranking later search updates. */
 internal suspend fun aggregateRecipientSearchUpdates(
     nextUpdate: suspend () -> UserSearchUpdateFfi?,
     followedAccountIds: Set<String>,
     emit: (RecipientUserSearchState) -> Unit,
 ) {
-    val aggregate = ArrayList<UserDirectorySearchResultFfi>()
+    val aggregate = LinkedHashMap<String, UserDirectorySearchResultFfi>()
     var progress = RecipientSearchProgress()
     while (!progress.completed) {
         val update = awaitCurrentRecipientSearchValue(nextUpdate) ?: break
-        aggregate += update.newResults
+        for (result in update.newResults + update.updatedResults) {
+            aggregate[result.accountIdHex.trim().lowercase(Locale.ROOT)] = result
+        }
         progress = progress.withTrigger(update.trigger)
         emit(
             RecipientUserSearchState(
-                candidates = RecipientSearch.discoveredCandidates(aggregate, followedAccountIds),
+                candidates = RecipientSearch.discoveredCandidates(aggregate.values.toList()),
                 isSearching = !progress.completed,
                 isIncomplete = progress.isIncomplete,
                 failed = progress.failed,

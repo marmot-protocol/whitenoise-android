@@ -59,16 +59,31 @@ private fun MarkdownPreviewBuilder.appendPreviewBlock(
         is MarkdownBlockFfi.CodeBlock -> appendPreviewCodeContent(block.content, codeStyle, maxLength)
         is MarkdownBlockFfi.MathBlock -> appendPreviewCodeContent(block.content, codeStyle, maxLength)
         is MarkdownBlockFfi.BlockQuote ->
-            markdownVisibleSiblings(block.blocks).forEach {
-                appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName, depth + 1)
-            }
+            appendPreviewChildren(block.blocks, codeStyle, maxLength, mentionDisplayName, depth)
         is MarkdownBlockFfi.ListBlock ->
             markdownVisibleSiblings(block.items).forEach { item ->
                 markdownVisibleSiblings(item.blocks).forEach {
                     appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName, depth + 1)
                 }
             }
+        is MarkdownBlockFfi.Details -> {
+            appendPreviewInlineSegment(block.summary, codeStyle, maxLength, mentionDisplayName)
+            appendPreviewChildren(block.body, codeStyle, maxLength, mentionDisplayName, depth)
+        }
         is MarkdownBlockFfi.Table -> appendPreviewTable(block, codeStyle, maxLength, mentionDisplayName)
+    }
+}
+
+/** Shares bounded nested traversal between block quotes and typed disclosures. */
+private fun MarkdownPreviewBuilder.appendPreviewChildren(
+    blocks: List<MarkdownBlockFfi>,
+    codeStyle: MarkdownPreviewStyle,
+    maxLength: Int,
+    mentionDisplayName: ((String) -> String?)?,
+    depth: Int,
+) {
+    markdownVisibleSiblings(blocks).forEach {
+        appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName, depth + 1)
     }
 }
 

@@ -68,6 +68,27 @@ class UsageDiagnosticsControllerTest {
             assertNull(state.observations.ticket())
         }
 
+    /** Recovery refresh restores foreground collection without admitting pre-wipe observation tickets. */
+    @Test
+    fun foregroundRecoveryRefreshRetiresOldTicketsAndRestoresNewObservations() =
+        runBlocking {
+            val native = NativeReceipt()
+            val state = UsageDiagnosticsController()
+            state.setForeground(true)
+            state.choose(native.engine, true)
+            val oldTicket = state.observations.ticket()
+            assertNotNull(oldTicket)
+            state.observations.reset()
+            assertNull(state.observations.ticket())
+            state.refresh(native.engine)
+            var staleRecorded = false
+            state.observations.record(oldTicket) { staleRecorded = true }
+            assertFalse(staleRecorded)
+            var currentRecorded = false
+            state.observations.record(state.observations.ticket()) { currentRecorded = true }
+            assertTrue(currentRecorded)
+        }
+
     /** Failed initial loading can be retried without storing Android-owned receipt state. */
     @Test
     fun initialReadFailureIsRetryable() =
