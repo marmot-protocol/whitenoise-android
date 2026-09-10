@@ -370,6 +370,7 @@ class NotificationAccountIsolationNavigationTest {
         }
     }
 
+    /** Routes a tap for the inactive account and checks only its cards are dismissed in either activation order. */
     private fun verifyInactiveAccountTapIsolation(preloadFinishesFirst: Boolean) {
         val gate = RouteOrderGate(preloadFinishesFirst)
         val appState = appState(fakeMarmot(gate))
@@ -411,8 +412,17 @@ class NotificationAccountIsolationNavigationTest {
             }
             // setActiveAccount publishes the target ref before the gated broad
             // chat-list subscription finishes. The direct conversation can
-            // already own and dismiss only its target cards in that window.
-            assertEquals(TARGET_ACCOUNT, appState.activeAccountRef)
+            // already own and dismiss only its target cards in that window, and
+            // the commit may land a frame before or after the ref flips, so wait
+            // for the ref while the activation gate still holds the broad bind.
+            awaitCondition(
+                failureMessage = {
+                    "target account was not published before the gated broad bind: " +
+                        "active=${appState.activeAccountRef} broadBindStarted=${gate.broadBindStarted.count == 0L}"
+                },
+            ) {
+                appState.activeAccountRef == TARGET_ACCOUNT
+            }
             gate.releaseActivation.countDown()
         } else {
             awaitCondition {
