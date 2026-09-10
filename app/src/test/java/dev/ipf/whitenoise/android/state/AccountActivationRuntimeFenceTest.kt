@@ -90,17 +90,16 @@ class AccountActivationRuntimeFenceTest {
     private fun fixture(
         notificationReads: AtomicInteger,
         onPrivacyRuntimeConfig: (() -> Unit)? = null,
-    ) =
-        NotificationBootstrapTestFixture(
-            context = RuntimeEnvironment.getApplication(),
-            accounts = listOf(AccountSummaryFfi("self", "11".repeat(32), true, false, false, true)),
-            emitStartupNotification = false,
-            onPrivacyRuntimeConfig = onPrivacyRuntimeConfig,
-            onNotificationSettings = { accountRef ->
-                notificationReads.incrementAndGet()
-                NotificationSettingsFfi(accountRef, "11".repeat(32), true, false)
-            },
-        )
+    ) = NotificationBootstrapTestFixture(
+        context = RuntimeEnvironment.getApplication(),
+        accounts = listOf(AccountSummaryFfi("self", "11".repeat(32), true, false, false, true)),
+        emitStartupNotification = false,
+        onPrivacyRuntimeConfig = onPrivacyRuntimeConfig,
+        onNotificationSettings = { accountRef ->
+            notificationReads.incrementAndGet()
+            NotificationSettingsFfi(accountRef, "11".repeat(32), true, false)
+        },
+    )
 
     /** Replays the existing recovered-runtime publication boundary without wiping any account. */
     private fun replaceRuntimeOwner(appState: WhiteNoiseAppState) {
