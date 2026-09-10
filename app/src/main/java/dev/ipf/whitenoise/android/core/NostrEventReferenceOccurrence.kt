@@ -118,6 +118,7 @@ private class NostrEventReferenceCollector {
         }
     }
 
+    /** Finds event references in every prose container, including disclosure summaries and bodies. */
     private fun walkBlocks(blocks: List<MarkdownBlockFfi>) {
         for (block in blocks) {
             if (references.size >= MAX_EVENT_REFERENCES_PER_MESSAGE) break
@@ -125,6 +126,10 @@ private class NostrEventReferenceCollector {
                 is MarkdownBlockFfi.Paragraph -> walkInlines(block.inlines)
                 is MarkdownBlockFfi.Heading -> walkInlines(block.inlines)
                 is MarkdownBlockFfi.BlockQuote -> walkBlocks(block.blocks)
+                is MarkdownBlockFfi.Details -> {
+                    walkInlines(block.summary)
+                    walkBlocks(block.body)
+                }
                 is MarkdownBlockFfi.ListBlock -> block.items.forEach { walkBlocks(it.blocks) }
                 is MarkdownBlockFfi.Table -> {
                     block.header.forEach { walkInlines(it.inlines) }

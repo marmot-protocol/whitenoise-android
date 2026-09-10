@@ -686,6 +686,7 @@ private fun MarkdownElisionMarker(
     )
 }
 
+/** Renders every native block kind with bounded nesting and stable speech leaf paths. */
 @Composable
 private fun MarkdownBlockView(
     block: MarkdownBlockFfi,
@@ -732,6 +733,7 @@ private fun MarkdownBlockView(
                 ctx.useDecorativeBackgrounds,
                 leafId = "$path/code",
             )
+        is MarkdownBlockFfi.Details -> MarkdownNativeDetailsView(block, ctx, depth, path)
         is MarkdownBlockFfi.BlockQuote -> MarkdownBlockQuoteView(block.blocks, ctx, depth, path = "$path/q")
         is MarkdownBlockFfi.ListBlock -> MarkdownListView(block, ctx, depth, path = path)
         is MarkdownBlockFfi.Table -> MarkdownTableView(block, ctx, path = path)
@@ -743,6 +745,34 @@ private fun MarkdownBlockView(
                 ctx.useDecorativeBackgrounds,
                 leafId = "$path/math",
             )
+    }
+}
+
+/** Renders typed disclosure metadata through the existing scaffold with stable speech paths. */
+@Suppress("FunctionNaming")
+@Composable
+private fun MarkdownNativeDetailsView(
+    block: MarkdownBlockFfi.Details,
+    ctx: MarkdownBodyContext,
+    depth: Int,
+    path: String,
+) {
+    val summary = rememberMarkdownInlineText(block.summary, ctx)
+    MarkdownDetailsScaffold(
+        stateKey = block,
+        summary = null,
+        initiallyExpanded = block.open,
+        summaryInlineText = summary.takeIf { it.isNotEmpty() },
+        summaryLeafId = "$path/summary",
+    ) {
+        MarkdownBlockList(
+            blocks = block.body,
+            ctx = ctx,
+            depth = depth + 1,
+            blankLinesBefore = block.blankLinesBefore,
+            pathPrefix = "$path/d",
+            modifier = Modifier.padding(start = DETAILS_CONTENT_INDENT, top = 2.dp),
+        )
     }
 }
 
@@ -1006,17 +1036,18 @@ private val DETAILS_CONTENT_INDENT = 24.dp
 private const val DETAILS_CHEVRON_COLLAPSED_DEGREES = -90f
 private const val DETAILS_CHEVRON_EXPANDED_DEGREES = 0f
 
-// Chevron + summary header toggling hidden content, collapsed by default.
-// Expansion lives in composition only (scroll away and back resets), keyed on
-// [stateKey] so a recomposed content lambda does not drop the current state.
+/** Keeps disclosure expansion local to its content, honoring the native initial open state. */
 @Suppress("FunctionNaming")
 @Composable
 private fun MarkdownDetailsScaffold(
     stateKey: Any?,
     summary: String?,
+    initiallyExpanded: Boolean = false,
+    summaryInlineText: AnnotatedString? = null,
+    summaryLeafId: String? = null,
     content: @Composable () -> Unit,
 ) {
-    var expanded by remember(stateKey) { mutableStateOf(false) }
+    var expanded by remember(stateKey, initiallyExpanded) { mutableStateOf(initiallyExpanded) }
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) DETAILS_CHEVRON_EXPANDED_DEGREES else DETAILS_CHEVRON_COLLAPSED_DEGREES,
         label = "detailsChevron",
@@ -1038,11 +1069,19 @@ private fun MarkdownDetailsScaffold(
                         .rotate(chevronRotation),
             )
             Spacer(Modifier.width(4.dp))
-            Text(
-                summaryText,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
+            if (summaryLeafId != null) {
+                MarkdownBodyText(
+                    leafId = summaryLeafId,
+                    text = summaryInlineText ?: AnnotatedString(summaryText),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                )
+            } else {
+                Text(
+                    summaryText,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
         AnimatedVisibility(visible = expanded, enter = expandVertically(), exit = shrinkVertically()) {
             content()

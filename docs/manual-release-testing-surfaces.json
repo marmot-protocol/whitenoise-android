@@ -5345,6 +5345,14 @@
         "test_ids": [
           "TTS-004"
         ]
+      },
+      {
+        "surface": "MarkdownNativeDetailsView",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownNativeDetailsView(",
+        "test_ids": [
+          "MSG-002"
+        ]
       }
     ],
     "settings_controls": [
