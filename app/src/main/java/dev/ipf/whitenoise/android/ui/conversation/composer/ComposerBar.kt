@@ -604,6 +604,7 @@ internal fun ComposerBar(
                         accountRef = accountForDictation,
                         groupIdHex = groupForDictation,
                         draft = textFieldValue,
+                        replyToMessageIdHex = replyingTo?.messageIdHex,
                     )
                 }
             }

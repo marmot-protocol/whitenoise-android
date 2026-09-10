@@ -1169,6 +1169,7 @@ class WhiteNoiseAppState private constructor(
                 accounts.any { it.label == accountRef && it.signedOut != true } &&
                     (activeAccountRef != accountRef || chatsController?.containsGroup(groupIdHex) != false)
             },
+            targetReplyAvailable = ::conversationDictationReplyTargetAvailable,
             targetValidator = { accountRef, groupIdHex ->
                 if (accounts.none { it.label == accountRef && it.signedOut != true }) {
                     false
@@ -2450,7 +2451,11 @@ class WhiteNoiseAppState private constructor(
      * on a failed or unknown send, which keeps a newer edit made during the send along with its retained geometry.
      */
     internal suspend fun sendDictationTranscriptIfOriginUnchanged(request: ConversationDictationSendRequest): Boolean =
-        withGroupCommitLock(request.accountRef, request.groupIdHex) {
+        matchingConversationControllerForReply(
+            request.accountRef,
+            request.groupIdHex,
+            request.replyToMessageIdHex,
+        )?.let { controller ->
             val current = conversationDictationDraftSnapshot(request.accountRef, request.groupIdHex)
             if (
                 current.revision != request.expectedDraftRevision ||
@@ -2459,13 +2464,36 @@ class WhiteNoiseAppState private constructor(
             ) {
                 false
             } else {
-                val pendingClear = captureDraftForSend(request.accountRef, request.groupIdHex)
-                val accepted =
-                    marmotIo(MarmotTraceSection.TEXT_SEND) {
-                        sendText(request.accountRef, request.groupIdHex, request.payload)
-                    }.messageIds.isNotEmpty()
-                if (accepted && pendingClear != null) clearDraftAfterSuccessfulSend(pendingClear)
-                accepted
+                val replyTarget = controller.replyingTo
+                var durablyAccepted = false
+                try {
+                    durablyAccepted = sendConversationText(controller, request.payload)
+                    durablyAccepted
+                } finally {
+                    if (!durablyAccepted && replyTarget != null && controller.replyingTo == null) {
+                        controller.replyingTo = replyTarget
+                    }
+                }
+            }
+        } ?: false
+
+    private fun conversationDictationReplyTargetAvailable(
+        accountRef: String,
+        groupIdHex: String,
+        replyToMessageIdHex: String?,
+    ): Boolean = matchingConversationControllerForReply(accountRef, groupIdHex, replyToMessageIdHex) != null
+
+    private fun matchingConversationControllerForReply(
+        accountRef: String,
+        groupIdHex: String,
+        replyToMessageIdHex: String?,
+    ): ConversationController? =
+        synchronized(conversationControllerLock) {
+            newestMatchingController(conversationControllers) { controller ->
+                controller.matchesConversation(accountRef, groupIdHex) &&
+                    controller.replyingTo
+                        ?.messageIdHex
+                        .equals(replyToMessageIdHex, ignoreCase = true)
             }
         }
 
@@ -2507,7 +2535,7 @@ class WhiteNoiseAppState private constructor(
         controller: ConversationController,
         text: String,
         onAccepted: () -> Unit = {},
-    ) {
+    ): Boolean {
         val pendingClear = captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
         var accepted = false
         var durablyAccepted = false
@@ -2528,6 +2556,7 @@ class WhiteNoiseAppState private constructor(
                 }
             },
         )
+        return durablyAccepted
     }
 
     internal suspend fun deleteDraftBeforeGroupRemoval(

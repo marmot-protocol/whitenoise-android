@@ -27,6 +27,7 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
+import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -51,6 +52,50 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36], qualifiers = "en")
 @Suppress("LargeClass") // Send, retry, projection, preview, and durable-draft scenarios share one controller fixture.
 class ConversationSendRetryIntegrationTest {
+    @Test
+    fun rejectedAndUnknownDictationReplySendsRestoreTheCapturedReplyTarget() =
+        runTest {
+            val failures =
+                listOf(
+                    MarmotKitException.Publish("relay rejected event"),
+                    MarmotKitException.Publish("send event timed out"),
+                )
+
+            failures.forEach { failure ->
+                val appState = appState()
+                appState.setDraft(GROUP_ID, TextFieldValue("typed"))
+                val reply = timelineAppMessage(REPLY_MESSAGE_ID)
+                val controller =
+                    ConversationController(
+                        appState = appState,
+                        initialGroup = group(),
+                        initialMemberSnapshot = memberSnapshot(),
+                        textPublisher = { replyTarget, _, _, _ ->
+                            assertEquals(REPLY_MESSAGE_ID, replyTarget)
+                            throw failure
+                        },
+                    )
+                controller.replyingTo = reply
+                appState.attachConversationController(controller)
+                val request =
+                    ConversationDictationSendRequest(
+                        accountRef = ACCOUNT_REF,
+                        groupIdHex = GROUP_ID,
+                        expectedDraftRevision = appState.composerDraftGeneration(ACCOUNT_REF, GROUP_ID),
+                        expectedDraftText = "typed",
+                        payload = "spoken reply",
+                        replyToMessageIdHex = REPLY_MESSAGE_ID,
+                    )
+
+                try {
+                    assertFalse(appState.sendDictationTranscriptIfOriginUnchanged(request))
+                    assertEquals(reply, controller.replyingTo)
+                } finally {
+                    appState.detachConversationController(controller)
+                }
+            }
+        }
+
     @Test
     fun acceptInviteRetriesAClosedRuntimeWorkerWithoutRollingBackOrReportingAnError() =
         runTest {
@@ -1380,6 +1425,7 @@ class ConversationSendRetryIntegrationTest {
         const val ACCOUNT_REF = "alice"
         val ACCOUNT_ID = "a1".repeat(32)
         val GROUP_ID = "b2".repeat(32)
+        const val REPLY_MESSAGE_ID = "reply-message"
         val CONFIRMED_MESSAGE_ID = "c3".repeat(32)
     }
 }

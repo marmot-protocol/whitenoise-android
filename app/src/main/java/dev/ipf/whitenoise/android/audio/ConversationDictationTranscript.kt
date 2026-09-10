@@ -39,6 +39,7 @@ internal fun conversationDictationSendRequest(
             ConversationDictationSendRequest(
                 accountRef = target.accountRef,
                 groupIdHex = target.groupIdHex,
+                replyToMessageIdHex = target.replyToMessageIdHex,
                 expectedDraftRevision = target.capturedDraftRevision,
                 expectedDraftText = target.capturedDraft.text,
                 payload = text,
