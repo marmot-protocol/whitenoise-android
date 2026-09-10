@@ -421,7 +421,7 @@ class NotificationAccountIsolationNavigationTest {
                         "active=${appState.activeAccountRef} broadBindStarted=${gate.broadBindStarted.count == 0L}"
                 },
             ) {
-                appState.activeAccountRef == TARGET_ACCOUNT
+                appState.activeAccountRef == TARGET_ACCOUNT && gate.broadBindStarted.count == 0L
             }
             gate.releaseActivation.countDown()
         } else {
