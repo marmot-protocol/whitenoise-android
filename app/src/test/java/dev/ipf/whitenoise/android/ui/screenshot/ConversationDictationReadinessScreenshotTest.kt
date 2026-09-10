@@ -108,6 +108,17 @@ class ConversationDictationReadinessScreenshotTest {
     }
 
     @Test
+    fun callerAudioBufferOverflowShowsVisibleFailure() {
+        val fixture = fixture(appOwned = true)
+        fixture.platform.listener.onError(ConversationDictationFailure.AudioBufferFull)
+        capture(
+            fixture,
+            "dictation_audio_buffer_full_large_font_rtl_dark.png",
+            darkTheme = true,
+        )
+    }
+
+    @Test
     fun providerAccessRejectionIsNotAppPermissionDenial() {
         val fixture = fixture(appOwned = true)
         val initial = fixture.controller.state as ConversationDictationState.Starting
