@@ -75,6 +75,7 @@ class RelayListSettingsScreenshotTest {
                             onPendingUrlChange = {},
                             mutation = null,
                             canEdit = true,
+                            allowExternalRelayHosts = false,
                             onAddRelay = { _, _, _ -> },
                             onRemoveRelay = { _, _ -> },
                         )

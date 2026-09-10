@@ -28,41 +28,49 @@ class RelayUrlsTest {
                     "wss://?bad",
                     "wss://user:pass@relay.example",
                 ),
+                allowExternalRelayHosts = true,
             ),
         )
     }
 
     @Test
     fun relayUrlValidationRequiresSecureWebsocketWithHost() {
-        assertEquals(true, isAcceptableRelayUrl("wss://relay.example"))
-        assertEquals(true, isAcceptableRelayUrl("WSS://relay.example"))
-        assertEquals(true, isAcceptableRelayUrl(" wss://relay.example/path "))
-        assertEquals(true, isAcceptableRelayUrl("wss://relay.example:443"))
-        assertEquals(true, isAcceptableRelayUrl("wss://пример.рф"))
-        assertEquals(false, isAcceptableRelayUrl("ws://relay.example"))
-        assertEquals(false, isAcceptableRelayUrl("https://relay.example"))
-        assertEquals(false, isAcceptableRelayUrl("wss://"))
-        assertEquals(false, isAcceptableRelayUrl("wss://?bad"))
-        assertEquals(false, isAcceptableRelayUrl("wss://user:pass@relay.example"))
-        assertEquals(false, isAcceptableRelayUrl("wss://bad host.example"))
-        assertEquals(false, isAcceptableRelayUrl("not a url"))
-        assertEquals(false, isAcceptableRelayUrl("wss://relay.example:7777"))
-        assertEquals(false, isAcceptableRelayUrl("wss://relay.example:8443"))
+        assertEquals(true, isAcceptableRelayUrl("wss://relay.example", allowExternalRelayHosts = true))
+        assertEquals(true, isAcceptableRelayUrl("WSS://relay.example", allowExternalRelayHosts = true))
+        assertEquals(true, isAcceptableRelayUrl(" wss://relay.example/path ", allowExternalRelayHosts = true))
+        assertEquals(true, isAcceptableRelayUrl("wss://relay.example:443", allowExternalRelayHosts = true))
+        assertEquals(true, isAcceptableRelayUrl("wss://пример.рф", allowExternalRelayHosts = true))
+        assertEquals(false, isAcceptableRelayUrl("ws://relay.example", allowExternalRelayHosts = true))
+        assertEquals(false, isAcceptableRelayUrl("https://relay.example", allowExternalRelayHosts = true))
+        assertEquals(false, isAcceptableRelayUrl("wss://", allowExternalRelayHosts = true))
+        assertEquals(false, isAcceptableRelayUrl("wss://?bad", allowExternalRelayHosts = true))
+        assertEquals(false, isAcceptableRelayUrl("wss://user:pass@relay.example", allowExternalRelayHosts = true))
+        assertEquals(false, isAcceptableRelayUrl("wss://bad host.example", allowExternalRelayHosts = true))
+        assertEquals(false, isAcceptableRelayUrl("not a url", allowExternalRelayHosts = true))
+        assertEquals(false, isAcceptableRelayUrl("wss://relay.example:7777", allowExternalRelayHosts = true))
+        assertEquals(false, isAcceptableRelayUrl("wss://relay.example:8443", allowExternalRelayHosts = true))
     }
 
     @Test
     fun relayUrlValidationRejectsNonStandardPortsWithoutDns() {
-        assertEquals(emptyList<String>(), normalizeRelayUrls(listOf("wss://relay.example:7777")))
+        assertEquals(
+            emptyList<String>(),
+            normalizeRelayUrls(listOf("wss://relay.example:7777"), allowExternalRelayHosts = true),
+        )
     }
 
     @Test
-    fun relayUrlValidationAllowsWhiteNoiseAndExternalPublicHosts() {
-        assertTrue(isAcceptableRelayUrl("wss://relay.us.whitenoise.chat"))
-        assertTrue(isAcceptableRelayUrl("wss://relay.eu.whitenoise.chat"))
-        assertTrue(isAcceptableRelayUrl("wss://relay.example"))
+    fun relayUrlValidationRetainsReleaseAllowlistAndDebugExternalSupport() {
+        assertTrue(isAcceptableRelayUrl("wss://relay.us.whitenoise.chat", allowExternalRelayHosts = false))
+        assertTrue(isAcceptableRelayUrl("wss://relay.eu.whitenoise.chat", allowExternalRelayHosts = false))
+        assertEquals(
+            RelayUrlValidationResult.UnsupportedHost,
+            relayUrlValidationResult("wss://relay.example", allowExternalRelayHosts = false),
+        )
+        assertTrue(isAcceptableRelayUrl("wss://relay.example", allowExternalRelayHosts = true))
         assertEquals(
             listOf("wss://relay.example"),
-            normalizeRelayUrls(listOf("wss://relay.example")),
+            normalizeRelayUrls(listOf("wss://relay.example"), allowExternalRelayHosts = true),
         )
     }
 
@@ -70,16 +78,16 @@ class RelayUrlsTest {
     fun relayUrlValidationDistinguishesValidExternalHostFromInvalidUrl() {
         assertEquals(
             RelayUrlValidationResult.Invalid,
-            relayUrlValidationResult("https://relay.example"),
+            relayUrlValidationResult("https://relay.example", allowExternalRelayHosts = true),
         )
         assertEquals(
             RelayUrlValidationResult.Acceptable,
-            relayUrlValidationResult("wss://relay.example"),
+            relayUrlValidationResult("wss://relay.example", allowExternalRelayHosts = true),
         )
     }
 
     @Test
-    fun additionPreservesImportedExternalRelaysWhenAppendingWhiteNoiseRelay() {
+    fun debugAdditionPreservesImportedExternalRelaysWhenAppendingWhiteNoiseRelay() {
         assertEquals(
             RelayListEditPlan(
                 relays = listOf("wss://external.example", "wss://relay.us.whitenoise.chat"),
@@ -88,6 +96,22 @@ class RelayUrlsTest {
             relayListAfterAddition(
                 currentRelays = listOf("wss://external.example"),
                 relayToAdd = "wss://relay.us.whitenoise.chat",
+                allowExternalRelayHosts = true,
+            ),
+        )
+    }
+
+    @Test
+    fun productionAdditionDropsImportedExternalRelays() {
+        assertEquals(
+            RelayListEditPlan(
+                relays = listOf("wss://relay.us.whitenoise.chat"),
+                requiredRelay = "wss://relay.us.whitenoise.chat",
+            ),
+            relayListAfterAddition(
+                currentRelays = listOf("wss://external.example"),
+                relayToAdd = "wss://relay.us.whitenoise.chat",
+                allowExternalRelayHosts = false,
             ),
         )
     }
@@ -102,6 +126,7 @@ class RelayUrlsTest {
             relayListAfterAddition(
                 currentRelays = listOf("wss://relay.us.whitenoise.chat"),
                 relayToAdd = "wss://external.example",
+                allowExternalRelayHosts = true,
             ),
         )
     }
@@ -120,6 +145,7 @@ class RelayUrlsTest {
                         "wss://two.external.example",
                     ),
                 relayToRemove = "wss://one.external.example",
+                allowExternalRelayHosts = true,
             ),
         )
     }
@@ -133,6 +159,7 @@ class RelayUrlsTest {
             relayListAfterRemoval(
                 currentRelays = listOf("wss://one.external.example", "wss://two.external.example"),
                 relayToRemove = "wss://one.external.example",
+                allowExternalRelayHosts = true,
             ),
         )
     }
@@ -146,6 +173,24 @@ class RelayUrlsTest {
             relayListAfterRemoval(
                 currentRelays = listOf("wss://one.external.example"),
                 relayToRemove = "wss://one.external.example",
+                allowExternalRelayHosts = true,
+            ),
+        )
+    }
+
+    @Test
+    fun productionRemovalNeverRepublishesImportedExternalRelays() {
+        assertEquals(
+            RelayListEditPlan(relays = listOf("wss://relay.us.whitenoise.chat")),
+            relayListAfterRemoval(
+                currentRelays =
+                    listOf(
+                        "wss://private-resolving.example",
+                        "wss://relay.us.whitenoise.chat",
+                        "wss://another-external.example",
+                    ),
+                relayToRemove = "wss://private-resolving.example",
+                allowExternalRelayHosts = false,
             ),
         )
     }
@@ -154,9 +199,27 @@ class RelayUrlsTest {
     fun externalRelayKeepsWhiteNoiseRelayRemovable() {
         val relays = listOf("wss://relay.us.whitenoise.chat", "wss://external.example")
 
-        assertTrue(canRemoveRelay(currentRelays = relays, relay = "wss://relay.us.whitenoise.chat"))
-        assertTrue(canRemoveRelay(currentRelays = relays, relay = "wss://external.example"))
-        assertFalse(canRemoveRelay(currentRelays = listOf(relays.first()), relay = relays.first()))
+        assertTrue(
+            canRemoveRelay(
+                currentRelays = relays,
+                relay = "wss://relay.us.whitenoise.chat",
+                allowExternalRelayHosts = true,
+            ),
+        )
+        assertTrue(
+            canRemoveRelay(
+                currentRelays = relays,
+                relay = "wss://external.example",
+                allowExternalRelayHosts = true,
+            ),
+        )
+        assertFalse(
+            canRemoveRelay(
+                currentRelays = listOf(relays.first()),
+                relay = relays.first(),
+                allowExternalRelayHosts = true,
+            ),
+        )
     }
 
     @Test
@@ -176,6 +239,24 @@ class RelayUrlsTest {
                     classified("wss://retired.example", RelayEndpointPolicyFfi.RETIRED),
                     classified("wss://relay.us.whitenoise.chat", RelayEndpointPolicyFfi.ALLOWED),
                 ),
+                allowExternalRelayHosts = true,
+            ),
+        )
+    }
+
+    @Test
+    fun publishClassificationProductionNeverPassesExternalRelayAcrossUniffi() {
+        val whiteNoiseRelay = "wss://relay.us.whitenoise.chat"
+
+        assertEquals(
+            listOf(whiteNoiseRelay),
+            allowedRelayUrlsForPublish(
+                RelayListEditPlan(relays = listOf("wss://private-resolving.example", whiteNoiseRelay)),
+                listOf(
+                    classified("wss://private-resolving.example", RelayEndpointPolicyFfi.ALLOWED),
+                    classified(whiteNoiseRelay, RelayEndpointPolicyFfi.ALLOWED),
+                ),
+                allowExternalRelayHosts = false,
             ),
         )
     }
@@ -195,6 +276,7 @@ class RelayUrlsTest {
                     classified("wss://external.example", RelayEndpointPolicyFfi.ALLOWED),
                     classified(newRelay, RelayEndpointPolicyFfi.UNSAFE),
                 ),
+                allowExternalRelayHosts = true,
             ),
         )
     }
@@ -214,6 +296,7 @@ class RelayUrlsTest {
                         normalizedEndpoint = "$newRelay/",
                     ),
                 ),
+                allowExternalRelayHosts = true,
             ),
         )
     }

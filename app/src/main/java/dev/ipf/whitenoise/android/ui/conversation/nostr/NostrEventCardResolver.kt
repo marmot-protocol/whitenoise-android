@@ -304,7 +304,7 @@ internal suspend fun WhiteNoiseAppState.publicEventCardRelays(): List<String> {
             lists.defaultRelays + lists.nip65.relays + lists.bootstrapRelays + MarmotClient.bootstrapRelays
         }
     return withContext(Dispatchers.IO) {
-        normalizeRelayUrls(candidates)
+        normalizeRelayUrls(candidates, allowExternalRelayHosts = true)
             .asSequence()
             .filter(::relayUrlPassesResolveTimeCheck)
             .take(MAX_PUBLIC_EVENT_RELAYS)
@@ -318,7 +318,7 @@ internal suspend fun safePublicEventRelayHints(
 ): List<String> {
     if (hints.isEmpty()) return emptyList()
     return withContext(Dispatchers.IO) {
-        normalizeRelayUrls(hints)
+        normalizeRelayUrls(hints, allowExternalRelayHosts = true)
             .asSequence()
             .filter(passesResolveTimeCheck)
             .take(MAX_PUBLIC_EVENT_RELAYS)

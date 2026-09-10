@@ -655,6 +655,7 @@ enum class RelayListKind {
 
 internal enum class RelayUrlValidationResult {
     Acceptable,
+    UnsupportedHost,
     Invalid,
 }
 
@@ -679,10 +680,13 @@ private sealed interface RelayPublishValidation {
     ) : RelayPublishValidation
 }
 
-/** Canonicalizes secure public relay URLs without restricting them to White Noise-owned hosts. */
-internal fun normalizeRelayUrls(relays: Iterable<String>): List<String> =
+/** Canonicalizes relay URLs and keeps the production relay-host boundary unless explicitly relaxed. */
+internal fun normalizeRelayUrls(
+    relays: Iterable<String>,
+    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
+): List<String> =
     relays
-        .mapNotNull(::canonicalRelayUrl)
+        .mapNotNull { canonicalRelayUrl(it, allowExternalRelayHosts) }
         .distinct()
 
 internal fun telemetryServiceVersion(
@@ -701,28 +705,44 @@ internal fun telemetryDeploymentEnvironment(value: String): String =
 internal fun telemetryDeviceModelIdentifier(model: String): String? = model.trim().takeIf { it.isNotEmpty() }
 
 /** Returns whether a relay URL passes the synchronous structural and literal-host checks. */
-internal fun isAcceptableRelayUrl(url: String): Boolean = relayUrlValidationResult(url) == RelayUrlValidationResult.Acceptable
+internal fun isAcceptableRelayUrl(
+    url: String,
+    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
+): Boolean = relayUrlValidationResult(url, allowExternalRelayHosts) == RelayUrlValidationResult.Acceptable
 
-/** Classifies a relay URL for immediate editor feedback; MarmotKit remains the publish boundary. */
-internal fun relayUrlValidationResult(url: String): RelayUrlValidationResult =
-    if (canonicalRelayUrl(url) == null) RelayUrlValidationResult.Invalid else RelayUrlValidationResult.Acceptable
+/** Classifies a relay URL for editor feedback while retaining the production host allowlist. */
+internal fun relayUrlValidationResult(
+    url: String,
+    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
+): RelayUrlValidationResult {
+    val canonical =
+        canonicalRelayUrl(url, allowExternalRelayHosts = true)
+            ?: return RelayUrlValidationResult.Invalid
+    return if (allowExternalRelayHosts || canonicalRelayUrl(canonical, allowExternalRelayHosts = false) != null) {
+        RelayUrlValidationResult.Acceptable
+    } else {
+        RelayUrlValidationResult.UnsupportedHost
+    }
+}
 
-/** Builds an add mutation while preserving every other structurally valid imported relay. */
+/** Builds an add mutation within the active build's relay-host policy. */
 internal fun relayListAfterAddition(
     currentRelays: List<String>,
     relayToAdd: String,
+    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
 ): RelayListEditPlan? {
-    val canonicalRelay = canonicalRelayUrl(relayToAdd) ?: return null
+    val canonicalRelay = canonicalRelayUrl(relayToAdd, allowExternalRelayHosts) ?: return null
     return RelayListEditPlan(
-        relays = normalizeRelayUrls(currentRelays + canonicalRelay),
+        relays = normalizeRelayUrls(currentRelays + canonicalRelay, allowExternalRelayHosts),
         requiredRelay = canonicalRelay,
     )
 }
 
-/** Builds a removal mutation that deletes only the selected relay and keeps safe imported siblings. */
+/** Builds a removal mutation and strips endpoints outside the active build's relay-host policy. */
 internal fun relayListAfterRemoval(
     currentRelays: List<String>,
     relayToRemove: String,
+    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
     fallbackRelays: List<String> = MarmotClient.bootstrapRelays,
 ): RelayListEditPlan {
     val target = relayToRemove.trim()
@@ -731,9 +751,9 @@ internal fun relayListAfterRemoval(
             .map(String::trim)
             .filter { it.isNotEmpty() && it != target }
             .distinct()
-    val supported = normalizeRelayUrls(remaining)
+    val supported = normalizeRelayUrls(remaining, allowExternalRelayHosts)
     return RelayListEditPlan(
-        relays = supported.ifEmpty { normalizeRelayUrls(fallbackRelays) },
+        relays = supported.ifEmpty { normalizeRelayUrls(fallbackRelays, allowExternalRelayHosts) },
     )
 }
 
@@ -741,23 +761,34 @@ internal fun relayListAfterRemoval(
 internal fun canRemoveRelay(
     currentRelays: List<String>,
     relay: String,
-): Boolean = normalizeRelayUrls(currentRelays.filterNot { it.trim() == relay.trim() }).isNotEmpty()
+    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
+): Boolean {
+    if (relayUrlValidationResult(relay, allowExternalRelayHosts) != RelayUrlValidationResult.Acceptable) {
+        return true
+    }
+    return normalizeRelayUrls(
+        currentRelays.filterNot { it.trim() == relay.trim() },
+        allowExternalRelayHosts,
+    ).isNotEmpty()
+}
 
-/** Keeps MarmotKit-approved endpoints while requiring a requested addition to survive classification. */
+/** Keeps endpoints approved by both MarmotKit and the active build's relay-host policy. */
 internal fun allowedRelayUrlsForPublish(
     plan: RelayListEditPlan,
     classified: List<RelayEndpointClassificationFfi>,
+    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
 ): List<String>? {
     val requiredRelayAllowed =
         plan.requiredRelay == null ||
             classified.any {
-                it.policy == RelayEndpointPolicyFfi.ALLOWED && canonicalRelayUrl(it.endpoint) == plan.requiredRelay
+                it.policy == RelayEndpointPolicyFfi.ALLOWED &&
+                    canonicalRelayUrl(it.endpoint, allowExternalRelayHosts) == plan.requiredRelay
             }
     val allowedRelays =
         classified
             .filter { it.policy == RelayEndpointPolicyFfi.ALLOWED }
             .mapNotNull(RelayEndpointClassificationFfi::normalizedEndpoint)
-            .mapNotNull(::canonicalRelayUrl)
+            .mapNotNull { canonicalRelayUrl(it, allowExternalRelayHosts) }
             .distinct()
     return allowedRelays.takeIf { it.isNotEmpty() && requiredRelayAllowed }
 }
@@ -809,7 +840,18 @@ internal fun requiredRelayResolveTimeCheckResult(
 
 private fun resolveRelayHost(host: String): Array<InetAddress>? = runCatching { InetAddress.getAllByName(host) }.getOrNull()
 
-private fun canonicalRelayUrl(url: String): String? {
+private val releaseRelayHosts: Set<String> by lazy {
+    MarmotClient.bootstrapRelays
+        .mapNotNull { runCatching { URI(it).host?.lowercase(Locale.ROOT) }.getOrNull() }
+        .toSet()
+}
+
+private fun relayHostPassesReleasePolicy(canonicalHost: String): Boolean = canonicalHost in releaseRelayHosts
+
+private fun canonicalRelayUrl(
+    url: String,
+    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
+): String? {
     return runCatching {
         val uri = URI(url.trim())
         if (uri.scheme?.equals("wss", ignoreCase = true) != true || uri.userInfo != null) {
@@ -832,6 +874,13 @@ private fun canonicalRelayUrl(url: String): String? {
         // never accept one that points the client at loopback or the local
         // network. See issue #82.
         if (HostSafety.isPrivateOrLoopbackHost(canonicalHost)) return@runCatching null
+        // Release builds cannot pin the native Marmot/nostr-sdk WebSocket dial to
+        // this app-side DNS answer, so only app-owned relay hosts are allowed to
+        // cross the UniFFI boundary. Debug builds keep external relays available
+        // for local/self-hosted testing.
+        if (!allowExternalRelayHosts && !relayHostPassesReleasePolicy(canonicalHost)) {
+            return@runCatching null
+        }
         val authorityHost = if (canonicalHost.contains(":")) "[$canonicalHost]" else canonicalHost
         val port =
             uri.port
@@ -5693,6 +5742,7 @@ class WhiteNoiseAppState private constructor(
         val validationError =
             when (relayUrlValidationResult(relay)) {
                 RelayUrlValidationResult.Acceptable -> null
+                RelayUrlValidationResult.UnsupportedHost -> R.string.error_external_relay_not_supported
                 RelayUrlValidationResult.Invalid -> R.string.error_invalid_relay_url
             }
         val current = account?.takeIf { validationError == null }?.let { loadAccountRelayLists(it) }
@@ -5737,6 +5787,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Validates and publishes one relay-list edit without passing unsupported release hosts to native code. */
     private suspend fun publishAccountRelays(
         account: String,
         kind: RelayListKind,
