@@ -71,10 +71,6 @@ android_build_tool() {
   fi
 }
 
-normalize_fingerprint() {
-  tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]'
-}
-
 configured_value() {
   local property_name="$1"
   local property_value=""
@@ -198,13 +194,8 @@ if [[ "$actual_application_id" != "$application_id" || "$actual_version_code" !=
   exit 1
 fi
 
-"$apksigner_bin" verify --verbose "$apk_source" >/dev/null
-actual_app_signing_sha="$($apksigner_bin verify --print-certs "$apk_source" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | normalize_fingerprint)"
-if [[ "$actual_app_signing_sha" != "$expected_app_signing_sha" ]]; then
-  printf 'error: direct APK signer does not match the registered Play/Zapstore app-signing key: expected %s, actual %s\n' \
-    "$expected_app_signing_sha" "${actual_app_signing_sha:-<not parsed>}" >&2
-  exit 1
-fi
+actual_app_signing_sha="$(python3 "$repo_dir/scripts/verify_apk_signature.py" \
+  "$apksigner_bin" "$apk_source" "$expected_app_signing_sha")"
 
 apk_abis="$(unzip -Z1 "$apk_source" | awk -F/ '/^lib\/[^\/]+\/.*\.so$/ { print $2 }' | sort -u | paste -sd, -)"
 if [[ "$apk_abis" != "arm64-v8a" ]]; then

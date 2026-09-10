@@ -30,6 +30,7 @@ def load(name, path):
 
 bundle = load('release_bundle', 'scripts/release_bundle.py')
 metadata = load('release_metadata', 'scripts/check-release-metadata.py')
+apk_signature = load('apk_signature', 'scripts/verify_apk_signature.py')
 VERSION = '2026.9.9'
 SOURCE = 'a' * 40
 RUN_ID = '12345'
@@ -339,6 +340,35 @@ class ZapstoreIntegrationTests(unittest.TestCase):
                     self.assertNotEqual(result.returncode, 0)
                     self.assertEqual(len(calls), 1)
                     self.assertIn('signer differs', result.stderr)
+
+
+class ApkCertificateOutputTests(unittest.TestCase):
+    def test_numbered_and_sdk_range_signers_accept_only_the_pinned_identity(self):
+        expected = 'a' * 64
+        stamp = 'Source Stamp Signer certificate SHA-256 digest: ' + 'b' * 64
+        numbered = f'Signer #1 certificate SHA-256 digest: {expected}'
+        ranges = (f'Signer (minSdkVersion=33, maxSdkVersion=2147483647) certificate SHA-256 digest: {expected}\n'
+                  f'Signer (minSdkVersion=28, maxSdkVersion=32) certificate SHA-256 digest: {expected}')
+        dev = f'Signer (minSdkVersion=33 (dev release=true), maxSdkVersion=2147483647) certificate SHA-256 digest: {expected}'
+        for output in (numbered, ranges, dev, numbered + '\n' + stamp):
+            with self.subTest(output=output):
+                self.assertEqual(apk_signature.verify_certificates(output, expected), expected)
+        for output in ('', stamp, numbered.replace(expected, 'b' * 64),
+                       ranges.replace(expected, 'b' * 64, 1),
+                       numbered + '\nSigner #2 certificate SHA-256 digest: ' + 'b' * 64,
+                       numbered.replace(expected, 'invalid')):
+            with self.subTest(output=output), self.assertRaises(ValueError):
+                apk_signature.verify_certificates(output, expected)
+
+    def test_invalid_signature_cannot_pass_with_matching_printed_certificate(self):
+        expected = 'a' * 64
+        result = SimpleNamespace(returncode=1, stderr='DOES NOT VERIFY',
+                                 stdout=f'Signer #1 certificate SHA-256 digest: {expected}')
+        with patch.object(apk_signature.subprocess, 'run', return_value=result) as run:
+            with self.assertRaisesRegex(ValueError, 'signature verification failed'):
+                apk_signature.verify('/sdk/apksigner', '/candidate with spaces.apk', expected)
+            self.assertEqual(run.call_args.args[0],
+                             ['/sdk/apksigner', 'verify', '--verbose', '--print-certs', '/candidate with spaces.apk'])
 
 
 class KeystoreCertificateTests(unittest.TestCase):

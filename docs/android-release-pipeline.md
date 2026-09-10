@@ -141,7 +141,10 @@ not load the app-signing keystore into the publication job.
 The production workflow checks both keystore certificates against the pinned
 fingerprints before compiling. A mismatch reports only public certificate
 fingerprints; passwords remain environment inputs. The finished APK and AAB
-still undergo their separate signature checks before artifact upload.
+still undergo their separate signature checks before artifact upload. APK verification
+recognizes numbered signers and the SDK-range signers emitted for v3.1 signatures;
+every reported APK signing certificate must match the pinned identity. Source
+stamp certificates do not count as APK signing certificates.
 
 `release-manifest.json` binds the source, version, signing fingerprints, build
 run/attempt, runtime completeness, and file hashes. This is a verified inventory,
