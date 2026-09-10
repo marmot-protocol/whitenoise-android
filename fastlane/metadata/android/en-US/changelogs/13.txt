@@ -1,0 +1,5 @@
+Improved startup and saved-account recovery, including profile and avatar restoration.
+
+More reliable notifications and smoother dictation controls, with playback resuming after dictation.
+
+Clearer text-to-speech reading of structured messages and updated MarmotKit integration.

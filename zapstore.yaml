@@ -54,4 +54,4 @@ images:
   - ./fastlane/metadata/android/en-US/images/phoneScreenshots/03-accounts.png
   - ./fastlane/metadata/android/en-US/images/phoneScreenshots/04-qr.png
   - ./fastlane/metadata/android/en-US/images/phoneScreenshots/05-no-servers.png
-release_notes: ./fastlane/metadata/android/en-US/changelogs/12.txt
+release_notes: ./fastlane/metadata/android/en-US/changelogs/13.txt
