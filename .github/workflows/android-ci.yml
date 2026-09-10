@@ -50,13 +50,10 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  validate:
-    name: Compile, test, ktlint, detekt, Android lint
+  build-contracts:
+    name: Build, release, and tooling contracts
     runs-on: ubuntu-latest
-    # Cold full-suite runs can reach screenshots at minute 42. Leave time for
-    # both variants and report uploads instead of cancelling a passing suite.
-    timeout-minutes: 60
-
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -74,10 +71,6 @@ jobs:
           if [[ -n "$PR_BASE_SHA" ]]; then
             python3 scripts/check_manual_test_guide.py --base "$PR_BASE_SHA"
           fi
-
-      - name: Configure MarmotKit cache directory
-        shell: bash
-        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
 
       - name: Test PR screenshot renderer
         run: node --test .github/scripts/update-pr-screenshots.test.js .github/scripts/update-pr-preview-links.test.js
@@ -113,6 +106,13 @@ jobs:
           bash .github/scripts/test-verify-generated-profiles.sh
           bash scripts/verify-generated-profiles.sh
 
+      - name: Test Android CI aggregate gate
+        run: python3 -m unittest scripts/test_android_ci_gate.py
+
+      - name: Configure MarmotKit cache directory
+        shell: bash
+        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
+
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
@@ -120,15 +120,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Restores dependencies and the local task-output cache across runs
-      # (master and same-repository PR writes; forks read only). Invocations must
-      # also use --build-cache; setup-gradle does not enable task-output caching.
+      # Reuse cached dependencies and task outputs without publishing another
+      # job-specific Gradle home. The Play test leg is the sole cache writer.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
-          # Same-repository PR iterations can reuse their own ref-scoped outputs.
-          # Fork jobs retain the default read-only behavior.
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          cache-read-only: true
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -162,10 +159,10 @@ jobs:
         run: python3 scripts/test-release-gradle.py
 
       - name: Compile (Kotlin)
-        run: ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
+        run: ./gradlew :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
 
-      # Keep this release compilation in its own Gradle process. Compiling it
-      # concurrently with the debug matrix can exhaust the hosted runner heap.
+      # Keep release compilation in a fresh process after androidTest and the
+      # benchmark harness so their compiler heaps do not compete on this runner.
       - name: Assemble app for Baseline Profile verification
         run: ./gradlew :app:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
 
@@ -202,8 +199,69 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Unit tests
-        run: ./gradlew :app:testDevZapstoreDebugUnitTest :app:testDevPlayDebugUnitTest --build-cache --profile --no-daemon --stacktrace
+      # Preserve failure diagnostics with a unique artifact name per job.
+      - name: Upload reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-ci-reports-build-contracts
+          path: |
+            app/build/reports/
+            app/build/test-results/
+            app/build/outputs/roborazzi/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Keep task timings on successful runs too; wall-clock timeouts alone do
+      # not show whether compilation, tests, or analysis is doing extra work.
+      - name: Upload Gradle timing reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-ci-gradle-profiles-build-contracts
+          path: build/reports/profile/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  static-analysis:
+    name: ktlint, detekt, and Android lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Configure MarmotKit cache directory
+        shell: bash
+        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
+
+      # AGP 9.x / Gradle 9.4.1 require JDK 17.
+      - name: Set up JDK 17
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Reuse cached dependencies and task outputs without publishing another
+      # job-specific Gradle home. The Play test leg is the sole cache writer.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-read-only: true
+
+      - name: Read MarmotKit artifact pin
+        id: marmotkit
+        shell: bash
+        run: |
+          sha="$(awk -F= '$1 == "artifact-sha256" { print $2 }' app/src/main/marmotkit/MARMOT_VERSION)"
+          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid MarmotKit artifact SHA-256" >&2; exit 1; }
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Restore MarmotKit artifact
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       - name: ktlint
         run: ./gradlew :app:ktlintCheck :benchmark:ktlintCheck --build-cache --profile --no-daemon --stacktrace
@@ -214,11 +272,89 @@ jobs:
       - name: Android lint
         run: ./gradlew :app:lintDevZapstoreDebug :app:lintDevPlayDebug --build-cache --profile --no-daemon --stacktrace
 
+      # Preserve failure diagnostics with a unique artifact name per job.
+      - name: Upload reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-ci-reports-static-analysis
+          path: |
+            app/build/reports/
+            app/build/test-results/
+            app/build/outputs/roborazzi/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Keep task timings on successful runs too; wall-clock timeouts alone do
+      # not show whether compilation, tests, or analysis is doing extra work.
+      - name: Upload Gradle timing reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-ci-gradle-profiles-static-analysis
+          path: build/reports/profile/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  tests:
+    name: Unit, coverage, and screenshots (${{ matrix.flavor }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      # Keep both variants' diagnostics when one fails. Each runner retains the
+      # existing single test worker and heap limits.
+      fail-fast: false
+      matrix:
+        flavor: [Zapstore, Play]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Configure MarmotKit cache directory
+        shell: bash
+        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
+
+      # AGP 9.x / Gradle 9.4.1 require JDK 17.
+      - name: Set up JDK 17
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Share cached dependencies and task outputs, but publish Gradle state
+      # from only the Play leg to avoid multiplying job/matrix cache entries.
+      # Fork PRs remain read-only, including their Play leg.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-read-only: >-
+            ${{ matrix.flavor != 'Play' ||
+                (github.event_name == 'pull_request' &&
+                 github.event.pull_request.head.repo.full_name != github.repository) }}
+
+      - name: Read MarmotKit artifact pin
+        id: marmotkit
+        shell: bash
+        run: |
+          sha="$(awk -F= '$1 == "artifact-sha256" { print $2 }' app/src/main/marmotkit/MARMOT_VERSION)"
+          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid MarmotKit artifact SHA-256" >&2; exit 1; }
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Restore MarmotKit artifact
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
+
+      - name: Unit tests
+        run: ./gradlew :app:testDev${{ matrix.flavor }}DebugUnitTest --build-cache --profile --no-daemon --stacktrace
+
       # Coverage gate (phase 2): fail CI when overall line coverage drops below the
       # ratchet floor in app/build.gradle.kts. DevZapstoreDebug only — the aggregate
       # kover tasks pull in release variants, whose packaging trips the unsigned-release
       # guard (no signing in CI).
       - name: Coverage gate (Kover)
+        if: matrix.flavor == 'Zapstore'
         run: ./gradlew :app:koverVerifyDevZapstoreDebug --build-cache --profile --no-daemon --stacktrace
 
       # Coverage visibility (phase 1): generate HTML/XML reports and publish them as
@@ -227,13 +363,13 @@ jobs:
       - name: Coverage report (Kover)
         if: always()
         continue-on-error: true
-        run: ./gradlew :app:koverXmlReportDevZapstoreDebug :app:koverHtmlReportDevZapstoreDebug :app:koverXmlReportDevPlayDebug :app:koverHtmlReportDevPlayDebug --build-cache --profile --no-daemon --stacktrace
+        run: ./gradlew :app:koverXmlReportDev${{ matrix.flavor }}Debug :app:koverHtmlReportDev${{ matrix.flavor }}Debug --build-cache --profile --no-daemon --stacktrace
 
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: kover-coverage-report
+          name: kover-coverage-report-${{ matrix.flavor }}
           path: |
             app/build/reports/kover/
           if-no-files-found: ignore
@@ -256,8 +392,7 @@ jobs:
         # tests that also capture committed snapshots.
         run: |
           ./gradlew \
-            :app:verifyRoborazziDevZapstoreDebug \
-            :app:verifyRoborazziDevPlayDebug \
+            :app:verifyRoborazziDev${{ matrix.flavor }}Debug \
             --tests '*ScreenshotTest' \
             --tests '*ConversationImeCollapseFocusTest' \
             --tests '*NewGroupNameEmojiPickerTest' \
@@ -275,16 +410,12 @@ jobs:
             --build-cache --profile --no-daemon \
             --stacktrace
 
-      # Surface failure details (unit-test HTML/XML, lint reports, and Roborazzi
-      # screenshot diff/compare/actual images) on red runs. The roborazzi output
-      # dir holds *_compare.png / *_actual.png for any screenshot that diverged
-      # from its committed baseline, so a UI regression is inspectable from the
-      # workflow artifacts without re-running locally.
+      # Preserve failure diagnostics with a unique artifact name per job.
       - name: Upload reports
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: android-ci-reports
+          name: android-ci-reports-${{ matrix.flavor }}
           path: |
             app/build/reports/
             app/build/test-results/
@@ -298,7 +429,28 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: android-ci-gradle-profiles
+          name: android-ci-gradle-profiles-${{ matrix.flavor }}
           path: build/reports/profile/
           if-no-files-found: ignore
           retention-days: 7
+
+  # Preserve the existing check name for branch protection and consumers.
+  # always() is essential: a failed/skipped dependency must produce a red gate,
+  # rather than a skipped check that GitHub can treat as passing.
+  validate:
+    name: Compile, test, ktlint, detekt, Android lint
+    needs: [offline-zsp, build-contracts, static-analysis, tests]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every validation job to succeed
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$JOB_RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          printf '%s\n' "$JOB_RESULTS" | jq -e '
+            length > 0 and all(.[]; .result == "success")
+          ' > /dev/null
