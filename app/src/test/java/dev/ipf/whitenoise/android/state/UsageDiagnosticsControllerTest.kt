@@ -6,16 +6,55 @@ import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
 import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsStatusFfi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.lang.reflect.Proxy
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /** Behavioral receipt projection tests; the fake controls persistence failure and exporter capability. */
 class UsageDiagnosticsControllerTest {
+    /** Slow grants and revocations keep the last receipt visible while admitting no host observations. */
+    @Test
+    fun pendingSaveKeepsPresentationStableWithoutGrantingCollection() =
+        runBlocking {
+            val native = NativeReceipt()
+            val state = UsageDiagnosticsController()
+            state.setForeground(true)
+            state.refresh(native.engine)
+            for (enabled in listOf(true, false)) {
+                val previous = state.snapshot
+                val entered = CountDownLatch(1)
+                val release = CountDownLatch(1)
+                native.beforeWrite = {
+                    entered.countDown()
+                    check(release.await(30, TimeUnit.SECONDS))
+                }
+                val save = async { state.choose(native.engine, enabled) }
+                try {
+                    withContext(Dispatchers.IO) { assertTrue(entered.await(5, TimeUnit.SECONDS)) }
+                    assertSame(previous, state.snapshot)
+                    assertEquals(enabled, state.selected)
+                    assertFalse(state.granted)
+                    state.setForeground(true)
+                    assertNull(state.observations.ticket())
+                } finally {
+                    release.countDown()
+                }
+                assertTrue(save.await())
+                assertEquals(enabled, state.granted)
+            }
+        }
+
     /** A missing read or rejected write never displays a previous grant as a confirmed current decision. */
     @Test
     fun failureDisablesObservationUntilAnExplicitSuccessfulRetry() =
@@ -109,6 +148,7 @@ class UsageDiagnosticsControllerTest {
     private class NativeReceipt {
         var fail = false
         var configured = true
+        var beforeWrite: () -> Unit = {}
         private var decision = UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED
         val engine =
             Proxy.newProxyInstance(
@@ -118,6 +158,7 @@ class UsageDiagnosticsControllerTest {
                 check(!fail) { "synthetic persistence failure" }
                 when (method.name) {
                     "setUsageDiagnosticsConsent" -> {
+                        beforeWrite()
                         decision =
                             if (args!![0] == true) {
                                 UsageDiagnosticsDecisionFfi.GRANTED

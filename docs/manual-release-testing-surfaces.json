@@ -5375,6 +5375,39 @@
         ]
       },
       {
+        "surface": "ConsentSwitchRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConsentSwitchRow.kt",
+        "anchor": "fun ConsentSwitchRow(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "UsageDiagnosticsChoice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "fun UsageDiagnosticsChoice(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "UsageDiagnosticsFeedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "fun UsageDiagnosticsFeedback(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
         "surface": "UsageDiagnosticsSettings",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
         "anchor": "fun UsageDiagnosticsSettings(",

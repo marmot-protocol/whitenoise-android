@@ -1892,7 +1892,7 @@
     <string name="tts_choose_sentence">Choose sentence to read</string>
     <string name="tts_bar_preparing">Preparing speech…</string>
     <string name="usage_diagnostics_title">Share usage and diagnostics</string>
-    <string name="usage_diagnostics_subtitle">Feature activity and reliability metrics, with temporary sessions and a resettable diagnostic identifier.</string>
+    <string name="usage_diagnostics_subtitle">Feature activity and reliability metrics.</string>
     <string name="usage_diagnostics_prompt_title">Help Improve White Noise</string>
     <string name="usage_diagnostics_disclosure">Usage includes approved, bucketed activity and temporary session IDs, without message contents or account and group identifiers. Diagnostics includes a random installation identifier that changes after you turn sharing off.</string>
     <string name="usage_diagnostics_operator">Operated by %1$s.</string>

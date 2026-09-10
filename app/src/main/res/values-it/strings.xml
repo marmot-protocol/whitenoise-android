@@ -1773,7 +1773,7 @@
     <string name="group_rejoin_success">Sei rientrato nel gruppo.</string>
     <string name="group_rejoin_failed">Impossibile applicare questo invito</string>
     <string name="usage_diagnostics_title">Condividi dati di utilizzo e diagnostica</string>
-    <string name="usage_diagnostics_subtitle">Attività delle funzionalità e metriche di affidabilità, con sessioni temporanee e un identificatore diagnostico reimpostabile.</string>
+    <string name="usage_diagnostics_subtitle">Attività delle funzionalità e metriche di affidabilità.</string>
     <string name="usage_diagnostics_prompt_title">Aiuta a migliorare White Noise</string>
     <string name="usage_diagnostics_disclosure">I dati di utilizzo includono attività consentite raggruppate per categorie e identificatori temporanei di sessione, senza contenuti dei messaggi né identificatori di account e gruppi. La diagnostica include un identificatore casuale dell’installazione che cambia dopo la disattivazione della condivisione.</string>
     <string name="usage_diagnostics_operator">Gestito da %1$s.</string>

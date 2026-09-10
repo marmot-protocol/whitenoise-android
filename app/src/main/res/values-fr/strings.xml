@@ -1773,7 +1773,7 @@
     <string name="group_rejoin_success">Groupe rejoint à nouveau.</string>
     <string name="group_rejoin_failed">Impossible d’appliquer cette invitation</string>
     <string name="usage_diagnostics_title">Partager les données d’utilisation et de diagnostic</string>
-    <string name="usage_diagnostics_subtitle">Activité des fonctionnalités et mesures de fiabilité, avec des sessions temporaires et un identifiant de diagnostic réinitialisable.</string>
+    <string name="usage_diagnostics_subtitle">Activité des fonctionnalités et mesures de fiabilité.</string>
     <string name="usage_diagnostics_prompt_title">Aidez à améliorer White Noise</string>
     <string name="usage_diagnostics_disclosure">Les données d’utilisation comprennent les activités autorisées regroupées par catégories et des identifiants de session temporaires, sans le contenu des messages ni les identifiants de comptes ou de groupes. Les diagnostics comprennent un identifiant d’installation aléatoire qui change après la désactivation du partage.</string>
     <string name="usage_diagnostics_operator">Service exploité par %1$s.</string>

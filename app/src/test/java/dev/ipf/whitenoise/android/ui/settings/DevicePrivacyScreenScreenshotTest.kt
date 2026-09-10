@@ -5,8 +5,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -30,6 +33,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,6 +41,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.lang.reflect.Proxy
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -61,6 +68,12 @@ class DevicePrivacyScreenScreenshotTest {
     @Test
     fun firstLaunchPrompt() {
         capturePrompt("usage_diagnostics_prompt", dark = false)
+    }
+
+    /** The compact grouping and full disclosure retain contrast in dark appearance. */
+    @Test
+    fun firstLaunchPromptDark() {
+        capturePrompt("usage_diagnostics_prompt_dark", dark = true)
     }
 
     /** Dark, RTL and enlarged text keep the consent body scrollable and its action reachable. */
@@ -109,6 +122,14 @@ class DevicePrivacyScreenScreenshotTest {
         composeRule.waitForIdle()
         composeRule.onAllNodes(isToggleable())[0].assertIsOff()
         composeRule.onNodeWithText("Done").assertIsDisplayed()
+        val viewport =
+            composeRule
+                .onAllNodes(isRoot())
+                .fetchSemanticsNodes()
+                .maxBy { it.boundsInRoot.height }
+                .boundsInRoot
+        val done = composeRule.onNodeWithText("Done").fetchSemanticsNode().boundsInRoot
+        assertTrue("Done $done must fit inside $viewport", done.bottom <= viewport.bottom)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 
@@ -165,6 +186,68 @@ class DevicePrivacyScreenScreenshotTest {
         assertFalse(state.auditLogSettings?.enabled ?: true)
     }
 
+    /** Both directions of each slow save retain switch geometry, text wrapping, and the Done position. */
+    @Test
+    fun savingEitherChoiceKeepsTheSheetLayoutStable() {
+        val writes = LinkedBlockingQueue<Pair<CountDownLatch, CountDownLatch>>()
+        val state =
+            privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED) {
+                val (entered, release) = checkNotNull(writes.poll(5, TimeUnit.SECONDS))
+                entered.countDown()
+                check(release.await(30, TimeUnit.SECONDS))
+            }
+        runBlocking { state.refreshSecurityPrivacySettings() }
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) { UsageDiagnosticsPrompt(state, onDone = {}) }
+        }
+        val initialBounds = promptContentBounds()
+        for ((index, enabled) in listOf(0 to true, 0 to false, 1 to true, 1 to false)) {
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            writes.put(entered to release)
+            try {
+                val title = if (index == 0) "Share usage and diagnostics" else "Audit logs"
+                composeRule.onNodeWithText(title).performClick()
+                waitForMutation { entered.count == 0L }
+                val toggle = composeRule.onAllNodes(isToggleable())[index]
+                if (enabled) toggle.assertIsOn() else toggle.assertIsOff()
+                toggle.assertIsNotEnabled()
+                composeRule.onNodeWithText("Done").assertIsNotEnabled()
+                assertEquals(initialBounds, promptContentBounds())
+                if (index == 0 && enabled) {
+                    composeRule.onRoot().captureRoboImage("src/test/snapshots/usage_diagnostics_prompt_saving.png")
+                }
+            } finally {
+                release.countDown()
+            }
+            waitForMutation {
+                if (index == 0) {
+                    !state.diagnostics.busy && state.diagnostics.granted == enabled
+                } else {
+                    state.auditLogSettings?.enabled == enabled
+                }
+            }
+            composeRule.onNodeWithText("Done").assertIsEnabled()
+            assertEquals(initialBounds, promptContentBounds())
+        }
+    }
+
+    /** Samples the static disclosure and completion action instead of relying on screenshot timing alone. */
+    private fun promptContentBounds() =
+        listOf("Help Improve White Noise", "Share usage and diagnostics", "Audit logs", "Done").map {
+            composeRule.onNodeWithText(it).fetchSemanticsNode().boundsInRoot
+        }
+
+    /** Advances the main looper while an off-main native save or its UI completion is pending. */
+    private fun waitForMutation(condition: () -> Boolean) {
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idle()
+            condition()
+        }
+    }
+
     /** Builds one deterministic native privacy snapshot and captures the full settings surface. */
     private fun captureConsentState(
         decision: UsageDiagnosticsDecisionFfi,
@@ -189,7 +272,10 @@ class DevicePrivacyScreenScreenshotTest {
     }
 
     /** Creates a state whose only native reads are fixed device-privacy values. */
-    private fun privacyAppState(decision: UsageDiagnosticsDecisionFfi): WhiteNoiseAppState {
+    private fun privacyAppState(
+        decision: UsageDiagnosticsDecisionFfi,
+        beforeSave: () -> Unit = {},
+    ): WhiteNoiseAppState {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val preferences =
             context.getSharedPreferences(
@@ -197,7 +283,7 @@ class DevicePrivacyScreenScreenshotTest {
                 Context.MODE_PRIVATE,
             )
         preferences.edit().clear().commit()
-        val marmot = privacyMarmot(decision)
+        val marmot = privacyMarmot(decision, beforeSave)
         return WhiteNoiseAppState(
             context = context,
             draftStore = DraftStore(EmptyDraftPersistence),
@@ -215,14 +301,19 @@ class DevicePrivacyScreenScreenshotTest {
     }
 
     /** Implements device-privacy reads and explicit consent writes using disposable state. */
-    private fun privacyMarmot(initialDecision: UsageDiagnosticsDecisionFfi): MarmotInterface {
+    private fun privacyMarmot(
+        initialDecision: UsageDiagnosticsDecisionFfi,
+        beforeSave: () -> Unit,
+    ): MarmotInterface {
         var decision = initialDecision
+        var auditSettings = AuditLogSettingsFfi(enabled = false)
         return Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
             when (method.name) {
                 "setUsageDiagnosticsConsent" -> {
+                    beforeSave()
                     decision =
                         if (arguments?.firstOrNull() == true) {
                             UsageDiagnosticsDecisionFfi.GRANTED
@@ -259,7 +350,12 @@ class DevicePrivacyScreenScreenshotTest {
                         exportEnabled = false,
                         exportIntervalSeconds = 60uL,
                     )
-                "auditLogSettings" -> AuditLogSettingsFfi(enabled = false)
+                "auditLogSettings" -> auditSettings
+                "setAuditLogSettings" -> {
+                    beforeSave()
+                    auditSettings = arguments!!.first() as AuditLogSettingsFfi
+                    auditSettings
+                }
                 "toString" -> "DevicePrivacyScreenshotMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.firstOrNull()

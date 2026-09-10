@@ -25,12 +25,16 @@ internal class UsageDiagnosticsController {
     private var runtime: MarmotInterface? = null
     private var revision = 0L
     private var foreground = false
-    private var pendingChoice: Boolean? = null
+    private var pendingChoice by mutableStateOf<Boolean?>(null)
 
     val requiresChoice: Boolean
         get() = snapshot?.settings?.decision == UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED
     val granted: Boolean
-        get() = snapshot?.settings?.decision == UsageDiagnosticsDecisionFfi.GRANTED
+        get() = !failed && pendingChoice == null && snapshot?.settings?.decision == UsageDiagnosticsDecisionFfi.GRANTED
+
+    /** Optimistic switch presentation never grants collection before native persistence succeeds. */
+    val selected: Boolean
+        get() = !failed && (pendingChoice ?: granted)
 
     /** Records the immediate Activity edge before asynchronous MDK work or runtime construction. */
     fun setForeground(value: Boolean) {
@@ -64,7 +68,6 @@ internal class UsageDiagnosticsController {
         bind(engine)
         revision += 1
         pendingChoice = enabled
-        snapshot = null
         observations.reset()
         return update(engine, enabled)
     }

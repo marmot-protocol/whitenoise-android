@@ -1771,7 +1771,7 @@
     <string name="group_rejoin_success">Gruba yeniden katıldınız.</string>
     <string name="group_rejoin_failed">Bu davet uygulanamadı</string>
     <string name="usage_diagnostics_title">Kullanım ve tanılama verilerini paylaş</string>
-    <string name="usage_diagnostics_subtitle">Geçici oturumlar ve sıfırlanabilir bir tanılama tanımlayıcısı ile özellik etkinliği ve güvenilirlik ölçümleri.</string>
+    <string name="usage_diagnostics_subtitle">Özellik etkinliği ve güvenilirlik ölçümleri.</string>
     <string name="usage_diagnostics_prompt_title">White Noise’u geliştirmeye yardımcı olun</string>
     <string name="usage_diagnostics_disclosure">Kullanım verileri, izin verilen ve kategoriler halinde gruplanan etkinlikleri ve geçici oturum tanımlayıcılarını içerir; mesaj içeriklerini, hesap veya grup tanımlayıcılarını içermez. Tanılama verileri, paylaşımı kapattığınızda değişen rastgele bir kurulum tanımlayıcısı içerir.</string>
     <string name="usage_diagnostics_operator">%1$s tarafından işletilir.</string>

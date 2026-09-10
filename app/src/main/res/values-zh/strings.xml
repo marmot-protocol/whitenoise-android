@@ -1746,7 +1746,7 @@
     <string name="group_rejoin_success">已重新加入群组。</string>
     <string name="group_rejoin_failed">无法应用此邀请</string>
     <string name="usage_diagnostics_title">分享使用情况和诊断数据</string>
-    <string name="usage_diagnostics_subtitle">功能使用活动和可靠性指标，包含临时会话和可重置的诊断标识符。</string>
+    <string name="usage_diagnostics_subtitle">功能使用活动和可靠性指标。</string>
     <string name="usage_diagnostics_prompt_title">帮助改进 White Noise</string>
     <string name="usage_diagnostics_disclosure">使用数据包含按类别汇总的获准活动和临时会话标识符，不包含消息内容、账户或群组标识符。诊断数据包含随机生成的安装标识符，关闭分享后该标识符会更改。</string>
     <string name="usage_diagnostics_operator">由 %1$s 运营。</string>

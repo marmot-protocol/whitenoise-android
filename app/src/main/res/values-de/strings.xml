@@ -1789,7 +1789,7 @@
     <string name="group_rejoin_success">Gruppe erneut beigetreten.</string>
     <string name="group_rejoin_failed">Einladung konnte nicht angewendet werden</string>
     <string name="usage_diagnostics_title">Nutzungs- und Diagnosedaten teilen</string>
-    <string name="usage_diagnostics_subtitle">Funktionsnutzung und Zuverlässigkeitskennzahlen mit temporären Sitzungen und einer zurücksetzbaren Diagnosekennung.</string>
+    <string name="usage_diagnostics_subtitle">Funktionsnutzung und Zuverlässigkeitskennzahlen.</string>
     <string name="usage_diagnostics_prompt_title">Hilf, White Noise zu verbessern</string>
     <string name="usage_diagnostics_disclosure">Die Nutzungsdaten enthalten freigegebene, in Kategorien zusammengefasste Aktivitäten und temporäre Sitzungskennungen, jedoch keine Nachrichteninhalte oder Konto- und Gruppenkennungen. Die Diagnosedaten enthalten eine zufällige Installationskennung, die sich nach dem Ausschalten der Datenfreigabe ändert.</string>
     <string name="usage_diagnostics_operator">Betrieben von %1$s.</string>

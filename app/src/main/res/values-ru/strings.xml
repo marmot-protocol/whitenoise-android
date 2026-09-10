@@ -1835,7 +1835,7 @@
     <string name="group_rejoin_success">Вы вернулись в группу.</string>
     <string name="group_rejoin_failed">Не удалось применить это приглашение</string>
     <string name="usage_diagnostics_title">Делиться данными об использовании и диагностике</string>
-    <string name="usage_diagnostics_subtitle">Данные об использовании функций и показателях надёжности с временными сеансами и сбрасываемым диагностическим идентификатором.</string>
+    <string name="usage_diagnostics_subtitle">Данные об использовании функций и показателях надёжности.</string>
     <string name="usage_diagnostics_prompt_title">Помогите улучшить White Noise</string>
     <string name="usage_diagnostics_disclosure">Данные об использовании включают разрешённые действия, объединённые по категориям, и временные идентификаторы сеансов, но не содержимое сообщений или идентификаторы аккаунтов и групп. Диагностика включает случайный идентификатор установки, который меняется после отключения передачи данных.</string>
     <string name="usage_diagnostics_operator">Оператор: %1$s.</string>
