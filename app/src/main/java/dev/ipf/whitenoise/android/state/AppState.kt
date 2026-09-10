@@ -798,7 +798,14 @@ internal fun relayUrlPassesResolveTimeCheck(
     resolve: RelayHostResolver = ::resolveRelayHost,
 ): Boolean = relayUrlResolveTimeCheckResult(canonicalUrl, resolve) == RelayResolveTimeCheckResult.Passed
 
-private const val RELAY_VALIDATION_UNAVAILABLE_MESSAGE = "Couldn't validate the relay list. Try again."
+/** Resolve-checks only a newly requested relay; removal plans preserve unreachable imported relays. */
+internal fun requiredRelayResolveTimeCheckResult(
+    plan: RelayListEditPlan,
+    resolve: RelayHostResolver = ::resolveRelayHost,
+): RelayResolveTimeCheckResult =
+    plan.requiredRelay
+        ?.let { relayUrlResolveTimeCheckResult(it, resolve) }
+        ?: RelayResolveTimeCheckResult.Passed
 
 private fun resolveRelayHost(host: String): Array<InetAddress>? = runCatching { InetAddress.getAllByName(host) }.getOrNull()
 
@@ -5748,7 +5755,7 @@ class WhiteNoiseAppState private constructor(
                     RelayPublishValidationError.Unavailable ->
                         present(
                             R.string.toast_relay_update_failed,
-                            AppText.Plain(RELAY_VALIDATION_UNAVAILABLE_MESSAGE),
+                            R.string.error_couldnt_verify_relay_hosts,
                         )
                 }
                 null
@@ -5779,18 +5786,25 @@ class WhiteNoiseAppState private constructor(
         if (plan.relays.isEmpty() || plan.relays.any { !isAcceptableRelayUrl(it) }) {
             RelayPublishValidation.Rejected(RelayPublishValidationError.Invalid)
         } else {
-            runCatchingCancellable {
-                marmotIo { classifyRelayEndpoints(plan.relays) }
-            }.fold(
-                onSuccess = { classified ->
-                    allowedRelayUrlsForPublish(plan, classified)
-                        ?.let(RelayPublishValidation::Ready)
-                        ?: RelayPublishValidation.Rejected(RelayPublishValidationError.Blocked)
-                },
-                onFailure = {
+            when (withContext(Dispatchers.IO) { requiredRelayResolveTimeCheckResult(plan) }) {
+                RelayResolveTimeCheckResult.Blocked ->
+                    RelayPublishValidation.Rejected(RelayPublishValidationError.Blocked)
+                RelayResolveTimeCheckResult.Unavailable ->
                     RelayPublishValidation.Rejected(RelayPublishValidationError.Unavailable)
-                },
-            )
+                RelayResolveTimeCheckResult.Passed ->
+                    runCatchingCancellable {
+                        marmotIo { classifyRelayEndpoints(plan.relays) }
+                    }.fold(
+                        onSuccess = { classified ->
+                            allowedRelayUrlsForPublish(plan, classified)
+                                ?.let(RelayPublishValidation::Ready)
+                                ?: RelayPublishValidation.Rejected(RelayPublishValidationError.Blocked)
+                        },
+                        onFailure = {
+                            RelayPublishValidation.Rejected(RelayPublishValidationError.Unavailable)
+                        },
+                    )
+            }
         }
 
     private fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> =

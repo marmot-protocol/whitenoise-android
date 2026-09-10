@@ -272,6 +272,61 @@ class RelayUrlsTest {
         assertFalse(relayUrlPassesResolveTimeCheck("wss://rebind.example", resolveToLoopback))
     }
 
+    @Test
+    fun requiredRelayResolveTimeCheckChecksOnlyNewAddition() {
+        val resolvedHosts = mutableListOf<String>()
+        val resolveToPublic: RelayHostResolver = { host ->
+            resolvedHosts += host
+            arrayOf(ipv4(8, 8, 8, 8))
+        }
+
+        assertEquals(
+            RelayResolveTimeCheckResult.Passed,
+            requiredRelayResolveTimeCheckResult(
+                RelayListEditPlan(
+                    relays = listOf("wss://unreachable-import.example", "wss://new-relay.example"),
+                    requiredRelay = "wss://new-relay.example",
+                ),
+                resolveToPublic,
+            ),
+        )
+        assertEquals(listOf("new-relay.example"), resolvedHosts)
+    }
+
+    @Test
+    fun requiredRelayResolveTimeCheckRejectsPrivateNewAddition() {
+        val resolveToLoopback: RelayHostResolver = { arrayOf(ipv4(127, 0, 0, 1)) }
+
+        assertEquals(
+            RelayResolveTimeCheckResult.Blocked,
+            requiredRelayResolveTimeCheckResult(
+                RelayListEditPlan(
+                    relays = listOf("wss://existing.example", "wss://rebind.example"),
+                    requiredRelay = "wss://rebind.example",
+                ),
+                resolveToLoopback,
+            ),
+        )
+    }
+
+    @Test
+    fun requiredRelayResolveTimeCheckSkipsRemovalPlan() {
+        var resolveCalls = 0
+        val failIfCalled: RelayHostResolver = {
+            resolveCalls += 1
+            null
+        }
+
+        assertEquals(
+            RelayResolveTimeCheckResult.Passed,
+            requiredRelayResolveTimeCheckResult(
+                RelayListEditPlan(relays = listOf("wss://unreachable-import.example")),
+                failIfCalled,
+            ),
+        )
+        assertEquals(0, resolveCalls)
+    }
+
     private fun ipv4(
         a: Int,
         b: Int,
