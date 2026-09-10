@@ -71,6 +71,22 @@ frozen in `config/detekt/detekt-baseline.xml`. The workflow runs both the
 `zapstore` and `play` dev debug variants and requires no signing secrets or
 `google-services.json`.
 
+Validation runs concurrently on separate runners: build/release/tooling contracts,
+static analysis (ktlint, detekt, and both Android lint variants), and one test job
+per distribution. Each test job compiles its dev debug variant, runs the full
+unit suite, generates coverage, and then verifies screenshots. The Zapstore job
+also enforces all Kover ratchets. Coverage runs before the filtered screenshot
+invocation so it reuses the full unit-suite results. The existing
+`Compile, test, ktlint, detekt, Android lint` check aggregates every job, including
+the offline ZSP contract, and fails if any dependency fails, is cancelled, or skips.
+
+Coverage artifacts are `kover-coverage-report-Zapstore` and
+`kover-coverage-report-Play`. Failure reports and Gradle timing profiles use
+`android-ci-reports-<job>` and `android-ci-gradle-profiles-<job>`, where `<job>` is
+`build-contracts`, `static-analysis`, `Zapstore`, or `Play`. Separate runners
+reduce the serial critical path but repeat some setup/compilation; compare both
+wall time and summed job durations when measuring CI performance.
+
 Two security workflows run separately from the main Gradle validation so their
 permissions and results stay explicit:
 
@@ -154,7 +170,7 @@ covers two surfaces:
 
 Baseline PNGs live under `app/src/test/snapshots/` and are committed to git. CI
 runs `:app:verifyRoborazziDevZapstoreDebug` and `:app:verifyRoborazziDevPlayDebug`; on a mismatch the build fails and the
-diff/compare images are uploaded as workflow artifacts (`android-ci-reports`).
+diff/compare images are uploaded as workflow artifacts (`android-ci-reports-Zapstore` and `android-ci-reports-Play`).
 
 **Re-baseline after an intentional UI change.** When you deliberately change a
 covered composable, regenerate the baselines and commit the updated PNGs:
