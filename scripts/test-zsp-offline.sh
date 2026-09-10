@@ -31,6 +31,10 @@ keytool -genkeypair -alias fixture -keystore "$temporary_dir/fixture.jks" \
   -keyalg RSA -validity 1 >/dev/null 2>&1
 "$sdk_dir/build-tools/36.0.0/apksigner" sign --ks "$temporary_dir/fixture.jks" \
   --ks-pass pass:disposable-fixture --out "$temporary_dir/fixture.apk" "$temporary_dir/unsigned.apk"
+fixture_fingerprint="$(keytool -exportcert -alias fixture -keystore "$temporary_dir/fixture.jks" \
+  -storepass disposable-fixture | python3 -c 'import hashlib, sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())')"
+python3 "$repo_dir/scripts/verify_apk_signature.py" "$sdk_dir/build-tools/36.0.0/apksigner" \
+  "$temporary_dir/fixture.apk" "$fixture_fingerprint" >/dev/null
 (
   cd "$temporary_dir/source"
   GOWORK=off go run "$repo_dir/scripts/rehearse-zsp.go" "$temporary_dir/zsp" "$temporary_dir/fixture.apk"
