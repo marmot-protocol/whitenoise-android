@@ -341,6 +341,39 @@ class ZapstoreIntegrationTests(unittest.TestCase):
                     self.assertIn('signer differs', result.stderr)
 
 
+class KeystoreCertificateTests(unittest.TestCase):
+    def test_certificate_identity_and_password_fail_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            keystore = Path(directory) / 'fixture with spaces.p12'
+            password = 'disposable-keystore-password'
+            env = {**os.environ, 'RELEASE_FIXTURE_PASSWORD': password}
+            subprocess.run(['keytool', '-genkeypair', '-alias', 'fixture', '-keyalg', 'RSA',
+                            '-validity', '1', '-dname', 'CN=Disposable Certificate Test',
+                            '-keystore', str(keystore), '-storepass:env', 'RELEASE_FIXTURE_PASSWORD'],
+                           env=env, check=True, capture_output=True)
+            certificate = subprocess.check_output(
+                ['keytool', '-exportcert', '-alias', 'fixture', '-keystore', str(keystore),
+                 '-storepass:env', 'RELEASE_FIXTURE_PASSWORD'], env=env)
+            fingerprint = hashlib.sha256(certificate).hexdigest()
+            for expected, supplied, success in [(fingerprint, password, True),
+                                                ('0' * 64, password, False),
+                                                (fingerprint, 'wrong-password', False),
+                                                (fingerprint, '', False)]:
+                with self.subTest(expected=expected, password_present=bool(supplied)):
+                    result = subprocess.run(
+                        ['bash', str(ROOT / 'scripts/verify-keystore-certificate.sh'),
+                         str(keystore), 'fixture', 'RELEASE_FIXTURE_PASSWORD', expected],
+                        env={**env, 'RELEASE_FIXTURE_PASSWORD': supplied},
+                        text=True, capture_output=True)
+                    self.assertEqual(result.returncode == 0, success, result.stderr)
+                    self.assertNotIn(password, result.stdout + result.stderr)
+                    if success:
+                        self.assertIn(fingerprint, result.stdout)
+                    elif expected != fingerprint:
+                        self.assertIn(fingerprint, result.stderr)
+                        self.assertIn(expected, result.stderr)
+
+
 class BundleSignatureTests(unittest.TestCase):
     def test_signature_gate_rejects_unsigned_partial_tampered_and_wrong_identity(self):
         with tempfile.TemporaryDirectory() as directory:
