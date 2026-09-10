@@ -43,6 +43,7 @@ import dev.ipf.marmotkit.ProductAnalyticsMetadataFfi
 import dev.ipf.marmotkit.ProductAnalyticsRuntimeConfigFfi
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.RelayEndpointClassificationFfi
+import dev.ipf.marmotkit.RelayEndpointPolicyFfi
 import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
@@ -654,12 +655,12 @@ enum class RelayListKind {
 
 internal enum class RelayUrlValidationResult {
     Acceptable,
-    UnsupportedHost,
     Invalid,
 }
 
 internal data class RelayListEditPlan(
     val relays: List<String>,
+    val requiredRelay: String? = null,
 )
 
 private enum class RelayPublishValidationError {
@@ -668,12 +669,20 @@ private enum class RelayPublishValidationError {
     Unavailable,
 }
 
-internal fun normalizeRelayUrls(
-    relays: Iterable<String>,
-    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
-): List<String> =
+private sealed interface RelayPublishValidation {
+    data class Ready(
+        val relays: List<String>,
+    ) : RelayPublishValidation
+
+    data class Rejected(
+        val error: RelayPublishValidationError,
+    ) : RelayPublishValidation
+}
+
+/** Canonicalizes secure public relay URLs without restricting them to White Noise-owned hosts. */
+internal fun normalizeRelayUrls(relays: Iterable<String>): List<String> =
     relays
-        .mapNotNull { canonicalRelayUrl(it, allowExternalRelayHosts) }
+        .mapNotNull(::canonicalRelayUrl)
         .distinct()
 
 internal fun telemetryServiceVersion(
@@ -691,42 +700,29 @@ internal fun telemetryDeploymentEnvironment(value: String): String =
 
 internal fun telemetryDeviceModelIdentifier(model: String): String? = model.trim().takeIf { it.isNotEmpty() }
 
-internal fun isAcceptableRelayUrl(
-    url: String,
-    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
-): Boolean = relayUrlValidationResult(url, allowExternalRelayHosts) == RelayUrlValidationResult.Acceptable
+/** Returns whether a relay URL passes the synchronous structural and literal-host checks. */
+internal fun isAcceptableRelayUrl(url: String): Boolean = relayUrlValidationResult(url) == RelayUrlValidationResult.Acceptable
 
-internal fun relayUrlValidationResult(
-    url: String,
-    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
-): RelayUrlValidationResult {
-    val canonical =
-        canonicalRelayUrl(url, allowExternalRelayHosts = true)
-            ?: return RelayUrlValidationResult.Invalid
-    return if (allowExternalRelayHosts || canonicalRelayUrl(canonical, allowExternalRelayHosts = false) != null) {
-        RelayUrlValidationResult.Acceptable
-    } else {
-        RelayUrlValidationResult.UnsupportedHost
-    }
-}
+/** Classifies a relay URL for immediate editor feedback; MarmotKit remains the publish boundary. */
+internal fun relayUrlValidationResult(url: String): RelayUrlValidationResult =
+    if (canonicalRelayUrl(url) == null) RelayUrlValidationResult.Invalid else RelayUrlValidationResult.Acceptable
 
+/** Builds an add mutation while preserving every other structurally valid imported relay. */
 internal fun relayListAfterAddition(
     currentRelays: List<String>,
     relayToAdd: String,
-    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
 ): RelayListEditPlan? {
-    if (relayUrlValidationResult(relayToAdd, allowExternalRelayHosts) != RelayUrlValidationResult.Acceptable) {
-        return null
-    }
+    val canonicalRelay = canonicalRelayUrl(relayToAdd) ?: return null
     return RelayListEditPlan(
-        relays = normalizeRelayUrls(currentRelays + relayToAdd, allowExternalRelayHosts),
+        relays = normalizeRelayUrls(currentRelays + canonicalRelay),
+        requiredRelay = canonicalRelay,
     )
 }
 
+/** Builds a removal mutation that deletes only the selected relay and keeps safe imported siblings. */
 internal fun relayListAfterRemoval(
     currentRelays: List<String>,
     relayToRemove: String,
-    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
     fallbackRelays: List<String> = MarmotClient.bootstrapRelays,
 ): RelayListEditPlan {
     val target = relayToRemove.trim()
@@ -735,24 +731,35 @@ internal fun relayListAfterRemoval(
             .map(String::trim)
             .filter { it.isNotEmpty() && it != target }
             .distinct()
-    val supported = normalizeRelayUrls(remaining, allowExternalRelayHosts)
+    val supported = normalizeRelayUrls(remaining)
     return RelayListEditPlan(
-        relays = supported.ifEmpty { normalizeRelayUrls(fallbackRelays, allowExternalRelayHosts) },
+        relays = supported.ifEmpty { normalizeRelayUrls(fallbackRelays) },
     )
 }
 
+/** Prevents removing the final publishable relay while permitting targeted cleanup. */
 internal fun canRemoveRelay(
     currentRelays: List<String>,
     relay: String,
-    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
-): Boolean {
-    if (relayUrlValidationResult(relay, allowExternalRelayHosts) != RelayUrlValidationResult.Acceptable) {
-        return true
-    }
-    return normalizeRelayUrls(
-        currentRelays.filterNot { it.trim() == relay.trim() },
-        allowExternalRelayHosts,
-    ).isNotEmpty()
+): Boolean = normalizeRelayUrls(currentRelays.filterNot { it.trim() == relay.trim() }).isNotEmpty()
+
+/** Keeps MarmotKit-approved endpoints while requiring a requested addition to survive classification. */
+internal fun allowedRelayUrlsForPublish(
+    plan: RelayListEditPlan,
+    classified: List<RelayEndpointClassificationFfi>,
+): List<String>? {
+    val requiredRelayAllowed =
+        plan.requiredRelay == null ||
+            classified.any {
+                it.policy == RelayEndpointPolicyFfi.ALLOWED && canonicalRelayUrl(it.endpoint) == plan.requiredRelay
+            }
+    val allowedRelays =
+        classified
+            .filter { it.policy == RelayEndpointPolicyFfi.ALLOWED }
+            .mapNotNull(RelayEndpointClassificationFfi::normalizedEndpoint)
+            .mapNotNull(::canonicalRelayUrl)
+            .distinct()
+    return allowedRelays.takeIf { it.isNotEmpty() && requiredRelayAllowed }
 }
 
 internal enum class RelayResolveTimeCheckResult {
@@ -765,9 +772,8 @@ internal enum class RelayResolveTimeCheckResult {
 internal typealias RelayHostResolver = (String) -> Array<InetAddress>?
 
 /**
- * Resolve-time SSRF guard for relay URLs about to be dialed. Call from the IO
- * dispatcher (see [relayUrlsResolveTimeCheckResult]) after cheap
- * [canonicalRelayUrl] / [normalizeRelayUrls] canonicalization.
+ * Resolve-time SSRF guard for app-owned relay fetches. Call from a background
+ * dispatcher after cheap [canonicalRelayUrl] / [normalizeRelayUrls] canonicalization.
  */
 internal fun relayUrlResolveTimeCheckResult(
     canonicalUrl: String,
@@ -792,44 +798,11 @@ internal fun relayUrlPassesResolveTimeCheck(
     resolve: RelayHostResolver = ::resolveRelayHost,
 ): Boolean = relayUrlResolveTimeCheckResult(canonicalUrl, resolve) == RelayResolveTimeCheckResult.Passed
 
-internal suspend fun relayUrlsResolveTimeCheckResult(
-    canonicalUrls: List<String>,
-    resolve: RelayHostResolver = ::resolveRelayHost,
-): RelayResolveTimeCheckResult =
-    withContext(Dispatchers.IO) {
-        var unavailable = false
-        for (canonicalUrl in canonicalUrls) {
-            when (relayUrlResolveTimeCheckResult(canonicalUrl, resolve)) {
-                RelayResolveTimeCheckResult.Passed -> Unit
-                RelayResolveTimeCheckResult.Blocked -> return@withContext RelayResolveTimeCheckResult.Blocked
-                RelayResolveTimeCheckResult.Unavailable -> unavailable = true
-            }
-        }
-        if (unavailable) RelayResolveTimeCheckResult.Unavailable else RelayResolveTimeCheckResult.Passed
-    }
-
-internal suspend fun relayUrlsPassResolveTimeChecks(
-    canonicalUrls: List<String>,
-    resolve: RelayHostResolver = ::resolveRelayHost,
-): Boolean = relayUrlsResolveTimeCheckResult(canonicalUrls, resolve) == RelayResolveTimeCheckResult.Passed
-
-private const val RELAY_HOSTS_UNAVAILABLE_MESSAGE =
-    "Couldn't verify relay hosts. Check your connection and try again."
-
-private val releaseRelayHosts: Set<String> by lazy {
-    MarmotClient.bootstrapRelays
-        .mapNotNull { runCatching { URI(it).host?.lowercase(Locale.ROOT) }.getOrNull() }
-        .toSet()
-}
-
-private fun relayHostPassesReleasePolicy(canonicalHost: String): Boolean = canonicalHost in releaseRelayHosts
+private const val RELAY_VALIDATION_UNAVAILABLE_MESSAGE = "Couldn't validate the relay list. Try again."
 
 private fun resolveRelayHost(host: String): Array<InetAddress>? = runCatching { InetAddress.getAllByName(host) }.getOrNull()
 
-private fun canonicalRelayUrl(
-    url: String,
-    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
-): String? {
+private fun canonicalRelayUrl(url: String): String? {
     return runCatching {
         val uri = URI(url.trim())
         if (uri.scheme?.equals("wss", ignoreCase = true) != true || uri.userInfo != null) {
@@ -852,13 +825,6 @@ private fun canonicalRelayUrl(
         // never accept one that points the client at loopback or the local
         // network. See issue #82.
         if (HostSafety.isPrivateOrLoopbackHost(canonicalHost)) return@runCatching null
-        // Release builds cannot pin the native Marmot/nostr-sdk WebSocket dial to
-        // this app-side DNS answer, so only app-owned relay hosts are allowed to
-        // cross the UniFFI boundary. Debug builds keep external relays available
-        // for local/self-hosted testing.
-        if (!allowExternalRelayHosts && !relayHostPassesReleasePolicy(canonicalHost)) {
-            return@runCatching null
-        }
         val authorityHost = if (canonicalHost.contains(":")) "[$canonicalHost]" else canonicalHost
         val port =
             uri.port
@@ -5720,7 +5686,6 @@ class WhiteNoiseAppState private constructor(
         val validationError =
             when (relayUrlValidationResult(relay)) {
                 RelayUrlValidationResult.Acceptable -> null
-                RelayUrlValidationResult.UnsupportedHost -> R.string.error_external_relay_not_supported
                 RelayUrlValidationResult.Invalid -> R.string.error_invalid_relay_url
             }
         val current = account?.takeIf { validationError == null }?.let { loadAccountRelayLists(it) }
@@ -5769,53 +5734,63 @@ class WhiteNoiseAppState private constructor(
         account: String,
         kind: RelayListKind,
         plan: RelayListEditPlan,
-    ): AccountRelayListsFfi? {
-        val next = plan.relays
-        val validationError = relayPublishValidationError(next)
-        return if (validationError != null) {
-            when (validationError) {
-                RelayPublishValidationError.Invalid ->
-                    present(R.string.toast_relay_update_failed, R.string.error_invalid_relay_url)
-                RelayPublishValidationError.Blocked ->
-                    present(
-                        R.string.toast_relay_update_failed,
-                        R.string.error_remove_invalid_relay_urls_first,
-                    )
-                RelayPublishValidationError.Unavailable ->
-                    present(
-                        R.string.toast_relay_update_failed,
-                        AppText.Plain(RELAY_HOSTS_UNAVAILABLE_MESSAGE),
-                    )
-            }
-            null
-        } else {
-            runCatchingCancellable {
-                marmotIo {
-                    when (kind) {
-                        RelayListKind.Nip65 -> setAccountNip65Relays(account, next, MarmotClient.bootstrapRelays)
-                        RelayListKind.Inbox -> setAccountInboxRelays(account, next, MarmotClient.bootstrapRelays)
-                    }
+    ): AccountRelayListsFfi? =
+        when (val validation = relayPublishValidation(plan)) {
+            is RelayPublishValidation.Rejected -> {
+                when (validation.error) {
+                    RelayPublishValidationError.Invalid ->
+                        present(R.string.toast_relay_update_failed, R.string.error_invalid_relay_url)
+                    RelayPublishValidationError.Blocked ->
+                        present(
+                            R.string.toast_relay_update_failed,
+                            R.string.error_remove_invalid_relay_urls_first,
+                        )
+                    RelayPublishValidationError.Unavailable ->
+                        present(
+                            R.string.toast_relay_update_failed,
+                            AppText.Plain(RELAY_VALIDATION_UNAVAILABLE_MESSAGE),
+                        )
                 }
-            }.onSuccess {
-                presentTransient(R.string.toast_relay_list_updated)
-            }.onFailure {
-                presentFailure(R.string.toast_relay_update_failed, "RELAY_LIST_UPDATE", it)
-            }.getOrNull()
+                null
+            }
+
+            is RelayPublishValidation.Ready ->
+                runCatchingCancellable {
+                    marmotIo {
+                        when (kind) {
+                            RelayListKind.Nip65 ->
+                                setAccountNip65Relays(account, validation.relays, MarmotClient.bootstrapRelays)
+                            RelayListKind.Inbox ->
+                                setAccountInboxRelays(account, validation.relays, MarmotClient.bootstrapRelays)
+                        }
+                    }
+                }.onSuccess {
+                    presentTransient(R.string.toast_relay_list_updated)
+                }.onFailure {
+                    presentFailure(R.string.toast_relay_update_failed, "RELAY_LIST_UPDATE", it)
+                }.getOrNull()
         }
-    }
 
     private suspend fun loadAccountRelayLists(account: String): AccountRelayListsFfi? =
         runCatchingCancellable { marmotIo { accountRelayLists(account) } }.getOrNull()
 
-    private suspend fun relayPublishValidationError(relays: List<String>): RelayPublishValidationError? =
-        when {
-            relays.isEmpty() || relays.any { !isAcceptableRelayUrl(it) } -> RelayPublishValidationError.Invalid
-            else ->
-                when (relayUrlsResolveTimeCheckResult(relays)) {
-                    RelayResolveTimeCheckResult.Passed -> null
-                    RelayResolveTimeCheckResult.Blocked -> RelayPublishValidationError.Blocked
-                    RelayResolveTimeCheckResult.Unavailable -> RelayPublishValidationError.Unavailable
-                }
+    /** Applies MarmotKit's shared relay policy and strips only unsafe pre-existing entries. */
+    private suspend fun relayPublishValidation(plan: RelayListEditPlan): RelayPublishValidation =
+        if (plan.relays.isEmpty() || plan.relays.any { !isAcceptableRelayUrl(it) }) {
+            RelayPublishValidation.Rejected(RelayPublishValidationError.Invalid)
+        } else {
+            runCatchingCancellable {
+                marmotIo { classifyRelayEndpoints(plan.relays) }
+            }.fold(
+                onSuccess = { classified ->
+                    allowedRelayUrlsForPublish(plan, classified)
+                        ?.let(RelayPublishValidation::Ready)
+                        ?: RelayPublishValidation.Rejected(RelayPublishValidationError.Blocked)
+                },
+                onFailure = {
+                    RelayPublishValidation.Rejected(RelayPublishValidationError.Unavailable)
+                },
+            )
         }
 
     private fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> =

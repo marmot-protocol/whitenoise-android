@@ -62,7 +62,11 @@ class RelayListSettingsScreenshotTest {
                         RelayListSettingsContent(
                             lists =
                                 relayLists(
-                                    nip65 = listOf("wss://relay.example.com"),
+                                    nip65 =
+                                        listOf(
+                                            "wss://relay.example.com",
+                                            "wss://relay.us.whitenoise.chat",
+                                        ),
                                     inbox = listOf("wss://inbox.example.com"),
                                 ),
                             selectedKind = RelayListKind.Nip65,
