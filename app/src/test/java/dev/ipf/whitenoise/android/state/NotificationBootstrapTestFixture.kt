@@ -94,6 +94,7 @@ internal class NotificationBootstrapTestFixture(
     // boundary per call; every default preserves the fixture's original shape.
     private val onOnboardingSnapshot: (() -> OnboardingSnapshotFfi?)? = null,
     private val onAuditLogSettings: (() -> Unit)? = null,
+    private val onPrivacyRuntimeConfig: (() -> Unit)? = null,
     private val onUserProfile: ((accountIdHex: String) -> UserProfileMetadataFfi?)? = null,
     private val onChatList: ((accountRef: String) -> List<ChatListRowFfi>)? = null,
     private val onGroupMemberIdsPage: ((groupIds: List<String>) -> List<AppGroupMemberIdsFfi>)? = null,
@@ -227,7 +228,11 @@ internal class NotificationBootstrapTestFixture(
                     hook()
                 }
                 "telemetryInstallId" -> "test-install"
-                "setRelayTelemetryRuntimeConfig", "setProductAnalyticsRuntimeConfig" -> Unit
+                "setRelayTelemetryRuntimeConfig" -> {
+                    onPrivacyRuntimeConfig?.invoke()
+                    Unit
+                }
+                "setProductAnalyticsRuntimeConfig" -> Unit
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "setAuditLogTrackerConfig" -> arguments?.first()
                 "usageDiagnosticsSettings" -> {

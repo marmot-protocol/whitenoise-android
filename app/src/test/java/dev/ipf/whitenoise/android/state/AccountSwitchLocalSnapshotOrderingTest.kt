@@ -416,7 +416,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
             policyGate >= 0 && rowGate > policyGate && broadSnapshot > rowGate && policyElse > broadSnapshot,
         )
         assertTrue("the target account must activate before waiting for its readable frame", firstFrameGate > activated)
-        val refreshCall = body.indexOf("refreshActivatedAccount(label, requestGeneration)")
+        val refreshCall = body.indexOf("refreshActivatedAccount(label, requestGeneration, activationRuntimeGeneration)")
         assertTrue("refreshes must wait for the target frame", refreshCall > firstFrameGate)
         assertTrue("superseded deferred work must be rejected after the wait", staleGuard > refreshCall)
         assertTrue("profile warming must stay outside the target first-frame path", profile > staleGuard)

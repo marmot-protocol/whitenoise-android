@@ -5149,9 +5149,7 @@ class WhiteNoiseAppState private constructor(
                     isAccountSwitchCurrent(requestGeneration) &&
                     canPublishAccountActivation(label, activationRuntimeGeneration)
             }
-            // A route may outlive the UI intent that requested it while a signed-out
-            // account is being restored. Let request-scoped callers reject that late
-            // activation without cancelling the process-lifetime sign-in work.
+            // Reject expired UI intent without cancelling process-lifetime sign-in work.
             if (!activationAllowed()) return false
             if (switchingAccounts) hideConversationShortcutsFromDirectShare()
             // Shortcut cleanup suspends: reject supersession/deletion again before publishing seeds.
@@ -5168,34 +5166,35 @@ class WhiteNoiseAppState private constructor(
             activeAccountRef = label
             preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
             reloadMediaAutoDownloadMatrix()
-            // This is the local-ready boundary for account switching. UI callers can
-            // dismiss/reset navigation now, while the process-lifetime mutation keeps
-            // the profile/privacy/notification/push work below alive in the background.
+            // Local-ready lets callers reset navigation before process-lifetime background refreshes.
             onActivated()
-            // An inactive-account notification already owns a precise local target.
-            // Its first readable transcript must not compete with broad profile,
-            // notification, or push refreshes. Ordinary account switches use the
-            // immediate default; the notification route releases this after the
-            // target frame, on failure, or when superseded.
+            // Notification routes wait for their target frame, failure, or supersession; ordinary switches do not wait.
             awaitPostActivationWork()
-            refreshActivatedAccount(label, requestGeneration)
+            refreshActivatedAccount(label, requestGeneration, activationRuntimeGeneration)
             return true
         } finally {
             accountSwitchHandoff.finishRequest(requestGeneration)
         }
     }
 
-    /** Runs best-effort refreshes only after activation and its caller-owned first-frame wait. */
+    /** Rechecks activation and runtime ownership before each best-effort step after the first-frame wait. */
+    @Suppress("ReturnCount") // Every suspending step is a separate stale-owner admission boundary.
     private suspend fun refreshActivatedAccount(
         label: String,
         requestGeneration: Long,
+        activationRuntimeGeneration: Int,
     ) {
-        if (isCurrentPostActivationAccountSwitch(label, requestGeneration)) {
-            accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
-            configurePrivacyRuntime()
-            refreshLocalNotificationSettings()
-            syncNativePushRegistrationIfEnabled()
+        val isCurrent = {
+            runtimeGeneration == activationRuntimeGeneration && isCurrentPostActivationAccountSwitch(label, requestGeneration)
         }
+        if (!isCurrent()) return
+        accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
+        if (!isCurrent()) return
+        configurePrivacyRuntime()
+        if (!isCurrent()) return
+        refreshLocalNotificationSettings()
+        if (!isCurrent()) return
+        syncNativePushRegistrationIfEnabled()
     }
 
     /**

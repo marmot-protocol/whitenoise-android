@@ -8927,6 +8927,14 @@
         "test_ids": [
           "INT-003"
         ]
+      },
+      {
+        "surface": "Runtime-owned deferred activation refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "private suspend fun refreshActivatedAccount(",
+        "test_ids": [
+          "INT-003"
+        ]
       }
     ],
     "notification_content_contracts": [
