@@ -1574,6 +1574,14 @@
         ]
       },
       {
+        "surface": "ConversationDictationAudioBufferFull",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_audio_buffer_full",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
         "surface": "ConversationDictationCompactActions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
         "anchor": "fun ConversationDictationCompactActions(",
