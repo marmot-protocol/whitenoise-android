@@ -138,6 +138,11 @@ not load the app-signing keystore into the publication job.
    Retain the artifact for qualification. An expired artifact cannot be promoted;
    a new build is a new candidate requiring another review.
 
+The production workflow checks both keystore certificates against the pinned
+fingerprints before compiling. A mismatch reports only public certificate
+fingerprints; passwords remain environment inputs. The finished APK and AAB
+still undergo their separate signature checks before artifact upload.
+
 `release-manifest.json` binds the source, version, signing fingerprints, build
 run/attempt, runtime completeness, and file hashes. This is a verified inventory,
 not a cryptographic reproducible-build attestation or proof of device behavior.

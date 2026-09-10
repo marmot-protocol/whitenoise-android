@@ -201,7 +201,8 @@ fi
 "$apksigner_bin" verify --verbose "$apk_source" >/dev/null
 actual_app_signing_sha="$($apksigner_bin verify --print-certs "$apk_source" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | normalize_fingerprint)"
 if [[ "$actual_app_signing_sha" != "$expected_app_signing_sha" ]]; then
-  echo "error: direct APK signer does not match the registered Play/Zapstore app-signing key" >&2
+  printf 'error: direct APK signer does not match the registered Play/Zapstore app-signing key: expected %s, actual %s\n' \
+    "$expected_app_signing_sha" "${actual_app_signing_sha:-<not parsed>}" >&2
   exit 1
 fi
 
