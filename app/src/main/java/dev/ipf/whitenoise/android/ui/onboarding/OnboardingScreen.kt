@@ -106,12 +106,16 @@ internal const val ONBOARDING_OFFLINE_NOTICE_TAG = "onboarding-offline-notice"
 // stretching full-bleed (per the `adaptive` skill's max-content-width guidance).
 internal val OnboardingMaxContentWidth = 440.dp
 
+/** Owns sign-in actions and observes entry only when sharing permission already exists. */
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod") // Owns the short-lived sign-in state machine.
 internal fun OnboardingScreen(
     appState: WhiteNoiseAppState,
     hasValidatedInternet: () -> Boolean = appState::hasValidatedInternet,
 ) {
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.ONBOARDING)
+    }
     var identity by remember { mutableStateOf("") }
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
     var importErrorRes by remember { mutableStateOf<Int?>(null) }

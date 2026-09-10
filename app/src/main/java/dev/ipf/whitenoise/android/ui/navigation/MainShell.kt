@@ -676,6 +676,11 @@ internal fun MainShell(
     val deferNotificationChatListBind =
         shouldDeferNotificationChatListBind(notificationFirstFrameGate, chatListBindAccountRef)
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
+    LaunchedEffect(section) {
+        if (section == MainSection.Settings) {
+            appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.SETTINGS)
+        }
+    }
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
 
     LaunchedEffect(

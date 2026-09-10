@@ -1,0 +1,10 @@
+# Copy these entries into ignored local.properties or supply matching env vars.
+# Provision separate self-hosted Aptabase applications. Do not reuse OTLP/audit tokens.
+WHITENOISE_STAGING_PRODUCT_EVENTS_ENDPOINT=https://aptabase.ipf.dev/api/v0/events
+WHITENOISE_STAGING_PRODUCT_APP_KEY=
+WHITENOISE_STAGING_PRODUCT_OPERATOR=white_noise
+WHITENOISE_STAGING_PRODUCT_RETENTION=
+WHITENOISE_PRODUCTION_PRODUCT_EVENTS_ENDPOINT=https://aptabase.ipf.dev/api/v0/events
+WHITENOISE_PRODUCTION_PRODUCT_APP_KEY=
+WHITENOISE_PRODUCTION_PRODUCT_OPERATOR=white_noise
+WHITENOISE_PRODUCTION_PRODUCT_RETENTION=

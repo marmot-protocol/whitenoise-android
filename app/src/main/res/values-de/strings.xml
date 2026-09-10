@@ -1789,4 +1789,23 @@
     <string name="group_rejoin_decline">Einladung ablehnen</string>
     <string name="group_rejoin_success">Gruppe erneut beigetreten.</string>
     <string name="group_rejoin_failed">Einladung konnte nicht angewendet werden</string>
+    <string name="usage_diagnostics_title">Nutzungs- und Diagnosedaten teilen</string>
+    <string name="usage_diagnostics_subtitle">Funktionsnutzung und Zuverlässigkeitskennzahlen mit temporären Sitzungen und einer zurücksetzbaren Diagnosekennung.</string>
+    <string name="usage_diagnostics_prompt_title">Hilf, White Noise zu verbessern</string>
+    <string name="usage_diagnostics_disclosure">Die Nutzungsdaten enthalten freigegebene, in Kategorien zusammengefasste Aktivitäten und temporäre Sitzungskennungen, jedoch keine Nachrichteninhalte oder Konto- und Gruppenkennungen. Die Diagnosedaten enthalten eine zufällige Installationskennung, die sich nach dem Ausschalten der Datenfreigabe ändert.</string>
+    <string name="usage_diagnostics_operator">Betrieben von %1$s.</string>
+    <string name="usage_diagnostics_retention_unknown">Die Aufbewahrungsrichtlinie wurde für diese Version noch nicht überprüft.</string>
+    <string name="usage_diagnostics_logs_separate">Bereinigte technische Protokolle aller Profile auf diesem Gerät, die separat geteilt werden.</string>
+    <string name="usage_diagnostics_renew">Die Datenfreigabe umfasst jetzt auch die Funktionsnutzung. Bitte prüfe diese Informationen und triff eine neue Entscheidung.</string>
+    <string name="usage_diagnostics_status">Nutzung: %1$s. Diagnose: %2$s.</string>
+    <string name="usage_diagnostics_error">Die Freigabeeinstellungen konnten nicht bestätigt werden. Bitte versuche es erneut. Es wurde keine neue Entscheidung bestätigt.</string>
+    <string name="usage_diagnostics_off">Aus</string>
+    <string name="usage_diagnostics_permission_needed">Zustimmung erforderlich</string>
+    <string name="usage_diagnostics_unconfigured">Nicht konfiguriert</string>
+    <string name="usage_diagnostics_unsupported">In dieser Version nicht verfügbar</string>
+    <string name="usage_diagnostics_ready">Bereit zum Teilen</string>
+    <string name="usage_diagnostics_rejected">Konfiguration abgelehnt</string>
+    <string name="usage_diagnostics_unknown">Nicht geladen</string>
+    <string name="usage_diagnostics_done">Fertig</string>
+    <string name="usage_diagnostics_loading">Freigabeeinstellungen werden geladen…</string>
 </resources>

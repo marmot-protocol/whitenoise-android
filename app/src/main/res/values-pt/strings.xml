@@ -1773,4 +1773,23 @@
     <string name="group_rejoin_decline">Recusar convite</string>
     <string name="group_rejoin_success">Voltou a entrar no grupo.</string>
     <string name="group_rejoin_failed">Não foi possível aplicar este convite</string>
+    <string name="usage_diagnostics_title">Partilhar dados de utilização e diagnóstico</string>
+    <string name="usage_diagnostics_subtitle">Atividade das funcionalidades e métricas de fiabilidade, com sessões temporárias e um identificador de diagnóstico que pode ser reposto.</string>
+    <string name="usage_diagnostics_prompt_title">Ajude a melhorar o White Noise</string>
+    <string name="usage_diagnostics_disclosure">Os dados de utilização incluem atividades permitidas, agrupadas por categorias, e identificadores temporários de sessão, sem o conteúdo das mensagens nem identificadores de contas ou grupos. Os diagnósticos incluem um identificador de instalação aleatório que muda após desativar a partilha.</string>
+    <string name="usage_diagnostics_operator">Operado por %1$s.</string>
+    <string name="usage_diagnostics_retention_unknown">A política de retenção ainda não foi verificada para esta versão.</string>
+    <string name="usage_diagnostics_logs_separate">Registos técnicos depurados de todos os perfis neste dispositivo, partilhados separadamente.</string>
+    <string name="usage_diagnostics_renew">A partilha inclui agora a utilização de funcionalidades. Reveja estas informações e faça uma nova escolha.</string>
+    <string name="usage_diagnostics_status">Utilização: %1$s. Diagnósticos: %2$s.</string>
+    <string name="usage_diagnostics_error">Não foi possível confirmar as definições de partilha. Tente novamente. Nenhuma nova escolha foi confirmada.</string>
+    <string name="usage_diagnostics_off">Desativado</string>
+    <string name="usage_diagnostics_permission_needed">Consentimento necessário</string>
+    <string name="usage_diagnostics_unconfigured">Não configurado</string>
+    <string name="usage_diagnostics_unsupported">Indisponível nesta versão</string>
+    <string name="usage_diagnostics_ready">Pronto para partilhar</string>
+    <string name="usage_diagnostics_rejected">Configuração rejeitada</string>
+    <string name="usage_diagnostics_unknown">Não carregado</string>
+    <string name="usage_diagnostics_done">Concluído</string>
+    <string name="usage_diagnostics_loading">A carregar definições de partilha…</string>
 </resources>

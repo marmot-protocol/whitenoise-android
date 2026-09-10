@@ -5345,6 +5345,48 @@
         "test_ids": [
           "TTS-004"
         ]
+      },
+      {
+        "surface": "IndependentAuditLogChoice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "fun IndependentAuditLogChoice(",
+        "test_ids": [
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "UsageDiagnosticsPrompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "fun UsageDiagnosticsPrompt(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "UsageDiagnosticsSettings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "fun UsageDiagnosticsSettings(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "UsageDiagnosticsDisclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "fun UsageDiagnosticsDisclosure(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
+        ]
       }
     ],
     "settings_controls": [
@@ -6221,38 +6263,24 @@
       },
       {
         "surface": "setting:telemetry",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
-        "anchor": "R.string.telemetry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_title",
         "test_ids": [
-          "SEC-001",
-          "SEC-002",
-          "SEC-003",
-          "SEC-004",
-          "SEC-005",
-          "SEC-006",
           "SEC-007",
-          "SEC-008",
-          "SEC-009",
-          "SEC-010",
-          "SET-001"
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
         ]
       },
       {
         "surface": "setting:telemetry_settings_subtitle",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
-        "anchor": "R.string.telemetry_settings_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_subtitle",
         "test_ids": [
-          "SEC-001",
-          "SEC-002",
-          "SEC-003",
-          "SEC-004",
-          "SEC-005",
-          "SEC-006",
           "SEC-007",
-          "SEC-008",
-          "SEC-009",
-          "SEC-010",
-          "SET-001"
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
         ]
       },
       {

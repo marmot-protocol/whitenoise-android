@@ -1746,4 +1746,23 @@
     <string name="group_rejoin_decline">拒绝邀请</string>
     <string name="group_rejoin_success">已重新加入群组。</string>
     <string name="group_rejoin_failed">无法应用此邀请</string>
+    <string name="usage_diagnostics_title">分享使用情况和诊断数据</string>
+    <string name="usage_diagnostics_subtitle">功能使用活动和可靠性指标，包含临时会话和可重置的诊断标识符。</string>
+    <string name="usage_diagnostics_prompt_title">帮助改进 White Noise</string>
+    <string name="usage_diagnostics_disclosure">使用数据包含按类别汇总的获准活动和临时会话标识符，不包含消息内容、账户或群组标识符。诊断数据包含随机生成的安装标识符，关闭分享后该标识符会更改。</string>
+    <string name="usage_diagnostics_operator">由 %1$s 运营。</string>
+    <string name="usage_diagnostics_retention_unknown">此版本的数据保留政策尚未经过验证。</string>
+    <string name="usage_diagnostics_logs_separate">此设备上所有个人资料的已清理技术日志，单独分享。</string>
+    <string name="usage_diagnostics_renew">分享范围现在包含功能使用情况。请查看此信息并重新选择。</string>
+    <string name="usage_diagnostics_status">使用情况：%1$s。诊断：%2$s。</string>
+    <string name="usage_diagnostics_error">无法确认分享设置。请重试。尚未确认新的选择。</string>
+    <string name="usage_diagnostics_off">已关闭</string>
+    <string name="usage_diagnostics_permission_needed">需要同意</string>
+    <string name="usage_diagnostics_unconfigured">未配置</string>
+    <string name="usage_diagnostics_unsupported">此版本不可用</string>
+    <string name="usage_diagnostics_ready">已准备好分享</string>
+    <string name="usage_diagnostics_rejected">配置被拒绝</string>
+    <string name="usage_diagnostics_unknown">未加载</string>
+    <string name="usage_diagnostics_done">完成</string>
+    <string name="usage_diagnostics_loading">正在加载分享设置…</string>
 </resources>

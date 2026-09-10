@@ -1773,4 +1773,23 @@
     <string name="group_rejoin_decline">Refuser l’invitation</string>
     <string name="group_rejoin_success">Groupe rejoint à nouveau.</string>
     <string name="group_rejoin_failed">Impossible d’appliquer cette invitation</string>
+    <string name="usage_diagnostics_title">Partager les données d’utilisation et de diagnostic</string>
+    <string name="usage_diagnostics_subtitle">Activité des fonctionnalités et mesures de fiabilité, avec des sessions temporaires et un identifiant de diagnostic réinitialisable.</string>
+    <string name="usage_diagnostics_prompt_title">Aidez à améliorer White Noise</string>
+    <string name="usage_diagnostics_disclosure">Les données d’utilisation comprennent les activités autorisées regroupées par catégories et des identifiants de session temporaires, sans le contenu des messages ni les identifiants de comptes ou de groupes. Les diagnostics comprennent un identifiant d’installation aléatoire qui change après la désactivation du partage.</string>
+    <string name="usage_diagnostics_operator">Service exploité par %1$s.</string>
+    <string name="usage_diagnostics_retention_unknown">La politique de conservation n’a pas encore été vérifiée pour cette version.</string>
+    <string name="usage_diagnostics_logs_separate">Journaux techniques nettoyés de tous les profils sur cet appareil, partagés séparément.</string>
+    <string name="usage_diagnostics_renew">Le partage inclut désormais l’utilisation des fonctionnalités. Consultez ces informations et faites un nouveau choix.</string>
+    <string name="usage_diagnostics_status">Utilisation : %1$s. Diagnostics : %2$s.</string>
+    <string name="usage_diagnostics_error">Impossible de confirmer les paramètres de partage. Réessayez. Aucun nouveau choix n’a été confirmé.</string>
+    <string name="usage_diagnostics_off">Désactivé</string>
+    <string name="usage_diagnostics_permission_needed">Consentement requis</string>
+    <string name="usage_diagnostics_unconfigured">Non configuré</string>
+    <string name="usage_diagnostics_unsupported">Indisponible dans cette version</string>
+    <string name="usage_diagnostics_ready">Prêt à partager</string>
+    <string name="usage_diagnostics_rejected">Configuration refusée</string>
+    <string name="usage_diagnostics_unknown">Non chargé</string>
+    <string name="usage_diagnostics_done">Terminé</string>
+    <string name="usage_diagnostics_loading">Chargement des paramètres de partage…</string>
 </resources>

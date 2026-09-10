@@ -42,47 +42,13 @@ errors. Turn the switch off and repeat an action to confirm no new lines appear.
 White Noise controls future emission only; retention of lines already written to
 Logcat is controlled by Android/GrapheneOS.
 
-## MDK host timing integration (draft)
+## MDK host timing integration
 
-This integration targets [MDK #1760](https://github.com/marmot-protocol/mdk/pull/1760)
-through MDK 0.9.20 at `2f44f6b65a19f8818644ccd7027618ba91450c33`. The checked-in
-immutable Android release includes `otlp-export` and `product-analytics-export`,
-with matching generated Kotlin and all four JNI ABIs. Android deliberately passes
-no product endpoint or app key, even when build configuration provides them. The
-current relay-only settings disclosure can grant native combined consent, so
-product export must remain unconfigured until that disclosure is replaced.
-Activation requires:
-
-- Android integrates MDK's combined usage/diagnostics consent, disclosure,
-  operator and verified retention policy. The legacy relay-telemetry toggle
-  uses the combined native setter but does not disclose expanded collection.
-- Each enabled environment supplies its own `WHITENOISE_<ENV>_PRODUCT_EVENTS_ENDPOINT`,
-  `WHITENOISE_<ENV>_PRODUCT_APP_KEY`, and `WHITENOISE_<ENV>_PRODUCT_OPERATOR`
-  through local properties or build environment (`ENV`: `DEV`, `STAGING`,
-  `PRODUCTION`). Previews receive empty values. Endpoint/key configuration
-  never grants consent. Verify revocation and disabled/unconfigured operation
-  before enabling collection in a release.
-
-Consent is enforced inside MDK's `record_host_timing` → `record_product_event`
-→ `ProductAnalyticsController::record` path under the native controller lock.
-It returns `IgnoredDisabled` unless the combined decision is granted and
-`IgnoredUnconfigured` when the exporter is unavailable. Revocation invalidates
-pending work and clears queued events. Android does not cache this decision.
-Keeping the product destination unset prevents the current relay-only UI from enabling product export.
-
-`HostTimingConsentDeviceTest` exercises the packaged native library with an
-isolated empty store and loopback-only destination: no consent, legacy-toggle
-rejection, missing configuration, destination-change reacceptance, all 26 stages
-after explicit consent, and revocation. It runs in the PR native smoke suite.
-The expanded consent UI and operator disclosure remain release blockers.
-
-`MarmotTraceSection.hostTimingRegistry` registers 26 aggregate events with exactly
-`elapsed: DurationBucket` and `outcome: success|failure`. The existing traced
-`marmotIo` overload records these through `recordHostTiming` on the same IO
-worker/runtime as the measured call. No task or unbounded Android event queue is
-created. Native rejection disables this tracer's analytics recording for the
-app-state lifetime and emits one fixed diagnostic warning; application failures
-and cancellation retain their original exception.
+The 26 bridge stages use the published MarmotKit 0.9.20 `recordHostTiming` API.
+Product export now uses environment-specific Aptabase configuration and MDK's
+expanded, explicitly accepted Android consent scope. See
+[Android usage and diagnostics](product-analytics.md) for the variable names,
+first-launch/upgrade behavior, release gates, and pending operator validation.
 
 | Events (`app_` prefix) | Measured work |
 | --- | --- |

@@ -187,6 +187,9 @@ internal fun ChatsScreen(
     },
     onGroupCreateFlowSuperseded: () -> Unit = {},
 ) {
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.INBOX)
+    }
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
     val openNewMessageFlow = { showNewChatFlow = true }

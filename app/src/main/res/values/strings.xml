@@ -1892,4 +1892,23 @@
     <string name="tts_read_from_sentence">Read from this sentence</string>
     <string name="tts_choose_sentence">Choose sentence to read</string>
     <string name="tts_bar_preparing">Preparing speech…</string>
+    <string name="usage_diagnostics_title">Share usage and diagnostics</string>
+    <string name="usage_diagnostics_subtitle">Feature activity and reliability metrics, with temporary sessions and a resettable diagnostic identifier.</string>
+    <string name="usage_diagnostics_prompt_title">Help Improve White Noise</string>
+    <string name="usage_diagnostics_disclosure">Usage includes approved, bucketed activity and temporary session IDs, without message contents or account and group identifiers. Diagnostics includes a random installation identifier that changes after you turn sharing off.</string>
+    <string name="usage_diagnostics_operator">Operated by %1$s.</string>
+    <string name="usage_diagnostics_retention_unknown">Retention policy has not yet been verified for this build.</string>
+    <string name="usage_diagnostics_logs_separate">Sanitized technical logs from every profile on this device, shared separately.</string>
+    <string name="usage_diagnostics_renew">Sharing now includes feature usage. Please review this information and make a fresh choice.</string>
+    <string name="usage_diagnostics_status">Usage: %1$s. Diagnostics: %2$s.</string>
+    <string name="usage_diagnostics_error">Could not confirm sharing settings. Please retry. No new choice has been confirmed.</string>
+    <string name="usage_diagnostics_off">Off</string>
+    <string name="usage_diagnostics_permission_needed">Permission needed</string>
+    <string name="usage_diagnostics_unconfigured">Not configured</string>
+    <string name="usage_diagnostics_unsupported">Unavailable in this build</string>
+    <string name="usage_diagnostics_ready">Ready to share</string>
+    <string name="usage_diagnostics_rejected">Configuration rejected</string>
+    <string name="usage_diagnostics_unknown">Not loaded</string>
+    <string name="usage_diagnostics_done">Done</string>
+    <string name="usage_diagnostics_loading">Loading sharing settings…</string>
 </resources>
