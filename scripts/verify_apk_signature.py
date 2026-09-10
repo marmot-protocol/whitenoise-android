@@ -8,11 +8,11 @@ import sys
 def verify_certificates(output, expected):
     if not re.fullmatch(r'[0-9a-f]{64}', expected):
         raise ValueError('Expected certificate must be a lowercase SHA-256 fingerprint')
-    signer = r'(?:Signer #[1-9][0-9]*|Signer \(minSdkVersion=[0-9]+(?: \(dev release=true\))?, maxSdkVersion=[0-9]+\))'
+    signer = r'(?:Signer #[1-9][0-9]*|Signer \(minSdkVersion=[0-9]+(?: \(dev release=true\))?, maxSdkVersion=[0-9]+\)|V[1-4](?:\.[0-9]+)? Signer:)'
     pattern = re.compile(signer + r' certificate SHA-256 digest: ([0-9a-fA-F]{64})')
     fingerprints = set()
     for line in output.splitlines():
-        if line.startswith('Signer ') and 'certificate SHA-256 digest:' in line:
+        if 'Signer' in line and 'certificate SHA-256 digest:' in line and not line.startswith('Source Stamp Signer '):
             match = pattern.fullmatch(line)
             if not match:
                 raise ValueError(f'Unsupported APK signer certificate output: {line}')

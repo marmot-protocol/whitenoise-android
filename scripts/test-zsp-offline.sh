@@ -33,7 +33,12 @@ keytool -genkeypair -alias fixture -keystore "$temporary_dir/fixture.jks" \
   --ks-pass pass:disposable-fixture --out "$temporary_dir/fixture.apk" "$temporary_dir/unsigned.apk"
 fixture_fingerprint="$(keytool -exportcert -alias fixture -keystore "$temporary_dir/fixture.jks" \
   -storepass disposable-fixture | python3 -c 'import hashlib, sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())')"
-python3 "$repo_dir/scripts/verify_apk_signature.py" "$sdk_dir/build-tools/36.0.0/apksigner" \
+# Match production verification: prefer PATH, otherwise the newest installed
+# build-tools path. Using only 36.0.0 here missed newer scheme-prefixed labels.
+apksigner_bin="$(command -v apksigner || find "$sdk_dir/build-tools" -mindepth 2 -maxdepth 2 \
+  -type f -name apksigner | sort | tail -1)"
+printf 'Verifying fixture with %s\n' "$apksigner_bin"
+python3 "$repo_dir/scripts/verify_apk_signature.py" "$apksigner_bin" \
   "$temporary_dir/fixture.apk" "$fixture_fingerprint" >/dev/null
 (
   cd "$temporary_dir/source"

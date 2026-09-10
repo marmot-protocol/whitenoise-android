@@ -350,15 +350,28 @@ class ApkCertificateOutputTests(unittest.TestCase):
         ranges = (f'Signer (minSdkVersion=33, maxSdkVersion=2147483647) certificate SHA-256 digest: {expected}\n'
                   f'Signer (minSdkVersion=28, maxSdkVersion=32) certificate SHA-256 digest: {expected}')
         dev = f'Signer (minSdkVersion=33 (dev release=true), maxSdkVersion=2147483647) certificate SHA-256 digest: {expected}'
-        for output in (numbered, ranges, dev, numbered + '\n' + stamp):
+        scheme = f'V2 Signer: certificate SHA-256 digest: {expected}'
+        for output in (numbered, ranges, dev, scheme, numbered + '\n' + stamp):
             with self.subTest(output=output):
                 self.assertEqual(apk_signature.verify_certificates(output, expected), expected)
         for output in ('', stamp, numbered.replace(expected, 'b' * 64),
                        ranges.replace(expected, 'b' * 64, 1),
                        numbered + '\nSigner #2 certificate SHA-256 digest: ' + 'b' * 64,
+                       scheme.replace(expected, 'b' * 64),
+                       scheme + '\nV3.1 Signer: certificate SHA-256 digest: ' + 'b' * 64,
+                       numbered + '\nUnknown Signer certificate SHA-256 digest: ' + 'b' * 64,
                        numbered.replace(expected, 'invalid')):
             with self.subTest(output=output), self.assertRaises(ValueError):
                 apk_signature.verify_certificates(output, expected)
+
+    def test_runner_v2_output_distinguishes_certificate_from_public_key_digest(self):
+        expected = 'e3ca27b35a14f3e67d0fa68c270c9a330539ac89930d89e6e5c05beba8f03b7a'
+        output = ('Verifies\nVerified using v2 scheme (APK Signature Scheme v2): true\n'
+                  'Number of signers: 1\n'
+                  f'V2 Signer: certificate SHA-256 digest: {expected}\n'
+                  'V2 Signer: key algorithm: RSA\nV2 Signer: key size (bits): 4096\n'
+                  'V2 Signer: public key SHA-256 digest: b99ee1be64c78663ee09854acb45b205d3354983a2e904f980d07a9abe8b412d\n')
+        self.assertEqual(apk_signature.verify_certificates(output, expected), expected)
 
     def test_invalid_signature_cannot_pass_with_matching_printed_certificate(self):
         expected = 'a' * 64
