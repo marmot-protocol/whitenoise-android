@@ -40,6 +40,10 @@ internal class ConversationDictationAudioChunkBuffer(
     val hasPending: Boolean
         @Synchronized get() = currentSize > 0 || queued.isNotEmpty() || inFlight.isNotEmpty()
 
+    /** True only after the capture tail is sealed and every sealed chunk has been delivered. */
+    val isDrained: Boolean
+        @Synchronized get() = finished && !hasPending
+
     init {
         require(chunkBytes > 0 && chunkBytes % 2 == 0)
         require(maxBufferedBytes >= chunkBytes && maxBufferedBytes % 2 == 0)

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -120,6 +121,43 @@ class ConversationDictationCallerAudioTest {
             capture.discard {}
             first.closeProviderEnd()
         }
+    }
+
+    /** A stream whose buffer is already fully drained closes instead of polling forever. */
+    @Test
+    fun drainedBufferClosesFeedWithoutWaitingForAnotherChunk() {
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 5L, chunkBytes = 4, maxBufferedBytes = 8)
+        buffer.finish()
+        val capture = callerAudio(buffer = buffer)
+        val stream = checkNotNull(capture.openProviderStream())
+        val feedClosed = CountDownLatch(1)
+        stream.onFeedClosed(feedClosed::countDown)
+
+        assertTrue(stream.start())
+        assertTrue(feedClosed.await(2, TimeUnit.SECONDS))
+
+        assertFalse(stream.acknowledge())
+        assertFalse(capture.hasPending())
+        capture.discard {}
+    }
+
+    /** A stream whose tail chunk drains before it asks closes after that already polled chunk. */
+    @Test
+    fun drainCompletedBeforeFeedSettlesClosesTheStreamLease() {
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 6L, chunkBytes = 4, maxBufferedBytes = 8)
+        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4), 4))
+        buffer.finish()
+        val capture = callerAudio(buffer = buffer)
+        val stream = checkNotNull(capture.openProviderStream())
+        val feedClosed = CountDownLatch(1)
+        stream.onFeedClosed(feedClosed::countDown)
+
+        assertTrue(stream.start())
+        assertTrue(feedClosed.await(2, TimeUnit.SECONDS))
+
+        assertTrue(stream.acknowledge())
+        assertFalse(capture.hasPending())
+        capture.discard {}
     }
 
     /** Builds a real capture with small bounded PCM storage and an injectable device and writer. */

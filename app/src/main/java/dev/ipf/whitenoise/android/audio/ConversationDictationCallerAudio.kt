@@ -393,12 +393,19 @@ internal class ConversationDictationCallerAudioStream(
     }
 
     /** Claims one chunk, feeds its PCM, and requeues ownership on interruption or provider disconnection. */
+    @Suppress("ReturnCount")
     private fun feed() {
         try {
             var owned: ConversationDictationAudioChunk? = null
             while (!cancelled.get() && !settled.get() && owned == null) {
                 owned = buffer.poll()
-                if (owned == null) Thread.sleep(PIPE_RETRY_MILLIS)
+                if (owned != null) break
+                if (buffer.isDrained) {
+                    settle(requeue = false)
+                    closePipe()
+                    return
+                }
+                Thread.sleep(PIPE_RETRY_MILLIS)
             }
             if (owned == null) return
             chunk.set(owned)
