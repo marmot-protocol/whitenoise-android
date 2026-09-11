@@ -38,6 +38,35 @@ class ConversationDictationServiceResolutionTest {
     }
 
     @Test
+    fun android17RecognitionServicePermissionKeepsInAppProviderDiscoverable() {
+        val service =
+            installService(
+                bindingPermission = "android.permission.BIND_RECOGNITION_SERVICE",
+            )
+        Settings.Secure.putString(context.contentResolver, VOICE_RECOGNITION_SERVICE_SETTING, null)
+
+        assertTrue(platform.prepareProviderSelection())
+        assertTrue(platform.recognitionAvailable())
+        assertEquals(service.packageName, platform.speechProviderPackage())
+    }
+
+    @Test
+    fun inventedSpeechBindingPermissionDoesNotOfferAService() {
+        installService(bindingPermission = "android.permission.BIND_SPEECH_RECOGNITION_SERVICE")
+
+        assertTrue(discoverConversationDictationProviders(context).isEmpty())
+        assertFalse(platform.prepareProviderSelection())
+    }
+
+    @Test
+    fun unrelatedBindingPermissionDoesNotOfferAService() {
+        installService(bindingPermission = "android.permission.BIND_INPUT_METHOD")
+
+        assertTrue(discoverConversationDictationProviders(context).isEmpty())
+        assertFalse(platform.prepareProviderSelection())
+    }
+
+    @Test
     fun disabledAndPrivateServicesAreNotUsableProviders() {
         installService(name = "Disabled", enabled = false)
         installService(name = "Private", exported = false)
@@ -206,6 +235,7 @@ class ConversationDictationServiceResolutionTest {
         enabled: Boolean = true,
         exported: Boolean = true,
         appEnabled: Boolean = true,
+        bindingPermission: String? = "android.permission.BIND_RECOGNITION_SERVICE",
     ): ServiceInfo {
         shadowOf(context.packageManager).installPackage(
             PackageInfo().apply {
@@ -224,7 +254,7 @@ class ConversationDictationServiceResolutionTest {
                 this.name = ComponentName(packageName, "$packageName.$name").className
                 this.enabled = enabled
                 this.exported = exported
-                permission = "android.permission.BIND_SPEECH_RECOGNITION_SERVICE"
+                permission = bindingPermission
                 applicationInfo =
                     ApplicationInfo().apply {
                         this.enabled = appEnabled

@@ -8307,6 +8307,15 @@
         ]
       },
       {
+        "surface": "Dictation recognition-service discovery and binding permission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationProviders.kt",
+        "anchor": "internal fun discoverConversationDictationProviders(",
+        "test_ids": [
+          "DIC-003",
+          "DIC-004"
+        ]
+      },
+      {
         "surface": "Dictation caller-audio capability probe",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "private class ConversationDictationCallerAudioProbe(",
