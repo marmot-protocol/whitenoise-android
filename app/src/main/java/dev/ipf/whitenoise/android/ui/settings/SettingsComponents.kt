@@ -211,6 +211,7 @@ internal fun SettingsLink(
     value: String? = null,
     enabled: Boolean = true,
     busy: Boolean = false,
+    destructive: Boolean = false,
     leading: (@Composable () -> Unit)? = null,
 ) {
     val editable = enabled && !busy
@@ -232,7 +233,40 @@ internal fun SettingsLink(
             }
         },
         colors = settingsRowColors(context),
-        content = { SettingsRowTitle(title, editable) },
+        content = { SettingsRowTitle(title, editable, destructive) },
+    )
+}
+
+/**
+ * Row that performs an action in place instead of opening a destination, so it carries no chevron.
+ *
+ * [destructive] actions use the error role for the title; callers tint any leading icon to match.
+ */
+@Suppress("FunctionNaming", "LongParameterList")
+@Composable
+internal fun SettingsAction(
+    context: SettingsRowContext,
+    title: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    enabled: Boolean = true,
+    destructive: Boolean = false,
+    leading: (@Composable () -> Unit)? = null,
+) {
+    SegmentedListItem(
+        onClick = onClick,
+        shapes = context.shapes,
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .settingsRowBorder(context, enabled)
+                .semantics { role = Role.Button },
+        enabled = enabled,
+        leadingContent = leading,
+        supportingContent = subtitle?.let { { SettingsRowSupportingText(it, enabled) } },
+        colors = settingsRowColors(context),
+        content = { SettingsRowTitle(title, enabled, destructive) },
     )
 }
 

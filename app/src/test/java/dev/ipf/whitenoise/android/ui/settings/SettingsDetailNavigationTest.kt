@@ -6,10 +6,12 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SettingsDetailNavigationTest {
+    /** Key Packages returns to Developer Tools, a hub destination; About returns to Help, which returns home. */
     @Test
-    fun helpAboutDeveloperFormABackStackDownToHome() {
-        // Developer → About → Help → home (null).
-        assertEquals(SettingsDetail.About, settingsDetailParent(SettingsDetail.Developer))
+    fun developerToolsAndHelpFormBackStacksDownToHome() {
+        // Key Packages → Developer Tools → home (null); About → Help → home (null).
+        assertEquals(SettingsDetail.Developer, settingsDetailParent(SettingsDetail.KeyPackages))
+        assertNull(settingsDetailParent(SettingsDetail.Developer))
         assertEquals(SettingsDetail.Help, settingsDetailParent(SettingsDetail.About))
         assertNull(settingsDetailParent(SettingsDetail.Help))
     }

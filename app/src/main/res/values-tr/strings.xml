@@ -796,6 +796,15 @@
     <string name="data_and_storage_settings_subtitle">Medyayı otomatik indir</string>
     <string name="app_preferences">Uygulama</string>
     <string name="settings_version_label">Sürüm %1$s</string>
+    <string name="settings_profile_keys">Profil Anahtarları</string>
+    <string name="settings_read_aloud">Yüksek Sesle Oku</string>
+    <string name="settings_privacy_security">Gizlilik ve Güvenlik</string>
+    <string name="settings_data_usage">Veri Kullanımı</string>
+    <string name="settings_developer_tools">Geliştirici Araçları</string>
+    <string name="settings_donate">Bağış yap</string>
+    <string name="settings_add_profile">Profil Ekle</string>
+    <string name="settings_switch_profile">Profil Değiştir</string>
+    <string name="settings_open_share_connect_for">%1$s için Paylaş ve Bağlan\'ı açın</string>
     <string name="support_the_project">Projeyi destekle</string>
     <string name="support_the_project_subtitle">White Noise ücretsiz ve açık kaynaklıdır. Bağışlar böyle kalmasına yardımcı olur.</string>
     <string name="chat_with_support">Destek ile sohbet</string>

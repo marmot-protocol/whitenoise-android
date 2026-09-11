@@ -12,12 +12,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
@@ -116,9 +118,8 @@ class SettingsScrollRestorationTest {
         composeRule.onNodeWithText(context.getString(R.string.diagnostics)).performClick()
         composeRule.runOnIdle { diagnosticsOpen = false }
 
-        repeat(3) {
-            composeRule.onNodeWithContentDescription(back).performClick()
-        }
+        // Developer tools is a hub destination, so one back returns to the Settings home.
+        composeRule.onNodeWithContentDescription(back).performClick()
 
         assertRestoredHelpBounds(originalBounds)
     }
@@ -136,7 +137,7 @@ class SettingsScrollRestorationTest {
             showSettings = true
         }
 
-        composeRule.onNodeWithText(context.getString(R.string.account)).fetchSemanticsNode()
+        composeRule.onNodeWithText(context.getString(R.string.profile)).fetchSemanticsNode()
     }
 
     @Test
@@ -149,9 +150,9 @@ class SettingsScrollRestorationTest {
             )
         val sections =
             listOf(
-                SettingsHomeSection.Account,
+                SettingsHomeSection.Profile,
                 SettingsHomeSection.Support,
-                SettingsHomeSection.BuildInfo,
+                SettingsHomeSection.Version,
             )
 
         assertEquals(1, viewport.resolveIndex(sections))
@@ -217,8 +218,9 @@ class SettingsScrollRestorationTest {
     }
 
     private fun scrollToAndOpenHelp(): Rect {
+        // Help sits in a later lazy item, so scroll the list to it before the row exists in the tree.
+        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(help))
         val helpNode = composeRule.onNodeWithText(help)
-        helpNode.performScrollTo()
         val bounds = helpNode.fetchSemanticsNode().boundsInRoot
         helpNode.performClick()
         return bounds
