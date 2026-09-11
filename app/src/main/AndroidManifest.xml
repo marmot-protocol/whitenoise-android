@@ -60,6 +60,10 @@
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
+        <!-- Voice IME discovery is independent of RecognitionService and provider Activities. -->
+        <intent>
+            <action android:name="android.view.InputMethod" />
+        </intent>
     </queries>
 
     <application

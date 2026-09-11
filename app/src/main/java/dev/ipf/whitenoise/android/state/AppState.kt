@@ -61,10 +61,11 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.RuntimePolicyHooks
 import dev.ipf.whitenoise.android.amber.AmberSignerController
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
-import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
+import dev.ipf.whitenoise.android.audio.ConversationDictationProvider
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
+import dev.ipf.whitenoise.android.audio.discoverConversationDictationProviders
 import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineResolver
@@ -1200,14 +1201,17 @@ class WhiteNoiseAppState private constructor(
         )
     }
 
-    /** Updates the endpointing policy captured by future dictation sessions. */
-    internal fun setConversationDictationFinishAfterSilence(value: Long?) {
-        conversationDictationPreferences.setFinishAfterSilenceMillis(value)
-    }
-
-    /** Updates the terminal delivery policy captured by future dictation sessions. */
-    internal fun setConversationDictationDeliveryMode(value: ConversationDictationDeliveryMode) {
-        conversationDictationPreferences.setDeliveryMode(value)
+    /** Settings discovery is lifecycle-local; protocol data never enters this platform snapshot. */
+    internal suspend fun discoverDictationProviders(): List<ConversationDictationProvider> {
+        val providers =
+            withContext(Dispatchers.IO) {
+                discoverConversationDictationProviders(appContext)
+            }
+        val saved = conversationDictationPreferences.current().providerSelection
+        if (saved != null && providers.flatMap { it.choices }.none(saved::sameInstallation)) {
+            conversationDictationPreferences.setProviderSelection(null)
+        }
+        return providers
     }
 
     private val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }

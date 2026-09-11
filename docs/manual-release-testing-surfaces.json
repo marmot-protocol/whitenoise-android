@@ -5684,6 +5684,34 @@
         "test_ids": [
           "MSG-002"
         ]
+      },
+      {
+        "surface": "DictationProviderChooser",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "fun DictationProviderChooser(",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002",
+          "DIC-003"
+        ]
+      },
+      {
+        "surface": "DictationProviderSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "fun DictationProviderSheet(",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002",
+          "DIC-003"
+        ]
+      },
+      {
+        "surface": "DictationSettingsTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "fun DictationSettingsTopBar(",
+        "test_ids": [
+          "DIC-001"
+        ]
       }
     ],
     "settings_controls": [

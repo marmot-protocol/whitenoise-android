@@ -57,13 +57,31 @@ recognition across every provider, OS restriction or process death.
 | Provider Activity | Provider capture, endpointing and UI | An Activity resolving `android.speech.action.RECOGNIZE_SPEECH`, chosen before capture when the provider cannot accept caller audio. An active in-app recording never switches to this surface after failure. |
 | Voice IME | Keyboard/IME capture and text commit | Ordinary editor input. White Noise does not control its recording lifecycle or promise immutable-origin routing. |
 
-There is no silent fallback to an arbitrary recognition service. If Android has
-an explicit selected component, only that component is eligible. With no selected
-component, prefer a single eligible service in the resolved speech Activity's
-package; otherwise require exactly one eligible installed service. Disabled,
-unexported and application-disabled services are excluded. The resolved component
-is pinned and rechecked before each recognition generation; it is never replaced
-mid-session merely because the selected setting changes.
+New gestures resolve a valid Android-selected RecognitionService first, then an
+exact versioned White Noise choice, then a sole logical provider/engine. A missing
+Android selection is not an instruction to pick the default speech Activity's app.
+Ambiguity opens the provider chooser before microphone access. A stale saved choice
+is cleared and requests a fresh choice; that gesture does not silently substitute
+another provider. There is no silent fallback between providers during or between
+sessions. Selecting or cancelling records nothing and preserves the draft;
+tap dictation again after selection.
+
+Settings → Dictation → Speech provider groups services, recognition Activities and
+voice IMEs by package, retaining genuine service engines. Disabled, private,
+test-only and improperly permissioned services are excluded; the exact FUTO
+`org.futo.voiceinput/org.futo.voiceinput.DummyService` placeholder is excluded
+without excluding its provider Activity or unrelated classes named DummyService.
+Voice IMEs are discovered through declared voice subtypes, plus Gboard's known
+voice-typing package. This identifies a keyboard surface, not proof that voice typing
+is configured, available in every language, or a public speech service.
+
+Saved choices contain package, longVersionCode and exact service/Activity/IME
+components. Malformed and versionless records are not restored. Every gesture
+refreshes installed state; the resolved identity and capture privilege are pinned
+for that logical session. Removing/disabling/replacing a pinned component fails
+without switching to another provider. Provider Activity intents constrain both
+package and component; result registrations and callbacks are scoped to a request
+ID and preserve the captured origin across navigation and cancellation.
 
 Resolving a component does not establish caller-audio support. Android grants
 microphone binding capabilities to selected, configured on-device and preinstalled
@@ -122,6 +140,28 @@ discard retained text. A 30-minute session watchdog and bounded processing/send
 timeouts prevent orphan recording or indefinite pending UI. Process death does
 not persist transcript audio/text; a service restart must not resume old capture.
 
+## Android 17 multi-provider acceptance matrix (not device results)
+
+Use a disposable fixture with synthetic drafts and configured provider models. Do
+not change personal provider selections to manufacture a result. Record Android
+build, White Noise artifact, package longVersionCode and each exposed component.
+Leave Android's recognition-service setting unset for the multi-provider case;
+Android's assistant-role settings page does not establish a selected recognizer.
+No device testing was performed for this provider-selection implementation.
+
+| Provider family | Guarded expectation | Still required on the exact artifact |
+|---|---|---|
+| FUTO Voice Input | Exclude its exact internal DummyService; retain exported recognition Activities. Show Opens provider window only when one is available. | Confirm installed component names, model setup, explicit window routing, cancel and origin-safe result. No in-app compatibility claim without a real service and verified caller audio. |
+| Google Speech Services | Enumerate the installed build's eligible services and Activities; preserve engine sub-choices. A valid Android-selected service wins. | Verify selected/unselected configurations, caller-audio verdict, version invalidation and provider setup. Installation alone proves no capability. |
+| AOSP / GrapheneOS Speech Services | Discover actual components rather than assuming package identity or Google compatibility. Preinstalled capture privilege does not count as verified caller-audio support. | Verify the build's available surfaces, empty/no-model/error paths, exact identity pinning and cancellation. |
+| Gboard voice typing | A keyboard surface is independent of RecognitionService/recognition Activity. Show Keyboard only when neither app surface exists. | Verify configured voice typing in the keyboard itself; it must not be auto-routed as an app speech service. Language/download/account availability is provider-owned. |
+
+Run DIC-004 through DIC-006 for precedence, stale records, in-session preference
+changes, explicit Activity routing, old callbacks, capability labels, empty/loading
+states, screen-reader semantics, 200% font and RTL. Test two engines in one package:
+a conclusive verdict for one component/version must never label the other supported.
+Package-only legacy verdicts are ignored.
+
 ## Physical evidence requirements
 
 A row is supported only after the exact artifact's journey passes; capability
@@ -132,7 +172,7 @@ queries, unit tests and a provider Activity success do not prove app-owned captu
 | Pixel 6a GrapheneOS + Offline Voice Input (`dev.notune.transcribe`) | Earlier 2026-09-07 diagnostics used a populated selected-service setting. That configuration was set through ADB and is not representative of a user-reachable Android 17 setup. | Historical diagnostic evidence only; do not reuse it as current acceptance. |
 | Android with empty selected-service setting + caller-audio-capable Offline Voice Input | Owner tests on 2026-09-08 at White Noise `f4f71f1a88f082e5c9e66cc986b9f4e5e739b857` with provider `c689f00` returned transcripts in three consecutive sessions, dropped zero audio and released microphone/service ownership after each. | Configured-model caller-audio path passed. This precedes the capability router and is not device proof for its new head; missing-model recovery remains separate. |
 | Provider without caller-audio support | The capability router chooses the Activity before real capture after a conclusive probe, or when Android lacks the audio-source extras. | Verify first-use check, cached route, cancellation and provider-upgrade recheck on an appropriate fixture. |
-| Activity-only provider | Explicit compatibility controller coverage remains. Automatic routing requires an unambiguous service or an applicable platform fallback. | Pending dedicated configuration. |
+| Activity-only provider | Explicit compatibility controller coverage remains. An exact saved Activity or a sole Activity-only provider can route directly; multiple choices require the pre-microphone chooser. | Pending dedicated configuration. |
 | Voice IME only / no speech provider | Independent Android contracts; IME presence is not evidence of a service or Activity. | Pending dedicated configuration; do not reconfigure personal providers to manufacture a result. |
 
 Use the guarded fixture preflight and session tools. Record provider package
@@ -236,3 +276,36 @@ Local tests are not device evidence or CI authority. Required GitHub checks and
 preview provenance must match the exact pushed signed head. A formal GitHub
 approval must come from an identity distinct from the PR author; never self-review
 or merge this PR as part of the device workflow.
+
+## Focused validation evidence for provider selection
+
+Run from this worktree through the shared heavy slot; no broad suite is needed
+for this handoff.
+
+```bash
+/opt/data/scripts/hermes_test_gate.py --tier focused -- /opt/data/bin/hermes-heavy-run ./gradlew --offline --no-daemon --max-workers=2 :app:testDevZapstoreDebugUnitTest \
+  --tests 'dev.ipf.whitenoise.android.audio.ConversationDictationProvidersTest' \
+  --tests 'dev.ipf.whitenoise.android.audio.ConversationDictationServiceResolutionTest' \
+  --tests 'dev.ipf.whitenoise.android.audio.ConversationDictationCallerAudioSupportTest' \
+  --tests 'dev.ipf.whitenoise.android.audio.ConversationDictationCallerAudioRequirementTest' \
+  --tests 'dev.ipf.whitenoise.android.audio.ConversationDictationCompatibilityContractTest' \
+  --tests 'dev.ipf.whitenoise.android.audio.ConversationDictationControllerTest' \
+  --tests 'dev.ipf.whitenoise.android.state.ConversationDictationPreferencesTest' \
+  --tests 'dev.ipf.whitenoise.android.ui.WhiteNoiseAppDictationTest' \
+  --tests 'dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationCoordinatorTest'
+```
+
+Screenshots were recorded, inspected, and verified on DevZapstore:
+
+```bash
+/opt/data/scripts/hermes_test_gate.py --tier focused -- /opt/data/bin/hermes-heavy-run ./gradlew --offline --no-daemon --max-workers=2 :app:verifyRoborazziDevZapstoreDebug \
+  --tests 'dev.ipf.whitenoise.android.ui.screenshot.DictationProviderScreenshotTest'
+/opt/data/scripts/hermes_test_gate.py --tier focused -- python3 scripts/check_manual_test_guide.py
+/opt/data/scripts/hermes_test_gate.py --tier focused -- python3 -m unittest scripts/test_check_manual_test_guide.py
+```
+
+PNG baselines committed for this stage: `dictation_provider_unknown_light.png`,
+`dictation_provider_window_large_rtl_dark.png`, `dictation_provider_empty_light.png`,
+`dictation_provider_loading_light.png`, `dictation_provider_verified_light.png`,
+and `dictation_provider_capabilities_light.png`. Device matrix rows above remain
+pending; JVM or screenshot results must not be described as Android 17 device proof.

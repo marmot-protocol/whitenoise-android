@@ -149,7 +149,10 @@ class ConversationDictationCallerAudioRequirementTest {
         answerProbe(SpeechRecognizer.ERROR_NO_MATCH)
 
         assertEquals(listOf(ConversationDictationCallerAudioRequirement.Supported), answers)
-        assertEquals(setOf("caller_audio_support:$PROVIDER:$VERSION_CODE"), recordedKeys())
+        assertEquals(
+            setOf("caller_audio_support_component:$PROVIDER/$PROVIDER.Recognition:$VERSION_CODE"),
+            recordedKeys(),
+        )
 
         handle.cancel()
         shadowOf(context.mainLooper).idle()
@@ -245,7 +248,7 @@ class ConversationDictationCallerAudioRequirementTest {
     private fun record(value: String) {
         preferences()
             .edit()
-            .putString("caller_audio_support:$PROVIDER:$VERSION_CODE", value)
+            .putString("caller_audio_support_component:$PROVIDER/$PROVIDER.Recognition:$VERSION_CODE", value)
             .apply()
     }
 
@@ -253,7 +256,7 @@ class ConversationDictationCallerAudioRequirementTest {
         preferences()
             .all
             .keys
-            .filter { it.startsWith("caller_audio_support:") }
+            .filter { it.startsWith("caller_audio_support_component:") }
             .toSet()
 
     private fun preferences() = context.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
@@ -280,11 +283,16 @@ class ConversationDictationCallerAudioRequirementTest {
             ResolveInfo().apply {
                 serviceInfo =
                     ServiceInfo().apply {
+                        permission = "android.permission.BIND_SPEECH_RECOGNITION_SERVICE"
                         packageName = PROVIDER
                         name = ComponentName(PROVIDER, "$PROVIDER.Recognition").className
                         enabled = true
                         exported = true
-                        applicationInfo = ApplicationInfo().apply { enabled = true }
+                        applicationInfo =
+                            ApplicationInfo().apply {
+                                enabled = true
+                                packageName = PROVIDER
+                            }
                     }
             },
         )

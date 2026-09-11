@@ -74,10 +74,10 @@ internal class ConversationDictationCallerAudioVerdicts(
     private val write: (String, String) -> Unit,
 ) {
     fun recorded(
-        packageName: String,
+        component: ComponentName,
         versionCode: Long,
     ): ConversationDictationCallerAudioRequirement =
-        when (read(key(packageName, versionCode))) {
+        when (read(key(component, versionCode))) {
             SUPPORTED -> ConversationDictationCallerAudioRequirement.Supported
             UNSUPPORTED -> ConversationDictationCallerAudioRequirement.Unsupported
             else -> ConversationDictationCallerAudioRequirement.Unknown
@@ -85,7 +85,7 @@ internal class ConversationDictationCallerAudioVerdicts(
 
     /** Stores a conclusive answer. An inconclusive probe records nothing so it can be retried. */
     fun record(
-        packageName: String,
+        component: ComponentName,
         versionCode: Long,
         requirement: ConversationDictationCallerAudioRequirement,
     ) {
@@ -97,16 +97,16 @@ internal class ConversationDictationCallerAudioVerdicts(
                 ConversationDictationCallerAudioRequirement.Unknown,
                 -> return
             }
-        write(key(packageName, versionCode), value)
+        write(key(component, versionCode), value)
     }
 
     private fun key(
-        packageName: String,
+        component: ComponentName,
         versionCode: Long,
-    ): String = "$KEY_PREFIX$packageName:$versionCode"
+    ): String = "$KEY_PREFIX${component.flattenToString()}:$versionCode"
 
     private companion object {
-        const val KEY_PREFIX = "caller_audio_support:"
+        const val KEY_PREFIX = "caller_audio_support_component:"
         const val SUPPORTED = "supported"
         const val UNSUPPORTED = "unsupported"
     }

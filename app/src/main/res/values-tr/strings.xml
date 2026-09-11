@@ -1641,6 +1641,16 @@
     <string name="dictation_processing">Metne dönüştürülüyor…</string>
     <string name="dictation_stop">Dikteyi durdur</string>
     <string name="dictation_cancel">Dikteyi iptal et</string>
+    <string name="dictation_provider_title">Konuşma hizmeti</string>
+    <string name="dictation_provider_explanation">Gelecekteki dikteler için bir hizmet seçin. Seçtikten sonra başlamak için dikteye tekrar dokunun. Seçim ve iptal ses kaydetmez ve taslağınızı değiştirmez.</string>
+    <string name="dictation_provider_automatic">Otomatik</string>
+    <string name="dictation_provider_precedence">Android’in seçtiği konuşma hizmeti önceliklidir. Aksi hâlde White Noise seçiminiz veya tek kullanılabilir hizmet kullanılır.</string>
+    <string name="dictation_provider_loading">Konuşma hizmetleri aranıyor…</string>
+    <string name="dictation_provider_empty">Konuşma hizmeti bulunamadı. Bir konuşma hizmeti yükleyip etkinleştirin, kurulumunu tamamlayın ve buraya dönün. Bir klavye, kendi denetimlerinde doğrudan sesle yazma sunabilir.</string>
+    <string name="dictation_provider_in_app">White Noise içinde çalışır</string>
+    <string name="dictation_provider_window">Sağlayıcı penceresini açar</string>
+    <string name="dictation_provider_keyboard">Yalnızca klavye</string>
+    <string name="dictation_provider_unknown">Uygulama içi destek doğrulanmadı</string>
     <string name="dictation_provider_unavailable">Konuşma tanıma kullanılamıyor</string>
     <string name="dictation_permission_denied">Mikrofon izni gerekiyor</string>
     <string name="dictation_provider_access_rejected">Konuşma hizmeti mikrofon erişimini reddetti</string>

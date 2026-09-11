@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.audio
 
+import android.content.ComponentName
 import android.content.Intent
 import android.media.AudioFormat
 import android.os.Build
@@ -17,7 +18,13 @@ internal fun conversationDictationRecognitionIntent(): Intent =
         .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
 
 /** Builds the provider-Activity intent used by the compatibility fallback surface. */
-internal fun conversationDictationRecognitionActivityIntent(): Intent = conversationDictationRecognitionIntent()
+internal fun conversationDictationRecognitionActivityIntent(component: ComponentName? = null): Intent =
+    conversationDictationRecognitionIntent().apply {
+        component?.let {
+            setPackage(it.packageName)
+            setComponent(it)
+        }
+    }
 
 /** Reports whether this Android version defines the caller-supplied audio recognizer extras. */
 @Suppress("MaxLineLength")

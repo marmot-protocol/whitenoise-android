@@ -80,6 +80,62 @@ class ConversationDictationControllerTest {
     }
 
     @Test
+    fun disappearanceOfPinnedProviderRejectsItsLateResultVisibly() {
+        val platform = FakePlatform()
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        platform.pinnedProviderPresent = false
+        platform.listener.onResult("late")
+        assertEquals(
+            ConversationDictationFailure.ProviderUnavailable,
+            (fixture.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertEquals("Keep", fixture.drafts.getValue(key()).text)
+    }
+
+    @Test
+    fun ambiguousProviderRequiresChoiceBeforeMicrophoneAndCancelPreservesDraft() {
+        val platform = FakePlatform(needsProviderChoice = true)
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        assertTrue(fixture.controller.state is ConversationDictationState.ProviderSelectionRequired)
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertTrue(platform.sessions.isEmpty())
+        assertEquals(0, platform.callerAudioProbes)
+        fixture.controller.cancel()
+        assertEquals("Keep", fixture.drafts.getValue(key()).text)
+        assertTrue(platform.sessions.isEmpty())
+    }
+
+    @Test
+    fun selectingProviderPersistsButRequiresANewGestureWithoutCapturingOrChangingDraft() {
+        val platform = FakePlatform(needsProviderChoice = true)
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.controller.onProviderSelected()
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertTrue(platform.sessions.isEmpty())
+        assertEquals("Keep", fixture.drafts.getValue(key()).text)
+    }
+
+    @Test
+    fun staleActivityRequestCannotWriteIntoANewerSession() {
+        val fixture = fixture(draft = TextFieldValue("Keep"))
+        val controller = fixture.controller
+        controller.requestProviderActivityStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val old = controller.providerActivityRequestId
+        controller.beginProviderActivityLaunch(old)
+        controller.cancel()
+        controller.requestProviderActivityStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        controller.beginProviderActivityLaunch(controller.providerActivityRequestId)
+        controller.onProviderActivityResult("stale", old)
+        controller.onProviderActivityCancelled(old)
+        assertTrue(controller.state is ConversationDictationState.ProviderActivityActive)
+        assertEquals("Keep", fixture.drafts.getValue(key()).text)
+    }
+
+    @Test
     fun offlineVoiceInputServerFailureOffersProviderSetupInsteadOfNetworkRetry() {
         listOf("dev.notune.transcribe", "dev.notune.transcribe.callerfix").forEach { providerPackage ->
             assertEquals(
@@ -3112,6 +3168,8 @@ class ConversationDictationControllerTest {
 
     @Suppress("MaxLineLength")
     private class FakePlatform(
+        var pinnedProviderPresent: Boolean = true,
+        var needsProviderChoice: Boolean = false,
         var hasPermission: Boolean = true,
         var configured: Boolean = true,
         var available: Boolean = true,
@@ -3156,6 +3214,10 @@ class ConversationDictationControllerTest {
 
         /** Simulates a platform that cannot even start the question, such as a recognizer refusal. */
         var callerAudioProbeFailure: RuntimeException? = null
+
+        override fun pinnedProviderStillAvailable(): Boolean = pinnedProviderPresent
+
+        override fun prepareProviderSelection(): Boolean = !needsProviderChoice
 
         override fun hasRecordAudioPermission(): Boolean = hasPermission
 

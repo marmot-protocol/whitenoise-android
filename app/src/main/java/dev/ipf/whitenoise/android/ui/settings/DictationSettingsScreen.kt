@@ -21,14 +21,20 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.state.ConversationDictationPreferenceState
@@ -44,37 +50,47 @@ internal fun DictationSettingsScreen(
     onBack: () -> Unit,
 ) {
     val preferences by appState.conversationDictationPreferences.state.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var refreshToken by remember { mutableIntStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) refreshToken++
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(appState, refreshToken) { appState.discoverDictationProviders() }
+    var providerSheetOpen by remember { mutableStateOf(false) }
     var finishSheetOpen by remember { mutableStateOf(false) }
     var resultSheetOpen by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.dictation_settings_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                },
-            )
+            DictationSettingsTopBar(onBack)
         },
     ) { padding ->
         DictationSettingsContent(
             preferences = preferences,
+            onProviderClick = { providerSheetOpen = true },
             onFinishClick = { finishSheetOpen = true },
             onResultClick = { resultSheetOpen = true },
             modifier = Modifier.fillMaxSize().padding(padding),
         )
     }
 
+    if (providerSheetOpen) {
+        DictationProviderChooser(
+            appState,
+            onSelected = { providerSheetOpen = false },
+            onDismiss = { providerSheetOpen = false },
+        )
+    }
     if (finishSheetOpen) {
         DictationFinishSheet(
             selectedMillis = preferences.finishAfterSilenceMillis,
             onSelect = { millis ->
-                appState.setConversationDictationFinishAfterSilence(millis)
+                appState.conversationDictationPreferences.setFinishAfterSilenceMillis(millis)
                 finishSheetOpen = false
             },
             onDismiss = { finishSheetOpen = false },
@@ -84,7 +100,7 @@ internal fun DictationSettingsScreen(
         DictationResultSheet(
             selected = preferences.deliveryMode,
             onSelect = { mode ->
-                appState.setConversationDictationDeliveryMode(mode)
+                appState.conversationDictationPreferences.setDeliveryMode(mode)
                 resultSheetOpen = false
             },
             onDismiss = { resultSheetOpen = false },
@@ -92,10 +108,27 @@ internal fun DictationSettingsScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DictationSettingsTopBar(onBack: () -> Unit) {
+    TopAppBar(
+        title = { Text(stringResource(R.string.dictation_settings_title)) },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.back),
+                )
+            }
+        },
+    )
+}
+
 /** Renders the scrollable explanation, preference rows, and conditional send warning. */
 @Composable
 private fun DictationSettingsContent(
     preferences: ConversationDictationPreferenceState,
+    onProviderClick: () -> Unit,
     onFinishClick: () -> Unit,
     onResultClick: () -> Unit,
     modifier: Modifier,
@@ -112,7 +145,7 @@ private fun DictationSettingsContent(
                 modifier = Modifier.padding(horizontal = 4.dp),
             )
         }
-        item { DictationPreferenceGroup(preferences, onFinishClick, onResultClick) }
+        item { DictationPreferenceGroup(preferences, onProviderClick, onFinishClick, onResultClick) }
         if (preferences.deliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
             item {
                 Text(
@@ -130,6 +163,7 @@ private fun DictationSettingsContent(
 @Composable
 private fun DictationPreferenceGroup(
     preferences: ConversationDictationPreferenceState,
+    onProviderClick: () -> Unit,
     onFinishClick: () -> Unit,
     onResultClick: () -> Unit,
 ) {
@@ -145,6 +179,17 @@ private fun DictationPreferenceGroup(
             },
         )
     SettingsGroup {
+        item {
+            // Selectable row has wrapping subtitle text, unlike the compact SettingsRow.
+            SelectableSettingsRowWithSubtitle(
+                title = stringResource(R.string.dictation_provider_title),
+                subtitle =
+                    preferences.providerSelection?.let { "${it.appName} — ${it.engineName}" }
+                        ?: stringResource(R.string.dictation_provider_automatic),
+                selected = false,
+                onClick = onProviderClick,
+            )
+        }
         item {
             SettingsRow(
                 title = stringResource(R.string.dictation_finish_title),

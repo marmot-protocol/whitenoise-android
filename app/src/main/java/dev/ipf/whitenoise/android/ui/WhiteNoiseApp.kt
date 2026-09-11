@@ -26,6 +26,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -43,7 +44,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
-import dev.ipf.whitenoise.android.audio.conversationDictationRecognitionActivityIntent
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.AppPhase
@@ -73,6 +73,7 @@ import dev.ipf.whitenoise.android.ui.navigation.shouldComposeProtectedMainShell
 import dev.ipf.whitenoise.android.ui.navigation.warmResumeFirstUsefulSurface
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingScreen
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupScreen
+import dev.ipf.whitenoise.android.ui.settings.DictationProviderChooser
 import dev.ipf.whitenoise.android.ui.settings.UsageDiagnosticsPrompt
 import dev.ipf.whitenoise.android.ui.settings.WipeOutcomeSheet
 import dev.ipf.whitenoise.android.ui.settings.WipeProgressSheet
@@ -108,6 +109,7 @@ internal fun shouldShowConversationDictationPersistentControl(
             is ConversationDictationState.DeliveryUnknown,
             -> true
             ConversationDictationState.Idle,
+            is ConversationDictationState.ProviderSelectionRequired,
             is ConversationDictationState.DisclosureRequired,
             is ConversationDictationState.PermissionRequired,
             -> false
@@ -271,16 +273,19 @@ internal fun WhiteNoiseApp(
                     } == true
             dictation.onPermissionResult(granted, permanentlyDenied)
         }
+    // Separate registration for each request: a cancelled Activity cannot report into a later owner.
     val dictationProviderActivityLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == Activity.RESULT_OK) {
-                dictation.onProviderActivityResult(
-                    result.data
-                        ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-                        ?.firstOrNull(),
-                )
-            } else {
-                dictation.onProviderActivityCancelled()
+        key(dictationProviderActivityRequestId) {
+            val requestId = dictationProviderActivityRequestId
+            rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                if (result.resultCode == Activity.RESULT_OK) {
+                    dictation.onProviderActivityResult(
+                        result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull(),
+                        requestId,
+                    )
+                } else {
+                    dictation.onProviderActivityCancelled(requestId)
+                }
             }
         }
     var notificationPermissionTicket by remember { mutableStateOf<Long?>(null) }
@@ -405,9 +410,9 @@ internal fun WhiteNoiseApp(
             withFrameNanos { }
             if (dictation.beginProviderActivityLaunch(dictationProviderActivityRequestId)) {
                 runCatching {
-                    dictationProviderActivityLauncher.launch(conversationDictationRecognitionActivityIntent())
+                    dictationProviderActivityLauncher.launch(dictation.providerActivityIntent())
                 }.onFailure {
-                    dictation.onProviderActivityLaunchFailed()
+                    dictation.onProviderActivityLaunchFailed(dictationProviderActivityRequestId)
                 }
             }
         }
@@ -637,6 +642,9 @@ internal fun WhiteNoiseApp(
                 }
             }
         }
+    }
+    if (!appState.appLockScreenVisible && dictationState is ConversationDictationState.ProviderSelectionRequired) {
+        DictationProviderChooser(appState, onSelected = dictation::onProviderSelected, onDismiss = dictation::cancel)
     }
     if (!appState.appLockScreenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
         ConfirmDialog(

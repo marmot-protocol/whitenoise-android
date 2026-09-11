@@ -1616,6 +1616,16 @@
     <string name="dictation_processing">正在轉寫…</string>
     <string name="dictation_stop">停止聽寫</string>
     <string name="dictation_cancel">取消聽寫</string>
+    <string name="dictation_provider_title">語音辨識服務</string>
+    <string name="dictation_provider_explanation">選擇未來聽寫使用的語音辨識服務。選擇後，請再按一次聽寫開始。選擇或取消不會錄音，也不會變更您的草稿。</string>
+    <string name="dictation_provider_automatic">自動</string>
+    <string name="dictation_provider_precedence">Android 選擇的語音辨識服務優先。否則使用您在 White Noise 的選擇，或唯一可用的服務。</string>
+    <string name="dictation_provider_loading">正在尋找語音辨識服務…</string>
+    <string name="dictation_provider_empty">找不到語音辨識服務。請安裝並啟用語音辨識服務，完成其設定後再回來。鍵盤可能直接在其控制項中提供語音輸入。</string>
+    <string name="dictation_provider_in_app">可在 White Noise 內使用</string>
+    <string name="dictation_provider_window">開啟服務提供者視窗</string>
+    <string name="dictation_provider_keyboard">僅限鍵盤</string>
+    <string name="dictation_provider_unknown">應用內支援尚未驗證</string>
     <string name="dictation_provider_unavailable">語音辨識無法使用</string>
     <string name="dictation_permission_denied">需要麥克風權限</string>
     <string name="dictation_provider_access_rejected">語音服務拒絕存取麥克風</string>

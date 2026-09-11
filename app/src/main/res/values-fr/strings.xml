@@ -1643,6 +1643,16 @@
     <string name="dictation_processing">Transcription…</string>
     <string name="dictation_stop">Arrêter la dictée</string>
     <string name="dictation_cancel">Annuler la dictée</string>
+    <string name="dictation_provider_title">Service vocal</string>
+    <string name="dictation_provider_explanation">Choisissez un service pour les dictées futures. Après avoir choisi, touchez à nouveau dictée pour commencer. La sélection et l’annulation n’enregistrent pas d’audio et ne modifient pas votre brouillon.</string>
+    <string name="dictation_provider_automatic">Automatique</string>
+    <string name="dictation_provider_precedence">Le service vocal sélectionné par Android est prioritaire. Sinon, votre choix White Noise ou le seul service disponible est utilisé.</string>
+    <string name="dictation_provider_loading">Recherche de services vocaux…</string>
+    <string name="dictation_provider_empty">Aucun service vocal trouvé. Installez et activez un service vocal, terminez sa configuration, puis revenez ici. Un clavier peut proposer la saisie vocale directement dans ses propres contrôles.</string>
+    <string name="dictation_provider_in_app">Fonctionne dans White Noise</string>
+    <string name="dictation_provider_window">Ouvre la fenêtre du fournisseur</string>
+    <string name="dictation_provider_keyboard">Clavier uniquement</string>
+    <string name="dictation_provider_unknown">Prise en charge dans l’application non vérifiée</string>
     <string name="dictation_provider_unavailable">La reconnaissance vocale n’est pas disponible</string>
     <string name="dictation_permission_denied">L’autorisation du microphone est nécessaire</string>
     <string name="dictation_provider_access_rejected">Le service vocal a refusé l’accès au microphone</string>

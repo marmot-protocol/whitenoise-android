@@ -1705,6 +1705,16 @@
     <string name="dictation_processing">Расшифровка…</string>
     <string name="dictation_stop">Остановить диктовку</string>
     <string name="dictation_cancel">Отменить диктовку</string>
+    <string name="dictation_provider_title">Служба распознавания речи</string>
+    <string name="dictation_provider_explanation">Выберите службу для будущей диктовки. После выбора снова нажмите диктовку, чтобы начать. Выбор и отмена не записывают звук и не изменяют ваш черновик.</string>
+    <string name="dictation_provider_automatic">Автоматически</string>
+    <string name="dictation_provider_precedence">Приоритет имеет служба, выбранная Android. В противном случае используется ваш выбор White Noise или единственная доступная служба.</string>
+    <string name="dictation_provider_loading">Поиск служб распознавания речи…</string>
+    <string name="dictation_provider_empty">Служба распознавания речи не найдена. Установите и включите службу распознавания речи, завершите её настройку и вернитесь сюда. Клавиатура может предлагать голосовой ввод прямо в своих элементах управления.</string>
+    <string name="dictation_provider_in_app">Работает внутри White Noise</string>
+    <string name="dictation_provider_window">Открывает окно поставщика</string>
+    <string name="dictation_provider_keyboard">Только клавиатура</string>
+    <string name="dictation_provider_unknown">Поддержка в приложении не проверена</string>
     <string name="dictation_provider_unavailable">Распознавание речи недоступно</string>
     <string name="dictation_permission_denied">Требуется доступ к микрофону</string>
     <string name="dictation_provider_access_rejected">Служба распознавания речи отклонила доступ к микрофону</string>

@@ -1643,6 +1643,16 @@
     <string name="dictation_processing">Trascrizione…</string>
     <string name="dictation_stop">Interrompi dettatura</string>
     <string name="dictation_cancel">Annulla dettatura</string>
+    <string name="dictation_provider_title">Servizio vocale</string>
+    <string name="dictation_provider_explanation">Scegli un servizio per le dettature future. Dopo aver scelto, tocca di nuovo dettatura per iniziare. Selezione e annullamento non registrano audio e non modificano la tua bozza.</string>
+    <string name="dictation_provider_automatic">Automatico</string>
+    <string name="dictation_provider_precedence">Il servizio vocale selezionato da Android ha la priorità. Altrimenti viene usata la tua scelta White Noise o l’unico servizio disponibile.</string>
+    <string name="dictation_provider_loading">Ricerca dei servizi vocali…</string>
+    <string name="dictation_provider_empty">Nessun servizio vocale trovato. Installa e attiva un servizio vocale, completa la sua configurazione, poi torna qui. Una tastiera può offrire la digitazione vocale direttamente nei suoi controlli.</string>
+    <string name="dictation_provider_in_app">Funziona dentro White Noise</string>
+    <string name="dictation_provider_window">Apre la finestra del fornitore</string>
+    <string name="dictation_provider_keyboard">Solo tastiera</string>
+    <string name="dictation_provider_unknown">Supporto in-app non verificato</string>
     <string name="dictation_provider_unavailable">Il riconoscimento vocale non è disponibile</string>
     <string name="dictation_permission_denied">È necessaria l’autorizzazione per il microfono</string>
     <string name="dictation_provider_access_rejected">Il servizio vocale ha rifiutato l’accesso al microfono</string>
