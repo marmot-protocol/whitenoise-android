@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui.theme
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -55,3 +57,23 @@ internal fun Modifier.amoledSurfaceBorder(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun amoledSheetContainerColor(): Color = if (isAmoledSurfaceTheme()) Color.Black else BottomSheetDefaults.ContainerColor
+
+private const val AMOLED_DISABLED_OUTLINE_ALPHA = 0.38f
+
+/** One-pixel white outline for buttons and surfaces on AMOLED; null elsewhere so Material fills stand alone. */
+@Composable
+internal fun amoledOutlineBorder(enabled: Boolean = true): BorderStroke? =
+    if (isAmoledSurfaceTheme()) {
+        BorderStroke(1.dp, Color.White.copy(alpha = if (enabled) 1f else AMOLED_DISABLED_OUTLINE_ALPHA))
+    } else {
+        null
+    }
+
+/** Filled buttons on AMOLED turn black with white content behind the outline instead of a tonal fill. */
+@Composable
+internal fun outlineButtonColors(): ButtonColors =
+    if (isAmoledSurfaceTheme()) {
+        ButtonDefaults.outlinedButtonColors(containerColor = Color.Black, contentColor = Color.White)
+    } else {
+        ButtonDefaults.buttonColors()
+    }

@@ -794,6 +794,12 @@
     <string name="settings_add_profile">新增個人資料</string>
     <string name="settings_switch_profile">切換個人資料</string>
     <string name="settings_open_share_connect_for">開啟 %1$s 的「分享與連線」</string>
+    <string name="share_and_connect">分享與連線</string>
+    <string name="scan_to_connect">掃描即可連線。</string>
+    <string name="not_copied">未複製</string>
+    <string name="copy_public_key">複製公鑰</string>
+    <string name="profile_photo_for">%1$s 的個人資料照片</string>
+    <string name="button_in_progress">進行中</string>
     <string name="support_the_project">支持專案</string>
     <string name="support_the_project_subtitle">White Noise 免費且開源。捐款有助於維持這一點。</string>
     <string name="chat_with_support">與支援團隊聊天</string>

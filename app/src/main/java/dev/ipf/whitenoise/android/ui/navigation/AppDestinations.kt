@@ -10,6 +10,7 @@ internal enum class MainSection {
 }
 
 internal enum class SettingsDetail {
+    ShareConnect,
     Appearance,
     ActionColor,
     ChatBubbleColors,

@@ -164,7 +164,7 @@
     <string name="no_chats_yet">No chats yet</string>
     <string name="empty_chats_invite_npub">Start a conversation by inviting someone with their npub.</string>
     <string name="new_chat">New Chat</string>
-    <string name="error_not_white_noise_profile_qr">That QR code is not a White Noise profile.</string>
+    <string name="error_not_white_noise_profile_qr">That QR code doesn’t contain a White Noise profile.</string>
     <string name="error_valid_recipient_reference">Enter a valid npub, profile link, or hex public key.</string>
     <string name="error_missing_key_package">This person hasn’t set up encrypted messaging yet. Ask them to install White Noise and open it once, then try again.</string>
     <string name="error_missing_key_package_for">%1$s hasn’t set up encrypted messaging yet. Ask them to install White Noise and open it once, then try again.</string>
@@ -1077,6 +1077,12 @@
     <string name="settings_add_profile">Add Profile</string>
     <string name="settings_switch_profile">Switch Profile</string>
     <string name="settings_open_share_connect_for">Open Share &amp; Connect for %1$s</string>
+    <string name="share_and_connect">Share &amp; Connect</string>
+    <string name="scan_to_connect">Scan to connect.</string>
+    <string name="not_copied">Not copied</string>
+    <string name="copy_public_key">Copy public key</string>
+    <string name="profile_photo_for">Profile photo for %1$s</string>
+    <string name="button_in_progress">In progress</string>
     <string name="settings_mdk_version_label" translatable="false">MDK %1$s</string>
     <!-- Release-channel name shown on staging builds only; not a translatable word. -->
     <string name="settings_staging_badge" translatable="false">STAGING</string>

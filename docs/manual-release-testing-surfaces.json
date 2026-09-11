@@ -5560,6 +5560,15 @@
         ]
       },
       {
+        "surface": "Modifier.whiteNoiseVerticalScroll",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScaffold.kt",
+        "anchor": "fun Modifier.whiteNoiseVerticalScroll(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
         "surface": "WhiteNoiseTopBar",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTopBar.kt",
         "anchor": "fun WhiteNoiseTopBar(",
@@ -5842,6 +5851,105 @@
         "anchor": "fun DictationSettingsTopBar(",
         "test_ids": [
           "DIC-001"
+        ]
+      },
+      {
+        "surface": "ShareConnectScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "fun ShareConnectScreen(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "ShareConnectContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "fun ShareConnectContent(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "ShareProfileContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "fun ShareProfileContent(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "ShareConnectBottomAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "fun ShareConnectBottomAction(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "IdentityQrCodeSurface",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/IdentityCodeComponents.kt",
+        "anchor": "fun IdentityQrCodeSurface(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "IdentityQrCode",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/IdentityCodeComponents.kt",
+        "anchor": "fun IdentityQrCode(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "IdentifierCopyCapsule",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/IdentityCodeComponents.kt",
+        "anchor": "fun IdentifierCopyCapsule(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseButtons.kt",
+        "anchor": "fun WhiteNoiseButton(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseOutlinedButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseButtons.kt",
+        "anchor": "fun WhiteNoiseOutlinedButton(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseFilledTonalButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseButtons.kt",
+        "anchor": "fun WhiteNoiseFilledTonalButton(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseButtonDefaults.colors",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseButtons.kt",
+        "anchor": "internal fun colors(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
         ]
       }
     ],
@@ -8250,6 +8358,105 @@
         "anchor": "R.string.settings_version_label",
         "test_ids": [
           "SET-001"
+        ]
+      },
+      {
+        "surface": "string:share_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.share_profile",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "string:share_and_connect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.share_and_connect",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "string:back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "string:copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.copied",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "string:not_copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.not_copied",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "string:copy_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.copy_public_key",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "string:profile_qr_code",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.profile_qr_code",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "string:scan_to_connect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.scan_to_connect",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "string:error_not_white_noise_profile_qr",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.error_not_white_noise_profile_qr",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "string:scan_qr_code",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.scan_qr_code",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "string:button_in_progress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseButtons.kt",
+        "anchor": "R.string.button_in_progress",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
         ]
       }
     ],
