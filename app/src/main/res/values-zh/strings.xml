@@ -1616,6 +1616,16 @@
     <string name="dictation_processing">正在转写…</string>
     <string name="dictation_stop">停止听写</string>
     <string name="dictation_cancel">取消听写</string>
+    <string name="dictation_provider_title">语音识别服务</string>
+    <string name="dictation_provider_explanation">选择未来听写使用的语音识别服务。选择后，请再点按一次听写开始。选择或取消不会录音，也不会更改您的草稿。</string>
+    <string name="dictation_provider_automatic">自动</string>
+    <string name="dictation_provider_precedence">Android 选择的语音识别服务优先。否则使用您在 White Noise 的选择，或唯一可用的服务。</string>
+    <string name="dictation_provider_loading">正在查找语音识别服务…</string>
+    <string name="dictation_provider_empty">找不到语音识别服务。请安装并启用语音识别服务，完成其设置后再回来。键盘可能直接在其控件中提供语音输入。</string>
+    <string name="dictation_provider_in_app">可在 White Noise 内使用</string>
+    <string name="dictation_provider_window">打开服务提供商窗口</string>
+    <string name="dictation_provider_keyboard">仅限键盘</string>
+    <string name="dictation_provider_unknown">应用内支持尚未验证</string>
     <string name="dictation_provider_unavailable">语音识别不可用</string>
     <string name="dictation_permission_denied">需要麦克风权限</string>
     <string name="dictation_provider_access_rejected">语音服务拒绝访问麦克风</string>

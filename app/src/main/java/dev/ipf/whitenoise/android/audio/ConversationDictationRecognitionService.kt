@@ -17,7 +17,12 @@ internal fun conversationDictationRecognitionServiceComponent(configuredValue: S
             } else {
                 configuredClassName
             }
-        ComponentName(packageName, className)
+        val identifier = Regex("[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_$]*)*")
+        if (!identifier.matches(packageName) || !identifier.matches(className)) {
+            null
+        } else {
+            ComponentName(packageName, className)
+        }
     }
 }
 

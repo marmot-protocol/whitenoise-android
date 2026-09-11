@@ -1643,6 +1643,16 @@
     <string name="dictation_processing">Transcrevendo…</string>
     <string name="dictation_stop">Parar ditado</string>
     <string name="dictation_cancel">Cancelar ditado</string>
+    <string name="dictation_provider_title">Serviço de voz</string>
+    <string name="dictation_provider_explanation">Escolha um serviço para futuros ditados. Depois de escolher, toque em ditado novamente para começar. A seleção e o cancelamento não gravam áudio nem alteram o seu rascunho.</string>
+    <string name="dictation_provider_automatic">Automático</string>
+    <string name="dictation_provider_precedence">O serviço de voz selecionado pelo Android tem prioridade. Caso contrário, é usada a sua escolha do White Noise ou o único serviço disponível.</string>
+    <string name="dictation_provider_loading">A procurar serviços de voz…</string>
+    <string name="dictation_provider_empty">Nenhum serviço de voz encontrado. Instale e ative um serviço de voz, conclua a sua configuração e volte aqui. Um teclado pode oferecer escrita por voz diretamente nos seus próprios controlos.</string>
+    <string name="dictation_provider_in_app">Funciona dentro do White Noise</string>
+    <string name="dictation_provider_window">Abre a janela do fornecedor</string>
+    <string name="dictation_provider_keyboard">Apenas teclado</string>
+    <string name="dictation_provider_unknown">Suporte na aplicação não verificado</string>
     <string name="dictation_provider_unavailable">O reconhecimento de voz não está disponível</string>
     <string name="dictation_permission_denied">É necessária a permissão do microfone</string>
     <string name="dictation_provider_access_rejected">O serviço de voz recusou o acesso ao microfone</string>

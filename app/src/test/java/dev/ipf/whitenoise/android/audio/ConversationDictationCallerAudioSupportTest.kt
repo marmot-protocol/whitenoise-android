@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.audio
 
+import android.content.ComponentName
 import android.speech.SpeechRecognizer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -83,7 +84,7 @@ class ConversationDictationCallerAudioSupportTest {
         )
         assertEquals(
             ConversationDictationCallerAudioRequirement.Unknown,
-            verdicts.recorded("org.other.provider", 19L),
+            verdicts.recorded(ComponentName("org.other.provider", "org.other.provider.Engine"), 19L),
         )
     }
 
@@ -94,8 +95,8 @@ class ConversationDictationCallerAudioSupportTest {
 
         verdicts.record(PROVIDER, 19L, ConversationDictationCallerAudioRequirement.Supported)
 
-        assertEquals(setOf("caller_audio_support:$PROVIDER:19"), store.keys)
-        assertEquals("supported", store.getValue("caller_audio_support:$PROVIDER:19"))
+        assertEquals(setOf("caller_audio_support_component:${PROVIDER.flattenToString()}:19"), store.keys)
+        assertEquals("supported", store.getValue("caller_audio_support_component:${PROVIDER.flattenToString()}:19"))
     }
 
     @Test
@@ -115,11 +116,23 @@ class ConversationDictationCallerAudioSupportTest {
 
     @Test
     fun anUnrecognizedStoredValueIsTreatedAsUnestablished() {
-        val store = mutableMapOf("caller_audio_support:$PROVIDER:19" to "maybe")
+        val store = mutableMapOf("caller_audio_support_component:${PROVIDER.flattenToString()}:19" to "maybe")
 
         assertEquals(
             ConversationDictationCallerAudioRequirement.Unknown,
             verdicts(store).recorded(PROVIDER, 19L),
+        )
+    }
+
+    @Test
+    fun packageResidueAndAnotherEngineNeverEstablishSupport() {
+        val store = mutableMapOf("caller_audio_support:org.offline.provider:19" to "supported")
+        val verdicts = verdicts(store)
+        assertEquals(ConversationDictationCallerAudioRequirement.Unknown, verdicts.recorded(PROVIDER, 19))
+        verdicts.record(PROVIDER, 19, ConversationDictationCallerAudioRequirement.Supported)
+        assertEquals(
+            ConversationDictationCallerAudioRequirement.Unknown,
+            verdicts.recorded(ComponentName(PROVIDER.packageName, "org.offline.provider.Other"), 19),
         )
     }
 
@@ -130,6 +143,6 @@ class ConversationDictationCallerAudioSupportTest {
         )
 
     private companion object {
-        const val PROVIDER = "org.offline.provider"
+        val PROVIDER = ComponentName("org.offline.provider", "org.offline.provider.Engine")
     }
 }

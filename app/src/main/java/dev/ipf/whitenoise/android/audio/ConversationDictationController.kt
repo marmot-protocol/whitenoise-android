@@ -17,7 +17,6 @@ import android.os.Process
 import android.os.SystemClock
 import android.provider.Settings
 import android.speech.RecognitionListener
-import android.speech.RecognitionService
 import android.speech.SpeechRecognizer
 import android.util.Log
 import androidx.compose.runtime.Stable
@@ -32,6 +31,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.pm.PackageInfoCompat
 import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrAfter
 import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrBefore
+import dev.ipf.whitenoise.android.state.ConversationDictationPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -138,6 +138,12 @@ internal sealed interface ConversationDictationState {
         override val sessionId: Long? = null
         override val target: ConversationDictationTarget? = null
     }
+
+    /** Choosing or dismissing a provider never captures audio or changes the captured draft. */
+    data class ProviderSelectionRequired(
+        override val sessionId: Long,
+        override val target: ConversationDictationTarget,
+    ) : ConversationDictationState
 
     data class DisclosureRequired(
         override val sessionId: Long,
@@ -275,6 +281,16 @@ internal enum class ConversationDictationMicrophoneAccess {
 }
 
 internal interface ConversationDictationPlatform {
+    /** Resolves and pins a new gesture; false asks for a provider before microphone access. */
+    fun prepareProviderSelection(): Boolean = true
+
+    /** Checks the already pinned identity without resolving preferences again. */
+    fun pinnedRecognitionConfigured(): Boolean = recognitionConfigured()
+
+    fun providerActivityIntent(): Intent = conversationDictationRecognitionActivityIntent()
+
+    fun pinnedProviderStillAvailable(): Boolean = true
+
     /** Whether White Noise currently has permission to capture microphone audio. */
     fun hasRecordAudioPermission(): Boolean
 
@@ -630,6 +646,10 @@ internal class ConversationDictationController internal constructor(
                 deliveryMode = deliveryMode(),
             )
         if (!targetAvailable(target)) return false
+        if (!runCatching(platform::prepareProviderSelection).getOrDefault(false)) {
+            state = ConversationDictationState.ProviderSelectionRequired(sessionId, target)
+            return true
+        }
         if (!disclosureAccepted()) {
             state = ConversationDictationState.DisclosureRequired(sessionId, target)
             return true
@@ -653,6 +673,13 @@ internal class ConversationDictationController internal constructor(
     private fun targetAvailable(target: ConversationDictationTarget): Boolean =
         targetAvailable(target.accountRef, target.groupIdHex) &&
             targetReplyAvailable(target.accountRef, target.groupIdHex, target.replyToMessageIdHex)
+
+    /** The choice applies on the next gesture, never as a side effect of selecting a row. */
+    fun onProviderSelected() {
+        if (state is ConversationDictationState.ProviderSelectionRequired) cancel()
+    }
+
+    fun providerActivityIntent(): Intent = platform.providerActivityIntent()
 
     /** Records the first-use disclosure and resumes its exact pending target. */
     fun acceptDisclosure() {
@@ -863,9 +890,17 @@ internal class ConversationDictationController internal constructor(
     }
 
     /** Validates and delivers the transcript returned by the provider-owned Activity. */
-    fun onProviderActivityResult(transcript: String?) {
+    fun onProviderActivityResult(
+        transcript: String?,
+        requestId: Long = providerActivityRequestId,
+    ) {
+        if (requestId != providerActivityRequestId) return
         conversationDictationDiagnostic("event=provider_activity_result has_text=${!transcript.isNullOrBlank()}")
         val active = state as? ConversationDictationState.ProviderActivityActive ?: return
+        if (!runCatching(platform::pinnedProviderStillAvailable).getOrDefault(false)) {
+            fail(active.sessionId, active.target, ConversationDictationFailure.ProviderUnavailable)
+            return
+        }
         val recognized = transcript?.trim().orEmpty()
         if (recognized.isBlank()) {
             fail(active.sessionId, active.target, ConversationDictationFailure.NoSpeech)
@@ -879,13 +914,15 @@ internal class ConversationDictationController internal constructor(
     }
 
     /** Clears ownership after the user dismisses the provider-owned Activity. */
-    fun onProviderActivityCancelled() {
+    fun onProviderActivityCancelled(requestId: Long = providerActivityRequestId) {
+        if (requestId != providerActivityRequestId) return
         conversationDictationDiagnostic("event=provider_activity_cancelled")
         if (state is ConversationDictationState.ProviderActivityActive) cancel()
     }
 
     /** Converts a provider-Activity launch failure into a retryable terminal state. */
-    fun onProviderActivityLaunchFailed() {
+    fun onProviderActivityLaunchFailed(requestId: Long = providerActivityRequestId) {
+        if (requestId != providerActivityRequestId) return
         conversationDictationDiagnostic("event=provider_activity_launch_failed")
         val providerState = state as? ConversationDictationState.ProviderActivityActive ?: return
         fail(
@@ -988,6 +1025,7 @@ internal class ConversationDictationController internal constructor(
     /** Releases any provider/microphone resource without discarding terminal review text. */
     fun onAppBackgrounded() {
         when (state) {
+            is ConversationDictationState.ProviderSelectionRequired,
             is ConversationDictationState.DisclosureRequired,
             is ConversationDictationState.PermissionRequired,
             is ConversationDictationState.CheckingProvider,
@@ -1264,7 +1302,7 @@ internal class ConversationDictationController internal constructor(
         target: ConversationDictationTarget,
     ) {
         state = ConversationDictationState.Starting(sessionId, target)
-        val configured = platform.recognitionConfigured()
+        val configured = platform.pinnedRecognitionConfigured()
         conversationDictationDiagnostic("event=recognition_configured configured=$configured")
         val microphoneAccess = platform.microphoneAccess()
         conversationDictationDiagnostic("event=microphone_preflight access=${microphoneAccess.name}")
@@ -1434,6 +1472,10 @@ internal class ConversationDictationController internal constructor(
                         "event=callback_result generation=$generationId has_text=${!transcript.isNullOrBlank()}",
                     )
                     if (!owns(sessionId, generationId)) return
+                    if (!runCatching(platform::pinnedProviderStillAvailable).getOrDefault(false)) {
+                        failOrRetainTranscript(sessionId, target, ConversationDictationFailure.ProviderUnavailable)
+                        return
+                    }
                     val readyAt = generationReadyAtElapsedMillis
                     val recognized = transcript?.trim().orEmpty()
                     recognitionSession?.acknowledgeCallerAudio()
@@ -2444,6 +2486,10 @@ internal class AndroidConversationDictationPlatform(
     private var sessionRecognitionService: ComponentName? = null
     private var callerAudioCapture: ConversationDictationCallerAudio? = null
     private var nextCallerAudioSessionId = 0L
+    private var sessionProvider: ConversationDictationProviderChoice? = null
+    private var providerPrepared = false
+    private var sessionProviderCanRecord = false
+    private val dictationPreferences by lazy { ConversationDictationPreferences(context) }
 
     /**
      * Remembers what each provider build answered about caller-supplied audio.
@@ -2493,43 +2539,57 @@ internal class AndroidConversationDictationPlatform(
         return access
     }
 
-    /** Starts a session by resolving the provider afresh, so install and selection changes land. */
-    override fun recognitionConfigured(): Boolean = resolveAndPinRecognitionService() != null
+    override fun prepareProviderSelection(): Boolean {
+        val choices = discoverConversationDictationProviders(context).flatMap { it.choices }
+        val saved = dictationPreferences.current().providerSelection
+        val stale = saved != null && choices.none(saved::sameInstallation)
+        if (stale) dictationPreferences.setProviderSelection(null)
+        val androidSelected = selectedRecognitionService()
+        sessionProvider =
+            if (stale && choices.none { androidSelected != null && it.service == androidSelected }) {
+                null
+            } else {
+                resolveConversationDictationProvider(androidSelected, saved, choices)
+            }
+        sessionRecognitionService = sessionProvider?.service
+        sessionProviderCanRecord = providerCanRecord(sessionRecognitionService)
+        providerPrepared = true
+        return sessionProvider != null
+    }
 
-    /**
-     * Rechecks the pinned service without switching providers during a session. A check that
-     * arrives before this session pinned anything resolves instead of reporting an installed
-     * provider as missing, which would fail the session on call order alone.
-     */
+    /** Legacy preflight callers also explicitly begin a fresh provider resolution. */
+    override fun recognitionConfigured(): Boolean {
+        prepareProviderSelection()
+        return sessionRecognitionService != null
+    }
+
+    override fun pinnedRecognitionConfigured(): Boolean = recognitionAvailable()
+
     override fun recognitionAvailable(): Boolean {
-        val pinned = sessionRecognitionService ?: resolveAndPinRecognitionService()
-        val available =
-            conversationDictationRecognitionServiceAvailable(pinned, eligibleRecognitionServices())
-        conversationDictationDiagnostic("event=recognition_service_available available=$available")
-        return available
+        if (!providerPrepared) prepareProviderSelection()
+        return sessionRecognitionService != null && pinnedProviderAvailable()
     }
 
-    /** Names the pinned provider's package without switching providers to answer the question. */
+    override fun pinnedProviderStillAvailable(): Boolean = pinnedProviderAvailable()
+
+    private fun pinnedProviderAvailable(): Boolean =
+        sessionProvider?.let { pinned ->
+            discoverConversationDictationProviders(context).flatMap { it.choices }.any(pinned::sameInstallation)
+        } ?: false
+
     override fun speechProviderPackage(): String? {
-        val pinned = sessionRecognitionService ?: resolvedRecognitionService(selectedRecognitionService())
-        return pinned?.packageName
+        if (!providerPrepared) prepareProviderSelection()
+        return sessionProvider?.packageName
     }
 
-    /** Resolves one component and pins it as this session's provider. */
-    private fun resolveAndPinRecognitionService(): ComponentName? {
-        val selected = selectedRecognitionService()
-        conversationDictationDiagnostic("event=selected_service ${selected.describeProvider()}")
-        return resolvedRecognitionService(selected).also { sessionRecognitionService = it }
-    }
-
-    /** Reports whether Android can route the provider-owned compatibility recognition UI. */
-    override fun recognitionActivityAvailable(): Boolean {
-        val resolved = conversationDictationRecognitionActivityIntent().resolveActivity(context.packageManager)
-        conversationDictationDiagnostic(
-            "event=provider_activity_resolve component=${resolved?.flattenToShortString() ?: "none"}",
+    override fun providerActivityIntent(): Intent {
+        if (!pinnedProviderAvailable()) throw ConversationDictationProviderUnavailableException()
+        return conversationDictationRecognitionActivityIntent(
+            sessionProvider?.activity ?: throw ConversationDictationProviderUnavailableException(),
         )
-        return resolved != null
     }
+
+    override fun recognitionActivityAvailable(): Boolean = sessionProvider?.activity != null && pinnedProviderAvailable()
 
     /** Resolves provider UI off the main thread and posts at most one cancellable callback. */
     override fun checkRecognitionActivity(callback: (Boolean) -> Unit): ConversationDictationTimeoutHandle {
@@ -2570,7 +2630,7 @@ internal class AndroidConversationDictationPlatform(
     @Suppress("MaxLineLength")
     private fun openCallerAudioStreamIfProviderCannotRecord(listener: ConversationDictationRecognitionListener): ConversationDictationCallerAudioStream? {
         val systemSelected = selectedRecognitionService() != null
-        val providerRecords = providerCanRecord(sessionRecognitionService)
+        val providerRecords = sessionProviderCanRecord
         val supported = conversationDictationAudioSourceSupported()
         val capture =
             if (providerRecords || !supported) {
@@ -2630,6 +2690,8 @@ internal class AndroidConversationDictationPlatform(
 
     /** Reports what is already known about the resolved provider build, without asking it. */
     override fun callerAudioRequirement(): ConversationDictationCallerAudioRequirement {
+        if (!providerPrepared) prepareProviderSelection()
+        if (sessionProvider != null && sessionRecognitionService == null) return ConversationDictationCallerAudioRequirement.Unsupported
         val requirement = knownCallerAudioRequirement(callerAudioProvider())
         conversationDictationDiagnostic("event=caller_audio_known requirement=${requirement.name}")
         return requirement
@@ -2667,10 +2729,10 @@ internal class AndroidConversationDictationPlatform(
      */
     private fun knownCallerAudioRequirement(provider: ConversationDictationCallerAudioProvider?): ConversationDictationCallerAudioRequirement =
         when {
-            providerCanRecord(provider?.component) -> ConversationDictationCallerAudioRequirement.NotNeeded
+            provider != null && sessionProviderCanRecord -> ConversationDictationCallerAudioRequirement.NotNeeded
             !conversationDictationAudioSourceSupported() -> ConversationDictationCallerAudioRequirement.Unsupported
             provider == null -> ConversationDictationCallerAudioRequirement.Unknown
-            else -> callerAudioVerdicts.recorded(provider.packageName, provider.versionCode)
+            else -> callerAudioVerdicts.recorded(provider.component, provider.versionCode)
         }
 
     /**
@@ -2681,7 +2743,9 @@ internal class AndroidConversationDictationPlatform(
      * entry on a version this app never read.
      */
     private fun callerAudioProvider(): ConversationDictationCallerAudioProvider? {
-        val component = resolvedRecognitionService(selectedRecognitionService()) ?: return null
+        if (!providerPrepared) prepareProviderSelection()
+        val component = sessionRecognitionService
+        if (component == null || !pinnedProviderAvailable()) return null
         return providerVersionCode(component.packageName)?.let { versionCode ->
             ConversationDictationCallerAudioProvider(component, versionCode)
         }
@@ -2689,7 +2753,7 @@ internal class AndroidConversationDictationPlatform(
 
     /** Preinstalled recognizers also receive Android's microphone binding capability. */
     private fun providerCanRecord(component: ComponentName?): Boolean {
-        if (selectedRecognitionService() != null) return true
+        if (component != null && selectedRecognitionService() == component) return true
         return component?.let {
             runCatching {
                 val application = context.packageManager.getApplicationInfo(it.packageName, 0)
@@ -2713,32 +2777,6 @@ internal class AndroidConversationDictationPlatform(
                 VOICE_RECOGNITION_SERVICE_SETTING,
             ),
         )
-
-    /** Keeps the UI inside White Noise when Android leaves the selected-service setting empty. */
-    private fun resolvedRecognitionService(selected: ComponentName?): ComponentName? {
-        val discovered = eligibleRecognitionServices()
-        val activity = conversationDictationRecognitionActivityIntent().resolveActivity(context.packageManager)
-        val resolved = conversationDictationRecognitionService(selected, activity, discovered)
-        val source =
-            when {
-                resolved == null -> "none"
-                resolved == selected -> "setting"
-                activity != null && resolved.packageName == activity.packageName -> "activity_package"
-                else -> "unique_discovered"
-            }
-        conversationDictationDiagnostic(
-            "event=recognition_service_resolved source=$source ${resolved.describeProvider()} " +
-                "discovered=${discovered.size}",
-        )
-        return resolved
-    }
-
-    private fun eligibleRecognitionServices(): List<ComponentName> =
-        context.packageManager
-            .queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0)
-            .mapNotNull { it.serviceInfo }
-            .filter { it.enabled && it.exported && it.applicationInfo.enabled }
-            .map { ComponentName(it.packageName, it.name) }
 
     private fun ComponentName?.describeProvider(): String {
         if (this == null) return "component=none"
@@ -2843,7 +2881,7 @@ private class ConversationDictationCallerAudioProbe(
         )
         // An inconclusive answer, including one about a provider build that changed underneath this
         // probe, records nothing so the question can be asked again.
-        verdicts.record(provider.packageName, provider.versionCode, answered)
+        verdicts.record(provider.component, provider.versionCode, answered)
         callback(answered)
     }
 

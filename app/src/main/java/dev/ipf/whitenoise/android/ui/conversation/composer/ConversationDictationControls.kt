@@ -306,6 +306,7 @@ private fun ConversationDictationDismissAction(
 @Composable
 private fun dictationStatusLabel(state: ConversationDictationState): String =
     when (state) {
+        is ConversationDictationState.ProviderSelectionRequired,
         is ConversationDictationState.DisclosureRequired,
         is ConversationDictationState.PermissionRequired,
         -> stringResource(R.string.dictation_preparing)

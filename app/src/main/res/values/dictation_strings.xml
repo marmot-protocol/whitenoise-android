@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dictation_provider_title">Speech provider</string>
+    <string name="dictation_provider_explanation">Choose a provider for future dictation. After choosing, tap dictation again to start. Selection and cancellation do not record audio or change your draft.</string>
+    <string name="dictation_provider_automatic">Automatic</string>
+    <string name="dictation_provider_precedence">Android’s selected speech service takes priority. Otherwise use your White Noise choice, or the only available engine.</string>
+    <string name="dictation_provider_loading">Finding speech providers…</string>
+    <string name="dictation_provider_empty">No speech provider found. Install and enable a speech provider, complete its setup, then return here. A keyboard may offer voice typing directly in its own controls.</string>
+    <string name="dictation_provider_in_app">Works inside White Noise</string>
+    <string name="dictation_provider_window">Opens provider window</string>
+    <string name="dictation_provider_keyboard">Keyboard only</string>
+    <string name="dictation_provider_unknown">In-app support not verified</string>
+</resources>

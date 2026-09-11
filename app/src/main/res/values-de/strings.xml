@@ -1641,6 +1641,16 @@
     <string name="dictation_processing">Wird transkribiert…</string>
     <string name="dictation_stop">Diktat beenden</string>
     <string name="dictation_cancel">Diktat abbrechen</string>
+    <string name="dictation_provider_title">Sprachdienst</string>
+    <string name="dictation_provider_explanation">Wählen Sie einen Sprachdienst für zukünftige Diktate. Tippen Sie nach der Auswahl erneut auf Diktieren, um zu starten. Auswahl und Abbruch zeichnen kein Audio auf und ändern Ihren Entwurf nicht.</string>
+    <string name="dictation_provider_automatic">Automatisch</string>
+    <string name="dictation_provider_precedence">Der von Android ausgewählte Sprachdienst hat Vorrang. Andernfalls wird Ihre White-Noise-Auswahl oder der einzige verfügbare Dienst verwendet.</string>
+    <string name="dictation_provider_loading">Sprachdienste werden gesucht…</string>
+    <string name="dictation_provider_empty">Kein Sprachdienst gefunden. Installieren und aktivieren Sie einen Sprachdienst, schließen Sie dessen Einrichtung ab und kehren Sie hierher zurück. Eine Tastatur bietet möglicherweise direkt in ihren eigenen Steuerelementen Spracheingabe an.</string>
+    <string name="dictation_provider_in_app">Funktioniert in White Noise</string>
+    <string name="dictation_provider_window">Öffnet Anbieterfenster</string>
+    <string name="dictation_provider_keyboard">Nur Tastatur</string>
+    <string name="dictation_provider_unknown">In-App-Unterstützung nicht verifiziert</string>
     <string name="dictation_provider_unavailable">Spracherkennung ist nicht verfügbar</string>
     <string name="dictation_permission_denied">Mikrofonberechtigung ist erforderlich</string>
     <string name="dictation_provider_access_rejected">Sprachdienst hat Mikrofonzugriff abgelehnt</string>

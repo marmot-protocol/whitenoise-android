@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import android.content.ComponentName
 import android.content.Context
 import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import org.junit.Assert.assertEquals
@@ -28,6 +29,7 @@ class ConversationDictationPreferencesTest {
 
         assertNull(state.finishAfterSilenceMillis)
         assertEquals(ConversationDictationDeliveryMode.PasteIntoDraft, state.deliveryMode)
+        assertNull(state.recognitionServiceOverride)
     }
 
     /** Verifies only supported endpointing values persist and send mode requires explicit selection. */
@@ -43,6 +45,59 @@ class ConversationDictationPreferencesTest {
 
         restored.setFinishAfterSilenceMillis(2_000L)
         assertNull(restored.current().finishAfterSilenceMillis)
+    }
+
+    /** Keeps an explicit provider choice local and clears it for the System default option. */
+    @Test
+    fun persistsAndClearsRecognitionServiceOverride() {
+        org.robolectric.Shadows.shadowOf(context.packageManager).installPackage(
+            android.content.pm.PackageInfo().apply {
+                packageName = "org.offline"
+                versionCode = 7
+                applicationInfo =
+                    android.content.pm
+                        .ApplicationInfo()
+                        .apply { packageName = "org.offline" }
+            },
+        )
+        val selected = ComponentName("org.offline", "org.offline.Recognition")
+        val original = ConversationDictationPreferences(context, preferences())
+
+        original.setRecognitionServiceOverride(selected)
+
+        assertEquals(
+            selected,
+            ConversationDictationPreferences(context, preferences()).current().recognitionServiceOverride,
+        )
+
+        original.setRecognitionServiceOverride(null)
+
+        assertNull(ConversationDictationPreferences(context, preferences()).current().recognitionServiceOverride)
+    }
+
+    @Test
+    fun rejectsVersionlessAndMalformedProviderRecords() {
+        preferences().edit().putString("providerSelection", "{\"package\":\"org.offline\"}").commit()
+        assertNull(ConversationDictationPreferences(context, preferences()).current().providerSelection)
+        preferences().edit().putString("providerSelection", "broken").commit()
+        assertNull(ConversationDictationPreferences(context, preferences()).current().providerSelection)
+    }
+
+    @Test
+    fun exactActivitySelectionRoundTripsWithVersionAndSurfaces() {
+        val choice =
+            dev.ipf.whitenoise.android.audio.ConversationDictationProviderChoice(
+                packageName = "org.offline",
+                versionCode = 42,
+                appName = "Offline",
+                engineName = "Window",
+                activity = ComponentName("org.offline", "org.offline.Window"),
+            )
+        val original = ConversationDictationPreferences(context, preferences())
+        original.setProviderSelection(choice)
+        assertEquals(choice, ConversationDictationPreferences(context, preferences()).current().providerSelection)
+        original.setProviderSelection(null)
+        assertNull(ConversationDictationPreferences(context, preferences()).current().providerSelection)
     }
 
     /** Returns the isolated backing store used by this preference contract test. */
