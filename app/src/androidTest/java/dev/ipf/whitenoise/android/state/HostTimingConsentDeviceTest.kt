@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -76,7 +77,7 @@ class HostTimingConsentDeviceTest {
                             assertEquals(0uL, marmot.usageDiagnosticsStatus().queuedEvents)
                             assertTiming(marmot, name, ProductRecordResultFfi.IGNORED_DISABLED)
                         } finally {
-                            marmot.shutdown()
+                            marmot.shutdownAndClose()
                         }
                     }
                 }
@@ -117,7 +118,9 @@ class HostTimingConsentDeviceTest {
                     try {
                         previous.setUsageDiagnosticsConsent(true)
                     } finally {
-                        previous.shutdown()
+                        // Reopening the same root requires released storage, not only stopped workers.
+                        previous.shutdownAndClose()
+                        assertTrue(previous.storageIsClosed())
                     }
                 }
                 Marmot(root.absolutePath, emptyList()).use { upgraded ->
@@ -129,7 +132,7 @@ class HostTimingConsentDeviceTest {
                             upgraded.usageDiagnosticsSettings().decision,
                         )
                     } finally {
-                        upgraded.shutdown()
+                        upgraded.shutdownAndClose()
                     }
                 }
             } finally {
