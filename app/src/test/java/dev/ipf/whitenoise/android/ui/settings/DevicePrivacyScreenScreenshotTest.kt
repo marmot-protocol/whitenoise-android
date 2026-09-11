@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -26,13 +27,15 @@ import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
 import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsStatusFfi
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshot
+import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshotHandoff
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
-import dev.ipf.whitenoise.android.ui.navigation.MainShell
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
@@ -62,41 +65,96 @@ class DevicePrivacyScreenScreenshotTest {
     fun pendingConsentNeverCoversWelcomeOrSignIn() {
         val state = privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED, hasAccount = false)
         runBlocking { state.refreshSecurityPrivacySettings() }
+        val shell = presentBootstrappedApp(state, AppPhase.Onboarding)
+        composeRule.onNodeWithText("Sign Up").assertIsDisplayed()
+        composeRule.onNodeWithText("Help Improve White Noise").assertDoesNotExist()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/usage_diagnostics_welcome_deferred.png")
+        composeRule.onNodeWithText("Sign In").performClick()
+        composeRule
+            .onNodeWithText(ApplicationProvider.getApplicationContext<Context>().getString(R.string.nostr_nsec))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Help Improve White Noise").assertDoesNotExist()
+        assertEquals(AppPhase.Onboarding, state.phase)
+        assertTrue(state.diagnostics.requiresChoice)
+        composeRule.runOnIdle { shell.release() }
+    }
+
+    /** Existing signed-in accounts with unanswered or renewed consent are prompted on Chats. */
+    @Test
+    fun existingAccountWithPendingConsentIsPromptedAtChats() {
+        val state = privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED)
+        runBlocking { state.refreshSecurityPrivacySettings() }
+        val shell = presentBootstrappedApp(state, AppPhase.Ready)
+        composeRule.onNodeWithText("Help Improve White Noise").assertIsDisplayed()
+        composeRule.onNodeWithText("Done").assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/usage_diagnostics_chats_prompt.png")
+        composeRule.runOnIdle { shell.release() }
+    }
+
+    /** A previous explicit decline is respected when an existing account opens Chats. */
+    @Test
+    fun existingAccountWithDeclinedConsentIsNotPromptedAgain() {
+        assertExistingDecisionDoesNotPrompt(UsageDiagnosticsDecisionFfi.DECLINED)
+    }
+
+    /** A current grant is not presented as another unanswered choice at launch. */
+    @Test
+    fun existingAccountWithGrantedConsentIsNotPromptedAgain() {
+        assertExistingDecisionDoesNotPrompt(UsageDiagnosticsDecisionFfi.GRANTED)
+    }
+
+    /** Exercises the real app-root receipt gate while confirming Chats is actually visible. */
+    private fun assertExistingDecisionDoesNotPrompt(decision: UsageDiagnosticsDecisionFfi) {
+        val state = privacyAppState(decision)
+        runBlocking { state.refreshSecurityPrivacySettings() }
+        val shell = presentBootstrappedApp(state, AppPhase.Ready)
+        composeRule.onNodeWithContentDescription("New message").assertIsDisplayed()
+        composeRule.onNodeWithText("Help Improve White Noise").assertDoesNotExist()
+        assertEquals(decision, state.usageDiagnosticsSettings?.decision)
+        composeRule.runOnIdle { shell.release() }
+    }
+
+    /** Seeds a completed offline startup so root effects cannot race a privacy-only native fake. */
+    private fun presentBootstrappedApp(
+        state: WhiteNoiseAppState,
+        phase: AppPhase,
+    ): MainShellStateHolder {
         WhiteNoiseAppState::class.java
             .getDeclaredMethod("setPhase", AppPhase::class.java)
             .apply { isAccessible = true }
-            .invoke(state, AppPhase.Onboarding)
+            .invoke(state, phase)
+        listOf("bootstrapCompleted", "networkNotificationRecoverySuppressed").forEach { field ->
+            WhiteNoiseAppState::class.java
+                .getDeclaredField(field)
+                .apply { isAccessible = true }
+                .setBoolean(state, true)
+        }
+        state.markDefaultNotificationsEnableAttempted()
+        if (phase == AppPhase.Ready) {
+            val handoff =
+                WhiteNoiseAppState::class.java
+                    .getDeclaredField("accountSwitchHandoff")
+                    .apply { isAccessible = true }
+                    .get(state) as AccountSwitchLocalSnapshotHandoff
+            handoff.publish(
+                handoff.beginRequest("account"),
+                AccountSwitchLocalSnapshot(
+                    "account",
+                    "aa".repeat(32),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                ),
+            )
+        }
         val shell = MainShellStateHolder(state, SavedStateHandle())
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
                 WhiteNoiseApp(state, shell, warmResumeTraceToken = 0, warmResumeEpoch = 0)
             }
         }
-        composeRule.onNodeWithText("Sign Up").assertIsDisplayed()
-        composeRule.onNodeWithText("Help Improve White Noise").assertDoesNotExist()
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/usage_diagnostics_welcome_deferred.png")
-        composeRule.onNodeWithText("Sign In").performClick()
-        composeRule.onNodeWithText("Help Improve White Noise").assertDoesNotExist()
-        assertTrue(state.diagnostics.requiresChoice)
-        composeRule.runOnIdle { shell.release() }
-    }
-
-    /** The signed-in shell presents the pending choice over Chats. */
-    @Test
-    fun pendingConsentAppearsOnChats() {
-        val state = privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED)
-        runBlocking { state.refreshSecurityPrivacySettings() }
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false) {
-                MainShell(
-                    appState = state,
-                    diagnosticsPrompt = { UsageDiagnosticsPrompt(state, onDone = {}) },
-                )
-            }
-        }
-        composeRule.onNodeWithText("Help Improve White Noise").assertIsDisplayed()
-        composeRule.onNodeWithText("Done").assertIsDisplayed()
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/usage_diagnostics_chats_prompt.png")
+        return shell
     }
 
     /** Pins the diagnostics switch when the unified MDK consent is granted. */
