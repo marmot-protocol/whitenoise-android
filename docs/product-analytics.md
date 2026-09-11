@@ -44,8 +44,12 @@ or event persistence. Keys have not been provisioned as part of this change.
 
 ## Consent and event scope
 
-First launch and upgraded receipts requiring renewed permission present a “Help
-Improve White Noise” bottom sheet. Its details scroll while Done stays reachable. Sharing defaults off. Done saves a decline unless the user
+Pending first-launch and renewed receipts present a “Help Improve White Noise”
+bottom sheet only after signup/login and account setup finish, when Chats is
+visible. Welcome and onboarding never present the sheet. Conversation navigation,
+account switching, app lock, wiping, and other foreground flows or sheets defer
+it until the unobstructed Chats list returns. Existing signed-in users with a
+pending receipt can see it when they launch directly into Chats. Its details scroll while Done stays reachable. Sharing defaults off. Done saves a decline unless the user
 has explicitly granted sharing. Technical logging has a separate switch and is
 never enabled by a usage choice. Failed reads/writes remain visible with Retry.
 The same disclosure and independent exporter status appear in Device privacy.

@@ -15,6 +15,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -26,9 +27,13 @@ import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
 import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsStatusFfi
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
+import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
+import dev.ipf.whitenoise.android.ui.navigation.MainShell
+import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -51,6 +56,48 @@ import java.util.concurrent.TimeUnit
 class DevicePrivacyScreenScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    /** A pending native receipt must leave Welcome and the sign-in form unobstructed. */
+    @Test
+    fun pendingConsentNeverCoversWelcomeOrSignIn() {
+        val state = privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED, hasAccount = false)
+        runBlocking { state.refreshSecurityPrivacySettings() }
+        WhiteNoiseAppState::class.java
+            .getDeclaredMethod("setPhase", AppPhase::class.java)
+            .apply { isAccessible = true }
+            .invoke(state, AppPhase.Onboarding)
+        val shell = MainShellStateHolder(state, SavedStateHandle())
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                WhiteNoiseApp(state, shell, warmResumeTraceToken = 0, warmResumeEpoch = 0)
+            }
+        }
+        composeRule.onNodeWithText("Sign Up").assertIsDisplayed()
+        composeRule.onNodeWithText("Help Improve White Noise").assertDoesNotExist()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/usage_diagnostics_welcome_deferred.png")
+        composeRule.onNodeWithText("Sign In").performClick()
+        composeRule.onNodeWithText("Help Improve White Noise").assertDoesNotExist()
+        assertTrue(state.diagnostics.requiresChoice)
+        composeRule.runOnIdle { shell.release() }
+    }
+
+    /** The signed-in shell presents the pending choice over Chats. */
+    @Test
+    fun pendingConsentAppearsOnChats() {
+        val state = privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED)
+        runBlocking { state.refreshSecurityPrivacySettings() }
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                MainShell(
+                    appState = state,
+                    diagnosticsPrompt = { UsageDiagnosticsPrompt(state, onDone = {}) },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Help Improve White Noise").assertIsDisplayed()
+        composeRule.onNodeWithText("Done").assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/usage_diagnostics_chats_prompt.png")
+    }
 
     /** Pins the diagnostics switch when the unified MDK consent is granted. */
     @Test
@@ -274,6 +321,7 @@ class DevicePrivacyScreenScreenshotTest {
     /** Creates a state whose only native reads are fixed device-privacy values. */
     private fun privacyAppState(
         decision: UsageDiagnosticsDecisionFfi,
+        hasAccount: Boolean = true,
         beforeSave: () -> Unit = {},
     ): WhiteNoiseAppState {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -288,7 +336,12 @@ class DevicePrivacyScreenScreenshotTest {
             context = context,
             draftStore = DraftStore(EmptyDraftPersistence),
             accountIdHexResolver = { null },
-            accounts = listOf(AccountSummaryFfi("account", "aa".repeat(32), true, false, false, true)),
+            accounts =
+                if (hasAccount) {
+                    listOf(AccountSummaryFfi("account", "aa".repeat(32), true, false, false, true))
+                } else {
+                    emptyList()
+                },
             activeAccountRef = "account",
             marmotRuntimeFactory = { AppMarmotRuntime(rootPath = "test", marmot = marmot) },
             preferences = preferences,

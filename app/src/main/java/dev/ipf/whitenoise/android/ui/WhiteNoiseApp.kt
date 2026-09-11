@@ -79,6 +79,7 @@ import dev.ipf.whitenoise.android.ui.settings.WipeProgressSheet
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
+import dev.ipf.whitenoise.android.updates.AppSelfUpdateState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -200,17 +201,7 @@ internal fun WhiteNoiseApp(
 
     var diagnosticsPromptSeen by remember(appState.runtimeGeneration) { mutableStateOf(false) }
     var diagnosticsPromptOpen by remember(appState.runtimeGeneration) { mutableStateOf(false) }
-    val diagnosticsEligible = appState.phase == AppPhase.Onboarding || appState.phase == AppPhase.Ready
-    LaunchedEffect(diagnosticsEligible, appState.diagnostics.snapshot, appState.diagnostics.failed) {
-        val decisionLoaded = appState.diagnostics.snapshot != null || appState.diagnostics.failed
-        if (diagnosticsEligible && !diagnosticsPromptSeen && decisionLoaded) {
-            diagnosticsPromptSeen = true
-            diagnosticsPromptOpen = appState.diagnostics.requiresChoice || appState.diagnostics.failed
-        }
-    }
-    if (diagnosticsPromptOpen && diagnosticsEligible && !appState.appLockScreenVisible) {
-        UsageDiagnosticsPrompt(appState) { diagnosticsPromptOpen = false }
-    }
+    val diagnosticsEligible = appState.phase == AppPhase.Ready && appState.activeAccountRef != null
 
     // Mutable bottom-chrome inset so screens further down the tree
     // (e.g. ConversationScreen) can push the snackbar above their
@@ -247,6 +238,10 @@ internal fun WhiteNoiseApp(
             inboundProfilePayload != null ||
             mainShellStateHolder.hasPendingShareRoute ||
             inboundAppUpdateTap != 0
+    val diagnosticsRootUnobstructed =
+        !inboundRoutePending &&
+            appState.pendingWipeReport == null &&
+            appState.appSelfUpdateState == AppSelfUpdateState.Idle
     val dictationImeVisible =
         WindowInsets.ime.getBottom(density) > WindowInsets.navigationBars.getBottom(density)
     val firstUsefulFrameReady =
@@ -559,6 +554,34 @@ internal fun WhiteNoiseApp(
                                                 MainShell(
                                                     appState = appState,
                                                     stateHolder = mainShellStateHolder,
+                                                    diagnosticsPrompt = {
+                                                        if (
+                                                            diagnosticsEligible &&
+                                                            !appState.wipeInProgress &&
+                                                            diagnosticsRootUnobstructed
+                                                        ) {
+                                                            LaunchedEffect(
+                                                                appState.runtimeGeneration,
+                                                                appState.diagnostics.snapshot,
+                                                                appState.diagnostics.failed,
+                                                            ) {
+                                                                val decisionLoaded =
+                                                                    appState.diagnostics.snapshot != null ||
+                                                                        appState.diagnostics.failed
+                                                                if (!diagnosticsPromptSeen && decisionLoaded) {
+                                                                    diagnosticsPromptSeen = true
+                                                                    diagnosticsPromptOpen =
+                                                                        appState.diagnostics.requiresChoice ||
+                                                                        appState.diagnostics.failed
+                                                                }
+                                                            }
+                                                            if (diagnosticsPromptOpen) {
+                                                                UsageDiagnosticsPrompt(appState) {
+                                                                    diagnosticsPromptOpen = false
+                                                                }
+                                                            }
+                                                        }
+                                                    },
                                                     inboundNotificationTarget = inboundNotificationTarget,
                                                     inboundNotificationRequestId = inboundNotificationRequestId,
                                                     onNotificationTargetHandled = { target, requestId ->

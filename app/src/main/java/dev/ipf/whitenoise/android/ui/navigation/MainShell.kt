@@ -347,6 +347,7 @@ internal fun MainShell(
     onShareRequestHandled: (ShareRequest) -> Unit = {},
     inboundAppUpdateTap: Int = 0,
     onAppUpdateTapHandled: (Int) -> Unit = {},
+    diagnosticsPrompt: @Composable () -> Unit = {},
 ) {
     attachmentInstallerHandoffEffect(appState)
     val shellStateHolder =
@@ -2319,6 +2320,19 @@ internal fun MainShell(
                                 ChatsScreen(
                                     appState = appState,
                                     controller = chatsController,
+                                    diagnosticsPrompt = {
+                                        val chatsSettled =
+                                            selectedChat == null &&
+                                                pendingConversationOpen == null &&
+                                                !routeTransition.isRunning
+                                        val shellUnobstructed =
+                                            quickAccountSwitchTransition == null &&
+                                                appState.pendingProfileNpub == null &&
+                                                visiblePickerRequest == null
+                                        if (chatsSettled && navAccountStable && shellUnobstructed) {
+                                            diagnosticsPrompt()
+                                        }
+                                    },
                                     globalSearchState = scopedGlobalSearchState,
                                     onGlobalSearchStateChange = globalSearch.update,
                                     selectedFolderId = selectedChatListFolderId,
