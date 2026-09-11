@@ -1092,8 +1092,16 @@
     <string name="theme_light_subtitle">Always use light</string>
     <string name="theme_dark_subtitle">Always use dark</string>
     <string name="amoled_mode_subtitle">Use a pure black background</string>
+    <string name="appearance_outline_colors_fixed">AMOLED uses fixed white action and bubble colors. Switch themes to customize colors.</string>
+    <string name="appearance_theme">Theme</string>
+    <string name="appearance_theme_help">System default follows your device. Light and Dark keep the selected appearance. AMOLED uses a black background with white outlines.</string>
+    <string name="appearance_amoled" translatable="false">AMOLED</string>
+    <string name="appearance_amoled_detail">Pure black with crisp white outlines.</string>
+    <string name="appearance_font_size_help">Text size adds to your device font-size setting.</string>
+    <string name="appearance_enter_help">Shift+Enter always inserts a new line on a hardware keyboard.</string>
+    <string name="appearance_font_system">System</string>
     <string name="language">Language</string>
-    <string name="language_system">System language</string>
+    <string name="language_system">System default</string>
     <string name="language_english">English</string>
     <string name="language_german">Deutsch</string>
     <string name="language_spanish">Español</string>
@@ -1589,7 +1597,7 @@
     <string name="notification_channel_app_updates_global_description">Android alert behavior for White Noise app updates</string>
 
     <string name="chat_bubble_colors">Chat bubble colors</string>
-    <string name="action_color">App accent color</string>
+    <string name="action_color">Action color</string>
     <string name="action_color_subtitle">Choose this account’s accent color for buttons, selections, and unread indicators. Light, dark, and AMOLED colors are stored separately.</string>
     <string name="action_color_no_active_account">Choose an active account before setting its app accent color.</string>
     <string name="action_color_swatch_content_description">App accent color %1$s</string>

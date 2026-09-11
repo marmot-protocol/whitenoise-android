@@ -800,7 +800,7 @@
     <string name="theme_dark">深色</string>
     <string name="theme_amoled">AMOLED</string>
     <string name="language">語言</string>
-    <string name="language_system">系統語言</string>
+    <string name="language_system">跟隨系統</string>
     <string name="language_english">English</string>
     <string name="language_german">Deutsch</string>
     <string name="language_spanish">Español</string>
@@ -1388,7 +1388,7 @@
     <string name="notification_channel_app_updates_global_description">White Noise 應用程式更新的 Android 提醒方式</string>
 
     <string name="chat_bubble_colors">聊天氣泡顏色</string>
-    <string name="action_color">應用程式強調色</string>
+    <string name="action_color">動作顏色</string>
     <string name="action_color_subtitle">為此帳戶的按鈕、選取狀態和未讀指示器選擇強調色。淺色、深色和 AMOLED 顏色會分別儲存。</string>
     <string name="action_color_no_active_account">設定應用程式強調色前，請先選擇一個使用中的帳戶。</string>
     <string name="action_color_swatch_content_description">應用程式強調色 %1$s</string>
@@ -1542,6 +1542,13 @@
     <string name="theme_light_subtitle">一律使用淺色</string>
     <string name="theme_dark_subtitle">一律使用深色</string>
     <string name="amoled_mode_subtitle">使用純黑背景</string>
+    <string name="appearance_outline_colors_fixed">AMOLED 的操作按鈕和訊息氣泡使用固定的白色。如需自訂顏色，請切換主題。</string>
+    <string name="appearance_theme">主題</string>
+    <string name="appearance_theme_help">系統預設跟蹤您的裝置 。 光和暗保持選定的外觀.AMOLED使用帶有白色輪廓的黑色背景。</string>
+    <string name="appearance_amoled_detail">純黑背景，搭配清晰的白色輪廓。</string>
+    <string name="appearance_font_size_help">文字大小新增到裝置字型大小設定中。</string>
+    <string name="appearance_enter_help">Shift+Enter 總是在硬體鍵盤上插入新行.</string>
+    <string name="appearance_font_system">系統</string>
     <string name="support">支援</string>
     <string name="app_font">應用程式字型</string>
     <string name="attachment_type_android_package">APK</string>

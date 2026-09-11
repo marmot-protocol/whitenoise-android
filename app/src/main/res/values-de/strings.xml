@@ -811,7 +811,7 @@
     <string name="theme_dark">Dunkel</string>
     <string name="theme_amoled">AMOLED</string>
     <string name="language">Sprache</string>
-    <string name="language_system">Systemsprache</string>
+    <string name="language_system">Systemstandard</string>
     <string name="language_english">English</string>
     <string name="language_german">Deutsch</string>
     <string name="language_spanish">Español</string>
@@ -1413,7 +1413,7 @@
     <string name="notification_channel_app_updates_global_description">Android-Benachrichtigungsverhalten für White-Noise-App-Updates</string>
 
     <string name="chat_bubble_colors">Farben der Chatblasen</string>
-    <string name="action_color">Akzentfarbe der App</string>
+    <string name="action_color">Aktionsfarbe</string>
     <string name="action_color_subtitle">Wähle die Akzentfarbe dieses Kontos für Schaltflächen, Auswahlzustände und Ungelesen-Markierungen. Farben für Hell, Dunkel und AMOLED werden getrennt gespeichert.</string>
     <string name="action_color_no_active_account">Wähle ein aktives Konto aus, bevor du seine App-Akzentfarbe festlegst.</string>
     <string name="action_color_swatch_content_description">App-Akzentfarbe %1$s</string>
@@ -1567,6 +1567,13 @@
     <string name="theme_light_subtitle">Immer hell verwenden</string>
     <string name="theme_dark_subtitle">Immer dunkel verwenden</string>
     <string name="amoled_mode_subtitle">Einen reinen schwarzen Hintergrund verwenden</string>
+    <string name="appearance_outline_colors_fixed">AMOLED verwendet feste weiße Farben für Aktionen und Sprechblasen. Wechsle das Design, um Farben anzupassen.</string>
+    <string name="appearance_theme">Design</string>
+    <string name="appearance_theme_help">Systemstandard folgt deinem Gerät. Hell und Dunkel behalten das gewählte Erscheinungsbild. AMOLED verwendet einen schwarzen Hintergrund mit weißen Konturen.</string>
+    <string name="appearance_amoled_detail">Reines Schwarz mit klaren weißen Konturen.</string>
+    <string name="appearance_font_size_help">Die Textgröße wird zur Schriftgrößeneinstellung deines Geräts addiert.</string>
+    <string name="appearance_enter_help">Shift+Enter fügt auf einer Hardwaretastatur immer eine neue Zeile ein.</string>
+    <string name="appearance_font_system">System</string>
     <string name="support">Unterstützung</string>
     <string name="app_font">App-Schriftart</string>
     <string name="attachment_type_android_package">APK</string>

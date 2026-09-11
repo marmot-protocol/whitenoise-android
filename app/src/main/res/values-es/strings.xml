@@ -811,7 +811,7 @@
     <string name="theme_dark">Oscuro</string>
     <string name="theme_amoled">AMOLED</string>
     <string name="language">Idioma</string>
-    <string name="language_system">Idioma del sistema</string>
+    <string name="language_system">Predeterminado del sistema</string>
     <string name="language_english">English</string>
     <string name="language_german">Deutsch</string>
     <string name="language_spanish">Español</string>
@@ -1415,7 +1415,7 @@
     <string name="notification_channel_app_updates_global_description">Comportamiento de alertas de Android para las actualizaciones de White Noise</string>
 
     <string name="chat_bubble_colors">Colores de las burbujas</string>
-    <string name="action_color">Color de acento de la app</string>
+    <string name="action_color">Color de acción</string>
     <string name="action_color_subtitle">Elige el color de acento de esta cuenta para botones, selecciones e indicadores de no leídos. Los colores claros, oscuros y AMOLED se guardan por separado.</string>
     <string name="action_color_no_active_account">Selecciona una cuenta activa antes de configurar su color de acento.</string>
     <string name="action_color_swatch_content_description">Color de acento de la app %1$s</string>
@@ -1569,6 +1569,13 @@
     <string name="theme_light_subtitle">Usar siempre el claro</string>
     <string name="theme_dark_subtitle">Usar siempre el oscuro</string>
     <string name="amoled_mode_subtitle">Usar un fondo negro puro</string>
+    <string name="appearance_outline_colors_fixed">AMOLED usa colores blancos fijos para acciones y burbujas. Cambia de tema para personalizar los colores.</string>
+    <string name="appearance_theme">Tema</string>
+    <string name="appearance_theme_help">El valor predeterminado del sistema sigue tu dispositivo. Claro y Oscuro mantienen la apariencia seleccionada. AMOLED usa un fondo negro con contornos blancos.</string>
+    <string name="appearance_amoled_detail">Negro puro con contornos blancos nítidos.</string>
+    <string name="appearance_font_size_help">El tamaño del texto se suma al ajuste de tamaño de fuente de tu dispositivo.</string>
+    <string name="appearance_enter_help">Shift+Enter siempre inserta una nueva línea en un teclado físico.</string>
+    <string name="appearance_font_system">Sistema</string>
     <string name="support">Soporte</string>
     <string name="app_font">Fuente de la aplicación</string>
     <string name="attachment_type_android_package">APK</string>

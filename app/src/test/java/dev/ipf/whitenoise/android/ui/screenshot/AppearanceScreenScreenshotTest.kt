@@ -23,7 +23,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Pre-change baselines for the Appearance settings screen before the M123 pilot restyles it.
+ * Screenshot baselines for the Appearance settings screen.
  * The tall viewport keeps every group visible so the whole screen is one comparable frame.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -89,6 +89,7 @@ class AppearanceScreenScreenshotTest {
                         onBack = {},
                         onOpenActionColor = {},
                         onOpenChatBubbleColors = {},
+                        onOpenLanguage = {},
                     )
                 }
             }
@@ -103,7 +104,11 @@ class AppearanceScreenScreenshotTest {
     /** An app state whose appearance preferences start from defaults regardless of earlier tests. */
     private fun appearanceAppState(): WhiteNoiseAppState {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        context.getSharedPreferences("whitenoise", Context.MODE_PRIVATE).edit().clear().commit()
+        context
+            .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
         return WhiteNoiseAppState(
             context = context,
             draftStore = DraftStore.forContext(context),
