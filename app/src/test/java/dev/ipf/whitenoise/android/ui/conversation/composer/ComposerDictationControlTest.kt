@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.state.timelineAppMessage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +49,15 @@ import org.robolectric.annotation.Config
 class ComposerDictationControlTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun dictationStartedFromAReplyBannerPinsThatVisibleMessageIdentity() {
+        val controller = render(replyingTo = timelineAppMessage(REPLY_MESSAGE_ID))
+
+        composeRule.onNodeWithContentDescription("Dictate text").performClick()
+
+        assertEquals(REPLY_MESSAGE_ID, controller.state.target?.replyToMessageIdHex)
+    }
 
     @Test
     fun availableDictationDoesNotDisplaceOrMoveTheEmojiAction() {
@@ -188,6 +198,7 @@ class ComposerDictationControlTest {
         draft: TextFieldValue = TextFieldValue(""),
         withAttachments: Boolean = false,
         voiceRecordingController: VoiceRecordingController? = null,
+        replyingTo: dev.ipf.marmotkit.AppMessageRecordFfi? = null,
     ): ConversationDictationController {
         val dictationController = idleDictationController(draft)
         composeRule.setContent {
@@ -198,7 +209,7 @@ class ComposerDictationControlTest {
             ) {
                 WhiteNoiseTheme(darkTheme = false) {
                     ComposerBar(
-                        replyingTo = null,
+                        replyingTo = replyingTo,
                         messageTextCopy = MessageTextCopy.Default,
                         onCancelReply = {},
                         onSend = { _, _ -> },
@@ -261,5 +272,6 @@ class ComposerDictationControlTest {
         const val ROOT_TAG = "composer-dictation-control-root"
         const val ACCOUNT = "account"
         const val GROUP = "group"
+        const val REPLY_MESSAGE_ID = "reply-message"
     }
 }

@@ -21,6 +21,64 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 @Suppress("LargeClass")
 class ConversationDictationControllerTest {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun unacceptedSendOnFinishRestoresTheDraftAndCarriesTheCapturedReplyIdentity() =
+        runTest {
+            var dispatched: ConversationDictationSendRequest? = null
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("typed", TextRange(5)),
+                    targetReplyAvailable = { true },
+                    targetValidationScope = this,
+                    deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
+                    sendTranscriptIfOriginUnchanged = {
+                        dispatched = it
+                        false
+                    },
+                )
+
+            fixture.controller.requestStart(
+                ACCOUNT,
+                GROUP,
+                fixture.drafts.getValue(key()),
+                replyToMessageIdHex = REPLY_MESSAGE_ID,
+            )
+            assertEquals(
+                REPLY_MESSAGE_ID,
+                fixture.controller.state.target
+                    ?.replyToMessageIdHex,
+            )
+            fixture.controller.stop()
+            fixture.platform.listener.onResult("reply by voice")
+            advanceUntilIdle()
+
+            assertEquals(REPLY_MESSAGE_ID, dispatched?.replyToMessageIdHex)
+            assertEquals("typed", fixture.drafts.getValue(key()).text)
+        }
+
+    @Test
+    fun changedReplyIdentityPreventsPasteFromBecomingStandaloneText() {
+        var replyAvailable = true
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Keep", TextRange(4)),
+                targetReplyAvailable = { replyAvailable },
+            )
+        fixture.controller.requestStart(
+            ACCOUNT,
+            GROUP,
+            fixture.drafts.getValue(key()),
+            replyToMessageIdHex = REPLY_MESSAGE_ID,
+        )
+        replyAvailable = false
+
+        fixture.platform.listener.onResult("must remain a reply")
+
+        assertEquals("Keep", fixture.drafts.getValue(key()).text)
+        assertEquals(0, fixture.writes)
+    }
+
     @Test
     fun offlineVoiceInputServerFailureOffersProviderSetupInsteadOfNetworkRetry() {
         listOf("dev.notune.transcribe", "dev.notune.transcribe.callerfix").forEach { providerPackage ->
@@ -2965,6 +3023,7 @@ class ConversationDictationControllerTest {
     private fun fixture(
         draft: TextFieldValue,
         targetAvailable: () -> Boolean = { true },
+        targetReplyAvailable: (String?) -> Boolean = { true },
         targetValidator: (suspend (String, String) -> Boolean)? = null,
         targetValidationScope: CoroutineScope? = null,
         onBeforeRecognition: () -> Unit = {},
@@ -3009,6 +3068,7 @@ class ConversationDictationControllerTest {
                     }
                 },
                 targetAvailable = { _, _ -> targetAvailable() },
+                targetReplyAvailable = { _, _, replyToMessageIdHex -> targetReplyAvailable(replyToMessageIdHex) },
                 targetValidator = targetValidator,
                 targetValidationScope = targetValidationScope,
                 onBeforeRecognition = onBeforeRecognition,
@@ -3320,6 +3380,7 @@ class ConversationDictationControllerTest {
     private companion object {
         const val ACCOUNT = "account"
         const val GROUP = "group"
+        val REPLY_MESSAGE_ID = "ab".repeat(32)
         const val OTHER_ACCOUNT = "other-account"
         const val OTHER_GROUP = "other-group"
 

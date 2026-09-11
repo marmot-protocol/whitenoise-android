@@ -14,6 +14,7 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.marmotkit.MessageDraftSummaryFfi
@@ -68,9 +69,9 @@ class ComposerExpansionDestructiveLifecycleTest {
         }
 
     @Test
-    fun unacceptedDictationSendRetainsDraftAndGeometry() =
+    fun terminallyRejectedDictationSendRestoresDraftAndGeometry() =
         runBlocking {
-            val fixture = fixture(sendResult = { successfulSendSummary().copy(messageIds = emptyList()) })
+            val fixture = fixture(sendResult = { throw MarmotKitException.Publish("relay rejected event") })
             fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
             val request = dictationRequest(fixture.appState, "typed")
             val retained = retainExpansion(fixture.appState, draftGeneration = request.expectedDraftRevision)
@@ -86,20 +87,14 @@ class ComposerExpansionDestructiveLifecycleTest {
         }
 
     @Test
-    fun throwingDictationSendRetainsDraftAndGeometry() =
+    fun unexpectedDictationSendFailureRestoresDraftAndGeometry() =
         runBlocking {
             val fixture = fixture(sendResult = { throw IllegalStateException("send rejected") })
             fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
             val request = dictationRequest(fixture.appState, "typed")
             val retained = retainExpansion(fixture.appState, draftGeneration = request.expectedDraftRevision)
 
-            assertTrue(
-                runCatching {
-                    fixture.appState.sendDictationTranscriptIfOriginUnchanged(request)
-                }.isFailure,
-            )
-
-            assertEquals(1, fixture.calls.send.get())
+            assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
             assertEquals("typed", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
             assertEquals(
                 retained,
@@ -167,7 +162,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         }
 
     @Test
-    fun newerDraftDuringDictationSendPreservesItsGeometry() =
+    fun newerDraftDuringDictationSendPreservesTextAfterTheOptimisticGeometryClear() =
         runBlocking {
             lateinit var appState: WhiteNoiseAppState
             val fixture =
@@ -177,13 +172,13 @@ class ComposerExpansionDestructiveLifecycleTest {
                 })
             appState = fixture.appState
             val request = dictationRequest(appState)
-            val retained = retainExpansion(appState, draftGeneration = request.expectedDraftRevision)
+            retainExpansion(appState, draftGeneration = request.expectedDraftRevision)
 
             assertTrue(appState.sendDictationTranscriptIfOriginUnchanged(request))
 
             assertEquals(1, fixture.calls.send.get())
             assertEquals("newer", appState.draftFor(ACCOUNT_REF, GROUP_ID))
-            assertEquals(retained, appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            assertNull(appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
         }
 
     @Test
@@ -341,6 +336,7 @@ class ComposerExpansionDestructiveLifecycleTest {
             .getDeclaredField("marmotRuntime")
             .apply { isAccessible = true }
             .set(appState, AppMarmotRuntime(rootPath = "test", marmot = marmot))
+        appState.attachConversationController(ConversationController(appState = appState, initialGroup = group()))
         return LifecycleFixture(appState, calls)
     }
 

@@ -9512,6 +9512,22 @@
           "GRP-012",
           "GRP-014"
         ]
+      },
+      {
+        "surface": "Dictation reply-origin immutable target",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "replyToMessageIdHex: String?",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Dictation reply-aware durable send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "replyToMessageIdHex",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ],
     "notification_content_contracts": [

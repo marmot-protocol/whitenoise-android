@@ -59,6 +59,7 @@ internal data class ConversationDictationTarget(
     val capturedDraft: TextFieldValue,
     val capturedDraftRevision: Long,
     val mode: ConversationDictationMode,
+    val replyToMessageIdHex: String? = null,
     val finishAfterSilenceMillis: Long? = null,
     val deliveryMode: ConversationDictationDeliveryMode = ConversationDictationDeliveryMode.PasteIntoDraft,
 ) {
@@ -93,6 +94,7 @@ internal data class ConversationDictationSendRequest(
     val expectedDraftRevision: Long,
     val expectedDraftText: String,
     val payload: String,
+    val replyToMessageIdHex: String? = null,
     /** Called under the origin commit lock immediately before dispatch; false cancels an uncommitted send. */
     val beginDispatch: () -> Boolean = { true },
 )
@@ -377,6 +379,11 @@ internal class ConversationDictationController internal constructor(
         value: TextFieldValue,
     ) -> Boolean,
     private val targetAvailable: (accountRef: String, groupIdHex: String) -> Boolean = { _, _ -> true },
+    private val targetReplyAvailable: (
+        accountRef: String,
+        groupIdHex: String,
+        replyToMessageIdHex: String?,
+    ) -> Boolean = { _, _, _ -> true },
     private val targetValidator: (suspend (accountRef: String, groupIdHex: String) -> Boolean)? = null,
     private val targetValidationScope: CoroutineScope? = null,
     private val onBeforeRecognition: () -> Unit = {},
@@ -410,6 +417,8 @@ internal class ConversationDictationController internal constructor(
             value: TextFieldValue,
         ) -> Boolean,
         targetAvailable: (accountRef: String, groupIdHex: String) -> Boolean,
+        targetReplyAvailable: (accountRef: String, groupIdHex: String, replyToMessageIdHex: String?) -> Boolean =
+            { _, _, _ -> true },
         targetValidator: suspend (accountRef: String, groupIdHex: String) -> Boolean,
         targetValidationScope: CoroutineScope,
         onBeforeRecognition: () -> Unit,
@@ -426,6 +435,7 @@ internal class ConversationDictationController internal constructor(
         readDraft = readDraft,
         writeDraft = writeDraft,
         targetAvailable = targetAvailable,
+        targetReplyAvailable = targetReplyAvailable,
         targetValidator = targetValidator,
         targetValidationScope = targetValidationScope,
         onBeforeRecognition = onBeforeRecognition,
@@ -556,11 +566,13 @@ internal class ConversationDictationController internal constructor(
         accountRef: String,
         groupIdHex: String,
         draft: TextFieldValue,
+        replyToMessageIdHex: String? = null,
     ): Boolean =
         requestStart(
             accountRef = accountRef,
             groupIdHex = groupIdHex,
             draft = draft,
+            replyToMessageIdHex = replyToMessageIdHex,
             mode = ConversationDictationMode.InApp,
         )
 
@@ -569,11 +581,13 @@ internal class ConversationDictationController internal constructor(
         accountRef: String,
         groupIdHex: String,
         draft: TextFieldValue,
+        replyToMessageIdHex: String? = null,
     ): Boolean =
         requestStart(
             accountRef = accountRef,
             groupIdHex = groupIdHex,
             draft = draft,
+            replyToMessageIdHex = replyToMessageIdHex,
             mode = ConversationDictationMode.ProviderActivity,
         )
 
@@ -582,6 +596,7 @@ internal class ConversationDictationController internal constructor(
         accountRef: String,
         groupIdHex: String,
         draft: TextFieldValue,
+        replyToMessageIdHex: String?,
         mode: ConversationDictationMode,
     ): Boolean {
         conversationDictationDiagnostic("event=request_start mode=${mode.name}")
@@ -607,12 +622,14 @@ internal class ConversationDictationController internal constructor(
             ConversationDictationTarget(
                 accountRef = accountRef,
                 groupIdHex = groupIdHex,
+                replyToMessageIdHex = replyToMessageIdHex,
                 capturedDraft = draft.copy(composition = null),
                 capturedDraftRevision = capturedRevision,
                 mode = mode,
                 finishAfterSilenceMillis = finishAfterSilenceMillis()?.takeIf { it > 0L },
                 deliveryMode = deliveryMode(),
             )
+        if (!targetAvailable(target)) return false
         if (!disclosureAccepted()) {
             state = ConversationDictationState.DisclosureRequired(sessionId, target)
             return true
@@ -631,6 +648,11 @@ internal class ConversationDictationController internal constructor(
             target.matchesConversation(accountRef, groupIdHex) &&
                 target.mode == mode
         } == true
+
+    /** Reply identity is part of the immutable origin, not mutable composer decoration. */
+    private fun targetAvailable(target: ConversationDictationTarget): Boolean =
+        targetAvailable(target.accountRef, target.groupIdHex) &&
+            targetReplyAvailable(target.accountRef, target.groupIdHex, target.replyToMessageIdHex)
 
     /** Records the first-use disclosure and resumes its exact pending target. */
     fun acceptDisclosure() {
@@ -849,7 +871,7 @@ internal class ConversationDictationController internal constructor(
             fail(active.sessionId, active.target, ConversationDictationFailure.NoSpeech)
             return
         }
-        if (!targetAvailable(active.target.accountRef, active.target.groupIdHex)) {
+        if (!targetAvailable(active.target)) {
             cancel()
             return
         }
@@ -885,6 +907,7 @@ internal class ConversationDictationController internal constructor(
             accountRef = failed.target.accountRef,
             groupIdHex = failed.target.groupIdHex,
             draft = readDraft(failed.target.accountRef, failed.target.groupIdHex).value,
+            replyToMessageIdHex = failed.target.replyToMessageIdHex,
             mode = failed.target.mode,
         )
     }
@@ -892,7 +915,7 @@ internal class ConversationDictationController internal constructor(
     /** Revalidates the origin and appends a conflicted transcript at the current draft end. */
     fun insertReviewAtEnd() {
         val review = state as? ConversationDictationState.ReviewRequired ?: return
-        if (!targetAvailable(review.target.accountRef, review.target.groupIdHex)) {
+        if (!targetAvailable(review.target)) {
             cancel()
             return
         }
@@ -913,7 +936,7 @@ internal class ConversationDictationController internal constructor(
                 }
             val current = state as? ConversationDictationState.ReviewRequired
             if (current?.sessionId != review.sessionId) return@launch
-            if (!available || !targetAvailable(review.target.accountRef, review.target.groupIdHex)) {
+            if (!available || !targetAvailable(review.target)) {
                 cancel()
                 return@launch
             }
@@ -1014,7 +1037,7 @@ internal class ConversationDictationController internal constructor(
         promotionReadyReceived = true
         if (!durableStartAccepted) return
         try {
-            if (!targetAvailable(current.target.accountRef, current.target.groupIdHex)) {
+            if (!targetAvailable(current.target)) {
                 if (ownsDurableSession(current.sessionId, sessionToken)) cancel()
                 return
             }
@@ -1424,8 +1447,7 @@ internal class ConversationDictationController internal constructor(
                         }
                         return
                     }
-                    val targetStillAvailable =
-                        runCatching { targetAvailable(target.accountRef, target.groupIdHex) }.getOrDefault(false)
+                    val targetStillAvailable = runCatching { targetAvailable(target) }.getOrDefault(false)
                     if (!targetStillAvailable) {
                         if (state.sessionId == sessionId) cancel()
                         return
@@ -1536,7 +1558,7 @@ internal class ConversationDictationController internal constructor(
     ) {
         val targetStillAvailable =
             try {
-                targetAvailable(target.accountRef, target.groupIdHex)
+                targetAvailable(target)
             } catch (_: RuntimeException) {
                 if (state.sessionId == sessionId) {
                     failOrRetainTranscript(sessionId, target, ConversationDictationFailure.Unknown)
@@ -1645,7 +1667,7 @@ internal class ConversationDictationController internal constructor(
     ) {
         val targetStillAvailable =
             try {
-                targetAvailable(target.accountRef, target.groupIdHex)
+                targetAvailable(target)
             } catch (_: RuntimeException) {
                 if (state.sessionId == sessionId) {
                     failOrRetainTranscript(sessionId, target, ConversationDictationFailure.Unknown)
@@ -1898,7 +1920,7 @@ internal class ConversationDictationController internal constructor(
             return
         }
         repeat(MAX_CONDITIONAL_WRITE_ATTEMPTS) {
-            if (state.sessionId != sessionId || !targetAvailable(target.accountRef, target.groupIdHex)) {
+            if (state.sessionId != sessionId || !targetAvailable(target)) {
                 cancel()
                 return
             }
@@ -1982,7 +2004,9 @@ internal class ConversationDictationController internal constructor(
                 } else {
                     dispatchedSessionId = sessionId
                     emptiedRevision = emptyDraftForDispatch(target)
-                    true
+                    (emptiedRevision != null).also { claimed ->
+                        if (!claimed) dispatchedSessionId = null
+                    }
                 }
             })
         sendJob =
@@ -2089,7 +2113,7 @@ internal class ConversationDictationController internal constructor(
                     if (validatingSessionId == sessionId) validatingSessionId = null
                 }
             if (state.sessionId != sessionId) return@launch
-            if (!available || !targetAvailable(target.accountRef, target.groupIdHex)) {
+            if (!available || !targetAvailable(target)) {
                 cancel()
                 return@launch
             }
