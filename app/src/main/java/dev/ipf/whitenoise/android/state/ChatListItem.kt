@@ -86,6 +86,9 @@ internal fun chatListItemFromProjection(
                 ?: if (selectedPeer != null) 2 else presentation?.memberCount ?: 0,
         presentationActiveAccountIsSoleMember = presentation?.activeAccountIsSoleMember == true,
         projection = row,
+        inviteConfirmationUnresolved =
+            !displayGroup.selfMembership.isNonMember() &&
+                (group?.let { it.pendingConfirmation != row.pendingConfirmation } ?: row.pendingConfirmation),
         selectedPresentation = selectedPresentation,
         previewTokens = previewTokens,
         resolvedMediaPreviewFallback = resolvedMediaPreviewFallback,
@@ -112,6 +115,8 @@ data class ChatListItem(
     val presentationMemberCount: Int = memberCount,
     val presentationActiveAccountIsSoleMember: Boolean = false,
     val projection: ChatListRowFfi? = null,
+    /** Conflicting confirmation snapshots require a canonical MDK read before showing actions. */
+    val inviteConfirmationUnresolved: Boolean = false,
     /** MDK-selected title/avatar/peer projection for this exact chat row. */
     val selectedPresentation: ConversationPresentationFfi? = null,
     /**

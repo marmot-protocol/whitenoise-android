@@ -9,13 +9,11 @@ internal data class InviteAcceptanceGeneration(
     val welcomeMessageIdHex: String?,
 )
 
-/** Captured owner and projections required to settle one native Join attempt. */
+/** Captured account and invitation revision required to settle one native Join attempt. */
 internal data class InviteAcceptanceAttempt(
     val account: String,
     val generation: InviteAcceptanceGeneration,
-    val previousGroup: AppGroupRecordFfi,
-    val optimisticGroup: AppGroupRecordFfi,
-    val authorityEpoch: Long,
+    val inviteRevision: Long,
 )
 
 /** Captures the exact group and Welcome generation represented by [group]. */

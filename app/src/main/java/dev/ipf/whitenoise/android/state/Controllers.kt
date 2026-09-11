@@ -6216,6 +6216,7 @@ class ConversationController(
     initialGroup: AppGroupRecordFfi,
     internal val initialMemberSnapshot: GroupMemberSnapshot? = null,
     initialChatListRow: ChatListRowFfi? = null,
+    initialInviteConfirmationUnresolved: Boolean = false,
     internal val initialIsDm: Boolean = false,
     initialTimelinePreview: ChatListMessagePreviewFfi? = null,
     // Pins the conversation to a specific account instead of the account active
@@ -6273,7 +6274,15 @@ class ConversationController(
 ) {
     private val liveSubscriptions = appState.conversationLiveSubscriptions()
 
-    var group by mutableStateOf(reconcileTerminalSelfMembership(initialGroup, initialGroup))
+    private var inviteConfirmationUnresolved by mutableStateOf(initialInviteConfirmationUnresolved)
+    private val inviteConfirmationAuthority = InviteConfirmationAuthority(initialGroup)
+    var group by mutableStateOf(
+        inviteConfirmationAuthority
+            .reconcile(
+                reconcileTerminalSelfMembership(initialGroup, initialGroup),
+                establishesAcceptance = !initialInviteConfirmationUnresolved,
+            ).let { if (initialInviteConfirmationUnresolved) it.copy(pendingConfirmation = false) else it },
+    )
         private set
 
     /** The accepted in-flight archive/restore, presentation-only; identity-compared on settle. */
@@ -6296,16 +6305,18 @@ class ConversationController(
     private var inviteAcceptanceAwaitingAuthority by mutableStateOf<InviteAcceptanceGeneration?>(null)
 
     internal val inviteAcceptanceResolutionPending: Boolean
-        get() = inviteAcceptanceAwaitingAuthority != null
+        get() = inviteConfirmationUnresolved || inviteAcceptanceAwaitingAuthority != null
 
     private val ownsInviteAcceptanceResult: Boolean
         get() = !controllerCleared && !isAccountTeardownRequested()
 
-    /** Retains one acceptance attempt only while its owner and optimistic generation are unchanged. */
-    private fun ownsInviteAttempt(
-        authorityEpoch: Long,
-        optimisticGroup: AppGroupRecordFfi,
-    ): Boolean = ownsInviteAcceptanceResult && groupAuthorityEpoch == authorityEpoch && group == optimisticGroup
+    /** Metadata refreshes may cross Join; a different Welcome or terminal observation may not. */
+    private fun ownsInviteAttempt(attempt: InviteAcceptanceAttempt): Boolean =
+        ownsInviteAcceptanceResult &&
+            !inviteConfirmationUnresolved &&
+            inviteConfirmationAuthority.revision == attempt.inviteRevision &&
+            attempt.generation.matches(group) &&
+            group.acceptsInviteResults()
 
     /**
      * Archived state the conversation surfaces should present: the accepted
@@ -6605,7 +6616,7 @@ class ConversationController(
         initialConversationTimeline(
             preview = initialTimelinePreview,
             groupIdHex = initialGroup.groupIdHex,
-            pendingConfirmation = group.pendingConfirmation,
+            pendingConfirmation = group.pendingConfirmation || initialInviteConfirmationUnresolved,
             optimisticMessages = optimisticMessages.values,
         )
 
@@ -7401,14 +7412,16 @@ class ConversationController(
                 update = update,
                 previous = previousGroup,
             )
+        val confirmed = inviteConfirmationAuthority.reconcile(reconciled)
+        inviteConfirmationUnresolved = false
         val awaitingAuthority = inviteAcceptanceAwaitingAuthority
         val freshTerminalReinvite = isDistinctWelcomeReinvite(previousGroup, update)
         group =
-            if (awaitingAuthority?.matches(reconciled) == true && reconciled.pendingConfirmation) {
-                reconciled.copy(pendingConfirmation = false)
+            if (awaitingAuthority?.matches(confirmed) == true && confirmed.pendingConfirmation) {
+                confirmed.copy(pendingConfirmation = false)
             } else {
                 inviteAcceptanceAwaitingAuthority = null
-                reconciled
+                confirmed
             }
         if (freshTerminalReinvite) {
             memberRosterRefreshGeneration.advance()
@@ -9789,29 +9802,36 @@ class ConversationController(
             val invitePeerAccount = inviteAccount
             val previousGroup = group
             val generation = InviteAcceptanceGeneration(renderedGroupIdHex, renderedWelcomeMessageIdHex)
-            if (!ownsInviteAcceptanceResult || !canAcceptRenderedInvite(previousGroup, generation)) {
+            if (
+                !ownsInviteAcceptanceResult ||
+                inviteConfirmationUnresolved ||
+                !canAcceptRenderedInvite(previousGroup, generation)
+            ) {
                 return@withMutationLockResult false
             }
             val authorityEpochBefore = groupAuthorityEpoch
+            inviteConfirmationAuthority.begin(previousGroup)
             val optimisticGroup = optimisticAcceptedInvite(previousGroup)
             group = optimisticGroup
             appState.applyLocalGroupUpdate(optimisticGroup, account)
             val attempt =
-                InviteAcceptanceAttempt(account, generation, previousGroup, optimisticGroup, authorityEpochBefore)
+                InviteAcceptanceAttempt(account, generation, inviteConfirmationAuthority.revision)
             val acceptedGroup = resolveInviteAcceptance(attempt)
             if (acceptedGroup == null) return@withMutationLockResult false
             if (
-                !ownsInviteAttempt(authorityEpochBefore, optimisticGroup) ||
+                !ownsInviteAttempt(attempt) ||
                 !acceptedInviteMatchesGeneration(acceptedGroup, generation)
             ) {
-                if (ownsInviteAttempt(authorityEpochBefore, optimisticGroup)) {
+                if (ownsInviteAttempt(attempt)) {
+                    inviteConfirmationAuthority.finish()
+                    group = group.copy(pendingConfirmation = false)
                     inviteAcceptanceAwaitingAuthority = generation
                     refreshMembers()
                 }
                 return@withMutationLockResult false
             }
             acceptedInvitePeerAccount = invitePeerAccount
-            group = acceptedGroup
+            applyAcceptedInviteGroup(acceptedGroup, authorityEpochBefore)
             appState.applyLocalGroupUpdate(group, account)
             appState.dismissConversationNotifications(account, generation.groupIdHex)
             // Accepting an invite (re-)joins the group, so clear any stale
@@ -9856,7 +9876,7 @@ class ConversationController(
                     )
                 },
             ) {
-                if (ownsInviteAttempt(attempt.authorityEpoch, attempt.optimisticGroup)) {
+                if (ownsInviteAttempt(attempt)) {
                     inviteAcceptor(attempt.account, attempt.generation.groupIdHex)
                 } else {
                     null
@@ -9864,7 +9884,9 @@ class ConversationController(
             }
         }.getOrElse { failure ->
             if (failure is MarmotKitException.GroupInviteNotPending) {
-                if (ownsInviteAttempt(attempt.authorityEpoch, attempt.optimisticGroup)) {
+                if (ownsInviteAttempt(attempt)) {
+                    inviteConfirmationAuthority.finish()
+                    group = group.copy(pendingConfirmation = false)
                     inviteAcceptanceAwaitingAuthority = attempt.generation
                     appState.applyLocalGroupUpdate(group, attempt.account)
                     refreshMembers()
@@ -9872,7 +9894,7 @@ class ConversationController(
                 return@getOrElse null
             }
             val currentGroup = group
-            group = rollbackOptimisticAcceptedInvite(currentGroup, attempt.optimisticGroup, attempt.previousGroup)
+            group = inviteConfirmationAuthority.rollback(currentGroup)
             val ownsPresentation = ownsInviteAcceptanceResult
             if (ownsPresentation && group != currentGroup) appState.applyLocalGroupUpdate(group, attempt.account)
             failure.rethrowIfCancellation()
@@ -9882,8 +9904,21 @@ class ConversationController(
             null
         }
 
+    /** Keeps metadata refreshed during Join while committing confirmation for its current Welcome. */
+    private fun applyAcceptedInviteGroup(
+        acceptedGroup: AppGroupRecordFfi,
+        authorityEpochBefore: Long,
+    ) {
+        val confirmed =
+            if (groupAuthorityEpoch == authorityEpochBefore) acceptedGroup else group.copy(pendingConfirmation = false)
+        group = inviteConfirmationAuthority.reconcile(confirmed)
+        inviteConfirmationAuthority.finish()
+    }
+
+    /** Declines only after conflicting chat-list confirmation snapshots have been resolved. */
     suspend fun declineInvite(): Boolean =
         withMutationLockResult(false) {
+            if (inviteConfirmationUnresolved) return@withMutationLockResult false
             val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatching {
                 appState.marmotIo { declineGroupInvite(account, group.groupIdHex) }
@@ -12235,7 +12270,7 @@ class ConversationController(
     /** Retries only the authority read for a retired invite; it never replays Join. */
     suspend fun retryInviteAcceptanceAuthority() {
         if (ownsInviteAcceptanceResult) {
-            withMutationLockResult(Unit) { if (inviteAcceptanceAwaitingAuthority != null) refreshMembers() }
+            withMutationLockResult(Unit) { if (inviteAcceptanceResolutionPending) refreshMembers() }
         }
     }
 
@@ -12245,6 +12280,20 @@ class ConversationController(
             if (accountTeardownRequested || controllerCleared) null else memberRosterRefreshGeneration.advance()
         }
 
+    /** Resolves conflicting list snapshots only while the opening controller still owns the read. */
+    private suspend fun resolveInitialInviteConfirmation(
+        account: String,
+        refreshGeneration: Long,
+    ): Boolean {
+        if (!inviteConfirmationUnresolved) return true
+        val epoch = groupAuthorityEpoch
+        val canonical = liveSubscriptions.readInviteConfirmation(account, group.groupIdHex)
+        val currentRead = memberRosterRefreshGeneration.isCurrent(refreshGeneration)
+        val ownsRead = ownsInviteAcceptanceResult && epoch == groupAuthorityEpoch && currentRead
+        if (ownsRead) applyGroupState(canonical)
+        return ownsRead
+    }
+
     /** Publishes the latest authoritative roster while rejecting older refresh completions. */
     private suspend fun refreshMembers(retryOnHydrationPending: Boolean = true) {
         val account = conversationAccountRef ?: return
@@ -12252,6 +12301,7 @@ class ConversationController(
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.STARTED)
         try {
             runCatchingCancellable {
+                if (!resolveInitialInviteConfirmation(account, refreshGeneration)) return@runCatchingCancellable
                 // One projection replaces the serialized groupMlsState() eviction and groupDetails() roster reads.
                 // It carries membership, admins, epoch/revision, lifecycle, and self-membership together.
                 val roster = groupRosterReader(account, group.groupIdHex)
@@ -12294,6 +12344,7 @@ class ConversationController(
     private fun markActiveAccountRemovedFromMembers(account: String) {
         val activeAccountIdHex = conversationAccountIdHex ?: return
         groupAuthorityEpoch += 1L
+        inviteConfirmationAuthority.invalidate()
         // Engine-confirmed removal (UseAfterEviction). Record the same
         // authoritative local-left marker the leaveGroup() success path sets so
         // a later authoritative roster result that races ahead of eviction can't re-add
@@ -12387,9 +12438,9 @@ class ConversationController(
         val applied = resolution.applied
         groupAuthorityEpoch += 1L
         group =
-            reconcileTerminalSelfMembership(
-                update = applied.group,
-                previous = previousGroup,
+            inviteConfirmationAuthority.reconcile(
+                reconcileTerminalSelfMembership(update = applied.group, previous = previousGroup),
+                establishesAcceptance = false,
             )
         if (previousRetention != group.disappearingMessageSecs) {
             publishTimelineFromIndexes()

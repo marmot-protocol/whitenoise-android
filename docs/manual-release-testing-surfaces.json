@@ -9018,6 +9018,15 @@
         "test_ids": [
           "INT-003"
         ]
+      },
+      {
+        "surface": "InviteConfirmationAuthority",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteConfirmationAuthority.kt",
+        "anchor": "internal class InviteConfirmationAuthority(",
+        "test_ids": [
+          "GRP-012",
+          "GRP-014"
+        ]
       }
     ],
     "notification_content_contracts": [

@@ -1840,6 +1840,7 @@ internal fun MainShell(
                                     openChat.group.groupIdHex,
                                 ),
                         initialChatListRow = openChat.projection,
+                        initialInviteConfirmationUnresolved = openChat.inviteConfirmationUnresolved,
                         initialIsDm = openChat.isDm(),
                         initialTimelinePreview = openChat.projection?.lastMessage,
                         accountRefOverride = accountRef.takeIf { it != appState.activeAccountRef },
