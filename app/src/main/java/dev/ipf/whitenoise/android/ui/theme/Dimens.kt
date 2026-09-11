@@ -32,6 +32,9 @@ object Radii {
     val md = 12.dp
     val lg = 16.dp
     val xl = 24.dp
+
+    /** Form fields, dialogs and sheets share the 28 dp Material extra-large corner. */
+    val xxl = 28.dp
 }
 
 val PillShape = RoundedCornerShape(percent = 50)

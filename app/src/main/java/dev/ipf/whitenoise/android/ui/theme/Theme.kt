@@ -24,119 +24,134 @@ import dev.ipf.whitenoise.android.state.resolveActionColorArgb
 
 private const val OPAQUE_ARGB_MASK = 0xFFFFFFFFL
 
-// Locked brand scheme — a monochrome-cyan palette over neutral surfaces. Every
-// role is defined explicitly so nothing falls back to the M3 baseline (which is
-// violet-tinted) when dynamic color is off. Chips/tallies (secondaryContainer)
-// read as deep teal, accents (tertiary) stay in the cyan family, and the unread
-// badge (error) is a clean red — the three roles that previously leaked the
-// device wallpaper palette.
+// Locked brand scheme — strictly monochrome Material roles over neutral surfaces,
+// with a clean red reserved for errors. Every role is defined explicitly so nothing
+// falls back to the M3 baseline (which is violet-tinted) when dynamic color is off.
+// Colour enters only through a saved per-account accent, never through the base roles.
 private val DarkColorScheme =
     darkColorScheme(
-        primary = Highlight,
-        onPrimary = OnHighlight,
-        primaryContainer = Highlight,
-        onPrimaryContainer = OnHighlight,
-        secondary = Color(0xFF6BA3AD),
-        onSecondary = Color(0xFF00363F),
-        secondaryContainer = Color(0xFF1E3A40),
-        onSecondaryContainer = Color(0xFFB8E7EF),
-        tertiary = Color(0xFF7FD4E0),
-        onTertiary = Color(0xFF003640),
-        tertiaryContainer = Color(0xFF1E3A40),
-        onTertiaryContainer = Color(0xFFC7EEF5),
-        error = Color(0xFFFF5C5C),
-        onError = Color(0xFF2A0000),
-        errorContainer = Color(0xFF5C1A1A),
-        onErrorContainer = Color(0xFFFFD9D6),
-        background = Color(0xFF0F1112),
-        onBackground = Color(0xFFE2E3E3),
-        surface = Color(0xFF121414),
-        onSurface = Color(0xFFE2E3E3),
-        surfaceVariant = Color(0xFF3F4849),
-        onSurfaceVariant = Color(0xFFBEC8C9),
-        surfaceContainerLowest = Color(0xFF0C0E0E),
-        surfaceContainerLow = Color(0xFF161818),
-        surfaceContainer = Color(0xFF1A1D1D),
-        surfaceContainerHigh = Color(0xFF242727),
-        surfaceContainerHighest = Color(0xFF2F3232),
-        outline = Color(0xFF899393),
-        outlineVariant = Color(0xFF3F4849),
-        inverseSurface = Color(0xFFE2E3E3),
-        inverseOnSurface = Color(0xFF1A1D1D),
+        primary = Color(0xFFF5F5F5),
+        onPrimary = Color(0xFF171717),
+        primaryContainer = Color(0xFF404040),
+        onPrimaryContainer = Color(0xFFF5F5F5),
+        inversePrimary = Color(0xFF171717),
+        secondary = Color(0xFFD4D4D4),
+        onSecondary = Color(0xFF262626),
+        secondaryContainer = Color(0xFF404040),
+        onSecondaryContainer = Color(0xFFF5F5F5),
+        tertiary = Color(0xFFB8B8B8),
+        onTertiary = Color(0xFF171717),
+        tertiaryContainer = Color(0xFF404040),
+        onTertiaryContainer = Color(0xFFF5F5F5),
+        error = Color(0xFFFFB4AB),
+        onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A),
+        onErrorContainer = Color(0xFFFFDAD6),
+        background = Color(0xFF101010),
+        onBackground = Color(0xFFF5F5F5),
+        surface = Color(0xFF101010),
+        onSurface = Color(0xFFF5F5F5),
+        surfaceVariant = Color(0xFF333333),
+        onSurfaceVariant = Color(0xFFD4D4D4),
+        surfaceTint = Color(0xFFF5F5F5),
+        surfaceBright = Color(0xFF383838),
+        surfaceDim = Color(0xFF101010),
+        surfaceContainerLowest = Color(0xFF080808),
+        surfaceContainerLow = Color(0xFF171717),
+        surfaceContainer = Color(0xFF1E1E1E),
+        surfaceContainerHigh = Color(0xFF262626),
+        surfaceContainerHighest = Color(0xFF303030),
+        outline = Color(0xFF999999),
+        outlineVariant = Color(0xFF4D4D4D),
+        inverseSurface = Color(0xFFE5E5E5),
+        inverseOnSurface = Color(0xFF262626),
         scrim = Color(0xFF000000),
+        primaryFixed = Color(0xFFE5E5E5),
+        primaryFixedDim = Color(0xFFC7C7C7),
+        onPrimaryFixed = Color(0xFF171717),
+        onPrimaryFixedVariant = Color(0xFF4D4D4D),
+        secondaryFixed = Color(0xFFE5E5E5),
+        secondaryFixedDim = Color(0xFFC7C7C7),
+        onSecondaryFixed = Color(0xFF171717),
+        onSecondaryFixedVariant = Color(0xFF4D4D4D),
+        tertiaryFixed = Color(0xFFE5E5E5),
+        tertiaryFixedDim = Color(0xFFC7C7C7),
+        onTertiaryFixed = Color(0xFF171717),
+        onTertiaryFixedVariant = Color(0xFF4D4D4D),
     )
 
 private val LightColorScheme =
     lightColorScheme(
-        primary = Highlight,
-        onPrimary = OnHighlight,
-        primaryContainer = Highlight,
-        onPrimaryContainer = OnHighlight,
-        secondary = Color(0xFF4A6268),
+        primary = Color(0xFF171717),
+        onPrimary = Color(0xFFFFFFFF),
+        primaryContainer = Color(0xFFE5E5E5),
+        onPrimaryContainer = Color(0xFF171717),
+        inversePrimary = Color(0xFFF5F5F5),
+        secondary = Color(0xFF4D4D4D),
         onSecondary = Color(0xFFFFFFFF),
-        secondaryContainer = Color(0xFFCDE7ED),
-        onSecondaryContainer = Color(0xFF051F24),
-        tertiary = Color(0xFF00696E),
+        secondaryContainer = Color(0xFFE5E5E5),
+        onSecondaryContainer = Color(0xFF262626),
+        tertiary = Color(0xFF666666),
         onTertiary = Color(0xFFFFFFFF),
-        tertiaryContainer = Color(0xFFC7EEF5),
-        onTertiaryContainer = Color(0xFF002023),
+        tertiaryContainer = Color(0xFFE5E5E5),
+        onTertiaryContainer = Color(0xFF262626),
         error = Color(0xFFBA1A1A),
         onError = Color(0xFFFFFFFF),
-        errorContainer = Color(0xFFFFDAD6),
+        errorContainer = Color(0xFFFFE0DE),
         onErrorContainer = Color(0xFF410002),
-        background = Color(0xFFECEEEE),
-        onBackground = Color(0xFF191C1C),
-        surface = Color(0xFFECEEEE),
-        onSurface = Color(0xFF191C1C),
-        surfaceVariant = Color(0xFFDBE4E5),
-        onSurfaceVariant = Color(0xFF3F4849),
+        background = Color(0xFFF7F7F7),
+        onBackground = Color(0xFF171717),
+        surface = Color(0xFFF7F7F7),
+        onSurface = Color(0xFF171717),
+        surfaceVariant = Color(0xFFE5E5E5),
+        onSurfaceVariant = Color(0xFF4D4D4D),
+        surfaceTint = Color(0xFF171717),
+        surfaceBright = Color(0xFFFFFFFF),
+        surfaceDim = Color(0xFFDADADA),
         surfaceContainerLowest = Color(0xFFFFFFFF),
-        surfaceContainerLow = Color(0xFFF3F4F4),
-        surfaceContainer = Color(0xFFEDEFEF),
-        surfaceContainerHigh = Color(0xFFE7E9E9),
-        surfaceContainerHighest = Color(0xFFE1E3E3),
-        outline = Color(0xFF6F7979),
-        outlineVariant = Color(0xFFBFC8C9),
-        inverseSurface = Color(0xFF2D3131),
-        inverseOnSurface = Color(0xFFEFF1F1),
+        surfaceContainerLow = Color(0xFFF3F3F3),
+        surfaceContainer = Color(0xFFEFEFEF),
+        surfaceContainerHigh = Color(0xFFE9E9E9),
+        surfaceContainerHighest = Color(0xFFE3E3E3),
+        outline = Color(0xFF737373),
+        outlineVariant = Color(0xFFC7C7C7),
+        inverseSurface = Color(0xFF262626),
+        inverseOnSurface = Color(0xFFF5F5F5),
         scrim = Color(0xFF000000),
+        primaryFixed = Color(0xFFE5E5E5),
+        primaryFixedDim = Color(0xFFC7C7C7),
+        onPrimaryFixed = Color(0xFF171717),
+        onPrimaryFixedVariant = Color(0xFF4D4D4D),
+        secondaryFixed = Color(0xFFE5E5E5),
+        secondaryFixedDim = Color(0xFFC7C7C7),
+        onSecondaryFixed = Color(0xFF171717),
+        onSecondaryFixedVariant = Color(0xFF4D4D4D),
+        tertiaryFixed = Color(0xFFE5E5E5),
+        tertiaryFixedDim = Color(0xFFC7C7C7),
+        onTertiaryFixed = Color(0xFF171717),
+        onTertiaryFixedVariant = Color(0xFF4D4D4D),
     )
 
-// AMOLED is a deliberately blue-free reading palette, not just a set of black
-// surfaces. Every ColorScheme role is overridden explicitly so new Material
-// components cannot inherit a cyan or neutral-grey fallback from the base dark
-// scheme. Media and avatars remain unfiltered content.
+// AMOLED is a fixed black-and-white palette, layered by white outlines instead of
+// tonal surfaces. Every ColorScheme role is overridden explicitly so new Material
+// components cannot inherit a grey fallback from the base dark scheme, and a saved
+// account accent is deliberately not applied on it. Media and avatars stay unfiltered.
 private val AmoledColorScheme =
     DarkColorScheme.copy(
-        primary = Color(0xFFFFC400),
+        primary = Color.White,
         onPrimary = Color.Black,
-        primaryContainer = Color(0xFF493800),
-        onPrimaryContainer = Color(0xFFFFE600),
-        inversePrimary = Color(0xFFFFC400),
-        secondary = Color(0xFFE0B000),
-        onSecondary = Color.Black,
-        secondaryContainer = Color(0xFF493600),
-        onSecondaryContainer = Color(0xFFFFDC00),
-        tertiary = Color(0xFFF5E600),
-        onTertiary = Color.Black,
-        tertiaryContainer = Color(0xFF3E3900),
-        onTertiaryContainer = Color(0xFFF5E600),
+        primaryContainer = Color.Black,
+        onPrimaryContainer = Color.White,
+        secondaryContainer = Color.Black,
+        onSecondaryContainer = Color.White,
+        tertiaryContainer = Color.Black,
+        onTertiaryContainer = Color.White,
         background = Color.Black,
-        onBackground = Color(0xFFF5E600),
+        onBackground = Color.White,
         surface = Color.Black,
-        onSurface = Color(0xFFF5E600),
+        onSurface = Color.White,
         surfaceVariant = Color.Black,
-        onSurfaceVariant = Color(0xFFB0A000),
         surfaceTint = Color.Transparent,
-        inverseSurface = Color.Black,
-        inverseOnSurface = Color(0xFFF5E600),
-        error = Color(0xFFFF5C00),
-        onError = Color.Black,
-        errorContainer = Color(0xFF4A1200),
-        onErrorContainer = Color(0xFFFFB000),
-        outline = AmoledEmphasizedSurfaceBorder,
-        outlineVariant = AmoledSurfaceBorder,
-        scrim = Color.Black,
         surfaceBright = Color.Black,
         surfaceDim = Color.Black,
         surfaceContainer = Color.Black,
@@ -144,33 +159,22 @@ private val AmoledColorScheme =
         surfaceContainerHighest = Color.Black,
         surfaceContainerLow = Color.Black,
         surfaceContainerLowest = Color.Black,
-        primaryFixed = Color(0xFFFFE600),
-        primaryFixedDim = Color(0xFFFFC400),
-        onPrimaryFixed = Color.Black,
-        onPrimaryFixedVariant = Color.Black,
-        secondaryFixed = Color(0xFFFFDC00),
-        secondaryFixedDim = Color(0xFFE0B000),
-        onSecondaryFixed = Color.Black,
-        onSecondaryFixedVariant = Color.Black,
-        tertiaryFixed = Color(0xFFF5E600),
-        tertiaryFixedDim = Color(0xFFC9BD00),
-        onTertiaryFixed = Color.Black,
-        onTertiaryFixedVariant = Color.Black,
+        outline = AmoledEmphasizedSurfaceBorder,
+        outlineVariant = AmoledSurfaceBorder,
+        scrim = Color.Black,
     )
 
-// Route the existing brand corner radii (Radii) through MaterialTheme.shapes so
-// theme-aware M3 components (Button/Card/dialog/text-field/sheet) pick up
-// consistent corners instead of the violet-baseline defaults. Values mirror the
-// current literal radii used at call sites — extraSmall halves `sm` for the
-// smallest chips, and extraLarge maps to `xl` (24dp) rather than the M3 default
-// 28dp so large sheets/containers match the rest of the brand scale.
+// Route the brand corner radii (Radii) through MaterialTheme.shapes so theme-aware
+// M3 components (Button/Card/dialog/text-field/sheet) pick up consistent corners.
+// extraSmall halves `sm` for the smallest chips; extraLarge is the 28 dp form and
+// sheet corner shared with the tonal text field.
 private val ShapeScheme =
     Shapes(
         extraSmall = RoundedCornerShape(Radii.sm / 2),
         small = RoundedCornerShape(Radii.sm),
         medium = RoundedCornerShape(Radii.md),
         large = RoundedCornerShape(Radii.lg),
-        extraLarge = RoundedCornerShape(Radii.xl),
+        extraLarge = RoundedCornerShape(Radii.xxl),
     )
 
 private fun ColorScheme.withAmoledPalette(amoledActive: Boolean): ColorScheme {
@@ -182,13 +186,14 @@ private fun ColorScheme.withAccountAccent(
     accentColorArgb: Long?,
     amoledActive: Boolean,
 ): ColorScheme {
+    // AMOLED keeps its fixed white action colour, the saved accent stays stored for the other themes.
     val resolvedAccent =
-        accentColorArgb?.let {
+        accentColorArgb?.takeUnless { amoledActive }?.let {
             resolveActionColorArgb(
                 customArgb = it,
                 defaultContainerArgb = primary.toOpaqueArgb(),
                 defaultContentArgb = onPrimary.toOpaqueArgb(),
-                blueFree = amoledActive,
+                blueFree = false,
             )
         } ?: return this
     val accent = Color(resolvedAccent.container)
@@ -203,9 +208,8 @@ private fun ColorScheme.withAccountAccent(
         primaryContainer = accent,
         onPrimaryContainer = onAccent,
         inversePrimary = safeInversePrimary,
-        // AMOLED elevation must remain untinted; other themes follow the
-        // active account accent for Material tonal elevation.
-        surfaceTint = if (amoledActive) Color.Transparent else accent,
+        // Material tonal elevation follows the active account accent.
+        surfaceTint = accent,
     )
 }
 
@@ -215,8 +219,8 @@ private fun Color.toOpaqueArgb(): Long = toArgb().toLong() and OPAQUE_ARGB_MASK
 fun WhiteNoiseTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     amoled: Boolean = false,
-    // The active account's accent. A null value preserves the locked brand
-    // cyan, while a custom value drives primary actions and selected states.
+    // The active account's accent. A null value keeps the monochrome brand roles,
+    // while a custom value drives primary actions and selected states outside AMOLED.
     accentColorArgb: Long? = null,
     // The app ships a locked brand palette, so dynamic (wallpaper-derived)
     // color is off by default. The path is kept for anyone who opts in.
@@ -225,7 +229,7 @@ fun WhiteNoiseTheme(
     // already include the OS font scale, so it composes with the system
     // setting rather than replacing it.
     fontScale: Float = 1f,
-    appFont: AppFont = AppFont.Manrope,
+    appFont: AppFont = AppFont.System,
     content: @Composable () -> Unit,
 ) {
     val baseColorScheme =

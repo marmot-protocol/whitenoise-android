@@ -15,6 +15,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
@@ -270,11 +271,11 @@ class EmojiPickerScreenshotTest {
         assertStartsNextRow(FIRST_SMILEYS_ROW.last(), SECOND_SMILEYS_ROW.first())
 
         val smileysHeader = boundsOfText(string(R.string.emoji_category_smileys))
-        val firstSmiley = boundsOfText(FIRST_SMILEYS_ROW.first())
+        val firstSmileyCell = boundsOfCellContaining(FIRST_SMILEYS_ROW.first())
         assertVerticalGap(
             top = smileysHeader.bottom,
-            bottom = firstSmiley.top,
-            expected = EXPECTED_SECTION_HEADER_PADDING,
+            bottom = firstSmileyCell.top,
+            expected = EXPECTED_SECTION_HEADER_PADDING + EXPECTED_ROW_SPACING,
             label = "Smileys section header bottom padding",
         )
 
@@ -362,6 +363,20 @@ class EmojiPickerScreenshotTest {
         val bounds =
             composeRule
                 .onNodeWithText(text, substring = false, useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
+        // Robolectric config uses mdpi, so 1.dp == 1px for these assertions.
+        return Rect(bounds.left.value, bounds.top.value, bounds.right.value, bounds.bottom.value)
+    }
+
+    /**
+     * Bounds of the grid cell holding [emoji]. The cell, not the glyph, carries the layout contract,
+     * because the glyph's height follows the active font's metrics rather than the fitted line height.
+     */
+    private fun boundsOfCellContaining(emoji: String): Rect {
+        val bounds =
+            composeRule
+                .onNodeWithText(emoji, substring = false, useUnmergedTree = true)
+                .onParent()
                 .getUnclippedBoundsInRoot()
         // Robolectric config uses mdpi, so 1.dp == 1px for these assertions.
         return Rect(bounds.left.value, bounds.top.value, bounds.right.value, bounds.bottom.value)

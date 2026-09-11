@@ -35,17 +35,17 @@ private val Outfit = variableFamily(R.font.outfit_variable)
 private val Urbanist = variableFamily(R.font.urbanist_variable)
 private val Figtree = variableFamily(R.font.figtree_variable)
 
-/** The [FontFamily] a Settings font choice maps to; null keeps the Manrope default. */
+/** The [FontFamily] a Settings font choice maps to; null keeps the system face the scale is built on. */
 fun AppFont.fontFamilyOrNull(): FontFamily? =
     when (this) {
-        AppFont.Manrope -> null
-        AppFont.System -> FontFamily.Default
+        AppFont.System -> null
+        AppFont.Manrope -> Manrope
         AppFont.Outfit -> Outfit
         AppFont.Urbanist -> Urbanist
         AppFont.Figtree -> Figtree
     }
 
-/** Re-bases the whole scale onto the chosen app font; Manrope is the built-in default. */
+/** Re-bases the whole scale onto the chosen app font; the system face is the built-in default. */
 fun Typography.withAppFont(font: AppFont): Typography = font.fontFamilyOrNull()?.let { applyFontFamily(it) } ?: this
 
 /** Applies [family] to every style of a [Typography] so the whole scale shares one font. */
@@ -68,65 +68,23 @@ private fun Typography.applyFontFamily(family: FontFamily): Typography =
         labelSmall = labelSmall.copy(fontFamily = family),
     )
 
-// Set of Material typography styles to start with
-val Typography =
-    Typography(
-        // Expressive display treatment for brand surfaces (onboarding hero name).
-        // The M3 baseline leaves display* at Normal weight with slightly positive
-        // tracking, which reads thin for a wordmark; the brand lockup wants a
-        // tighter, more confident display. Sizes stay on the M3 display scale so
-        // the in-app font-size step (#403, Typography.scaledBy) and the OS font
-        // scale still compose cleanly. Call sites may still bump weight locally
-        // (e.g. the landing name uses SemiBold).
-        displayLarge =
-            TextStyle(
-                fontFamily = FontFamily.Default,
-                fontWeight = FontWeight.Medium,
-                fontSize = 57.sp,
-                lineHeight = 64.sp,
-                letterSpacing = (-0.25).sp,
-            ),
-        displayMedium =
-            TextStyle(
-                fontFamily = FontFamily.Default,
-                fontWeight = FontWeight.Medium,
-                fontSize = 45.sp,
-                lineHeight = 52.sp,
-                letterSpacing = 0.sp,
-            ),
-        displaySmall =
-            TextStyle(
-                fontFamily = FontFamily.Default,
-                fontWeight = FontWeight.Medium,
-                fontSize = 36.sp,
-                lineHeight = 44.sp,
-                letterSpacing = 0.sp,
-            ),
-        bodyLarge =
-            TextStyle(
-                fontFamily = FontFamily.Default,
-                fontWeight = FontWeight.Normal,
-                fontSize = 16.sp,
-                lineHeight = 24.sp,
-                letterSpacing = 0.5.sp,
-            ),
-    /* Other default text styles to override
-    titleLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Normal,
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
-        letterSpacing = 0.sp
-    ),
-    labelSmall = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.5.sp
+/**
+ * The Material 3 baseline scale on the system face, with headlines, titles and labels at Medium
+ * weight so hierarchy reads without size jumps. A chosen app font re-bases every style.
+ */
+val Typography = Typography().withMediumHeadings()
+
+/** Headlines, titles and labels sit at Medium weight so hierarchy reads without size jumps. */
+private fun Typography.withMediumHeadings(): Typography =
+    copy(
+        headlineMedium = headlineMedium.copy(fontWeight = FontWeight.Medium),
+        headlineSmall = headlineSmall.copy(fontWeight = FontWeight.Medium),
+        titleLarge = titleLarge.copy(fontWeight = FontWeight.Medium),
+        titleMedium = titleMedium.copy(fontWeight = FontWeight.Medium),
+        titleSmall = titleSmall.copy(fontWeight = FontWeight.Medium),
+        labelLarge = labelLarge.copy(fontWeight = FontWeight.Medium),
+        labelMedium = labelMedium.copy(fontWeight = FontWeight.Medium),
     )
-     */
-    ).applyFontFamily(Manrope)
 
 /**
  * Scale every Material text style by the in-app font-size step (#403).
