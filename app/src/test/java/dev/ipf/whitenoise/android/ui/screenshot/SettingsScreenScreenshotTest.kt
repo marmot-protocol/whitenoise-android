@@ -62,13 +62,13 @@ class SettingsScreenScreenshotTest {
                             ),
                         appUpdateInfo =
                             AppUpdateInfo(
-                                installedVersion = "2026.9.10",
+                                installedVersion = "2026.9.11",
                                 latestVersion = null,
                                 checkedAtMillis = null,
                                 dismissedVersion = null,
                                 releasesBehind = null,
                             ),
-                        versionName = "2026.9.10",
+                        versionName = "2026.9.11",
                         mdkShortSha = "abc1234",
                         staging = false,
                         onBackToChats = {},
@@ -119,8 +119,8 @@ class SettingsScreenScreenshotTest {
 
         composeRule
             .onNode(hasScrollToNodeAction())
-            .performScrollToNode(hasText("Version 2026.9.10"))
-        composeRule.onNodeWithText("Version 2026.9.10").assertIsDisplayed()
+            .performScrollToNode(hasText("Version 2026.9.11"))
+        composeRule.onNodeWithText("Version 2026.9.11").assertIsDisplayed()
         composeRule
             .onNodeWithTag(SETTINGS_HOME_CONTENT_TAG)
             .captureRoboImage("src/test/snapshots/settings_screen_version_footer_dark.png")
@@ -177,13 +177,13 @@ class SettingsScreenScreenshotTest {
                 ),
             appUpdateInfo =
                 AppUpdateInfo(
-                    installedVersion = "2026.9.10",
+                    installedVersion = "2026.9.11",
                     latestVersion = null,
                     checkedAtMillis = null,
                     dismissedVersion = null,
                     releasesBehind = null,
                 ),
-            versionName = "2026.9.10",
+            versionName = "2026.9.11",
             mdkShortSha = "abc1234",
             staging = false,
             onBackToChats = {},

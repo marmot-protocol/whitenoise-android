@@ -1,0 +1,5 @@
+Added a clearer usage and diagnostics consent flow.
+
+Improved dictation reliability, speech recognition service discovery, and reply handling.
+
+Fixed joined chats returning to stale invite screens and preserved valid imported relay settings.
