@@ -107,6 +107,45 @@ class ConversationDictationControllerTest {
         assertTrue(platform.sessions.isEmpty())
     }
 
+    /** A stale reply must be rejected before a provider chooser can own the dictation gesture. */
+    @Test
+    fun invalidReplyDoesNotOfferProviderSelection() {
+        val platform = FakePlatform(needsProviderChoice = true)
+        val fixture = fixture(TextFieldValue("Keep"), targetReplyAvailable = { false }, platform = platform)
+
+        assertFalse(
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()), REPLY_MESSAGE_ID),
+        )
+
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertTrue(platform.sessions.isEmpty())
+        assertEquals("Keep", fixture.drafts.getValue(key()).text)
+    }
+
+    /** Choosing a provider must not bypass reply validation on the required next gesture. */
+    @Test
+    fun replyChangedDuringProviderSelectionIsRejectedOnTheNextGesture() {
+        var replyAvailable = true
+        val platform = FakePlatform(needsProviderChoice = true)
+        val fixture = fixture(TextFieldValue("Keep"), targetReplyAvailable = { replyAvailable }, platform = platform)
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()), REPLY_MESSAGE_ID)
+        val pending = fixture.controller.state as ConversationDictationState.ProviderSelectionRequired
+        assertEquals(REPLY_MESSAGE_ID, pending.target.replyToMessageIdHex)
+
+        replyAvailable = false
+        platform.needsProviderChoice = false
+        fixture.controller.onProviderSelected()
+
+        assertFalse(
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()), REPLY_MESSAGE_ID),
+        )
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertTrue(platform.sessions.isEmpty())
+        assertEquals(0, fixture.writes)
+    }
+
     @Test
     fun selectingProviderPersistsButRequiresANewGestureWithoutCapturingOrChangingDraft() {
         val platform = FakePlatform(needsProviderChoice = true)

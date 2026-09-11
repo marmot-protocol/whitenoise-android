@@ -50,7 +50,8 @@ class StateSourceSizeCeilingTest {
         // adds 38 lines for the async prepared-speech handoff while keeping preparation
         // in the bounded TTS sources; retain both changes in the combined growth ceiling.
         // PR #2565 adds 20 lines for the reply-aware dictation send path.
-        const val APP_STATE_MAX_LINES = 10352
+        // PR #2566 adds 4 lines for lifecycle-local provider discovery.
+        const val APP_STATE_MAX_LINES = 10356
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }
