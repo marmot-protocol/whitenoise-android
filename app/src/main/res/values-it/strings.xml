@@ -1772,4 +1772,23 @@
     <string name="group_rejoin_decline">Rifiuta invito</string>
     <string name="group_rejoin_success">Sei rientrato nel gruppo.</string>
     <string name="group_rejoin_failed">Impossibile applicare questo invito</string>
+    <string name="usage_diagnostics_title">Condividi dati di utilizzo e diagnostica</string>
+    <string name="usage_diagnostics_subtitle">Attività delle funzionalità e metriche di affidabilità.</string>
+    <string name="usage_diagnostics_prompt_title">Aiuta a migliorare White Noise</string>
+    <string name="usage_diagnostics_disclosure">I dati di utilizzo includono attività consentite raggruppate per categorie e identificatori temporanei di sessione, senza contenuti dei messaggi né identificatori di account e gruppi. La diagnostica include un identificatore casuale dell’installazione che cambia dopo la disattivazione della condivisione.</string>
+    <string name="usage_diagnostics_operator">Gestito da %1$s.</string>
+    <string name="usage_diagnostics_retention_unknown">La politica di conservazione non è ancora stata verificata per questa versione.</string>
+    <string name="usage_diagnostics_logs_separate">Log tecnici ripuliti di tutti i profili su questo dispositivo, condivisi separatamente.</string>
+    <string name="usage_diagnostics_renew">La condivisione ora include l’utilizzo delle funzionalità. Consulta queste informazioni ed esprimi una nuova scelta.</string>
+    <string name="usage_diagnostics_status">Utilizzo: %1$s. Diagnostica: %2$s.</string>
+    <string name="usage_diagnostics_error">Impossibile confermare le impostazioni di condivisione. Riprova. Nessuna nuova scelta è stata confermata.</string>
+    <string name="usage_diagnostics_off">Condivisione disattivata</string>
+    <string name="usage_diagnostics_permission_needed">Consenso necessario</string>
+    <string name="usage_diagnostics_unconfigured">Configurazione assente</string>
+    <string name="usage_diagnostics_unsupported">Non disponibile in questa versione</string>
+    <string name="usage_diagnostics_ready">Condivisione pronta</string>
+    <string name="usage_diagnostics_rejected">Configurazione rifiutata</string>
+    <string name="usage_diagnostics_unknown">Stato non disponibile</string>
+    <string name="usage_diagnostics_done">Fine</string>
+    <string name="usage_diagnostics_loading">Caricamento delle impostazioni di condivisione…</string>
 </resources>

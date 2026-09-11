@@ -1834,4 +1834,23 @@
     <string name="group_rejoin_decline">Отклонить приглашение</string>
     <string name="group_rejoin_success">Вы вернулись в группу.</string>
     <string name="group_rejoin_failed">Не удалось применить это приглашение</string>
+    <string name="usage_diagnostics_title">Делиться данными об использовании и диагностике</string>
+    <string name="usage_diagnostics_subtitle">Данные об использовании функций и показателях надёжности.</string>
+    <string name="usage_diagnostics_prompt_title">Помогите улучшить White Noise</string>
+    <string name="usage_diagnostics_disclosure">Данные об использовании включают разрешённые действия, объединённые по категориям, и временные идентификаторы сеансов, но не содержимое сообщений или идентификаторы аккаунтов и групп. Диагностика включает случайный идентификатор установки, который меняется после отключения передачи данных.</string>
+    <string name="usage_diagnostics_operator">Оператор: %1$s.</string>
+    <string name="usage_diagnostics_retention_unknown">Политика хранения данных для этой версии ещё не проверена.</string>
+    <string name="usage_diagnostics_logs_separate">Очищенные технические журналы всех профилей на этом устройстве, передаваемые отдельно.</string>
+    <string name="usage_diagnostics_renew">Передаваемые данные теперь включают использование функций. Ознакомьтесь с этой информацией и сделайте новый выбор.</string>
+    <string name="usage_diagnostics_status">Использование: %1$s. Диагностика: %2$s.</string>
+    <string name="usage_diagnostics_error">Не удалось подтвердить настройки передачи данных. Повторите попытку. Новый выбор не подтверждён.</string>
+    <string name="usage_diagnostics_off">Выключено</string>
+    <string name="usage_diagnostics_permission_needed">Требуется согласие</string>
+    <string name="usage_diagnostics_unconfigured">Не настроено</string>
+    <string name="usage_diagnostics_unsupported">Недоступно в этой версии</string>
+    <string name="usage_diagnostics_ready">Готово к передаче</string>
+    <string name="usage_diagnostics_rejected">Конфигурация отклонена</string>
+    <string name="usage_diagnostics_unknown">Не загружено</string>
+    <string name="usage_diagnostics_done">Готово</string>
+    <string name="usage_diagnostics_loading">Загрузка настроек передачи данных…</string>
 </resources>

@@ -1770,4 +1770,23 @@
     <string name="group_rejoin_decline">Daveti reddet</string>
     <string name="group_rejoin_success">Gruba yeniden katıldınız.</string>
     <string name="group_rejoin_failed">Bu davet uygulanamadı</string>
+    <string name="usage_diagnostics_title">Kullanım ve tanılama verilerini paylaş</string>
+    <string name="usage_diagnostics_subtitle">Özellik etkinliği ve güvenilirlik ölçümleri.</string>
+    <string name="usage_diagnostics_prompt_title">White Noise’u geliştirmeye yardımcı olun</string>
+    <string name="usage_diagnostics_disclosure">Kullanım verileri, izin verilen ve kategoriler halinde gruplanan etkinlikleri ve geçici oturum tanımlayıcılarını içerir; mesaj içeriklerini, hesap veya grup tanımlayıcılarını içermez. Tanılama verileri, paylaşımı kapattığınızda değişen rastgele bir kurulum tanımlayıcısı içerir.</string>
+    <string name="usage_diagnostics_operator">%1$s tarafından işletilir.</string>
+    <string name="usage_diagnostics_retention_unknown">Saklama politikası bu sürüm için henüz doğrulanmadı.</string>
+    <string name="usage_diagnostics_logs_separate">Bu cihazdaki tüm profillerin temizlenmiş teknik günlükleri, ayrı olarak paylaşılır.</string>
+    <string name="usage_diagnostics_renew">Paylaşım artık özellik kullanımını da içeriyor. Lütfen bu bilgileri inceleyip yeniden seçim yapın.</string>
+    <string name="usage_diagnostics_status">Kullanım: %1$s. Tanılama: %2$s.</string>
+    <string name="usage_diagnostics_error">Paylaşım ayarları doğrulanamadı. Lütfen yeniden deneyin. Yeni bir seçim doğrulanmadı.</string>
+    <string name="usage_diagnostics_off">Kapalı</string>
+    <string name="usage_diagnostics_permission_needed">Onay gerekiyor</string>
+    <string name="usage_diagnostics_unconfigured">Yapılandırılmadı</string>
+    <string name="usage_diagnostics_unsupported">Bu sürümde kullanılamıyor</string>
+    <string name="usage_diagnostics_ready">Paylaşıma hazır</string>
+    <string name="usage_diagnostics_rejected">Yapılandırma reddedildi</string>
+    <string name="usage_diagnostics_unknown">Yüklenmedi</string>
+    <string name="usage_diagnostics_done">Bitti</string>
+    <string name="usage_diagnostics_loading">Paylaşım ayarları yükleniyor…</string>
 </resources>

@@ -351,6 +351,7 @@ internal fun NewGroupFlow(
     }
 }
 
+/** Opens the recipient picker and records a content-free compose observation. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NewMessageScreen(
@@ -359,6 +360,9 @@ private fun NewMessageScreen(
     onNewGroup: () -> Unit,
     onOpenConversation: (ChatListItem, Boolean) -> Unit,
 ) {
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.COMPOSE)
+    }
     val queryState = rememberTextFieldState()
     val query = queryState.text.toString()
     var showScanner by remember { mutableStateOf(false) }

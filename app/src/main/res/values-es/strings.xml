@@ -1772,4 +1772,23 @@
     <string name="group_rejoin_decline">Rechazar invitación</string>
     <string name="group_rejoin_success">Te has vuelto a unir al grupo.</string>
     <string name="group_rejoin_failed">No se pudo aplicar esta invitación</string>
+    <string name="usage_diagnostics_title">Compartir datos de uso y diagnóstico</string>
+    <string name="usage_diagnostics_subtitle">Actividad de las funciones y métricas de fiabilidad.</string>
+    <string name="usage_diagnostics_prompt_title">Ayuda a mejorar White Noise</string>
+    <string name="usage_diagnostics_disclosure">Los datos de uso incluyen actividades permitidas agrupadas por categorías e identificadores temporales de sesión, sin contenido de mensajes ni identificadores de cuentas o grupos. Los diagnósticos incluyen un identificador de instalación aleatorio que cambia después de desactivar el uso compartido.</string>
+    <string name="usage_diagnostics_operator">Operado por %1$s.</string>
+    <string name="usage_diagnostics_retention_unknown">La política de conservación aún no se ha verificado para esta versión.</string>
+    <string name="usage_diagnostics_logs_separate">Registros técnicos depurados de todos los perfiles de este dispositivo, compartidos por separado.</string>
+    <string name="usage_diagnostics_renew">Ahora los datos compartidos incluyen el uso de funciones. Revisa esta información y elige de nuevo.</string>
+    <string name="usage_diagnostics_status">Uso: %1$s. Diagnósticos: %2$s.</string>
+    <string name="usage_diagnostics_error">No se pudo confirmar la configuración de uso compartido. Inténtalo de nuevo. No se ha confirmado ninguna nueva elección.</string>
+    <string name="usage_diagnostics_off">Desactivado</string>
+    <string name="usage_diagnostics_permission_needed">Se necesita consentimiento</string>
+    <string name="usage_diagnostics_unconfigured">Sin configurar</string>
+    <string name="usage_diagnostics_unsupported">No disponible en esta versión</string>
+    <string name="usage_diagnostics_ready">Listo para compartir</string>
+    <string name="usage_diagnostics_rejected">Configuración rechazada</string>
+    <string name="usage_diagnostics_unknown">Sin cargar</string>
+    <string name="usage_diagnostics_done">Listo</string>
+    <string name="usage_diagnostics_loading">Cargando la configuración de uso compartido…</string>
 </resources>

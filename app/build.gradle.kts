@@ -550,7 +550,7 @@ android {
         // Each environment has its own product destination/key; previews receive neither.
         listOf("dev", "preview", "staging", "production").forEach { environment ->
             named(environment) {
-                listOf("PRODUCT_EVENTS_ENDPOINT", "PRODUCT_APP_KEY", "PRODUCT_OPERATOR").forEach { suffix ->
+                listOf("PRODUCT_EVENTS_ENDPOINT", "PRODUCT_APP_KEY", "PRODUCT_OPERATOR", "PRODUCT_RETENTION").forEach { suffix ->
                     buildConfigField(
                         "String",
                         "WHITENOISE_$suffix",
@@ -1185,5 +1185,24 @@ afterEvaluate {
 tasks.configureEach {
     if (name == "koverVerifyDevZapstoreDebug") {
         dependsOn("koverVerifyStatePackageFloor")
+    }
+}
+
+// Optional operator checks read generated values, including local.properties precedence.
+listOf("staging", "production").forEach { environment ->
+    val title = environment.replaceFirstChar(Char::uppercaseChar)
+    tasks.register<Exec>("verify${title}ProductAnalyticsConfig") {
+        group = "verification"
+        description = "Validate resolved $environment Aptabase configuration without printing values"
+        dependsOn("generate${title}ZapstoreReleaseBuildConfig")
+        commandLine(
+            "python3",
+            rootProject.file("scripts/check_product_analytics_config.py").absolutePath,
+            layout.buildDirectory
+                .file(
+                    "generated/source/buildConfig/${environment}Zapstore/release/dev/ipf/whitenoise/android/BuildConfig.java",
+                ).get()
+                .asFile.absolutePath,
+        )
     }
 }

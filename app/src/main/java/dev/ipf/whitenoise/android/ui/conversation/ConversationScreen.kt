@@ -575,6 +575,14 @@ internal fun ConversationScreen(
     surfaceState: ConversationSurfaceState? = null,
     dictationControlsVisible: Boolean = true,
 ) {
+    androidx.compose.runtime.LaunchedEffect(
+        controller,
+        chat.id,
+        appState.runtimeGeneration,
+        notificationOpenRequestId,
+    ) {
+        appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.CONVERSATION)
+    }
     WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
     // The conversation's own account. Identical to the active account except
     // during a notification-routed early open (#586), while the switch is

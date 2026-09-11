@@ -2,11 +2,15 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import android.content.Context
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
@@ -79,6 +83,28 @@ class ChatsScreenFolderSelectionRecompositionTest {
         composeRule.runOnIdle { selectedFolderId = null }
         composeRule.onNodeWithTag(folderTag).assertDoesNotExist()
 
+        controller.onCleared()
+    }
+
+    /** A deferred consent slot is reachable on Chats and removed while New Chat owns the screen. */
+    @Test
+    fun consentWaitsForChatsWhenNewMessageFlowIsOpen() {
+        val appState = testAppState()
+        val controller = ChatsController(appState)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ChatsScreen(
+                    appState = appState,
+                    controller = controller,
+                    onOpenSettings = {},
+                    onOpenGroup = { _, _, _, _ -> },
+                    diagnosticsPrompt = { Text("Pending consent") },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Pending consent").assertExists()
+        composeRule.onNodeWithContentDescription("New message").performClick()
+        composeRule.onNodeWithText("Pending consent").assertDoesNotExist()
         controller.onCleared()
     }
 

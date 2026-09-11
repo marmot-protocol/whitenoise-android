@@ -47,6 +47,7 @@ import dev.ipf.whitenoise.android.audio.conversationDictationRecognitionActivity
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.AppPhase
+import dev.ipf.whitenoise.android.state.ProductObservation
 import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.state.WarmResumeRenderedSurface
 import dev.ipf.whitenoise.android.state.WarmResumeTrace
@@ -72,11 +73,13 @@ import dev.ipf.whitenoise.android.ui.navigation.shouldComposeProtectedMainShell
 import dev.ipf.whitenoise.android.ui.navigation.warmResumeFirstUsefulSurface
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingScreen
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupScreen
+import dev.ipf.whitenoise.android.ui.settings.UsageDiagnosticsPrompt
 import dev.ipf.whitenoise.android.ui.settings.WipeOutcomeSheet
 import dev.ipf.whitenoise.android.ui.settings.WipeProgressSheet
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
+import dev.ipf.whitenoise.android.updates.AppSelfUpdateState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -192,6 +195,14 @@ internal fun WhiteNoiseApp(
     onRequestAppUnlock: () -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val profileEntryTicket = remember(inboundProfilePayload) { appState.diagnostics.observations.ticket() }
+    val notificationEntryTicket = remember(inboundNotificationRequestId) { appState.diagnostics.observations.ticket() }
+    val shareEntryTicket = remember(inboundShareRequest) { appState.diagnostics.observations.ticket() }
+
+    var diagnosticsPromptSeen by remember(appState.runtimeGeneration) { mutableStateOf(false) }
+    var diagnosticsPromptOpen by remember(appState.runtimeGeneration) { mutableStateOf(false) }
+    val diagnosticsEligible = appState.phase == AppPhase.Ready && appState.activeAccountRef != null
+
     // Mutable bottom-chrome inset so screens further down the tree
     // (e.g. ConversationScreen) can push the snackbar above their
     // composer. Owned here so the host — which lives at this level —
@@ -227,6 +238,10 @@ internal fun WhiteNoiseApp(
             inboundProfilePayload != null ||
             mainShellStateHolder.hasPendingShareRoute ||
             inboundAppUpdateTap != 0
+    val diagnosticsRootUnobstructed =
+        !inboundRoutePending &&
+            appState.pendingWipeReport == null &&
+            appState.appSelfUpdateState == AppSelfUpdateState.Idle
     val dictationImeVisible =
         WindowInsets.ime.getBottom(density) > WindowInsets.navigationBars.getBottom(density)
     val firstUsefulFrameReady =
@@ -268,8 +283,14 @@ internal fun WhiteNoiseApp(
                 dictation.onProviderActivityCancelled()
             }
         }
+    var notificationPermissionTicket by remember { mutableStateOf<Long?>(null) }
     val notificationPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            appState.recordProductObservation(
+                if (granted) ProductObservation.NOTIFICATION_GRANTED else ProductObservation.NOTIFICATION_DENIED,
+                notificationPermissionTicket,
+            )
+            notificationPermissionTicket = null
             appState.refreshLocalNotificationPermission()
             if (granted) {
                 appState.launchMutation { appState.enableDefaultNotificationsIfReady() }
@@ -312,12 +333,18 @@ internal fun WhiteNoiseApp(
         appState.localNotificationSettings?.localNotificationsEnabled,
         appState.runtimeGeneration,
         appState.appLockScreenVisible,
+        diagnosticsPromptOpen,
+        appState.diagnostics.requiresChoice,
+        appState.diagnostics.snapshot,
     ) {
+        if (diagnosticsPromptOpen || appState.diagnostics.requiresChoice) return@LaunchedEffect
+        if (appState.diagnostics.snapshot == null) return@LaunchedEffect
         if (appState.phase != AppPhase.Ready || appState.appLockScreenVisible) return@LaunchedEffect
         appState.refreshLocalNotificationPermission()
         appState.refreshLocalNotificationSettings()
         if (appState.shouldRequestDefaultNotificationPermission()) {
             appState.markDefaultNotificationPermissionPromptLaunched()
+            notificationPermissionTicket = appState.diagnostics.observations.ticket()
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
             appState.enableDefaultNotificationsIfReady()
@@ -340,6 +367,7 @@ internal fun WhiteNoiseApp(
     LaunchedEffect(inboundProfilePayload, appState.phase) {
         val payload = inboundProfilePayload ?: return@LaunchedEffect
         if (appState.phase == AppPhase.Ready && appState.presentProfilePayload(payload)) {
+            appState.recordProductObservation(ProductObservation.PROFILE_ENTRY, profileEntryTicket)
             onProfilePayloadHandled(payload)
         }
     }
@@ -526,11 +554,51 @@ internal fun WhiteNoiseApp(
                                                 MainShell(
                                                     appState = appState,
                                                     stateHolder = mainShellStateHolder,
+                                                    diagnosticsPrompt = {
+                                                        if (
+                                                            diagnosticsEligible &&
+                                                            !appState.wipeInProgress &&
+                                                            diagnosticsRootUnobstructed
+                                                        ) {
+                                                            LaunchedEffect(
+                                                                appState.runtimeGeneration,
+                                                                appState.diagnostics.snapshot,
+                                                                appState.diagnostics.failed,
+                                                            ) {
+                                                                val decisionLoaded =
+                                                                    appState.diagnostics.snapshot != null ||
+                                                                        appState.diagnostics.failed
+                                                                if (!diagnosticsPromptSeen && decisionLoaded) {
+                                                                    diagnosticsPromptSeen = true
+                                                                    diagnosticsPromptOpen =
+                                                                        appState.diagnostics.requiresChoice ||
+                                                                        appState.diagnostics.failed
+                                                                }
+                                                            }
+                                                            if (diagnosticsPromptOpen) {
+                                                                UsageDiagnosticsPrompt(appState) {
+                                                                    diagnosticsPromptOpen = false
+                                                                }
+                                                            }
+                                                        }
+                                                    },
                                                     inboundNotificationTarget = inboundNotificationTarget,
                                                     inboundNotificationRequestId = inboundNotificationRequestId,
-                                                    onNotificationTargetHandled = onNotificationTargetHandled,
+                                                    onNotificationTargetHandled = { target, requestId ->
+                                                        appState.recordProductObservation(
+                                                            ProductObservation.NOTIFICATION_ENTRY,
+                                                            notificationEntryTicket,
+                                                        )
+                                                        onNotificationTargetHandled(target, requestId)
+                                                    },
                                                     inboundShareRequest = inboundShareRequest,
-                                                    onShareRequestHandled = onShareRequestHandled,
+                                                    onShareRequestHandled = { request ->
+                                                        appState.recordProductObservation(
+                                                            ProductObservation.SHARE_ENTRY,
+                                                            shareEntryTicket,
+                                                        )
+                                                        onShareRequestHandled(request)
+                                                    },
                                                     inboundAppUpdateTap = inboundAppUpdateTap,
                                                     onAppUpdateTapHandled = onAppUpdateTapHandled,
                                                 )

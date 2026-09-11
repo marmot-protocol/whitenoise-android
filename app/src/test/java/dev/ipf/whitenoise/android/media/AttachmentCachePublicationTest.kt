@@ -144,6 +144,8 @@ class AttachmentCachePublicationTest {
         val payload = byteArrayOf(9, 8, 7)
         val attachmentKey = AttachmentCachePublication.attachmentKey("msg-2", 0, 1uL)
         val permit = AttachmentCachePublication.capturePermit(attachmentKey)!!
+        // Some host JDKs replace empty directories, so inject the failed rename explicitly.
+        AttachmentCachePublication.renameFileForTests = { _, _ -> false }
 
         val published =
             runCatching {

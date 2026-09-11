@@ -15,15 +15,6 @@ import java.io.File
  */
 class AppStateSendLockCoverageTest {
     @Test
-    fun productExportStaysUnconfigured() {
-        val body = appStateFunctionBody("MarmotInterface.configurePrivacyRuntime")
-        val config = body.substringAfter("ProductAnalyticsRuntimeConfigFfi(")
-
-        assertTrue("Relay-only UI consent must not enable product export", "eventsEndpoint = null," in config)
-        assertTrue("Build credentials must remain inactive until disclosure exists", "appKey = null," in config)
-    }
-
-    @Test
     fun dictationSendRecordsTiming() {
         val body = appStateFunctionBody("sendDictationTranscriptIfOriginUnchanged")
 

@@ -557,7 +557,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "fun ChatsScreen(",
         "test_ids": [
-          "CHL-001"
+          "CHL-001",
+          "SEC-012"
         ]
       },
       {
@@ -3696,7 +3697,8 @@
         "anchor": "fun MainShell(",
         "test_ids": [
           "NAV-001",
-          "NTF-009"
+          "NTF-009",
+          "SEC-012"
         ]
       },
       {
@@ -5355,6 +5357,81 @@
         ]
       },
       {
+        "surface": "IndependentAuditLogChoice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "fun IndependentAuditLogChoice(",
+        "test_ids": [
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "UsageDiagnosticsPrompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "fun UsageDiagnosticsPrompt(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "ConsentSwitchRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConsentSwitchRow.kt",
+        "anchor": "fun ConsentSwitchRow(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "UsageDiagnosticsChoice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "fun UsageDiagnosticsChoice(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "UsageDiagnosticsFeedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "fun UsageDiagnosticsFeedback(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "UsageDiagnosticsSettings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "fun UsageDiagnosticsSettings(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "UsageDiagnosticsDisclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "fun UsageDiagnosticsDisclosure(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
         "surface": "MarkdownNativeDetailsView",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
         "anchor": "fun MarkdownNativeDetailsView(",
@@ -6270,38 +6347,24 @@
       },
       {
         "surface": "setting:telemetry",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
-        "anchor": "R.string.telemetry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_title",
         "test_ids": [
-          "SEC-001",
-          "SEC-002",
-          "SEC-003",
-          "SEC-004",
-          "SEC-005",
-          "SEC-006",
           "SEC-007",
-          "SEC-008",
-          "SEC-009",
-          "SEC-010",
-          "SET-001"
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
         ]
       },
       {
         "surface": "setting:telemetry_settings_subtitle",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
-        "anchor": "R.string.telemetry_settings_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_subtitle",
         "test_ids": [
-          "SEC-001",
-          "SEC-002",
-          "SEC-003",
-          "SEC-004",
-          "SEC-005",
-          "SEC-006",
           "SEC-007",
-          "SEC-008",
-          "SEC-009",
-          "SEC-010",
-          "SET-001"
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
         ]
       },
       {
@@ -7226,6 +7289,196 @@
         "anchor": "R.string.onboarding_recover_setup_success",
         "test_ids": [
           "ONB-024"
+        ]
+      },
+      {
+        "surface": "audit_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.audit_logs",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_disclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_disclosure",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_done",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_error",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_loading",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_logs_separate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_logs_separate",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_off",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_operator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_operator",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_permission_needed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_permission_needed",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_prompt_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_prompt_title",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_ready",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_ready",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_rejected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_rejected",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_renew",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_renew",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_retention_unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_retention_unknown",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_status",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_status",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_unconfigured",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_unconfigured",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_unknown",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "usage_diagnostics_unsupported",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_unsupported",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012",
+          "SEC-013"
         ]
       }
     ],

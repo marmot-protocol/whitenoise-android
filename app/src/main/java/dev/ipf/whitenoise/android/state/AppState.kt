@@ -39,8 +39,7 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationsSubscription
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
-import dev.ipf.marmotkit.ProductAnalyticsMetadataFfi
-import dev.ipf.marmotkit.ProductAnalyticsRuntimeConfigFfi
+import dev.ipf.marmotkit.ProductAnalyticsActivityFfi
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.RelayEndpointClassificationFfi
 import dev.ipf.marmotkit.RelayEndpointPolicyFfi
@@ -53,7 +52,6 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
-import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
 import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsStatusFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
@@ -977,7 +975,6 @@ internal fun operationalNpub(
     encode: (String) -> String?,
 ): String = cachedNpub ?: runCatching { encode(accountIdHex) }.getOrNull() ?: accountIdHex
 
-private const val PRODUCT_OS_MAJOR_MAX_LENGTH = 4
 private const val APP_STATE_SCOPE_LOG_TAG = "WhiteNoiseAppState"
 private const val FORWARD_BACKGROUND_RETRY_ATTEMPTS = 3
 private const val FORWARD_BACKGROUND_RETRY_DELAY_MS = 1_000L
@@ -1887,14 +1884,13 @@ class WhiteNoiseAppState private constructor(
     var localNotificationSettings by mutableStateOf<NotificationSettingsFfi?>(null)
         private set
 
-    var relayTelemetrySettings by mutableStateOf<RelayTelemetrySettingsFfi?>(null)
-        private set
-
-    var usageDiagnosticsSettings by mutableStateOf<UsageDiagnosticsSettingsFfi?>(null)
-        private set
-
-    var usageDiagnosticsStatus by mutableStateOf<UsageDiagnosticsStatusFfi?>(null)
-        private set
+    internal val diagnostics = UsageDiagnosticsController()
+    val relayTelemetrySettings: RelayTelemetrySettingsFfi?
+        get() = diagnostics.snapshot?.relayTelemetry
+    val usageDiagnosticsSettings: UsageDiagnosticsSettingsFfi?
+        get() = diagnostics.snapshot?.settings
+    val usageDiagnosticsStatus: UsageDiagnosticsStatusFfi?
+        get() = diagnostics.snapshot?.status
 
     var auditLogSettings by mutableStateOf<AuditLogSettingsFfi?>(null)
         private set
@@ -2856,8 +2852,12 @@ class WhiteNoiseAppState private constructor(
             runtimeGeneration = runtimeGeneration,
         )
 
+    /** Retires observation tickets whenever destructive recovery replaces the runtime generation. */
     private fun applyDestructiveWipeRuntimeState(state: DestructiveAccountWipeRuntimeState) {
-        if (runtimeGeneration != state.runtimeGeneration) nativePushFallback.invalidateAll()
+        if (runtimeGeneration != state.runtimeGeneration) {
+            diagnostics.observations.reset()
+            nativePushFallback.invalidateAll()
+        }
         activeAccountRef = state.activeAccountRef
         updateNotificationSuppression(
             suppression.copy(
@@ -2904,6 +2904,7 @@ class WhiteNoiseAppState private constructor(
         )
         reloadMediaAutoDownloadMatrix()
         configurePrivacyRuntime()
+        diagnostics.refresh(marmot())
         refreshLocalNotificationSettings()
         networkNotificationRecoverySuppressed = false
         if (restartNotifications) startNotificationListener()
@@ -3566,20 +3567,24 @@ class WhiteNoiseAppState private constructor(
             marmot().block()
         }
 
+    /** Measures one bridge attempt only if it began under the current analytics permission. */
     suspend fun <T> marmotIo(
         traceSection: String,
         block: suspend MarmotInterface.() -> T,
-    ): T =
-        withContext(Dispatchers.IO) {
+    ): T {
+        val ticket = diagnostics.observations.ticket()
+        return withContext(Dispatchers.IO) {
             val runtime = marmot()
             marmotBridgeTracer.trace(
                 traceSection,
                 recordTiming = { name, durationMs, outcome ->
-                    // MDK admits under its consent lock; revocation clears pending events atomically.
-                    runtime.recordHostTiming(name, durationMs.toULong(), outcome)
+                    diagnostics.observations.record(ticket) {
+                        runtime.recordHostTiming(name, durationMs.toULong(), outcome)
+                    }
                 },
             ) { runtime.block() }
         }
+    }
 
     /**
      * Drive Marmot's per-account catch-up so every signed-in account on this
@@ -4140,6 +4145,7 @@ class WhiteNoiseAppState private constructor(
         startupPerformance.stage(PerformancePhase.NOTIFICATION_PRIVACY_SETUP) { refreshSecurityPrivacySettings() }
     }
 
+    /** Binds the consent projection before configuring and starting the process-owned native runtime. */
     private suspend fun startBootstrapRuntime(): AppMarmotRuntime {
         val opened =
             bootstrapRuntime.open(
@@ -4150,6 +4156,7 @@ class WhiteNoiseAppState private constructor(
                                 // Publish before start so lifecycle consumers
                                 // and later listener retries can resolve Marmot.
                                 marmotRuntime = runtime
+                                diagnostics.bind(runtime.marmot)
                                 AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
                                     runtime.marmot.downloadProfileImage(url, maxBytes)
                                 }
@@ -5474,9 +5481,14 @@ class WhiteNoiseAppState private constructor(
      * Drop every registered account-scoped cache so account A's data isn't
      * reachable after switching to B. New caches participate by construction;
      * this boundary must never grow another hand-maintained field list.
+     * Also retires in-flight observations before another identity becomes active.
      */
     private fun clearCrossAccountCaches() {
         assertMainThread { "clearCrossAccountCaches" }
+        diagnostics.observations.invalidate()
+        marmotRuntime?.marmot?.let { engine ->
+            notificationScope.launch { diagnostics.activity(engine, ProductAnalyticsActivityFfi.ACCOUNT_CHANGED) }
+        }
         profileCacheLifetime.advance()
         inviteNotificationIdentityRefreshStore.clear()
         accountScopedCaches.clearAll()
@@ -5662,6 +5674,7 @@ class WhiteNoiseAppState private constructor(
             if (restartNotifications) startNotificationListener()
             notificationNetworkRecovery.resumeIfPending()
             refreshLocalNotificationSettings()
+            diagnostics.refresh(marmot())
             return outcome
         } finally {
             // Backstop: the suppression bracket must not outlive this call
@@ -6060,37 +6073,35 @@ class WhiteNoiseAppState private constructor(
         AppLockPreferences.writeLastUnlockedAtMillis(appContext, normalizedNow)
     }
 
+    /** Refreshes device-scoped native receipts and the independent diagnostic log choice. */
     suspend fun refreshSecurityPrivacySettings() {
-        runCatchingCancellable { marmotIo { usageDiagnosticsSnapshot() } }
-            .getOrNull()
-            ?.let(::applyUsageDiagnosticsSnapshot)
+        diagnostics.refresh(marmot())
         auditLogSettingsMutex.withLock {
             auditLogSettings = runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()
         }
     }
 
-    /** Applies an explicit device-privacy choice through MDK’s current consent API. */
-    suspend fun setTelemetryEnabled(enabled: Boolean): Boolean =
-        runCatching {
-            val updated = marmotIo { updateTelemetryConsent(enabled) }
-            applyUsageDiagnosticsSnapshot(updated)
-            presentTransient(R.string.toast_security_privacy_updated)
-            true
-        }.getOrElse {
-            if (it is CancellationException) throw it
-            presentFailure(R.string.toast_couldnt_update_security_privacy, "SECURITY_PRIVACY_UPDATE", it)
-            false
+    /** Saves the explicit sharing choice and returns false while the retryable error remains visible. */
+    suspend fun setTelemetryEnabled(enabled: Boolean): Boolean = diagnostics.choose(marmot(), enabled)
+
+    /** Retries the failed user choice, rather than discarding it with a passive settings read. */
+    internal suspend fun retryUsageDiagnostics() = diagnostics.retry(marmot())
+
+    /** Whether the current MDK policy has a confirmed explicit grant. */
+    fun isUsageDiagnosticsGranted(): Boolean = diagnostics.granted
+
+    /** Records a finite host event using a ticket captured before asynchronous work starts. */
+    internal fun recordProductObservation(
+        observation: ProductObservation,
+        ticket: Long? = diagnostics.observations.ticket(),
+    ) {
+        val runtime = marmotRuntime?.marmot ?: return
+        notificationScope.launch(Dispatchers.IO) {
+            runCatchingCancellable {
+                diagnostics.observations.record(ticket) { runtime.recordProductEvent(observation.event()) }
+            }
         }
-
-    /** Applies a coherent native diagnostics read to all settings surfaces. */
-    private fun applyUsageDiagnosticsSnapshot(snapshot: UsageDiagnosticsSnapshot) {
-        usageDiagnosticsSettings = snapshot.settings
-        usageDiagnosticsStatus = snapshot.status
-        relayTelemetrySettings = snapshot.relayTelemetry
     }
-
-    /** Whether the user explicitly granted the current unified diagnostics policy. */
-    fun isUsageDiagnosticsGranted(): Boolean = usageDiagnosticsSettings?.decision == UsageDiagnosticsDecisionFfi.GRANTED
 
     suspend fun setAuditLogsEnabled(enabled: Boolean): Boolean =
         runCatching {
@@ -7217,6 +7228,7 @@ class WhiteNoiseAppState private constructor(
         applyApplicationLanguageTag(normalized)
     }
 
+    /** Applies the Activity visibility boundary immediately and schedules native lifecycle work off-main. */
     fun setAppInForeground(
         foreground: Boolean,
         dismissRetainedVisibleConversation: Boolean = true,
@@ -7229,6 +7241,19 @@ class WhiteNoiseAppState private constructor(
         // process cannot keep silencing that chat after the UI is gone (#821).
         updateNotificationSuppression(if (foreground) suppression.onForeground() else suppression.onBackground())
         AppUpdateForegroundState.isForeground = foreground
+        diagnostics.setForeground(foreground)
+        marmotRuntime?.marmot?.let { engine ->
+            notificationScope.launch {
+                diagnostics.activity(
+                    engine,
+                    if (foreground) {
+                        ProductAnalyticsActivityFfi.FOREGROUND
+                    } else {
+                        ProductAnalyticsActivityFfi.BACKGROUND
+                    },
+                )
+            }
+        }
         if (foreground) {
             appLockTtsBoundaryJob?.cancel()
             appLockTtsBoundaryJob = null
@@ -9202,6 +9227,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Installs independent telemetry, audit and product destinations before native startup. */
     private suspend fun MarmotInterface.configurePrivacyRuntime() {
         val installId = runCatchingCancellable { telemetryInstallId() }.getOrNull().orEmpty()
         setRelayTelemetryRuntimeConfig(
@@ -9221,35 +9247,7 @@ class WhiteNoiseAppState private constructor(
             ),
         )
         configureAuditRuntime()
-        setProductAnalyticsRuntimeConfig(
-            ProductAnalyticsRuntimeConfigFfi(
-                // Keep export unconfigured until the settings UI discloses combined usage/diagnostics collection.
-                eventsEndpoint = null,
-                appKey = null,
-                metadata =
-                    ProductAnalyticsMetadataFfi(
-                        appVersion = BuildConfig.VERSION_NAME.substringBefore('-'),
-                        osFamily = "android",
-                        osMajorVersion =
-                            Build.VERSION.RELEASE
-                                .substringBefore('.')
-                                .filter(Char::isDigit)
-                                .take(PRODUCT_OS_MAJOR_MAX_LENGTH),
-                        deviceClass = "other",
-                        hostSurface = "native",
-                        environment =
-                            when (BuildConfig.WHITENOISE_DEPLOYMENT_ENVIRONMENT) {
-                                "production" -> "production"
-                                "staging" -> "staging"
-                                else -> "development"
-                            },
-                        isDebug = BuildConfig.DEBUG,
-                    ),
-                registry = MarmotTraceSection.hostTimingRegistry,
-                allowLoopback = false,
-                operator = BuildConfig.WHITENOISE_PRODUCT_OPERATOR,
-            ),
-        )
+        setProductAnalyticsRuntimeConfig(androidProductAnalyticsRuntimeConfig())
     }
 
     private fun warmProfile(accountIdHex: String) {

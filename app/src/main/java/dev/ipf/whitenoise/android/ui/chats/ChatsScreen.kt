@@ -186,7 +186,11 @@ internal fun ChatsScreen(
         onOpenGroup(item, null, false, null)
     },
     onGroupCreateFlowSuperseded: () -> Unit = {},
+    diagnosticsPrompt: @Composable () -> Unit = {},
 ) {
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.INBOX)
+    }
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
     val openNewMessageFlow = { showNewChatFlow = true }
@@ -1009,6 +1013,16 @@ internal fun ChatsScreen(
             initialManualChatIds = folderEditorTargets.orEmpty(),
         )
         return
+    }
+
+    // Consent belongs to the unobstructed Chats list, after all account setup.
+    // Keep its request in the app root so leaving Chats never consumes the choice.
+    val anotherSheetVisible =
+        actionSheetChatId != null ||
+            folderHandoff.pickerChatIds != null ||
+            pendingBulkDelete != null
+    if (!anotherSheetVisible && !globalSearchPresentationState.filterSheetOpen) {
+        diagnosticsPrompt()
     }
 
     val chatRowContent: @Composable LazyItemScope.(ChatListItem, Int, MessageBodyMatch?) -> Unit =

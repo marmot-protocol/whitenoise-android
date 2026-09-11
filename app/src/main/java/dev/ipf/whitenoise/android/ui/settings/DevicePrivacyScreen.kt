@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Keyboard
@@ -45,6 +44,7 @@ import dev.ipf.whitenoise.android.state.auditLogShareChooserIntent
 import dev.ipf.whitenoise.android.ui.common.GroupSwitchRow
 import dev.ipf.whitenoise.android.ui.common.SettingsGroup
 
+/** Presents independent device privacy controls and the expanded usage disclosure. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DevicePrivacyScreen(
@@ -52,7 +52,9 @@ internal fun DevicePrivacyScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
-    var telemetryBusy by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.PRIVACY)
+    }
     var auditLogsBusy by remember { mutableStateOf(false) }
     var exportAuditLogsConfirmOpen by remember { mutableStateOf(false) }
     var deleteAuditLogsConfirmOpen by remember { mutableStateOf(false) }
@@ -144,26 +146,7 @@ internal fun DevicePrivacyScreen(
                             onCheckedChange = { appState.updateAllowChatScreenshotsInChats(!it) },
                         )
                     }
-                    item {
-                        GroupSwitchRow(
-                            title = stringResource(R.string.telemetry),
-                            subtitle = stringResource(R.string.telemetry_settings_subtitle),
-                            checked = appState.isUsageDiagnosticsGranted(),
-                            enabled = !telemetryBusy,
-                            busy = telemetryBusy,
-                            icon = Icons.Filled.Analytics,
-                            onCheckedChange = { enabled ->
-                                telemetryBusy = true
-                                appState.launchMutation {
-                                    try {
-                                        appState.setTelemetryEnabled(enabled)
-                                    } finally {
-                                        telemetryBusy = false
-                                    }
-                                }
-                            },
-                        )
-                    }
+                    item { UsageDiagnosticsSettings(appState) }
                     item {
                         GroupSwitchRow(
                             title = stringResource(R.string.audit_logs),

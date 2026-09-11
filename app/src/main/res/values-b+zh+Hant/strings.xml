@@ -1745,4 +1745,23 @@
     <string name="group_rejoin_decline">拒絕邀請</string>
     <string name="group_rejoin_success">已重新加入群組。</string>
     <string name="group_rejoin_failed">無法套用此邀請</string>
+    <string name="usage_diagnostics_title">分享使用情況和診斷資料</string>
+    <string name="usage_diagnostics_subtitle">功能使用活動和可靠性指標。</string>
+    <string name="usage_diagnostics_prompt_title">協助改善 White Noise</string>
+    <string name="usage_diagnostics_disclosure">使用資料包含按類別彙整的允許活動和暫時工作階段識別碼，不包含訊息內容、帳戶或群組識別碼。診斷資料包含隨機產生的安裝識別碼，關閉分享後該識別碼會變更。</string>
+    <string name="usage_diagnostics_operator">由 %1$s 營運。</string>
+    <string name="usage_diagnostics_retention_unknown">此版本的資料保留政策尚未經過驗證。</string>
+    <string name="usage_diagnostics_logs_separate">此裝置上所有個人檔案的已清理技術記錄，單獨分享。</string>
+    <string name="usage_diagnostics_renew">分享範圍現在包含功能使用情況。請查看此資訊並重新選擇。</string>
+    <string name="usage_diagnostics_status">使用情況：%1$s。診斷：%2$s。</string>
+    <string name="usage_diagnostics_error">無法確認分享設定。請重試。尚未確認新的選擇。</string>
+    <string name="usage_diagnostics_off">已關閉</string>
+    <string name="usage_diagnostics_permission_needed">需要同意</string>
+    <string name="usage_diagnostics_unconfigured">未設定</string>
+    <string name="usage_diagnostics_unsupported">此版本無法使用</string>
+    <string name="usage_diagnostics_ready">已準備好分享</string>
+    <string name="usage_diagnostics_rejected">設定遭拒</string>
+    <string name="usage_diagnostics_unknown">尚未載入</string>
+    <string name="usage_diagnostics_done">完成</string>
+    <string name="usage_diagnostics_loading">正在載入分享設定…</string>
 </resources>

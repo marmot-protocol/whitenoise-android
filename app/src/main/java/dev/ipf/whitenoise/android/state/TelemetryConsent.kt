@@ -16,8 +16,7 @@ internal data class UsageDiagnosticsSnapshot(
 
 /**
  * Records a fresh opt-in or revocation, then reads the effective unified state without resetting exporter intervals.
- * Upgraded legacy consent is never promoted automatically. The 0.9.20 Android artifact reports product analytics as
- * unsupported because it was published without the `product-analytics-export` feature.
+ * MDK requires renewed acceptance when the configured Android product registry expands.
  */
 internal fun MarmotInterface.updateTelemetryConsent(enabled: Boolean): UsageDiagnosticsSnapshot =
     UsageDiagnosticsSnapshot(

@@ -21,6 +21,7 @@ import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class HostTimingConsentDeviceTest {
+    /** Verifies the published JNI supports export and requires renewed consent for Android scope expansion. */
     @Test
     fun nativeConsentGatesTimings() =
         runBlocking {
@@ -70,6 +71,7 @@ class HostTimingConsentDeviceTest {
                             for (stage in MarmotTraceSection.hostTimingNames.values) {
                                 assertTiming(marmot, stage, ProductRecordResultFfi.RECORDED)
                             }
+                            assertExpandedAndroidScope(marmot, config, server.localPort, name)
                             marmot.setUsageDiagnosticsConsent(false)
                             assertEquals(0uL, marmot.usageDiagnosticsStatus().queuedEvents)
                             assertTiming(marmot, name, ProductRecordResultFfi.IGNORED_DISABLED)
@@ -83,6 +85,86 @@ class HostTimingConsentDeviceTest {
             }
         }
 
+    /** A persisted old-registry grant cannot silently become expanded product consent after relaunch. */
+    @Test
+    fun scopeExpansionRequiresFreshConsentAfterRestart() =
+        runBlocking {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            MarmotAndroid.initialize(context)
+            val root = File(context.cacheDir, "analytics-upgrade-${UUID.randomUUID()}").apply { mkdirs() }
+            val config =
+                ProductAnalyticsRuntimeConfigFfi(
+                    eventsEndpoint = null,
+                    appKey = null,
+                    metadata =
+                        ProductAnalyticsMetadataFfi(
+                            "1.0",
+                            "android",
+                            "15",
+                            "other",
+                            "native",
+                            "development",
+                            true,
+                        ),
+                    registry = MarmotTraceSection.hostTimingRegistry,
+                    allowLoopback = true,
+                    operator = "test_operator",
+                )
+            try {
+                Marmot(root.absolutePath, emptyList()).use { previous ->
+                    previous.setProductAnalyticsRuntimeConfig(config)
+                    previous.start()
+                    try {
+                        previous.setUsageDiagnosticsConsent(true)
+                    } finally {
+                        previous.shutdown()
+                    }
+                }
+                Marmot(root.absolutePath, emptyList()).use { upgraded ->
+                    upgraded.setProductAnalyticsRuntimeConfig(config.copy(registry = androidProductRegistry))
+                    upgraded.start()
+                    try {
+                        assertEquals(
+                            UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED,
+                            upgraded.usageDiagnosticsSettings().decision,
+                        )
+                    } finally {
+                        upgraded.shutdown()
+                    }
+                }
+            } finally {
+                root.deleteRecursively()
+            }
+        }
+
+    /** Proves a previously granted relay-only scope requires renewed permission and validates every event. */
+    private suspend fun assertExpandedAndroidScope(
+        marmot: Marmot,
+        config: ProductAnalyticsRuntimeConfigFfi,
+        port: Int,
+        name: String,
+    ) {
+        // Same destination and current GRANTED receipt: only the Android scope expands.
+        marmot.setProductAnalyticsRuntimeConfig(
+            config.copy(
+                eventsEndpoint = "http://127.0.0.1:$port/api/v0/events",
+                appKey = "A-SH-test",
+                registry = androidProductRegistry,
+            ),
+        )
+        assertEquals(
+            UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED,
+            marmot.usageDiagnosticsSettings().decision,
+        )
+        assertTiming(marmot, name, ProductRecordResultFfi.IGNORED_DISABLED)
+        marmot.setUsageDiagnosticsConsent(true)
+        marmot.setProductAnalyticsActivity(dev.ipf.marmotkit.ProductAnalyticsActivityFfi.FOREGROUND)
+        for (event in ProductObservation.entries) {
+            assertEquals(ProductRecordResultFfi.RECORDED, marmot.recordProductEvent(event.event()))
+        }
+    }
+
+    /** Asserts native admission without draining events to an external service. */
     private fun assertTiming(
         marmot: Marmot,
         name: String,

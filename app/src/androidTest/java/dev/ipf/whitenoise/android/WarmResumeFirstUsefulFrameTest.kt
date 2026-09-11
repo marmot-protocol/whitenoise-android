@@ -6,7 +6,6 @@ import android.os.SystemClock
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onRoot
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -110,8 +109,8 @@ class WarmResumeFirstUsefulFrameTest {
         composeRule.onNodeWithTag(WARM_RESUME_USEFUL_SURFACE_TEST_TAG).assertExists()
     }
 
+    /** Checks the app surface even when the first-launch consent sheet contributes a second root. */
     private fun assertUsefulSurfaceWithoutFullScreenLoading() {
-        composeRule.onRoot().assertExists()
         composeRule.onNodeWithTag(WARM_RESUME_USEFUL_SURFACE_TEST_TAG).assertExists()
         composeRule.onNodeWithTag(FULL_SCREEN_LOADING_TEST_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(STARTUP_LOADING_TEST_TAG).assertDoesNotExist()
