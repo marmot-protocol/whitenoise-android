@@ -1150,6 +1150,8 @@ class LocalizationResourceTest {
                         "attachment_type_video",
                         // "Emoji" is the standard German loan word.
                         "group_image_source_emoji",
+                        // "System" is the German word for the system font choice.
+                        "appearance_font_system",
                     ),
                 "values-es" to
                     setOf(

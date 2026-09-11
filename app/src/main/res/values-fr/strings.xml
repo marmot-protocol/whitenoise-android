@@ -811,7 +811,7 @@
     <string name="theme_dark">Sombre</string>
     <string name="theme_amoled">AMOLED</string>
     <string name="language">Langue</string>
-    <string name="language_system">Langue du système</string>
+    <string name="language_system">Par défaut du système</string>
     <string name="language_english">English</string>
     <string name="language_german">Deutsch</string>
     <string name="language_spanish">Español</string>
@@ -1415,7 +1415,7 @@
     <string name="notification_channel_app_updates_global_description">Comportement d’alerte Android pour les mises à jour de White Noise</string>
 
     <string name="chat_bubble_colors">Couleurs des bulles</string>
-    <string name="action_color">Couleur d’accentuation de l’application</string>
+    <string name="action_color">Couleur d\'action</string>
     <string name="action_color_subtitle">Choisissez la couleur d’accentuation de ce compte pour les boutons, les sélections et les indicateurs de messages non lus. Les couleurs claires, sombres et AMOLED sont enregistrées séparément.</string>
     <string name="action_color_no_active_account">Sélectionnez un compte actif avant de définir sa couleur d’accentuation.</string>
     <string name="action_color_swatch_content_description">Couleur d’accentuation de l’application %1$s</string>
@@ -1569,6 +1569,13 @@
     <string name="theme_light_subtitle">Toujours utiliser le clair</string>
     <string name="theme_dark_subtitle">Toujours utiliser le sombre</string>
     <string name="amoled_mode_subtitle">Utiliser un fond noir pur</string>
+    <string name="appearance_outline_colors_fixed">AMOLED utilise des couleurs blanches fixes pour les actions et les bulles. Changez de thème pour personnaliser les couleurs.</string>
+    <string name="appearance_theme">Thème</string>
+    <string name="appearance_theme_help">Par défaut, le système suit votre appareil. Clair et Sombre conservent l\'apparence choisie. AMOLED utilise un fond noir avec des contours blancs.</string>
+    <string name="appearance_amoled_detail">Noir pur avec des contours blancs nets.</string>
+    <string name="appearance_font_size_help">La taille du texte s\'ajoute au réglage de taille de police de votre appareil.</string>
+    <string name="appearance_enter_help">Maj+Entrée insère toujours une nouvelle ligne sur un clavier physique.</string>
+    <string name="appearance_font_system">Système</string>
     <string name="support">Assistance</string>
     <string name="app_font">Police de l\'application</string>
     <string name="attachment_type_android_package">APK</string>

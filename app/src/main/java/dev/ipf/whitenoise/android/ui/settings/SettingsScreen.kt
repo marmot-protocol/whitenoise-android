@@ -239,6 +239,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
     when (detail) {
         SettingsDetail.ActionColor,
         SettingsDetail.ChatBubbleColors,
+        SettingsDetail.Language,
         -> SettingsDetail.Appearance
         SettingsDetail.About -> SettingsDetail.Help
         SettingsDetail.Developer -> SettingsDetail.About
@@ -286,22 +287,20 @@ internal fun SettingsScreen(
                 onBack = { onDetailChange(null) },
                 onOpenActionColor = { onDetailChange(SettingsDetail.ActionColor) },
                 onOpenChatBubbleColors = { onDetailChange(SettingsDetail.ChatBubbleColors) },
+                onOpenLanguage = { onDetailChange(SettingsDetail.Language) },
             )
         SettingsDetail.ActionColor ->
             ActionColorScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
         SettingsDetail.ChatBubbleColors ->
             ChatBubbleColorsScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
+        SettingsDetail.Language -> LanguageScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
         SettingsDetail.Data -> AutoDownloadDataScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Profile -> ProfileEditScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.AccountKeys -> AccountKeysScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Relays -> RelaysScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.KeyPackages -> KeyPackagesScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Notifications -> NotificationsScreen(appState, onBack = { onDetailChange(null) })
-        SettingsDetail.DevicePrivacy ->
-            DevicePrivacyScreen(
-                appState = appState,
-                onBack = { onDetailChange(null) },
-            )
+        SettingsDetail.DevicePrivacy -> DevicePrivacyScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.AiAgents -> AiAgentsScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Donate -> DonateScreen(onBack = { onDetailChange(null) })
         SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = { onDetailChange(null) })

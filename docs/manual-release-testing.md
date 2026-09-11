@@ -382,6 +382,8 @@ This checklist was derived from the current navigation, UI, resources, manifest 
 
 A feature is in scope when a release build can present it to a user, including loading, empty, disabled, permission-denied, offline, error, retry, destructive-confirmation, account-switch, background, and restored states. A visible Coming soon control is tested as a disabled/explicit state; a source-only feature with no release-build user path is not represented as working UI.
 
+The shared settings components in `ui/settings/SettingsComponents.kt`, `ui/settings/SettingsRowDefaults.kt` and `ui/common/WhiteNoiseDialogs.kt` have their first release-build user path on the Appearance screen and are covered by `SET-001`–`SET-008`. `ui/common/WhiteNoiseTextField.kt` and the shared `SettingsSwitch` row have no release-build user path yet; they are listed in `docs/manual-release-testing-surfaces.json` as explicit coverage exceptions and are pinned by `WhiteNoiseTextFieldBehaviorTest`, `WhiteNoiseTextFieldScreenshotTest`, `SettingsComponentsSemanticsTest` and `SettingsComponentsScreenshotTest`. When a screen adopts them, replace those exceptions with permanent owning-prefix IDs in the same pull request.
+
 ### Maintenance contract
 
 - Any pull request that adds, removes, renames, or changes user-visible behavior or state must update the affected point(s) in this guide in the same pull request. This includes permissions, intents, navigation, settings, error/retry copy, build-flavor differences, background work, privacy behavior, and accessibility behavior.

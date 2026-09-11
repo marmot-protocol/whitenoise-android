@@ -4275,59 +4275,9 @@
         ]
       },
       {
-        "surface": "AppFontPickerRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
-        "anchor": "fun AppFontPickerRow(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
         "surface": "AppearanceScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
         "anchor": "fun AppearanceScreen(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "EnterKeyBehaviorRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
-        "anchor": "fun EnterKeyBehaviorRow(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "FontSizePickerRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
-        "anchor": "fun FontSizePickerRow(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "LanguagePickerSection",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
-        "anchor": "fun LanguagePickerSection(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "ThemeAndColorSettings",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
-        "anchor": "fun ThemeAndColorSettings(",
-        "test_ids": [
-          "SET-002",
-          "SET-003",
-          "SET-004"
-        ]
-      },
-      {
-        "surface": "ThemeModeCard",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
-        "anchor": "fun ThemeModeCard(",
         "test_ids": [
           "SET-001"
         ]
@@ -5512,6 +5462,159 @@
         ]
       },
       {
+        "surface": "WhiteNoiseTextFieldContainer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
+        "anchor": "fun WhiteNoiseTextFieldContainer(",
+        "test_ids": [],
+        "coverage_exception": "Shared form field with no release-build user path yet. Covered by WhiteNoiseTextFieldScreenshotTest and WhiteNoiseTextFieldBehaviorTest; assign permanent manual route IDs when a form flow adopts it."
+      },
+      {
+        "surface": "WhiteNoiseTextField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
+        "anchor": "fun WhiteNoiseTextField(",
+        "test_ids": [],
+        "coverage_exception": "Shared form field with no release-build user path yet. Covered by WhiteNoiseTextFieldScreenshotTest and WhiteNoiseTextFieldBehaviorTest; assign permanent manual route IDs when a form flow adopts it."
+      },
+      {
+        "surface": "SettingsGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsComponents.kt",
+        "anchor": "fun SettingsGroup(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsSwitch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsComponents.kt",
+        "anchor": "fun SettingsSwitch(",
+        "test_ids": [],
+        "coverage_exception": "Shared settings switch row with no release-build user path yet. Covered by SettingsComponentsSemanticsTest and SettingsComponentsScreenshotTest; assign permanent manual route IDs when a screen adopts it."
+      },
+      {
+        "surface": "SettingsLink",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsComponents.kt",
+        "anchor": "fun SettingsLink(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsChoice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsComponents.kt",
+        "anchor": "fun SettingsChoice(",
+        "test_ids": [
+          "SET-002"
+        ]
+      },
+      {
+        "surface": "SettingsRowTitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsRowDefaults.kt",
+        "anchor": "fun SettingsRowTitle(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsRowSupportingText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsRowDefaults.kt",
+        "anchor": "fun SettingsRowSupportingText(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsRowTrailing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsRowDefaults.kt",
+        "anchor": "fun SettingsRowTrailing(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "ChoiceDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "fun <T> ChoiceDialog(",
+        "test_ids": [
+          "SET-006",
+          "SET-007",
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseDialogChoiceRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "fun WhiteNoiseDialogChoiceRow(",
+        "test_ids": [
+          "SET-006",
+          "SET-007",
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "LanguageScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageScreen.kt",
+        "anchor": "fun LanguageScreen(",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "SettingsScaffold",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "fun SettingsScaffold(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsList",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "fun SettingsList(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsSection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "fun SettingsSection(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsExplainer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "fun SettingsExplainer(",
+        "test_ids": [
+          "SET-002"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseScaffold",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScaffold.kt",
+        "anchor": "fun WhiteNoiseScaffold(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTopBar.kt",
+        "anchor": "fun WhiteNoiseTopBar(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "AdaptiveContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AdaptiveContent.kt",
+        "anchor": "fun AdaptiveContent(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
         "surface": "ChatFolderManageItem.displayName",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
         "anchor": "fun ChatFolderManageItem.displayName(",
@@ -6194,17 +6297,97 @@
         ]
       },
       {
-        "surface": "setting:action_color",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
-        "anchor": "R.string.action_color",
+        "surface": "setting:language_chinese_traditional",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_chinese_traditional",
         "test_ids": [
-          "SET-001"
+          "SET-008"
         ]
       },
       {
-        "surface": "setting:action_color_subtitle",
+        "surface": "setting:language_chinese_simplified",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_chinese_simplified",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_turkish",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_turkish",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_russian",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_russian",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_portuguese",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_portuguese",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_italian",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_italian",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_french",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_french",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_spanish",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_spanish",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_german",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_german",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_english",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_english",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_system",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_system",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:action_color",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
-        "anchor": "R.string.action_color_subtitle",
+        "anchor": "R.string.action_color",
         "test_ids": [
           "SET-001"
         ]
@@ -6221,14 +6404,6 @@
         "surface": "setting:chat_bubble_colors",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
         "anchor": "R.string.chat_bubble_colors",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "setting:chat_bubble_colors_global_subtitle",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
-        "anchor": "R.string.chat_bubble_colors_global_subtitle",
         "test_ids": [
           "SET-001"
         ]
@@ -6258,11 +6433,95 @@
         ]
       },
       {
-        "surface": "setting:theme_mode",
+        "surface": "setting:appearance",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
-        "anchor": "R.string.theme_mode",
+        "anchor": "R.string.appearance",
         "test_ids": [
           "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageScreen.kt",
+        "anchor": "R.string.language",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_system",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.language_system",
+        "test_ids": [
+          "SET-002",
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:appearance_font_system",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_font_system",
+        "test_ids": [
+          "SET-007"
+        ]
+      },
+      {
+        "surface": "setting:appearance_enter_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_enter_help",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:appearance_font_size_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_font_size_help",
+        "test_ids": [
+          "SET-006"
+        ]
+      },
+      {
+        "surface": "setting:appearance_amoled_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_amoled_detail",
+        "test_ids": [
+          "SET-002"
+        ]
+      },
+      {
+        "surface": "setting:appearance_amoled",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_amoled",
+        "test_ids": [
+          "SET-002"
+        ]
+      },
+      {
+        "surface": "setting:appearance_theme_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_theme_help",
+        "test_ids": [
+          "SET-002",
+          "SET-003"
+        ]
+      },
+      {
+        "surface": "setting:appearance_theme",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_theme",
+        "test_ids": [
+          "SET-002"
+        ]
+      },
+      {
+        "surface": "setting:appearance_outline_colors_fixed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_outline_colors_fixed",
+        "test_ids": [
+          "SET-002",
+          "SET-004",
+          "SET-005"
         ]
       },
       {
@@ -7875,6 +8134,24 @@
         "anchor": "R.string.dictation_settings_title",
         "test_ids": [
           "DIC-001"
+        ]
+      },
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SET-006",
+          "SET-007",
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "string:back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTopBar.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "SET-001"
         ]
       }
     ],

@@ -811,7 +811,7 @@
     <string name="theme_dark">Scuro</string>
     <string name="theme_amoled">AMOLED</string>
     <string name="language">Lingua</string>
-    <string name="language_system">Lingua di sistema</string>
+    <string name="language_system">Predefinito di sistema</string>
     <string name="language_english">English</string>
     <string name="language_german">Deutsch</string>
     <string name="language_spanish">Español</string>
@@ -1415,7 +1415,7 @@
     <string name="notification_channel_app_updates_global_description">Comportamento degli avvisi Android per gli aggiornamenti di White Noise</string>
 
     <string name="chat_bubble_colors">Colori dei fumetti</string>
-    <string name="action_color">Colore d’accento dell’app</string>
+    <string name="action_color">Colore azione</string>
     <string name="action_color_subtitle">Scegli il colore d’accento di questo account per pulsanti, selezioni e indicatori dei messaggi non letti. I colori chiaro, scuro e AMOLED vengono salvati separatamente.</string>
     <string name="action_color_no_active_account">Seleziona un account attivo prima di impostarne il colore d’accento.</string>
     <string name="action_color_swatch_content_description">Colore d’accento dell’app %1$s</string>
@@ -1569,6 +1569,13 @@
     <string name="theme_light_subtitle">Usa sempre il tema chiaro</string>
     <string name="theme_dark_subtitle">Usa sempre il tema scuro</string>
     <string name="amoled_mode_subtitle">Usa uno sfondo nero puro</string>
+    <string name="appearance_outline_colors_fixed">AMOLED usa colori bianchi fissi per azioni e fumetti. Cambia tema per personalizzare i colori.</string>
+    <string name="appearance_theme">Tema</string>
+    <string name="appearance_theme_help">L\'impostazione di sistema segue il dispositivo. Chiaro e Scuro mantengono l\'aspetto selezionato. AMOLED usa uno sfondo nero con contorni bianchi.</string>
+    <string name="appearance_amoled_detail">Nero puro con contorni bianchi netti.</string>
+    <string name="appearance_font_size_help">La dimensione del testo si aggiunge all\'impostazione della dimensione dei caratteri del dispositivo.</string>
+    <string name="appearance_enter_help">Maiusc+Invio inserisce sempre una nuova riga su una tastiera fisica.</string>
+    <string name="appearance_font_system">Sistema</string>
     <string name="support">Supporto</string>
     <string name="app_font">Carattere dell\'app</string>
     <string name="attachment_type_android_package">APK</string>

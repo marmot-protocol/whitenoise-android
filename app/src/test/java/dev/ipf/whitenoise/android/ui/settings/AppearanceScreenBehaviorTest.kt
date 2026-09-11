@@ -1,7 +1,12 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -23,8 +28,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Pre-change behaviour contract of the Appearance screen: every callback and preference write
- * the M123 pilot must preserve, captured against the current presentation.
+ * Behaviour contract of the Appearance screen: every callback and preference write a restyle must preserve.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h1200dp-mdpi")
@@ -36,12 +40,17 @@ class AppearanceScreenBehaviorTest {
     private var backCount = 0
     private var actionColorCount = 0
     private var bubbleColorsCount = 0
+    private var languageCount = 0
 
     /** Start each test from default appearance preferences and fresh callback counters. */
     @Before
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        context.getSharedPreferences("whitenoise", Context.MODE_PRIVATE).edit().clear().commit()
+        context
+            .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
         appState =
             WhiteNoiseAppState(
                 context = context,
@@ -57,28 +66,51 @@ class AppearanceScreenBehaviorTest {
                     onBack = { backCount++ },
                     onOpenActionColor = { actionColorCount++ },
                     onOpenChatBubbleColors = { bubbleColorsCount++ },
+                    onOpenLanguage = { languageCount++ },
                 )
             }
         }
     }
 
-    /** Back and the two colour editor rows each invoke their caller exactly once per tap. */
+    /** Back, the two colour editor rows and the language row each invoke their caller exactly once per tap. */
     @Test
     fun navigationCallbacksFireOncePerTap() {
         composeRule.onNodeWithContentDescription("Back").performClick()
-        composeRule.onNodeWithText("App accent color").performClick()
+        composeRule.onNodeWithText("Action color").performClick()
         composeRule.onNodeWithText("Chat bubble colors").performClick()
+        composeRule.onNodeWithText("Language").performClick()
         composeRule.runOnIdle {
             assertEquals(1, backCount)
             assertEquals(1, actionColorCount)
             assertEquals(1, bubbleColorsCount)
+            assertEquals(1, languageCount)
+            assertEquals("", appState.languageTag)
         }
     }
 
-    /** Tapping a theme card selects it and writes the mode, including the AMOLED mode. */
+    /** AMOLED fixes the palette: both colour editors disable, explain why, and never open. */
+    @Test
+    fun amoledDisablesColourEditorsWithAFixedColoursNotice() {
+        composeRule.onNodeWithText("AMOLED").performClick()
+        composeRule.runOnIdle { assertEquals(AppThemeMode.Amoled, appState.themeMode) }
+        composeRule.onNodeWithText("Action color").assertIsNotEnabled().performClick()
+        composeRule.onNodeWithText("Chat bubble colors").assertIsNotEnabled().performClick()
+        composeRule
+            .onNodeWithText("AMOLED uses fixed white action and bubble colors. Switch themes to customize colors.")
+            .assertExists()
+        composeRule.runOnIdle {
+            assertEquals(0, actionColorCount)
+            assertEquals(0, bubbleColorsCount)
+        }
+        composeRule.onNodeWithText("Light").performClick()
+        composeRule.onNodeWithText("Action color").assertIsEnabled()
+    }
+
+    /** Tapping a theme row selects it and writes the mode, including the AMOLED mode. */
     @Test
     fun themeModeCardsWriteTheSelectedMode() {
         assertEquals(AppThemeMode.System, appState.themeMode)
+        composeRule.onNode(themeRow("System default")).assertIsSelected()
         composeRule.onNodeWithText("Dark").performClick()
         composeRule.runOnIdle { assertEquals(AppThemeMode.Dark, appState.themeMode) }
         composeRule.onNodeWithText("AMOLED").performClick()
@@ -86,29 +118,32 @@ class AppearanceScreenBehaviorTest {
         composeRule.onNodeWithText("AMOLED").assertIsSelected()
     }
 
-    /** The font size sheet writes the chosen step, closes, and the row shows the new value. */
+    /** The font size dialog explains the scale, writes the chosen step, closes, and the row shows the new value. */
     @Test
     fun fontSizeSheetWritesScaleAndCloses() {
         composeRule.onNodeWithText("Font size").performClick()
+        composeRule.onNodeWithText("Text size adds to your device font-size setting.").assertExists()
         composeRule.onNodeWithText("Extra large").performClick()
         composeRule.runOnIdle { assertEquals(AppFontScale.ExtraLarge, appState.fontScale) }
         composeRule.onNodeWithText("Small").assertDoesNotExist()
         composeRule.onNodeWithText("Extra large").assertExists()
     }
 
-    /** The app font sheet writes the chosen family and closes. */
+    /** The app font dialog writes the chosen family and closes; the system face is the default. */
     @Test
     fun appFontSheetWritesFontAndCloses() {
+        assertEquals(AppFont.System, appState.appFont)
         composeRule.onNodeWithText("App font").performClick()
         composeRule.onNodeWithText("Outfit").performClick()
         composeRule.runOnIdle { assertEquals(AppFont.Outfit, appState.appFont) }
         composeRule.onNodeWithText("Urbanist").assertDoesNotExist()
     }
 
-    /** The Enter key dialog applies a choice on tap, and Cancel leaves the stored choice alone. */
+    /** The Enter key dialog explains Shift+Enter, applies on tap, and Cancel keeps the stored choice. */
     @Test
     fun enterKeyDialogAppliesOnTapAndCancelKeepsIt() {
         composeRule.onNodeWithText("Enter key behavior").performClick()
+        composeRule.onNodeWithText("Shift+Enter always inserts a new line on a hardware keyboard.").assertExists()
         composeRule.onNodeWithText("Send message").performClick()
         composeRule.runOnIdle { assertEquals(EnterKeyBehavior.SendMessage, appState.enterKeyBehavior) }
         composeRule.onNodeWithText("Enter key behavior").performClick()
@@ -117,12 +152,15 @@ class AppearanceScreenBehaviorTest {
         composeRule.onNodeWithText("New line").assertDoesNotExist()
     }
 
-    /** The language sheet writes the selected tag and closes. */
+    /** The language row shows the current choice and is a destination, so no list opens in place. */
     @Test
-    fun languageSheetWritesTagAndCloses() {
+    fun languageRowShowsTheCurrentChoiceAndOpensNothingInPlace() {
+        composeRule.onNode(hasText("Language") and hasText("System default")).assertExists()
         composeRule.onNodeWithText("Language").performClick()
-        composeRule.onNodeWithText("Deutsch").performClick()
-        composeRule.runOnIdle { assertEquals("de", appState.languageTag) }
-        composeRule.onNodeWithText("Español").assertDoesNotExist()
+        composeRule.onNodeWithText("Deutsch").assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(1, languageCount) }
     }
+
+    /** A theme row is the node with that label inside the theme group, not the language value. */
+    private fun themeRow(label: String) = hasText(label) and hasAnyAncestor(hasTestTag("appearance.theme.group"))
 }

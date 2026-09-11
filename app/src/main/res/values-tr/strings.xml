@@ -811,7 +811,7 @@
     <string name="theme_dark">Koyu</string>
     <string name="theme_amoled">AMOLED</string>
     <string name="language">Dil</string>
-    <string name="language_system">Sistem dili</string>
+    <string name="language_system">Sistem varsayılanı</string>
     <string name="language_english">English</string>
     <string name="language_german">Deutsch</string>
     <string name="language_spanish">Español</string>
@@ -1413,7 +1413,7 @@
     <string name="notification_channel_app_updates_global_description">White Noise uygulama güncellemeleri için Android uyarı davranışı</string>
 
     <string name="chat_bubble_colors">Sohbet balonu renkleri</string>
-    <string name="action_color">Uygulama vurgu rengi</string>
+    <string name="action_color">Eylem rengi</string>
     <string name="action_color_subtitle">Düğmeler, seçimler ve okunmamış göstergeleri için bu hesabın vurgu rengini seçin. Açık, koyu ve AMOLED renkleri ayrı kaydedilir.</string>
     <string name="action_color_no_active_account">Uygulama vurgu rengini ayarlamadan önce etkin bir hesap seçin.</string>
     <string name="action_color_swatch_content_description">Uygulama vurgu rengi %1$s</string>
@@ -1567,6 +1567,13 @@
     <string name="theme_light_subtitle">Her zaman açık kullan</string>
     <string name="theme_dark_subtitle">Her zaman koyu kullan</string>
     <string name="amoled_mode_subtitle">Saf siyah bir arka plan kullan</string>
+    <string name="appearance_outline_colors_fixed">AMOLED, eylemler ve mesaj balonları için sabit beyaz renk kullanır. Renkleri özelleştirmek için temayı değiştirin.</string>
+    <string name="appearance_theme">Tema</string>
+    <string name="appearance_theme_help">Sistem varsayılanı cihazınızı takip eder. Açık ve Koyu, seçilen görünümü korur. AMOLED, beyaz çizgili siyah bir arka plan kullanır.</string>
+    <string name="appearance_amoled_detail">Keskin beyaz çizgilerle saf siyah.</string>
+    <string name="appearance_font_size_help">Metin boyutu, cihazınızın yazı tipi boyutu ayarına eklenir.</string>
+    <string name="appearance_enter_help">Shift+Enter, donanım klavyesine her zaman yeni bir satır ekler.</string>
+    <string name="appearance_font_system">Sistem</string>
     <string name="support">Destek</string>
     <string name="app_font">Uygulama yazı tipi</string>
     <string name="attachment_type_android_package">APK</string>
