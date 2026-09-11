@@ -834,6 +834,7 @@ internal class ConversationDictationController internal constructor(
                     if (state !is ConversationDictationState.Processing || state.sessionId != sessionId) {
                         return@finishCallerAudioCapture
                     }
+                    finishPlaybackInterruption()
                     if (platform.callerAudioHasPending()) {
                         startRecognition(sessionId, target)
                     } else {
@@ -841,7 +842,10 @@ internal class ConversationDictationController internal constructor(
                     }
                 }
             }.getOrDefault(false)
-        if (!platformOwnsClosure) finalizeAccumulatedTranscript(sessionId, target)
+        if (!platformOwnsClosure) {
+            finishPlaybackInterruption()
+            finalizeAccumulatedTranscript(sessionId, target)
+        }
     }
 
     /** Keeps one drain deadline active while replacement recognizers move through their states. */

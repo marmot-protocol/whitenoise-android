@@ -1617,6 +1617,44 @@ class ConversationDictationControllerTest {
         assertEquals("first tail", fixture.drafts.getValue(key()).text)
     }
 
+    /** Capture closure releases playback and the logical lease before sealed tail transcription finishes. */
+    @Test
+    fun restartGapCaptureCloseRestoresPlaybackBeforeTailDrainCompletes() {
+        var releases = 0
+        var resumes = 0
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                releaseMicrophone = { releases += 1 },
+                onAfterAudioCapture = { resumes += 1 },
+            )
+        fixture.platform.pendingCallerAudio = true
+        fixture.platform.deferCallerAudioFinish = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        fixture.platform.listener.onResult("first")
+        fixture.controller.stop()
+
+        assertEquals(0, releases)
+        assertEquals(0, resumes)
+        assertEquals("", fixture.drafts.getValue(key()).text)
+
+        checkNotNull(fixture.platform.callerAudioFinishCallback).invoke()
+
+        assertEquals(1, releases)
+        assertEquals(1, resumes)
+        assertEquals("", fixture.drafts.getValue(key()).text)
+        assertEquals(2, fixture.platform.sessions.size)
+
+        fixture.platform.pendingCallerAudio = false
+        fixture.platform.listener.onResult("tail")
+
+        assertEquals("first tail", fixture.drafts.getValue(key()).text)
+        assertEquals(1, fixture.writes)
+        assertEquals(1, releases)
+        assertEquals(1, resumes)
+    }
+
     /** A stop before the next provider's speech callback still drains its captured caller-audio chunk. */
     @Test
     fun stopBeforeSpeechCallbackDoesNotDiscardCallerAudioTail() {
