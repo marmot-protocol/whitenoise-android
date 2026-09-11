@@ -805,6 +805,12 @@
     <string name="settings_add_profile">Adicionar perfil</string>
     <string name="settings_switch_profile">Trocar de perfil</string>
     <string name="settings_open_share_connect_for">Abrir Compartilhar e conectar de %1$s</string>
+    <string name="share_and_connect">Compartilhar e conectar</string>
+    <string name="scan_to_connect">Digitalize para conectar.</string>
+    <string name="not_copied">Não copiado</string>
+    <string name="copy_public_key">Copiar chave pública</string>
+    <string name="profile_photo_for">Foto de perfil de %1$s</string>
+    <string name="button_in_progress">Em andamento</string>
     <string name="support_the_project">Apoie o projeto</string>
     <string name="support_the_project_subtitle">White Noise é gratuito e de código aberto. As doações ajudam a mantê-lo assim.</string>
     <string name="chat_with_support">Conversar com o suporte</string>

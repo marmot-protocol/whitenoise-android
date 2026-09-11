@@ -73,7 +73,6 @@ import dev.ipf.whitenoise.android.ui.common.LocalSettingsRowsInsideSectionCard
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.profile.ProfileEditScreen
-import dev.ipf.whitenoise.android.ui.profile.ProfileQrSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
@@ -290,6 +289,7 @@ internal fun SettingsScreen(
     settingsBackHandler(detail, onBackToChats, onDetailChange)
 
     when (detail) {
+        SettingsDetail.ShareConnect -> ShareConnectScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Appearance ->
             AppearanceScreen(
                 appState = appState,
@@ -365,7 +365,6 @@ private fun SettingsHomeScreen(
     viewport: SettingsHomeViewport,
     onViewportChange: (SettingsHomeViewport) -> Unit,
 ) {
-    var qrOpen by remember { mutableStateOf(false) }
     var showAccountSelector by remember { mutableStateOf(false) }
     var showAddIdentity by remember { mutableStateOf(false) }
     var showSignOut by remember { mutableStateOf(false) }
@@ -410,8 +409,7 @@ private fun SettingsHomeScreen(
         appUpdateInfo = appState.appUpdateInfo,
         versionName = BuildConfig.VERSION_NAME,
         onBack = onBackToChats,
-        // Share & Connect lands with the Phase 2 detail screens; until then the header opens the QR sheet.
-        onOpenShareConnect = { qrOpen = true },
+        onOpenShareConnect = { onOpenDetail(SettingsDetail.ShareConnect) },
         onAddProfile = { showAddIdentity = true },
         onSwitchProfile = { showAccountSelector = true },
         onOpenDetail = onOpenDetail,
@@ -430,11 +428,6 @@ private fun SettingsHomeScreen(
         },
     )
 
-    if (qrOpen) {
-        activeAccount?.let { account ->
-            ProfileQrSheet(appState = appState, accountIdHex = account.accountIdHex, onDismiss = { qrOpen = false })
-        }
-    }
     if (showAccountSelector) {
         AccountSelectorSheet(
             appState = appState,

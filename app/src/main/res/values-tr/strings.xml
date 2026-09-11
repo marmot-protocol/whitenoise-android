@@ -805,6 +805,12 @@
     <string name="settings_add_profile">Profil Ekle</string>
     <string name="settings_switch_profile">Profil Değiştir</string>
     <string name="settings_open_share_connect_for">%1$s için Paylaş ve Bağlan\'ı açın</string>
+    <string name="share_and_connect">Paylaş ve Bağlan</string>
+    <string name="scan_to_connect">Bağlanmak için tarayın.</string>
+    <string name="not_copied">Kopyalanmadı</string>
+    <string name="copy_public_key">Genel anahtarı kopyala</string>
+    <string name="profile_photo_for">%1$s için profil fotoğrafı</string>
+    <string name="button_in_progress">Devam ediyor</string>
     <string name="support_the_project">Projeyi destekle</string>
     <string name="support_the_project_subtitle">White Noise ücretsiz ve açık kaynaklıdır. Bağışlar böyle kalmasına yardımcı olur.</string>
     <string name="chat_with_support">Destek ile sohbet</string>
