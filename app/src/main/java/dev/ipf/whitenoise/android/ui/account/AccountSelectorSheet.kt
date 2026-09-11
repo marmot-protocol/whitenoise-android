@@ -1,9 +1,7 @@
 package dev.ipf.whitenoise.android.ui.account
 
-import android.content.ClipData
 import android.util.Log
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,19 +15,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.QrCode
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
@@ -42,27 +35,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
@@ -70,204 +56,9 @@ import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
-import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
-import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
-import dev.ipf.whitenoise.android.ui.settings.settingsRowAmoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
-
-@Composable
-fun SettingsAccountHeader(
-    title: String,
-    subtitle: String,
-    seed: String,
-    pictureUrl: String?,
-    onOpenAccountSelector: () -> Unit,
-    onOpenQr: () -> Unit,
-    onEditProfilePicture: () -> Unit = {},
-) {
-    val protocolPictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
-    val avatarImageAvailable = rememberAvatarImageAvailable(protocolPictureUrl)
-    var viewerOpen by remember(protocolPictureUrl) { mutableStateOf(false) }
-    val presentation =
-        SettingsAccountHeaderPresentation(
-            title = title,
-            subtitle = subtitle,
-            seed = seed,
-            pictureUrl = protocolPictureUrl,
-            avatarImageAvailable = avatarImageAvailable,
-        )
-    SettingsAccountHeaderRow(
-        presentation = presentation,
-        onOpenAccountSelector = onOpenAccountSelector,
-        onOpenQr = onOpenQr,
-        onOpenAvatar = { viewerOpen = true },
-    )
-    if (viewerOpen && protocolPictureUrl != null && avatarImageAvailable) {
-        AvatarFullScreenViewer(
-            title = title,
-            seed = seed,
-            pictureUrl = protocolPictureUrl,
-            onDismiss = { viewerOpen = false },
-            editActionLabel = stringResource(R.string.profile_picture_edit),
-            onEditPicture = {
-                viewerOpen = false
-                onEditProfilePicture()
-            },
-        )
-    }
-}
-
-private data class SettingsAccountHeaderPresentation(
-    val title: String,
-    val subtitle: String,
-    val seed: String,
-    val pictureUrl: String?,
-    val avatarImageAvailable: Boolean,
-)
-
-@Suppress("FunctionNaming")
-@Composable
-private fun SettingsAccountHeaderRow(
-    presentation: SettingsAccountHeaderPresentation,
-    onOpenAccountSelector: () -> Unit,
-    onOpenQr: () -> Unit,
-    onOpenAvatar: () -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .settingsRowAmoledSurfaceBorder()
-                .testTag(SETTINGS_ACCOUNT_HEADER_TAG),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SettingsAccountSelectorTarget(
-            presentation = presentation,
-            onOpenAccountSelector = onOpenAccountSelector,
-            onOpenAvatar = onOpenAvatar,
-            modifier = Modifier.weight(1f),
-        )
-        IconButton(
-            onClick = onOpenQr,
-            modifier = Modifier.size(48.dp).testTag(SETTINGS_ACCOUNT_QR_TARGET_TAG),
-        ) {
-            Icon(Icons.Default.QrCode, contentDescription = stringResource(R.string.my_qr_code))
-        }
-    }
-}
-
-@Suppress("FunctionNaming")
-@Composable
-private fun SettingsAccountSelectorTarget(
-    presentation: SettingsAccountHeaderPresentation,
-    onOpenAccountSelector: () -> Unit,
-    onOpenAvatar: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val switchAccountDescription = stringResource(R.string.switch_account)
-    val clipboard = LocalClipboard.current
-    val clipboardLabel = stringResource(R.string.public_key)
-    val scope = rememberCoroutineScope()
-    ListItem(
-        modifier =
-            modifier
-                .combinedClickable(
-                    onClickLabel = switchAccountDescription,
-                    onLongClickLabel = stringResource(R.string.copy),
-                    role = Role.Button,
-                    onLongClick = {
-                        scope.launch {
-                            val clip = ClipData.newPlainText(clipboardLabel, presentation.subtitle)
-                            clipboard.setClipEntry(ClipEntry(clip))
-                        }
-                    },
-                    onClick = onOpenAccountSelector,
-                ).semantics(mergeDescendants = true) {
-                    contentDescription = switchAccountDescription
-                    stateDescription = presentation.subtitle
-                }.testTag(SETTINGS_ACCOUNT_SELECTOR_TARGET_TAG),
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        leadingContent = {
-            SettingsAccountHeaderAvatar(presentation = presentation, onOpenAvatar = onOpenAvatar)
-        },
-        headlineContent = { SettingsAccountHeaderTitle(presentation.title) },
-        supportingContent = { SettingsAccountHeaderNpub(presentation.subtitle) },
-        trailingContent = {
-            Icon(
-                Icons.Default.ExpandMore,
-                contentDescription = null,
-                modifier = Modifier.testTag(SETTINGS_ACCOUNT_EXPAND_TAG),
-            )
-        },
-    )
-}
-
-@Suppress("FunctionNaming")
-@Composable
-private fun SettingsAccountHeaderAvatar(
-    presentation: SettingsAccountHeaderPresentation,
-    onOpenAvatar: () -> Unit,
-) {
-    val clickModifier =
-        if (presentation.avatarImageAvailable) {
-            Modifier.clickable(
-                onClickLabel = stringResource(R.string.profile_view_picture),
-                role = Role.Button,
-                onClick = onOpenAvatar,
-            )
-        } else {
-            Modifier
-        }
-    Box(
-        modifier =
-            Modifier
-                .clip(CircleShape)
-                .then(clickModifier)
-                .testTag(SETTINGS_ACCOUNT_AVATAR_TAG),
-    ) {
-        Avatar(
-            title = presentation.title,
-            seed = presentation.seed,
-            size = 52.dp,
-            pictureUrl = presentation.pictureUrl,
-        )
-    }
-}
-
-@Suppress("FunctionNaming")
-@Composable
-private fun SettingsAccountHeaderTitle(title: String) {
-    Text(
-        text = title,
-        modifier = Modifier.testTag(SETTINGS_ACCOUNT_TITLE_TAG),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
-}
-
-@Suppress("FunctionNaming")
-@Composable
-private fun SettingsAccountHeaderNpub(npub: String) {
-    Text(
-        text = npub,
-        modifier = Modifier.fillMaxWidth().testTag(SETTINGS_ACCOUNT_NPUB_TAG),
-        fontFamily = FontFamily.Monospace,
-        maxLines = 1,
-        overflow = TextOverflow.MiddleEllipsis,
-        softWrap = false,
-    )
-}
-
-internal const val SETTINGS_ACCOUNT_HEADER_TAG = "settings-account-header"
-internal const val SETTINGS_ACCOUNT_SELECTOR_TARGET_TAG = "settings-account-selector-target"
-internal const val SETTINGS_ACCOUNT_AVATAR_TAG = "settings-account-avatar"
-internal const val SETTINGS_ACCOUNT_TITLE_TAG = "settings-account-title"
-internal const val SETTINGS_ACCOUNT_NPUB_TAG = "settings-account-npub"
-internal const val SETTINGS_ACCOUNT_EXPAND_TAG = "settings-account-expand"
-internal const val SETTINGS_ACCOUNT_QR_TARGET_TAG = "settings-account-qr-target"
 
 internal const val ACCOUNT_SELECTOR_CONTENT_TAG = "account-selector-content"
 

@@ -796,6 +796,15 @@
     <string name="data_and_storage_settings_subtitle">Medien automatisch herunterladen</string>
     <string name="app_preferences">App</string>
     <string name="settings_version_label">Version %1$s</string>
+    <string name="settings_profile_keys">Profilschlüssel</string>
+    <string name="settings_read_aloud">Vorlesen</string>
+    <string name="settings_privacy_security">Datenschutz &amp; Sicherheit</string>
+    <string name="settings_data_usage">Datennutzung</string>
+    <string name="settings_developer_tools">Entwicklertools</string>
+    <string name="settings_donate">Spenden</string>
+    <string name="settings_add_profile">Profil hinzufügen</string>
+    <string name="settings_switch_profile">Profil wechseln</string>
+    <string name="settings_open_share_connect_for">„Teilen &amp; Verbinden“ für %1$s öffnen</string>
     <string name="support_the_project">Projekt unterstützen</string>
     <string name="support_the_project_subtitle">White Noise ist kostenlos und quelloffen. Spenden helfen, dass es so bleibt.</string>
     <string name="chat_with_support">Mit dem Support chatten</string>

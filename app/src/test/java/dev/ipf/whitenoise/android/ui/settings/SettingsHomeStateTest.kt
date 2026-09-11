@@ -6,54 +6,70 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsHomeStateTest {
-    /** Verifies Dictation appears in the complete account-aware settings order. */
+    /** A self-updating build with an account shows every section in the prototype's order. */
     @Test
     fun selfUpdatingBuildIncludesEverySettingsSectionInDisplayOrder() {
         val state = settingsHomeState(hasActiveAccount = true, selfUpdateEnabled = true)
-
-        assertTrue(state.showAccountHeader)
+        assertTrue(state.showProfileHeader)
         assertEquals(
             listOf(
-                SettingsHomeSection.Account,
-                SettingsHomeSection.AppPreferences,
-                SettingsHomeSection.Support,
+                SettingsHomeSection.Profile,
                 SettingsHomeSection.AppUpdates,
-                SettingsHomeSection.BuildInfo,
+                SettingsHomeSection.Hub,
+                SettingsHomeSection.Support,
+                SettingsHomeSection.SignOut,
+                SettingsHomeSection.Version,
             ),
             state.sections,
         )
+    }
+
+    /** The hub lists the prototype's eleven rows in its order; Key Packages lives under Developer tools. */
+    @Test
+    fun hubRowsFollowThePrototypeOrder() {
+        val state = settingsHomeState(hasActiveAccount = true, selfUpdateEnabled = false)
         assertEquals(
             listOf(
                 SettingsHomeRow.Profile,
-                SettingsHomeRow.AccountAndKeys,
+                SettingsHomeRow.ProfileKeys,
+                SettingsHomeRow.AiAgents,
+                SettingsHomeRow.Notifications,
+                SettingsHomeRow.ReadAloud,
+                SettingsHomeRow.Dictation,
+                SettingsHomeRow.Appearance,
+                SettingsHomeRow.ChatFolders,
+                SettingsHomeRow.PrivacySecurity,
+                SettingsHomeRow.DataUsage,
                 SettingsHomeRow.Relays,
-                SettingsHomeRow.KeyPackages,
             ),
-            state.accountRows,
+            state.hubRows,
         )
         assertEquals(
             listOf(
-                SettingsHomeRow.Appearance,
-                SettingsHomeRow.ChatFolders,
-                SettingsHomeRow.DataAndStorage,
-                SettingsHomeRow.Notifications,
-                SettingsHomeRow.TextToSpeech,
-                SettingsHomeRow.Dictation,
-                SettingsHomeRow.DevicePrivacy,
-                SettingsHomeRow.AiAgents,
                 SettingsHomeRow.Help,
+                SettingsHomeRow.ChatWithSupport,
+                SettingsHomeRow.Donate,
+                SettingsHomeRow.DeveloperTools,
             ),
-            state.preferenceRows,
+            state.supportRows,
         )
     }
 
+    /** Without an account the profile header and sign out disappear; store builds also drop app updates. */
     @Test
-    fun storeBuildWithoutActiveAccountHidesOnlyDerivedAccountHeaderAndUpdateSection() {
+    fun storeBuildWithoutActiveAccountHidesProfileSignOutAndUpdates() {
         val state = settingsHomeState(hasActiveAccount = false, selfUpdateEnabled = false)
+        assertFalse(state.showProfileHeader)
+        assertEquals(
+            listOf(SettingsHomeSection.Hub, SettingsHomeSection.Support, SettingsHomeSection.Version),
+            state.sections,
+        )
+    }
 
-        assertFalse(state.showAccountHeader)
-        assertFalse(SettingsHomeSection.AppUpdates in state.sections)
-        assertTrue(SettingsHomeSection.Account in state.sections)
-        assertEquals(SettingsHomeSection.BuildInfo, state.sections.last())
+    /** Every hub row except Chat with support opens a settings detail. */
+    @Test
+    fun onlyChatWithSupportRunsAnActionInsteadOfOpeningADetail() {
+        val actionRows = SettingsHomeRow.entries.filter { it.detail == null }
+        assertEquals(listOf(SettingsHomeRow.ChatWithSupport), actionRows)
     }
 }

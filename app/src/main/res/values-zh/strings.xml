@@ -785,6 +785,15 @@
     <string name="data_and_storage_settings_subtitle">媒体自动下载</string>
     <string name="app_preferences">应用</string>
     <string name="settings_version_label">版本 %1$s</string>
+    <string name="settings_profile_keys">个人资料密钥</string>
+    <string name="settings_read_aloud">朗读</string>
+    <string name="settings_privacy_security">隐私与安全</string>
+    <string name="settings_data_usage">数据用量</string>
+    <string name="settings_developer_tools">开发者工具</string>
+    <string name="settings_donate">捐赠</string>
+    <string name="settings_add_profile">添加个人资料</string>
+    <string name="settings_switch_profile">切换个人资料</string>
+    <string name="settings_open_share_connect_for">打开 %1$s 的“分享与连接”</string>
     <string name="support_the_project">支持项目</string>
     <string name="support_the_project_subtitle">White Noise 免费且开源。捐赠有助于保持这一点。</string>
     <string name="chat_with_support">与支持团队聊天</string>

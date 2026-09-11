@@ -32,8 +32,10 @@ internal object SettingsRowDefaults {
 internal fun SettingsRowTitle(
     title: String,
     editable: Boolean,
+    destructive: Boolean = false,
 ) {
-    Text(title, color = MaterialTheme.colorScheme.onSurface.dimmedUnless(editable))
+    val color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+    Text(title, color = color.dimmedUnless(editable))
 }
 
 /** Supporting values wrap onto as many lines as they need instead of truncating. */

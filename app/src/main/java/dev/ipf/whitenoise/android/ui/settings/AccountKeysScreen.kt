@@ -465,31 +465,7 @@ internal fun AccountKeysScreen(
         SignOutSheet(
             onConfirm = { deleteKeyPackages ->
                 showSignOutSheet = false
-                appState.signOutInProgress = true
-                // Mutation scope, not the screen scope: signOutActiveAccount()
-                // flips activeAccountRef before its disk-media wipe finishes,
-                // and the account-change nav reset pops this screen — a
-                // screen-scoped job would be cancelled mid-teardown.
-                appState.launchMutation {
-                    try {
-                        when (appState.signOutActiveAccount(deleteKeyPackages)) {
-                            SignOutCompletion.Complete -> appState.presentTransient(R.string.toast_signed_out)
-                            // Local sign-out completed but the engine call
-                            // failed or reported relay cleanup failures. This
-                            // is informational and not copyable (#966); MDK
-                            // does not retain a retry queue for the deletions.
-                            SignOutCompletion.RelayCleanupIncomplete ->
-                                appState.present(R.string.toast_signed_out_relay_cleanup_incomplete)
-                            // MDK kept the account active, so the screen and
-                            // all account-scoped state remain intact.
-                            SignOutCompletion.AccountCleanupIncomplete ->
-                                appState.present(R.string.toast_couldnt_sign_out)
-                            null -> Unit
-                        }
-                    } finally {
-                        appState.signOutInProgress = false
-                    }
-                }
+                signOutActiveAccount(appState, deleteKeyPackages)
             },
             onDismiss = { showSignOutSheet = false },
         )
@@ -935,6 +911,41 @@ internal fun EncryptedBackupPassphraseStrength.color(): Color =
     }
 
 /**
+ * Runs the confirmed sign-out on the mutation scope and reports its outcome. The Settings hub and
+ * the keys screen share this so both entry points tear the account down identically.
+ */
+internal fun signOutActiveAccount(
+    appState: WhiteNoiseAppState,
+    deleteKeyPackages: Boolean,
+) {
+    appState.signOutInProgress = true
+    // Mutation scope, not the screen scope: signOutActiveAccount()
+    // flips activeAccountRef before its disk-media wipe finishes,
+    // and the account-change nav reset pops this screen — a
+    // screen-scoped job would be cancelled mid-teardown.
+    appState.launchMutation {
+        try {
+            when (appState.signOutActiveAccount(deleteKeyPackages)) {
+                SignOutCompletion.Complete -> appState.presentTransient(R.string.toast_signed_out)
+                // Local sign-out completed but the engine call
+                // failed or reported relay cleanup failures. This
+                // is informational and not copyable (#966); MDK
+                // does not retain a retry queue for the deletions.
+                SignOutCompletion.RelayCleanupIncomplete ->
+                    appState.present(R.string.toast_signed_out_relay_cleanup_incomplete)
+                // MDK kept the account active, so the screen and
+                // all account-scoped state remain intact.
+                SignOutCompletion.AccountCleanupIncomplete ->
+                    appState.present(R.string.toast_couldnt_sign_out)
+                null -> Unit
+            }
+        } finally {
+            appState.signOutInProgress = false
+        }
+    }
+}
+
+/**
  * Non-destructive sign-out sheet (#348, #349). Explains what stays on device
  * and what changes, offers the "Delete key packages from relays" toggle
  * (default ON — passed through to the engine `sign_out` FFI), then performs
@@ -942,7 +953,8 @@ internal fun EncryptedBackupPassphraseStrength.color(): Color =
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SignOutSheet(
+@Suppress("FunctionNaming", "LongMethod")
+internal fun SignOutSheet(
     onConfirm: (deleteKeyPackages: Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {

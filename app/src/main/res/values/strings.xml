@@ -582,7 +582,7 @@
     <string name="streaming_debug_subtitle" translatable="false">Show agent-stream and MLS signaling events inline in conversations</string>
     <string name="device_privacy">Device privacy</string>
     <string name="device_privacy_settings_subtitle">App lock, keyboard, telemetry, audit logs</string>
-    <string name="ai_agents">AI agents</string>
+    <string name="ai_agents">AI Agents</string>
     <string name="ai_agents_settings_subtitle">Connect Hermes, OpenClaw, or OpenCode</string>
     <string name="ai_agents_about_title">About AI agents</string>
     <string name="ai_agents_intro">White Noise works with AI agents. Your agent runs on your own machine or server as a separate Marmot account; you chat with it here like any contact, end-to-end encrypted.</string>
@@ -1068,6 +1068,15 @@
     <string name="data_and_storage_settings_subtitle">Media auto-download</string>
     <string name="app_preferences">App</string>
     <string name="settings_version_label">Version %1$s</string>
+    <string name="settings_profile_keys">Profile Keys</string>
+    <string name="settings_read_aloud">Read Aloud</string>
+    <string name="settings_privacy_security">Privacy &amp; Security</string>
+    <string name="settings_data_usage">Data Usage</string>
+    <string name="settings_developer_tools">Developer Tools</string>
+    <string name="settings_donate">Donate</string>
+    <string name="settings_add_profile">Add Profile</string>
+    <string name="settings_switch_profile">Switch Profile</string>
+    <string name="settings_open_share_connect_for">Open Share &amp; Connect for %1$s</string>
     <string name="settings_mdk_version_label" translatable="false">MDK %1$s</string>
     <!-- Release-channel name shown on staging builds only; not a translatable word. -->
     <string name="settings_staging_badge" translatable="false">STAGING</string>

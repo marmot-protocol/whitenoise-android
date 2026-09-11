@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
@@ -12,17 +13,23 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
@@ -80,10 +87,14 @@ internal fun SettingsScaffold(
 /** Lazy settings column with 8 dp top and peer spacing, 24 dp bottom clearance, 8 dp between roots in one item. */
 @Suppress("FunctionNaming")
 @Composable
-internal fun SettingsList(content: LazyListScope.() -> Unit) {
+internal fun SettingsList(
+    state: LazyListState = rememberLazyListState(),
+    content: LazyListScope.() -> Unit,
+) {
     CompositionLocalProvider(LocalSettingsList provides true) {
         LazyColumn(
             modifier = Modifier.fillMaxSize().testTag("settings.list"),
+            state = state,
             contentPadding = PaddingValues(top = WhiteNoiseSpacing.Related, bottom = WhiteNoiseSpacing.Section),
             verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
             content = {
@@ -144,5 +155,26 @@ internal fun SettingsExplainer(text: String) {
                 ),
     ) {
         Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+/** Centered version line that closes the Settings home; the version name is the only build detail shown here. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun SettingsVersionFooter(versionName: String) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(WhiteNoiseSpacing.CompactScreenMargin)
+                .testTag("settings.version_footer"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = stringResource(R.string.settings_version_label, versionName),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center,
+        )
     }
 }
