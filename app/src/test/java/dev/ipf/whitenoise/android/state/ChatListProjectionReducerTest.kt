@@ -144,6 +144,24 @@ class ChatListProjectionReducerTest {
         assertTrue(item.group.pendingConfirmation)
     }
 
+    /** Opposing confirmation flags have no shared revision, so neither snapshot authorizes actions. */
+    @Test
+    fun conflictingInviteSnapshotsRequireCanonicalConfirmation() {
+        listOf(true, false).forEach { rowPending ->
+            val item =
+                chatListItemFromProjection(
+                    row(groupId = "g1", rawTitle = "Chat", pendingConfirmation = rowPending),
+                    group = group(name = "Chat", pendingConfirmation = !rowPending),
+                )
+            assertTrue(item.inviteConfirmationUnresolved)
+        }
+        val unknownInvite =
+            chatListItemFromProjection(row(groupId = "g1", rawTitle = "Invite", pendingConfirmation = true))
+        assertTrue(unknownInvite.inviteConfirmationUnresolved)
+        val accepted = chatListItemFromProjection(row(groupId = "g1", rawTitle = "Chat"), group = group(name = "Chat"))
+        assertFalse(accepted.inviteConfirmationUnresolved)
+    }
+
     @Test
     fun avatarProjectionOverridesAStaleGroupRecord() {
         val item =

@@ -182,6 +182,44 @@ class ConversationInviteAcceptanceResolutionScreenshotTest {
         }
     }
 
+    /** A delayed pre-Join snapshot must not replace the actual composer with invite actions. */
+    @Test
+    fun acceptedChatKeepsComposerAfterDelayedInviteLight() = assertAcceptedChatKeepsComposer(darkTheme = false)
+
+    /** The same accepted-state regression is guarded on the dark conversation surface. */
+    @Test
+    fun acceptedChatKeepsComposerAfterDelayedInviteDark() = assertAcceptedChatKeepsComposer(darkTheme = true)
+
+    /** Captures the production route after native acceptance and a stale same-Welcome update. */
+    private fun assertAcceptedChatKeepsComposer(darkTheme: Boolean) {
+        val pending = pendingInviteGroup()
+        val accepted = pending.copy(pendingConfirmation = false)
+        val scripted = ScriptedConversationLiveSubscriptions(timelineScripts = emptyList(), group = accepted)
+        val appState = conversationTimelineTestAppState(scripted.subscriptions)
+        val controller =
+            ConversationController(
+                appState = appState,
+                initialGroup = pending,
+                initialMemberSnapshot = conversationTimelineMemberSnapshot(),
+                initialChatListRow = pendingInviteRow(),
+                inviteAcceptor = { _, _ -> accepted },
+                groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
+            )
+        try {
+            runBlocking { assertTrue(controller.acceptInvite(notify = false)) }
+            controller.markAuthoritativeTimelinePublishedForTest()
+            showConversation(appState, controller, accepted, darkTheme)
+            composeRule.runOnIdle { controller.applyGroupStateForTest(pending) }
+            composeRule.onNode(hasSetTextAction()).assertIsDisplayed()
+            composeRule.onNodeWithText(context.getString(R.string.join_group)).assertDoesNotExist()
+            composeRule.onNodeWithText(context.getString(R.string.decline)).assertDoesNotExist()
+            val theme = if (darkTheme) "dark" else "light"
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_accepted_invite_replay_$theme.png")
+        } finally {
+            controller.onCleared()
+        }
+    }
+
     /** Mounts a long real bubble; only Read More can open its full-screen pending-state branch. */
     private fun showExpandableMessage(
         appState: WhiteNoiseAppState,
@@ -239,9 +277,10 @@ class ConversationInviteAcceptanceResolutionScreenshotTest {
         appState: WhiteNoiseAppState,
         controller: ConversationController,
         group: dev.ipf.marmotkit.AppGroupRecordFfi,
+        darkTheme: Boolean = false,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme {
+            WhiteNoiseTheme(darkTheme = darkTheme) {
                 renderedSurfaceColor = MaterialTheme.colorScheme.surface
                 ConversationScreen(
                     appState = appState,

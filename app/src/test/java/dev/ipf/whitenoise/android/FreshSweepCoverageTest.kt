@@ -140,7 +140,7 @@ class FreshSweepCoverageTest {
         val optimisticLocalUpdate = body.indexOf("applyLocalGroupUpdate(optimisticGroup")
         val accept = body.indexOf("resolveInviteAcceptance(attempt)")
         val nativeAccept = resolution.indexOf("inviteAcceptor(")
-        val confirmedProjection = body.indexOf("group = acceptedGroup")
+        val confirmedProjection = body.indexOf("applyAcceptedInviteGroup(acceptedGroup")
         val confirmedLocalUpdate = body.indexOf("applyLocalGroupUpdate(group", confirmedProjection)
         val dismiss = body.indexOf("dismissConversationNotifications")
         val clearSelfLeft = body.indexOf("clearSelfLeft()")
