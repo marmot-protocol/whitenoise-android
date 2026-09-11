@@ -62,7 +62,7 @@ internal data class ConversationDictationProvider(
 // Exact compatibility exclusion: FUTO's placeholder is not a transcription engine. Do not infer
 // that other providers' classes containing "Dummy", "Test", etc. are unusable.
 private val FUTO_PLACEHOLDER = ComponentName("org.futo.voiceinput", "org.futo.voiceinput.DummyService")
-private const val BIND_SPEECH_RECOGNITION_SERVICE = "android.permission.BIND_SPEECH_RECOGNITION_SERVICE"
+private const val BIND_RECOGNITION_SERVICE = "android.permission.BIND_RECOGNITION_SERVICE"
 
 @Suppress("MaxLineLength") // The named surface and provider types keep this one-argument transformation explicit.
 internal fun conversationDictationProviders(surfaces: List<ConversationDictationSurface>): List<ConversationDictationProvider> =
@@ -137,7 +137,7 @@ internal fun discoverConversationDictationProviders(context: Context): List<Conv
     val services =
         pm.queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0).mapNotNull { resolved ->
             resolved.serviceInfo
-                ?.takeIf { it.permission == BIND_SPEECH_RECOGNITION_SERVICE }
+                ?.takeIf { it.permission == BIND_RECOGNITION_SERVICE }
                 ?.let { surface(it, ConversationDictationSurfaceKind.Service) }
         }
     val activities =

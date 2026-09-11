@@ -283,7 +283,7 @@ class ConversationDictationCallerAudioRequirementTest {
             ResolveInfo().apply {
                 serviceInfo =
                     ServiceInfo().apply {
-                        permission = "android.permission.BIND_SPEECH_RECOGNITION_SERVICE"
+                        permission = "android.permission.BIND_RECOGNITION_SERVICE"
                         packageName = PROVIDER
                         name = ComponentName(PROVIDER, "$PROVIDER.Recognition").className
                         enabled = true
