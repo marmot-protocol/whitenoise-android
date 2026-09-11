@@ -100,8 +100,9 @@ internal fun reactionSummaryChipBorder(
     val colorScheme = MaterialTheme.colorScheme
     val amoledAccent =
         if (isAmoledSurfaceTheme()) {
+            // AMOLED outlines are fixed: sent chips white, received chips a quieter white.
             customAmoledBorderColor
-                ?: if (outgoing) colorScheme.inversePrimary else colorScheme.onSurface.copy(alpha = 0.7f)
+                ?: if (outgoing) colorScheme.primary else colorScheme.onSurface.copy(alpha = 0.7f)
         } else {
             null
         }

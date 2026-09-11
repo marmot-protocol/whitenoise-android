@@ -78,14 +78,16 @@ class AmoledSurfaceThemeTest {
         }
     }
 
+    /** AMOLED object boundaries are crisp white strokes on the black fill. */
     @Test
-    fun amoledBorderTokensAreWarmAndBlueFree() {
-        assertEquals(Color(0xFF665A00), AmoledSurfaceBorder)
-        assertEquals(Color(0xFF665A00), AmoledEmphasizedSurfaceBorder)
+    fun amoledBorderTokensAreWhite() {
+        assertEquals(Color.White, AmoledSurfaceBorder)
+        assertEquals(Color.White, AmoledEmphasizedSurfaceBorder)
     }
 
+    /** AMOLED is a fixed black-and-white palette: a saved account accent is stored but never applied. */
     @Test
-    fun everyAmoledColorSchemeRoleHasZeroBlueEvenWithCustomAccountAccent() {
+    fun everyAmoledColorSchemeRoleIsMonochromeAndIgnoresCustomAccountAccent() {
         var captured: ColorScheme? = null
 
         composeRule.setContent {
@@ -100,12 +102,18 @@ class AmoledSurfaceThemeTest {
         }
 
         composeRule.runOnIdle {
-            val blueBearingRoles =
-                requireNotNull(captured)
+            val scheme = requireNotNull(captured)
+            val tintedRoles =
+                scheme
                     .namedRoles()
-                    .filterValues { color -> color.toArgb() and 0xFF != 0 }
+                    .filterKeys { !it.contains("rror") }
+                    .filterValues { color -> !color.isGrey() }
 
-            assertTrue("AMOLED roles still driving blue: $blueBearingRoles", blueBearingRoles.isEmpty())
+            assertTrue("AMOLED roles carrying colour: $tintedRoles", tintedRoles.isEmpty())
+            assertEquals(Color.White, scheme.primary)
+            assertEquals(Color.Black, scheme.onPrimary)
+            assertEquals(Color.Black, scheme.surface)
+            assertEquals(Color.White, scheme.outline)
         }
     }
 
@@ -147,6 +155,15 @@ class AmoledSurfaceThemeTest {
 }
 
 private const val MINIMUM_NON_TEXT_CONTRAST = 3.0
+
+/** A role is grey when its red, green and blue channels match, including pure black and white. */
+private fun Color.isGrey(): Boolean {
+    val argb = toArgb()
+    val red = (argb shr 16) and 0xFF
+    val green = (argb shr 8) and 0xFF
+    val blue = argb and 0xFF
+    return red == green && green == blue
+}
 
 private fun assertContrastAtLeast(
     foreground: Color,

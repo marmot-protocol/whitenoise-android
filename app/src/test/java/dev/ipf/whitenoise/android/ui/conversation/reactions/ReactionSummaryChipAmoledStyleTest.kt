@@ -47,7 +47,7 @@ class ReactionSummaryChipAmoledStyleTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
-                val sentAccent = MaterialTheme.colorScheme.inversePrimary
+                val sentAccent = MaterialTheme.colorScheme.primary
                 val receivedAccent = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 val onSurface = MaterialTheme.colorScheme.onSurface
                 val selectedContainerValue = reactionSummaryChipContainerColor(selected = true)
@@ -222,11 +222,11 @@ class ReactionSummaryChipAmoledStyleTest {
         composeRule.runOnIdle { assertEquals(1, clickCount) }
     }
 
+    /** AMOLED ignores a saved dark accent: the sent chip keeps the fixed white outline. */
     @Test
-    fun darkAccountAccentUsesContrastSafeAmoledOutline() {
+    fun darkAccountAccentIsIgnoredAndOutgoingOutlineStaysWhiteOnAmoled() {
         var outgoingBorder: BorderStroke? = null
-        var configuredAccent = Color.Unspecified
-        var expectedSafeAccent = Color.Unspecified
+        var themePrimary = Color.Unspecified
 
         composeRule.setContent {
             WhiteNoiseTheme(
@@ -236,20 +236,17 @@ class ReactionSummaryChipAmoledStyleTest {
             ) {
                 val border = reactionSummaryChipBorder(outgoing = true, selected = false)
                 val primary = MaterialTheme.colorScheme.primary
-                val inversePrimary = MaterialTheme.colorScheme.inversePrimary
                 SideEffect {
                     outgoingBorder = border
-                    configuredAccent = primary
-                    expectedSafeAccent = inversePrimary
+                    themePrimary = primary
                 }
             }
         }
 
         composeRule.runOnIdle {
-            assertEquals(expectedSafeAccent, borderColor(outgoingBorder))
-            assertEquals(configuredAccent, borderColor(outgoingBorder))
+            assertEquals(Color.White, themePrimary)
+            assertEquals(Color.White, borderColor(outgoingBorder))
             assertNotEquals(Color.Black, borderColor(outgoingBorder))
-            assertEquals(0f, borderColor(outgoingBorder).blue)
         }
     }
 
