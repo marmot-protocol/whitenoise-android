@@ -33,6 +33,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.TtsTrustWarningDialog
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceOption
+import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceUnavailableReason
 import dev.ipf.whitenoise.android.audio.tts.requiresTtsTrustWarning
 import dev.ipf.whitenoise.android.audio.tts.shouldReportNoTtsEngine
@@ -96,7 +97,7 @@ internal fun TextToSpeechScreen(
     val effectiveVoiceLabel =
         voiceResolution.options.firstOrNull { it.key == voiceResolution.effectiveKey }?.label
             ?: voiceResolution.effectiveKey?.voiceName
-    val status = ttsStatusRes(appState, voiceResolution.effectiveKey != null)
+    val status = ttsStatusRes(appState, voiceResolution)
     // A saved voice that is unavailable means the engine speaks with a different one; say so.
     val usingFallbackVoice = voiceResolution.requestedKey != null && !voiceResolution.isUsingRequestedVoice
 
@@ -114,7 +115,7 @@ internal fun TextToSpeechScreen(
                             )
                         }
                     }
-                    if (voiceResolution.options.isNotEmpty() || voiceResolution.effectiveKey != null) {
+                    if (showTtsVoicePicker(voiceResolution)) {
                         row("voice") { context ->
                             SettingsLink(
                                 context = context,
@@ -407,16 +408,27 @@ private fun SpeechCustomRateDialog(
     )
 }
 
+/** Retains the Automatic reset action when a saved voice outlives the engine's optional catalogue. */
+internal fun showTtsVoicePicker(resolution: TtsVoiceResolution): Boolean =
+    resolution.options.isNotEmpty() || resolution.effectiveKey != null || resolution.requestedKey != null
+
+/** A missing optional catalogue is not a speech failure; only a known catalogue can establish unavailable voices. */
+internal fun hasUnavailableTtsVoiceCatalog(resolution: TtsVoiceResolution): Boolean {
+    val hasCatalog = resolution.options.isNotEmpty()
+    return hasCatalog && resolution.effectiveKey == null
+}
+
 /** The discovery state worth telling the user about, or null while everything is usable. */
 private fun ttsStatusRes(
     appState: WhiteNoiseAppState,
-    hasEffectiveVoice: Boolean,
+    voiceResolution: TtsVoiceResolution,
 ): SpeechStatus? =
     when {
         shouldReportNoTtsEngine(appState.ttsResolution) ->
             SpeechStatus(R.string.speech_no_engine, R.drawable.ic_warning)
         !appState.ttsDiscoveryComplete -> SpeechStatus(R.string.speech_discovering, R.drawable.ic_info)
-        !hasEffectiveVoice -> SpeechStatus(R.string.tts_voice_unavailable, R.drawable.ic_warning)
+        hasUnavailableTtsVoiceCatalog(voiceResolution) ->
+            SpeechStatus(R.string.tts_voice_unavailable, R.drawable.ic_warning)
         else -> null
     }
 
