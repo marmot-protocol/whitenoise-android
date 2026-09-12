@@ -6247,6 +6247,15 @@
           "TTS-002",
           "TTS-003"
         ]
+      },
+      {
+        "surface": "SignOutProgressDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun SignOutProgressDialog(",
+        "test_ids": [
+          "ACC-013",
+          "ACC-014"
+        ]
       }
     ],
     "settings_controls": [

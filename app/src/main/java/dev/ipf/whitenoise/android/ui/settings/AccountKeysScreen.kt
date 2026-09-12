@@ -99,7 +99,6 @@ import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * Whether the destructive "Sign Out & Wipe" path is wired to Marmot's
@@ -144,13 +143,34 @@ private class ProfileKeysUiState {
     var wipeSheet by mutableStateOf(false)
     var wipeConfirm by mutableStateOf(false)
     var wipeConfirmInput by mutableStateOf("")
+    val exportOperation = ProfileKeyOperation()
+    val copyOperation = ProfileKeyOperation()
+    val revealOperation = ProfileKeyOperation()
     val password = TextFieldState()
     val confirmation = TextFieldState()
 
     /** Hides the revealed key. */
     fun hidePrivateKey() {
+        revealOperation.cancel()
         revealRequested = false
         privateKey = null
+    }
+
+    /** Cancels a dismissed confirmation before its suspended native export can open the file picker. */
+    fun cancelExport() {
+        exportOperation.cancel()
+        exportBusy = false
+        rawExportDialog = false
+        passwordDialog = false
+        clearPasswords()
+    }
+
+    /** Prevents delayed exports, clipboard writes and reveals after backgrounding or leaving this account. */
+    fun stopSensitiveOperations() {
+        cancelExport()
+        copyOperation.cancel()
+        hidePrivateKey()
+        copiedKey = null
     }
 
     /** Clears both export password fields. */
@@ -168,6 +188,7 @@ private class ProfileKeysUiState {
     }
 }
 
+/** Presents account-bound key operations whose results are discarded after dismissal or lifecycle invalidation. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun AccountKeysScreen(
@@ -187,13 +208,29 @@ internal fun AccountKeysScreen(
     val hasLocalKey = active?.localSigning == true
     val publicKeyLabel = stringResource(R.string.public_key)
     val privateKeyLabel = stringResource(R.string.private_key)
-    val ui = remember(accountIdHex) { ProfileKeysUiState() }
+    val accountRef = appState.activeAccountRef
+    val runtimeGeneration = appState.runtimeGeneration
+    val ui = remember(accountIdHex, accountRef, runtimeGeneration) { ProfileKeysUiState() }
+
+    fun ownsAccount(): Boolean =
+        accountIdHex != null &&
+            appState.activeAccount?.accountIdHex == accountIdHex &&
+            appState.activeAccountRef == accountRef &&
+            appState.runtimeGeneration == runtimeGeneration
+
+    fun canDeliverSecret(): Boolean =
+        ownsAccount() &&
+            lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&
+            appState.activeAccount?.localSigning == true &&
+            !appState.signOutInProgress &&
+            !appState.wipeInProgress
+
     val exportLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
             val request = ui.pendingExport
             ui.pendingExport = null
             when {
-                uri == null -> Unit
+                uri == null || !canDeliverSecret() -> Unit
                 request == null || request.isExpired() -> ui.expiredExportDialog = true
                 else -> ui.saveErrorDialog = !writeExport(context, uri, request.content)
             }
@@ -214,25 +251,28 @@ internal fun AccountKeysScreen(
     }
 
     fun beginExport(encrypted: Boolean) {
-        if (!hasLocalKey || ui.exportBusy || ui.pendingExport != null) return
+        if (!hasLocalKey || ui.exportBusy) return
+        if (ui.pendingExport != null || !canDeliverSecret()) return
         val passphrase = ui.password.text.toString()
         ui.exportBusy = true
-        scope.launch {
-            try {
-                val content =
-                    if (encrypted) {
-                        appState.exportEncryptedSecretKeyBackup(passphrase)
-                    } else {
-                        appState.exportActiveAccountNsec()
-                    }
+        ui.exportOperation.start(
+            scope = scope,
+            canDeliver = ::canDeliverSecret,
+            load = {
+                if (encrypted) {
+                    appState.exportEncryptedSecretKeyBackup(passphrase)
+                } else {
+                    appState.exportActiveAccountNsec()
+                }
+            },
+            onResult = { content ->
                 if (content != null) launchExport(encrypted, content) else ui.saveErrorDialog = true
-            } finally {
-                ui.exportBusy = false
-            }
-        }
+            },
+            onFinished = { ui.exportBusy = false },
+        )
     }
 
-    ProfileKeysEffects(appState = appState, ui = ui, lifecycle = lifecycle)
+    ProfileKeysEffects(ui = ui, lifecycle = lifecycle)
 
     SettingsScaffold(
         title = stringResource(R.string.settings_profile_keys),
@@ -248,15 +288,34 @@ internal fun AccountKeysScreen(
                 copyToClipboard(context, publicKeyLabel, npub)
                 ui.copiedKey = CopiedProfileKey.Public
             },
-            onToggleReveal = { if (ui.revealRequested) ui.hidePrivateKey() else ui.revealRequested = true },
-            onCopyPrivate = {
-                scope.launch {
-                    val secret = ui.privateKey ?: appState.exportActiveAccountNsec()
-                    if (secret != null) {
-                        copyToClipboard(context, privateKeyLabel, secret, sensitive = true)
-                        ui.copiedKey = CopiedProfileKey.Private
-                    }
+            onToggleReveal = {
+                if (ui.revealRequested) {
+                    ui.hidePrivateKey()
+                } else if (canDeliverSecret()) {
+                    ui.revealRequested = true
+                    ui.revealOperation.start(
+                        scope = scope,
+                        canDeliver = { ui.revealRequested && canDeliverSecret() },
+                        load = { appState.exportActiveAccountNsec() },
+                        onResult = { secret ->
+                            ui.privateKey = secret
+                            if (secret == null) ui.revealRequested = false
+                        },
+                    )
                 }
+            },
+            onCopyPrivate = {
+                ui.copyOperation.start(
+                    scope = scope,
+                    canDeliver = ::canDeliverSecret,
+                    load = { ui.privateKey ?: appState.exportActiveAccountNsec() },
+                    onResult = { secret ->
+                        if (secret != null) {
+                            copyToClipboard(context, privateKeyLabel, secret, sensitive = true)
+                            ui.copiedKey = CopiedProfileKey.Private
+                        }
+                    },
+                )
             },
             onExportEncrypted = { ui.passwordDialog = true },
             onExportRaw = { ui.rawExportDialog = true },
@@ -271,23 +330,14 @@ internal fun AccountKeysScreen(
 @Suppress("FunctionNaming")
 @Composable
 private fun ProfileKeysEffects(
-    appState: WhiteNoiseAppState,
     ui: ProfileKeysUiState,
     lifecycle: Lifecycle,
 ) {
-    LaunchedEffect(ui.revealRequested) {
-        if (!ui.revealRequested) {
-            ui.privateKey = null
-            return@LaunchedEffect
+    LaunchedEffect(ui.privateKey) {
+        if (ui.privateKey != null) {
+            delay(ProfileKeysDefaults.EXPIRY_MILLIS)
+            ui.hidePrivateKey()
         }
-        val exported = appState.exportActiveAccountNsec()
-        if (exported == null) {
-            ui.revealRequested = false
-            return@LaunchedEffect
-        }
-        ui.privateKey = exported
-        delay(ProfileKeysDefaults.EXPIRY_MILLIS)
-        ui.hidePrivateKey()
     }
     LaunchedEffect(ui.pendingExport) {
         val request = ui.pendingExport ?: return@LaunchedEffect
@@ -306,12 +356,12 @@ private fun ProfileKeysEffects(
     DisposableEffect(lifecycle, ui) {
         val observer =
             LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_STOP) ui.hideSensitive()
+                if (event == Lifecycle.Event.ON_STOP) ui.stopSensitiveOperations()
             }
         lifecycle.addObserver(observer)
         onDispose {
             lifecycle.removeObserver(observer)
-            ui.hideSensitive()
+            ui.stopSensitiveOperations()
             ui.pendingExport = null
         }
     }
@@ -536,16 +586,16 @@ private fun ProfileKeysDialogs(
 ) {
     if (ui.rawExportDialog && canExport) {
         WhiteNoiseAlertDialog(
-            onDismissRequest = { ui.rawExportDialog = false },
+            onDismissRequest = ui::cancelExport,
             title = { Text(stringResource(R.string.keep_your_private_key_safe)) },
             text = { Text(stringResource(R.string.export_private_key_consequence)) },
             confirmButton = {
-                TextButton(onClick = { onExport(false) }) {
+                TextButton(enabled = !ui.exportBusy, onClick = { onExport(false) }) {
                     Text(stringResource(R.string.export_nsec), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { ui.rawExportDialog = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = ui::cancelExport) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -555,10 +605,7 @@ private fun ProfileKeysDialogs(
             confirmation = ui.confirmation,
             busy = ui.exportBusy,
             onConfirm = { onExport(true) },
-            onDismiss = {
-                ui.passwordDialog = false
-                ui.clearPasswords()
-            },
+            onDismiss = ui::cancelExport,
         )
     }
     if (ui.saveErrorDialog) {
@@ -707,19 +754,7 @@ private fun AccountWipeFlow(
     ui: ProfileKeysUiState,
 ) {
     if (appState.signOutInProgress) {
-        Dialog(
-            onDismissRequest = {},
-            properties =
-                DialogProperties(
-                    dismissOnBackPress = false,
-                    dismissOnClickOutside = false,
-                    usePlatformDefaultWidth = false,
-                ),
-        ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                LoadingIndicator()
-            }
-        }
+        SignOutProgressDialog()
     }
 
     if (WIPE_ENGINE_FFI_AVAILABLE && ui.wipeSheet) {
@@ -864,6 +899,27 @@ internal fun EncryptedBackupPassphraseStrength.color(): Color =
         EncryptedBackupPassphraseStrength.Strong -> MaterialTheme.colorScheme.primary
     }
 
+/** Blocks Back and outside interaction while the non-cancellable account teardown finishes. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Suppress("FunctionNaming")
+@Composable
+internal fun SignOutProgressDialog() {
+    Dialog(
+        onDismissRequest = {},
+        properties =
+            DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
+                usePlatformDefaultWidth = false,
+            ),
+    ) {
+        Box(Modifier.fillMaxSize().testTag("settings.sign_out_progress"), contentAlignment = Alignment.Center) {
+            // The full-window dim layer can cover either theme; white stays visible against that scrim.
+            LoadingIndicator(color = Color.White)
+        }
+    }
+}
+
 /**
  * Runs the confirmed sign-out on the mutation scope and reports its outcome. The Settings hub and
  * the keys screen share this so both entry points tear the account down identically.
@@ -872,6 +928,7 @@ internal fun signOutActiveAccount(
     appState: WhiteNoiseAppState,
     deleteKeyPackages: Boolean,
 ) {
+    if (appState.signOutInProgress || appState.wipeInProgress) return
     appState.signOutInProgress = true
     // Mutation scope, not the screen scope: signOutActiveAccount()
     // flips activeAccountRef before its disk-media wipe finishes,
