@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class)
 
 package dev.ipf.whitenoise.android.ui.settings
 
@@ -6,31 +6,26 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CornerBasedShape
-import androidx.compose.foundation.shape.CornerSize
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemColors
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
@@ -78,76 +73,17 @@ internal fun SettingsGroup(
     val group = SettingsGroupScope().apply(content)
     val amoled = isAmoledSurfaceTheme()
     val borderColor = if (amoled) MaterialTheme.colorScheme.outline else Color.Unspecified
-    val gap = if (amoled) 0.dp else ListItemDefaults.SegmentedGap
+    val gap = WhiteNoiseListItemDefaults.segmentedGap
     Column(
         modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
         verticalArrangement = Arrangement.spacedBy(gap),
     ) {
         group.rows.forEachIndexed { index, entry ->
             key(entry.key) {
-                val shapes = settingsRowShapes(index, group.rows.size, amoled)
+                val shapes = WhiteNoiseListItemDefaults.segmentedShapes(index, group.rows.size)
                 entry.content(SettingsRowContext(shapes, containerColor, borderColor))
             }
         }
-    }
-}
-
-/**
- * Native positional shapes for one row, frozen across interaction states so seams cannot open.
- *
- * Material 1.5.0-alpha20 leaves a one-row group at the small resting corner, while alpha25 gives
- * it the large container corners on every side. That singleton case is compensated here with the
- * same large shape token until the dependency pin advances.
- */
-@Composable
-private fun settingsRowShapes(
-    index: Int,
-    count: Int,
-    amoled: Boolean,
-): ListItemShapes {
-    val defaults = ListItemDefaults.segmentedShapes(index, count)
-    val large = MaterialTheme.shapes.large
-    // Material returns the same default shapes for a middle row and a singleton, so key on position too.
-    return remember(index, count, defaults, large, amoled) {
-        val corners =
-            requireNotNull(defaults.shape as? CornerBasedShape) { "Material list corners must be corner based" }
-        val first = index == 0
-        val last = index == count - 1
-        val positioned =
-            if (count == 1) {
-                corners.copy(
-                    topStart = large.topStart,
-                    topEnd = large.topEnd,
-                    bottomEnd = large.bottomEnd,
-                    bottomStart = large.bottomStart,
-                )
-            } else {
-                corners
-            }
-        val shape: Shape =
-            if (amoled) {
-                ConnectedRowShape(
-                    corners =
-                        positioned.copy(
-                            topStart = if (first) positioned.topStart else CornerSize(0.dp),
-                            topEnd = if (first) positioned.topEnd else CornerSize(0.dp),
-                            bottomEnd = if (last) positioned.bottomEnd else CornerSize(0.dp),
-                            bottomStart = if (last) positioned.bottomStart else CornerSize(0.dp),
-                        ),
-                    first = first,
-                    last = last,
-                )
-            } else {
-                positioned
-            }
-        defaults.copy(
-            shape = shape,
-            selectedShape = shape,
-            pressedShape = shape,
-            focusedShape = shape,
-            hoveredShape = shape,
-            draggedShape = shape,
-        )
     }
 }
 
@@ -170,7 +106,7 @@ internal fun SettingsSwitch(
     busy: Boolean = false,
 ) {
     val editable = enabled && !busy
-    SegmentedListItem(
+    ListItem(
         checked = checked,
         onCheckedChange = onCheckedChange,
         shapes = context.shapes,
@@ -216,7 +152,7 @@ internal fun SettingsLink(
 ) {
     val editable = enabled && !busy
     val summary = listOfNotNull(value, subtitle).distinct().joinToString("\n").takeIf { it.isNotEmpty() }
-    SegmentedListItem(
+    ListItem(
         onClick = onClick,
         shapes = context.shapes,
         modifier =
@@ -254,7 +190,7 @@ internal fun SettingsAction(
     destructive: Boolean = false,
     leading: (@Composable () -> Unit)? = null,
 ) {
-    SegmentedListItem(
+    ListItem(
         onClick = onClick,
         shapes = context.shapes,
         modifier =
@@ -273,7 +209,7 @@ internal fun SettingsAction(
 /** Keep the group fill identical at rest, checked, and disabled so only the control reports state. */
 @Composable
 private fun settingsRowColors(context: SettingsRowContext): ListItemColors =
-    ListItemDefaults.segmentedColors(
+    ListItemDefaults.colors(
         containerColor = context.containerColor,
         disabledContainerColor = context.containerColor,
         selectedContainerColor = context.containerColor,
@@ -298,7 +234,7 @@ internal fun SettingsChoice(
     enabled: Boolean = true,
     highlightSelected: Boolean = true,
 ) {
-    SegmentedListItem(
+    ListItem(
         selected = selected,
         onClick = onClick,
         shapes = context.shapes,
@@ -332,7 +268,7 @@ private fun settingsChoiceColors(
             }
             else -> MaterialTheme.colorScheme.surfaceContainerHigh
         }
-    return ListItemDefaults.segmentedColors(
+    return ListItemDefaults.colors(
         containerColor = context.containerColor,
         disabledContainerColor = context.containerColor,
         selectedContainerColor = selectedContainer,

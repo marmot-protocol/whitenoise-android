@@ -255,6 +255,40 @@ class SettingsComponentsSemanticsTest {
         composeRule.runOnIdle { assertEquals(0, disabledTaps) }
     }
 
+    /** Destructive actions remain single accessible buttons and reject activation when disabled. */
+    @Test
+    fun actionRowActivatesOnceAndRejectsDisabledTaps() {
+        val enabled = mutableStateOf(true)
+        var requests = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                SettingsGroup {
+                    row("action") { context ->
+                        SettingsAction(
+                            context,
+                            "Remove",
+                            { requests++ },
+                            modifier = Modifier.testTag("action"),
+                            enabled = enabled.value,
+                            destructive = true,
+                        )
+                    }
+                }
+            }
+        }
+        composeRule
+            .onNodeWithTag("action")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, requests)
+            enabled.value = false
+        }
+        composeRule.onNodeWithTag("action").assertIsNotEnabled().performTouchInput { click() }
+        composeRule.runOnIdle { assertEquals(1, requests) }
+    }
+
     private companion object {
         const val SWITCH = "settings-switch"
         const val LINK = "settings-link"
