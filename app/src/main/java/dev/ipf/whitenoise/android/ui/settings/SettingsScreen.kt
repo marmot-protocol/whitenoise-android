@@ -64,7 +64,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.SupportContact
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
@@ -253,6 +252,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.BugReport,
         -> SettingsDetail.Help
         SettingsDetail.KeyPackages -> SettingsDetail.Developer
+        SettingsDetail.SupportRelays -> SettingsDetail.Support
         SettingsDetail.DiagnosticsImprovements -> SettingsDetail.DevicePrivacy
         else -> null
     }
@@ -298,7 +298,6 @@ internal fun SettingsScreen(
             appState = appState,
             onBackToChats = onBackToChats,
             onOpenDetail = { onDetailChange(it) },
-            onOpenSupportChat = onOpenSupportChat,
             viewport = homeViewport,
             onViewportChange = onHomeViewportChange,
         )
@@ -307,6 +306,7 @@ internal fun SettingsScreen(
     SettingsDetailRoute(
         appState = appState,
         detail = detail,
+        onOpenSupportChat = onOpenSupportChat,
         onOpenDiagnostics = onOpenDiagnostics,
         onDetailChange = onDetailChange,
     )
@@ -318,6 +318,7 @@ internal fun SettingsScreen(
 private fun SettingsDetailRoute(
     appState: WhiteNoiseAppState,
     detail: SettingsDetail,
+    onOpenSupportChat: (ChatListItem) -> Unit,
     onOpenDiagnostics: () -> Unit,
     onDetailChange: (SettingsDetail?) -> Unit,
 ) {
@@ -340,6 +341,15 @@ private fun SettingsDetailRoute(
         SettingsDetail.Profile -> ProfileEditScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.AccountKeys -> AccountKeysScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Relays -> RelaysScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Support ->
+            SupportScreen(
+                appState = appState,
+                onBack = { onDetailChange(null) },
+                onOpenSupportChat = onOpenSupportChat,
+                onRelays = { onDetailChange(SettingsDetail.SupportRelays) },
+            )
+        SettingsDetail.SupportRelays ->
+            RelaysScreen(appState, onBack = { onDetailChange(SettingsDetail.Support) })
         SettingsDetail.KeyPackages ->
             KeyPackagesScreen(appState, onBack = { onDetailChange(SettingsDetail.Developer) })
         SettingsDetail.Notifications -> NotificationsScreen(appState, onBack = { onDetailChange(null) })
@@ -398,7 +408,6 @@ private fun SettingsHomeScreen(
     appState: WhiteNoiseAppState,
     onBackToChats: () -> Unit,
     onOpenDetail: (SettingsDetail) -> Unit,
-    onOpenSupportChat: (ChatListItem) -> Unit,
     viewport: SettingsHomeViewport,
     onViewportChange: (SettingsHomeViewport) -> Unit,
 ) {
@@ -416,20 +425,6 @@ private fun SettingsHomeScreen(
 
     LaunchedEffect(appState.accounts.size) {
         if (showAddIdentity) showAddIdentity = false
-    }
-
-    // Chat with support: reopen the existing direct chat with the canonical
-    // support identity. Matches the prior behavior: reopen the existing DM if
-    // there is one, otherwise present the support profile — whose Message
-    // action runs the ordinary start-chat flow (KeyPackage handling, typed
-    // failure, invitation) instead of a bespoke path.
-    fun startSupportChat() {
-        val existing = appState.existingDirectChat(SupportContact.NPUB)
-        if (existing != null) {
-            onOpenSupportChat(existing)
-        } else {
-            appState.presentProfile(SupportContact.NPUB)
-        }
     }
 
     SettingsHomeContent(
@@ -455,7 +450,7 @@ private fun SettingsHomeScreen(
         onAddProfile = { whenIdle { showAddIdentity = true } },
         onSwitchProfile = { whenIdle { showAccountSelector = true } },
         onOpenDetail = { detail -> whenIdle { onOpenDetail(detail) } },
-        onChatWithSupport = { whenIdle(::startSupportChat) },
+        onChatWithSupport = { whenIdle { onOpenDetail(SettingsDetail.Support) } },
         onSignOut = { whenIdle { showSignOut = true } },
         viewport = viewport,
         onViewportChange = onViewportChange,

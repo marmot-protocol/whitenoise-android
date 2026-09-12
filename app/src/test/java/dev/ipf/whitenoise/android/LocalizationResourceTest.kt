@@ -994,6 +994,8 @@ class LocalizationResourceTest {
 
         val identicalValueAllowedKeys =
             setOf(
+                // Two translated labels joined by locale-independent punctuation.
+                "developer_work_status",
                 // Pure positional-format string ("current/total"); no
                 // translatable text, identical across every locale by design.
                 "conversation_search_match_count",
@@ -1177,6 +1179,8 @@ class LocalizationResourceTest {
                     ),
                 "values-fr" to
                     setOf(
+                        // Source is also the standard French provenance label.
+                        "developer_package_source",
                         // "Version" is spelled identically in French.
                         "about_version",
                         "disappearing_unit_minutes",

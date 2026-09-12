@@ -19,6 +19,8 @@ internal enum class SettingsDetail {
     Profile,
     AccountKeys,
     Relays,
+    Support,
+    SupportRelays,
     KeyPackages,
     Notifications,
     DevicePrivacy,
