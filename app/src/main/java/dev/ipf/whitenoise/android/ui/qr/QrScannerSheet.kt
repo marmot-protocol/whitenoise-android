@@ -1,38 +1,28 @@
 package dev.ipf.whitenoise.android.ui.qr
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -40,20 +30,23 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
@@ -61,111 +54,125 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
-import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
-import kotlinx.coroutines.launch
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-internal const val QR_SCANNER_SHEET_CONTENT_TAG = "qr_scanner_sheet_content"
-
+/** Near-full prototype scanner chrome around the production CameraX/ML Kit owner. */
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("FunctionNaming", "LongMethod") // One CameraX/lifecycle owner with declarative Compose content.
 @Composable
 internal fun QrScannerSheet(
     onDismiss: () -> Unit,
     onScan: (String) -> Unit,
+    @StringRes permissionDetailRes: Int = R.string.camera_access_required,
+    cameraContent: @Composable ((String) -> Unit, (String) -> Unit, (Camera?) -> Unit) -> Unit = { scan, error, bound ->
+        CameraQrScanner(onScan = scan, onError = error, onCameraBound = bound)
+    },
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val activity = remember(context) { context.scannerActivity() }
+    var permissionGranted by remember { mutableStateOf(context.scannerCameraPermission()) }
+    var permissionFinished by rememberSaveable { mutableStateOf(permissionGranted) }
     var scannerError by remember { mutableStateOf<String?>(null) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var permissionGranted by remember {
-        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
-    }
+    val torch = remember(context) { QrScannerTorch(ContextCompat.getMainExecutor(context)) }
+    val currentScan by rememberUpdatedState(onScan)
+    var active by remember { mutableStateOf(true) }
+    val cameraUnavailable = stringResource(R.string.camera_unavailable)
     val launcher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             permissionGranted = granted
+            permissionFinished = true
         }
-
-    LaunchedEffect(Unit) {
-        if (!permissionGranted) launcher.launch(Manifest.permission.CAMERA)
+    DisposableEffect(context, lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) permissionGranted = context.scannerCameraPermission()
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-
+    DisposableEffect(Unit) {
+        onDispose {
+            active = false
+            torch.bind(null)
+        }
+    }
+    LaunchedEffect(permissionGranted, permissionFinished) {
+        if (!permissionGranted && !permissionFinished) launcher.launch(Manifest.permission.CAMERA)
+    }
+    val height =
+        with(LocalDensity.current) {
+            LocalWindowInfo.current.containerSize.height
+                .toDp() * 0.94f
+        }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = amoledSheetContainerColor(),
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color.Black,
+        contentColor = Color.White,
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
+        dragHandle = null,
     ) {
         QrScannerSheetContent(
             permissionGranted = permissionGranted,
             scannerError = scannerError,
             onDismiss = onDismiss,
-            onRequestPermission = { launcher.launch(Manifest.permission.CAMERA) },
+            onRequestPermission = { permissionFinished = false },
+            modifier = Modifier.height(height.coerceAtLeast(0.dp)),
+            permissionPending = !permissionFinished,
+            openSettings =
+                permissionFinished &&
+                    activity?.let {
+                        !ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.CAMERA)
+                    } == true,
+            onOpenSettings = {
+                runCatching {
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", context.packageName, null),
+                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }.onFailure { scannerError = cameraUnavailable }
+            },
+            permissionDetailRes = permissionDetailRes,
+            hasFlashUnit = torch.available,
+            torchEnabled = torch.enabled,
+            torchPending = torch.pending,
+            onToggleTorch = torch::toggle,
+            onRetry = { scannerError = null },
             cameraPreview = {
-                CameraQrScanner(onScan = onScan, onError = { scannerError = it })
+                cameraContent(
+                    { if (active) currentScan(it) },
+                    { if (active) scannerError = it },
+                    { if (active) torch.bind(it) },
+                )
             },
         )
     }
 }
 
-@Composable
-internal fun QrScannerSheetContent(
-    permissionGranted: Boolean,
-    scannerError: String?,
-    onDismiss: () -> Unit,
-    onRequestPermission: () -> Unit,
-    cameraPreview: @Composable () -> Unit,
-) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .testTag(QR_SCANNER_SHEET_CONTENT_TAG)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.scan), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-            IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
-            }
-        }
-        if (permissionGranted) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(520.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color.Black),
-                contentAlignment = Alignment.BottomCenter,
-            ) {
-                cameraPreview()
-                Text(
-                    scannerError ?: stringResource(R.string.point_camera_at_profile_qr),
-                    color = Color.White,
-                    modifier =
-                        Modifier
-                            .padding(
-                                16.dp,
-                            ).background(Color.Black.copy(alpha = ScrimAlpha.AFFORDANCE), RoundedCornerShape(24.dp))
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                )
-            }
-        } else {
-            Text(stringResource(R.string.camera_access_required), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Button(onClick = onRequestPermission, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.allow_camera))
-            }
-        }
-    }
-}
+/** Read Android's current grant again after returning from application settings. */
+private fun Context.scannerCameraPermission(): Boolean =
+    ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
 
+/** Find the host only for Android's permission-rationale decision; never substitute a fake grant. */
+private tailrec fun Context.scannerActivity(): Activity? =
+    when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.scannerActivity()
+        else -> null
+    }
+
+/** Keep the existing analysis executor and explicit provider/scanner teardown with the sheet lifecycle. */
 @Composable
 private fun CameraQrScanner(
     onScan: (String) -> Unit,
     onError: (String) -> Unit,
+    onCameraBound: (Camera?) -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = context.lifecycleOwner()
@@ -204,6 +211,7 @@ private fun CameraQrScanner(
     DisposableEffect(Unit) {
         onDispose {
             disposedRef.set(true)
+            onCameraBound(null)
             runCatching { providerRef.getAndSet(null)?.unbindAll() }
             runCatching { scannerRef.getAndSet(null)?.close() }
             runCatching { analyzerExecutor.shutdown() }
@@ -213,6 +221,9 @@ private fun CameraQrScanner(
     AndroidView(
         factory = { viewContext ->
             PreviewView(viewContext).also { previewView ->
+                previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
+                previewView.importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 bindQrScannerCamera(
                     context,
                     lifecycleOwner,
@@ -224,6 +235,7 @@ private fun CameraQrScanner(
                     analyzerExecutor,
                     onScan,
                     onError,
+                    onCameraBound,
                 )
             }
         },
@@ -231,6 +243,7 @@ private fun CameraQrScanner(
     )
 }
 
+/** Bind the production latest-frame QR analyzer; rotation, one-result and late-disposal guards stay authoritative. */
 @androidx.annotation.OptIn(ExperimentalGetImage::class)
 private fun bindQrScannerCamera(
     context: Context,
@@ -243,6 +256,7 @@ private fun bindQrScannerCamera(
     analyzerExecutor: Executor,
     onScan: (String) -> Unit,
     onError: (String) -> Unit,
+    onCameraBound: (Camera?) -> Unit,
 ) {
     val executor = ContextCompat.getMainExecutor(context)
     val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
@@ -250,7 +264,7 @@ private fun bindQrScannerCamera(
         {
             val provider =
                 runCatching { cameraProviderFuture.get() }.getOrElse {
-                    onError(cameraUnavailable)
+                    if (!disposedRef.get()) onError(cameraUnavailable)
                     return@addListener
                 }
             // If the sheet dismissed before this listener fired, the caller's
@@ -317,7 +331,14 @@ private fun bindQrScannerCamera(
 
             runCatching {
                 provider.unbindAll()
-                provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                val camera =
+                    provider.bindToLifecycle(
+                        lifecycleOwner,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        preview,
+                        analysis,
+                    )
+                onCameraBound(camera)
             }.onFailure {
                 // Failed before lifecycle binding could take over — the
                 // composable's onDispose has nothing to unbind, so release

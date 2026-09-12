@@ -2161,4 +2161,7 @@
     <string name="app_self_update_remind_later">Dismiss update</string>
     <string name="app_self_update_verifying">Verifying update</string>
     <string name="app_self_update_verifying_body">Checking the completed download before installation.</string>
+    <string name="qr_camera_access_needed">Camera Access Needed</string>
+    <string name="qr_turn_flashlight_on">Turn flashlight on</string>
+    <string name="qr_turn_flashlight_off">Turn flashlight off</string>
 </resources>

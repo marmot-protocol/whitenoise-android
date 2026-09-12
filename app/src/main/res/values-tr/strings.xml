@@ -2047,4 +2047,7 @@
     <string name="app_self_update_remind_later">Güncellemeyi kapat</string>
     <string name="app_self_update_verifying">Güncelleme doğrulanıyor</string>
     <string name="app_self_update_verifying_body">Kurulumdan önce tamamlanan indirme işleminin kontrol edilmesi.</string>
+    <string name="qr_camera_access_needed">Kamera Erişimi Gerekiyor</string>
+    <string name="qr_turn_flashlight_on">El fenerini aç</string>
+    <string name="qr_turn_flashlight_off">El fenerini kapat</string>
 </resources>

@@ -2111,4 +2111,7 @@
     <string name="app_self_update_remind_later">Скрыть обновление</string>
     <string name="app_self_update_verifying">Проверка обновления</string>
     <string name="app_self_update_verifying_body">Проверка завершенной загрузки перед установкой.</string>
+    <string name="qr_camera_access_needed">Требуется доступ к камере</string>
+    <string name="qr_turn_flashlight_on">Включите фонарик</string>
+    <string name="qr_turn_flashlight_off">Выключить фонарик</string>
 </resources>

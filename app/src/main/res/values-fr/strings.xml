@@ -2049,4 +2049,7 @@
     <string name="app_self_update_remind_later">Ignorer la mise à jour</string>
     <string name="app_self_update_verifying">Vérification de la mise à jour</string>
     <string name="app_self_update_verifying_body">Vérification du téléchargement terminé avant l’installation.</string>
+    <string name="qr_camera_access_needed">Accès à la caméra requis</string>
+    <string name="qr_turn_flashlight_on">Allumer la lampe torche</string>
+    <string name="qr_turn_flashlight_off">Éteindre la lampe torche</string>
 </resources>

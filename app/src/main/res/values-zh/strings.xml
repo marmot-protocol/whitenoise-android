@@ -2022,4 +2022,7 @@
     <string name="app_self_update_remind_later">忽略更新</string>
     <string name="app_self_update_verifying">正在验证更新</string>
     <string name="app_self_update_verifying_body">在安装前检查已完成的下载 。</string>
+    <string name="qr_camera_access_needed">需要相机权限</string>
+    <string name="qr_turn_flashlight_on">打开手电筒</string>
+    <string name="qr_turn_flashlight_off">关闭手电筒</string>
 </resources>
