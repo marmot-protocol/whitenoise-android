@@ -1199,7 +1199,7 @@
     <string name="export">Export</string>
     <string name="export_encrypted_private_key">Export Encrypted Private Key</string>
     <string name="keep_your_private_key_safe">Keep Your Private Key Safe</string>
-    <string name="export_private_key_consequence">Store this file somewhere secure. The encrypted export or a trusted password manager is safer.</string>
+    <string name="export_private_key_consequence">Keep your private key somewhere secure. Sharing exposes it to the app you choose. An encrypted backup or a trusted password manager is safer.</string>
     <string name="encrypted_private_key">Encrypted Private Key</string>
     <string name="password">Password</string>
     <string name="confirm_password">Confirm password</string>
@@ -2111,4 +2111,6 @@
     <string name="usage_diagnostics_unknown">Not loaded</string>
     <string name="usage_diagnostics_done">Done</string>
     <string name="usage_diagnostics_loading">Loading sharing settings…</string>
+    <string name="key_export_view_backup">View backup</string>
+    <string name="key_export_preview_help">Copy or export this encrypted backup to a secure place. It hides after 30 seconds or when you leave this screen.</string>
 </resources>

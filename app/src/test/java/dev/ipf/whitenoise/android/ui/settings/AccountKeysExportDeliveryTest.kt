@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import android.content.ClipDescription
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivityResultRegistryOwner
@@ -8,6 +11,10 @@ import androidx.activity.result.ActivityResultRegistry
 import androidx.activity.result.ActivityResultRegistryOwner
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
@@ -33,6 +40,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -40,6 +49,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSystemClock
 import java.io.ByteArrayOutputStream
 import java.lang.reflect.Proxy
 import java.util.concurrent.CountDownLatch
@@ -60,6 +70,7 @@ class AccountKeysExportDeliveryTest {
     @After
     fun releaseNative() {
         currentNative?.finishRaw()
+        currentNative?.finishEncrypted()
     }
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
@@ -114,6 +125,230 @@ class AccountKeysExportDeliveryTest {
         assertEquals(1, fixture.native.rawCalls.get())
     }
 
+    /** Password drafts are gone and inputs disabled before the synchronous native encryption returns. */
+    @Test
+    fun blockedEncryptionClearsAndDisablesBothPasswordsBeforeReturning() {
+        val fixture = render(deferEncrypted = true)
+        beginExport(encrypted = true)
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.native.encryptedStarted.get() }
+        assertClearedPasswordDrafts()
+        assertEquals(0, fixture.picker.launchCount)
+        fixture.native.finishEncrypted()
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.picker.launchCount == 1 }
+        assertEquals(1, fixture.native.encryptedCalls.get())
+    }
+
+    /** Canceling View backup discards late native output without opening a destination or preview. */
+    @Test
+    fun cancelledEncryptedPreviewDiscardsItsBlockedNativeResult() {
+        val fixture = render(deferEncrypted = true)
+        beginExport(encrypted = true, encryptedAction = R.string.key_export_view_backup)
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.native.encryptedStarted.get() }
+        assertClearedPasswordDrafts()
+        dialogButton(R.string.cancel).performClick()
+        fixture.native.finishEncrypted()
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.native.encryptedFinished.get() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertDoesNotExist()
+        assertEquals(0, fixture.picker.launchCount)
+        assertEquals(1, fixture.native.encryptedCalls.get())
+    }
+
+    /** Copy preserves the exact sensitive native value; Hide discards it without opening a file picker. */
+    @Test
+    fun encryptedPreviewCopiesExactSensitiveValueAndHidesWithoutPickingAFile() {
+        val fixture = render()
+        openBackupPreview()
+        assertEquals(0, fixture.picker.launchCount)
+        dialogButton(R.string.copy).performClick()
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        composeRule.runOnIdle {
+            val clip = requireNotNull(clipboard.primaryClip)
+            assertEquals(ENCRYPTED_KEY, clip.getItemAt(0).text.toString())
+            assertEquals(context.getString(R.string.encrypted_backup_result_title), clip.description.label.toString())
+            assertTrue(clip.description.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE) == true)
+        }
+        dialogButton(R.string.hide).performClick()
+        composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertDoesNotExist()
+        assertEquals(0, fixture.picker.launchCount)
+    }
+
+    /** The optional file action reuses the confirmed preview bytes, without requesting native encryption again. */
+    @Test
+    fun exportingThePreviewUsesTheSameEncryptedValue() {
+        val fixture = render()
+        val uri = Uri.parse("content://key-export-test/preview-key")
+        val bytes = ByteArrayOutputStream()
+        shadowOf(context.contentResolver).registerOutputStreamSupplier(uri) { bytes }
+        openBackupPreview()
+        dialogButton(R.string.export).performClick()
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.picker.launchCount == 1 }
+        composeRule.runOnIdle { fixture.picker.deliver(uri) }
+        assertEquals(ENCRYPTED_KEY, bytes.toString(Charsets.UTF_8.name()))
+        assertEquals(1, fixture.native.encryptedCalls.get())
+        composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertDoesNotExist()
+    }
+
+    /** Foreground departure clears an encrypted preview and resume does not reveal it again. */
+    @Test
+    fun stoppedEncryptedPreviewStaysHiddenAfterResume() {
+        val fixture = render()
+        openBackupPreview()
+        composeRule.runOnIdle {
+            fixture.owner.stop()
+            fixture.owner.resume()
+        }
+        composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertDoesNotExist()
+        assertEquals(0, fixture.picker.launchCount)
+    }
+
+    /** Native teardown revokes the visible backup even while the same account reference is still active. */
+    @Test
+    fun wipeClearsEncryptedPreviewBeforeAccountRemoval() {
+        val fixture = render()
+        openBackupPreview()
+        composeRule.runOnIdle { fixture.appState.wipeInProgress = true }
+        composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertDoesNotExist()
+        assertEquals(ACCOUNT_REF, fixture.appState.activeAccountRef)
+        assertEquals(0, fixture.picker.launchCount)
+    }
+
+    /** The result's 30-second timer clears the preview without requiring a second user gesture. */
+    @Test
+    fun encryptedPreviewExpiresAfterThirtySeconds() {
+        render()
+        openBackupPreview()
+        composeRule.mainClock.advanceTimeBy(30_001L)
+        composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertDoesNotExist()
+    }
+
+    /** The raw confirmation preserves the legacy explicit sensitive share transport without opening a file picker. */
+    @Test
+    fun rawShareMarksBothIntentAndPayloadSensitive() {
+        val fixture = render()
+        composeRule.onNodeWithTag("profile_keys.export_raw").performScrollTo().performClick()
+        dialogButton(R.string.share).performClick()
+        composeRule.waitUntil(TIMEOUT_MILLIS) { shadowOf(composeRule.activity).peekNextStartedActivity() != null }
+        val chooser = shadowOf(composeRule.activity).nextStartedActivity
+        assertNotNull(chooser)
+        assertEquals(Intent.ACTION_CHOOSER, chooser.action)
+        val target = requireNotNull(chooser.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java))
+        assertEquals(Intent.ACTION_SEND, target.action)
+        assertEquals("text/plain", target.type)
+        assertEquals(RAW_KEY, target.getStringExtra(Intent.EXTRA_TEXT))
+        assertTrue(target.getBooleanExtra(ClipDescription.EXTRA_IS_SENSITIVE, false))
+        val clip = requireNotNull(target.clipData)
+        assertEquals(RAW_KEY, clip.getItemAt(0).text.toString())
+        assertTrue(clip.description.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE) == true)
+        assertEquals(0, fixture.picker.launchCount)
+    }
+
+    /** The added share action follows the same generation guard as file export after cancellation. */
+    @Test
+    fun cancelledRawShareDoesNotDispatchALateNativeSecret() {
+        val fixture = render(deferRaw = true)
+        composeRule.onNodeWithTag("profile_keys.export_raw").performScrollTo().performClick()
+        dialogButton(R.string.share).performClick()
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.native.rawStarted.get() }
+        dialogButton(R.string.cancel).performClick()
+        fixture.native.finishRaw()
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.native.rawFinished.get() }
+        composeRule.waitForIdle()
+        assertNull(shadowOf(composeRule.activity).nextStartedActivity)
+        assertEquals(0, fixture.picker.launchCount)
+    }
+
+    /** The preview retains its original deadline when handed to a picker instead of receiving another 30 seconds. */
+    @Test
+    fun previewFileReturnAfterOriginalDeadlineDoesNotWrite() {
+        val fixture = render()
+        val uri = Uri.parse("content://key-export-test/expired-preview")
+        val opens = AtomicInteger()
+        shadowOf(context.contentResolver).registerOutputStreamSupplier(uri) {
+            opens.incrementAndGet()
+            ByteArrayOutputStream()
+        }
+        openBackupPreview()
+        composeRule.runOnIdle { ShadowSystemClock.advanceBy(20, TimeUnit.SECONDS) }
+        dialogButton(R.string.export).performClick()
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.picker.launchCount == 1 }
+        composeRule.runOnIdle {
+            ShadowSystemClock.advanceBy(11, TimeUnit.SECONDS)
+            fixture.picker.deliver(uri)
+        }
+        assertEquals(0, opens.get())
+        assertEquals(1, fixture.native.encryptedCalls.get())
+    }
+
+    /** A stale rendered Copy action reads the live teardown flag before touching the clipboard. */
+    @Test
+    fun encryptedCopyDuringSignOutDoesNotReplaceTheClipboard() {
+        val fixture = render()
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        composeRule.runOnIdle { clipboard.clearPrimaryClip() }
+        openBackupPreview()
+        val copy =
+            requireNotNull(dialogButton(R.string.copy).fetchSemanticsNode().config[SemanticsActions.OnClick].action)
+        composeRule.runOnIdle {
+            fixture.appState.signOutInProgress = true
+            assertTrue(copy())
+            assertNull(clipboard.primaryClip)
+        }
+        composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertDoesNotExist()
+    }
+
+    /** A native encryption failure is identified accurately and allows retry only with newly entered passwords. */
+    @Test
+    fun failedEncryptedPreviewAllowsExplicitRetryWithFreshPassphrase() {
+        val fixture = render(deferEncrypted = true, failFirstEncryption = true)
+        beginExport(encrypted = true, encryptedAction = R.string.key_export_view_backup)
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.native.encryptedStarted.get() }
+        assertClearedPasswordDrafts()
+        fixture.native.finishEncrypted()
+        composeRule.waitUntil(TIMEOUT_MILLIS) {
+            composeRule
+                .onAllNodes(hasText(context.getString(R.string.toast_couldnt_create_encrypted_backup)))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onNodeWithText(context.getString(R.string.couldnt_save_file)).assertDoesNotExist()
+        assertEquals(0, fixture.picker.launchCount)
+        dialogButton(R.string.ok).performClick()
+        dialogButton(R.string.key_export_view_backup).assertIsNotEnabled()
+        composeRule.onNodeWithTag("profile_keys.export_password").assertIsEnabled().performTextInput(PASSPHRASE)
+        composeRule.onNodeWithTag("profile_keys.export_confirmation").assertIsEnabled().performTextInput(PASSPHRASE)
+        dialogButton(R.string.key_export_view_backup).performClick()
+        composeRule.waitUntil(TIMEOUT_MILLIS) {
+            composeRule
+                .onAllNodes(hasText(context.getString(R.string.encrypted_backup_result_title)))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertExists()
+        assertEquals(2, fixture.native.encryptedCalls.get())
+        assertEquals(0, fixture.picker.launchCount)
+    }
+
+    /** Checks the actual secure input semantics while the native worker is still blocked. */
+    private fun assertClearedPasswordDrafts() {
+        listOf("profile_keys.export_password", "profile_keys.export_confirmation").forEach { tag ->
+            val field = composeRule.onNodeWithTag(tag).assertIsNotEnabled()
+            assertEquals("", field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        }
+    }
+
+    /** Opens the real optional encrypted result; its content is synthetic native output only. */
+    private fun openBackupPreview() {
+        beginExport(encrypted = true, encryptedAction = R.string.key_export_view_backup)
+        composeRule.waitUntil(TIMEOUT_MILLIS) {
+            composeRule
+                .onAllNodes(hasText(context.getString(R.string.encrypted_backup_result_title)))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertExists()
+    }
+
     /** Drives the actual returned-URI callback, recording whether the ContentResolver ever opens a destination. */
     private fun assertPickerReturn(
         encrypted: Boolean,
@@ -154,7 +389,10 @@ class AccountKeysExportDeliveryTest {
     }
 
     /** Uses the screen's real menu rows and consequence/password dialogs rather than assigning private UI state. */
-    private fun beginExport(encrypted: Boolean) {
+    private fun beginExport(
+        encrypted: Boolean,
+        encryptedAction: Int = R.string.export,
+    ) {
         if (encrypted) {
             composeRule
                 .onNodeWithText(context.getString(R.string.export_encrypted_private_key))
@@ -162,7 +400,7 @@ class AccountKeysExportDeliveryTest {
                 .performClick()
             composeRule.onNodeWithTag("profile_keys.export_password").performTextInput(PASSPHRASE)
             composeRule.onNodeWithTag("profile_keys.export_confirmation").performTextInput(PASSPHRASE)
-            dialogButton(R.string.export).performClick()
+            dialogButton(encryptedAction).performClick()
         } else {
             composeRule.onNodeWithTag("profile_keys.export_raw").performScrollTo().performClick()
             dialogButton(R.string.export_nsec).performClick()
@@ -176,8 +414,12 @@ class AccountKeysExportDeliveryTest {
         )
 
     /** Injects only synthetic native outputs and a recording registry; no file picker, identity or device is used. */
-    private fun render(deferRaw: Boolean = false): Fixture {
-        val native = NativeExports(deferRaw).also { currentNative = it }
+    private fun render(
+        deferRaw: Boolean = false,
+        deferEncrypted: Boolean = false,
+        failFirstEncryption: Boolean = false,
+    ): Fixture {
+        val native = NativeExports(deferRaw, deferEncrypted, failFirstEncryption).also { currentNative = it }
         val appState =
             WhiteNoiseAppState(
                 context = context,
@@ -267,12 +509,18 @@ class AccountKeysExportDeliveryTest {
     /** Native API proxy models revealNsec as the pinned ABI’s synchronous blocking call on the IO dispatcher. */
     private class NativeExports(
         private val deferRaw: Boolean,
+        private val deferEncrypted: Boolean,
+        failFirstEncryption: Boolean,
     ) {
         val rawCalls = AtomicInteger()
         val encryptedCalls = AtomicInteger()
         val rawStarted = AtomicBoolean(false)
         private val rawRelease = CountDownLatch(1)
         val rawFinished = AtomicBoolean(false)
+        private val encryptionFailurePending = AtomicBoolean(failFirstEncryption)
+        val encryptedStarted = AtomicBoolean(false)
+        private val encryptedRelease = CountDownLatch(1)
+        val encryptedFinished = AtomicBoolean(false)
         val marmot =
             Proxy.newProxyInstance(
                 MarmotInterface::class.java.classLoader,
@@ -281,12 +529,7 @@ class AccountKeysExportDeliveryTest {
                 when (method.name) {
                     "npub" -> "npub1testpublickey"
                     "revealNsec" -> raw(arguments)
-                    "exportEncryptedSecretKey" -> {
-                        encryptedCalls.incrementAndGet()
-                        check(arguments?.get(0) == ACCOUNT_REF)
-                        check(arguments?.get(1) == PASSPHRASE)
-                        ENCRYPTED_KEY
-                    }
+                    "exportEncryptedSecretKey" -> encrypted(arguments)
                     "toString" -> "NativeExportsTestProxy"
                     "hashCode" -> System.identityHashCode(proxy)
                     "equals" -> proxy === arguments?.firstOrNull()
@@ -306,6 +549,27 @@ class AccountKeysExportDeliveryTest {
             } finally {
                 rawFinished.set(true)
             }
+        }
+
+        /** The pinned encrypted export ABI is also synchronous; the IO worker remains blocked until released. */
+        private fun encrypted(arguments: Array<out Any?>?): String {
+            encryptedCalls.incrementAndGet()
+            check(arguments?.get(0) == ACCOUNT_REF)
+            check(arguments?.get(1) == PASSPHRASE)
+            if (!deferEncrypted) return ENCRYPTED_KEY
+            encryptedStarted.set(true)
+            try {
+                check(encryptedRelease.await(15, TimeUnit.SECONDS)) { "Test did not release native encrypted export" }
+                check(!encryptionFailurePending.getAndSet(false)) { "Synthetic native encryption failure" }
+                return ENCRYPTED_KEY
+            } finally {
+                encryptedFinished.set(true)
+            }
+        }
+
+        /** Releases encrypted native work after assertions or in unconditional test cleanup. */
+        fun finishEncrypted() {
+            encryptedRelease.countDown()
         }
 
         /** Completes the recorded native call even when its coroutine has already been cancelled. */

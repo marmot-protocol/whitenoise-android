@@ -879,7 +879,7 @@
     <string name="export">Esporta</string>
     <string name="export_encrypted_private_key">Esporta chiave privata cifrata</string>
     <string name="keep_your_private_key_safe">Tieni al sicuro la tua chiave privata</string>
-    <string name="export_private_key_consequence">Conserva questo file in un luogo sicuro. L’esportazione cifrata o un gestore di password affidabile è più sicuro.</string>
+    <string name="export_private_key_consequence">Conserva la chiave privata in un luogo sicuro. Condividendola, la rendi accessibile all’app scelta. Un backup cifrato o un gestore di password affidabile è più sicuro.</string>
     <string name="encrypted_private_key">Chiave privata cifrata</string>
     <string name="password">Password</string>
     <string name="confirm_password">Conferma password</string>
@@ -1999,4 +1999,6 @@
     <string name="usage_diagnostics_unknown">Stato non disponibile</string>
     <string name="usage_diagnostics_done">Fine</string>
     <string name="usage_diagnostics_loading">Caricamento delle impostazioni di condivisione…</string>
+    <string name="key_export_view_backup">Visualizza backup</string>
+    <string name="key_export_preview_help">Copia o esporta questo backup cifrato in un luogo sicuro. Viene nascosto dopo 30 secondi o quando lasci questa schermata.</string>
 </resources>

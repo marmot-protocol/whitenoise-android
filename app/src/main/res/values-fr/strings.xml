@@ -879,7 +879,7 @@
     <string name="export">Exporter</string>
     <string name="export_encrypted_private_key">Exporter la clé privée chiffrée</string>
     <string name="keep_your_private_key_safe">Gardez votre clé privée en sécurité</string>
-    <string name="export_private_key_consequence">Conservez ce fichier en lieu sûr. L’export chiffré ou un gestionnaire de mots de passe de confiance est plus sûr.</string>
+    <string name="export_private_key_consequence">Conservez votre clé privée en lieu sûr. Le partage la transmet à l’application choisie. Une sauvegarde chiffrée ou un gestionnaire de mots de passe de confiance est plus sûr.</string>
     <string name="encrypted_private_key">Clé privée chiffrée</string>
     <string name="password">Mot de passe</string>
     <string name="confirm_password">Confirmer le mot de passe</string>
@@ -1999,4 +1999,6 @@
     <string name="usage_diagnostics_unknown">Non chargé</string>
     <string name="usage_diagnostics_done">Terminé</string>
     <string name="usage_diagnostics_loading">Chargement des paramètres de partage…</string>
+    <string name="key_export_view_backup">Voir la sauvegarde</string>
+    <string name="key_export_preview_help">Copiez ou exportez cette sauvegarde chiffrée dans un endroit sûr. Elle est masquée après 30 secondes ou lorsque vous quittez cet écran.</string>
 </resources>

@@ -879,7 +879,7 @@
     <string name="export">Exportieren</string>
     <string name="export_encrypted_private_key">Verschlüsselten privaten Schlüssel exportieren</string>
     <string name="keep_your_private_key_safe">Bewahre deinen privaten Schlüssel sicher auf</string>
-    <string name="export_private_key_consequence">Bewahre diese Datei an einem sicheren Ort auf. Der verschlüsselte Export oder ein vertrauenswürdiger Passwort-Manager ist sicherer.</string>
+    <string name="export_private_key_consequence">Bewahre deinen privaten Schlüssel sicher auf. Beim Teilen erhält die ausgewählte App Zugriff darauf. Ein verschlüsseltes Backup oder ein vertrauenswürdiger Passwort-Manager ist sicherer.</string>
     <string name="encrypted_private_key">Verschlüsselter privater Schlüssel</string>
     <string name="password">Passwort</string>
     <string name="confirm_password">Passwort bestätigen</string>
@@ -2015,4 +2015,6 @@
     <string name="usage_diagnostics_unknown">Nicht geladen</string>
     <string name="usage_diagnostics_done">Fertig</string>
     <string name="usage_diagnostics_loading">Freigabeeinstellungen werden geladen…</string>
+    <string name="key_export_view_backup">Backup anzeigen</string>
+    <string name="key_export_preview_help">Kopiere oder exportiere dieses verschlüsselte Backup an einen sicheren Ort. Es wird nach 30 Sekunden oder beim Verlassen dieses Bildschirms ausgeblendet.</string>
 </resources>

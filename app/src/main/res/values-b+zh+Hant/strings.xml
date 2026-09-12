@@ -868,7 +868,7 @@
     <string name="export">匯出</string>
     <string name="export_encrypted_private_key">匯出加密私鑰</string>
     <string name="keep_your_private_key_safe">妥善保管你的私鑰</string>
-    <string name="export_private_key_consequence">請將此檔案保存在安全的地方。加密匯出或可信的密碼管理器更安全。</string>
+    <string name="export_private_key_consequence">請妥善保管私鑰。分享會將私鑰提供給你選擇的應用程式。加密備份或可信的密碼管理器更安全。</string>
     <string name="encrypted_private_key">加密私鑰</string>
     <string name="password">密碼</string>
     <string name="confirm_password">確認密碼</string>
@@ -1972,4 +1972,6 @@
     <string name="usage_diagnostics_unknown">尚未載入</string>
     <string name="usage_diagnostics_done">完成</string>
     <string name="usage_diagnostics_loading">正在載入分享設定…</string>
+    <string name="key_export_view_backup">檢視備份</string>
+    <string name="key_export_preview_help">將此加密備份複製或匯出至安全的地方。30 秒後或離開此畫面時，備份會隱藏。</string>
 </resources>

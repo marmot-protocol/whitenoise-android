@@ -879,7 +879,7 @@
     <string name="export">Exportar</string>
     <string name="export_encrypted_private_key">Exportar clave privada cifrada</string>
     <string name="keep_your_private_key_safe">Mantén segura tu clave privada</string>
-    <string name="export_private_key_consequence">Guarda este archivo en un lugar seguro. La exportación cifrada o un gestor de contraseñas de confianza son más seguros.</string>
+    <string name="export_private_key_consequence">Guarda tu clave privada en un lugar seguro. Al compartirla, la aplicación elegida tendrá acceso a ella. Una copia cifrada o un gestor de contraseñas de confianza son más seguros.</string>
     <string name="encrypted_private_key">Clave privada cifrada</string>
     <string name="password">Contraseña</string>
     <string name="confirm_password">Confirmar contraseña</string>
@@ -1999,4 +1999,6 @@
     <string name="usage_diagnostics_unknown">Sin cargar</string>
     <string name="usage_diagnostics_done">Listo</string>
     <string name="usage_diagnostics_loading">Cargando la configuración de uso compartido…</string>
+    <string name="key_export_view_backup">Ver copia de seguridad</string>
+    <string name="key_export_preview_help">Copia o exporta esta copia cifrada a un lugar seguro. Se oculta a los 30 segundos o al salir de esta pantalla.</string>
 </resources>

@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.PersistableBundle
 import android.os.SystemClock
@@ -14,6 +15,7 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -23,9 +25,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -87,6 +91,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.EncryptedBackupPassphraseStrength
 import dev.ipf.whitenoise.android.core.encryptedBackupPassphraseInputsValid
 import dev.ipf.whitenoise.android.core.encryptedBackupPassphraseStrength
+import dev.ipf.whitenoise.android.core.groupedEncryptedBackup
 import dev.ipf.whitenoise.android.state.SignOutCompletion
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.WipeReport
@@ -109,9 +114,12 @@ private const val WIPE_ENGINE_FFI_AVAILABLE = true
 internal const val WIPE_ACTION_TAG = "wipe-action"
 
 /** The key the copy glyph last acknowledged; it shows a check for two seconds. */
-private enum class CopiedProfileKey { Public, Private }
+private enum class CopiedProfileKey { Public, Private, Encrypted }
 
-/** A confirmed export waiting for the user to pick a file; it expires like a revealed key does. */
+/** Explicit user-selected delivery of an account-bound native export. */
+private enum class KeyExportDestination { File, Preview, Share }
+
+/** A confirmed native result held temporarily for preview or document delivery, with one original expiry. */
 private data class PendingKeyExport(
     val encrypted: Boolean,
     val content: String,
@@ -135,6 +143,9 @@ private class ProfileKeysUiState {
     var revealRequested by mutableStateOf(false)
     var copiedKey by mutableStateOf<CopiedProfileKey?>(null)
     var pendingExport by mutableStateOf<PendingKeyExport?>(null)
+    var encryptedBackup by mutableStateOf<PendingKeyExport?>(null)
+    var shareErrorDialog by mutableStateOf(false)
+    var nativeExportError by mutableStateOf<Int?>(null)
     var passwordDialog by mutableStateOf(false)
     var rawExportDialog by mutableStateOf(false)
     var saveErrorDialog by mutableStateOf(false)
@@ -162,6 +173,7 @@ private class ProfileKeysUiState {
         exportBusy = false
         rawExportDialog = false
         passwordDialog = false
+        encryptedBackup = null
         clearPasswords()
     }
 
@@ -184,6 +196,7 @@ private class ProfileKeysUiState {
         hidePrivateKey()
         rawExportDialog = false
         passwordDialog = false
+        encryptedBackup = null
         clearPasswords()
     }
 }
@@ -208,6 +221,8 @@ internal fun AccountKeysScreen(
     val hasLocalKey = active?.localSigning == true
     val publicKeyLabel = stringResource(R.string.public_key)
     val privateKeyLabel = stringResource(R.string.private_key)
+    val encryptedBackupLabel = stringResource(R.string.encrypted_backup_result_title)
+    val shareTitle = stringResource(R.string.share_secret_key)
     val accountRef = appState.activeAccountRef
     val runtimeGeneration = appState.runtimeGeneration
     val ui = remember(accountIdHex, accountRef, runtimeGeneration) { ProfileKeysUiState() }
@@ -239,8 +254,9 @@ internal fun AccountKeysScreen(
     fun launchExport(
         encrypted: Boolean,
         content: String,
+        createdAtMillis: Long = SystemClock.elapsedRealtime(),
     ) {
-        ui.pendingExport = PendingKeyExport(encrypted, content, SystemClock.elapsedRealtime())
+        ui.pendingExport = PendingKeyExport(encrypted, content, createdAtMillis)
         ui.hideSensitive()
         val stem = npub.take(ProfileKeysDefaults.FILE_STEM_LENGTH)
         val filename = if (encrypted) "$stem-white-noise-key.wnkey.txt" else "$stem-white-noise-key.txt"
@@ -250,10 +266,22 @@ internal fun AccountKeysScreen(
         }
     }
 
-    fun beginExport(encrypted: Boolean) {
-        if (!hasLocalKey || ui.exportBusy) return
-        if (ui.pendingExport != null || !canDeliverSecret()) return
-        val passphrase = ui.password.text.toString()
+    fun beginExport(
+        encrypted: Boolean,
+        destination: KeyExportDestination,
+    ) {
+        val exportIdle = !ui.exportBusy && ui.pendingExport == null
+        if (!hasLocalKey || !exportIdle || !canDeliverSecret()) return
+        if (encrypted &&
+            !encryptedBackupPassphraseInputsValid(
+                ui.password.text.toString(),
+                ui.confirmation.text.toString(),
+            )
+        ) {
+            return
+        }
+        val passphrase = if (encrypted) ui.password.text.toString() else ""
+        ui.clearPasswords()
         ui.exportBusy = true
         ui.exportOperation.start(
             scope = scope,
@@ -266,13 +294,39 @@ internal fun AccountKeysScreen(
                 }
             },
             onResult = { content ->
-                if (content != null) launchExport(encrypted, content) else ui.saveErrorDialog = true
+                if (content == null) {
+                    ui.nativeExportError =
+                        if (encrypted) {
+                            R.string.toast_couldnt_create_encrypted_backup
+                        } else {
+                            R.string.toast_couldnt_export_nsec
+                        }
+                } else {
+                    when (destination) {
+                        KeyExportDestination.File -> launchExport(encrypted, content)
+                        KeyExportDestination.Preview -> {
+                            ui.hideSensitive()
+                            ui.copiedKey = null
+                            ui.encryptedBackup = PendingKeyExport(true, content, SystemClock.elapsedRealtime())
+                        }
+                        KeyExportDestination.Share -> {
+                            ui.hideSensitive()
+                            ui.shareErrorDialog = !sharePrivateKey(context, shareTitle, content)
+                        }
+                    }
+                }
             },
             onFinished = { ui.exportBusy = false },
         )
     }
 
     ProfileKeysEffects(ui = ui, lifecycle = lifecycle)
+    LaunchedEffect(hasLocalKey, appState.signOutInProgress, appState.wipeInProgress) {
+        if (!hasLocalKey || appState.signOutInProgress || appState.wipeInProgress) {
+            ui.stopSensitiveOperations()
+            ui.pendingExport = null
+        }
+    }
 
     SettingsScaffold(
         title = stringResource(R.string.settings_profile_keys),
@@ -322,7 +376,29 @@ internal fun AccountKeysScreen(
             onWipe = { ui.wipeSheet = true },
         )
     }
-    ProfileKeysDialogs(ui = ui, canExport = hasLocalKey, onExport = ::beginExport)
+    ProfileKeysDialogs(
+        ui = ui,
+        canExport = hasLocalKey,
+        onExport = ::beginExport,
+        onCopyBackup = {
+            val backup = ui.encryptedBackup
+            if (backup != null && !backup.isExpired() && canDeliverSecret()) {
+                copyToClipboard(context, encryptedBackupLabel, backup.content, sensitive = true)
+                ui.copiedKey = CopiedProfileKey.Encrypted
+            } else {
+                ui.encryptedBackup = null
+            }
+        },
+        onExportBackup = {
+            val backup = ui.encryptedBackup
+            if (backup != null && !backup.isExpired() && canDeliverSecret()) {
+                launchExport(true, backup.content, backup.createdAtMillis)
+            } else {
+                ui.encryptedBackup = null
+                if (canDeliverSecret()) ui.expiredExportDialog = true
+            }
+        },
+    )
     AccountWipeFlow(appState = appState, ui = ui)
 }
 
@@ -341,11 +417,16 @@ private fun ProfileKeysEffects(
     }
     LaunchedEffect(ui.pendingExport) {
         val request = ui.pendingExport ?: return@LaunchedEffect
-        delay(ProfileKeysDefaults.EXPIRY_MILLIS)
+        delay(request.remainingMillis())
         if (ui.pendingExport === request) {
             ui.pendingExport = null
             ui.expiredExportDialog = true
         }
+    }
+    LaunchedEffect(ui.encryptedBackup) {
+        val backup = ui.encryptedBackup ?: return@LaunchedEffect
+        delay(backup.remainingMillis())
+        if (ui.encryptedBackup === backup) ui.encryptedBackup = null
     }
     LaunchedEffect(ui.copiedKey) {
         if (ui.copiedKey != null) {
@@ -576,22 +657,34 @@ private fun ProfileKeySupportingText(text: String) {
     )
 }
 
-/** The export dialogs: raw consequence, encrypted password, save failure and expiry. */
-@Suppress("FunctionNaming")
+/** The export dialogs: raw consequence, encrypted password/result, delivery failure and expiry. */
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 private fun ProfileKeysDialogs(
     ui: ProfileKeysUiState,
     canExport: Boolean,
-    onExport: (encrypted: Boolean) -> Unit,
+    onExport: (encrypted: Boolean, destination: KeyExportDestination) -> Unit,
+    onCopyBackup: () -> Unit,
+    onExportBackup: () -> Unit,
 ) {
     if (ui.rawExportDialog && canExport) {
         WhiteNoiseAlertDialog(
             onDismissRequest = ui::cancelExport,
             title = { Text(stringResource(R.string.keep_your_private_key_safe)) },
-            text = { Text(stringResource(R.string.export_private_key_consequence)) },
+            text = {
+                Text(
+                    stringResource(R.string.export_private_key_consequence),
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                )
+            },
             confirmButton = {
-                TextButton(enabled = !ui.exportBusy, onClick = { onExport(false) }) {
-                    Text(stringResource(R.string.export_nsec), color = MaterialTheme.colorScheme.error)
+                FlowRow(horizontalArrangement = Arrangement.End) {
+                    TextButton(enabled = !ui.exportBusy, onClick = { onExport(false, KeyExportDestination.Share) }) {
+                        Text(stringResource(R.string.share), color = MaterialTheme.colorScheme.error)
+                    }
+                    TextButton(enabled = !ui.exportBusy, onClick = { onExport(false, KeyExportDestination.File) }) {
+                        Text(stringResource(R.string.export_nsec), color = MaterialTheme.colorScheme.error)
+                    }
                 }
             },
             dismissButton = {
@@ -604,8 +697,36 @@ private fun ProfileKeysDialogs(
             password = ui.password,
             confirmation = ui.confirmation,
             busy = ui.exportBusy,
-            onConfirm = { onExport(true) },
+            onConfirm = { onExport(true, KeyExportDestination.File) },
+            onViewBackup = { onExport(true, KeyExportDestination.Preview) },
             onDismiss = ui::cancelExport,
+        )
+    }
+    ui.encryptedBackup?.let { backup ->
+        EncryptedBackupResultDialog(
+            backup = backup.content,
+            copied = ui.copiedKey == CopiedProfileKey.Encrypted,
+            onCopy = onCopyBackup,
+            onExport = onExportBackup,
+            onHide = ui::cancelExport,
+        )
+    }
+    ui.nativeExportError?.let { title ->
+        WhiteNoiseAlertDialog(
+            onDismissRequest = { ui.nativeExportError = null },
+            title = { Text(stringResource(title)) },
+            confirmButton = {
+                TextButton(onClick = { ui.nativeExportError = null }) { Text(stringResource(R.string.ok)) }
+            },
+        )
+    }
+    if (ui.shareErrorDialog) {
+        WhiteNoiseAlertDialog(
+            onDismissRequest = { ui.shareErrorDialog = false },
+            title = { Text(stringResource(R.string.outbound_share_failed)) },
+            confirmButton = {
+                TextButton(onClick = { ui.shareErrorDialog = false }) { Text(stringResource(R.string.ok)) }
+            },
         )
     }
     if (ui.saveErrorDialog) {
@@ -630,14 +751,15 @@ private fun ProfileKeysDialogs(
     }
 }
 
-/** Two secure fields, the mismatch or help line, and the strength meter; Export enables once both fields agree. */
-@Suppress("FunctionNaming", "LongMethod")
+/** Two secure fields, the mismatch/help line and strength meter; matching fields unlock both destinations. */
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 private fun ExportPasswordDialog(
     password: TextFieldState,
     confirmation: TextFieldState,
     busy: Boolean,
     onConfirm: () -> Unit,
+    onViewBackup: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val passwordValue = password.text.toString()
@@ -648,17 +770,19 @@ private fun ExportPasswordDialog(
         title = { Text(stringResource(R.string.encrypted_private_key)) },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
             ) {
                 WhiteNoiseSecureTextField(
                     state = password,
+                    enabled = !busy,
                     modifier = Modifier.fillMaxWidth().testTag("profile_keys.export_password"),
                     label = { Text(stringResource(R.string.password)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
                 )
                 WhiteNoiseSecureTextField(
                     state = confirmation,
+                    enabled = !busy,
                     modifier = Modifier.fillMaxWidth().testTag("profile_keys.export_confirmation"),
                     label = { Text(stringResource(R.string.confirm_password)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
@@ -679,12 +803,55 @@ private fun ExportPasswordDialog(
             }
         },
         confirmButton = {
-            TextButton(
-                enabled = !busy && encryptedBackupPassphraseInputsValid(passwordValue, confirmationValue),
-                onClick = onConfirm,
-            ) { Text(stringResource(R.string.export)) }
+            FlowRow(horizontalArrangement = Arrangement.End) {
+                TextButton(
+                    enabled = !busy && encryptedBackupPassphraseInputsValid(passwordValue, confirmationValue),
+                    onClick = onViewBackup,
+                ) { Text(stringResource(R.string.key_export_view_backup)) }
+                TextButton(
+                    enabled = !busy && encryptedBackupPassphraseInputsValid(passwordValue, confirmationValue),
+                    onClick = onConfirm,
+                ) { Text(stringResource(R.string.export)) }
+            }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+/** Temporary account-owned encrypted result; copying and file export are separate deliberate actions. */
+@Suppress("FunctionNaming", "LongParameterList")
+@Composable
+private fun EncryptedBackupResultDialog(
+    backup: String,
+    copied: Boolean,
+    onCopy: () -> Unit,
+    onExport: () -> Unit,
+    onHide: () -> Unit,
+) {
+    WhiteNoiseAlertDialog(
+        onDismissRequest = onHide,
+        title = { Text(stringResource(R.string.encrypted_backup_result_title)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+            ) {
+                Text(stringResource(R.string.key_export_preview_help))
+                Text(
+                    text = groupedEncryptedBackup(backup),
+                    fontFamily = FontFamily.Monospace,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.testTag("profile_keys.encrypted_backup"),
+                )
+            }
+        },
+        confirmButton = {
+            FlowRow(horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onCopy) { Text(stringResource(if (copied) R.string.copied else R.string.copy)) }
+                TextButton(onClick = onExport) { Text(stringResource(R.string.export)) }
+            }
+        },
+        dismissButton = { TextButton(onClick = onHide) { Text(stringResource(R.string.hide)) } },
     )
 }
 
@@ -720,6 +887,33 @@ private fun PendingKeyExport.isExpired(): Boolean {
     val age = SystemClock.elapsedRealtime() - createdAtMillis
     return age >= ProfileKeysDefaults.EXPIRY_MILLIS
 }
+
+/** Remaining lifetime follows the native result when a preview is handed to the document picker. */
+private fun PendingKeyExport.remainingMillis(): Long {
+    val age = SystemClock.elapsedRealtime() - createdAtMillis
+    return (ProfileKeysDefaults.EXPIRY_MILLIS - age).coerceAtLeast(0L)
+}
+
+/** Restores the deliberate raw-key share transport, marking both intent and clipboard payload sensitive. */
+private fun sharePrivateKey(
+    context: Context,
+    title: String,
+    content: String,
+): Boolean =
+    runCatching {
+        val clip =
+            ClipData.newPlainText(title, content).apply {
+                description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
+            }
+        val intent =
+            Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, content)
+                putExtra(ClipDescription.EXTRA_IS_SENSITIVE, true)
+                clipData = clip
+            }
+        context.startActivity(Intent.createChooser(intent, title))
+    }.isSuccess
 
 /** Writes an export to the document the user picked; false when the stream could not be written. */
 private fun writeExport(

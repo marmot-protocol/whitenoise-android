@@ -879,7 +879,7 @@
     <string name="export">İhracat</string>
     <string name="export_encrypted_private_key">Şifrelenmiş Özel Anahtarı Dışa Aktar</string>
     <string name="keep_your_private_key_safe">Özel Anahtarınızı Güvende Tutun</string>
-    <string name="export_private_key_consequence">Bu dosyayı güvenli bir yerde saklayın. Şifrelenmiş dışa aktarma veya güvenilir bir parola yöneticisi daha güvenlidir.</string>
+    <string name="export_private_key_consequence">Özel anahtarınızı güvenli bir yerde saklayın. Paylaşmak, seçtiğiniz uygulamanın anahtara erişmesini sağlar. Şifreli yedek veya güvenilir bir parola yöneticisi daha güvenlidir.</string>
     <string name="encrypted_private_key">Şifrelenmiş Özel Anahtar</string>
     <string name="password">Şifre</string>
     <string name="confirm_password">Şifreyi onayla</string>
@@ -1997,4 +1997,6 @@
     <string name="usage_diagnostics_unknown">Yüklenmedi</string>
     <string name="usage_diagnostics_done">Bitti</string>
     <string name="usage_diagnostics_loading">Paylaşım ayarları yükleniyor…</string>
+    <string name="key_export_view_backup">Yedeği görüntüle</string>
+    <string name="key_export_preview_help">Bu şifreli yedeği güvenli bir yere kopyalayın veya dışa aktarın. 30 saniye sonra veya bu ekrandan ayrıldığınızda gizlenir.</string>
 </resources>

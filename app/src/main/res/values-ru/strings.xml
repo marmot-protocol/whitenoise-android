@@ -913,7 +913,7 @@
     <string name="export">Экспорт</string>
     <string name="export_encrypted_private_key">Экспорт зашифрованного закрытого ключа</string>
     <string name="keep_your_private_key_safe">Храните свой закрытый ключ в безопасности</string>
-    <string name="export_private_key_consequence">Сохраните этот файл в безопасном месте. Зашифрованный экспорт или надежный менеджер паролей безопаснее.</string>
+    <string name="export_private_key_consequence">Храните закрытый ключ в безопасном месте. При отправке он станет доступен выбранному приложению. Зашифрованная копия или надежный менеджер паролей безопаснее.</string>
     <string name="encrypted_private_key">Зашифрованный закрытый ключ</string>
     <string name="password">Пароль</string>
     <string name="confirm_password">Подтвердите пароль</string>
@@ -2061,4 +2061,6 @@
     <string name="usage_diagnostics_unknown">Не загружено</string>
     <string name="usage_diagnostics_done">Готово</string>
     <string name="usage_diagnostics_loading">Загрузка настроек передачи данных…</string>
+    <string name="key_export_view_backup">Посмотреть копию</string>
+    <string name="key_export_preview_help">Скопируйте или экспортируйте зашифрованную копию в безопасное место. Она скроется через 30 секунд или при выходе с этого экрана.</string>
 </resources>
