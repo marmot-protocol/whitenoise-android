@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.profile
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -8,7 +9,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -18,31 +18,24 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,27 +45,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.Lud16Resolver
+import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.ProfileFieldValidation
 import dev.ipf.whitenoise.android.core.ProfilePseudonymGenerator
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
@@ -80,9 +70,6 @@ import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.ProfilePublicWarning
-import dev.ipf.whitenoise.android.ui.common.SectionCard
-import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.group.ImagePreviewPresentation
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -461,7 +448,9 @@ internal fun ProfileSaveButton(
     }
 }
 
+/** Owns the account-scoped draft and existing load, image-upload and publication transactions. */
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
 @Composable
 internal fun ProfileEditScreen(
     appState: WhiteNoiseAppState,
@@ -469,6 +458,8 @@ internal fun ProfileEditScreen(
     cachedProfile: (String) -> UserProfileMetadataFfi? = appState::userProfileCached,
     loadProfile: suspend (String) -> UserProfileMetadataFfi? = appState::loadUserProfile,
     publishProfile: suspend (UserProfileMetadataFfi) -> Boolean = appState::publishProfile,
+    resolveAddress: suspend (String) -> String? = { Nip05Resolver.resolve(it) },
+    resolveLightning: suspend (String) -> Boolean = { Lud16Resolver.resolve(it) },
 ) {
     val active = appState.activeAccount
     val activeAccountId = active?.accountIdHex
@@ -486,16 +477,21 @@ internal fun ProfileEditScreen(
                 }
             }
         }
-    var displayName by remember(appState, activeAccountId) { mutableStateOf(initialDraft.displayName) }
-    var about by remember(appState, activeAccountId) { mutableStateOf(initialDraft.about) }
+    val fields = remember(appState, activeAccountId) { ProfileEditFields(initialDraft) }
+    val displayName = fields.name.text.toString()
+    val about = fields.about.text.toString()
+    var baselineDraft by remember(appState, activeAccountId) { mutableStateOf(initialDraft) }
+    var isEditing by remember(appState, activeAccountId) { mutableStateOf(false) }
+    var editRevision by remember(appState, activeAccountId) { mutableIntStateOf(0) }
+    var acceptedSaveRevision by remember(appState, activeAccountId) { mutableIntStateOf(0) }
     var imageDrafts by
         remember(appState, activeAccountId) {
             mutableStateOf(ProfileImageDrafts(picture = initialDraft.picture, banner = initialDraft.banner))
         }
     val picture = imageDrafts.picture
     val banner = imageDrafts.banner
-    var nip05 by remember(appState, activeAccountId) { mutableStateOf(initialDraft.nip05) }
-    var lud16 by remember(appState, activeAccountId) { mutableStateOf(initialDraft.lud16) }
+    val nip05 = fields.address.text.toString()
+    val lud16 = fields.lightning.text.toString()
     // In-flight / failed LNURL-pay resolution of the lud16 field (#795). The
     // error is a string resource id so the inline message can distinguish
     // "doesn't resolve" from "no network"; it clears on every edit.
@@ -503,6 +499,7 @@ internal fun ProfileEditScreen(
     var lud16ResolveError by remember(activeAccountId) { mutableStateOf<Int?>(null) }
     val lud16FocusRequester = remember { FocusRequester() }
     var busy by remember(activeAccountId) { mutableStateOf(false) }
+    var saveFailed by remember(activeAccountId) { mutableStateOf(false) }
     var pictureUploading by remember(activeAccountId) { mutableStateOf(false) }
     var pictureUploadJob by remember(activeAccountId) { mutableStateOf<Job?>(null) }
     var bannerUploading by remember(activeAccountId) { mutableStateOf(false) }
@@ -512,12 +509,12 @@ internal fun ProfileEditScreen(
     // The picture URL no longer lives as a standalone editor row; it's edited
     // exclusively through this control so the editor reads like an app screen,
     // not a developer surface. See #286.
-    var showPictureSheet by remember { mutableStateOf(false) }
-    var showBannerSheet by remember { mutableStateOf(false) }
-    var fullPictureOpen by remember { mutableStateOf(false) }
+    var showPictureSheet by remember(activeAccountId) { mutableStateOf(false) }
+    var showBannerSheet by remember(activeAccountId) { mutableStateOf(false) }
+    var fullPictureOpen by remember(activeAccountId) { mutableStateOf(false) }
+    var fullBannerOpen by remember(activeAccountId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
     val safePictureUrl = ProfileSanitizer.protocolImageUrl(picture)
     val safeBannerUrl = ProfileSanitizer.protocolImageUrl(banner)
     val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
@@ -525,9 +522,22 @@ internal fun ProfileEditScreen(
     val bannerValid = ProfileFieldValidation.isAcceptablePictureUrl(banner)
     val nip05Valid = ProfileFieldValidation.isAcceptableNip05(nip05)
     val lud16Valid = ProfileFieldValidation.isAcceptableLud16(lud16)
+    var resolvedAddressHex by remember(activeAccountId, baselineDraft.nip05) { mutableStateOf<String?>(null) }
+    LaunchedEffect(activeAccountId, baselineDraft.nip05) {
+        resolvedAddressHex = baselineDraft.nip05.takeIf { it.isNotBlank() }?.let { resolveAddress(it) }
+    }
+    LaunchedEffect(lud16) { lud16ResolveError = null }
+    val addressVerified =
+        nip05 == baselineDraft.nip05 &&
+            resolvedAddressHex != null &&
+            resolvedAddressHex.equals(
+                activeAccountId,
+                ignoreCase = true,
+            )
     val currentMetadata = profileEditMetadata(displayName, about, picture, banner, nip05, lud16)
     val saveEnabled =
-        !busy &&
+        isEditing &&
+            !busy &&
             !pictureUploading &&
             !bannerUploading &&
             active != null &&
@@ -539,20 +549,54 @@ internal fun ProfileEditScreen(
 
     DisposableEffect(active?.accountIdHex) {
         onDispose {
+            editRevision++
             pictureUploadJob?.cancel()
             bannerUploadJob?.cancel()
         }
     }
 
+    fun resetDraft() {
+        saveFailed = false
+        fields.restore(baselineDraft)
+        imageDrafts = ProfileImageDrafts(baselineDraft.picture, baselineDraft.banner)
+        lud16ResolveError = null
+    }
+
+    fun beginEditing() {
+        if (busy || activeAccountId == null || !profileContentReady) return
+        editRevision++
+        resetDraft()
+        isEditing = true
+    }
+
+    fun handleBack() {
+        if (!isEditing) {
+            onBack()
+            return
+        }
+        editRevision++
+        pictureUploadJob?.cancel()
+        bannerUploadJob?.cancel()
+        showPictureSheet = false
+        showBannerSheet = false
+        resetDraft()
+        isEditing = false
+    }
+
+    val imageOverlayOpen = fullPictureOpen || fullBannerOpen || showPictureSheet || showBannerSheet
+    BackHandler(enabled = isEditing && !imageOverlayOpen) { handleBack() }
+
     fun saveProfile() {
         if (!saveEnabled) return
         val accountId = activeAccountId ?: return
         busy = true
+        saveFailed = false
         lud16ResolveError = null
         // Snapshot the field values now: the mutation outlives this composition,
         // so reading them inside the lambda would publish whatever is on screen
         // when it runs.
         val metadata = currentMetadata
+        val submittedRevision = editRevision
         scope.launch {
             // A non-blank Lightning address must resolve to a live LNURL-pay
             // endpoint before it is published (#795); a blank field means "no
@@ -563,10 +607,14 @@ internal fun ProfileEditScreen(
                 lud16Checking = true
                 val resolves =
                     try {
-                        Lud16Resolver.resolve(address)
+                        resolveLightning(address)
                     } finally {
                         lud16Checking = false
                     }
+                if (submittedRevision != editRevision || !isEditing) {
+                    busy = false
+                    return@launch
+                }
                 if (!resolves) {
                     lud16ResolveError =
                         if (appState.hasActiveNetwork()) {
@@ -579,11 +627,21 @@ internal fun ProfileEditScreen(
                     return@launch
                 }
             }
+            if (submittedRevision != editRevision || !isEditing) {
+                busy = false
+                return@launch
+            }
             appState.launchMutation {
                 try {
                     if (appState.activeAccount?.accountIdHex != accountId) return@launchMutation
                     val succeeded = publishProfile(metadata)
-                    saveState.completeSave(accountId, metadata, succeeded)
+                    if (!succeeded && submittedRevision == editRevision) saveFailed = true
+                    if (saveState.completeSave(accountId, metadata, succeeded)) {
+                        acceptedSaveRevision++
+                        baselineDraft = profileEditDraft(metadata)
+                        if (submittedRevision == editRevision) isEditing = false
+                        if (!isEditing) resetDraft()
+                    }
                 } finally {
                     busy = false
                 }
@@ -602,7 +660,8 @@ internal fun ProfileEditScreen(
                 ProfileImageTarget.Picture -> pictureUploading
                 ProfileImageTarget.Banner -> bannerUploading
             }
-        if (alreadyUploading || busy) return
+        if (alreadyUploading || busy || !isEditing) return
+        val capturedRevision = editRevision
         when (target) {
             ProfileImageTarget.Picture -> pictureUploading = true
             ProfileImageTarget.Banner -> bannerUploading = true
@@ -626,6 +685,7 @@ internal fun ProfileEditScreen(
                         ProfileSanitizer.androidOwnedHttpsImageUrl(uploaded)
                             ?: throw IllegalStateException("profile image upload returned an unsafe URL")
                     val activeAccountRef = appState.activeAccountRef
+                    if (capturedRevision != editRevision || !isEditing) return@launch
                     imageDrafts =
                         imageDrafts.withUploadedImage(
                             target = target,
@@ -678,20 +738,29 @@ internal fun ProfileEditScreen(
     LaunchedEffect(activeAccountId) {
         val accountId = activeAccountId ?: return@LaunchedEffect
         val loadStartedWith = ProfileEditDraft(displayName, about, picture, banner, nip05, lud16)
+        val loadSaveRevision = acceptedSaveRevision
         try {
             val profile = loadProfile(accountId)
             if (appState.activeAccount?.accountIdHex != accountId) return@LaunchedEffect
+            // A refresh started before an accepted publication cannot replace its new read/edit baseline.
+            if (loadSaveRevision != acceptedSaveRevision) return@LaunchedEffect
             if (profile == null && cachedDraft != null) return@LaunchedEffect
 
             val refreshed = profileEditDraft(profile)
-            val current = ProfileEditDraft(displayName, about, picture, banner, nip05, lud16)
+            val current =
+                ProfileEditDraft(
+                    fields.name.text.toString(),
+                    fields.about.text.toString(),
+                    imageDrafts.picture,
+                    imageDrafts.banner,
+                    fields.address.text.toString(),
+                    fields.lightning.text.toString(),
+                )
             val merged = current.mergeUntouchedFields(loadStartedWith, refreshed)
             if (!saveState.completeLoad(accountId, refreshed.metadata())) return@LaunchedEffect
-            displayName = merged.displayName
-            about = merged.about
+            baselineDraft = refreshed
+            fields.restore(merged)
             imageDrafts = ProfileImageDrafts(picture = merged.picture, banner = merged.banner)
-            nip05 = merged.nip05
-            lud16 = merged.lud16
             profileContentReady = true
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -707,187 +776,44 @@ internal fun ProfileEditScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.profile)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-            )
+    ProfileEditContent(
+        fields = fields,
+        seed = activeAccountId.orEmpty(),
+        hasAccount = active != null,
+        editing = isEditing,
+        ready = profileContentReady,
+        busy = busy,
+        pictureUrl = safePictureUrl,
+        bannerUrl = safeBannerUrl,
+        pictureUploading = pictureUploading,
+        bannerUploading = bannerUploading,
+        picturePresent = picture.isNotBlank(),
+        bannerPresent = banner.isNotBlank(),
+        pictureValid = pictureValid,
+        bannerValid = bannerValid,
+        addressVerified = addressVerified,
+        addressValid = nip05Valid,
+        lightningValid = lud16Valid,
+        lightningChecking = lud16Checking,
+        lightningError = lud16ResolveError,
+        saveEnabled = saveEnabled,
+        saveFailed = saveFailed,
+        lightningFocusRequester = lud16FocusRequester,
+        onBack = ::handleBack,
+        onEdit = ::beginEditing,
+        onSave = ::saveProfile,
+        onSuggestName = {
+            fields.name.setTextAndPlaceCursorAtEnd(ProfilePseudonymGenerator.random(excluding = displayName))
         },
-        bottomBar = {
-            if (active != null) {
-                StickyFormActionBar {
-                    ProfileSaveButton(
-                        enabled = saveEnabled,
-                        busy = busy,
-                        onSave = { saveProfile() },
-                    )
-                }
-            }
+        onOpenPicture = { if (avatarImageAvailable) fullPictureOpen = true },
+        onEditPicture = { showPictureSheet = true },
+        onEditBanner = { showBannerSheet = true },
+        onOpenBanner = { fullBannerOpen = true },
+        onPickImage = { target, uri ->
+            uploadProfileDraft(target) { GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri) }
         },
-    ) { padding ->
-        LazyColumn(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-            contentPadding = PaddingValues(bottom = Dimens.spaceXl),
-            verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
-        ) {
-            item {
-                // Live profile header — the avatar, name, and npub update as the
-                // fields below are edited, so the user previews their card inline.
-                if (active == null) {
-                    Text(
-                        stringResource(R.string.no_active_account_period),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLg),
-                        textAlign = TextAlign.Center,
-                    )
-                } else {
-                    ProfileHeroHeader(
-                        title = displayName.ifBlank { stringResource(R.string.anonymous) },
-                        seed = active.accountIdHex,
-                        npub = appState.shortNpub(active.accountIdHex),
-                        pictureUrl = safePictureUrl,
-                        bannerUrl = safeBannerUrl,
-                        bannerValid = bannerValid,
-                        bannerUploading = bannerUploading,
-                        contentReady = profileContentReady,
-                        avatarImageAvailable = avatarImageAvailable,
-                        pictureInvalid =
-                            picture.isNotBlank() &&
-                                !ProfileFieldValidation.isAcceptablePictureUrl(picture),
-                        onEditBanner = { showBannerSheet = true },
-                        onOpenPicture = {
-                            if (avatarImageAvailable) {
-                                fullPictureOpen = true
-                            } else {
-                                showPictureSheet = true
-                            }
-                        },
-                        onEditPicture = { showPictureSheet = true },
-                        onCopyNpub = {
-                            val copyValue = appState.npubForDisplay(active.accountIdHex)
-                            if (copyValue.isNotBlank()) {
-                                clipboard.setText(AnnotatedString(copyValue))
-                            }
-                        },
-                    )
-                }
-            }
-            if (active != null) {
-                item {
-                    // Public-profile notice (#380): kind:0 metadata is broadcast
-                    // unencrypted to relays, so warn before the editable fields
-                    // that everything here is visible to the whole network. Copy
-                    // mirrors Whitenoise Flutter (profileIsPublic /
-                    // profilePublicDescription) for cross-client parity.
-                    Box(Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg)) {
-                        ProfilePublicWarning()
-                    }
-                }
-            }
-            item {
-                Box(Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg)) {
-                    SectionCard(title = stringResource(R.string.profile)) {
-                        // Borderless fields: drop the filled container so each input
-                        // reads as a label + underline row on the white panel, leaving
-                        // the indicator line to carry focus/error state.
-                        val profileFieldColors =
-                            TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                errorContainerColor = Color.Transparent,
-                            )
-                        TextField(
-                            colors = profileFieldColors,
-                            value = displayName,
-                            onValueChange = { displayName = it },
-                            label = { Text(stringResource(R.string.display_name)) },
-                            singleLine = true,
-                            trailingIcon = {
-                                IconButton(
-                                    onClick = {
-                                        displayName = ProfilePseudonymGenerator.random(excluding = displayName)
-                                    },
-                                    enabled = !busy && active != null,
-                                ) {
-                                    Icon(
-                                        Icons.Default.Refresh,
-                                        contentDescription = stringResource(R.string.regenerate_display_name),
-                                    )
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        TextField(
-                            colors = profileFieldColors,
-                            value = about,
-                            onValueChange = { about = it },
-                            label = { Text(stringResource(R.string.about)) },
-                            minLines = 3,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        // Client-side validation: flag a malformed picture URL or
-                        // nip-05 and block publish so we don't push junk — or an
-                        // SSRF-prone avatar URL — to relays. The picture URL is now
-                        // edited via the avatar control above (no inline row), but
-                        // the same guard still gates publish in case a bad value was
-                        // pasted there. See #69, #286.
-                        TextField(
-                            colors = profileFieldColors,
-                            value = nip05,
-                            onValueChange = { nip05 = it },
-                            label = { Text(stringResource(R.string.nip_05)) },
-                            singleLine = true,
-                            isError = !nip05Valid,
-                            supportingText = {
-                                Text(
-                                    stringResource(
-                                        if (nip05Valid) R.string.profile_nip05_hint else R.string.profile_nip05_invalid,
-                                    ),
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
-                        )
-                        TextField(
-                            colors = profileFieldColors,
-                            value = lud16,
-                            onValueChange = {
-                                lud16 = it
-                                lud16ResolveError = null
-                            },
-                            label = { Text(stringResource(R.string.lightning)) },
-                            singleLine = true,
-                            isError = !lud16Valid || lud16ResolveError != null,
-                            supportingText = {
-                                val resolveError = lud16ResolveError
-                                Text(
-                                    stringResource(
-                                        when {
-                                            !lud16Valid -> R.string.profile_lightning_invalid
-                                            lud16Checking -> R.string.profile_lightning_checking
-                                            resolveError != null -> resolveError
-                                            else -> R.string.profile_lightning_hint
-                                        },
-                                    ),
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth().focusRequester(lud16FocusRequester),
-                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
-                        )
-                    }
-                }
-            }
-        }
-    }
+        onRemoveImage = { target -> imageDrafts = imageDrafts.without(target) },
+    )
 
     if (fullPictureOpen && safePictureUrl != null && avatarImageAvailable) {
         AvatarFullScreenViewer(
@@ -896,10 +822,40 @@ internal fun ProfileEditScreen(
             pictureUrl = safePictureUrl,
             onDismiss = { fullPictureOpen = false },
             editActionLabel = stringResource(R.string.profile_picture_edit),
-            onEditPicture = {
-                fullPictureOpen = false
-                showPictureSheet = true
-            },
+            onEditPicture =
+                if (busy) {
+                    null
+                } else {
+                    (
+                        {
+                            fullPictureOpen = false
+                            if (!isEditing) beginEditing()
+                            showPictureSheet = true
+                        }
+                    )
+                },
+        )
+    }
+
+    if (fullBannerOpen && safeBannerUrl != null) {
+        AvatarFullScreenViewer(
+            title = stringResource(R.string.profile_banner),
+            seed = activeAccountId.orEmpty(),
+            pictureUrl = safeBannerUrl,
+            onDismiss = { fullBannerOpen = false },
+            editActionLabel = stringResource(R.string.profile_banner_edit),
+            onEditPicture =
+                if (busy) {
+                    null
+                } else {
+                    (
+                        {
+                            fullBannerOpen = false
+                            if (!isEditing) beginEditing()
+                            showBannerSheet = true
+                        }
+                    )
+                },
         )
     }
 
