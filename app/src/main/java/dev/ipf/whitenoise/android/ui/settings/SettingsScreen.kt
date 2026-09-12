@@ -259,11 +259,13 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
 
 @Composable
 private fun settingsBackHandler(
+    signOutInProgress: Boolean,
     detail: SettingsDetail?,
     onBackToChats: () -> Unit,
     onDetailChange: (SettingsDetail?) -> Unit,
 ) {
     BackHandler {
+        if (signOutInProgress) return@BackHandler
         if (detail == null) {
             onBackToChats()
         } else {
@@ -289,7 +291,7 @@ internal fun SettingsScreen(
     // back fell through to the Activity and exited the app. Always
     // claim back here — pop the detail when on a subscreen, otherwise
     // hand control to the chats list (mirroring the top-bar back arrow).
-    settingsBackHandler(detail, onBackToChats, onDetailChange)
+    settingsBackHandler(appState.signOutInProgress, detail, onBackToChats, onDetailChange)
 
     if (detail == null) {
         SettingsHomeScreen(
@@ -363,10 +365,10 @@ private fun SettingsDetailRoute(
         SettingsDetail.BugReport -> BugReportScreen(onBack = { onDetailChange(SettingsDetail.Help) })
         SettingsDetail.About ->
             AboutScreen(
-                versionName = BuildConfig.VERSION_NAME,
-                buildNumber = BuildConfig.VERSION_CODE.toString(),
                 appState = appState,
                 onOpenDeveloper = { onDetailChange(SettingsDetail.Developer) },
+                versionName = BuildConfig.VERSION_NAME,
+                buildNumber = BuildConfig.VERSION_CODE.toString(),
                 mdkShortSha = BuildConfig.MDK_SHORT_SHA,
                 onBack = { onDetailChange(SettingsDetail.Help) },
             )
@@ -407,6 +409,11 @@ private fun SettingsHomeScreen(
     val scope = rememberCoroutineScope()
     val activeAccount = appState.activeAccount
 
+    // Read the live flag on invocation as teardown can begin before the next recomposition.
+    fun whenIdle(action: () -> Unit) {
+        if (!appState.signOutInProgress) action()
+    }
+
     LaunchedEffect(appState.accounts.size) {
         if (showAddIdentity) showAddIdentity = false
     }
@@ -443,26 +450,32 @@ private fun SettingsHomeScreen(
         profileCount = appState.accounts.size,
         appUpdateInfo = appState.appUpdateInfo,
         versionName = BuildConfig.VERSION_NAME,
-        onBack = onBackToChats,
-        onOpenShareConnect = { onOpenDetail(SettingsDetail.ShareConnect) },
-        onAddProfile = { showAddIdentity = true },
-        onSwitchProfile = { showAccountSelector = true },
-        onOpenDetail = onOpenDetail,
-        onChatWithSupport = ::startSupportChat,
-        onSignOut = { showSignOut = true },
+        onBack = { whenIdle(onBackToChats) },
+        onOpenShareConnect = { whenIdle { onOpenDetail(SettingsDetail.ShareConnect) } },
+        onAddProfile = { whenIdle { showAddIdentity = true } },
+        onSwitchProfile = { whenIdle { showAccountSelector = true } },
+        onOpenDetail = { detail -> whenIdle { onOpenDetail(detail) } },
+        onChatWithSupport = { whenIdle(::startSupportChat) },
+        onSignOut = { whenIdle { showSignOut = true } },
         viewport = viewport,
         onViewportChange = onViewportChange,
         onAppUpdateAction = {
-            scope.launch {
-                // Await the check before acting so the first tap uses a fresh result.
-                if (appState.appUpdateInfo.latestVersion == null) {
-                    appState.refreshAppUpdate(force = true, notifyIfNewer = false)
+            if (!appState.signOutInProgress) {
+                scope.launch {
+                    // Await the check before acting so the first tap uses a fresh result.
+                    if (appState.appUpdateInfo.latestVersion == null) {
+                        appState.refreshAppUpdate(force = true, notifyIfNewer = false)
+                    }
+                    appState.handleAppUpdateAction(context)
                 }
-                appState.handleAppUpdateAction(context)
             }
         },
     )
 
+    if (appState.signOutInProgress) {
+        SignOutProgressDialog()
+        return
+    }
     if (showAccountSelector) {
         AccountSelectorSheet(
             appState = appState,
