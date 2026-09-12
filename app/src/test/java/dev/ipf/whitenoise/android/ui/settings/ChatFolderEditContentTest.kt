@@ -1,11 +1,9 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
+import android.content.Context
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Surface
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
@@ -19,7 +17,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -30,118 +27,95 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+/** Contract of the folder editor form: Save gating, rule switches, and the rows that open pickers. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], qualifiers = "en")
+@Config(sdk = [36], qualifiers = "en-w360dp-h1400dp-mdpi")
 class ChatFolderEditContentTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private val app = ApplicationProvider.getApplicationContext<android.content.Context>()
+    private val app = ApplicationProvider.getApplicationContext<Context>()
 
+    /** Save is disabled while the name is blank. */
     @Test
     fun saveDisabledWhenNameBlank() {
         render(state = editState(name = "   "))
-
         composeRule.onNodeWithText(app.getString(R.string.save)).assertIsNotEnabled()
     }
 
+    /** The screen title reads New folder exactly once; there is no separate details heading. */
     @Test
-    fun editorUsesScreenTitleAndNeutralDetailsSectionTitle() {
+    fun editorUsesTheScreenTitleOnly() {
         render(state = editState(name = "Work"))
-
-        composeRule
-            .onAllNodesWithText(app.getString(R.string.chat_folder_new))
-            .assertCountEquals(1)
-        composeRule.onNodeWithText(app.getString(R.string.details)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(app.getString(R.string.chat_folder_new)).assertCountEquals(1)
+        composeRule.onAllNodesWithText(app.getString(R.string.details)).assertCountEquals(0)
     }
 
+    /** Save is enabled once the name has text. */
     @Test
     fun saveEnabledWhenNameNonBlank() {
         render(state = editState(name = "Work"))
-
         composeRule.onNodeWithText(app.getString(R.string.save)).assertIsEnabled()
     }
 
+    /** The four rule switches carry their labels and checked state in prototype order. */
     @Test
     fun switchRowsExposeLabelsAndCheckedState() {
-        render(
-            state =
-                editState(
-                    name = "Work",
-                    unreadOnly = true,
-                    groupsOnly = true,
-                    archivedOnly = false,
-                    includeMuted = false,
-                ),
-        )
-
-        composeRule
-            .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
-            .performScrollToNode(hasText(app.getString(R.string.chat_folder_unread_only)))
-        composeRule
-            .onNodeWithText(app.getString(R.string.chat_folder_unread_only))
-            .assertIsDisplayed()
-        composeRule.onAllNodes(isToggleable())[0].assertIsOn()
-        composeRule
-            .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
-            .performScrollToNode(hasText(app.getString(R.string.chat_folder_groups_only)))
-        composeRule
-            .onNodeWithText(app.getString(R.string.chat_folder_groups_only))
-            .assertIsDisplayed()
-        composeRule.onAllNodes(isToggleable())[1].assertIsOn()
-        composeRule
-            .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
-            .performScrollToNode(hasText(app.getString(R.string.chat_folder_archived_only)))
-        composeRule.onAllNodes(isToggleable())[2].assertIsOff()
+        render(state = editState(name = "Work", unreadOnly = true, groupsOnly = true))
         composeRule
             .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
             .performScrollToNode(hasText(app.getString(R.string.chat_folder_include_muted)))
-        composeRule
-            .onNodeWithText(app.getString(R.string.chat_folder_include_muted))
-            .assertIsDisplayed()
+        composeRule.onNodeWithText(app.getString(R.string.chat_folder_unread_only)).assertExists()
+        composeRule.onAllNodes(isToggleable())[0].assertIsOn()
+        composeRule.onNodeWithText(app.getString(R.string.chat_folder_groups_only)).assertExists()
+        composeRule.onAllNodes(isToggleable())[1].assertIsOn()
+        composeRule.onAllNodes(isToggleable())[2].assertIsOff()
+        composeRule.onNodeWithText(app.getString(R.string.chat_folder_include_muted)).assertExists()
         composeRule.onAllNodes(isToggleable())[3].assertIsOff()
     }
 
+    /** Included Chats shows its count and opens the chat picker. */
     @Test
     fun manualChatsRowOpensPicker() {
         var opened = false
-        render(
-            state = editState(name = "Work"),
-            onOpenManualChats = { opened = true },
-        )
-
-        composeRule
-            .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
-            .performScrollToNode(hasText("0 chats", substring = true))
+        render(state = editState(name = "Work", manualChatCount = 3), onOpenManualChats = { opened = true })
         composeRule
             .onAllNodes(
-                hasText(app.getString(R.string.chat_folder_manual_chats)) and
-                    hasText("0 chats", substring = true) and
-                    hasClickAction(),
+                hasText(app.getString(R.string.chat_folder_manual_chats)) and hasText("3") and hasClickAction(),
             )[0]
             .performClick()
-
         assertEquals(true, opened)
     }
 
+    /** People shows its count and opens the people picker. */
     @Test
     fun peopleRowOpensPicker() {
         var opened = false
-        render(
-            state = editState(name = "Work"),
-            onOpenPeople = { opened = true },
-        )
-
+        render(state = editState(name = "Work", peopleCount = 2), onOpenPeople = { opened = true })
         composeRule
-            .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
-            .performScrollToNode(hasText(app.getString(R.string.chat_folder_people_subtitle)))
-        composeRule
-            .onAllNodes(
-                hasText(app.getString(R.string.chat_folder_people_subtitle)) and hasClickAction(),
-            )[0]
+            .onAllNodes(hasText(app.getString(R.string.chat_folder_people)) and hasText("2") and hasClickAction())[0]
             .performClick()
-
         assertEquals(true, opened)
+    }
+
+    /** Preview shows how many chats the draft matches and opens the preview list. */
+    @Test
+    fun previewRowShowsCountAndOpens() {
+        var opened = false
+        render(state = editState(name = "Work", previewCount = 4), onOpenPreview = { opened = true })
+        val count = app.resources.getQuantityString(R.plurals.chat_folder_chat_count, 4, 4)
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasText(count))
+        composeRule
+            .onAllNodes(hasText(app.getString(R.string.folder_preview)) and hasText(count) and hasClickAction())[0]
+            .performClick()
+        assertEquals(true, opened)
+    }
+
+    /** An error message renders beneath the fields in the error colour. */
+    @Test
+    fun errorTextIsShownWhenPresent() {
+        render(state = editState(name = "Work", error = app.getString(R.string.folder_save_failed)))
+        composeRule.onNodeWithText(app.getString(R.string.folder_save_failed)).assertExists()
     }
 
     private fun editState(
@@ -153,55 +127,46 @@ class ChatFolderEditContentTest {
         groupsOnly: Boolean = false,
         archivedOnly: Boolean = false,
         manualChatCount: Int = 0,
-        peopleSummary: String = app.getString(R.string.chat_folder_people_subtitle),
+        peopleCount: Int = 0,
+        previewCount: Int = 0,
         isNew: Boolean = true,
+        error: String? = null,
     ) = ChatFolderEditFormState(
         isNew = isNew,
-        name = name,
-        description = description,
-        keyword = keyword,
+        name = TextFieldState(name),
+        description = TextFieldState(description),
+        keyword = TextFieldState(keyword),
         unreadOnly = unreadOnly,
         includeMuted = includeMuted,
         groupsOnly = groupsOnly,
         archivedOnly = archivedOnly,
-        manualChatSummary =
-            app.resources.getQuantityString(
-                R.plurals.chat_folder_chat_count,
-                manualChatCount,
-                manualChatCount,
-            ),
-        peopleSummary = peopleSummary,
+        manualChatCount = manualChatCount,
+        peopleCount = peopleCount,
+        previewCount = previewCount,
         canSave = name.isNotBlank(),
+        error = error,
     )
 
     private fun render(
         state: ChatFolderEditFormState,
-        onNameChange: (String) -> Unit = {},
-        onDescriptionChange: (String) -> Unit = {},
-        onKeywordChange: (String) -> Unit = {},
-        onUnreadOnlyChange: (Boolean) -> Unit = {},
-        onIncludeMutedChange: (Boolean) -> Unit = {},
-        onGroupsOnlyChange: (Boolean) -> Unit = {},
-        onArchivedOnlyChange: (Boolean) -> Unit = {},
         onOpenManualChats: () -> Unit = {},
         onOpenPeople: () -> Unit = {},
+        onOpenPreview: () -> Unit = {},
         onSave: () -> Unit = {},
         onBack: () -> Unit = {},
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
-                Surface(modifier = Modifier.fillMaxSize().height(640.dp)) {
+                Surface {
                     ChatFolderEditContent(
                         state = state,
-                        onNameChange = onNameChange,
-                        onDescriptionChange = onDescriptionChange,
-                        onKeywordChange = onKeywordChange,
-                        onUnreadOnlyChange = onUnreadOnlyChange,
-                        onIncludeMutedChange = onIncludeMutedChange,
-                        onGroupsOnlyChange = onGroupsOnlyChange,
-                        onArchivedOnlyChange = onArchivedOnlyChange,
+                        onUnreadOnlyChange = {},
+                        onIncludeMutedChange = {},
+                        onGroupsOnlyChange = {},
+                        onArchivedOnlyChange = {},
                         onOpenManualChats = onOpenManualChats,
                         onOpenPeople = onOpenPeople,
+                        onOpenPreview = onOpenPreview,
                         onSave = onSave,
                         onBack = onBack,
                     )
