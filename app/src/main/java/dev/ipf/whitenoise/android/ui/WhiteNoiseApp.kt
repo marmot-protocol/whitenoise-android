@@ -471,6 +471,7 @@ internal fun WhiteNoiseApp(
                                 AppLockScreen(
                                     error = appState.appUnlockError,
                                     onRetry = { appState.requestAppUnlock() },
+                                    evaluating = appState.appUnlockEvaluationPending,
                                 )
                             }
                         }

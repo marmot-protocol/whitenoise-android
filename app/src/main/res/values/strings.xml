@@ -2147,6 +2147,8 @@
     <string name="developer_work_status">%1$s: %2$s</string>
     <string name="developer_package_id">Package ID</string>
     <string name="developer_package_source">Source</string>
+    <string name="app_unlock">Unlock</string>
+    <string name="app_unlock_checking">Checking app protection…</string>
     <string name="audit_upload_title">Share technical logs</string>
     <string name="audit_upload_subtitle">Automatically send diagnostic audit logs to White Noise, separately from usage sharing.</string>
     <string name="audit_upload_confirm_title">Share technical logs with White Noise?</string>

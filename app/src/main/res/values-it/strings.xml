@@ -2035,6 +2035,8 @@
     <string name="developer_work_status">%1$s: %2$s</string>
     <string name="developer_package_id">ID del pacchetto</string>
     <string name="developer_package_source">Origine</string>
+    <string name="app_unlock">Sblocca</string>
+    <string name="app_unlock_checking">Verifica della protezione dell’app…</string>
     <string name="audit_upload_title">Condividi log tecnici</string>
     <string name="audit_upload_subtitle">Invia automaticamente i log diagnostici a White Noise, separatamente dalla condivisione dei dati di utilizzo.</string>
     <string name="audit_upload_confirm_title">Condividere i log tecnici con White Noise?</string>

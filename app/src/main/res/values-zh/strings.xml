@@ -2008,6 +2008,8 @@
     <string name="developer_work_status">%1$s: %2$s</string>
     <string name="developer_package_id">密钥包 ID</string>
     <string name="developer_package_source">来源</string>
+    <string name="app_unlock">解锁</string>
+    <string name="app_unlock_checking">正在检查应用程序保护…</string>
     <string name="audit_upload_title">分享技术日志</string>
     <string name="audit_upload_subtitle">自动向 White Noise 发送诊断审计日志，与使用情况分享分开控制。</string>
     <string name="audit_upload_confirm_title">与 White Noise 分享技术日志？</string>
