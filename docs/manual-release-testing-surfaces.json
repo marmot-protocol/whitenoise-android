@@ -4338,43 +4338,39 @@
         ]
       },
       {
-        "surface": "DictationFinishSheet",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
-        "anchor": "fun DictationFinishSheet(",
-        "test_ids": [
-          "DIC-001"
-        ]
-      },
-      {
-        "surface": "DictationPreferenceGroup",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
-        "anchor": "fun DictationPreferenceGroup(",
-        "test_ids": [
-          "DIC-001"
-        ]
-      },
-      {
-        "surface": "DictationResultSheet",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
-        "anchor": "fun DictationResultSheet(",
-        "test_ids": [
-          "DIC-001"
-        ]
-      },
-      {
-        "surface": "DictationSettingsContent",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
-        "anchor": "fun DictationSettingsContent(",
-        "test_ids": [
-          "DIC-001"
-        ]
-      },
-      {
         "surface": "DictationSettingsScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
         "anchor": "fun DictationSettingsScreen(",
         "test_ids": [
-          "DIC-001"
+          "DIC-002",
+          "DIC-004"
+        ]
+      },
+      {
+        "surface": "dictationFinishLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "fun dictationFinishLabel(",
+        "test_ids": [
+          "DIC-002",
+          "DIC-004"
+        ]
+      },
+      {
+        "surface": "dictationDeliveryLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "fun dictationDeliveryLabel(",
+        "test_ids": [
+          "DIC-002",
+          "DIC-004"
+        ]
+      },
+      {
+        "surface": "dictationDeliveryDescription",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "fun dictationDeliveryDescription(",
+        "test_ids": [
+          "DIC-002",
+          "DIC-004"
         ]
       },
       {
@@ -5907,14 +5903,6 @@
           "DIC-001",
           "DIC-002",
           "DIC-003"
-        ]
-      },
-      {
-        "surface": "DictationSettingsTopBar",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
-        "anchor": "fun DictationSettingsTopBar(",
-        "test_ids": [
-          "DIC-001"
         ]
       },
       {
@@ -9855,14 +9843,6 @@
         ]
       },
       {
-        "surface": "back",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
-        "anchor": "R.string.back",
-        "test_ids": [
-          "DIC-001"
-        ]
-      },
-      {
         "surface": "dictation_provider_automatic",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
         "anchor": "R.string.dictation_provider_automatic",
@@ -9884,6 +9864,51 @@
         "anchor": "R.string.dictation_settings_title",
         "test_ids": [
           "DIC-001"
+        ]
+      },
+      {
+        "surface": "string:dictation_finish_after_silence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_finish_after_silence",
+        "test_ids": [
+          "DIC-002",
+          "DIC-004"
+        ]
+      },
+      {
+        "surface": "string:dictation_send_safety_note",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_send_safety_note",
+        "test_ids": [
+          "DIC-002",
+          "DIC-004"
+        ]
+      },
+      {
+        "surface": "string:dictation_settings_explainer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_settings_explainer",
+        "test_ids": [
+          "DIC-002",
+          "DIC-004"
+        ]
+      },
+      {
+        "surface": "string:speech_android_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.speech_android_settings",
+        "test_ids": [
+          "DIC-002",
+          "DIC-004"
+        ]
+      },
+      {
+        "surface": "string:speech_settings_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.speech_settings_failed",
+        "test_ids": [
+          "DIC-002",
+          "DIC-004"
         ]
       },
       {
