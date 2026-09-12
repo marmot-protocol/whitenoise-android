@@ -11546,16 +11546,6 @@
         ]
       },
       {
-        "surface": "string:toast_relay_list_updated",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateRelayLists.kt",
-        "anchor": "R.string.toast_relay_list_updated",
-        "test_ids": [
-          "SYS-001",
-          "SYS-002",
-          "SYS-003"
-        ]
-      },
-      {
         "surface": "string:toast_relay_update_failed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateRelayLists.kt",
         "anchor": "R.string.toast_relay_update_failed",

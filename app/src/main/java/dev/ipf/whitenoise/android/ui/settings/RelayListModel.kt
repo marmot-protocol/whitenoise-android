@@ -1,13 +1,18 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.annotation.StringRes
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.MissingRelayListKindFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.RelayListKind
 import dev.ipf.whitenoise.android.state.RelayUrlValidationResult
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.normalizeRelayUrls
 import dev.ipf.whitenoise.android.state.relayUrlValidationResult
+import java.util.WeakHashMap
 
 /** Every relay in either list, in first-seen order, with the lists it serves. */
 internal fun accountRelays(lists: AccountRelayListsFfi): List<AccountRelay> {
@@ -103,3 +108,57 @@ internal val MissingRelayListKindFfi.labelRes: Int
             MissingRelayListKindFfi.NIP65 -> R.string.nip_65
             MissingRelayListKindFfi.INBOX -> R.string.inbox
         }
+
+/**
+ * One account's operation gate, shared by every visit to Relays. Claims synchronously before launching so
+ * publication, edits and refreshes cannot overlap; the mutation itself survives leaving the screen.
+ * All callers run on the main thread, as does WhiteNoiseAppState.launchMutation.
+ */
+internal class RelayOperationState {
+    var busy by mutableStateOf(false)
+        private set
+
+    /** Starts an operation only when idle, releasing the gate even when the operation or launcher fails. */
+    fun launch(
+        launcher: (suspend () -> Unit) -> Unit,
+        onStarted: () -> Unit = {},
+        block: suspend () -> Unit,
+    ) {
+        if (busy) return
+        busy = true
+        var launched = false
+        try {
+            onStarted()
+            launcher {
+                try {
+                    block()
+                } finally {
+                    busy = false
+                }
+            }
+            launched = true
+        } finally {
+            if (!launched) busy = false
+        }
+    }
+}
+
+// Values contain no AppState reference, allowing a disposed application state to leave the weak registry.
+private val relayOperations = WeakHashMap<WhiteNoiseAppState, MutableMap<String?, RelayOperationState>>()
+
+/** Keeps the same gate across navigation/recomposition while keeping different accounts independent. */
+internal fun WhiteNoiseAppState.relayOperationState(account: String?): RelayOperationState =
+    synchronized(relayOperations) {
+        relayOperations.getOrPut(this) { mutableMapOf() }.getOrPut(account) { RelayOperationState() }
+    }
+
+/** A retry may add an existing URL to a missing selected role after a partial multi-list publication. */
+internal fun missingRelayRoles(
+    existing: List<AccountRelay>,
+    url: String,
+    selected: Set<AccountRelayRole>,
+): Set<AccountRelayRole> {
+    val normalized = normalizeRelayUrls(listOf(url)).singleOrNull() ?: return selected
+    val present = existing.filter { normalized in normalizeRelayUrls(listOf(it.url)) }.flatMap { it.roles }.toSet()
+    return selected - present
+}

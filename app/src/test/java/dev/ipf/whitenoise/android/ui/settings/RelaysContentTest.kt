@@ -15,9 +15,13 @@ import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.MissingRelayListKindFfi
 import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -135,15 +139,65 @@ class RelaysContentTest {
         composeRule.onAllNodesWithText(app.getString(R.string.relay_list_published)).assertCountEquals(2)
     }
 
+    /** Publication disables every path to an edit, including opening a relay's role switches. */
+    @Test
+    fun publicationDisablesAddRestoreAndRelayDetails() {
+        render(
+            relayLists(nip65 = listOf(POST), inbox = emptyList(), missing = listOf(MissingRelayListKindFfi.INBOX)),
+            publication = RelayPublicationState(running = RelayPublicationOperation.PublishMissing),
+        )
+        composeRule.onNodeWithText(app.getString(R.string.add_relay)).performScrollTo().assertIsNotEnabled()
+        composeRule.onNodeWithTag("relays.restore").performScrollTo().assertIsNotEnabled()
+        composeRule.onNodeWithTag("relays.row.$POST").performScrollTo().assertIsNotEnabled()
+    }
+
+    /** An in-flight edit disables both refresh and missing-list recovery so their snapshots cannot race. */
+    @Test
+    fun editDisablesPublicationAndRefresh() {
+        render(
+            relayLists(nip65 = listOf(POST), inbox = emptyList(), missing = listOf(MissingRelayListKindFfi.INBOX)),
+            busy = true,
+        )
+        composeRule.onNodeWithTag("relay.publication.refresh").assertIsNotEnabled()
+        composeRule.onNodeWithTag("relay.publication.publish").assertIsNotEnabled()
+    }
+
+    /** After one role was added, retry adds only the remaining selected role instead of rejecting the URL. */
+    @Test
+    fun partialAddCanRetryTheMissingRole() {
+        val existing = listOf(AccountRelay(A, setOf(AccountRelayRole.Profile)))
+        assertEquals(
+            setOf(AccountRelayRole.Inbox),
+            missingRelayRoles(existing, A, AccountRelayRole.entries.toSet()),
+        )
+        assertTrue(missingRelayRoles(existing, A, setOf(AccountRelayRole.Profile)).isEmpty())
+    }
+
+    /** Reopening a screen shares its account's gate; switching accounts gets an independent operation state. */
+    @Test
+    fun operationGateSurvivesScreenVisitsAndSeparatesAccounts() {
+        val appState =
+            WhiteNoiseAppState(
+                context = app,
+                draftStore = DraftStore.forContext(app),
+                accountIdHexResolver = { null },
+                accounts = emptyList(),
+                activeAccountRef = "one",
+            )
+        assertSame(appState.relayOperationState("one"), appState.relayOperationState("one"))
+        assertNotSame(appState.relayOperationState("one"), appState.relayOperationState("two"))
+    }
+
     /** Renders the list content with counting callbacks. */
     private fun render(
         lists: AccountRelayListsFfi?,
         publication: RelayPublicationState = RelayPublicationState(),
+        busy: Boolean = false,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
                 RelaysContent(
-                    state = RelaysUiState(lists = lists, publication = publication),
+                    state = RelaysUiState(lists = lists, publication = publication, busy = busy),
                     onBack = {},
                     onOpenRelay = { opened = it },
                     onAdd = { adds++ },
