@@ -2023,4 +2023,18 @@
     <string name="diagnostics_health">Zustand und Leistung</string>
     <string name="diagnostics_events">Ereignisse</string>
     <string name="diagnostics_no_events">Keine Ereignisse</string>
+    <string name="profile_saving">Profil wird gespeichert…</string>
+    <string name="profile_add_banner">Banner hinzufügen</string>
+    <string name="profile_change_banner">Banner ändern</string>
+    <string name="add_photo">Foto hinzufügen</string>
+    <string name="change_photo">Foto ändern</string>
+    <string name="profile_choose_photos">Fotos auswählen</string>
+    <string name="profile_choose_files">Dateien auswählen</string>
+    <string name="find_web_image">Bild im Web suchen</string>
+    <string name="profile_remove_banner">Banner entfernen</string>
+    <string name="remove_photo">Foto entfernen</string>
+    <string name="profile_suggest_name">Namen vorschlagen</string>
+    <string name="profile_lightning_address">Lightning-Adresse</string>
+    <string name="profile_image_failed">Dieses Bild konnte nicht geladen werden. Wähle ein anderes Bild oder versuche es erneut.</string>
+    <string name="profile_publish_failed">Das Profil konnte nicht gespeichert werden. Versuche es erneut.</string>
 </resources>

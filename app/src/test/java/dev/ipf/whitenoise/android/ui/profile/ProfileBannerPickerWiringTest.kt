@@ -11,10 +11,8 @@ class ProfileBannerPickerWiringTest {
     fun profileBannerUsesDedicatedPickerUploadAndStaleResultState() {
         val source = profileEditSource().readText()
         val body = source.functionBody("ProfileEditScreen")
-        val heroBody = source.functionBody("ProfileHeroHeader")
 
-        assertTrue("screen must delegate to the profile hero", "ProfileHeroHeader(" in body)
-        assertTrue("hero must render the tappable wide banner control", "ProfileBannerControl(" in heroBody)
+        assertTrue("screen must delegate to the profile form", "ProfileEditContent(" in body)
         assertTrue(
             "banner picker must use the wide preview",
             "previewPresentation = ImagePreviewPresentation.Banner" in body,

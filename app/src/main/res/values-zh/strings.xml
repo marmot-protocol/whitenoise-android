@@ -1980,4 +1980,18 @@
     <string name="diagnostics_health">运行状态与性能</string>
     <string name="diagnostics_events">事件</string>
     <string name="diagnostics_no_events">暂无事件</string>
+    <string name="profile_saving">正在保存个人资料…</string>
+    <string name="profile_add_banner">添加横幅</string>
+    <string name="profile_change_banner">更改横幅</string>
+    <string name="add_photo">添加图片</string>
+    <string name="change_photo">更改照片</string>
+    <string name="profile_choose_photos">选择照片</string>
+    <string name="profile_choose_files">选择文件</string>
+    <string name="find_web_image">在网络上查找图像</string>
+    <string name="profile_remove_banner">移除横幅</string>
+    <string name="remove_photo">删除照片</string>
+    <string name="profile_suggest_name">建议名称</string>
+    <string name="profile_lightning_address">Lightning 地址</string>
+    <string name="profile_image_failed">无法加载此图片。请选择其他图片或重试。</string>
+    <string name="profile_publish_failed">您的配置文件无法保存 。 检查你的细节再试一次</string>
 </resources>

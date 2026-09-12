@@ -2007,4 +2007,18 @@
     <string name="diagnostics_health">Estado e desempenho</string>
     <string name="diagnostics_events">Eventos</string>
     <string name="diagnostics_no_events">Nenhum evento</string>
+    <string name="profile_saving">Salvando perfil…</string>
+    <string name="profile_add_banner">Adicionar banner</string>
+    <string name="profile_change_banner">Alterar banner</string>
+    <string name="add_photo">Adicionar foto</string>
+    <string name="change_photo">Alterar foto</string>
+    <string name="profile_choose_photos">Escolher fotos</string>
+    <string name="profile_choose_files">Escolher arquivos</string>
+    <string name="find_web_image">Buscar imagem na Web</string>
+    <string name="profile_remove_banner">Remover banner</string>
+    <string name="remove_photo">Remover foto</string>
+    <string name="profile_suggest_name">Sugerir nome</string>
+    <string name="profile_lightning_address">Endereço Lightning</string>
+    <string name="profile_image_failed">Não foi possível carregar esta imagem. Escolha outra imagem ou tente novamente.</string>
+    <string name="profile_publish_failed">Não foi possível salvar o perfil. Tente novamente.</string>
 </resources>

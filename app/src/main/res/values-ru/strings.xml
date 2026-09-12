@@ -2069,4 +2069,18 @@
     <string name="diagnostics_health">Состояние и производительность</string>
     <string name="diagnostics_events">События</string>
     <string name="diagnostics_no_events">Нет событий</string>
+    <string name="profile_saving">Сохранение профиля…</string>
+    <string name="profile_add_banner">Добавить баннер</string>
+    <string name="profile_change_banner">Изменить баннер</string>
+    <string name="add_photo">Добавить фото</string>
+    <string name="change_photo">Изменить фото</string>
+    <string name="profile_choose_photos">Выберите фотографии</string>
+    <string name="profile_choose_files">Выберите файлы</string>
+    <string name="find_web_image">Найти изображение в Интернете</string>
+    <string name="profile_remove_banner">Удалить баннер</string>
+    <string name="remove_photo">Удалить фото</string>
+    <string name="profile_suggest_name">Предложить имя</string>
+    <string name="profile_lightning_address">Lightning-адрес</string>
+    <string name="profile_image_failed">Не удалось загрузить это изображение. Выберите другое изображение или повторите попытку.</string>
+    <string name="profile_publish_failed">Ваш профиль не удалось сохранить. Проверьте свои данные и повторите попытку.</string>
 </resources>

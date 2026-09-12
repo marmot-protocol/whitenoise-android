@@ -2119,4 +2119,18 @@
     <string name="diagnostics_health">Health &amp; Performance</string>
     <string name="diagnostics_events">Events</string>
     <string name="diagnostics_no_events">No Events</string>
+    <string name="profile_saving">Saving profile…</string>
+    <string name="profile_add_banner">Add banner</string>
+    <string name="profile_change_banner">Change banner</string>
+    <string name="add_photo">Add Photo</string>
+    <string name="change_photo">Change Photo</string>
+    <string name="profile_choose_photos">Choose photos</string>
+    <string name="profile_choose_files">Choose files</string>
+    <string name="find_web_image">Find Image on Web</string>
+    <string name="profile_remove_banner">Remove banner</string>
+    <string name="remove_photo">Remove Photo</string>
+    <string name="profile_suggest_name">Suggest name</string>
+    <string name="profile_lightning_address">Lightning address</string>
+    <string name="profile_image_failed">This image could not be loaded. Choose another image or try again.</string>
+    <string name="profile_publish_failed">Your profile could not be saved. Check your details and try again.</string>
 </resources>

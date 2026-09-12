@@ -2005,4 +2005,18 @@
     <string name="diagnostics_health">Durum ve performans</string>
     <string name="diagnostics_events">Olaylar</string>
     <string name="diagnostics_no_events">Olay yok</string>
+    <string name="profile_saving">Profil kaydediliyor…</string>
+    <string name="profile_add_banner">Banner ekle</string>
+    <string name="profile_change_banner">Banner\'ı değiştir</string>
+    <string name="add_photo">Fotoğraf Ekle</string>
+    <string name="change_photo">Fotoğrafı Değiştir</string>
+    <string name="profile_choose_photos">Fotoğraf seç</string>
+    <string name="profile_choose_files">Dosyaları seç</string>
+    <string name="find_web_image">Web\'de Resim Bul</string>
+    <string name="profile_remove_banner">Bannerı kaldır</string>
+    <string name="remove_photo">Fotoğrafı Kaldır</string>
+    <string name="profile_suggest_name">İsim öner</string>
+    <string name="profile_lightning_address">Lightning adresi</string>
+    <string name="profile_image_failed">Bu resim yüklenemedi. Başka bir resim seçin veya tekrar deneyin.</string>
+    <string name="profile_publish_failed">Profiliniz kaydedilemedi. Bilgilerinizi kontrol edip tekrar deneyin.</string>
 </resources>
