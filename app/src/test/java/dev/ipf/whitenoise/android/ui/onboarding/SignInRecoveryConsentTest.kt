@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
@@ -65,8 +66,8 @@ class SignInRecoveryConsentTest {
     }
 
     private fun signIn(key: String) {
-        composeRule.onNodeWithText(string(R.string.nostr_nsec)).performTextInput(key)
-        composeRule.onNodeWithText(string(R.string.sign_in)).performClick()
+        composeRule.onNodeWithTag("onboarding.sign_in.private_key").performTextInput(key)
+        composeRule.onNodeWithTag("onboarding.sign_in.action").performClick()
         composeRule.waitForIdle()
     }
 
@@ -187,7 +188,7 @@ class SignInRecoveryConsentTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText(string(R.string.sign_in_error_setup_recovery_failed)).assertExists()
-        composeRule.onNodeWithText(string(R.string.sign_in)).performClick()
+        composeRule.onNodeWithTag("onboarding.sign_in.action").performClick()
         composeRule.waitForIdle()
 
         assertEquals("the second round must not re-prompt", 1, engine.recoveries.size)
