@@ -1,7 +1,8 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
-import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -27,6 +28,10 @@ class HelpAboutScreensTest {
     val composeRule = createComposeRule()
 
     private val app = ApplicationProvider.getApplicationContext<Context>()
+    private val developerMode = mutableStateOf(false)
+    private var unlocks = 0
+    private var alreadyEnabled = 0
+    private var developerOpens = 0
     private var bugReportOpens = 0
     private var licenseOpens = 0
     private var privacyOpens = 0
@@ -95,12 +100,12 @@ class HelpAboutScreensTest {
         composeRule.onNodeWithTag("help.open_failed").assertDoesNotExist()
     }
 
-    /** About shows the installed build facts and offers no hidden gesture on them. */
+    /** About retains the installed build facts and the production version gesture. */
     @Test
-    fun aboutShowsTheInstalledBuildFactsWithoutAHiddenGesture() {
+    fun aboutShowsTheInstalledBuildFactsAndVersionAction() {
         renderAbout()
 
-        composeRule.onNodeWithText(app.getString(R.string.about_version)).assertExists().assertHasNoClickAction()
+        composeRule.onNodeWithText(app.getString(R.string.about_version)).assertExists().assertHasClickAction()
         composeRule.onNodeWithText("1.2.3").assertExists()
         composeRule.onNodeWithText("42").assertExists()
         composeRule.onNodeWithText("abc1234").assertExists()
@@ -137,6 +142,33 @@ class HelpAboutScreensTest {
         composeRule.onNodeWithTag("help.open_failed").assertDoesNotExist()
     }
 
+    /** Six taps do nothing; the seventh enables Developer once and reveals its destination. */
+    @Test
+    fun seventhVersionTapUnlocksDeveloperAndPreservesItsRoute() {
+        renderAbout()
+        repeat(6) { composeRule.onNodeWithTag("about.version").performClick() }
+        composeRule.runOnIdle { assertEquals(0, unlocks) }
+        composeRule.onNodeWithTag("about.developer").assertDoesNotExist()
+        composeRule.onNodeWithTag("about.version").performClick()
+        composeRule.onNodeWithTag("about.developer").performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, unlocks)
+            assertEquals(1, developerOpens)
+        }
+    }
+
+    /** An already enabled installation gives feedback without toggling or writing the preference again. */
+    @Test
+    fun enabledDeveloperVersionTapOnlyShowsFeedback() {
+        developerMode.value = true
+        renderAbout()
+        composeRule.onNodeWithTag("about.version").performClick()
+        composeRule.runOnIdle {
+            assertEquals(0, unlocks)
+            assertEquals(1, alreadyEnabled)
+        }
+    }
+
     private fun renderBugReport() {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -155,6 +187,13 @@ class HelpAboutScreensTest {
         composeRule.setContent {
             WhiteNoiseTheme {
                 AboutContent(
+                    developerMode = developerMode.value,
+                    onEnableDeveloper = {
+                        unlocks++
+                        developerMode.value = true
+                    },
+                    onDeveloperAlreadyEnabled = { alreadyEnabled++ },
+                    onOpenDeveloper = { developerOpens++ },
                     versionName = "1.2.3",
                     buildNumber = "42",
                     mdkShortSha = "abc1234",

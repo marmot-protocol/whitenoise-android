@@ -365,6 +365,8 @@ private fun SettingsDetailRoute(
             AboutScreen(
                 versionName = BuildConfig.VERSION_NAME,
                 buildNumber = BuildConfig.VERSION_CODE.toString(),
+                appState = appState,
+                onOpenDeveloper = { onDetailChange(SettingsDetail.Developer) },
                 mdkShortSha = BuildConfig.MDK_SHORT_SHA,
                 onBack = { onDetailChange(SettingsDetail.Help) },
             )

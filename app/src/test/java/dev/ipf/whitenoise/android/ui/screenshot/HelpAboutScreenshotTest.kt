@@ -90,6 +90,13 @@ class HelpAboutScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/about_licenses_amoled.png")
     }
 
+    /** The retained Developer destination fits alongside build facts and legal links. */
+    @Test
+    fun aboutDeveloperEnabled() {
+        renderAbout(dark = false, amoled = false, developerMode = true)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/about_developer_enabled_light.png")
+    }
+
     private fun renderBugReport(
         dark: Boolean,
         accepted: Boolean,
@@ -104,10 +111,12 @@ class HelpAboutScreenshotTest {
     private fun renderAbout(
         dark: Boolean,
         amoled: Boolean,
+        developerMode: Boolean = false,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
                 AboutContent(
+                    developerMode = developerMode,
                     versionName = "1.4.0",
                     buildNumber = "140",
                     mdkShortSha = "0a5ab20",
