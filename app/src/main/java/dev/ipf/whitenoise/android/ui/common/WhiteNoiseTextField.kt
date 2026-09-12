@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicSecureTextField
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.InputTransformation
@@ -14,6 +15,7 @@ import androidx.compose.foundation.text.input.KeyboardActionHandler
 import androidx.compose.foundation.text.input.OutputTransformation
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextObfuscationMode
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalTextStyle
@@ -121,6 +123,86 @@ internal fun WhiteNoiseTextField(
                     enabled = enabled,
                     lineLimits = lineLimits,
                     outputTransformation = outputTransformation,
+                    interactionSource = interactionSource,
+                    labelPosition = TextFieldLabelPosition.Above(),
+                    label = label?.let(::insetLabel),
+                    placeholder = placeholder,
+                    leadingIcon = leadingIcon,
+                    trailingIcon = trailingIcon,
+                    supportingText = supportingText,
+                    isError = isError,
+                    colors = colors,
+                    contentPadding = whiteNoiseTextFieldContentPadding(),
+                    container = {
+                        WhiteNoiseTextFieldContainer(
+                            enabled = enabled,
+                            isError = isError,
+                            interactionSource = interactionSource,
+                            colors = colors,
+                        )
+                    },
+                ),
+        )
+    }
+}
+
+/**
+ * Password variant of [WhiteNoiseTextField]: same 28 dp container, above label and inset, single line, obfuscated
+ * input that reveals the last typed character.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
+@Composable
+internal fun WhiteNoiseSecureTextField(
+    state: TextFieldState,
+    modifier: Modifier = Modifier,
+    containerColor: Color = LocalWhiteNoiseTextFieldContainerColor.current,
+    enabled: Boolean = true,
+    textStyle: TextStyle = LocalTextStyle.current,
+    label: @Composable (TextFieldLabelScope.() -> Unit)? = null,
+    placeholder: @Composable (() -> Unit)? = null,
+    leadingIcon: @Composable (() -> Unit)? = null,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    supportingText: @Composable (() -> Unit)? = null,
+    errorMessage: String? = null,
+    inputTransformation: InputTransformation? = null,
+    textObfuscationMode: TextObfuscationMode = TextObfuscationMode.RevealLastTyped,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    onKeyboardAction: KeyboardActionHandler? = null,
+) {
+    val isError = errorMessage != null
+    val interactionSource = remember { MutableInteractionSource() }
+    val colors = whiteNoiseTextFieldColors(containerColor)
+    val focused = interactionSource.collectIsFocusedAsState().value
+    val resolvedTextColor =
+        textStyle.color.takeOrElse {
+            colors.textColorFor(enabled = enabled, isError = isError, focused = focused)
+        }
+
+    CompositionLocalProvider(LocalTextSelectionColors provides colors.textSelectionColors) {
+        BasicSecureTextField(
+            state = state,
+            modifier =
+                modifier
+                    .textFieldErrorSemantics(errorMessage)
+                    .defaultMinSize(
+                        minWidth = OutlinedTextFieldDefaults.MinWidth,
+                        minHeight = OutlinedTextFieldDefaults.MinHeight,
+                    ),
+            enabled = enabled,
+            textStyle = textStyle.merge(TextStyle(color = resolvedTextColor)),
+            cursorBrush = SolidColor(if (isError) colors.errorCursorColor else colors.cursorColor),
+            keyboardOptions = keyboardOptions,
+            onKeyboardAction = onKeyboardAction,
+            interactionSource = interactionSource,
+            inputTransformation = inputTransformation,
+            textObfuscationMode = textObfuscationMode,
+            decorator =
+                OutlinedTextFieldDefaults.decorator(
+                    state = state,
+                    enabled = enabled,
+                    lineLimits = TextFieldLineLimits.SingleLine,
+                    outputTransformation = null,
                     interactionSource = interactionSource,
                     labelPosition = TextFieldLabelPosition.Above(),
                     label = label?.let(::insetLabel),

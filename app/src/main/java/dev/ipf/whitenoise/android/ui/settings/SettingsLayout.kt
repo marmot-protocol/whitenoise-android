@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -177,4 +179,25 @@ internal fun SettingsVersionFooter(versionName: String) {
             textAlign = TextAlign.Center,
         )
     }
+}
+
+/** A callout at the screen margin inside a settings list; error callouts use the error container. */
+@Suppress("FunctionNaming", "LongParameterList")
+@Composable
+internal fun SettingsCallout(
+    text: String,
+    modifier: Modifier = Modifier,
+    title: String? = null,
+    isError: Boolean = false,
+    leading: (@Composable () -> Unit)? = null,
+    @DrawableRes icon: Int = if (isError) R.drawable.ic_error else R.drawable.ic_info,
+) {
+    WhiteNoiseCallout(
+        modifier = modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+        text = text,
+        title = title,
+        icon = icon,
+        isError = isError,
+        leading = leading,
+    )
 }

@@ -1189,6 +1189,8 @@ class LocalizationResourceTest {
                     ),
                 "values-it" to
                     setOf(
+                        // "Password" is the standard Italian loan word.
+                        "password",
                         // "chat" is a common loan word in Italian.
                         "archived_chats_count",
                         "chat_folder_chat_count",
