@@ -16,7 +16,7 @@ class TtsAutoReadWiringCoverageTest {
             "global default toggle must persist through AppState",
             "appState.setTtsAutoReadGlobalDefault(it)" in body,
         )
-        assertTrue("global default row must be composed", "TtsAutoReadGlobalDefaultRow(" in body)
+        assertTrue("global default row must be composed", "TTS_AUTO_READ_GLOBAL_DEFAULT_ROW_TAG" in body)
     }
 
     @Test

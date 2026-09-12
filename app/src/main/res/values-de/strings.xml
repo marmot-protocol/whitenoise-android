@@ -1658,6 +1658,10 @@
     <string name="tts_auto_read_override_on">Ein</string>
     <string name="tts_auto_read_override_off">Aus</string>
     <string name="tts_settings_rate_system">System (Geräteeinstellung folgen)</string>
+    <string name="speech_discovering">Sprachausgaben werden geprüft…</string>
+    <string name="speech_no_engine">Keine nutzbare Sprachausgabe verfügbar.</string>
+    <string name="speech_android_settings">Android-Einstellungen öffnen</string>
+    <string name="speech_settings_failed">Android-Einstellungen konnten nicht geöffnet werden.</string>
     <string name="tts_bar_rate_control">Sprechgeschwindigkeit, aktuell %1$s</string>
     <string name="tts_rate_custom">Benutzerdefiniert</string>
     <string name="tts_rate_custom_error">Gib eine Geschwindigkeit von 0,1× bis 10,0× ein.</string>

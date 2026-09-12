@@ -4638,8 +4638,26 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
         "anchor": "fun TextToSpeechScreen(",
         "test_ids": [
-          "TTS-001",
-          "TTS-004"
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "speechVoiceChoice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "fun speechVoiceChoice(",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "SpeechCustomRateDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "fun SpeechCustomRateDialog(",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
         ]
       },
       {
@@ -5486,6 +5504,15 @@
         ]
       },
       {
+        "surface": "SpeechChoiceDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "fun SpeechChoiceDialog(",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
         "surface": "LanguageScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageScreen.kt",
         "anchor": "fun LanguageScreen(",
@@ -6162,6 +6189,33 @@
           "SET-009",
           "FLD-001",
           "FLD-002"
+        ]
+      },
+      {
+        "surface": "ttsRateLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TtsSettingsLabels.kt",
+        "anchor": "fun ttsRateLabel(",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "ttsMediaMixVolumeLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TtsSettingsLabels.kt",
+        "anchor": "fun ttsMediaMixVolumeLabel(",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "ttsMediaMixVolumeDescription",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TtsSettingsLabels.kt",
+        "anchor": "fun ttsMediaMixVolumeDescription(",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
         ]
       }
     ],
@@ -9152,6 +9206,195 @@
         ]
       },
       {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.refresh",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:settings_read_aloud",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.settings_read_aloud",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:speech_android_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.speech_android_settings",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:speech_discovering",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.speech_discovering",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:speech_no_engine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.speech_no_engine",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:speech_settings_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.speech_settings_failed",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:theme_system",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.theme_system",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_auto_read_default_global_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.tts_auto_read_default_global_subtitle",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_auto_read_default_global_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.tts_auto_read_default_global_title",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_rate_apply",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.tts_rate_apply",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_rate_custom_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.tts_rate_custom_error",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_settings_engine_local",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.tts_settings_engine_local",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_settings_engine_unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.tts_settings_engine_unknown",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_voice_ambiguous",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.tts_voice_ambiguous",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_voice_available_offline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.tts_voice_available_offline",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_voice_effective_fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.tts_voice_effective_fallback",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_voice_invalid_identity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.tts_voice_invalid_identity",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_voice_not_installed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.tts_voice_not_installed",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_voice_requires_network",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.tts_voice_requires_network",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_voice_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+        "anchor": "R.string.tts_voice_unavailable",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
         "surface": "setting:group_rejoin_failed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.group_rejoin_failed",
@@ -11143,6 +11386,60 @@
           "SET-009",
           "FLD-001",
           "FLD-002"
+        ]
+      },
+      {
+        "surface": "string:tts_media_mix_volume_loud",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TtsSettingsLabels.kt",
+        "anchor": "R.string.tts_media_mix_volume_loud",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_media_mix_volume_loud_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TtsSettingsLabels.kt",
+        "anchor": "R.string.tts_media_mix_volume_loud_description",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_media_mix_volume_medium",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TtsSettingsLabels.kt",
+        "anchor": "R.string.tts_media_mix_volume_medium",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_media_mix_volume_medium_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TtsSettingsLabels.kt",
+        "anchor": "R.string.tts_media_mix_volume_medium_description",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_media_mix_volume_quiet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TtsSettingsLabels.kt",
+        "anchor": "R.string.tts_media_mix_volume_quiet",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "string:tts_media_mix_volume_quiet_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TtsSettingsLabels.kt",
+        "anchor": "R.string.tts_media_mix_volume_quiet_description",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
         ]
       }
     ],

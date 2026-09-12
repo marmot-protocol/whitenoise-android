@@ -1658,6 +1658,10 @@
     <string name="tts_auto_read_override_on">Açık</string>
     <string name="tts_auto_read_override_off">Kapalı</string>
     <string name="tts_settings_rate_system">Sistem (cihaz ayarını izle)</string>
+    <string name="speech_discovering">Konuşma motorları kontrol ediliyor…</string>
+    <string name="speech_no_engine">Kullanılabilir bir konuşma motoru mevcut değil.</string>
+    <string name="speech_android_settings">Android Ayarlarını Aç</string>
+    <string name="speech_settings_failed">Android Ayarları açılamadı.</string>
     <string name="tts_bar_rate_control">Konuşma hızı, geçerli değer %1$s</string>
     <string name="tts_rate_custom">Özel</string>
     <string name="tts_rate_custom_error">0,1× ile 10,0× arasında bir hız girin.</string>
