@@ -29,6 +29,7 @@ internal enum class SettingsDetail {
     Dictation,
     ChatFolders,
     Help,
+    BugReport,
     About,
     Developer,
 }

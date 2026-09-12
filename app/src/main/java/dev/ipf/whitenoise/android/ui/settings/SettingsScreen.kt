@@ -249,7 +249,9 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.ChatBubbleColors,
         SettingsDetail.Language,
         -> SettingsDetail.Appearance
-        SettingsDetail.About -> SettingsDetail.Help
+        SettingsDetail.About,
+        SettingsDetail.BugReport,
+        -> SettingsDetail.Help
         SettingsDetail.KeyPackages -> SettingsDetail.Developer
         SettingsDetail.DiagnosticsImprovements -> SettingsDetail.DevicePrivacy
         else -> null
@@ -353,14 +355,18 @@ private fun SettingsDetailRoute(
         SettingsDetail.Dictation -> DictationSettingsScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.ChatFolders -> ChatFoldersScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Help ->
-            HelpScreen(onBack = { onDetailChange(null) }, onOpenAbout = { onDetailChange(SettingsDetail.About) })
+            HelpScreen(
+                onBack = { onDetailChange(null) },
+                onOpenBugReport = { onDetailChange(SettingsDetail.BugReport) },
+                onOpenAbout = { onDetailChange(SettingsDetail.About) },
+            )
+        SettingsDetail.BugReport -> BugReportScreen(onBack = { onDetailChange(SettingsDetail.Help) })
         SettingsDetail.About ->
             AboutScreen(
-                appState = appState,
                 versionName = BuildConfig.VERSION_NAME,
+                buildNumber = BuildConfig.VERSION_CODE.toString(),
                 mdkShortSha = BuildConfig.MDK_SHORT_SHA,
                 onBack = { onDetailChange(SettingsDetail.Help) },
-                onOpenDeveloper = { onDetailChange(SettingsDetail.Developer) },
             )
         SettingsDetail.Developer ->
             DeveloperScreen(

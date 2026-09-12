@@ -4433,7 +4433,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
         "anchor": "fun AboutScreen(",
         "test_ids": [
-          "SET-001"
+          "SET-018",
+          "SET-019"
         ]
       },
       {
@@ -4441,7 +4442,53 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
         "anchor": "fun HelpScreen(",
         "test_ids": [
-          "SET-001"
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "BugReportScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "fun BugReportScreen(",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "BugReportContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "fun BugReportContent(",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "AboutContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "fun AboutContent(",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "HelpOpenFailureDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "fun HelpOpenFailureDialog(",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "HelpLeadingIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "fun HelpLeadingIcon(",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
         ]
       },
       {
@@ -8611,22 +8658,6 @@
         ]
       },
       {
-        "surface": "setting:developer",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
-        "anchor": "R.string.developer",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "setting:developer_mode_subtitle",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
-        "anchor": "R.string.developer_mode_subtitle",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
         "surface": "setting:open_source_licenses",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
         "anchor": "R.string.open_source_licenses",
@@ -8675,19 +8706,192 @@
         ]
       },
       {
-        "surface": "setting:settings_mdk_version_label",
+        "surface": "string:about_app_section",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
-        "anchor": "R.string.settings_mdk_version_label",
+        "anchor": "R.string.about_app_section",
         "test_ids": [
-          "SET-001"
+          "SET-018",
+          "SET-019"
         ]
       },
       {
-        "surface": "setting:settings_version_label",
+        "surface": "string:about_build",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
-        "anchor": "R.string.settings_version_label",
+        "anchor": "R.string.about_build",
         "test_ids": [
-          "SET-001"
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:about_legal_section",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.about_legal_section",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:about_mdk",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.about_mdk",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:about_version",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.about_version",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:external_open_failed_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.external_open_failed_detail",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.help",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:licenses_open_failed_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.licenses_open_failed_title",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:privacy_policy_open_failed_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.privacy_policy_open_failed_title",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:report_bug_destination",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.report_bug_destination",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:report_bug_destination_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.report_bug_destination_detail",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:report_bug_destination_section",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.report_bug_destination_section",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:report_bug_no_attachments_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.report_bug_no_attachments_detail",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:report_bug_no_attachments_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.report_bug_no_attachments_title",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:report_bug_open_failed_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.report_bug_open_failed_detail",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:report_bug_open_failed_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.report_bug_open_failed_title",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:report_bug_open_github",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.report_bug_open_github",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:report_bug_privacy_section",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.report_bug_privacy_section",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:report_bug_public_reminder",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.report_bug_public_reminder",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "SET-018",
+          "SET-019"
         ]
       },
       {

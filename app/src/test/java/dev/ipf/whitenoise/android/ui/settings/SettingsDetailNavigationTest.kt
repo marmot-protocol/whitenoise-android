@@ -13,6 +13,7 @@ class SettingsDetailNavigationTest {
         assertEquals(SettingsDetail.Developer, settingsDetailParent(SettingsDetail.KeyPackages))
         assertNull(settingsDetailParent(SettingsDetail.Developer))
         assertEquals(SettingsDetail.Help, settingsDetailParent(SettingsDetail.About))
+        assertEquals(SettingsDetail.Help, settingsDetailParent(SettingsDetail.BugReport))
         assertNull(settingsDetailParent(SettingsDetail.Help))
     }
 
