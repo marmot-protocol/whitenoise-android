@@ -503,6 +503,9 @@
     <string name="developer">Разработчик</string>
     <string name="developer_mode">Режим разработчика</string>
     <string name="developer_mode_subtitle">Показывает диагностику и внутренние компоненты MLS.</string>
+    <string name="developer_testing_only">Только для разработки и тестирования</string>
+    <string name="developer_testing_only_detail">Эти инструменты могут раскрывать технические сведения и изменять поведение приложения.</string>
+    <string name="developer_debugging">Отладка</string>
     <string name="diagnostics">Диагностика</string>
     <string name="diagnostics_settings_subtitle">Состояние реле и внутреннее устройство MLS</string>
     <string name="performance_logs">Журналы производительности</string>

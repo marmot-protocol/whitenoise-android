@@ -471,6 +471,9 @@
     <string name="developer">Geliştirici</string>
     <string name="developer_mode">Geliştirici modu</string>
     <string name="developer_mode_subtitle">Teşhisleri ve MLS dahili bilgilerini gösterir.</string>
+    <string name="developer_testing_only">Yalnızca geliştirme ve test amaçlıdır</string>
+    <string name="developer_testing_only_detail">Bu araçlar teknik bilgileri açığa çıkarabilir ve uygulamanın davranışını değiştirebilir.</string>
+    <string name="developer_debugging">Hata ayıklama</string>
     <string name="diagnostics">Teşhis</string>
     <string name="diagnostics_settings_subtitle">Aktarma durumu ve MLS dahili bilgileri</string>
     <string name="performance_logs">Performans günlükleri</string>

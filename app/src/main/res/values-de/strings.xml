@@ -471,6 +471,9 @@
     <string name="developer">Entwickler</string>
     <string name="developer_mode">Entwicklermodus</string>
     <string name="developer_mode_subtitle">Zeigt Diagnosen und MLS-Interna an.</string>
+    <string name="developer_testing_only">Nur für Entwicklung und Tests</string>
+    <string name="developer_testing_only_detail">Diese Werkzeuge können technische Informationen offenlegen und das Verhalten der App verändern.</string>
+    <string name="developer_debugging">Fehlersuche</string>
     <string name="diagnostics">Diagnose</string>
     <string name="diagnostics_settings_subtitle">Relay-Zustand und MLS-Interna</string>
     <string name="performance_logs">Leistungsprotokolle</string>
