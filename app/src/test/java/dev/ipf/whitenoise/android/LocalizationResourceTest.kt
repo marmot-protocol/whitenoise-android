@@ -1152,6 +1152,10 @@ class LocalizationResourceTest {
                         "group_image_source_emoji",
                         // "System" is the German word for the system font choice.
                         "appearance_font_system",
+                        // "Audio" is the same word in this locale.
+                        "download_audio",
+                        // "Videos" is the same word in German.
+                        "download_videos",
                     ),
                 "values-es" to
                     setOf(
@@ -1164,6 +1168,8 @@ class LocalizationResourceTest {
                         "attachment_type_audio",
                         // "Color" is also the Spanish word for colour.
                         "color_swatch_description",
+                        // "Audio" is the same word in this locale.
+                        "download_audio",
                     ),
                 "values-fr" to
                     setOf(
@@ -1190,6 +1196,10 @@ class LocalizationResourceTest {
                         "group_image_source_photos",
                         // "Action" is also the French word for action.
                         "color_preview_action",
+                        // "Audio" is the same word in this locale.
+                        "download_audio",
+                        // "Photos" is the same word in French.
+                        "download_photos",
                     ),
                 "values-it" to
                     setOf(
@@ -1210,6 +1220,8 @@ class LocalizationResourceTest {
                         "nostr_event_type_video",
                         // "Emoji" is the standard Italian loan word.
                         "group_image_source_emoji",
+                        // "Audio" is the same word in this locale.
+                        "download_audio",
                     ),
                 "values-pt" to
                     setOf(

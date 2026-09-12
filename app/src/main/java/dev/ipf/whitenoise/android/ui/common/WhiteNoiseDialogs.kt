@@ -75,6 +75,7 @@ internal fun <T> ChoiceDialog(
     modifier: Modifier = Modifier,
     labelFontFamily: (T) -> FontFamily? = { null },
     supportingText: String? = null,
+    subtitle: (T) -> String? = { null },
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -94,6 +95,7 @@ internal fun <T> ChoiceDialog(
                             selected = value == selected,
                             onClick = { onSelect(value) },
                             fontFamily = labelFontFamily(value),
+                            subtitle = subtitle(value),
                         )
                     }
                 }
@@ -122,6 +124,7 @@ internal fun WhiteNoiseDialogChoiceRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     fontFamily: FontFamily? = null,
+    subtitle: String? = null,
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         Row(
@@ -130,27 +133,40 @@ internal fun WhiteNoiseDialogChoiceRow(
                     .requiredWidth(maxWidth + ChoiceDialogDefaults.RowOverhang * 2)
                     .then(modifier)
                     .heightIn(min = ChoiceDialogDefaults.RowMinHeight)
-                    .clip(MaterialTheme.shapes.large)
-                    .background(if (selected) dialogSelectionColor() else Color.Transparent)
+                    .whiteNoiseDialogSelection(selected)
                     .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
                     .padding(horizontal = ChoiceDialogDefaults.RowOverhang),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             RadioButton(selected = selected, onClick = null, modifier = Modifier.clearAndSetSemantics {})
-            Text(
-                text = title,
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .padding(start = ChoiceDialogDefaults.RowOverhang)
-                        .padding(vertical = ChoiceDialogDefaults.RowTextPadding),
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.bodyLarge,
-                fontFamily = fontFamily,
-            )
+            Column(
+                Modifier
+                    .weight(1f)
+                    .padding(start = ChoiceDialogDefaults.RowOverhang)
+                    .padding(vertical = ChoiceDialogDefaults.RowTextPadding),
+            ) {
+                Text(
+                    text = title,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontFamily = fontFamily,
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
         }
     }
 }
+
+/** Shared boundary for the selected fill and native input feedback in modal option rows. */
+@Composable
+internal fun Modifier.whiteNoiseDialogSelection(selected: Boolean): Modifier =
+    clip(MaterialTheme.shapes.large).background(if (selected) dialogSelectionColor() else Color.Transparent)
 
 /**
  * The selected choice fill. AlertDialog already sits on `surfaceContainerHigh`, so the tonal fill is one
