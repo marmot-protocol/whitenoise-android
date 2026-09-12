@@ -1977,6 +1977,9 @@
     <string name="usage_diagnostics_loading">正在載入分享設定…</string>
     <string name="key_export_view_backup">檢視備份</string>
     <string name="key_export_preview_help">將此加密備份複製或匯出至安全的地方。30 秒後或離開此畫面時，備份會隱藏。</string>
+    <string name="diagnostics_health">執行狀態與效能</string>
+    <string name="diagnostics_events">事件</string>
+    <string name="diagnostics_no_events">尚無事件</string>
     <string name="audit_upload_title">分享技術記錄</string>
     <string name="audit_upload_subtitle">自動向 White Noise 傳送診斷稽核記錄，與使用情況分享分開控制。</string>
     <string name="audit_upload_confirm_title">與 White Noise 分享技術記錄？</string>

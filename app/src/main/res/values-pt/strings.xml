@@ -2004,6 +2004,9 @@
     <string name="usage_diagnostics_loading">A carregar definições de partilha…</string>
     <string name="key_export_view_backup">Ver backup</string>
     <string name="key_export_preview_help">Copie ou exporte este backup criptografado para um local seguro. Ele fica oculto após 30 segundos ou quando você sai desta tela.</string>
+    <string name="diagnostics_health">Estado e desempenho</string>
+    <string name="diagnostics_events">Eventos</string>
+    <string name="diagnostics_no_events">Nenhum evento</string>
     <string name="audit_upload_title">Compartilhar logs técnicos</string>
     <string name="audit_upload_subtitle">Enviar automaticamente logs de diagnóstico ao White Noise, separadamente do compartilhamento de dados de uso.</string>
     <string name="audit_upload_confirm_title">Compartilhar logs técnicos com o White Noise?</string>

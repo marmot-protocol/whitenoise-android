@@ -2116,6 +2116,9 @@
     <string name="usage_diagnostics_loading">Loading sharing settings…</string>
     <string name="key_export_view_backup">View backup</string>
     <string name="key_export_preview_help">Copy or export this encrypted backup to a secure place. It hides after 30 seconds or when you leave this screen.</string>
+    <string name="diagnostics_health">Health &amp; Performance</string>
+    <string name="diagnostics_events">Events</string>
+    <string name="diagnostics_no_events">No Events</string>
     <string name="audit_upload_title">Share technical logs</string>
     <string name="audit_upload_subtitle">Automatically send diagnostic audit logs to White Noise, separately from usage sharing.</string>
     <string name="audit_upload_confirm_title">Share technical logs with White Noise?</string>
