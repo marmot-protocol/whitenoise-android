@@ -5784,7 +5784,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Validates and publishes one relay-list edit after app-level and MarmotKit policy checks. */
-    private suspend fun publishAccountRelays(
+    internal suspend fun publishAccountRelays(
         account: String,
         kind: RelayListKind,
         plan: RelayListEditPlan,
@@ -5825,7 +5825,7 @@ class WhiteNoiseAppState private constructor(
                 }.getOrNull()
         }
 
-    private suspend fun loadAccountRelayLists(account: String): AccountRelayListsFfi? =
+    internal suspend fun loadAccountRelayLists(account: String): AccountRelayListsFfi? =
         runCatchingCancellable { marmotIo { accountRelayLists(account) } }.getOrNull()
 
     /** Applies MarmotKit's shared relay policy and strips only unsafe pre-existing entries. */

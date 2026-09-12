@@ -1156,6 +1156,8 @@ class LocalizationResourceTest {
                         "download_audio",
                         // "Videos" is the same word in German.
                         "download_videos",
+                        // "Name" is the German word for "name".
+                        "name",
                     ),
                 "values-es" to
                     setOf(
