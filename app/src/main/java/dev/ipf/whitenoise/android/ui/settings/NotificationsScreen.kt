@@ -52,9 +52,10 @@ internal fun NotificationsScreen(
     }
 
     val permissionGranted = appState.localNotificationPermissionGranted
-    val accountReady = appState.activeAccountRef != null && permissionGranted
+    val hasAccount = appState.activeAccountRef != null
     val localEnabled = appState.localNotificationSettings?.localNotificationsEnabled == true
     val backgroundEnabled = appState.backgroundConnectionEnabled
+    val pushEnabled = appState.localNotificationSettings?.nativePushEnabled == true
 
     SettingsScaffold(title = stringResource(R.string.notifications), onBack = onBack) {
         SettingsList {
@@ -76,7 +77,7 @@ internal fun NotificationsScreen(
                             title = stringResource(R.string.local_notifications),
                             subtitle = stringResource(R.string.local_notifications_detail),
                             checked = localEnabled,
-                            enabled = accountReady,
+                            enabled = hasAccount && (permissionGranted || localEnabled),
                             onCheckedChange = { enabled ->
                                 appState.launchMutation { appState.setLocalNotificationsEnabled(enabled) }
                             },
@@ -86,8 +87,8 @@ internal fun NotificationsScreen(
                         NativePushSettingRow(
                             context = rowContext,
                             capability = appState.nativePushCapability(),
-                            accountReady = accountReady && localEnabled,
-                            checked = appState.localNotificationSettings?.nativePushEnabled == true,
+                            accountReady = hasAccount && ((permissionGranted && localEnabled) || pushEnabled),
+                            checked = pushEnabled,
                             onCheckedChange = { enabled ->
                                 appState.launchMutation { appState.setNativePushEnabled(enabled) }
                             },
@@ -103,7 +104,7 @@ internal fun NotificationsScreen(
                             title = stringResource(R.string.keep_connected_in_background),
                             subtitle = stringResource(R.string.keep_connected_in_background_detail),
                             checked = backgroundEnabled,
-                            enabled = accountReady,
+                            enabled = hasAccount && (permissionGranted || backgroundEnabled),
                             onCheckedChange = { enabled ->
                                 appState.launchMutation { appState.setBackgroundConnectionEnabled(enabled) }
                             },
@@ -174,8 +175,8 @@ private fun NotificationPermissionIcon(drawable: Int) {
 }
 
 /**
- * Native push as a whole-row switch: on with the prototype's detail when the capability is available, otherwise off,
- * disabled and explaining its first actionable unsupported cause.
+ * Native push reflects the saved policy even when capability disappears. An enabled policy remains revocable;
+ * starting delivery still requires capability and caller readiness, with its first unsupported cause explained.
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -193,8 +194,8 @@ internal fun NativePushSettingRow(
             stringResource(
                 if (capability.isAvailable) R.string.notification_push_detail else capability.subtitleResource(),
             ),
-        checked = capability.isAvailable && checked,
-        enabled = capability.isAvailable && accountReady,
+        checked = checked,
+        enabled = accountReady && (capability.isAvailable || checked),
         onCheckedChange = onCheckedChange,
     )
 }
