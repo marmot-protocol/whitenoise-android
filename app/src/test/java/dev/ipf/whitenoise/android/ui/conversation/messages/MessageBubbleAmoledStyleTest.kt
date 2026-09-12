@@ -11,9 +11,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
-import dev.ipf.whitenoise.android.state.isBlueFreeAccentVisible
 import dev.ipf.whitenoise.android.state.readableTextArgb
-import dev.ipf.whitenoise.android.state.withoutBlueChannel
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -95,7 +93,7 @@ class MessageBubbleAmoledStyleTest {
     }
 
     @Test
-    fun amoledCustomColorOverridesDirectionalBubbleBorder() {
+    fun amoledCustomColorKeepsMonochromeDirectionalBubbleBorder() {
         val customArgb = 0xFF336699L
         var backgroundArgb = 0L
         var contentArgb = 0L
@@ -119,13 +117,11 @@ class MessageBubbleAmoledStyleTest {
                     messageBubbleBorder(
                         highlighted = false,
                         mine = true,
-                        customArgb = presentation.borderOverrideArgb,
                     )
                 val received =
                     messageBubbleBorder(
                         highlighted = false,
                         mine = false,
-                        customArgb = presentation.borderOverrideArgb,
                     )
 
                 SideEffect {
@@ -143,33 +139,29 @@ class MessageBubbleAmoledStyleTest {
             assertEquals(expectedContentArgb, contentArgb)
             assertEquals(2.dp, requireNotNull(sentBorder).width)
             assertEquals(2.dp, requireNotNull(receivedBorder).width)
-            assertEquals(colorFromArgb(customArgb.withoutBlueChannel()), borderColor(sentBorder))
-            assertEquals(colorFromArgb(customArgb.withoutBlueChannel()), borderColor(receivedBorder))
+            assertEquals(Color.White, borderColor(sentBorder))
+            assertEquals(Color.White.copy(alpha = 0.7f), borderColor(receivedBorder))
         }
     }
 
+    /** Highlight uses the semantic theme role, regardless of stored custom colours. */
     @Test
-    fun highlightedAmoledCustomBubbleRetainsItsCustomBorder() {
-        val customArgb = 0xFF336699L
+    fun highlightedAmoledBubbleUsesTheThemeHighlight() {
         var highlightedBorder: BorderStroke? = null
-
+        var expectedHighlight = Color.Unspecified
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
-                val border =
-                    messageBubbleBorder(
-                        highlighted = true,
-                        mine = false,
-                        customArgb = customArgb,
-                    )
-                SideEffect { highlightedBorder = border }
+                val border = messageBubbleBorder(highlighted = true, mine = false)
+                val highlight = MaterialTheme.colorScheme.tertiary
+                SideEffect {
+                    highlightedBorder = border
+                    expectedHighlight = highlight
+                }
             }
         }
-
         composeRule.runOnIdle {
-            val expectedArgb = customArgb.withoutBlueChannel()
-            assertTrue(expectedArgb.isBlueFreeAccentVisible())
             assertEquals(2.dp, requireNotNull(highlightedBorder).width)
-            assertEquals(colorFromArgb(expectedArgb), borderColor(highlightedBorder))
+            assertEquals(expectedHighlight, borderColor(highlightedBorder))
         }
     }
 

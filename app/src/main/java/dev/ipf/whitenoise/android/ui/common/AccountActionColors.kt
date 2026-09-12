@@ -14,6 +14,7 @@ internal data class AccountActionColors(
     val content: Color,
 )
 
+/** Resolves account actions while keeping AMOLED monochrome without changing stored preferences. */
 @Composable
 internal fun accountActionColors(
     appState: WhiteNoiseAppState?,
@@ -21,12 +22,12 @@ internal fun accountActionColors(
 ): AccountActionColors {
     val scheme = MaterialTheme.colorScheme
     val theme = appState?.let { BubbleTheme.resolve(it.themeMode, isSystemInDarkTheme()) }
+    val customTheme = theme?.takeUnless { it == BubbleTheme.Amoled }
     val resolved =
         resolveActionColorArgb(
-            customArgb = theme?.let { appState.actionColorArgb(it, accountRef) },
+            customArgb = customTheme?.let { appState.actionColorArgb(it, accountRef) },
             defaultContainerArgb = scheme.primary.toArgb().toLong() and 0xFFFFFFFFL,
             defaultContentArgb = scheme.onPrimary.toArgb().toLong() and 0xFFFFFFFFL,
-            blueFree = theme == BubbleTheme.Amoled,
         )
     return AccountActionColors(
         container = Color(resolved.container),

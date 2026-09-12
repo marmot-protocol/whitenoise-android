@@ -3,9 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 import androidx.compose.ui.graphics.Color
 import dev.ipf.whitenoise.android.core.TimelineInvalidationPresentation
 import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
-import dev.ipf.whitenoise.android.state.isBlueFreeAccentVisible
 import dev.ipf.whitenoise.android.state.readableTextArgb
-import dev.ipf.whitenoise.android.state.withoutBlueChannel
 
 internal fun colorFromArgb(argb: Long): Color = Color(argb)
 
@@ -89,8 +87,7 @@ internal fun messageBodyTextToRender(
         else -> displayedBody
     }
 
-/** Keeps failure/tombstone semantics fixed while routing ordinary AMOLED
- * customization through the bubble border instead of its black fill. */
+/** Keeps failure/tombstone semantics fixed and suppresses saved bubble colours on AMOLED. */
 internal fun resolveBubblePresentationArgb(
     deleted: Boolean,
     amoled: Boolean,
@@ -114,10 +111,6 @@ internal fun resolveBubblePresentationArgb(
                 backgroundArgb = OPAQUE_BLACK_ARGB,
                 contentArgb = tokens.surfaceContentArgb,
                 mentionAccentArgb = tokens.mentionAccentArgb,
-                borderOverrideArgb =
-                    customArgb
-                        ?.withoutBlueChannel()
-                        ?.takeIf(Long::isBlueFreeAccentVisible),
             )
         customArgb != null ->
             BubblePresentation(

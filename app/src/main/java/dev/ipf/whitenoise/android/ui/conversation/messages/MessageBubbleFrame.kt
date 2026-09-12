@@ -84,7 +84,6 @@ internal fun MessageBubbleFrame(
             messageBubbleBorder(
                 highlighted = false,
                 mine = mine,
-                customArgb = presentation.borderOverrideArgb,
                 persistedFailure = presentation.suppressBorder,
             ),
         tonalElevation = if (mine) 1.dp else 0.dp,
@@ -154,7 +153,6 @@ internal fun MediaCaptionFrame(
             messageBubbleBorder(
                 highlighted = false,
                 mine = mine,
-                customArgb = presentation.borderOverrideArgb,
                 persistedFailure = presentation.suppressBorder,
             ),
         tonalElevation = if (mine) 1.dp else 0.dp,
