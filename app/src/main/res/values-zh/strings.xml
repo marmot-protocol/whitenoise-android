@@ -2019,6 +2019,9 @@
     <string name="support_receiving_relay_required">开始支持聊天前，请为此个人资料添加并发布接收中继。</string>
     <string name="support_relays_loading">正在检查此个人资料的中继配置…</string>
     <string name="support_relays_unavailable">无法检查此个人资料的中继配置。请重试或打开中继。</string>
+    <string name="app_self_update_remind_later">忽略更新</string>
+    <string name="app_self_update_verifying">正在验证更新</string>
+    <string name="app_self_update_verifying_body">在安装前检查已完成的下载 。</string>
     <string name="audit_upload_title">分享技术日志</string>
     <string name="audit_upload_subtitle">自动向 White Noise 发送诊断审计日志，与使用情况分享分开控制。</string>
     <string name="audit_upload_confirm_title">与 White Noise 分享技术日志？</string>

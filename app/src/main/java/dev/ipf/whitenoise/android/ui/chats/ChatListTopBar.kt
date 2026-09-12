@@ -44,6 +44,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -51,6 +52,8 @@ import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
 import dev.ipf.whitenoise.android.ui.account.OtherAccountAvatarsRow
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import dev.ipf.whitenoise.android.ui.updates.AppUpdateIconButton
+import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 
 internal const val CHAT_LIST_FILTER_CHIP_ALL_TAG = "chat-list-filter-chip-all"
 internal const val CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG = "chat-list-other-account-avatars"
@@ -73,6 +76,8 @@ internal fun ChatListTopBar(
     onOpenSettings: () -> Unit,
     onSwitchAccount: (String) -> Unit,
     connectivityState: ConnectivityBannerState = ConnectivityBannerState.Hidden,
+    updateInfo: AppUpdateInfo = appState.appUpdateInfo,
+    selfUpdateEnabled: Boolean = BuildConfig.SELF_UPDATE_ENABLED,
 ) {
     LaunchedEffect(appState.accounts, appState.runtimeGeneration) {
         appState.requestProfiles(appState.accounts.map { it.accountIdHex })
@@ -174,6 +179,11 @@ internal fun ChatListTopBar(
                     )
                 }
             } else {
+                AppUpdateIconButton(
+                    info = updateInfo,
+                    selfUpdateEnabled = selfUpdateEnabled,
+                    onOpenSettings = onOpenSettings,
+                )
                 IconButton(onClick = onSearchOpen) {
                     Icon(
                         Icons.Default.Search,

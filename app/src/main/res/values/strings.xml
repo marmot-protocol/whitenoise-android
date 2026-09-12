@@ -2158,6 +2158,9 @@
     <string name="support_receiving_relay_required">Add and publish a receiving relay for this profile before starting a support chat.</string>
     <string name="support_relays_loading">Checking this profile’s relay configuration…</string>
     <string name="support_relays_unavailable">Could not check this profile’s relay configuration. Retry or open Relays.</string>
+    <string name="app_self_update_remind_later">Dismiss update</string>
+    <string name="app_self_update_verifying">Verifying update</string>
+    <string name="app_self_update_verifying_body">Checking the completed download before installation.</string>
     <string name="audit_upload_title">Share technical logs</string>
     <string name="audit_upload_subtitle">Automatically send diagnostic audit logs to White Noise, separately from usage sharing.</string>
     <string name="audit_upload_confirm_title">Share technical logs with White Noise?</string>

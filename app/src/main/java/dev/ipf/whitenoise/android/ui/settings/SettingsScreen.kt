@@ -74,6 +74,7 @@ import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.profile.ProfileEditScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
+import dev.ipf.whitenoise.android.ui.updates.AppUpdateEmblem
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -776,7 +777,15 @@ private fun AppUpdateGroup(
                 subtitle = appUpdateSubtitle(info),
                 onClick = onClick,
                 leading = {
-                    SettingsHubIcon(R.drawable.ic_download, "app_updates", MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (info.isUpdateAvailable) {
+                        AppUpdateEmblem()
+                    } else {
+                        SettingsHubIcon(
+                            R.drawable.ic_download,
+                            "app_updates",
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 },
             )
         }

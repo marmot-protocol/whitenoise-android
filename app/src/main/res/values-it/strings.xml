@@ -2046,6 +2046,9 @@
     <string name="support_receiving_relay_required">Aggiungi e pubblica un relay di ricezione per questo profilo prima di avviare una chat con l’assistenza.</string>
     <string name="support_relays_loading">Verifica della configurazione dei relay di questo profilo…</string>
     <string name="support_relays_unavailable">Impossibile verificare la configurazione dei relay di questo profilo. Riprova o apri Relay.</string>
+    <string name="app_self_update_remind_later">Ignora aggiornamento</string>
+    <string name="app_self_update_verifying">Verifica dell’aggiornamento</string>
+    <string name="app_self_update_verifying_body">Verifica del download completato prima dell’installazione.</string>
     <string name="audit_upload_title">Condividi log tecnici</string>
     <string name="audit_upload_subtitle">Invia automaticamente i log diagnostici a White Noise, separatamente dalla condivisione dei dati di utilizzo.</string>
     <string name="audit_upload_confirm_title">Condividere i log tecnici con White Noise?</string>

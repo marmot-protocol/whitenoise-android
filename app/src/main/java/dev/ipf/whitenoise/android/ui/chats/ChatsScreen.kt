@@ -32,18 +32,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material3.Button
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -76,7 +70,6 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -118,8 +111,6 @@ import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
-import dev.ipf.whitenoise.android.ui.theme.Dimens
-import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -1206,13 +1197,6 @@ internal fun ChatsScreen(
             },
         )
         Column(Modifier.fillMaxSize().padding(padding)) {
-            if (appState.appUpdateInfo.shouldShowBanner) {
-                AppUpdateBanner(
-                    info = appState.appUpdateInfo,
-                    onUpdateNow = { appState.handleAppUpdateAction(context) },
-                    onDismiss = { appState.dismissAppUpdateBanner() },
-                )
-            }
             // Filter chips visible whenever there's content to filter — both
             // in the active and archived lists. They're sticky above the
             // list rather than sticky inside the LazyColumn so they survive
@@ -1756,57 +1740,5 @@ internal fun ChatListSearchSectionHeader(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.SemiBold,
         )
-    }
-}
-
-@Composable
-private fun AppUpdateBanner(
-    info: AppUpdateInfo,
-    onUpdateNow: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val latest = info.latestVersion ?: return
-    val description = stringResource(R.string.app_update_available_description, latest)
-    val releasesBehind = info.releasesBehind
-    ElevatedCard(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Dimens.spaceMd, vertical = Dimens.spaceSm),
-        colors =
-            CardDefaults.elevatedCardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            ),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(Dimens.spaceMd),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
-        ) {
-            Icon(Icons.Default.Download, contentDescription = null)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    stringResource(if (info.isFarBehind) R.string.app_update_persistent_title else R.string.app_update_available_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(description, style = MaterialTheme.typography.bodyMedium)
-                if (releasesBehind != null && releasesBehind > 0) {
-                    Text(
-                        pluralStringResource(R.plurals.app_update_releases_behind, releasesBehind, releasesBehind),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Button(onClick = onUpdateNow) {
-                    Text(stringResource(R.string.app_update_now))
-                }
-            }
-            if (!info.isFarBehind) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
-                }
-            }
-        }
     }
 }
