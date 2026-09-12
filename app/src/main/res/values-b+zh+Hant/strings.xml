@@ -2022,6 +2022,9 @@
     <string name="app_self_update_remind_later">忽略更新</string>
     <string name="app_self_update_verifying">正在驗證更新</string>
     <string name="app_self_update_verifying_body">在安裝前檢查已完成的下載 。</string>
+    <string name="qr_camera_access_needed">需要相機權限</string>
+    <string name="qr_turn_flashlight_on">開啟手電筒</string>
+    <string name="qr_turn_flashlight_off">關閉手電筒</string>
     <string name="audit_upload_title">分享技術記錄</string>
     <string name="audit_upload_subtitle">自動向 White Noise 傳送診斷稽核記錄，與使用情況分享分開控制。</string>
     <string name="audit_upload_confirm_title">與 White Noise 分享技術記錄？</string>

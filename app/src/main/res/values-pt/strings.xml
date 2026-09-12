@@ -2049,6 +2049,9 @@
     <string name="app_self_update_remind_later">Dispensar atualização</string>
     <string name="app_self_update_verifying">Verificando atualização</string>
     <string name="app_self_update_verifying_body">Verificando o download concluído antes da instalação.</string>
+    <string name="qr_camera_access_needed">Acesso à câmara necessário</string>
+    <string name="qr_turn_flashlight_on">Ligar a lanterna</string>
+    <string name="qr_turn_flashlight_off">Desligar a lanterna</string>
     <string name="audit_upload_title">Compartilhar logs técnicos</string>
     <string name="audit_upload_subtitle">Enviar automaticamente logs de diagnóstico ao White Noise, separadamente do compartilhamento de dados de uso.</string>
     <string name="audit_upload_confirm_title">Compartilhar logs técnicos com o White Noise?</string>

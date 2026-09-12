@@ -2049,6 +2049,9 @@
     <string name="app_self_update_remind_later">Ignora aggiornamento</string>
     <string name="app_self_update_verifying">Verifica dell’aggiornamento</string>
     <string name="app_self_update_verifying_body">Verifica del download completato prima dell’installazione.</string>
+    <string name="qr_camera_access_needed">Accesso alla fotocamera necessario</string>
+    <string name="qr_turn_flashlight_on">Accendi la torcia</string>
+    <string name="qr_turn_flashlight_off">Spegni la torcia</string>
     <string name="audit_upload_title">Condividi log tecnici</string>
     <string name="audit_upload_subtitle">Invia automaticamente i log diagnostici a White Noise, separatamente dalla condivisione dei dati di utilizzo.</string>
     <string name="audit_upload_confirm_title">Condividere i log tecnici con White Noise?</string>
