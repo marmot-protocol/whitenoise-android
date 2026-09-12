@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -37,7 +38,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.RelayUrlValidationResult
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.canRemoveRelay
-import dev.ipf.whitenoise.android.state.normalizeRelayUrls
 import dev.ipf.whitenoise.android.state.publishMissingRelayLists
 import dev.ipf.whitenoise.android.state.relayUrlValidationResult
 import dev.ipf.whitenoise.android.state.restoreDefaultAccountRelays
@@ -48,6 +48,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import kotlinx.coroutines.flow.first
 
 /**
  * Relays: the account's published relay lists with their recovery actions, then every relay the account uses with
@@ -63,7 +64,8 @@ internal fun RelaysScreen(
     val account = appState.activeAccountRef
     var lists by remember(account) { mutableStateOf<AccountRelayListsFfi?>(null) }
     var publication by remember(account) { mutableStateOf(RelayPublicationState()) }
-    var busy by remember(account) { mutableStateOf(false) }
+    val operations = remember(appState, account) { appState.relayOperationState(account) }
+    val busy = operations.busy
     var selectedUrl by rememberSaveable(account) { mutableStateOf<String?>(null) }
     var addSheet by rememberSaveable(account) { mutableStateOf(false) }
     var rejectedUrl by rememberSaveable(account) { mutableStateOf<String?>(null) }
@@ -73,33 +75,30 @@ internal fun RelaysScreen(
         operation: RelayPublicationOperation,
         block: suspend () -> AccountRelayListsFfi?,
     ) {
-        if (publication.running != null) return
-        publication = RelayPublicationState(running = operation)
-        appState.launchMutation {
+        operations.launch(
+            launcher = appState::launchMutation,
+            onStarted = { publication = RelayPublicationState(running = operation) },
+        ) {
             val updated = block()
-            if (appState.activeAccountRef != account) return@launchMutation
-            if (updated != null) lists = updated
+            // A multi-kind publish may have partially succeeded. Always expose the authoritative projection.
+            val projection = updated ?: account?.let { appState.loadAccountRelayLists(it) }
+            if (appState.activeAccountRef != account) return@launch
+            if (projection != null) lists = projection
             publication = RelayPublicationState(failed = operation.takeIf { updated == null })
         }
     }
 
-    fun runEdit(block: suspend () -> AccountRelayListsFfi?): Unit =
-        if (busy) {
-            Unit
-        } else {
-            busy = true
-            appState.launchMutation {
-                try {
-                    val updated = block()
-                    if (updated != null && appState.activeAccountRef == account) lists = updated
-                } finally {
-                    busy = false
-                }
-            }
+    fun runEdit(block: suspend () -> AccountRelayListsFfi?) {
+        operations.launch(launcher = appState::launchMutation) {
+            val updated = block() ?: account?.let { appState.loadAccountRelayLists(it) }
+            if (updated != null && appState.activeAccountRef == account) lists = updated
         }
+    }
 
-    LaunchedEffect(account) {
-        runPublication(RelayPublicationOperation.Refresh) { appState.accountRelayLists() }
+    LaunchedEffect(account, operations) {
+        // Reopening this account during a mutation must load its result after the existing operation finishes.
+        snapshotFlow { operations.busy }.first { !it }
+        runPublication(RelayPublicationOperation.Refresh) { account?.let { appState.loadAccountRelayLists(it) } }
     }
 
     val relays = lists?.let(::accountRelays).orEmpty()
@@ -143,7 +142,9 @@ internal fun RelaysScreen(
         onBack = onBack,
         onOpenRelay = { selectedUrl = it },
         onAdd = { addSheet = true },
-        onRefresh = { runPublication(RelayPublicationOperation.Refresh) { appState.accountRelayLists() } },
+        onRefresh = {
+            runPublication(RelayPublicationOperation.Refresh) { account?.let { appState.loadAccountRelayLists(it) } }
+        },
         onPublishMissing = {
             runPublication(RelayPublicationOperation.PublishMissing) { appState.publishMissingRelayLists(account) }
         },
@@ -160,7 +161,7 @@ internal fun RelaysScreen(
                 runEdit {
                     var updated: AccountRelayListsFfi? = null
                     var allAdded = true
-                    roles.forEach { role ->
+                    missingRelayRoles(relays, url, roles).forEach { role ->
                         val result = appState.addAccountRelay(account, role.kind, url)
                         if (result == null) allAdded = false else updated = result
                     }
@@ -205,6 +206,7 @@ internal fun RelaysContent(
     val lists = state.lists
     val relays = lists?.let(::accountRelays).orEmpty()
     val defaultsInUse = lists != null && lists.usesDefaultRelays()
+    val busy = state.busy || state.publication.running != null
     SettingsScaffold(title = stringResource(R.string.relays), onBack = onBack) {
         SettingsList {
             if (relays.any(AccountRelay::needsAttention)) {
@@ -233,6 +235,7 @@ internal fun RelaysContent(
                                 context = context,
                                 title = relay.name,
                                 onClick = { onOpenRelay(relay.url) },
+                                enabled = !busy,
                                 modifier = Modifier.testTag("relays.row.${relay.url}"),
                                 subtitle = relaySummary(relay),
                             )
@@ -243,7 +246,7 @@ internal fun RelaysContent(
                             context = context,
                             title = stringResource(R.string.add_relay),
                             onClick = onAdd,
-                            enabled = lists != null && !state.busy,
+                            enabled = lists != null && !busy,
                             leading = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
                         )
                     }
@@ -261,7 +264,7 @@ internal fun RelaysContent(
                                 top = WhiteNoiseSpacing.Section,
                                 end = WhiteNoiseSpacing.CompactScreenMargin,
                             ).testTag("relays.restore"),
-                    enabled = lists != null && !defaultsInUse && !state.busy,
+                    enabled = lists != null && !defaultsInUse && !busy,
                 ) { Text(stringResource(R.string.restore_default_relays)) }
             }
             item {
@@ -332,6 +335,7 @@ private fun SettingsGroupScope.relayPublicationAction(
                     onClick = if (failed == RelayPublicationOperation.Refresh) onRefresh else onPublishMissing,
                     modifier = Modifier.testTag("relay.publication.retry"),
                     subtitle = stringResource(failed.failureRes),
+                    enabled = !state.busy,
                 )
             }
         else -> {
@@ -341,6 +345,7 @@ private fun SettingsGroupScope.relayPublicationAction(
                     title = stringResource(R.string.relay_list_refresh),
                     onClick = onRefresh,
                     modifier = Modifier.testTag("relay.publication.refresh"),
+                    enabled = !state.busy,
                 )
             }
             if (lists != null && lists.missing.isNotEmpty()) {
@@ -459,8 +464,7 @@ private fun AddRelaySheet(
     val currentValue = value.text.toString().trim()
     val acceptable =
         currentValue.isNotEmpty() && relayUrlValidationResult(currentValue) == RelayUrlValidationResult.Acceptable
-    val duplicate =
-        acceptable && normalizeRelayUrls(existing.map(AccountRelay::url) + currentValue).size == existing.size
+    val duplicate = acceptable && roles.isNotEmpty() && missingRelayRoles(existing, currentValue, roles).isEmpty()
     val rejected = rejectedUrl != null && rejectedUrl == currentValue
     val canAdd = acceptable && !duplicate && roles.isNotEmpty() && !busy
     WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss) {
