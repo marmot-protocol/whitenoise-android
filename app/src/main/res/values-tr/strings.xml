@@ -2050,6 +2050,7 @@
     <string name="qr_camera_access_needed">Kamera Erişimi Gerekiyor</string>
     <string name="qr_turn_flashlight_on">El fenerini aç</string>
     <string name="qr_turn_flashlight_off">El fenerini kapat</string>
+    <string name="startup_loading_message">White Noise başlatılıyor…</string>
     <string name="audit_upload_title">Teknik günlükleri paylaş</string>
     <string name="audit_upload_subtitle">Tanılama denetim günlüklerini kullanım paylaşımından ayrı olarak White Noise’a otomatik gönder.</string>
     <string name="audit_upload_confirm_title">Teknik günlükler White Noise ile paylaşılsın mı?</string>

@@ -2025,6 +2025,7 @@
     <string name="qr_camera_access_needed">需要相機權限</string>
     <string name="qr_turn_flashlight_on">開啟手電筒</string>
     <string name="qr_turn_flashlight_off">關閉手電筒</string>
+    <string name="startup_loading_message">正在啟動 White Noise…</string>
     <string name="audit_upload_title">分享技術記錄</string>
     <string name="audit_upload_subtitle">自動向 White Noise 傳送診斷稽核記錄，與使用情況分享分開控制。</string>
     <string name="audit_upload_confirm_title">與 White Noise 分享技術記錄？</string>

@@ -2068,6 +2068,7 @@
     <string name="qr_camera_access_needed">Kamerazugriff erforderlich</string>
     <string name="qr_turn_flashlight_on">Taschenlampe einschalten</string>
     <string name="qr_turn_flashlight_off">Taschenlampe ausschalten</string>
+    <string name="startup_loading_message">White Noise wird gestartet…</string>
     <string name="audit_upload_title">Technische Protokolle teilen</string>
     <string name="audit_upload_subtitle">Diagnostische Audit-Protokolle automatisch an White Noise senden, getrennt von der Nutzungsfreigabe.</string>
     <string name="audit_upload_confirm_title">Technische Protokolle mit White Noise teilen?</string>
