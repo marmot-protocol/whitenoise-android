@@ -11816,6 +11816,7 @@
         "test_ids": [
           "TTS-002",
           "TTS-003"
+        ]
       },
       {
         "surface": "string:developer",
@@ -11851,7 +11852,6 @@
         "test_ids": [
           "SET-019",
           "SET-020"
-        ]
         ]
       }
     ],
