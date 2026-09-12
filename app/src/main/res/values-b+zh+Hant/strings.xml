@@ -460,6 +460,9 @@
     <string name="developer">開發商</string>
     <string name="developer_mode">開發者模式</string>
     <string name="developer_mode_subtitle">顯示診斷和 MLS 內部結構。</string>
+    <string name="developer_testing_only">僅用於開發和測試</string>
+    <string name="developer_testing_only_detail">這些工具可能會暴露技術資訊並改變應用程式的行為。</string>
+    <string name="developer_debugging">除錯</string>
     <string name="diagnostics">診斷</string>
     <string name="diagnostics_settings_subtitle">繼電器健康狀況和 MLS 內部結構</string>
     <string name="performance_logs">效能記錄</string>

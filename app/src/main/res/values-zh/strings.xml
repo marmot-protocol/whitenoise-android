@@ -460,6 +460,9 @@
     <string name="developer">开发商</string>
     <string name="developer_mode">开发者模式</string>
     <string name="developer_mode_subtitle">显示诊断和 MLS 内部结构。</string>
+    <string name="developer_testing_only">仅用于开发和测试</string>
+    <string name="developer_testing_only_detail">这些工具可能会暴露技术信息并改变应用的行为。</string>
+    <string name="developer_debugging">调试</string>
     <string name="diagnostics">诊断</string>
     <string name="diagnostics_settings_subtitle">继电器健康状况和 MLS 内部结构</string>
     <string name="performance_logs">性能日志</string>

@@ -122,6 +122,9 @@ class SettingsScrollRestorationTest {
 
         // Diagnostics leaves Settings entirely; returning must land on the same viewport.
         val developerBounds = scrollToAndOpen(context.getString(R.string.settings_developer_tools))
+        composeRule
+            .onNode(hasScrollToNodeAction())
+            .performScrollToNode(hasText(context.getString(R.string.diagnostics)))
         composeRule.onNodeWithText(context.getString(R.string.diagnostics)).performClick()
         composeRule.runOnIdle { diagnosticsOpen = false }
 
@@ -165,6 +168,9 @@ class SettingsScrollRestorationTest {
         val developer = context.getString(R.string.developer)
         composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(developer))
         composeRule.onNodeWithText(developer).performClick()
+        composeRule
+            .onNode(hasScrollToNodeAction())
+            .performScrollToNode(hasText(context.getString(R.string.diagnostics)))
         composeRule.onNodeWithText(context.getString(R.string.diagnostics)).performClick()
         composeRule.runOnIdle { diagnosticsOpen = false }
 

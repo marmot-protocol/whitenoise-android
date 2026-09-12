@@ -471,6 +471,9 @@
     <string name="developer">Sviluppatore</string>
     <string name="developer_mode">Modalità sviluppatore</string>
     <string name="developer_mode_subtitle">Mostra la diagnostica e gli interni MLS.</string>
+    <string name="developer_testing_only">Solo per sviluppo e test</string>
+    <string name="developer_testing_only_detail">Questi strumenti possono esporre informazioni tecniche e cambiare il comportamento dell’app.</string>
+    <string name="developer_debugging">Debug</string>
     <string name="diagnostics">Diagnostica</string>
     <string name="diagnostics_settings_subtitle">Inoltro integrità e componenti interni MLS</string>
     <string name="performance_logs">Log delle prestazioni</string>

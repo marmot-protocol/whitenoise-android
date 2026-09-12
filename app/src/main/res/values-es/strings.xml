@@ -471,6 +471,9 @@
     <string name="developer">Desarrollador</string>
     <string name="developer_mode">Modo desarrollador</string>
     <string name="developer_mode_subtitle">Muestra diagnósticos y elementos internos de MLS.</string>
+    <string name="developer_testing_only">Solo para desarrollo y pruebas</string>
+    <string name="developer_testing_only_detail">Estas herramientas pueden exponer información técnica y cambiar el comportamiento de la aplicación.</string>
+    <string name="developer_debugging">Depuración</string>
     <string name="diagnostics">Diagnóstico</string>
     <string name="diagnostics_settings_subtitle">Estado del relé y elementos internos de MLS</string>
     <string name="performance_logs">Registros de rendimiento</string>
