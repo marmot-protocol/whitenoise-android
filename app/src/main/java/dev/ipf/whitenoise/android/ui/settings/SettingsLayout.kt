@@ -96,12 +96,13 @@ internal fun SettingsScaffold(
 @Suppress("FunctionNaming")
 @Composable
 internal fun SettingsList(
+    modifier: Modifier = Modifier,
     state: LazyListState = rememberLazyListState(),
     content: LazyListScope.() -> Unit,
 ) {
     CompositionLocalProvider(LocalSettingsList provides true) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize().testTag("settings.list"),
+            modifier = modifier.fillMaxSize().testTag("settings.list"),
             state = state,
             contentPadding = PaddingValues(top = WhiteNoiseSpacing.Related, bottom = WhiteNoiseSpacing.Section),
             verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),

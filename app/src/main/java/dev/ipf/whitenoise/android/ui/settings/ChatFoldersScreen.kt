@@ -1,49 +1,29 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -52,7 +32,6 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
@@ -60,11 +39,12 @@ import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
-import dev.ipf.whitenoise.android.ui.common.SectionCard
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import java.util.Locale
-import kotlin.math.roundToInt
 
 internal data class ChatFolderManageItem(
     val id: String,
@@ -73,25 +53,26 @@ internal data class ChatFolderManageItem(
     val chatCount: Int,
     val canMoveUp: Boolean,
     val canMoveDown: Boolean,
+    val description: String = "",
 )
 
 internal data class ChatFoldersState(
     val folders: List<ChatFolderManageItem>,
+    val defaultsMissing: Boolean,
 )
 
-internal fun chatFoldersState(folders: List<ChatFolderManageItem>): ChatFoldersState = ChatFoldersState(folders)
+internal fun chatFoldersState(
+    folders: List<ChatFolderManageItem>,
+    defaultsMissing: Boolean = true,
+): ChatFoldersState = ChatFoldersState(folders, defaultsMissing)
 
 internal const val CHAT_FOLDERS_CONTENT_TAG = "chat-folders-content"
 
 /**
- * Settings detail screen managing chat folders: every folder — seeded
- * defaults and custom alike — with its live chat count and reorder, edit,
- * and delete controls. Deleted defaults stay deleted; an explicit Restore
- * action re-adds whichever are missing. Creating or editing swaps in
- * [ChatFolderEditScreen] in place, so the Settings navigation state never
- * has to know about the form.
+ * Folders: every folder as its own group row with the live chat count, an actions menu (Edit, Move Up, Move Down,
+ * Delete) that long-press also opens, a `+` in the top bar, and Restore Default Folders while a default is missing.
+ * Creating or editing swaps in [ChatFolderEditScreen] in place, so the Settings navigation state never has to know.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
 internal fun ChatFoldersScreen(
@@ -106,7 +87,7 @@ internal fun ChatFoldersScreen(
     // Keyword rules match rendered row titles; subscribe like ChatsScreen's folder resolver.
     val profileRevision = appState.profileRevisionForCompose
     var editorOpenFor by remember { mutableStateOf<ChatFolderEditorTarget?>(null) }
-    var pendingDelete by remember { mutableStateOf<ChatFolder?>(null) }
+    var pendingDelete by rememberSaveable { mutableStateOf<String?>(null) }
 
     val editor = editorOpenFor
     if (editor != null && accountRef != null) {
@@ -148,39 +129,46 @@ internal fun ChatFoldersScreen(
                     ),
                 canMoveUp = folders.firstOrNull()?.id != folder.id,
                 canMoveDown = folders.lastOrNull()?.id != folder.id,
+                description = folder.description,
             )
         }
+    val defaultsMissing = SystemFolderKind.entries.any { kind -> folders.none { it.systemKind == kind } }
 
     ChatFoldersContent(
-        state = chatFoldersState(folderItems),
+        state = chatFoldersState(folderItems, defaultsMissing),
         onBack = onBack,
         onCreate = { editorOpenFor = ChatFolderEditorTarget(folderId = null) },
         onMove = { id, delta ->
             folders.firstOrNull { it.id == id }?.let { move(it, delta) }
         },
         onEdit = { id -> editorOpenFor = ChatFolderEditorTarget(folderId = id) },
-        onDelete = { id -> pendingDelete = folders.firstOrNull { it.id == id } },
+        onDelete = { id -> pendingDelete = id },
         onRestoreDefaults = { accountRef?.let(store::restoreDefaultFolders) },
     )
 
-    pendingDelete?.let { folder ->
-        ConfirmDialog(
-            title = stringResource(R.string.chat_folder_delete_title),
-            message = stringResource(R.string.chat_folder_delete_message, chatFolderDisplayName(folder)),
-            confirmLabel = stringResource(R.string.delete),
-            destructive = true,
-            onConfirm = {
-                pendingDelete = null
-                accountRef?.let { store.deleteFolder(it, folder.id) }
+    folders.firstOrNull { it.id == pendingDelete }?.let { folder ->
+        WhiteNoiseAlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text(stringResource(R.string.folder_delete_title, chatFolderDisplayName(folder))) },
+            text = { Text(stringResource(R.string.folder_delete_detail)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingDelete = null
+                        accountRef?.let { store.deleteFolder(it, folder.id) }
+                    },
+                ) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
             },
-            onDismiss = { pendingDelete = null },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.cancel)) }
+            },
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** The list without any state ownership, so tests can render every folder arrangement. */
 @Composable
-@Suppress("FunctionNaming", "LongMethod")
+@Suppress("FunctionNaming", "LongParameterList")
 internal fun ChatFoldersContent(
     state: ChatFoldersState,
     onBack: () -> Unit,
@@ -190,66 +178,132 @@ internal fun ChatFoldersContent(
     onDelete: (String) -> Unit,
     onRestoreDefaults: () -> Unit,
 ) {
-    val haptics = LocalHapticFeedback.current
-    val reorder = remember(haptics) { FolderReorderState(haptics) }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.chat_folders_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = onCreate) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.chat_folder_new))
+    SettingsScaffold(
+        title = stringResource(R.string.chat_folders_title),
+        onBack = onBack,
+        topBarActions = {
+            IconButton(onClick = onCreate) {
+                Icon(painterResource(R.drawable.ic_add), stringResource(R.string.chat_folder_new))
             }
         },
-    ) { padding ->
-        LazyColumn(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(16.dp)
-                    .testTag(CHAT_FOLDERS_CONTENT_TAG),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item {
-                SectionCard(title = stringResource(R.string.chat_folders_title)) {
-                    val ids = state.folders.map { it.id }
-                    state.folders.forEachIndexed { index, folder ->
-                        Box(
-                            modifier =
-                                Modifier
-                                    .zIndex(if (folder.id == reorder.draggedFolderId) 1f else 0f)
-                                    .onSizeChanged { reorder.rowHeightsPx[folder.id] = it.height }
-                                    .graphicsLayer { translationY = reorder.translationFor(index, ids) },
-                        ) {
-                            ChatFolderManageRow(
+    ) {
+        SettingsList(modifier = Modifier.testTag(CHAT_FOLDERS_CONTENT_TAG)) {
+            if (state.folders.isEmpty()) {
+                item {
+                    WhiteNoiseEmptyState(
+                        title = stringResource(R.string.folder_none),
+                        detail = stringResource(R.string.folder_none_detail),
+                    )
+                }
+            }
+            state.folders.forEach { folder ->
+                item(key = folder.id) {
+                    SettingsGroup {
+                        row(folder.id) { context ->
+                            FolderManageRow(
+                                context = context,
                                 folder = folder,
-                                onMoveUp = { onMove(folder.id, -1) },
-                                onMoveDown = { onMove(folder.id, +1) },
                                 onEdit = { onEdit(folder.id) },
+                                onMove = { onMove(folder.id, it) },
                                 onDelete = { onDelete(folder.id) },
-                                onDragStart = { reorder.start(folder.id) },
-                                onDragBy = reorder::dragBy,
-                                onDragEnd = { commit -> reorder.end(commit, ids, onMove) },
                             )
                         }
                     }
                 }
             }
             item {
-                SettingsRow(
-                    title = stringResource(R.string.chat_folder_restore_defaults),
-                    subtitle = stringResource(R.string.chat_folder_restore_defaults_subtitle),
-                    onClick = onRestoreDefaults,
+                SettingsGroup {
+                    row("restore") { context ->
+                        SettingsAction(
+                            context = context,
+                            title = stringResource(R.string.chat_folder_restore_defaults),
+                            onClick = onRestoreDefaults,
+                            enabled = state.defaultsMissing,
+                        )
+                    }
+                }
+                SettingsExplainer(stringResource(R.string.folder_restore_hint))
+            }
+        }
+    }
+}
+
+/** One folder: icon, name over "N chats · description", and the actions menu; long-press opens the same menu. */
+@Composable
+@Suppress("FunctionNaming", "LongMethod")
+private fun FolderManageRow(
+    context: SettingsRowContext,
+    folder: ChatFolderManageItem,
+    onEdit: () -> Unit,
+    onMove: (Int) -> Unit,
+    onDelete: () -> Unit,
+) {
+    var menu by remember(folder.id) { mutableStateOf(false) }
+    val name = folder.displayName()
+    val editLabel = stringResource(R.string.folder_edit)
+    val choices =
+        buildList {
+            add(WhiteNoiseMenuItem(editLabel, onClick = onEdit))
+            if (folder.canMoveUp) {
+                add(WhiteNoiseMenuItem(stringResource(R.string.chat_folder_move_up), onClick = { onMove(-1) }))
+            }
+            if (folder.canMoveDown) {
+                add(WhiteNoiseMenuItem(stringResource(R.string.chat_folder_move_down), onClick = { onMove(1) }))
+            }
+            add(WhiteNoiseMenuItem(stringResource(R.string.delete), onClick = onDelete, destructive = true))
+        }
+    val count = pluralStringResource(R.plurals.chat_folder_chat_count, folder.chatCount, folder.chatCount)
+    val supporting =
+        count +
+            folder.description
+                .takeIf { it.isNotBlank() }
+                ?.let { " · $it" }
+                .orEmpty()
+    SettingsGroupPanel(context, Modifier.testTag("folder.row.${folder.id}")) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onClickLabel = editLabel,
+                    role = Role.Button,
+                    onLongClick = { menu = true },
+                    onClick = onEdit,
+                ).semantics {
+                    customActions =
+                        choices.map { choice ->
+                            CustomAccessibilityAction(choice.label) {
+                                choice.onClick()
+                                true
+                            }
+                        }
+                }.padding(
+                    start = FolderRowInset,
+                    top = FolderRowVertical,
+                    end = FolderRowMenuInset,
+                    bottom = FolderRowVertical,
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(FolderRowInset),
+        ) {
+            Icon(
+                painterResource(R.drawable.ic_folder),
+                contentDescription = null,
+                modifier = Modifier.size(FolderIconSize),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Column(Modifier.weight(1f)) {
+                Text(name, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(
+                    supporting,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            Box {
+                IconButton(onClick = { menu = true }) {
+                    Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.actions_for, name))
+                }
+                WhiteNoiseDropdownMenu(expanded = menu, onDismissRequest = { menu = false }, items = choices)
             }
         }
     }
@@ -258,70 +312,6 @@ internal fun ChatFoldersContent(
 private data class ChatFolderEditorTarget(
     val folderId: String?,
 )
-
-/**
- * Drag bookkeeping for the reorder list: the row being dragged, its live
- * offset, measured row heights, and the slot arithmetic the row visuals and
- * the drop commit share. Rows between the origin and the current slot shift
- * aside visually; the drop commits the crossed slots as one reorder.
- */
-private class FolderReorderState(
-    private val haptics: HapticFeedback,
-) {
-    var draggedFolderId by mutableStateOf<String?>(null)
-        private set
-    private var dragOffsetPx by mutableFloatStateOf(0f)
-    val rowHeightsPx = mutableStateMapOf<String, Int>()
-
-    fun start(folderId: String) {
-        draggedFolderId = folderId
-        dragOffsetPx = 0f
-        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-    }
-
-    fun dragBy(deltaPx: Float) {
-        dragOffsetPx += deltaPx
-    }
-
-    fun end(
-        commit: Boolean,
-        orderedIds: List<String>,
-        onMove: (String, Int) -> Unit,
-    ) {
-        val id = draggedFolderId
-        val shift = slotShift(orderedIds)
-        draggedFolderId = null
-        dragOffsetPx = 0f
-        if (commit && id != null && shift != 0) onMove(id, shift)
-    }
-
-    fun translationFor(
-        index: Int,
-        orderedIds: List<String>,
-    ): Float {
-        val draggedIndex = orderedIds.indexOf(draggedFolderId)
-        val height = (draggedFolderId?.let { rowHeightsPx[it] } ?: 0).toFloat()
-        val shift = slotShift(orderedIds)
-        return when {
-            draggedIndex < 0 -> 0f
-            index == draggedIndex -> dragOffsetPx
-            index in (draggedIndex + 1)..(draggedIndex + shift) -> -height
-            index in (draggedIndex + shift) until draggedIndex -> height
-            else -> 0f
-        }
-    }
-
-    private fun slotShift(orderedIds: List<String>): Int {
-        val id = draggedFolderId ?: return 0
-        val height = rowHeightsPx[id] ?: 0
-        val index = orderedIds.indexOf(id)
-        return if (height <= 0 || index < 0) {
-            0
-        } else {
-            (dragOffsetPx / height).roundToInt().coerceIn(-index, orderedIds.lastIndex - index)
-        }
-    }
-}
 
 @Composable
 internal fun chatFolderDisplayName(folder: ChatFolder): String = chatFolderDisplayName(folder.systemKind, folder.name)
@@ -366,132 +356,7 @@ private fun folderChatCount(
     return source.count { it.group.groupIdHex.lowercase(Locale.ROOT) in ids }
 }
 
-@Composable
-@Suppress("FunctionNaming", "LongParameterList")
-private fun ChatFolderManageRow(
-    folder: ChatFolderManageItem,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onDragStart: () -> Unit,
-    onDragBy: (Float) -> Unit,
-    onDragEnd: (commit: Boolean) -> Unit,
-) {
-    var menuOpen by remember(folder.id) { mutableStateOf(false) }
-    // The drag gesture has no TalkBack equivalent, so the old up/down moves
-    // survive as custom accessibility actions on the row.
-    val moveActions =
-        folderMoveActions(
-            folder = folder,
-            moveUpLabel = stringResource(R.string.chat_folder_move_up),
-            moveDownLabel = stringResource(R.string.chat_folder_move_down),
-            onMoveUp = onMoveUp,
-            onMoveDown = onMoveDown,
-        )
-
-    ListItem(
-        modifier =
-            Modifier
-                .semantics { customActions = moveActions }
-                .clickable(
-                    onClickLabel = stringResource(R.string.edit),
-                    role = Role.Button,
-                    onClick = onEdit,
-                ),
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        headlineContent = { Text(folder.displayName(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = {
-            Text(pluralStringResource(R.plurals.chat_folder_chat_count, folder.chatCount, folder.chatCount))
-        },
-        trailingContent = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ChatFolderDragHandle(
-                    folderId = folder.id,
-                    onDragStart = onDragStart,
-                    onDragBy = onDragBy,
-                    onDragEnd = onDragEnd,
-                )
-                IconButton(onClick = { menuOpen = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.actions))
-                }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.edit)) },
-                        onClick = {
-                            menuOpen = false
-                            onEdit()
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.delete)) },
-                        onClick = {
-                            menuOpen = false
-                            onDelete()
-                        },
-                    )
-                }
-            }
-        },
-    )
-}
-
-private fun folderMoveActions(
-    folder: ChatFolderManageItem,
-    moveUpLabel: String,
-    moveDownLabel: String,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
-): List<CustomAccessibilityAction> =
-    buildList {
-        if (folder.canMoveUp) {
-            add(
-                CustomAccessibilityAction(moveUpLabel) {
-                    onMoveUp()
-                    true
-                },
-            )
-        }
-        if (folder.canMoveDown) {
-            add(
-                CustomAccessibilityAction(moveDownLabel) {
-                    onMoveDown()
-                    true
-                },
-            )
-        }
-    }
-
-@Composable
-@Suppress("FunctionNaming")
-private fun ChatFolderDragHandle(
-    folderId: String,
-    onDragStart: () -> Unit,
-    onDragBy: (Float) -> Unit,
-    onDragEnd: (commit: Boolean) -> Unit,
-) {
-    // The drag callbacks are read from inside a pointerInput block that
-    // outlives recompositions, so route them through updated state.
-    val currentOnDragStart by rememberUpdatedState(onDragStart)
-    val currentOnDragBy by rememberUpdatedState(onDragBy)
-    val currentOnDragEnd by rememberUpdatedState(onDragEnd)
-    Icon(
-        Icons.Default.DragHandle,
-        contentDescription = stringResource(R.string.chat_folder_drag_to_reorder),
-        modifier =
-            Modifier
-                // Keep taps on the drag affordance from bubbling to the editable row.
-                .pointerInput(folderId) { detectTapGestures() }
-                .pointerInput(folderId) {
-                    detectDragGestures(
-                        onDragStart = { currentOnDragStart() },
-                        onDrag = { change, amount ->
-                            change.consume()
-                            currentOnDragBy(amount.y)
-                        },
-                        onDragEnd = { currentOnDragEnd(true) },
-                        onDragCancel = { currentOnDragEnd(false) },
-                    )
-                }.padding(12.dp),
-    )
-}
+private val FolderRowInset = 16.dp
+private val FolderRowMenuInset = 4.dp
+private val FolderRowVertical = 8.dp
+private val FolderIconSize = 24.dp

@@ -1,83 +1,52 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
-import dev.ipf.whitenoise.android.core.localeInvariantFold
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.deriveRecipientCandidates
-import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.SectionCard
-import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
-import dev.ipf.whitenoise.android.ui.theme.Dimens
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.util.Locale
-
-internal data class ChatFolderEditFormState(
-    val isNew: Boolean,
-    val name: String,
-    val description: String,
-    val keyword: String,
-    val unreadOnly: Boolean,
-    val includeMuted: Boolean,
-    val groupsOnly: Boolean,
-    val archivedOnly: Boolean,
-    val manualChatSummary: String,
-    val peopleSummary: String,
-    val canSave: Boolean,
-)
 
 internal const val CHAT_FOLDER_EDIT_CONTENT_TAG = "chat-folder-edit-content"
 
 /**
- * Create/edit form for one custom chat folder: name, description, manual
- * chat selection, and the automatic rule (people, keyword, unread-only,
- * include-muted). Nothing persists until Save, which writes the folder,
- * diffs the manual membership, and stores the rule (or clears it when every
- * rule field is at its default).
+ * Create/edit form for one chat folder: name and description, Included Chats, the automatic rules (People,
+ * Keyword, four switches) and a live Preview. Nothing persists until Save; Back asks before discarding a dirty draft,
+ * and a failed save keeps every field (M027, M028).
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
 internal fun ChatFolderEditScreen(
@@ -88,37 +57,67 @@ internal fun ChatFolderEditScreen(
     initialManualChatIds: Set<String> = emptySet(),
 ) {
     val store = appState.chatFolderPreferences
+    val storeState by store.state.collectAsState()
     val existing =
-        remember(folderId) {
+        remember(folderId, storeState) {
             folderId?.let { id -> store.foldersFor(accountRef).firstOrNull { it.id == id } }
         }
     val existingRule = remember(folderId) { folderId?.let { store.folderRule(accountRef, it) } }
     // An un-renamed default stores "" and renders a localized label — prefill
     // that label so editing it doesn't demand a name the user already sees.
     val prefillName = existing?.let { chatFolderDisplayName(it) }.orEmpty()
-    var name by remember { mutableStateOf(prefillName) }
-    var description by remember { mutableStateOf(existing?.description.orEmpty()) }
-    var keyword by remember { mutableStateOf(existingRule?.keyword.orEmpty()) }
-    var unreadOnly by remember { mutableStateOf(existingRule?.unreadOnly ?: false) }
-    var includeMuted by remember { mutableStateOf(existingRule?.includeMuted ?: false) }
-    var groupsOnly by remember { mutableStateOf(existingRule?.groupsOnly ?: false) }
-    var archivedOnly by remember { mutableStateOf(existingRule?.archivedOnly ?: false) }
-    var manualChatIds by
+    val name = rememberTextFieldState(prefillName)
+    val description = rememberTextFieldState(existing?.description.orEmpty())
+    val keyword = rememberTextFieldState(existingRule?.keyword.orEmpty())
+    var unreadOnly by rememberSaveable { mutableStateOf(existingRule?.unreadOnly ?: false) }
+    var includeMuted by rememberSaveable { mutableStateOf(existingRule?.includeMuted ?: false) }
+    var groupsOnly by rememberSaveable { mutableStateOf(existingRule?.groupsOnly ?: false) }
+    var archivedOnly by rememberSaveable { mutableStateOf(existingRule?.archivedOnly ?: false) }
+    val initialManual =
         remember {
-            mutableStateOf(
-                folderId?.let { store.membershipFor(accountRef, it) }
-                    ?: initialManualChatIds.mapTo(HashSet()) { it.lowercase(Locale.ROOT) },
-            )
+            folderId?.let { store.membershipFor(accountRef, it) }
+                ?: initialManualChatIds.mapTo(HashSet()) { it.lowercase(Locale.ROOT) }
         }
+    var manualChatIds by remember { mutableStateOf<Set<String>>(initialManual) }
     var memberHexes by remember { mutableStateOf(existingRule?.includeMemberPubkeys ?: emptySet()) }
-    var showChatPicker by remember { mutableStateOf(false) }
-    var showMemberPicker by remember { mutableStateOf(false) }
+    var picker by rememberSaveable { mutableStateOf<FolderPicker?>(null) }
+    var discard by rememberSaveable { mutableStateOf(false) }
+    var failed by rememberSaveable { mutableStateOf(false) }
 
-    BackHandler { onClose() }
+    val rule =
+        ChatFolderRule(
+            includeMemberPubkeys = memberHexes,
+            unreadOnly = unreadOnly,
+            includeMuted = includeMuted,
+            keyword =
+                keyword.text
+                    .toString()
+                    .trim()
+                    .takeIf { it.isNotBlank() },
+            groupsOnly = groupsOnly,
+            archivedOnly = archivedOnly,
+        )
+    val initialRule = existingRule ?: ChatFolderRule()
+    val missing = folderId != null && existing == null
+    val dirty =
+        name.text.toString() != prefillName ||
+            description.text.toString() != existing?.description.orEmpty() ||
+            rule != initialRule ||
+            manualChatIds != initialManual
+
+    fun back() {
+        if (dirty) discard = true else onClose()
+    }
+
+    BackHandler(onBack = ::back)
 
     fun save() {
-        val trimmedName = name.trim().takeIf { it.isNotEmpty() } ?: return
-        val trimmedDescription = description.trim()
+        val trimmedName =
+            name.text
+                .toString()
+                .trim()
+                .takeIf { it.isNotEmpty() } ?: return
+        val trimmedDescription = description.text.toString().trim()
         // An untouched prefill on an un-renamed default is not a rename:
         // persisting it would freeze the localized label into the store and
         // the folder would stop following locale changes.
@@ -128,52 +127,62 @@ internal fun ChatFolderEditScreen(
                 if (renamed) store.renameFolder(accountRef, it, trimmedName)
                 store.editFolderDescription(accountRef, it, trimmedDescription)
             } ?: store.createFolder(accountRef, trimmedName, trimmedDescription)?.id
-        if (id != null) {
-            val before = store.membershipFor(accountRef, id)
-            (manualChatIds - before).forEach { store.setChatInFolder(accountRef, id, it, included = true) }
-            (before - manualChatIds).forEach { store.setChatInFolder(accountRef, id, it, included = false) }
-            val rule =
-                ChatFolderRule(
-                    includeMemberPubkeys = memberHexes,
-                    unreadOnly = unreadOnly,
-                    includeMuted = includeMuted,
-                    keyword = keyword.trim().takeIf { it.isNotBlank() },
-                    groupsOnly = groupsOnly,
-                    archivedOnly = archivedOnly,
-                )
-            store.setFolderRule(accountRef, id, rule.takeIf { it != ChatFolderRule() })
+        if (id == null) {
+            failed = true
+            return
         }
+        val before = store.membershipFor(accountRef, id)
+        (manualChatIds - before).forEach { store.setChatInFolder(accountRef, id, it, included = true) }
+        (before - manualChatIds).forEach { store.setChatInFolder(accountRef, id, it, included = false) }
+        store.setFolderRule(accountRef, id, rule.takeIf { it != ChatFolderRule() })
         onClose()
     }
 
     val groupTitleCopy = rememberGroupTitleCopy()
     val activeHex = appState.activeAccount?.accountIdHex
+    val profileRevision = appState.profileRevisionForCompose
+    val source = if (archivedOnly) appState.archivedChatListItems else appState.chatListItems
     val chatRows =
-        remember(appState.chatListItems, appState.profileRevisionForCompose, groupTitleCopy) {
+        remember(appState.chatListItems, profileRevision, groupTitleCopy) {
             appState.chatListItems.map { item ->
-                FolderPickRow(
+                WhiteNoisePickerItem(
                     id = item.id.lowercase(Locale.ROOT),
                     title = chatListItemDisplayTitle(item, appState, groupTitleCopy),
-                    subtitle = null,
                     avatarSeed = item.id,
                 )
             }
         }
     val memberRows =
-        remember(appState.chatListItems, activeHex, appState.profileRevisionForCompose) {
+        remember(appState.chatListItems, activeHex, profileRevision) {
             deriveRecipientCandidates(appState, activeHex).map { candidate ->
-                FolderPickRow(
+                WhiteNoisePickerItem(
                     id = candidate.accountIdHex.lowercase(Locale.ROOT),
                     title = candidate.displayName,
-                    subtitle = appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() },
                     avatarSeed = candidate.accountIdHex,
                     avatarUrl = appState.avatarUrl(candidate.accountIdHex),
                 )
             }
         }
-    val selectedPeople =
-        remember(memberHexes, appState.profileRevisionForCompose) {
-            memberHexes.joinToString(", ") { appState.displayName(it) }
+    val previewRows =
+        remember(source, manualChatIds, rule, activeHex, profileRevision, groupTitleCopy) {
+            val ids =
+                chatFolderChatIds(
+                    items = source,
+                    manualChatIds = manualChatIds,
+                    rule = rule.takeIf { it != ChatFolderRule() },
+                    activeAccountIdHex = activeHex,
+                    isMuted = { groupIdHex -> source.any { it.group.groupIdHex == groupIdHex && it.engineMuted() } },
+                    displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
+                )
+            source
+                .filter { it.group.groupIdHex.lowercase(Locale.ROOT) in ids }
+                .map { item ->
+                    WhiteNoisePickerItem(
+                        id = item.id.lowercase(Locale.ROOT),
+                        title = chatListItemDisplayTitle(item, appState, groupTitleCopy),
+                        avatarSeed = item.id,
+                    )
+                }
         }
 
     ChatFolderEditContent(
@@ -187,253 +196,216 @@ internal fun ChatFolderEditScreen(
                 includeMuted = includeMuted,
                 groupsOnly = groupsOnly,
                 archivedOnly = archivedOnly,
-                manualChatSummary =
-                    pluralStringResource(
-                        R.plurals.chat_folder_chat_count,
-                        manualChatIds.size,
-                        manualChatIds.size,
-                    ),
-                peopleSummary = selectedPeople.ifEmpty { stringResource(R.string.chat_folder_people_subtitle) },
-                canSave = name.isNotBlank(),
+                manualChatCount = manualChatIds.size,
+                peopleCount = memberHexes.size,
+                previewCount = previewRows.size,
+                canSave = name.text.isNotBlank() && !missing,
+                error =
+                    when {
+                        missing -> stringResource(R.string.folder_unavailable)
+                        failed -> stringResource(R.string.folder_save_failed)
+                        else -> null
+                    },
             ),
-        onNameChange = { name = it },
-        onDescriptionChange = { description = it },
-        onKeywordChange = { keyword = it },
         onUnreadOnlyChange = { unreadOnly = it },
         onIncludeMutedChange = { includeMuted = it },
         onGroupsOnlyChange = { groupsOnly = it },
         onArchivedOnlyChange = { archivedOnly = it },
-        onOpenManualChats = { showChatPicker = true },
-        onOpenPeople = { showMemberPicker = true },
-        onSave = { save() },
-        onBack = onClose,
+        onOpenManualChats = { picker = FolderPicker.Chats },
+        onOpenPeople = { picker = FolderPicker.People },
+        onOpenPreview = { picker = FolderPicker.Preview },
+        onSave = ::save,
+        onBack = ::back,
     )
 
-    if (showChatPicker) {
-        FolderMultiSelectSheet(
-            title = stringResource(R.string.chat_folder_manual_chats),
-            searchPlaceholder = stringResource(R.string.chat_list_search_hint),
-            rows = chatRows,
-            selectedIds = manualChatIds,
-            onToggle = { id ->
-                manualChatIds = if (id in manualChatIds) manualChatIds - id else manualChatIds + id
+    if (discard) {
+        WhiteNoiseAlertDialog(
+            onDismissRequest = { discard = false },
+            title = { Text(stringResource(R.string.folder_discard_title)) },
+            text = { Text(stringResource(R.string.folder_discard_detail)) },
+            confirmButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.folder_discard)) } },
+            dismissButton = {
+                TextButton(onClick = { discard = false }) { Text(stringResource(R.string.folder_keep_editing)) }
             },
-            onDismiss = { showChatPicker = false },
         )
     }
-    if (showMemberPicker) {
-        FolderMultiSelectSheet(
-            title = stringResource(R.string.chat_folder_people),
-            searchPlaceholder = stringResource(R.string.search_people_hint),
-            rows = memberRows,
-            selectedIds = memberHexes,
-            onToggle = { hex ->
-                memberHexes = if (hex in memberHexes) memberHexes - hex else memberHexes + hex
-            },
-            onDismiss = { showMemberPicker = false },
+    picker?.let { mode ->
+        WhiteNoiseEntityPickerSheet(
+            title =
+                stringResource(
+                    when (mode) {
+                        FolderPicker.People -> R.string.chat_folder_people
+                        FolderPicker.Preview -> R.string.folder_preview
+                        FolderPicker.Chats -> R.string.chat_folder_manual_chats
+                    },
+                ),
+            items =
+                when (mode) {
+                    FolderPicker.People -> memberRows
+                    FolderPicker.Preview -> previewRows
+                    FolderPicker.Chats -> chatRows
+                },
+            onDismiss = { picker = null },
+            onSelect =
+                when (mode) {
+                    FolderPicker.Preview -> null
+                    FolderPicker.People -> { hex -> memberHexes = memberHexes.toggled(hex) }
+                    FolderPicker.Chats -> { id -> manualChatIds = manualChatIds.toggled(id) }
+                },
+            selectedIds = if (mode == FolderPicker.People) memberHexes else manualChatIds,
+            multiple = true,
+            onDone = { picker = null },
+            searchTag = "folder.pickerSearch",
+            rowTagPrefix = "folder.choice",
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Everything the editor renders; the text fields are shared state so typing needs no round trip. */
+internal data class ChatFolderEditFormState(
+    val isNew: Boolean,
+    val name: TextFieldState,
+    val description: TextFieldState,
+    val keyword: TextFieldState,
+    val unreadOnly: Boolean,
+    val includeMuted: Boolean,
+    val groupsOnly: Boolean,
+    val archivedOnly: Boolean,
+    val manualChatCount: Int,
+    val peopleCount: Int,
+    val previewCount: Int,
+    val canSave: Boolean,
+    val error: String? = null,
+)
+
+/** The form without any store access, so tests can render every draft. */
 @Composable
-@Suppress("FunctionNaming", "LongMethod")
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 internal fun ChatFolderEditContent(
     state: ChatFolderEditFormState,
-    onNameChange: (String) -> Unit,
-    onDescriptionChange: (String) -> Unit,
-    onKeywordChange: (String) -> Unit,
     onUnreadOnlyChange: (Boolean) -> Unit,
     onIncludeMutedChange: (Boolean) -> Unit,
     onGroupsOnlyChange: (Boolean) -> Unit,
     onArchivedOnlyChange: (Boolean) -> Unit,
     onOpenManualChats: () -> Unit,
     onOpenPeople: () -> Unit,
+    onOpenPreview: () -> Unit,
     onSave: () -> Unit,
     onBack: () -> Unit,
 ) {
-    val profileFieldColors =
-        TextFieldDefaults.colors(
-            focusedContainerColor = Color.Transparent,
-            unfocusedContainerColor = Color.Transparent,
-            disabledContainerColor = Color.Transparent,
-            errorContainerColor = Color.Transparent,
-        )
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(
-                            if (state.isNew) R.string.chat_folder_new else R.string.chat_folder_edit_title,
-                        ),
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-            )
+    SettingsScaffold(
+        title = stringResource(if (state.isNew) R.string.chat_folder_new else R.string.chat_folder_edit_title),
+        onBack = onBack,
+        modifier = Modifier.imePadding(),
+        topBarActions = {
+            TextButton(enabled = state.canSave, onClick = onSave) { Text(stringResource(R.string.save)) }
         },
-        bottomBar = {
-            StickyFormActionBar {
-                Button(
-                    onClick = onSave,
-                    enabled = state.canSave,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.save))
-                }
-            }
-        },
-    ) { padding ->
-        LazyColumn(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .testTag(CHAT_FOLDER_EDIT_CONTENT_TAG),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item {
-                SectionCard(title = stringResource(R.string.details)) {
-                    TextField(
-                        colors = profileFieldColors,
-                        value = state.name,
-                        onValueChange = onNameChange,
-                        label = { Text(stringResource(R.string.chat_folder_name_label)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    TextField(
-                        colors = profileFieldColors,
-                        value = state.description,
-                        onValueChange = onDescriptionChange,
-                        label = { Text(stringResource(R.string.chat_folder_description_label)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-            item {
-                SectionCard(title = stringResource(R.string.chat_folder_manual_chats)) {
-                    SettingsRow(
-                        title = stringResource(R.string.chat_folder_manual_chats),
-                        subtitle = state.manualChatSummary,
-                        onClick = onOpenManualChats,
-                    )
-                    SettingsRow(
-                        title = stringResource(R.string.chat_folder_people),
-                        subtitle = state.peopleSummary,
-                        onClick = onOpenPeople,
-                    )
-                }
-            }
-            item {
-                SectionCard(title = stringResource(R.string.chat_folder_keyword_label)) {
-                    TextField(
-                        colors = profileFieldColors,
-                        value = state.keyword,
-                        onValueChange = onKeywordChange,
-                        label = { Text(stringResource(R.string.chat_folder_keyword_label)) },
-                        supportingText = { Text(stringResource(R.string.chat_folder_keyword_hint)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.chat_folder_unread_only),
-                        subtitle = stringResource(R.string.chat_folder_unread_only_subtitle),
-                        checked = state.unreadOnly,
-                        onCheckedChange = onUnreadOnlyChange,
-                    )
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.chat_folder_groups_only),
-                        subtitle = stringResource(R.string.chat_folder_groups_only_subtitle),
-                        checked = state.groupsOnly,
-                        onCheckedChange = onGroupsOnlyChange,
-                    )
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.chat_folder_archived_only),
-                        subtitle = stringResource(R.string.chat_folder_archived_only_subtitle),
-                        checked = state.archivedOnly,
-                        onCheckedChange = onArchivedOnlyChange,
-                    )
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.chat_folder_include_muted),
-                        subtitle = null,
-                        checked = state.includeMuted,
-                        onCheckedChange = onIncludeMutedChange,
-                    )
-                }
-            }
-        }
-    }
-}
-
-internal data class FolderPickRow(
-    val id: String,
-    val title: String,
-    val subtitle: String?,
-    val avatarSeed: String,
-    val avatarUrl: String? = null,
-)
-
-/** Searchable multi-select bottom sheet shared by the chat and people pickers. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-@Suppress("FunctionNaming", "LongParameterList")
-internal fun FolderMultiSelectSheet(
-    title: String,
-    searchPlaceholder: String,
-    rows: List<FolderPickRow>,
-    selectedIds: Set<String>,
-    onToggle: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var query by remember { mutableStateOf("") }
-    val filtered =
-        remember(rows, query) {
-            val needle = localeInvariantFold(query.trim())
-            if (needle.isEmpty()) rows else rows.filter { needle in localeInvariantFold(it.title) }
-        }
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = amoledSheetContainerColor(),
     ) {
-        Column(Modifier.fillMaxWidth()) {
-            Text(
-                title,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
-            )
-            FlowSearchField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = searchPlaceholder,
-                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
-            )
-            LazyColumn(Modifier.heightIn(max = 440.dp)) {
-                items(filtered, key = { it.id }) { row ->
-                    ListItem(
-                        modifier = Modifier.clickable { onToggle(row.id) },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        leadingContent = {
-                            Avatar(title = row.title, seed = row.avatarSeed, size = 40.dp, pictureUrl = row.avatarUrl)
-                        },
-                        headlineContent = { Text(row.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        supportingContent =
-                            row.subtitle?.let {
-                                { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                            },
-                        trailingContent = {
-                            Checkbox(checked = row.id in selectedIds, onCheckedChange = null)
-                        },
+        SettingsList(modifier = Modifier.testTag(CHAT_FOLDER_EDIT_CONTENT_TAG)) {
+            item {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                    verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
+                ) {
+                    WhiteNoiseTextField(
+                        state = state.name,
+                        modifier = Modifier.fillMaxWidth().testTag("folder.name"),
+                        label = { Text(stringResource(R.string.chat_folder_name)) },
+                        lineLimits = TextFieldLineLimits.SingleLine,
                     )
+                    WhiteNoiseTextField(
+                        state = state.description,
+                        modifier = Modifier.fillMaxWidth().testTag("folder.description"),
+                        label = { Text(stringResource(R.string.chat_folder_description_label)) },
+                        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 2, maxHeightInLines = 4),
+                    )
+                    state.error?.let { error ->
+                        Text(
+                            error,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                        )
+                    }
+                }
+            }
+            item {
+                SettingsGroup {
+                    row("chats") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.chat_folder_manual_chats),
+                            onClick = onOpenManualChats,
+                            value = state.manualChatCount.toString(),
+                        )
+                    }
+                }
+                SettingsExplainer(stringResource(R.string.folder_manual_hint))
+                SettingsSection(stringResource(R.string.folder_rules))
+                SettingsGroup {
+                    row("people") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.chat_folder_people),
+                            onClick = onOpenPeople,
+                            value = state.peopleCount.toString(),
+                        )
+                    }
+                }
+            }
+            item {
+                Column(Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
+                    WhiteNoiseTextField(
+                        state = state.keyword,
+                        modifier = Modifier.fillMaxWidth().testTag("folder.keyword"),
+                        label = { Text(stringResource(R.string.chat_folder_keyword_label)) },
+                        supportingText = { Text(stringResource(R.string.folder_keyword_hint)) },
+                        lineLimits = TextFieldLineLimits.SingleLine,
+                    )
+                }
+            }
+            item {
+                SettingsGroup {
+                    row("unread") { context ->
+                        val title = stringResource(R.string.chat_folder_unread_only)
+                        SettingsSwitch(context, title, state.unreadOnly, onUnreadOnlyChange)
+                    }
+                    row("groups") { context ->
+                        val title = stringResource(R.string.chat_folder_groups_only)
+                        SettingsSwitch(context, title, state.groupsOnly, onGroupsOnlyChange)
+                    }
+                    row("archived") { context ->
+                        val title = stringResource(R.string.chat_folder_archived_only)
+                        SettingsSwitch(context, title, state.archivedOnly, onArchivedOnlyChange)
+                    }
+                    row("muted") { context ->
+                        val title = stringResource(R.string.chat_folder_include_muted)
+                        SettingsSwitch(context, title, state.includeMuted, onIncludeMutedChange)
+                    }
+                }
+                SettingsExplainer(stringResource(R.string.folder_rule_hint))
+                SettingsSection(stringResource(R.string.folder_preview))
+                SettingsGroup {
+                    row("preview") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.folder_preview),
+                            onClick = onOpenPreview,
+                            subtitle =
+                                pluralStringResource(
+                                    R.plurals.chat_folder_chat_count,
+                                    state.previewCount,
+                                    state.previewCount,
+                                ),
+                        )
+                    }
                 }
             }
         }
     }
 }
+
+/** Adds [id] when absent and removes it when present. */
+private fun Set<String>.toggled(id: String): Set<String> = if (id in this) this - id else this + id
+
+/** Which picker sheet is open. */
+private enum class FolderPicker { Chats, People, Preview }
