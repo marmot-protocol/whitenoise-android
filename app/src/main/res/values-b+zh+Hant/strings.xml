@@ -2019,4 +2019,7 @@
     <string name="support_receiving_relay_required">開始支援聊天前，請為此個人資料新增並發布接收中繼。</string>
     <string name="support_relays_loading">正在檢查此個人資料的中繼設定…</string>
     <string name="support_relays_unavailable">無法檢查此個人資料的中繼設定。請重試或開啟中繼。</string>
+    <string name="app_self_update_remind_later">忽略更新</string>
+    <string name="app_self_update_verifying">正在驗證更新</string>
+    <string name="app_self_update_verifying_body">在安裝前檢查已完成的下載 。</string>
 </resources>

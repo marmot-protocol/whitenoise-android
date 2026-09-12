@@ -2046,4 +2046,7 @@
     <string name="support_receiving_relay_required">Ajoutez et publiez un relais de réception pour ce profil avant de démarrer une discussion avec l’assistance.</string>
     <string name="support_relays_loading">Vérification de la configuration des relais de ce profil…</string>
     <string name="support_relays_unavailable">Impossible de vérifier la configuration des relais de ce profil. Réessayez ou ouvrez les relais.</string>
+    <string name="app_self_update_remind_later">Ignorer la mise à jour</string>
+    <string name="app_self_update_verifying">Vérification de la mise à jour</string>
+    <string name="app_self_update_verifying_body">Vérification du téléchargement terminé avant l’installation.</string>
 </resources>

@@ -2062,4 +2062,7 @@
     <string name="support_receiving_relay_required">Füge für dieses Profil ein Empfangs-Relay hinzu und veröffentliche es, bevor du einen Support-Chat startest.</string>
     <string name="support_relays_loading">Relay-Konfiguration dieses Profils wird geprüft…</string>
     <string name="support_relays_unavailable">Die Relay-Konfiguration dieses Profils konnte nicht geprüft werden. Versuche es erneut oder öffne Relays.</string>
+    <string name="app_self_update_remind_later">Update ausblenden</string>
+    <string name="app_self_update_verifying">Update wird überprüft</string>
+    <string name="app_self_update_verifying_body">Der abgeschlossene Download wird vor der Installation überprüft.</string>
 </resources>

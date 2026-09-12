@@ -2046,4 +2046,7 @@
     <string name="support_receiving_relay_required">Añade y publica un relé de recepción para este perfil antes de iniciar un chat de soporte.</string>
     <string name="support_relays_loading">Comprobando la configuración de relés de este perfil…</string>
     <string name="support_relays_unavailable">No se pudo comprobar la configuración de relés de este perfil. Reinténtalo o abre Relés.</string>
+    <string name="app_self_update_remind_later">Descartar actualización</string>
+    <string name="app_self_update_verifying">Verificando actualización</string>
+    <string name="app_self_update_verifying_body">Comprobando la descarga completada antes de la instalación.</string>
 </resources>

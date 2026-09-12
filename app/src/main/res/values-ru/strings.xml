@@ -2108,4 +2108,7 @@
     <string name="support_receiving_relay_required">Добавьте и опубликуйте ретранслятор для получения сообщений этого профиля перед началом чата с поддержкой.</string>
     <string name="support_relays_loading">Проверка настроек ретрансляторов профиля…</string>
     <string name="support_relays_unavailable">Не удалось проверить настройки ретрансляторов профиля. Повторите попытку или откройте ретрансляторы.</string>
+    <string name="app_self_update_remind_later">Скрыть обновление</string>
+    <string name="app_self_update_verifying">Проверка обновления</string>
+    <string name="app_self_update_verifying_body">Проверка завершенной загрузки перед установкой.</string>
 </resources>

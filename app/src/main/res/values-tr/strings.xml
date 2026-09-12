@@ -2044,4 +2044,7 @@
     <string name="support_receiving_relay_required">Destek sohbeti başlatmadan önce bu profil için bir alıcı aktarıcı ekleyip yayınlayın.</string>
     <string name="support_relays_loading">Bu profilin aktarıcı yapılandırması kontrol ediliyor…</string>
     <string name="support_relays_unavailable">Bu profilin aktarıcı yapılandırması kontrol edilemedi. Yeniden deneyin veya Aktarıcıları açın.</string>
+    <string name="app_self_update_remind_later">Güncellemeyi kapat</string>
+    <string name="app_self_update_verifying">Güncelleme doğrulanıyor</string>
+    <string name="app_self_update_verifying_body">Kurulumdan önce tamamlanan indirme işleminin kontrol edilmesi.</string>
 </resources>

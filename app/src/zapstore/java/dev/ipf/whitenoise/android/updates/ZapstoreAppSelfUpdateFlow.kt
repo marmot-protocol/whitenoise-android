@@ -4,10 +4,18 @@ import android.content.Context
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.io.File
 
+@Suppress("TooManyFunctions") // Interface actions and cancellation helpers share one operation owner.
 internal class ZapstoreAppSelfUpdateFlow(
     private val appContext: Context,
     private val client: ZapstoreReleaseClient = ZapstoreReleaseClient(),
@@ -18,103 +26,183 @@ internal class ZapstoreAppSelfUpdateFlow(
                 .firstOrNull()
                 .orEmpty()
         },
+    private val resolveAsset: suspend (version: String, platformId: String) -> ZapstoreApkAsset? =
+        { version, platformId ->
+            ZapstoreApkAssetResolver.resolveApkAsset(client, version, platformId)
+        },
+    private val verifyPackage: suspend (apkFile: File, expectedVersion: String) -> Boolean = { file, version ->
+        withContext(Dispatchers.IO) { AppSelfUpdateInstaller.isTrustedUpdatePackage(appContext, file, version) }
+    },
 ) : AppSelfUpdateFlow {
     override var state: AppSelfUpdateState = AppSelfUpdateState.Idle
         private set
 
     private var activeJob: Job? = null
+    private val operationMutex = Mutex()
     private var verifiedApkFile: File? = null
+    private var operationGeneration = 0L
 
+    /** Resolve a publisher-verified asset only after the preceding operation has finished cleanup. */
     override fun start(
         scope: CoroutineScope,
         version: String,
         onStateChanged: (AppSelfUpdateState) -> Unit,
     ) {
         cancel(deleteVerifiedApk = true)
-        transition(AppSelfUpdateState.Resolving, onStateChanged)
-        activeJob =
-            scope.launch {
-                runCatching {
-                    val primaryAbi = primaryAbiProvider()
-                    if (!AndroidAbi.isSupportedPrimaryAbi(primaryAbi)) {
-                        fail(R.string.app_self_update_no_asset, retryable = true, onStateChanged)
-                        return@launch
-                    }
-                    val platformId = AndroidAbi.platformIdForPrimaryAbi(primaryAbi)
-                    val asset =
-                        ZapstoreApkAssetResolver.resolveApkAsset(
-                            client = client,
-                            version = version,
-                            platformId = platformId,
-                        )
-                    if (asset == null) {
-                        fail(R.string.app_self_update_no_asset, retryable = true, onStateChanged)
-                        return@launch
-                    }
-                    transition(AppSelfUpdateState.Confirming(asset), onStateChanged)
-                }.onFailure { error ->
-                    if (error is CancellationException) throw error
-                    fail(R.string.app_self_update_resolve_failed, retryable = true, onStateChanged)
+        val generation = operationGeneration
+        launchOperation(scope, generation, AppSelfUpdateState.Resolving, onStateChanged) {
+            runCatching {
+                val primaryAbi = primaryAbiProvider()
+                if (!AndroidAbi.isSupportedPrimaryAbi(primaryAbi)) {
+                    fail(R.string.app_self_update_no_asset, retryable = true, onStateChanged)
+                    return@launchOperation
                 }
+                val platformId = AndroidAbi.platformIdForPrimaryAbi(primaryAbi)
+                val asset = resolveAsset(version, platformId)
+                ensureCurrentOperation(generation)
+                if (asset == null) {
+                    fail(R.string.app_self_update_no_asset, retryable = true, onStateChanged)
+                    return@launchOperation
+                }
+                transition(AppSelfUpdateState.Confirming(asset), onStateChanged)
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                ensureCurrentOperation(generation)
+                fail(R.string.app_self_update_resolve_failed, retryable = true, onStateChanged)
             }
+        }
     }
 
+    /** Keeps checksum and package trust inside one owned operation; ready states require both checks. */
     override fun confirmDownload(
         scope: CoroutineScope,
         onStateChanged: (AppSelfUpdateState) -> Unit,
     ) {
         val asset = (state as? AppSelfUpdateState.Confirming)?.asset ?: return
         cancel(deleteVerifiedApk = true)
+        val generation = operationGeneration
         val destination = AppSelfUpdateStorage.apkFileForVersion(appContext, asset.version)
-        transition(
-            AppSelfUpdateState.Downloading(asset = asset, bytesRead = 0L, totalBytes = asset.sizeBytes),
+        launchOperation(
+            scope,
+            generation,
+            AppSelfUpdateState.Downloading(asset, 0L, asset.sizeBytes),
             onStateChanged,
-        )
-        activeJob =
-            scope.launch {
-                val result =
-                    downloader.downloadVerifiedApk(
-                        asset = asset,
-                        destination = destination,
-                        onProgress = { bytesRead, totalBytes ->
-                            transition(
-                                AppSelfUpdateState.Downloading(
-                                    asset = asset,
-                                    bytesRead = bytesRead,
-                                    totalBytes = totalBytes ?: asset.sizeBytes,
-                                ),
-                                onStateChanged,
-                            )
-                        },
-                    )
-                result
-                    .onSuccess {
-                        if (!AppSelfUpdateInstaller.isTrustedUpdatePackage(appContext, destination, asset.version)) {
-                            AppSelfUpdateStorage.deleteFile(destination)
-                            fail(R.string.app_self_update_install_failed, retryable = true, onStateChanged)
-                            return@onSuccess
-                        }
-                        verifiedApkFile = destination
-                        val next =
-                            if (AppSelfUpdateInstaller.canRequestPackageInstalls(appContext)) {
-                                AppSelfUpdateState.Verified(asset = asset, apkFile = destination)
-                            } else {
-                                AppSelfUpdateState.PermissionRequired(asset = asset, apkFile = destination)
-                            }
-                        transition(next, onStateChanged)
-                    }.onFailure { error ->
-                        if (error is CancellationException) throw error
-                        val messageRes =
-                            if (error is AppSelfUpdateDownloader.HashMismatchException) {
-                                R.string.app_self_update_hash_mismatch
-                            } else {
-                                R.string.app_self_update_download_failed
-                            }
-                        fail(messageRes, retryable = true, onStateChanged)
-                    }
+        ) {
+            try {
+                downloadAndVerify(asset, destination, generation, onStateChanged)
+            } finally {
+                if (verifiedApkFile != destination) AppSelfUpdateStorage.deleteFile(destination)
             }
+        }
     }
 
+    /**
+     * Register ownership before callbacks can cancel or replace it. The mutex holds through cleanup,
+     * so canceling any number of waiting replacements cannot bypass a noncooperative verifier.
+     */
+    @Suppress("TooGenericExceptionCaught") // Cancel registered work before propagating any callback failure.
+    private fun launchOperation(
+        scope: CoroutineScope,
+        generation: Long,
+        initialState: AppSelfUpdateState,
+        onStateChanged: (AppSelfUpdateState) -> Unit,
+        operation: suspend () -> Unit,
+    ) {
+        val job =
+            scope.launch(start = CoroutineStart.LAZY) {
+                operationMutex.withLock {
+                    ensureCurrentOperation(generation)
+                    operation()
+                }
+            }
+        activeJob = job
+        try {
+            transition(initialState, onStateChanged)
+        } catch (error: Throwable) {
+            job.cancel()
+            throw error
+        }
+        job.start()
+    }
+
+    /** The downloader announces the actual digest boundary; package verification extends that phase. */
+    private suspend fun downloadAndVerify(
+        asset: ZapstoreApkAsset,
+        destination: File,
+        generation: Long,
+        onStateChanged: (AppSelfUpdateState) -> Unit,
+    ) {
+        val result =
+            downloader.downloadVerifiedApk(
+                asset = asset,
+                destination = destination,
+                onVerificationStarted = {
+                    transitionOperation(AppSelfUpdateState.Verifying(asset), generation, onStateChanged)
+                },
+                onProgress = { bytesRead, totalBytes ->
+                    transitionOperation(
+                        AppSelfUpdateState.Downloading(asset, bytesRead, totalBytes ?: asset.sizeBytes),
+                        generation,
+                        onStateChanged,
+                    )
+                },
+            )
+        ensureCurrentOperation(generation)
+        val failure = result.exceptionOrNull()
+        if (failure != null) {
+            if (failure is CancellationException) throw failure
+            fail(
+                if (failure is AppSelfUpdateDownloader.HashMismatchException) {
+                    R.string.app_self_update_hash_mismatch
+                } else {
+                    R.string.app_self_update_download_failed
+                },
+                retryable = true,
+                onStateChanged,
+            )
+            return
+        }
+        val trusted =
+            try {
+                verifyPackage(destination, asset.version)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                false
+            }
+        ensureCurrentOperation(generation)
+        if (!trusted) {
+            fail(R.string.app_self_update_install_failed, retryable = true, onStateChanged)
+            return
+        }
+        verifiedApkFile = destination
+        val next =
+            if (AppSelfUpdateInstaller.canRequestPackageInstalls(appContext)) {
+                AppSelfUpdateState.Verified(asset, destination)
+            } else {
+                AppSelfUpdateState.PermissionRequired(asset, destination)
+            }
+        transitionOperation(next, generation, onStateChanged)
+    }
+
+    /** Dispatches UI state on Main and rejects canceled/replaced operations before and after callbacks. */
+    private suspend fun transitionOperation(
+        next: AppSelfUpdateState,
+        generation: Long,
+        onStateChanged: (AppSelfUpdateState) -> Unit,
+    ) = withContext(Dispatchers.Main.immediate) {
+        ensureCurrentOperation(generation)
+        transition(next, onStateChanged)
+        ensureCurrentOperation(generation)
+    }
+
+    /** Blocking native work may return after cancellation; it cannot publish a late trusted/permission result. */
+    private suspend fun ensureCurrentOperation(generation: Long) {
+        currentCoroutineContext().ensureActive()
+        if (generation != operationGeneration) throw CancellationException("Update operation replaced")
+    }
+
+    /** Restart release resolution only for an explicitly retryable failure. */
     override fun retry(
         scope: CoroutineScope,
         version: String,
@@ -128,10 +216,12 @@ internal class ZapstoreAppSelfUpdateFlow(
         }
     }
 
+    /** Invalidate callbacks immediately; the operation mutex retains file ownership until cleanup finishes. */
     override fun cancel(
         deleteVerifiedApk: Boolean,
         onStateChanged: ((AppSelfUpdateState) -> Unit)?,
     ) {
+        operationGeneration += 1
         activeJob?.cancel()
         activeJob = null
         if (deleteVerifiedApk) {
@@ -141,6 +231,7 @@ internal class ZapstoreAppSelfUpdateFlow(
         transition(AppSelfUpdateState.Idle, onStateChanged)
     }
 
+    /** Recheck Android permission for an already verified APK without bypassing package trust. */
     override fun refreshInstallPermission(onStateChanged: (AppSelfUpdateState) -> Unit) {
         when (val current = state) {
             is AppSelfUpdateState.PermissionRequired -> {
@@ -155,6 +246,7 @@ internal class ZapstoreAppSelfUpdateFlow(
         }
     }
 
+    /** Revalidate package trust immediately before handing the verified file to Android’s installer. */
     override fun launchInstall(
         context: Context,
         onStateChanged: (AppSelfUpdateState) -> Unit,
@@ -194,14 +286,17 @@ internal class ZapstoreAppSelfUpdateFlow(
         return true
     }
 
+    /** Open this application’s unknown-source permission settings; no installer action is implied. */
     override fun openInstallPermissionSettings(context: Context) {
         runCatching { context.startActivity(AppSelfUpdateInstaller.installPermissionSettingsIntent(context)) }
     }
 
+    /** Delegate old APK and abandoned-partial cleanup to the existing storage policy. */
     override fun sweepStaleApks() {
         AppSelfUpdateStorage.sweepStaleApks(appContext)
     }
 
+    /** Remove retained update files and report the existing typed recovery category. */
     private fun fail(
         messageRes: Int,
         retryable: Boolean,
@@ -213,6 +308,7 @@ internal class ZapstoreAppSelfUpdateFlow(
         transition(AppSelfUpdateState.Error(messageRes = messageRes, retryable = retryable), onStateChanged)
     }
 
+    /** Publish a caller-owned phase; asynchronous operations must first pass their generation guard. */
     private fun transition(
         next: AppSelfUpdateState,
         onStateChanged: ((AppSelfUpdateState) -> Unit)?,

@@ -2046,4 +2046,7 @@
     <string name="support_receiving_relay_required">Adicione e publique um relé de recepção para este perfil antes de iniciar uma conversa com o suporte.</string>
     <string name="support_relays_loading">Verificando a configuração de relés deste perfil…</string>
     <string name="support_relays_unavailable">Não foi possível verificar a configuração de relés deste perfil. Tente novamente ou abra Relés.</string>
+    <string name="app_self_update_remind_later">Dispensar atualização</string>
+    <string name="app_self_update_verifying">Verificando atualização</string>
+    <string name="app_self_update_verifying_body">Verificando o download concluído antes da instalação.</string>
 </resources>

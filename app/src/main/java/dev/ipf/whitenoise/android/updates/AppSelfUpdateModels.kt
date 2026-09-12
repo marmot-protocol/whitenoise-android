@@ -27,6 +27,11 @@ sealed interface AppSelfUpdateState {
         val totalBytes: Long?,
     ) : AppSelfUpdateState
 
+    /** The downloaded bytes are undergoing checksum and package identity/signature verification. */
+    data class Verifying(
+        val asset: ZapstoreApkAsset,
+    ) : AppSelfUpdateState
+
     data class Verified(
         val asset: ZapstoreApkAsset,
         val apkFile: File,
