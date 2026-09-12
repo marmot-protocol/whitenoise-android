@@ -96,12 +96,10 @@ import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.isBlueFreeAccentVisible
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
-import dev.ipf.whitenoise.android.state.withoutBlueChannel
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
@@ -149,22 +147,16 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+/** Draws semantic highlight or monochrome directional borders; saved colours only affect non-AMOLED fills. */
 @Composable
 internal fun messageBubbleBorder(
     highlighted: Boolean,
     mine: Boolean,
-    customArgb: Long? = null,
     persistedFailure: Boolean = false,
 ): BorderStroke? {
     val amoledAccent = amoledDirectionalAccentColor(mine)
-    val blueFreeCustomAccent =
-        customArgb
-            ?.withoutBlueChannel()
-            ?.takeIf(Long::isBlueFreeAccentVisible)
     return when {
         persistedFailure -> null
-        amoledAccent != null && customArgb != null ->
-            BorderStroke(2.dp, blueFreeCustomAccent?.let(::colorFromArgb) ?: amoledAccent)
         highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
         amoledAccent != null -> BorderStroke(2.dp, amoledAccent)
         else -> null
@@ -372,7 +364,8 @@ internal fun MessageBubble(
             groupIdHex = controller.group.groupIdHex,
         )
     val colorScheme = MaterialTheme.colorScheme
-    val customBubbleColorActive = customBubbleArgb != null && !deleted && !persistedFailure
+    val customBubbleColorActive =
+        bubbleTheme != BubbleTheme.Amoled && customBubbleArgb != null && !deleted && !persistedFailure
     val bubblePresentation =
         messageBubblePresentation(
             deleted = deleted,
