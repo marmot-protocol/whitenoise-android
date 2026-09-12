@@ -2052,4 +2052,5 @@
     <string name="qr_camera_access_needed">Accès à la caméra requis</string>
     <string name="qr_turn_flashlight_on">Allumer la lampe torche</string>
     <string name="qr_turn_flashlight_off">Éteindre la lampe torche</string>
+    <string name="startup_loading_message">Démarrage de White Noise…</string>
 </resources>

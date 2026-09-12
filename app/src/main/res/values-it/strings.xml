@@ -2052,4 +2052,5 @@
     <string name="qr_camera_access_needed">Accesso alla fotocamera necessario</string>
     <string name="qr_turn_flashlight_on">Accendi la torcia</string>
     <string name="qr_turn_flashlight_off">Spegni la torcia</string>
+    <string name="startup_loading_message">Avvio di White Noise…</string>
 </resources>

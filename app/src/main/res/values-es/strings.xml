@@ -2052,4 +2052,5 @@
     <string name="qr_camera_access_needed">Se necesita acceso a la cámara</string>
     <string name="qr_turn_flashlight_on">Encender la linterna</string>
     <string name="qr_turn_flashlight_off">Apagar la linterna</string>
+    <string name="startup_loading_message">Iniciando White Noise…</string>
 </resources>

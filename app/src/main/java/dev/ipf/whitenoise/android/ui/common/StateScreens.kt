@@ -73,33 +73,10 @@ fun LoadingScreen() {
     }
 }
 
-/** Presents branded startup progress before any interactive destination exists. */
+/** Presents the prototype startup indicator while native bootstrap owns all progress and readiness. */
 @Composable
 fun StartupLoadingScreen() {
-    Box(
-        Modifier.fillMaxSize().padding(24.dp).testTag(STARTUP_LOADING_TEST_TAG),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            WhiteNoiseLogoLockup(size = 72.dp)
-            Text(
-                text = stringResource(R.string.white_noise),
-                style = MaterialTheme.typography.headlineMedium,
-            )
-            CircularProgressIndicator(
-                modifier = Modifier.size(32.dp),
-                strokeWidth = 3.dp,
-            )
-            Text(
-                text = stringResource(R.string.starting_securely),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-    }
+    StartupProgressContent()
 }
 
 internal const val FULL_SCREEN_LOADING_TEST_TAG = "full-screen-loading"

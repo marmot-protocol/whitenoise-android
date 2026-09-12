@@ -2164,4 +2164,5 @@
     <string name="qr_camera_access_needed">Camera Access Needed</string>
     <string name="qr_turn_flashlight_on">Turn flashlight on</string>
     <string name="qr_turn_flashlight_off">Turn flashlight off</string>
+    <string name="startup_loading_message">Starting White Noise…</string>
 </resources>
