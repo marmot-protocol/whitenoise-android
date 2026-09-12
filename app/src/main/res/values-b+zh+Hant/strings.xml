@@ -1449,10 +1449,10 @@
     <string name="chat_bubble_colors_chat_subtitle">僅為目前對話覆寫氣泡顏色。重設後將沿用「外觀」預設值。</string>
     <string name="bubble_color_preview">預覽</string>
     <string name="bubble_color_current_theme">目前主題：%1$s</string>
-    <string name="bubble_my_messages">我的訊息</string>
+    <string name="bubble_my_messages">你的訊息</string>
     <string name="bubble_other_messages">其他訊息</string>
-    <string name="bubble_preview_other">你好——回覆會顯示成這樣。</string>
-    <string name="bubble_preview_mine">看起來不錯。</string>
+    <string name="bubble_preview_other">對方的訊息</string>
+    <string name="bubble_preview_mine">你的訊息</string>
     <string name="bubble_color_swatch_content_description">氣泡顏色 %1$s</string>
     <string name="more_colors">更多顏色</string>
     <string name="custom_hex_color">自訂十六進位顏色</string>
@@ -1462,6 +1462,18 @@
     <string name="color_picker_saturation">飽和度</string>
     <string name="color_picker_brightness">亮度</string>
     <string name="reset_to_default">恢復預設值</string>
+    <string name="color_preview_action">操作</string>
+    <string name="color_swatch_description">顏色 %1$s</string>
+    <string name="color_hue">色相：%1$d°</string>
+    <string name="color_saturation">飽和度：%1$d%%</string>
+    <string name="color_brightness">亮度：%1$d%%</string>
+    <string name="color_hex">十六進位顏色</string>
+    <string name="color_hex_error">請輸入六位十六進位數字，例如 #1D4ED8。</string>
+    <string name="action_color_detail">為%1$s主題選擇操作強調色。背景和中性表面保持不變。</string>
+    <string name="chat_bubble_colors_global_detail">為%1$s主題選擇預設訊息顏色。</string>
+    <string name="chat_bubble_colors_chat_detail">在所有主題中覆寫此聊天。重設以使用目前%1$s主題的預設值。</string>
+    <string name="more_options">更多選項</string>
+    <string name="reset_to_global_colors">重設為全域顏色</string>
 
     <string name="tts_warning_title">外部文字轉語音引擎</string>
     <string name="tts_warning_message">所選文字轉語音引擎是獨立應用程式，可能會將解密後的訊息文字傳送到其開發者的伺服器。若要在本機朗讀，請從 F-Droid 或 Zapstore 安裝 RHVoice 或 eSpeak NG，並在設定中選擇。</string>

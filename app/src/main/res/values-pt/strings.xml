@@ -1476,10 +1476,10 @@
     <string name="chat_bubble_colors_chat_subtitle">Substitua as cores dos balões apenas para esta conversa. Redefina para herdar os padrões de Aparência.</string>
     <string name="bubble_color_preview">Pré-visualização</string>
     <string name="bubble_color_current_theme">Tema atual: %1$s</string>
-    <string name="bubble_my_messages">Minhas mensagens</string>
+    <string name="bubble_my_messages">Suas mensagens</string>
     <string name="bubble_other_messages">Outras mensagens</string>
-    <string name="bubble_preview_other">Olá — é assim que as respostas aparecem.</string>
-    <string name="bubble_preview_mine">Parece bom para mim.</string>
+    <string name="bubble_preview_other">A mensagem deles</string>
+    <string name="bubble_preview_mine">Sua mensagem</string>
     <string name="bubble_color_swatch_content_description">Cor do balão %1$s</string>
     <string name="more_colors">Mais cores</string>
     <string name="custom_hex_color">Cor hexadecimal personalizada</string>
@@ -1489,6 +1489,18 @@
     <string name="color_picker_saturation">Saturação</string>
     <string name="color_picker_brightness">Brilho</string>
     <string name="reset_to_default">Redefinir padrões</string>
+    <string name="color_preview_action">Ação</string>
+    <string name="color_swatch_description">Cor %1$s</string>
+    <string name="color_hue">Matiz: %1$d°</string>
+    <string name="color_saturation">Saturação: %1$d%%</string>
+    <string name="color_brightness">Brilho: %1$d%%</string>
+    <string name="color_hex">Cor hexadecimal</string>
+    <string name="color_hex_error">Digite seis dígitos hexadecimais, como #1D4ED8.</string>
+    <string name="action_color_detail">Escolha o destaque de ação para o tema %1$s. Fundos e superfícies neutras permanecem iguais.</string>
+    <string name="chat_bubble_colors_global_detail">Escolha as cores padrão das mensagens para o tema %1$s.</string>
+    <string name="chat_bubble_colors_chat_detail">Substitui esta conversa em todos os temas. Redefina para usar os padrões do tema %1$s atual.</string>
+    <string name="more_options">Mais opções</string>
+    <string name="reset_to_global_colors">Redefinir para as cores globais</string>
 
     <string name="tts_warning_title">Motor de texto para fala externo</string>
     <string name="tts_warning_message">O motor de texto para fala selecionado é um app separado que pode enviar o texto descriptografado da mensagem aos servidores do desenvolvedor. Para fala no dispositivo, instale o RHVoice ou o eSpeak NG pelo F-Droid ou Zapstore e escolha-o nas definições.</string>

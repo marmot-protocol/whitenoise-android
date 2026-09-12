@@ -1538,10 +1538,10 @@
     <string name="chat_bubble_colors_chat_subtitle">Измените цвета сообщений только для этой беседы. Сбросьте настройки, чтобы использовать значения оформления.</string>
     <string name="bubble_color_preview">Предпросмотр</string>
     <string name="bubble_color_current_theme">Текущая тема: %1$s</string>
-    <string name="bubble_my_messages">Мои сообщения</string>
+    <string name="bubble_my_messages">Ваши сообщения</string>
     <string name="bubble_other_messages">Другие сообщения</string>
-    <string name="bubble_preview_other">Привет — так выглядят ответы.</string>
-    <string name="bubble_preview_mine">Мне нравится.</string>
+    <string name="bubble_preview_other">Их сообщение</string>
+    <string name="bubble_preview_mine">Ваше сообщение</string>
     <string name="bubble_color_swatch_content_description">Цвет сообщения %1$s</string>
     <string name="more_colors">Другие цвета</string>
     <string name="custom_hex_color">Свой шестнадцатеричный цвет</string>
@@ -1551,6 +1551,18 @@
     <string name="color_picker_saturation">Насыщенность</string>
     <string name="color_picker_brightness">Яркость</string>
     <string name="reset_to_default">Сбросить</string>
+    <string name="color_preview_action">Действие</string>
+    <string name="color_swatch_description">Цвет %1$s</string>
+    <string name="color_hue">Оттенок: %1$d°</string>
+    <string name="color_saturation">Насыщенность: %1$d%%</string>
+    <string name="color_brightness">Яркость: %1$d%%</string>
+    <string name="color_hex">Шестнадцатеричный цвет</string>
+    <string name="color_hex_error">Введите шесть шестнадцатеричных цифр, например #1D4ED8.</string>
+    <string name="action_color_detail">Выберите акцент действия для темы %1$s. Фон и нейтральные поверхности остаются неизменными.</string>
+    <string name="chat_bubble_colors_global_detail">Выберите цвета сообщений по умолчанию для темы %1$s.</string>
+    <string name="chat_bubble_colors_chat_detail">Переопределить этот чат в каждой теме. Выполните сброс, чтобы использовать текущие настройки темы %1$s по умолчанию.</string>
+    <string name="more_options">Больше возможностей</string>
+    <string name="reset_to_global_colors">Сброс к глобальным цветам</string>
 
     <string name="tts_warning_title">Внешний движок синтеза речи</string>
     <string name="tts_warning_message">Выбранный движок синтеза речи — отдельное приложение, которое может отправлять расшифрованный текст сообщения на серверы разработчика. Для речи на устройстве установите RHVoice или eSpeak NG из F-Droid или Zapstore и выберите его в настройках.</string>

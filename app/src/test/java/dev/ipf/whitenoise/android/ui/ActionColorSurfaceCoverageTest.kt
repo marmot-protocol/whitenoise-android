@@ -5,7 +5,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
+/** Source-level guards that action and bubble colours flow from the account token and per-account drafts. */
 class ActionColorSurfaceCoverageTest {
+    /** Every named action and unread surface resolves its colours through the account action token. */
     @Test
     fun namedActionAndUnreadSurfacesConsumeTheAccountActionToken() {
         val chats = source("chats/ChatsScreen.kt")
@@ -48,20 +50,23 @@ class ActionColorSurfaceCoverageTest {
         )
     }
 
+    /** Colour drafts restart whenever the represented account, chat or theme changes, never leaking between them. */
     @Test
     fun colorPickerDraftStateIsScopedToTheActiveAccount() {
         val bubbleColors = source("settings/ChatBubbleColorsScreen.kt")
+        val actionColor = source("settings/ActionColorScreen.kt")
 
         assertTrue(
-            "Bubble picker draft state must include the represented local account",
-            "\"account:\$accountScope:global\"" in bubbleColors,
+            "Bubble editor drafts must restart per account, chat and theme",
+            "key(accountScope, groupIdHex, bubbleTheme, initial, inherited)" in bubbleColors,
         )
         assertTrue(
-            "Per-chat picker draft state must retain both account and chat scope",
-            "\"account:\$accountScope:chat:\$it\"" in bubbleColors,
+            "Action colour drafts must restart per account and theme",
+            "key(accountRef, theme, initial)" in actionColor,
         )
     }
 
+    /** Reads one UI source file from either the module or repository root. */
     private fun source(relativePath: String): String =
         sequenceOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/$relativePath"),

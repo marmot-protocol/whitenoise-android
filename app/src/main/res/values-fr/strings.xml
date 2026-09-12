@@ -1476,10 +1476,10 @@
     <string name="chat_bubble_colors_chat_subtitle">Remplacez les couleurs des bulles uniquement pour cette conversation. Réinitialisez pour reprendre les valeurs d’apparence.</string>
     <string name="bubble_color_preview">Aperçu</string>
     <string name="bubble_color_current_theme">Thème actuel : %1$s</string>
-    <string name="bubble_my_messages">Mes messages</string>
+    <string name="bubble_my_messages">Vos messages</string>
     <string name="bubble_other_messages">Autres messages</string>
-    <string name="bubble_preview_other">Bonjour, voici l’apparence des réponses.</string>
-    <string name="bubble_preview_mine">Cela me convient.</string>
+    <string name="bubble_preview_other">Leur message</string>
+    <string name="bubble_preview_mine">Votre message</string>
     <string name="bubble_color_swatch_content_description">Couleur de bulle %1$s</string>
     <string name="more_colors">Plus de couleurs</string>
     <string name="custom_hex_color">Couleur hexadécimale personnalisée</string>
@@ -1489,6 +1489,18 @@
     <string name="color_picker_saturation">Saturation</string>
     <string name="color_picker_brightness">Luminosité</string>
     <string name="reset_to_default">Rétablir les valeurs</string>
+    <string name="color_preview_action">Action</string>
+    <string name="color_swatch_description">Couleur %1$s</string>
+    <string name="color_hue">Teinte : %1$d°</string>
+    <string name="color_saturation">Saturation : %1$d%%</string>
+    <string name="color_brightness">Luminosité : %1$d%%</string>
+    <string name="color_hex">Couleur hexadécimale</string>
+    <string name="color_hex_error">Saisissez six chiffres hexadécimaux, par exemple #1D4ED8.</string>
+    <string name="action_color_detail">Choisissez l’accent d’action pour le thème %1$s. Les arrière-plans et les surfaces neutres restent inchangés.</string>
+    <string name="chat_bubble_colors_global_detail">Choisissez les couleurs de message par défaut pour le thème %1$s.</string>
+    <string name="chat_bubble_colors_chat_detail">Remplace les couleurs de cette discussion dans tous les thèmes. Réinitialisez pour utiliser les valeurs par défaut du thème %1$s actuel.</string>
+    <string name="more_options">Plus d’options</string>
+    <string name="reset_to_global_colors">Rétablir les couleurs globales</string>
 
     <string name="tts_warning_title">Moteur de synthèse vocale externe</string>
     <string name="tts_warning_message">Le moteur de synthèse vocale sélectionné est une application distincte qui peut envoyer le texte déchiffré du message aux serveurs de son développeur. Pour une voix sur l\'appareil, installez RHVoice ou eSpeak NG depuis F-Droid ou Zapstore et choisissez-le dans les réglages.</string>
