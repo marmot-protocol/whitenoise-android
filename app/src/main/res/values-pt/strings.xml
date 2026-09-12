@@ -2021,4 +2021,18 @@
     <string name="profile_lightning_address">Endereço Lightning</string>
     <string name="profile_image_failed">Não foi possível carregar esta imagem. Escolha outra imagem ou tente novamente.</string>
     <string name="profile_publish_failed">Não foi possível salvar o perfil. Tente novamente.</string>
+    <string name="developer_republish_help">Publique novamente o material local atual sem o renovar.</string>
+    <string name="developer_publish_new">Publicar novo pacote de chaves</string>
+    <string name="developer_rotate_help">Crie novo material para convites futuros. O material local existente é preservado.</string>
+    <string name="developer_not_published">Nenhum pacote de chaves está publicado no momento. Publique um para receber novos convites para grupos.</string>
+    <string name="developer_seen_on">Visto em</string>
+    <string name="developer_delete_package">Excluir pacote de chaves</string>
+    <string name="developer_retained">Material local preservado</string>
+    <string name="developer_retained_help">O material local é preservado para os convites existentes. Não está publicado nos relays no momento.</string>
+    <string name="developer_no_retained">Nenhum material local não publicado.</string>
+    <string name="developer_refresh_packages">Atualizar pacotes de chaves</string>
+    <string name="developer_work_running">Em andamento</string>
+    <string name="developer_work_status">%1$s: %2$s</string>
+    <string name="developer_package_id">ID do pacote</string>
+    <string name="developer_package_source">Origem</string>
 </resources>

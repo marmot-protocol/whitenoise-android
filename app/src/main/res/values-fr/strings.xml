@@ -2021,4 +2021,18 @@
     <string name="profile_lightning_address">Adresse Lightning</string>
     <string name="profile_image_failed">Impossible de charger cette image. Choisissez une autre image ou réessayez.</string>
     <string name="profile_publish_failed">Impossible d’enregistrer le profil. Réessayez.</string>
+    <string name="developer_republish_help">Publier à nouveau le matériel local actuel sans le renouveler.</string>
+    <string name="developer_publish_new">Publier un nouveau paquet de clés</string>
+    <string name="developer_rotate_help">Créer du nouveau matériel pour les futures invitations. Le matériel local existant est conservé.</string>
+    <string name="developer_not_published">Aucun paquet de clés n’est actuellement publié. Publiez-en un pour recevoir de nouvelles invitations à des groupes.</string>
+    <string name="developer_seen_on">Vu sur</string>
+    <string name="developer_delete_package">Supprimer le paquet de clés</string>
+    <string name="developer_retained">Matériel local conservé</string>
+    <string name="developer_retained_help">Le matériel local est conservé pour les invitations existantes. Il n’est actuellement pas publié sur les relais.</string>
+    <string name="developer_no_retained">Aucun matériel local non publié.</string>
+    <string name="developer_refresh_packages">Actualiser les paquets de clés</string>
+    <string name="developer_work_running">En cours</string>
+    <string name="developer_work_status">%1$s : %2$s</string>
+    <string name="developer_package_id">ID du paquet</string>
+    <string name="developer_package_source">Source</string>
 </resources>

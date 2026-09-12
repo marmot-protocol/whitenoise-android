@@ -2037,4 +2037,18 @@
     <string name="profile_lightning_address">Lightning-Adresse</string>
     <string name="profile_image_failed">Dieses Bild konnte nicht geladen werden. Wähle ein anderes Bild oder versuche es erneut.</string>
     <string name="profile_publish_failed">Das Profil konnte nicht gespeichert werden. Versuche es erneut.</string>
+    <string name="developer_republish_help">Das aktuelle lokale Material erneut veröffentlichen, ohne es zu erneuern.</string>
+    <string name="developer_publish_new">Neues Schlüsselpaket veröffentlichen</string>
+    <string name="developer_rotate_help">Neues Material für künftige Einladungen erstellen. Vorhandenes lokales Material bleibt erhalten.</string>
+    <string name="developer_not_published">Derzeit ist kein Schlüsselpaket veröffentlicht. Veröffentliche eines, um neue Gruppeneinladungen zu erhalten.</string>
+    <string name="developer_seen_on">Gesehen auf</string>
+    <string name="developer_delete_package">Schlüsselpaket löschen</string>
+    <string name="developer_retained">Aufbewahrtes lokales Material</string>
+    <string name="developer_retained_help">Lokales Material bleibt für bestehende Einladungen erhalten. Es ist derzeit nicht auf Relays veröffentlicht.</string>
+    <string name="developer_no_retained">Kein unveröffentlichtes lokales Material.</string>
+    <string name="developer_refresh_packages">Schlüsselpakete aktualisieren</string>
+    <string name="developer_work_running">Wird ausgeführt</string>
+    <string name="developer_work_status">%1$s: %2$s</string>
+    <string name="developer_package_id">Paket-ID</string>
+    <string name="developer_package_source">Quelle</string>
 </resources>

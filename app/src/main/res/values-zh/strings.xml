@@ -1994,4 +1994,18 @@
     <string name="profile_lightning_address">Lightning 地址</string>
     <string name="profile_image_failed">无法加载此图片。请选择其他图片或重试。</string>
     <string name="profile_publish_failed">您的配置文件无法保存 。 检查你的细节再试一次</string>
+    <string name="developer_republish_help">发布当前本地material再不旋转它。</string>
+    <string name="developer_publish_new">发布新 密钥软件包</string>
+    <string name="developer_rotate_help">创建新material未来邀请。 现有当地material现予保留。</string>
+    <string name="developer_not_published">目前没有发布密钥包 。 发布一个接收新的团体邀请.</string>
+    <string name="developer_seen_on">看见了</string>
+    <string name="developer_delete_package">删除密钥包</string>
+    <string name="developer_retained">当地保留Material</string>
+    <string name="developer_retained_help">当地material用于当前邀请。 目前尚未在转发中发表。</string>
+    <string name="developer_no_retained">无未发表的本地material.</string>
+    <string name="developer_refresh_packages">刷新密钥包</string>
+    <string name="developer_work_running">工作时…</string>
+    <string name="developer_work_status">%1$s: %2$s</string>
+    <string name="developer_package_id">密钥包 ID</string>
+    <string name="developer_package_source">来源</string>
 </resources>

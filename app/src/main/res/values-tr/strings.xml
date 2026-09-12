@@ -2019,4 +2019,18 @@
     <string name="profile_lightning_address">Lightning adresi</string>
     <string name="profile_image_failed">Bu resim yüklenemedi. Başka bir resim seçin veya tekrar deneyin.</string>
     <string name="profile_publish_failed">Profiliniz kaydedilemedi. Bilgilerinizi kontrol edip tekrar deneyin.</string>
+    <string name="developer_republish_help">Geçerli yerel material\'yi döndürmeden yeniden yayınlayın.</string>
+    <string name="developer_publish_new">Yeni Anahtar Paketini Yayınla</string>
+    <string name="developer_rotate_help">Gelecekteki davetiyeler için yeni material oluşturun. Mevcut yerel material korunur.</string>
+    <string name="developer_not_published">Şu anda yayınlanmış bir anahtar paket yok. Yeni grup davetiyeleri almak için bir tane yayınlayın.</string>
+    <string name="developer_seen_on">Görüldü</string>
+    <string name="developer_delete_package">Anahtar Paketini Sil</string>
+    <string name="developer_retained">Tutulan Yerel Material</string>
+    <string name="developer_retained_help">Yerel material mevcut davetiyeler için tutulur. Şu anda rölelerde yayınlanmamaktadır.</string>
+    <string name="developer_no_retained">Yayınlanmamış yerel material yok.</string>
+    <string name="developer_refresh_packages">Anahtar paketlerini yenile</string>
+    <string name="developer_work_running">Çalışıyor…</string>
+    <string name="developer_work_status">%1$s: %2$s</string>
+    <string name="developer_package_id">Paket kimliği</string>
+    <string name="developer_package_source">Kaynak</string>
 </resources>

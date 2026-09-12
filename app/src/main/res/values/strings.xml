@@ -2133,4 +2133,18 @@
     <string name="profile_lightning_address">Lightning address</string>
     <string name="profile_image_failed">This image could not be loaded. Choose another image or try again.</string>
     <string name="profile_publish_failed">Your profile could not be saved. Check your details and try again.</string>
+    <string name="developer_republish_help">Publish the current local material again without rotating it.</string>
+    <string name="developer_publish_new">Publish New Key Package</string>
+    <string name="developer_rotate_help">Create new material for future invitations. Existing local material is retained.</string>
+    <string name="developer_not_published">No key package is currently published. Publish one to receive new group invitations.</string>
+    <string name="developer_seen_on">Seen on</string>
+    <string name="developer_delete_package">Delete Key Package</string>
+    <string name="developer_retained">Retained Local Material</string>
+    <string name="developer_retained_help">Local material is kept for existing invitations. It is not currently published on relays.</string>
+    <string name="developer_no_retained">No unpublished local material.</string>
+    <string name="developer_refresh_packages">Refresh key packages</string>
+    <string name="developer_work_running">Working…</string>
+    <string name="developer_work_status">%1$s: %2$s</string>
+    <string name="developer_package_id">Package ID</string>
+    <string name="developer_package_source">Source</string>
 </resources>

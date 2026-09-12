@@ -2,11 +2,15 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.material3.Surface
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.whitenoise.android.R
@@ -47,13 +51,17 @@ class KeyPackagesContentTest {
 
         render(listOf(retained, published), onDelete = { deleteTarget = it })
 
-        composeRule.onNodeWithText(IdentityFormatter.short(published.keyPackageId)).assertExists()
+        composeRule.onAllNodesWithText(IdentityFormatter.short(published.keyPackageId)).assertCountEquals(2)
+        composeRule.onNodeWithTag("key_packages.retained.${retained.keyPackageRefHex}").assertExists()
         composeRule.onNodeWithText(IdentityFormatter.short(published.keyPackageRefHex)).assertExists()
         composeRule.onNodeWithText(IdentityFormatter.short(retained.keyPackageRefHex)).assertDoesNotExist()
         composeRule
             .onAllNodesWithContentDescription(app.getString(R.string.delete_key_package))
             .assertCountEquals(1)
-        composeRule.onNodeWithContentDescription(app.getString(R.string.delete_key_package)).performClick()
+        composeRule
+            .onNodeWithContentDescription(app.getString(R.string.delete_key_package))
+            .performScrollTo()
+            .performClick()
         composeRule.runOnIdle { assertSame(published, deleteTarget) }
     }
 
@@ -68,7 +76,7 @@ class KeyPackagesContentTest {
 
         render(listOf(retained))
 
-        composeRule.onNodeWithText(app.getString(R.string.not_published)).assertExists()
+        composeRule.onNodeWithText(app.getString(R.string.developer_retained)).assertExists()
         composeRule.onNodeWithText(app.getString(R.string.no_key_packages_found)).assertDoesNotExist()
         composeRule.onNodeWithText(app.getString(R.string.no_key_packages_found_help)).assertDoesNotExist()
         composeRule
@@ -110,13 +118,30 @@ class KeyPackagesContentTest {
         composeRule
             .onAllNodesWithContentDescription(app.getString(R.string.delete_key_package))
             .assertCountEquals(1)
-        composeRule.onNodeWithContentDescription(app.getString(R.string.delete_key_package)).performClick()
+        composeRule
+            .onNodeWithContentDescription(app.getString(R.string.delete_key_package))
+            .performScrollTo()
+            .performClick()
         composeRule.runOnIdle { assertSame(valid, deleteTarget) }
+    }
+
+    /** Mutation busy state disables publication and every valid package deletion target. */
+    @Test
+    fun workingInventoryDisablesAllMutations() {
+        val target = keyPackage("published-slot", eventIdHex = "ab".repeat(32), relay = true)
+        render(listOf(target), working = true)
+        composeRule.onNodeWithText(app.getString(R.string.republish)).assertIsNotEnabled()
+        composeRule.onNodeWithTag("key_packages.publish").assertIsNotEnabled()
+        composeRule
+            .onNodeWithContentDescription(app.getString(R.string.delete_key_package))
+            .performScrollTo()
+            .assertIsNotEnabled()
     }
 
     private fun render(
         packages: List<AccountKeyPackageFfi>,
         onDelete: (AccountKeyPackageFfi) -> Unit = {},
+        working: Boolean = false,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -127,7 +152,7 @@ class KeyPackagesContentTest {
                                 hasActiveAccount = true,
                                 loaded = true,
                                 loading = false,
-                                working = false,
+                                working = working,
                                 packageCount = packages.count { it.relay },
                             ),
                         packages = packages,

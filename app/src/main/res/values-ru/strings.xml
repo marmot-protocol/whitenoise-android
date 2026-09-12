@@ -2083,4 +2083,18 @@
     <string name="profile_lightning_address">Lightning-адрес</string>
     <string name="profile_image_failed">Не удалось загрузить это изображение. Выберите другое изображение или повторите попытку.</string>
     <string name="profile_publish_failed">Ваш профиль не удалось сохранить. Проверьте свои данные и повторите попытку.</string>
+    <string name="developer_republish_help">Опубликуйте текущий локальный material еще раз, не поворачивая его.</string>
+    <string name="developer_publish_new">Опубликовать новый пакет ключей</string>
+    <string name="developer_rotate_help">Создайте новый material для будущих приглашений. Существующий локальный material сохраняется.</string>
+    <string name="developer_not_published">Ни один ключевой пакет в настоящее время не опубликован. Опубликуйте его, чтобы получать приглашения в новые группы.</string>
+    <string name="developer_seen_on">Видел на</string>
+    <string name="developer_delete_package">Удалить пакет ключей</string>
+    <string name="developer_retained">Сохранен локальный Material</string>
+    <string name="developer_retained_help">Локальный material сохраняется для существующих приглашений. В настоящее время он не публикуется на реле.</string>
+    <string name="developer_no_retained">Нет неопубликованных локальных material.</string>
+    <string name="developer_refresh_packages">Обновить пакеты ключей</string>
+    <string name="developer_work_running">Работаю…</string>
+    <string name="developer_work_status">%1$s: %2$s</string>
+    <string name="developer_package_id">ID пакета</string>
+    <string name="developer_package_source">Источник</string>
 </resources>
