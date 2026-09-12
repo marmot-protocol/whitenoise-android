@@ -1108,6 +1108,19 @@
     <string name="key_export_expired_body">Return to Profile Keys and start the export again. No key data was written.</string>
     <string name="access_amber_signed_in">Signed in with Amber</string>
     <string name="access_amber_owns_key">Amber holds this profile’s Private Key. Manage backups in Amber.</string>
+    <string name="allow_notifications">Allow notifications</string>
+    <string name="allow_notifications_detail">Get notified about new messages and use these options.</string>
+    <string name="notifications_are_off">Notifications are off</string>
+    <string name="notifications_are_off_detail">Turn them on in Android Settings to use these options.</string>
+    <string name="delivery">Delivery</string>
+    <string name="local_notifications_detail">Create message notifications on this device. Without native push, delivery may wait until White Noise is active.</string>
+    <string name="native_push_title">Native push</string>
+    <string name="notification_push_detail">Use a generic wake-up signal to check for new messages in the background. Message details stay on this device.</string>
+    <string name="keep_connected_in_background">Keep connected in the background</string>
+    <string name="keep_connected_in_background_detail">Keep checking for new messages while White Noise is in the background.</string>
+    <string name="notification_background_on">Background connection is on.</string>
+    <string name="notification_background_off">Background connection is off.</string>
+    <string name="notification_categories_detail">Android controls sound, vibration and importance for each category.</string>
     <string name="settings_mdk_version_label" translatable="false">MDK %1$s</string>
     <!-- Release-channel name shown on staging builds only; not a translatable word. -->
     <string name="settings_staging_badge" translatable="false">STAGING</string>

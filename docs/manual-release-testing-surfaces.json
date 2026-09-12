@@ -4581,15 +4581,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "fun GlobalNotificationCategories(",
         "test_ids": [
-          "NTF-001"
-        ]
-      },
-      {
-        "surface": "GlobalNotificationCategoryRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "fun GlobalNotificationCategoryRow(",
-        "test_ids": [
-          "NTF-001"
+          "SET-001"
         ]
       },
       {
@@ -4597,15 +4589,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "fun NativePushSettingRow(",
         "test_ids": [
-          "NTF-004"
-        ]
-      },
-      {
-        "surface": "NotificationSwitchRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "fun NotificationSwitchRow(",
-        "test_ids": [
-          "NTF-001"
+          "SET-001"
         ]
       },
       {
@@ -4613,7 +4597,23 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "fun NotificationsScreen(",
         "test_ids": [
-          "NTF-001"
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "NotificationPermissionGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "fun NotificationPermissionGroup(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "NotificationPermissionIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "fun NotificationPermissionIcon(",
+        "test_ids": [
+          "SET-001"
         ]
       },
       {
@@ -7895,59 +7895,9 @@
         ]
       },
       {
-        "surface": "setting:keep_connected_subtitle",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.keep_connected_subtitle",
-        "test_ids": [
-          "NTF-001",
-          "NTF-002",
-          "NTF-003",
-          "NTF-004",
-          "NTF-005",
-          "NTF-006",
-          "NTF-007",
-          "NTF-008",
-          "NTF-009",
-          "NTF-010",
-          "NTF-011",
-          "NTF-012",
-          "NTF-013",
-          "NTF-014",
-          "NTF-015",
-          "NTF-016",
-          "NTF-017",
-          "NTF-018"
-        ]
-      },
-      {
         "surface": "setting:local_notifications",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "R.string.local_notifications",
-        "test_ids": [
-          "NTF-001",
-          "NTF-002",
-          "NTF-003",
-          "NTF-004",
-          "NTF-005",
-          "NTF-006",
-          "NTF-007",
-          "NTF-008",
-          "NTF-009",
-          "NTF-010",
-          "NTF-011",
-          "NTF-012",
-          "NTF-013",
-          "NTF-014",
-          "NTF-015",
-          "NTF-016",
-          "NTF-017",
-          "NTF-018"
-        ]
-      },
-      {
-        "surface": "setting:local_notifications_subtitle",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.local_notifications_subtitle",
         "test_ids": [
           "NTF-001",
           "NTF-002",
@@ -7995,28 +7945,195 @@
         ]
       },
       {
-        "surface": "setting:notification_defaults",
+        "surface": "string:allow_notifications",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.notification_defaults",
+        "anchor": "R.string.allow_notifications",
         "test_ids": [
-          "NTF-001",
-          "NTF-002",
-          "NTF-003",
-          "NTF-004",
-          "NTF-005",
-          "NTF-006",
-          "NTF-007",
-          "NTF-008",
-          "NTF-009",
-          "NTF-010",
-          "NTF-011",
-          "NTF-012",
-          "NTF-013",
-          "NTF-014",
-          "NTF-015",
-          "NTF-016",
-          "NTF-017",
-          "NTF-018"
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:allow_notifications_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.allow_notifications_detail",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:delivery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.delivery",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:keep_connected_in_background",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.keep_connected_in_background",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:keep_connected_in_background_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.keep_connected_in_background_detail",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:local_notifications_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.local_notifications_detail",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:native_push_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.native_push_title",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notification_background_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_background_off",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notification_background_on",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_background_on",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notification_categories",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_categories",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notification_categories_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_categories_detail",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notification_channel_agent_activity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_channel_agent_activity",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notification_channel_app_updates",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_channel_app_updates",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notification_channel_direct_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_channel_direct_messages",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notification_channel_group_membership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_channel_group_membership",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notification_channel_group_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_channel_group_messages",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notification_channel_invites",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_channel_invites",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notification_channel_mentions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_channel_mentions",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notification_channel_reactions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_channel_reactions",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notification_push_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_push_detail",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notifications",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notifications",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notifications_are_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notifications_are_off",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notifications_are_off_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notifications_are_off_detail",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:toast_notification_permission_denied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.toast_notification_permission_denied",
+        "test_ids": [
+          "SET-001"
         ]
       },
       {
