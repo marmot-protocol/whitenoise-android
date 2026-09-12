@@ -1,13 +1,15 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.app.Application
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -26,7 +28,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
-import dev.ipf.whitenoise.android.ui.profile.PROFILE_QUICK_ACTIONS_TAG
+import dev.ipf.whitenoise.android.ui.profile.PROFILE_MESSAGE_ACTION_TAG
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -176,25 +178,25 @@ class DetailsSurfacePolishScreenshotTest {
         appState.presentDiscoveredProfile(npub, profile)
 
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
-                val density = LocalDensity.current
-                CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
-                    ProfileSheet(
-                        appState = appState,
-                        npub = npub,
-                        onOpenGroup = { _, _ -> },
-                        onStartGroup = {},
-                        onDismiss = {},
-                    )
-                }
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = fontScale) {
+                ProfileSheet(
+                    appState = appState,
+                    npub = npub,
+                    onOpenGroup = { _, _ -> },
+                    onStartGroup = {},
+                    onDismiss = {},
+                )
             }
         }
         composeRule.waitForIdle()
         assertUnavailableCallsAreAbsent()
         if (targetHex == null || targetHex == SELF_HEX) {
-            composeRule.onNodeWithTag(PROFILE_QUICK_ACTIONS_TAG).assertDoesNotExist()
+            composeRule.onNodeWithTag(PROFILE_MESSAGE_ACTION_TAG).assertDoesNotExist()
         } else {
-            composeRule.onNodeWithTag(PROFILE_QUICK_ACTIONS_TAG).assertExists()
+            composeRule.onNodeWithTag(PROFILE_MESSAGE_ACTION_TAG).assertIsDisplayed()
+            composeRule
+                .onNode(hasClickAction() and hasAnyAncestor(hasTestTag(PROFILE_MESSAGE_ACTION_TAG)))
+                .assertIsEnabled()
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshot")
     }
