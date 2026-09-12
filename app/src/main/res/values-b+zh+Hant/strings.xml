@@ -1671,6 +1671,12 @@
     <string name="ai_agents_clipboard_disclosure">這些是安裝提示。選擇你的代理，複製相應提示並將其貼到該代理中，即可將其連接到 White Noise。提示包含你的 npub（公鑰，並非秘密），並會讓代理先解釋連接器的運作方式，再請求你的安裝核准。請僅使用由你執行且信任的代理；其中絕不會包含你的私鑰。</string>
     <string name="ai_agents_connectors_title">連接器</string>
     <string name="ai_agents_prompt_copied">提示已複製——請貼到你的代理中。</string>
+    <string name="ai_agents_public_key_unavailable">你的公鑰不可用。返回設定並嘗試其他個人檔案。</string>
+    <string name="ai_agents_setup_title">設定 %1$s</string>
+    <string name="ai_agents_setup_instruction">將此提示複製到 %1$s 中。其中包含你的公鑰，並會在安裝前請求你的核准。</string>
+    <string name="ai_agents_copy_prompt">複製提示</string>
+    <string name="ai_agents_docs_opened">正在開啟連接器文件。</string>
+    <string name="ai_agents_docs_failed">無法開啟連接器文件。</string>
     <string name="ai_agents_manual_setup_title">手動設定</string>
     <string name="ai_agents_manual_setup_body">代理分享其 npub 後，從 %1$s 將其新增為聯絡人並開始聊天。完整說明請參閱代理連接器文件。</string>
     <string name="ai_agents_connector_docs_title">代理連接器文件</string>

@@ -1760,6 +1760,12 @@
     <string name="ai_agents_clipboard_disclosure">Это запросы на установку. Выберите своего агента, скопируйте запрос и вставьте его в этого агента, чтобы подключить его к White Noise. Запрос содержит вашу npub (открытый ключ, не секрет) и просит агента объяснить, как работает коннектор, прежде чем запросить ваше одобрение на установку. Используйте только агента, которого вы запускаете и которому доверяете; приватный ключ никогда не включается.</string>
     <string name="ai_agents_connectors_title">Коннекторы</string>
     <string name="ai_agents_prompt_copied">Запрос скопирован — вставьте его в ваш агент.</string>
+    <string name="ai_agents_public_key_unavailable">Ваш открытый ключ недоступен. Вернитесь в настройки и попробуйте другой профиль.</string>
+    <string name="ai_agents_setup_title">Настройка %1$s</string>
+    <string name="ai_agents_setup_instruction">Вставьте этот запрос в %1$s. Он содержит ваш публичный ключ и требует согласия перед установкой.</string>
+    <string name="ai_agents_copy_prompt">Копировать запрос</string>
+    <string name="ai_agents_docs_opened">Открытие документации коннектора.</string>
+    <string name="ai_agents_docs_failed">Не удалось открыть документацию коннектора.</string>
     <string name="ai_agents_manual_setup_title">Ручная настройка</string>
     <string name="ai_agents_manual_setup_body">После того как агент поделится своей npub, добавьте его в контакты через %1$s и начните общение. Подробности см. в документации коннектора агентов.</string>
     <string name="ai_agents_connector_docs_title">Документация коннектора агентов</string>

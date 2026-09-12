@@ -625,6 +625,12 @@
     <string name="ai_agents_clipboard_disclosure">These are installation prompts. Choose your agent, copy its prompt, and paste it into that agent to connect it to White Noise. The prompt includes your npub (a public key, not a secret) and asks the agent to explain how the connector works before requesting your approval to install it. Only use an agent you run and trust; your private key is never included.</string>
     <string name="ai_agents_connectors_title">Connectors</string>
     <string name="ai_agents_prompt_copied">Prompt copied — paste it into your agent.</string>
+    <string name="ai_agents_public_key_unavailable">Your public key is unavailable. Return to Settings and try another profile.</string>
+    <string name="ai_agents_setup_title">Set up %1$s</string>
+    <string name="ai_agents_setup_instruction">Copy this prompt into %1$s. It includes your public key and asks for approval before installation.</string>
+    <string name="ai_agents_copy_prompt">Copy prompt</string>
+    <string name="ai_agents_docs_opened">Opening the connector documentation.</string>
+    <string name="ai_agents_docs_failed">The connector documentation could not be opened.</string>
     <string name="ai_agents_manual_setup_title">Manual setup</string>
     <string name="ai_agents_manual_setup_body">After the agent shares its npub, add it as a contact from %1$s and start chatting. See the agent connector docs for full details.</string>
     <string name="ai_agents_connector_docs_title">Agent connector documentation</string>

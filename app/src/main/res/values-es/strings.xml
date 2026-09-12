@@ -1698,6 +1698,12 @@
     <string name="ai_agents_clipboard_disclosure">Estas son instrucciones de instalación. Elige tu agente, copia su instrucción y pégala en ese agente para conectarlo a White Noise. La instrucción incluye tu npub (una clave pública, no un secreto) y pide al agente que explique cómo funciona el conector antes de solicitar tu aprobación para instalarlo. Usa solo un agente que ejecutes y en el que confíes; tu clave privada nunca se incluye.</string>
     <string name="ai_agents_connectors_title">Conectores</string>
     <string name="ai_agents_prompt_copied">Indicación copiada — pégala en tu agente.</string>
+    <string name="ai_agents_public_key_unavailable">Tu clave pública no está disponible. Vuelve a Configuración y prueba con otro perfil.</string>
+    <string name="ai_agents_setup_title">Configurar %1$s</string>
+    <string name="ai_agents_setup_instruction">Copia esta indicación en %1$s. Incluye tu clave pública y pide tu aprobación antes de la instalación.</string>
+    <string name="ai_agents_copy_prompt">Copiar indicación</string>
+    <string name="ai_agents_docs_opened">Abriendo la documentación del conector.</string>
+    <string name="ai_agents_docs_failed">No se pudo abrir la documentación del conector.</string>
     <string name="ai_agents_manual_setup_title">Configuración manual</string>
     <string name="ai_agents_manual_setup_body">Cuando el agente comparta su npub, añádelo como contacto desde %1$s y empieza a chatear. Consulta la documentación del conector de agentes para más detalles.</string>
     <string name="ai_agents_connector_docs_title">Documentación del conector de agentes</string>
