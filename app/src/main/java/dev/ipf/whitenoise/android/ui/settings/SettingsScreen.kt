@@ -251,6 +251,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         -> SettingsDetail.Appearance
         SettingsDetail.About -> SettingsDetail.Help
         SettingsDetail.KeyPackages -> SettingsDetail.Developer
+        SettingsDetail.DiagnosticsImprovements -> SettingsDetail.DevicePrivacy
         else -> null
     }
 
@@ -288,6 +289,34 @@ internal fun SettingsScreen(
     // hand control to the chats list (mirroring the top-bar back arrow).
     settingsBackHandler(detail, onBackToChats, onDetailChange)
 
+    if (detail == null) {
+        SettingsHomeScreen(
+            appState = appState,
+            onBackToChats = onBackToChats,
+            onOpenDetail = { onDetailChange(it) },
+            onOpenSupportChat = onOpenSupportChat,
+            viewport = homeViewport,
+            onViewportChange = onHomeViewportChange,
+        )
+        return
+    }
+    SettingsDetailRoute(
+        appState = appState,
+        detail = detail,
+        onOpenDiagnostics = onOpenDiagnostics,
+        onDetailChange = onDetailChange,
+    )
+}
+
+/** Every Settings detail destination and the parent each one returns to. */
+@Composable
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
+private fun SettingsDetailRoute(
+    appState: WhiteNoiseAppState,
+    detail: SettingsDetail,
+    onOpenDiagnostics: () -> Unit,
+    onDetailChange: (SettingsDetail?) -> Unit,
+) {
     when (detail) {
         SettingsDetail.ShareConnect -> ShareConnectScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Appearance ->
@@ -310,7 +339,14 @@ internal fun SettingsScreen(
         SettingsDetail.KeyPackages ->
             KeyPackagesScreen(appState, onBack = { onDetailChange(SettingsDetail.Developer) })
         SettingsDetail.Notifications -> NotificationsScreen(appState, onBack = { onDetailChange(null) })
-        SettingsDetail.DevicePrivacy -> DevicePrivacyScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.DevicePrivacy ->
+            DevicePrivacyScreen(
+                appState,
+                onBack = { onDetailChange(null) },
+                onOpenDiagnostics = { onDetailChange(SettingsDetail.DiagnosticsImprovements) },
+            )
+        SettingsDetail.DiagnosticsImprovements ->
+            DiagnosticsImprovementsScreen(appState, onBack = { onDetailChange(SettingsDetail.DevicePrivacy) })
         SettingsDetail.AiAgents -> AiAgentsScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Donate -> DonateScreen(onBack = { onDetailChange(null) })
         SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = { onDetailChange(null) })
@@ -332,15 +368,6 @@ internal fun SettingsScreen(
                 onBack = { onDetailChange(null) },
                 onOpenDiagnostics = onOpenDiagnostics,
                 onOpenKeyPackages = { onDetailChange(SettingsDetail.KeyPackages) },
-            )
-        null ->
-            SettingsHomeScreen(
-                appState = appState,
-                onBackToChats = onBackToChats,
-                onOpenDetail = { onDetailChange(it) },
-                onOpenSupportChat = onOpenSupportChat,
-                viewport = homeViewport,
-                onViewportChange = onHomeViewportChange,
             )
     }
 }

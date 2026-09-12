@@ -22,6 +22,7 @@ internal enum class SettingsDetail {
     KeyPackages,
     Notifications,
     DevicePrivacy,
+    DiagnosticsImprovements,
     AiAgents,
     Donate,
     TextToSpeech,
