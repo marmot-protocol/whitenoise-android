@@ -1696,6 +1696,12 @@
     <string name="ai_agents_clipboard_disclosure">Bunlar kurulum istemleridir. Ajanınızı seçin, istemini kopyalayın ve White Noise’a bağlamak için o ajana yapıştırın. İstem, npub’ınızı (gizli olmayan genel anahtarınızı) içerir ve ajanınızdan kurulum için onayınızı istemeden önce bağlayıcının nasıl çalıştığını açıklamasını ister. Yalnızca çalıştırdığınız ve güvendiğiniz bir ajanı kullanın; özel anahtarınız hiçbir zaman eklenmez.</string>
     <string name="ai_agents_connectors_title">Bağlayıcılar</string>
     <string name="ai_agents_prompt_copied">İstem kopyalandı — ajana yapıştırın.</string>
+    <string name="ai_agents_public_key_unavailable">Genel anahtarınız kullanılamıyor. Ayarlar’a dönün ve başka bir profil deneyin.</string>
+    <string name="ai_agents_setup_title">%1$s kurulumu</string>
+    <string name="ai_agents_setup_instruction">Bu istemi %1$s içine yapıştırın. Açık anahtarınızı içerir ve kurulumdan önce onay ister.</string>
+    <string name="ai_agents_copy_prompt">İstemi kopyala</string>
+    <string name="ai_agents_docs_opened">Bağlayıcı belgeleri açılıyor.</string>
+    <string name="ai_agents_docs_failed">Bağlayıcı belgeleri açılamadı.</string>
     <string name="ai_agents_manual_setup_title">Manuel kurulum</string>
     <string name="ai_agents_manual_setup_body">Ajan npub\'unu paylaştıktan sonra %1$s üzerinden kişi olarak ekleyin ve sohbete başlayın. Tüm ayrıntılar için ajan bağlayıcı belgelerine bakın.</string>
     <string name="ai_agents_connector_docs_title">Ajan bağlayıcı belgeleri</string>

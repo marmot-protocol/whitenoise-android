@@ -1698,6 +1698,12 @@
     <string name="ai_agents_clipboard_disclosure">Voici des invites d’installation. Choisissez votre agent, copiez son invite et collez-la dans cet agent pour le connecter à White Noise. L’invite comprend votre npub (une clé publique, pas un secret) et demande à l’agent d’expliquer le fonctionnement du connecteur avant de solliciter votre approbation pour l’installer. Utilisez uniquement un agent que vous exécutez et auquel vous faites confiance ; votre clé privée n’est jamais incluse.</string>
     <string name="ai_agents_connectors_title">Connecteurs</string>
     <string name="ai_agents_prompt_copied">Invite copiée — collez-la dans votre agent.</string>
+    <string name="ai_agents_public_key_unavailable">Votre clé publique n’est pas disponible. Revenez aux paramètres et essayez un autre profil.</string>
+    <string name="ai_agents_setup_title">Configurer %1$s</string>
+    <string name="ai_agents_setup_instruction">Copiez cette invite dans %1$s. Elle contient votre clé publique et demande votre accord avant l’installation.</string>
+    <string name="ai_agents_copy_prompt">Copier l’invite</string>
+    <string name="ai_agents_docs_opened">Ouverture de la documentation du connecteur.</string>
+    <string name="ai_agents_docs_failed">Impossible d’ouvrir la documentation du connecteur.</string>
     <string name="ai_agents_manual_setup_title">Configuration manuelle</string>
     <string name="ai_agents_manual_setup_body">Une fois que l\'agent a partagé sa npub, ajoutez-le comme contact depuis %1$s et commencez à discuter. Consultez la documentation du connecteur d\'agent pour tous les détails.</string>
     <string name="ai_agents_connector_docs_title">Documentation du connecteur d\'agent</string>
