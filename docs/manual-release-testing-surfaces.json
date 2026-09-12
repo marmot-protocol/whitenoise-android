@@ -3716,26 +3716,8 @@
         ]
       },
       {
-        "surface": "OnboardingSavedAccountCard",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
-        "anchor": "fun OnboardingSavedAccountCard(",
-        "test_ids": [
-          "ONB-009",
-          "ONB-024"
-        ]
-      },
-      {
-        "surface": "OnboardingSavedAccountPicker",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
-        "anchor": "fun OnboardingSavedAccountPicker(",
-        "test_ids": [
-          "ONB-009",
-          "ONB-024"
-        ]
-      },
-      {
         "surface": "OnboardingContent",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/WelcomeScreen.kt",
         "anchor": "fun OnboardingContent(",
         "test_ids": [
           "ONB-001"
@@ -3743,16 +3725,8 @@
       },
       {
         "surface": "OnboardingOfflineNotice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/WelcomeScreen.kt",
         "anchor": "fun OnboardingOfflineNotice(",
-        "test_ids": [
-          "ONB-001"
-        ]
-      },
-      {
-        "surface": "OnboardingRotatingSlogan",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
-        "anchor": "fun OnboardingRotatingSlogan(",
         "test_ids": [
           "ONB-001"
         ]
@@ -3767,7 +3741,7 @@
       },
       {
         "surface": "IdentityEntryForm",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/IdentityEntryForm.kt",
         "anchor": "fun IdentityEntryForm(",
         "test_ids": [
           "ONB-001"
@@ -3775,7 +3749,7 @@
       },
       {
         "surface": "PublicIdentifierFieldTrailingAction",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/IdentityEntryForm.kt",
         "anchor": "fun PublicIdentifierFieldTrailingAction(",
         "test_ids": [
           "ONB-001"
@@ -3787,22 +3761,6 @@
         "anchor": "fun SignInContent(",
         "test_ids": [
           "ONB-001"
-        ]
-      },
-      {
-        "surface": "AddAccountOptionRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddIdentitySheet.kt",
-        "anchor": "fun AddAccountOptionRow(",
-        "test_ids": [
-          "PRO-001"
-        ]
-      },
-      {
-        "surface": "AddAccountSheetContent",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddIdentitySheet.kt",
-        "anchor": "fun AddAccountSheetContent(",
-        "test_ids": [
-          "PRO-001"
         ]
       },
       {
@@ -3967,30 +3925,6 @@
         "surface": "QrCodeImage",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrCodeImage.kt",
         "anchor": "fun QrCodeImage(",
-        "test_ids": [
-          "PRO-001"
-        ]
-      },
-      {
-        "surface": "CameraQrScanner",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
-        "anchor": "fun CameraQrScanner(",
-        "test_ids": [
-          "PRO-001"
-        ]
-      },
-      {
-        "surface": "QrScannerSheet",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
-        "anchor": "fun QrScannerSheet(",
-        "test_ids": [
-          "PRO-001"
-        ]
-      },
-      {
-        "surface": "QrScannerSheetContent",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
-        "anchor": "fun QrScannerSheetContent(",
         "test_ids": [
           "PRO-001"
         ]
@@ -4966,19 +4900,6 @@
         ]
       },
       {
-        "surface": "SetupEditorContent",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "fun SetupEditorContent(",
-        "test_ids": [
-          "ONB-013",
-          "ONB-014",
-          "ONB-016",
-          "ONB-018",
-          "ONB-019",
-          "ONB-021"
-        ]
-      },
-      {
         "surface": "AccountSetupPreview",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "fun AccountSetupPreview(",
@@ -5002,14 +4923,6 @@
         ]
       },
       {
-        "surface": "SetupProfileFields",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "fun SetupProfileFields(",
-        "test_ids": [
-          "ONB-014"
-        ]
-      },
-      {
         "surface": "SetupOperationNotice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "fun SetupOperationNotice(",
@@ -5022,16 +4935,6 @@
         "surface": "SetupActionButton",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupButtons.kt",
         "anchor": "fun SetupActionButton(",
-        "test_ids": [
-          "ONB-013",
-          "ONB-016",
-          "ONB-021"
-        ]
-      },
-      {
-        "surface": "SetupHeader",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupChrome.kt",
-        "anchor": "fun SetupHeader(",
         "test_ids": [
           "ONB-013",
           "ONB-016",
@@ -5329,15 +5232,6 @@
         "test_ids": [
           "NAV-005",
           "NAV-006"
-        ]
-      },
-      {
-        "surface": "RowScope.OnboardingOfflineMessage",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
-        "anchor": "fun RowScope.OnboardingOfflineMessage(",
-        "test_ids": [
-          "ONB-001",
-          "ONB-002"
         ]
       },
       {
@@ -6407,6 +6301,293 @@
           "SYS-008",
           "SYS-009",
           "SYS-010"
+        ]
+      },
+      {
+        "surface": "WelcomeScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/WelcomeScreen.kt",
+        "anchor": "fun WelcomeScreen(",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "SignInKeyField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "fun SignInKeyField(",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "RetainedProfilesSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "fun RetainedProfilesSheet(",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "onboardingSavedAccountActionLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "fun onboardingSavedAccountActionLabel(",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "SignUpScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "fun SignUpScreen(",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "SignUpContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "fun SignUpContent(",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "SignUpAvatar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "fun SignUpAvatar(",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "SignUpPhotoControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpPhotoControls.kt",
+        "anchor": "fun SignUpPhotoControls(",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "QrScannerSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
+        "anchor": "fun QrScannerSheet(",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "CameraQrScanner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
+        "anchor": "fun CameraQrScanner(",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "QrScannerSheetContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "fun QrScannerSheetContent(",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "ScannerRecoveryCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "fun ScannerRecoveryCard(",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "ScannerPermissionArea",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "fun ScannerPermissionArea(",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "ScannerErrorDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "fun ScannerErrorDialog(",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "ScannerHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "fun ScannerHeader(",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "RoundedQrTarget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "fun RoundedQrTarget(",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "SetupEditorActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
+        "anchor": "fun SetupEditorActions(",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "rememberSetupEditorFields",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "fun rememberSetupEditorFields(",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "SetupEditorContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "fun SetupEditorContent(",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "SetupPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupPage.kt",
+        "anchor": "fun SetupPage(",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "StartupProgressContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": "fun StartupProgressContent(",
+        "test_ids": [
+          "INT-003",
+          "INT-004"
+        ]
+      },
+      {
+        "surface": "StartupFailureScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": "fun StartupFailureScreen(",
+        "test_ids": [
+          "INT-003",
+          "INT-004"
+        ]
+      },
+      {
+        "surface": "StartupStatusPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": "fun StartupStatusPage(",
+        "test_ids": [
+          "INT-003",
+          "INT-004"
+        ]
+      },
+      {
+        "surface": "AddAccountSheetContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddAccountSheetContent.kt",
+        "anchor": "fun AddAccountSheetContent(",
+        "test_ids": [
+          "PRO-001",
+          "NAV-007",
+          "ONB-020"
+        ]
+      },
+      {
+        "surface": "AddProfileFeedbackDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddProfileFeedbackDialog.kt",
+        "anchor": "fun AddProfileFeedbackDialog(",
+        "test_ids": [
+          "PRO-001",
+          "NAV-007",
+          "ONB-020"
+        ]
+      },
+      {
+        "surface": "Modifier.reserveSnackbarSpace",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PinnedActionSnackbarInset.kt",
+        "anchor": "fun Modifier.reserveSnackbarSpace(",
+        "test_ids": [
+          "ONB-001"
         ]
       }
     ],
@@ -13655,6 +13836,1027 @@
           "SYS-008",
           "SYS-009"
         ]
+      },
+      {
+        "surface": "R.string.identity_entry_error_import_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.identity_entry_error_import_failed",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.identity_entry_error_invalid_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.identity_entry_error_invalid_key",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.sign_in_error_public_key",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_setup_key_package_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.sign_in_error_setup_key_package_retry",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_setup_recovery_declined",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.sign_in_error_setup_recovery_declined",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_setup_recovery_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.sign_in_error_setup_recovery_failed",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_setup_recovery_unexpected_state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.sign_in_error_setup_recovery_unexpected_state",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_setup_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.sign_in_error_setup_retry",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_setup_unexpected_state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.sign_in_error_setup_unexpected_state",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.app_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/WelcomeScreen.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.creating_identity_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/WelcomeScreen.kt",
+        "anchor": "R.string.creating_identity_title",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_login",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/WelcomeScreen.kt",
+        "anchor": "R.string.onboarding_login",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_offline_setup_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/WelcomeScreen.kt",
+        "anchor": "R.string.onboarding_offline_setup_message",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_sign_up",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/WelcomeScreen.kt",
+        "anchor": "R.string.onboarding_sign_up",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/WelcomeScreen.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.settings_add_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/WelcomeScreen.kt",
+        "anchor": "R.string.settings_add_profile",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.amber_signin_waiting_proof",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+        "anchor": "R.string.amber_signin_waiting_proof",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.amber_signin_waiting_request",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+        "anchor": "R.string.amber_signin_waiting_request",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.identity_entry_error_invalid_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+        "anchor": "R.string.identity_entry_error_invalid_key",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_login_with_amber",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+        "anchor": "R.string.onboarding_login_with_amber",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_signing_in",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+        "anchor": "R.string.onboarding_signing_in",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+        "anchor": "R.string.sign_in",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+        "anchor": "R.string.sign_in_error_public_key",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_recovery_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+        "anchor": "R.string.sign_in_recovery_confirm",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_recovery_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+        "anchor": "R.string.sign_in_recovery_message",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_recovery_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+        "anchor": "R.string.sign_in_recovery_title",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.clear",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.clear",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.identity_entry_error_invalid_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.identity_entry_error_invalid_key",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.ok",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.ok",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_enter_private_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.onboarding_enter_private_key",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.paste",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.paste",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.private_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.private_key",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.scan_qr_code",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.scan_qr_code",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.sign_in_error_public_key",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_secret_key_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.sign_in_secret_key_help",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.clear",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/IdentityEntryForm.kt",
+        "anchor": "R.string.clear",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.identity_entry_error_invalid_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/IdentityEntryForm.kt",
+        "anchor": "R.string.identity_entry_error_invalid_key",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_nsec",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/IdentityEntryForm.kt",
+        "anchor": "R.string.nostr_nsec",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.nsec_or_npub",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/IdentityEntryForm.kt",
+        "anchor": "R.string.nsec_or_npub",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.paste",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/IdentityEntryForm.kt",
+        "anchor": "R.string.paste",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.scan_qr_code",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/IdentityEntryForm.kt",
+        "anchor": "R.string.scan_qr_code",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/IdentityEntryForm.kt",
+        "anchor": "R.string.sign_in_error_public_key",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_choose_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.onboarding_choose_profile",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_signing_in",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.onboarding_signing_in",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.about",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.about",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.creating_identity_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.creating_identity_title",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.media_uploading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.media_uploading",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.name",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_sign_up",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.onboarding_sign_up",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.profile_picture_sheet_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.profile_picture_sheet_title",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.signup_about_prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.signup_about_prompt",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.signup_continue_without_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.signup_continue_without_profile",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.signup_create_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.signup_create_failed",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.signup_leave_profile_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.signup_leave_profile_detail",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.signup_owner_changed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.signup_owner_changed",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.signup_photo_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.signup_photo_failed",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.signup_profile_incomplete_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.signup_profile_incomplete_title",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.signup_publish_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.signup_publish_failed",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.signup_publishing_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.signup_publishing_profile",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.add_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpPhotoControls.kt",
+        "anchor": "R.string.add_photo",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.change_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpPhotoControls.kt",
+        "anchor": "R.string.change_photo",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.find_web_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpPhotoControls.kt",
+        "anchor": "R.string.find_web_image",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.profile_choose_files",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpPhotoControls.kt",
+        "anchor": "R.string.profile_choose_files",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.profile_choose_photos",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpPhotoControls.kt",
+        "anchor": "R.string.profile_choose_photos",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.profile_picture_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpPhotoControls.kt",
+        "anchor": "R.string.profile_picture_hint",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.profile_picture_sheet_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpPhotoControls.kt",
+        "anchor": "R.string.profile_picture_sheet_title",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.remove_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpPhotoControls.kt",
+        "anchor": "R.string.remove_photo",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.signup_preparing_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpPhotoControls.kt",
+        "anchor": "R.string.signup_preparing_photo",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_prepare_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpPhotoControls.kt",
+        "anchor": "R.string.toast_couldnt_prepare_image",
+        "test_ids": [
+          "ONB-002",
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "string:camera_access_required",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
+        "anchor": "R.string.camera_access_required",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:camera_lifecycle_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
+        "anchor": "R.string.camera_lifecycle_unavailable",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:camera_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
+        "anchor": "R.string.camera_unavailable",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:allow_camera",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.allow_camera",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:camera_access_required",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.camera_access_required",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:camera_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.camera_unavailable",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:open_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.open_settings",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:qr_camera_access_needed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.qr_camera_access_needed",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:qr_turn_flashlight_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.qr_turn_flashlight_off",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:qr_turn_flashlight_on",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.qr_turn_flashlight_on",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:scan_qr_code",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.scan_qr_code",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "R.string.qr_private_key_permission_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.qr_private_key_permission_detail",
+        "test_ids": [
+          "ONB-005",
+          "ONB-006"
+        ]
       }
     ],
     "manifest_permissions": [
@@ -14689,14 +15891,6 @@
         ]
       },
       {
-        "surface": "Imported-account setup: R.string.setup_about",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_about",
-        "test_ids": [
-          "ONB-014"
-        ]
-      },
-      {
         "surface": "Imported-account setup: R.string.setup_cancel_pending",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "R.string.setup_cancel_pending",
@@ -14718,30 +15912,6 @@
         "anchor": "R.string.setup_device_possible",
         "test_ids": [
           "ONB-018"
-        ]
-      },
-      {
-        "surface": "Imported-account setup: R.string.setup_discovery_help",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_discovery_help",
-        "test_ids": [
-          "ONB-015"
-        ]
-      },
-      {
-        "surface": "Imported-account setup: R.string.setup_discovery_list",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_discovery_list",
-        "test_ids": [
-          "ONB-015"
-        ]
-      },
-      {
-        "surface": "Imported-account setup: R.string.setup_display_name",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_display_name",
-        "test_ids": [
-          "ONB-014"
         ]
       },
       {
@@ -14810,25 +15980,6 @@
         ]
       },
       {
-        "surface": "Imported-account setup: R.string.setup_ready",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_ready",
-        "test_ids": [
-          "ONB-013",
-          "ONB-019",
-          "ONB-021"
-        ]
-      },
-      {
-        "surface": "Imported-account setup: R.string.setup_relays_help",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_relays_help",
-        "test_ids": [
-          "ONB-016",
-          "ONB-017"
-        ]
-      },
-      {
         "surface": "Imported-account setup: R.string.setup_replacement_warning",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "R.string.setup_replacement_warning",
@@ -14878,16 +16029,6 @@
         "anchor": "R.string.setup_stale",
         "test_ids": [
           "ONB-017"
-        ]
-      },
-      {
-        "surface": "Imported-account setup: R.string.setup_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupChrome.kt",
-        "anchor": "R.string.setup_title",
-        "test_ids": [
-          "ONB-013",
-          "ONB-019",
-          "ONB-021"
         ]
       },
       {
@@ -15465,6 +16606,296 @@
         "anchor": "replyToMessageIdHex",
         "test_ids": [
           "DIC-002"
+        ]
+      },
+      {
+        "surface": "Sign Up ownership: internal class SignUpController(",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpController.kt",
+        "anchor": "internal class SignUpController(",
+        "test_ids": [
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "Sign Up ownership: internal fun beginProfileSignUp()",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal fun beginProfileSignUp()",
+        "test_ids": [
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "Sign Up ownership: internal fun dismissProfileSignUp()",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal fun dismissProfileSignUp()",
+        "test_ids": [
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_later",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
+        "anchor": "R.string.setup_later",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
+        "anchor": "R.string.setup_title",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_working",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
+        "anchor": "R.string.setup_working",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_about",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_about",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_discovery_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_discovery_help",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_discovery_list",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_discovery_list",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_display_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_display_name",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_inbox_list",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_inbox_list",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_read_list",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_read_list",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_relays_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_relays_help",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_write_list",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_write_list",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "R.string.copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "INT-003",
+          "INT-004"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "INT-003",
+          "INT-004"
+        ]
+      },
+      {
+        "surface": "R.string.startup_loading_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": "R.string.startup_loading_message",
+        "test_ids": [
+          "INT-003",
+          "INT-004"
+        ]
+      },
+      {
+        "surface": "R.string.toast_amber_sign_in_cancelled",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddProfileSession.kt",
+        "anchor": "R.string.toast_amber_sign_in_cancelled",
+        "test_ids": [
+          "PRO-001",
+          "NAV-007",
+          "ONB-020"
+        ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_create_identity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddProfileSession.kt",
+        "anchor": "R.string.toast_couldnt_create_identity",
+        "test_ids": [
+          "PRO-001",
+          "NAV-007",
+          "ONB-020"
+        ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_login_amber",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddProfileSession.kt",
+        "anchor": "R.string.toast_couldnt_login_amber",
+        "test_ids": [
+          "PRO-001",
+          "NAV-007",
+          "ONB-020"
+        ]
+      },
+      {
+        "surface": "R.string.copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddProfileFeedbackDialog.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "PRO-001",
+          "NAV-007",
+          "ONB-020"
+        ]
+      },
+      {
+        "surface": "R.string.ok",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddProfileFeedbackDialog.kt",
+        "anchor": "R.string.ok",
+        "test_ids": [
+          "PRO-001",
+          "NAV-007",
+          "ONB-020"
+        ]
+      },
+      {
+        "surface": "Sign Up native feedback: toast_couldnt_create_identity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_couldnt_create_identity",
+        "test_ids": [
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "Sign Up native feedback: toast_couldnt_upload_profile_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppProfileSignUp.kt",
+        "anchor": "R.string.toast_couldnt_upload_profile_image",
+        "test_ids": [
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "Sign Up native feedback: toast_identity_created",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_identity_created",
+        "test_ids": [
+          "ONB-003"
         ]
       }
     ],

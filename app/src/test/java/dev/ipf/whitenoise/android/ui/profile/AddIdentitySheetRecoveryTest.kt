@@ -3,7 +3,7 @@ package dev.ipf.whitenoise.android.ui.profile
 import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -51,10 +51,9 @@ class AddIdentitySheetRecoveryTest {
         composeRule.setContent {
             WhiteNoiseTheme { AddIdentitySheet(appState = appState, onDismiss = { dismissed = true }) }
         }
-        val importLabel = app.getString(R.string.import_existing_identity)
-        composeRule.onAllNodesWithText(importLabel)[0].performClick()
-        composeRule.onNodeWithText(app.getString(R.string.nsec_or_npub)).performTextInput(nsec)
-        composeRule.onAllNodesWithText(importLabel)[1].performClick()
+        composeRule.onNodeWithTag("onboarding.welcome.sign_in").performClick()
+        composeRule.onNodeWithTag("onboarding.sign_in.private_key").performTextInput(nsec)
+        composeRule.onNodeWithTag("onboarding.sign_in.action").performClick()
         composeRule.waitForIdle()
         assertEquals(listOf(nsec), engine.setupBegins)
         assertEquals(0, engine.logins.size)
@@ -77,11 +76,10 @@ class AddIdentitySheetRecoveryTest {
             }
         }
 
-        val importLabel = app.getString(R.string.import_existing_identity)
-        composeRule.onAllNodesWithText(importLabel)[0].performClick()
+        composeRule.onNodeWithTag("onboarding.welcome.sign_in").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText(app.getString(R.string.nsec_or_npub)).performTextInput(nsec)
-        composeRule.onAllNodesWithText(importLabel)[1].performClick()
+        composeRule.onNodeWithTag("onboarding.sign_in.private_key").performTextInput(nsec)
+        composeRule.onNodeWithTag("onboarding.sign_in.action").performClick()
         composeRule.waitForIdle()
 
         assertEquals(1, engine.logins.size)

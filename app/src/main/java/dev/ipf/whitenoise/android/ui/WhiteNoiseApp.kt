@@ -54,11 +54,11 @@ import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
-import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineConfirmationNotice
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
+import dev.ipf.whitenoise.android.ui.common.StartupFailureScreen
 import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.WarmResumeUsefulSurface
@@ -479,6 +479,14 @@ internal fun WhiteNoiseApp(
                             AccountSetupScreen(setupController) {
                                 appState.launchMutation { appState.accountSetup.later() }
                             }
+                        } else if (appState.profileSignUpForPresentation != null) {
+                            WarmResumeUsefulSurface {
+                                dev.ipf.whitenoise.android.ui.onboarding.SignUpScreen(
+                                    controller = checkNotNull(appState.profileSignUpForPresentation),
+                                    hasValidatedInternet = appState::hasValidatedInternet,
+                                    onBack = { appState.dismissProfileSignUp() },
+                                )
+                            }
                         } else {
                             when (val phase = appState.phase) {
                                 AppPhase.Bootstrapping ->
@@ -619,7 +627,7 @@ internal fun WhiteNoiseApp(
                                         surface = WarmResumeRenderedSurface.Error,
                                     ) {
                                         WarmResumeUsefulSurface {
-                                            ErrorContent(
+                                            StartupFailureScreen(
                                                 title = stringResource(R.string.white_noise_couldnt_start),
                                                 error = phase.error,
                                                 onRetry = { scope.launch { appState.retryBootstrap() } },

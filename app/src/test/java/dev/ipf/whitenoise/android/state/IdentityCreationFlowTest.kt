@@ -30,7 +30,7 @@ class IdentityCreationFlowTest {
 
     @Test
     fun postCreateWarmupIsBestEffortAndAccountScoped() {
-        val body = appStateSource().readText().functionBody("launchIdentityPostCreateWarmup")
+        val body = appStateSource("AppProfileSignUp.kt").readText().functionBody("launchIdentityPostCreateWarmup")
 
         assertTrue(body.contains("runBestEffortPostCommitSteps("))
         assertTrue(body.contains("activeAccountRef == summary.label"))
@@ -84,10 +84,10 @@ class IdentityCreationFlowTest {
         running = running,
     )
 
-    private fun appStateSource(): File =
+    private fun appStateSource(name: String = "AppState.kt"): File =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
+            File("src/main/java/dev/ipf/whitenoise/android/state/$name"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/$name"),
         ).firstOrNull { it.exists() }
-            ?: error("Missing AppState.kt source file")
+            ?: error("Missing $name source file")
 }

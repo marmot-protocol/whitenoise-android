@@ -151,6 +151,7 @@ import dev.ipf.whitenoise.android.share.shareResolveMime
 import dev.ipf.whitenoise.android.state.GroupInviteNotificationIdentityRefreshStore.RefreshCandidate
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
+import dev.ipf.whitenoise.android.ui.onboarding.SignUpController
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupCoordinator
 import dev.ipf.whitenoise.android.ui.onboarding.setup.setupOptions
 import dev.ipf.whitenoise.android.updates.AppSelfUpdateFlows
@@ -4367,6 +4368,28 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    private val profileSignUp =
+        AppProfileSignUp(
+            this,
+            ::activateCreatedIdentity,
+            ::configurePrivacyRuntime,
+            ::warmProfile,
+        ) { phase = AppPhase.Ready }
+
+    /** Process-owned receipt survives recreation while native creation or profile publication runs. */
+    internal val pendingProfileSignUp: SignUpController?
+        get() = profileSignUp.pending
+
+    /** Presents the still-owned attempt above phase dispatch, including bootstrap re-entry. */
+    internal val profileSignUpForPresentation: SignUpController?
+        get() = profileSignUp.forPresentation
+
+    /** Opening the form performs no native creation or publication. */
+    internal fun beginProfileSignUp() = profileSignUp.begin()
+
+    /** Discards only an unsubmitted form or stale route; native accepted work remains intact. */
+    internal fun dismissProfileSignUp(): Boolean = profileSignUp.dismiss()
+
     suspend fun createIdentity() {
         val startedAt = SystemClock.elapsedRealtime()
         try {
@@ -4397,31 +4420,8 @@ class WhiteNoiseAppState private constructor(
         reloadMediaAutoDownloadMatrix()
     }
 
-    private fun launchIdentityPostCreateWarmup(summary: AccountSummaryFfi) {
-        mutationsScope.launch {
-            runBestEffortPostCommitSteps(
-                steps =
-                    listOf(
-                        "refresh-accounts" to { refreshAccounts() },
-                        "configure-privacy-runtime" to {
-                            if (activeAccountRef == summary.label) configurePrivacyRuntime()
-                        },
-                        "refresh-notification-settings" to {
-                            if (activeAccountRef == summary.label) refreshLocalNotificationSettings()
-                        },
-                        "warm-profile" to {
-                            if (activeAccountRef == summary.label) warmProfile(summary.accountIdHex)
-                        },
-                        "sync-push-registration" to {
-                            if (activeAccountRef == summary.label) syncNativePushRegistrationIfEnabled()
-                        },
-                    ),
-                onFailure = { step, error ->
-                    appStateDebug(error) { "post-create $step failed: ${error.readableMessage()}" }
-                },
-            )
-        }
-    }
+    /** Runs post-create enrichment without delaying the accepted identity or actionable route. */
+    private fun launchIdentityPostCreateWarmup(summary: AccountSummaryFfi) = profileSignUp.launchIdentityPostCreateWarmup(summary)
 
     /**
      * Reports how the import ended. Failures are reported to the caller (not
