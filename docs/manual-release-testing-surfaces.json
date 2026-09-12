@@ -4194,78 +4194,6 @@
         ]
       },
       {
-        "surface": "AutoDownloadBacklogGroup",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AutoDownloadScreen.kt",
-        "anchor": "fun AutoDownloadBacklogGroup(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "AutoDownloadDataScreen",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AutoDownloadScreen.kt",
-        "anchor": "fun AutoDownloadDataScreen(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "AutoDownloadIntroduction",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AutoDownloadScreen.kt",
-        "anchor": "fun AutoDownloadIntroduction(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "AutoDownloadNetworkGroup",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AutoDownloadScreen.kt",
-        "anchor": "fun AutoDownloadNetworkGroup(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "AutoDownloadPrivacyFooter",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AutoDownloadScreen.kt",
-        "anchor": "fun AutoDownloadPrivacyFooter(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "AutoDownloadSettingsList",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AutoDownloadScreen.kt",
-        "anchor": "fun AutoDownloadSettingsList(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "MediaQualityGroup",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AutoDownloadScreen.kt",
-        "anchor": "fun MediaQualityGroup(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "MediaTypesDialog",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AutoDownloadScreen.kt",
-        "anchor": "fun MediaTypesDialog(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "StopAutomaticDownloadsDialog",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AutoDownloadScreen.kt",
-        "anchor": "fun StopAutomaticDownloadsDialog(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
         "surface": "ChatBubbleColorsScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
         "anchor": "fun ChatBubbleColorsScreen(",
@@ -5560,6 +5488,15 @@
         ]
       },
       {
+        "surface": "Modifier.whiteNoiseDialogSelection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "fun Modifier.whiteNoiseDialogSelection(",
+        "test_ids": [
+          "SET-001",
+          "SET-010"
+        ]
+      },
+      {
         "surface": "LanguageScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageScreen.kt",
         "anchor": "fun LanguageScreen(",
@@ -6084,6 +6021,36 @@
           "SEC-010",
           "SEC-012",
           "SEC-013"
+        ]
+      },
+      {
+        "surface": "DataUsageScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "fun DataUsageScreen(",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "DownloadNetworkOptions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "fun DownloadNetworkOptions(",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "DownloadSwitch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "fun DownloadSwitch(",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
         ]
       }
     ],
@@ -7366,30 +7333,6 @@
           "SET-002",
           "SET-004",
           "SET-005"
-        ]
-      },
-      {
-        "surface": "setting:media_auto_download_backlog_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AutoDownloadScreen.kt",
-        "anchor": "R.string.media_auto_download_backlog_title",
-        "test_ids": [
-          "MED-001"
-        ]
-      },
-      {
-        "surface": "setting:media_auto_download_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AutoDownloadScreen.kt",
-        "anchor": "R.string.media_auto_download_title",
-        "test_ids": [
-          "MED-001"
-        ]
-      },
-      {
-        "surface": "setting:media_quality_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AutoDownloadScreen.kt",
-        "anchor": "R.string.media_quality_title",
-        "test_ids": [
-          "MED-001"
         ]
       },
       {
@@ -9767,6 +9710,346 @@
           "SEC-010",
           "SEC-012",
           "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:data_usage_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.data_usage_title",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_audio",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_audio",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_automatic",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_automatic",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_done",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_enabled",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_enabled",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_files",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_files",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_never",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_never",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_paused",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_paused",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_photos",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_photos",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_quality",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_quality",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_quality_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_quality_help",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_queue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_queue",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_reset",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_reset",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_reset_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_reset_help",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_restart",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_restart",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_rules_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_rules_help",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_sent_media",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_sent_media",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_stop",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_stop",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_stop_confirmation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_stop_confirmation",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:download_videos",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.download_videos",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:media_quality_footer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.media_quality_footer",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:media_quality_high",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.media_quality_high",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:media_quality_high_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.media_quality_high_subtitle",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:media_quality_low",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.media_quality_low",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:media_quality_low_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.media_quality_low_subtitle",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:media_quality_original",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.media_quality_original",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:media_quality_original_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.media_quality_original_subtitle",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:media_quality_standard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.media_quality_standard",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:media_quality_standard_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.media_quality_standard_subtitle",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:network_metered",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.network_metered",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:network_mobile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.network_mobile",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:network_roaming",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.network_roaming",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
+        ]
+      },
+      {
+        "surface": "string:network_wifi",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.network_wifi",
+        "test_ids": [
+          "SET-010",
+          "SET-011",
+          "MED-005"
         ]
       }
     ],

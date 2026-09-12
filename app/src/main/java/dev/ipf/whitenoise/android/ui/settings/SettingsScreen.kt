@@ -332,7 +332,7 @@ private fun SettingsDetailRoute(
         SettingsDetail.ChatBubbleColors ->
             ChatBubbleColorsScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
         SettingsDetail.Language -> LanguageScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
-        SettingsDetail.Data -> AutoDownloadDataScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Data -> DataUsageScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Profile -> ProfileEditScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.AccountKeys -> AccountKeysScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Relays -> RelaysScreen(appState, onBack = { onDetailChange(null) })
