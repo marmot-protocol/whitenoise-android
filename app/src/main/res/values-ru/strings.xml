@@ -1722,6 +1722,10 @@
     <string name="tts_auto_read_override_on">Вкл.</string>
     <string name="tts_auto_read_override_off">Выкл.</string>
     <string name="tts_settings_rate_system">Системная (по настройке устройства)</string>
+    <string name="speech_discovering">Проверка речевых двигателей…</string>
+    <string name="speech_no_engine">Никакой пригодный для использования речевой движок недоступен.</string>
+    <string name="speech_android_settings">Откройте настройки Android.</string>
+    <string name="speech_settings_failed">Не удалось открыть настройки Android.</string>
     <string name="tts_bar_rate_control">Скорость речи, текущая %1$s</string>
     <string name="tts_rate_custom">Настраиваемая</string>
     <string name="tts_rate_custom_error">Введите скорость от 0,1× до 10,0×.</string>

@@ -1660,6 +1660,10 @@
     <string name="tts_auto_read_override_on">Activado</string>
     <string name="tts_auto_read_override_off">Desactivado</string>
     <string name="tts_settings_rate_system">Sistema (seguir el ajuste del dispositivo)</string>
+    <string name="speech_discovering">Comprobando motores de voz…</string>
+    <string name="speech_no_engine">No hay ningún motor de voz utilizable.</string>
+    <string name="speech_android_settings">Abrir los ajustes de Android</string>
+    <string name="speech_settings_failed">No se pudieron abrir los ajustes de Android.</string>
     <string name="tts_bar_rate_control">Velocidad de voz, actual %1$s</string>
     <string name="tts_rate_custom">Personalizada</string>
     <string name="tts_rate_custom_error">Introduce una velocidad de 0,1× a 10,0×.</string>

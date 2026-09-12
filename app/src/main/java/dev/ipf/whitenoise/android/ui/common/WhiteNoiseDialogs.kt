@@ -25,9 +25,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -125,6 +128,8 @@ internal fun WhiteNoiseDialogChoiceRow(
     modifier: Modifier = Modifier,
     fontFamily: FontFamily? = null,
     subtitle: String? = null,
+    enabled: Boolean = true,
+    accessibilityLabel: String? = null,
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         Row(
@@ -133,12 +138,23 @@ internal fun WhiteNoiseDialogChoiceRow(
                     .requiredWidth(maxWidth + ChoiceDialogDefaults.RowOverhang * 2)
                     .then(modifier)
                     .heightIn(min = ChoiceDialogDefaults.RowMinHeight)
-                    .whiteNoiseDialogSelection(selected)
-                    .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-                    .padding(horizontal = ChoiceDialogDefaults.RowOverhang),
+                    .whiteNoiseDialogSelection(selected && enabled)
+                    .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
+                    .then(
+                        if (accessibilityLabel == null) {
+                            Modifier
+                        } else {
+                            Modifier.semantics(mergeDescendants = true) { contentDescription = accessibilityLabel }
+                        },
+                    ).padding(horizontal = ChoiceDialogDefaults.RowOverhang),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RadioButton(selected = selected, onClick = null, modifier = Modifier.clearAndSetSemantics {})
+            RadioButton(
+                selected = selected,
+                onClick = null,
+                enabled = enabled,
+                modifier = Modifier.clearAndSetSemantics {},
+            )
             Column(
                 Modifier
                     .weight(1f)
@@ -147,7 +163,12 @@ internal fun WhiteNoiseDialogChoiceRow(
             ) {
                 Text(
                     text = title,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color =
+                        if (enabled) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                     style = MaterialTheme.typography.bodyLarge,
                     fontFamily = fontFamily,
                 )
@@ -213,3 +234,55 @@ internal fun WhiteNoiseAlertDialog(
         )
     }
 }
+
+/** One option in a speech picker: its own label, selected state, availability reason and action. */
+internal data class SpeechChoice(
+    val title: String,
+    val selected: Boolean,
+    val subtitle: String? = null,
+    val enabled: Boolean = true,
+    val accessibilityLabel: String? = null,
+    val onClick: () -> Unit,
+)
+
+/**
+ * Dialog of speech options. Unlike [ChoiceDialog] each row carries its own availability and action, because an
+ * engine or voice can be listed while it cannot be chosen (not installed, network-only, ambiguous identity).
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun SpeechChoiceDialog(
+    title: String,
+    choices: List<SpeechChoice>,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(
+                Modifier
+                    .widthIn(max = ChoiceDialogDefaults.ContentMaxWidth)
+                    .fillMaxWidth()
+                    .heightIn(max = SpeechChoiceDialogMaxHeight)
+                    .verticalScroll(rememberScrollState())
+                    .selectableGroup(),
+            ) {
+                choices.forEachIndexed { index, choice ->
+                    WhiteNoiseDialogChoiceRow(
+                        title = choice.title,
+                        selected = choice.selected,
+                        onClick = choice.onClick,
+                        modifier = Modifier.testTag("speech.choice.$index"),
+                        subtitle = choice.subtitle,
+                        enabled = choice.enabled,
+                        accessibilityLabel = choice.accessibilityLabel,
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+private val SpeechChoiceDialogMaxHeight = 400.dp

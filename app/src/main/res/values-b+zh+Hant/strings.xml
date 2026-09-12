@@ -1633,6 +1633,10 @@
     <string name="tts_auto_read_override_on">開</string>
     <string name="tts_auto_read_override_off">關</string>
     <string name="tts_settings_rate_system">系統（跟隨裝置設定）</string>
+    <string name="speech_discovering">正在檢查語音引擎…</string>
+    <string name="speech_no_engine">沒有可用的語音引擎。</string>
+    <string name="speech_android_settings">開啟 Android 設定</string>
+    <string name="speech_settings_failed">無法開啟 Android 設定。</string>
     <string name="tts_bar_rate_control">語速，目前為 %1$s</string>
     <string name="tts_rate_custom">自訂</string>
     <string name="tts_rate_custom_error">請輸入 0.1× 到 10.0× 之間的語速。</string>
