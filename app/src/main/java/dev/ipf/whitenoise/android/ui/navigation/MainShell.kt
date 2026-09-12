@@ -75,9 +75,12 @@ import dev.ipf.whitenoise.android.state.newAttachmentOpenNavigationGeneration
 import dev.ipf.whitenoise.android.state.nextNavAccountRef
 import dev.ipf.whitenoise.android.state.observeTtsConversationDestination
 import dev.ipf.whitenoise.android.state.reconcileProvisionalOpenChat
+import dev.ipf.whitenoise.android.state.requestQuickProfileCycle
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
+import dev.ipf.whitenoise.android.ui.account.rememberQuickProfileCycleNotice
+import dev.ipf.whitenoise.android.ui.chats.ChatScope
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
@@ -391,7 +394,10 @@ internal fun MainShell(
     }
 
     /** Starts a generation-owned home-screen quick switch without delaying account activation. */
-    fun requestQuickAccountSwitch(targetAccountRef: String) {
+    fun requestQuickAccountSwitch(
+        targetAccountRef: String,
+        onActivated: () -> Unit = {},
+    ) {
         val sourceAccountRef = appState.activeAccountRef ?: return
         when (
             quickAccountSwitchRequestDisposition(
@@ -430,6 +436,7 @@ internal fun MainShell(
                 appState.setActiveAccount(
                     label = targetAccountRef,
                     preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
+                    onActivated = onActivated,
                     shouldActivate = {
                         quickAccountSwitchRequestIsCurrent(
                             transition = quickAccountSwitchTransition,
@@ -488,6 +495,15 @@ internal fun MainShell(
     // conversation does not dispose the selection when ChatsScreen leaves
     // composition (issue #1897).
     var selectedChatListFolderId by remember { mutableStateOf<String?>(null) }
+    val chatScopeAccount = appState.activeAccountRef
+    val chatScopeRuntime = appState.runtimeGeneration
+    val chatScopeState = rememberMainShellChatScope(chatScopeAccount, chatScopeRuntime)
+
+    fun chatScopeActionsAllowed(): Boolean =
+        appState.activeAccountRef == chatScopeAccount &&
+            appState.runtimeGeneration == chatScopeRuntime &&
+            !appState.signOutInProgress &&
+            !appState.wipeInProgress
     // Global chat-list search survives conversation navigation and rotation
     // (issue #1941). Saveable codec only — no protocol or preference storage.
     val globalSearch =
@@ -639,6 +655,7 @@ internal fun MainShell(
         mutableStateOf<NotificationMessagePreload<ChatListItem>?>(null)
     }
     val context = LocalContext.current
+    val cycleNotice = rememberQuickProfileCycleNotice()
     val currentInboundNotificationTarget by rememberUpdatedState(inboundNotificationTarget)
     val currentInboundNotificationRequestId by rememberUpdatedState(inboundNotificationRequestId)
     val currentRuntimeGeneration by rememberUpdatedState(appState.runtimeGeneration)
@@ -2337,9 +2354,27 @@ internal fun MainShell(
                                     globalSearchState = scopedGlobalSearchState,
                                     onGlobalSearchStateChange = globalSearch.update,
                                     selectedFolderId = selectedChatListFolderId,
-                                    onSelectFolder = { selectedChatListFolderId = it },
+                                    onSelectFolder = {
+                                        if (chatScopeActionsAllowed() && chatScopeState.select(ChatScope.Chats)) {
+                                            selectedChatListFolderId = it
+                                        }
+                                    },
+                                    chatScope = chatScopeState.scope,
+                                    onSelectScope = {
+                                        if (chatScopeActionsAllowed() && chatScopeState.select(it)) {
+                                            selectedChatListFolderId = null
+                                        }
+                                    },
                                     onTtsTransportBodyClick = requestTtsDestinationOpen,
-                                    onQuickSwitchAccount = ::requestQuickAccountSwitch,
+                                    onQuickSwitchAccount = { requestQuickAccountSwitch(it) },
+                                    onQuickCycleAccount = {
+                                        appState.requestQuickProfileCycle(
+                                            requestSwitch = { target, activated ->
+                                                requestQuickAccountSwitch(target, activated)
+                                            },
+                                            onSwitched = cycleNotice::show,
+                                        )
+                                    },
                                     onGroupCreateSubmitted = onGroupCreateSubmitted,
                                     onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
                                     onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,

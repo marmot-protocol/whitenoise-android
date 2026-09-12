@@ -140,12 +140,8 @@ class ChatRowSelectionIndicatorCoverageTest {
         val timestampAt = (System.currentTimeMillis() / 1_000L).toULong()
         composeRule.setContent {
             MaterialTheme {
-                Box(
-                    Modifier.chatListSelectionRow(
-                        selected = selected.value,
-                        onClick = {},
-                    ),
-                ) {
+                // ChatRowLayout now owns the native click/toggle semantics; no duplicate wrapper action.
+                Box {
                     ChatRowLayout(
                         title = "Conversation",
                         selectionMode = selectionMode.value,

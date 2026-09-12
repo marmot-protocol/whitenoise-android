@@ -3,9 +3,12 @@ package dev.ipf.whitenoise.android.ui.settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
@@ -13,10 +16,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -56,7 +63,39 @@ internal fun ChatFolderEditScreen(
     onClose: () -> Unit,
     initialManualChatIds: Set<String> = emptySet(),
 ) {
+    if (appState.signOutInProgress || appState.wipeInProgress || appState.activeAccountRef != accountRef) return
+    key(accountRef, folderId, appState.runtimeGeneration) {
+        ChatFolderEditSession(appState, accountRef, folderId, onClose, initialManualChatIds)
+    }
+}
+
+/** Draft fields and pending callbacks belong to exactly one account/folder editing session. */
+@Composable
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
+private fun ChatFolderEditSession(
+    appState: WhiteNoiseAppState,
+    accountRef: String,
+    folderId: String?,
+    onClose: () -> Unit,
+    initialManualChatIds: Set<String>,
+) {
+    val runtimeGeneration = remember { appState.runtimeGeneration }
+    var active by remember { mutableStateOf(true) }
+    var submitted by remember { mutableStateOf(false) }
+    DisposableEffect(Unit) { onDispose { active = false } }
+    LaunchedEffect(appState.activeAccountRef) {
+        if (appState.activeAccountRef != accountRef) onClose()
+    }
+
+    fun canMutate() =
+        active &&
+            appState.activeAccountRef == accountRef &&
+            appState.runtimeGeneration == runtimeGeneration &&
+            !appState.signOutInProgress &&
+            !appState.wipeInProgress
     val store = appState.chatFolderPreferences
+    // Initialization/migration belongs to opening the editor, before the atomic Save boundary.
+    remember(store, accountRef) { store.foldersFor(accountRef) }
     val storeState by store.state.collectAsState()
     val existing =
         remember(folderId, storeState) {
@@ -78,8 +117,10 @@ internal fun ChatFolderEditScreen(
             folderId?.let { store.membershipFor(accountRef, it) }
                 ?: initialManualChatIds.mapTo(HashSet()) { it.lowercase(Locale.ROOT) }
         }
-    var manualChatIds by remember { mutableStateOf<Set<String>>(initialManual) }
-    var memberHexes by remember { mutableStateOf(existingRule?.includeMemberPubkeys ?: emptySet()) }
+    var manualChatIds by rememberSaveable(stateSaver = FolderSelectionSaver) { mutableStateOf(initialManual) }
+    var memberHexes by rememberSaveable(stateSaver = FolderSelectionSaver) {
+        mutableStateOf(existingRule?.includeMemberPubkeys ?: emptySet())
+    }
     var picker by rememberSaveable { mutableStateOf<FolderPicker?>(null) }
     var discard by rememberSaveable { mutableStateOf(false) }
     var failed by rememberSaveable { mutableStateOf(false) }
@@ -111,31 +152,43 @@ internal fun ChatFolderEditScreen(
 
     BackHandler(onBack = ::back)
 
+    @Suppress("ReturnCount") // Early exits preserve route ownership and reject invalid or superseded actions.
     fun save() {
+        if (!canMutate() || submitted) return
+        if (folderId != null && store.foldersFor(accountRef).none { it.id == folderId }) {
+            failed = true
+            return
+        }
         val trimmedName =
             name.text
                 .toString()
                 .trim()
                 .takeIf { it.isNotEmpty() } ?: return
+        submitted = true
         val trimmedDescription = description.text.toString().trim()
         // An untouched prefill on an un-renamed default is not a rename:
         // persisting it would freeze the localized label into the store and
         // the folder would stop following locale changes.
         val renamed = existing?.name.orEmpty().isNotEmpty() || trimmedName != prefillName
-        val id =
-            folderId?.also {
-                if (renamed) store.renameFolder(accountRef, it, trimmedName)
-                store.editFolderDescription(accountRef, it, trimmedDescription)
-            } ?: store.createFolder(accountRef, trimmedName, trimmedDescription)?.id
-        if (id == null) {
+        val saved =
+            try {
+                store.commitFolderDraft(
+                    accountRef = accountRef,
+                    folderId = folderId,
+                    name = if (renamed || folderId == null) trimmedName else null,
+                    description = trimmedDescription,
+                    manualChatIds = manualChatIds,
+                    rule = rule.takeIf { it != ChatFolderRule() },
+                )
+            } catch (_: Exception) {
+                null
+            }
+        if (saved != null) {
+            onClose()
+        } else {
+            submitted = false
             failed = true
-            return
         }
-        val before = store.membershipFor(accountRef, id)
-        (manualChatIds - before).forEach { store.setChatInFolder(accountRef, id, it, included = true) }
-        (before - manualChatIds).forEach { store.setChatInFolder(accountRef, id, it, included = false) }
-        store.setFolderRule(accountRef, id, rule.takeIf { it != ChatFolderRule() })
-        onClose()
     }
 
     val groupTitleCopy = rememberGroupTitleCopy()
@@ -199,7 +252,7 @@ internal fun ChatFolderEditScreen(
                 manualChatCount = manualChatIds.size,
                 peopleCount = memberHexes.size,
                 previewCount = previewRows.size,
-                canSave = name.text.isNotBlank() && !missing,
+                canSave = name.text.isNotBlank() && !missing && !submitted && canMutate(),
                 error =
                     when {
                         missing -> stringResource(R.string.folder_unavailable)
@@ -236,7 +289,7 @@ internal fun ChatFolderEditScreen(
                     when (mode) {
                         FolderPicker.People -> R.string.chat_folder_people
                         FolderPicker.Preview -> R.string.folder_preview
-                        FolderPicker.Chats -> R.string.chat_folder_manual_chats
+                        FolderPicker.Chats -> R.string.folder_included_chats
                     },
                 ),
             items =
@@ -294,17 +347,24 @@ internal fun ChatFolderEditContent(
     onBack: () -> Unit,
 ) {
     SettingsScaffold(
-        title = stringResource(if (state.isNew) R.string.chat_folder_new else R.string.chat_folder_edit_title),
+        title = stringResource(if (state.isNew) R.string.folder_new_title else R.string.folder_edit),
         onBack = onBack,
         modifier = Modifier.imePadding(),
         topBarActions = {
-            TextButton(enabled = state.canSave, onClick = onSave) { Text(stringResource(R.string.save)) }
+            TextButton(
+                enabled = state.canSave,
+                onClick = onSave,
+                modifier = Modifier.testTag("folder.save"),
+            ) { Text(stringResource(R.string.save)) }
         },
     ) {
-        SettingsList(modifier = Modifier.testTag(CHAT_FOLDER_EDIT_CONTENT_TAG)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().testTag(CHAT_FOLDER_EDIT_CONTENT_TAG),
+            contentPadding = PaddingValues(bottom = WhiteNoiseSpacing.Section),
+        ) {
             item {
                 Column(
-                    Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                    Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.CompactScreenMargin),
                     verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
                 ) {
                     WhiteNoiseTextField(
@@ -333,7 +393,7 @@ internal fun ChatFolderEditContent(
                     row("chats") { context ->
                         SettingsLink(
                             context = context,
-                            title = stringResource(R.string.chat_folder_manual_chats),
+                            title = stringResource(R.string.folder_included_chats),
                             onClick = onOpenManualChats,
                             value = state.manualChatCount.toString(),
                         )
@@ -353,7 +413,7 @@ internal fun ChatFolderEditContent(
                 }
             }
             item {
-                Column(Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
+                Column(Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.CompactScreenMargin)) {
                     WhiteNoiseTextField(
                         state = state.keyword,
                         modifier = Modifier.fillMaxWidth().testTag("folder.keyword"),
@@ -409,3 +469,10 @@ private fun Set<String>.toggled(id: String): Set<String> = if (id in this) this 
 
 /** Which picker sheet is open. */
 private enum class FolderPicker { Chats, People, Preview }
+
+/** Only unsaved selected identifiers survive rotation; the existing per-account store remains authoritative. */
+private val FolderSelectionSaver =
+    Saver<Set<String>, List<String>>(
+        save = { it.toList() },
+        restore = { it.toSet() },
+    )

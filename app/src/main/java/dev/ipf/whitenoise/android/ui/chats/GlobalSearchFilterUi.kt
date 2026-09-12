@@ -14,8 +14,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -34,7 +34,6 @@ import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.search.labelRes
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.search.globalSearchDateFilterLabel
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 internal const val CHAT_LIST_SEARCH_FILTERS_ACTION_TAG = "chat-list-search-filters-action"
 internal const val CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG = "chat-list-search-clear-all-filters"
@@ -43,6 +42,7 @@ internal const val CHAT_LIST_SEARCH_FILTER_CONTROLS_TAG = "chat-list-search-filt
 
 internal fun globalSearchFilterChipTag(chipId: String): String = "chat-list-search-filter-chip-$chipId"
 
+/** Clear-first removable chips retain the shell filter identities and the caller\'s native availability gate. */
 @Composable
 internal fun GlobalSearchFilterControlsRow(
     state: GlobalSearchState,
@@ -62,7 +62,7 @@ internal fun GlobalSearchFilterControlsRow(
                 .fillMaxWidth()
                 .testTag(CHAT_LIST_SEARCH_FILTER_CONTROLS_TAG)
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 4.dp),
+                .padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -79,10 +79,23 @@ internal fun GlobalSearchFilterControlsRow(
                 Text(filtersButtonLabel)
             }
         }
+        if (activeFilterCount > 0) {
+            TextButton(
+                onClick = onClearAll,
+                modifier =
+                    Modifier
+                        .testTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG)
+                        .semantics {
+                            contentDescription = clearAllDescription
+                        },
+            ) {
+                Text(stringResource(R.string.chat_list_search_clear_all_filters))
+            }
+        }
         chips.items.forEach { chip ->
             val chipLabel = globalSearchActiveChipLabel(chip, state)
             val removeDescription = stringResource(R.string.chat_list_search_filter_remove, chipLabel)
-            FilterChip(
+            InputChip(
                 selected = true,
                 onClick = { onRemoveFilter(chip.chipId) },
                 label = { Text(chipLabel) },
@@ -99,22 +112,10 @@ internal fun GlobalSearchFilterControlsRow(
                         .semantics { contentDescription = removeDescription },
             )
         }
-        if (activeFilterCount > 0) {
-            TextButton(
-                onClick = onClearAll,
-                modifier =
-                    Modifier
-                        .testTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG)
-                        .semantics {
-                            contentDescription = clearAllDescription
-                        },
-            ) {
-                Text(stringResource(R.string.chat_list_search_clear_all_filters))
-            }
-        }
     }
 }
 
+/** Hosts only supplied native filter sections; an empty capability set cannot open a misleading filter sheet. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun GlobalSearchFilterSheet(
@@ -130,7 +131,7 @@ internal fun GlobalSearchFilterSheet(
     if (!visible || !hasInteractiveSections) return
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = amoledSheetContainerColor(),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(
             modifier =
@@ -144,7 +145,7 @@ internal fun GlobalSearchFilterSheet(
         ) {
             Text(
                 text = stringResource(R.string.chat_list_search_filter_sheet_title),
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
             )
             if (chatSection != null) {
                 SectionHeader(stringResource(R.string.chat_list_search_filter_chat))

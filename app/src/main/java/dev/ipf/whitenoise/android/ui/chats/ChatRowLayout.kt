@@ -1,17 +1,14 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Badge
-import androidx.compose.material3.Icon
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
@@ -20,121 +17,178 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.ManualUnreadDot
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import dev.ipf.whitenoise.android.ui.common.selectionRowIcon
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 internal const val CHAT_ROW_SELECTION_INDICATOR_TAG = "chat-row-selection-indicator"
-private val CHAT_ROW_MIN_HEIGHT = 72.dp
 
-@Suppress("FunctionNaming")
+private val ChatRowContentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+
+/** Native prototype list item with the production selection and metadata visibility contract. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 internal fun ChatRowLayout(
     title: String,
     timestampAt: ULong,
-    rowHasUnread: Boolean,
+    // Retained for existing row-layout callers; the prototype timestamp uses a uniform color.
+    @Suppress("UnusedParameter", "UNUSED_PARAMETER") rowHasUnread: Boolean,
     selectionMode: Boolean,
     selected: Boolean,
     leadingContent: @Composable () -> Unit,
     supportingContent: @Composable () -> Unit,
     supportingMetadata: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
+    titleMetadata: @Composable () -> Unit = {},
+    onClick: () -> Unit = {},
+    interactionsEnabled: Boolean = true,
+    consumeSelectionLongPress: Boolean = selectionMode,
+    menuHighlighted: Boolean = false,
 ) {
-    Row(
+    val scheme = MaterialTheme.colorScheme
+    val selectedColor = if (isAmoledSurfaceTheme()) Color.White.copy(alpha = 0.16f) else scheme.surfaceContainerHigh
+    ListItem(
+        onClick = onClick,
+        enabled = interactionsEnabled,
+        // A selection-mode hold must not turn into a tap on release. The range gesture, when active,
+        // is owned by AnchoredDragSelection on the modifier and must remain the sole long-press owner.
+        onLongClick = if (consumeSelectionLongPress) ({}) else null,
         modifier =
-            modifier
-                .heightIn(min = CHAT_ROW_MIN_HEIGHT)
-                .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        leadingContent()
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-                ProvideTextStyle(MaterialTheme.typography.bodyLarge) {
-                    ChatRowTitleLine(
-                        title = title,
-                        timestampAt = timestampAt,
-                        rowHasUnread = rowHasUnread,
-                        showTimestamp = !selectionMode,
-                    )
+            modifier.semantics {
+                this.selected = selected
+                if (selectionMode) {
+                    role = Role.Checkbox
+                    toggleableState = if (selected) ToggleableState.On else ToggleableState.Off
                 }
+            },
+        shapes = WhiteNoiseListItemDefaults.shapes(),
+        colors =
+            ListItemDefaults.colors(
+                containerColor = if (selected || menuHighlighted) selectedColor else scheme.surface,
+            ),
+        contentPadding = ChatRowContentPadding,
+        leadingContent = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (selectionMode) ChatRowSelectionIndicator(selected)
+                leadingContent()
             }
-            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
-                ProvideTextStyle(MaterialTheme.typography.bodyMedium) {
-                    ChatRowSupportingLine(
-                        supportingContent = supportingContent,
-                        supportingMetadata = supportingMetadata.takeUnless { selectionMode },
-                    )
-                }
-            }
-        }
-        if (selectionMode) {
-            Spacer(Modifier.width(12.dp))
-            ChatRowSelectionIndicator(selected = selected)
-        }
-    }
-}
-
-@Suppress("FunctionNaming")
-@Composable
-private fun ChatRowTitleLine(
-    title: String,
-    timestampAt: ULong,
-    rowHasUnread: Boolean,
-    showTimestamp: Boolean,
-) {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = title,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).alignByBaseline(),
-        )
-        if (showTimestamp) {
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = rememberedRelativeTime(timestampAt),
-                style = MaterialTheme.typography.labelSmall,
-                color =
-                    if (rowHasUnread) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                maxLines = 1,
-                modifier = Modifier.alignByBaseline(),
+        },
+        content = {
+            ChatRowTextLayout(
+                title = {
+                    Text(title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                },
+                metadata = titleMetadata,
+                timestamp = {
+                    if (!selectionMode) {
+                        Text(
+                            rememberedRelativeTime(timestampAt),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = scheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
+                },
+                preview = {
+                    CompositionLocalProvider(LocalContentColor provides scheme.onSurfaceVariant) {
+                        ProvideTextStyle(MaterialTheme.typography.bodyMedium) { supportingContent() }
+                    }
+                },
+                status = { if (!selectionMode) supportingMetadata?.invoke() },
             )
-        }
-    }
+        },
+    )
 }
 
-@Suppress("FunctionNaming")
+/**
+ * Adapted from pinned prototype ChatListRow.kt. One content slot avoids Material's inherited supporting
+ * baseline query during lazy reuse. Only the direct title/time Text baselines are read. Production's
+ * preview can include a delivery Row; its measured height, rather than that container's inherited
+ * baseline, selects the 72/88 dp minimum and leaves large fonts free to grow.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
-private fun ChatRowSupportingLine(
-    supportingContent: @Composable () -> Unit,
-    supportingMetadata: (@Composable () -> Unit)?,
+private fun ChatRowTextLayout(
+    title: @Composable () -> Unit,
+    metadata: @Composable () -> Unit,
+    timestamp: @Composable () -> Unit,
+    preview: @Composable () -> Unit,
+    status: @Composable () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(modifier = Modifier.weight(1f)) {
-            supportingContent()
-        }
-        if (supportingMetadata != null) {
-            Spacer(Modifier.width(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                supportingMetadata()
+    val verticalAlignment = ListItemDefaults.verticalAlignment()
+    val padding = ChatRowContentPadding
+    Layout(
+        contents =
+            listOf(
+                title,
+                { Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) { metadata() } },
+                timestamp,
+                preview,
+                status,
+            ),
+    ) { slots, constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val trailingGap = 8.dp.roundToPx()
+        val time = slots[2].firstOrNull()?.measure(loose)
+        val timeSpace = if (time == null) 0 else time.width + trailingGap
+        val icons = slots[1].single().measure(loose.offset(horizontal = -timeSpace))
+        val iconGap = if (icons.width > 0) 4.dp.roundToPx() else 0
+        val name = slots[0].single().measure(loose.offset(horizontal = -timeSpace - icons.width - iconGap))
+        val nameGroupHeight = maxOf(name.height, icons.height)
+        val nameInset = (nameGroupHeight - name.height) / 2
+        val baseline = maxOf(nameInset + name[FirstBaseline], time?.get(FirstBaseline) ?: 0)
+        val groupY = baseline - nameInset - name[FirstBaseline]
+        val timeY = time?.let { baseline - it[FirstBaseline] } ?: 0
+        val headlineHeight = maxOf(groupY + nameGroupHeight, timeY + (time?.height ?: 0))
+        val badge = slots[4].firstOrNull()?.measure(loose.offset(vertical = -headlineHeight))
+        val badgeSpace = if (badge == null) 0 else badge.width + trailingGap
+        val message = slots[3].single().measure(loose.offset(horizontal = -badgeSpace, vertical = -headlineHeight))
+        val textHeight = headlineHeight + maxOf(message.height, badge?.height ?: 0)
+        val width =
+            if (constraints.hasBoundedWidth) {
+                constraints.maxWidth
+            } else {
+                constraints.constrainWidth(
+                    maxOf(name.width + iconGap + icons.width + timeSpace, message.width + badgeSpace),
+                )
             }
+        val minimumHeight = if (message.height > name.height) 88.dp else 72.dp
+        val contentMinimum =
+            (minimumHeight - padding.calculateTopPadding() - padding.calculateBottomPadding()).roundToPx()
+        val height = constraints.constrainHeight(maxOf(textHeight, contentMinimum))
+        val contentY = verticalAlignment.align(textHeight, height)
+        layout(width, height) {
+            name.placeRelative(0, contentY + groupY + nameInset)
+            icons.placeRelative(name.width + iconGap, contentY + groupY + (nameGroupHeight - icons.height) / 2)
+            time?.placeRelative(width - time.width, contentY + timeY)
+            message.placeRelative(0, contentY + headlineHeight)
+            badge?.placeRelative(width - badge.width, contentY + headlineHeight)
         }
     }
 }
@@ -171,24 +225,14 @@ internal fun ChatRowSupportingMetadata(
     }
 }
 
+/** The row owns toggle semantics; its leading native checkbox is decorative and never a second target. */
 @Suppress("FunctionNaming")
 @Composable
 private fun ChatRowSelectionIndicator(selected: Boolean) {
-    Icon(
-        imageVector = chatRowSelectionIcon(selected),
-        // The clickable row already exposes selected semantics. Keeping the
-        // visual indicator decorative avoids a second TalkBack announcement.
-        contentDescription = null,
-        tint =
-            if (selected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        modifier =
-            Modifier
-                .size(24.dp)
-                .testTag(CHAT_ROW_SELECTION_INDICATOR_TAG),
+    Checkbox(
+        checked = selected,
+        onCheckedChange = null,
+        modifier = Modifier.size(24.dp).clearAndSetSemantics { testTag = CHAT_ROW_SELECTION_INDICATOR_TAG },
     )
 }
 

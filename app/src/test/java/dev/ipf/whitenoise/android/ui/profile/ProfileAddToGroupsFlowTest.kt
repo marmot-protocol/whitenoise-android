@@ -57,7 +57,7 @@ class ProfileAddToGroupsFlowTest {
         val hostDialog = latestComponentDialog()
 
         composeRule
-            .onNodeWithText(app.getString(R.string.profile_add_to_another_group))
+            .onNodeWithText(app.getString(R.string.person_add_to_group))
             .performScrollTo()
             .performClick()
         finishContentTransition()

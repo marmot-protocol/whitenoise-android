@@ -2,15 +2,12 @@ package dev.ipf.whitenoise.android.ui.profile
 
 import android.app.Application
 import androidx.compose.material3.Text
-import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.hasAnyAncestor
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -21,7 +18,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.navigation.ProfileGroupForegroundCoordinator
 import dev.ipf.whitenoise.android.ui.navigation.ProfileGroupForegroundState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -45,27 +41,16 @@ class ProfileSheetEntryPointTest {
 
         // No engine is attached, so the follow read fails and the state stays
         // unknown — the control must be dead rather than offering a guess.
-        composeRule
-            .onAllNodes(hasAnyAncestor(hasTestTag(PROFILE_FOLLOW_ACTION_TAG)) and hasClickAction())
-            .onFirst()
-            .assertIsNotEnabled()
+        composeRule.onNodeWithTag(PROFILE_FOLLOW_ACTION_TAG).assertIsNotEnabled()
     }
 
+    /** Follow is in the scrollable action group, while Message remains available in the pinned bottom bar. */
     @Test
-    fun followSitsInTheQuickActionRowBeforeMessage() {
+    fun followScrollsWhileMessageStaysPinned() {
         renderProfile { it.presentProfile(TARGET_NPROFILE) }
-
-        // Semantics traversal order is composition order, unlike laid-out bounds,
-        // which read as zero until the sheet has finished animating in.
-        val ordered =
-            composeRule
-                .onAllNodes(
-                    hasAnyAncestor(hasTestTag(PROFILE_QUICK_ACTIONS_TAG)) and
-                        (hasTestTag(PROFILE_FOLLOW_ACTION_TAG) or hasTestTag(PROFILE_MESSAGE_ACTION_TAG)),
-                ).fetchSemanticsNodes()
-                .map { it.config[SemanticsProperties.TestTag] }
-
-        assertEquals(listOf(PROFILE_FOLLOW_ACTION_TAG, PROFILE_MESSAGE_ACTION_TAG), ordered)
+        composeRule.onNodeWithTag(PROFILE_FOLLOW_ACTION_TAG).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(app.getString(R.string.message)).assertIsDisplayed()
+        composeRule.onNodeWithTag(PROFILE_QUICK_ACTIONS_TAG).assertDoesNotExist()
     }
 
     @Test

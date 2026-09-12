@@ -42,7 +42,7 @@ class NewGroupSetupScreenTest {
         }
 
         composeRule.onNodeWithText(string(R.string.error_chat_created_not_loaded)).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.retry)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.new_message_open_chat)).assertIsDisplayed()
         composeRule.onAllNodes(hasSetTextAction()).assertCountEquals(0)
     }
 

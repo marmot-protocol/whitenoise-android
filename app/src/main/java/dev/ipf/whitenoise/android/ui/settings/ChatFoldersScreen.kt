@@ -1,26 +1,30 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -29,6 +33,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -42,8 +48,10 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.util.Locale
 
 internal data class ChatFolderManageItem(
@@ -79,8 +87,32 @@ internal fun ChatFoldersScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
 ) {
+    if (appState.signOutInProgress || appState.wipeInProgress) return
+    key(appState.activeAccountRef, appState.runtimeGeneration) {
+        ChatFoldersAccountScreen(appState, onBack)
+    }
+}
+
+/** An account change removes its editor/menu/confirmation state before another account can act. */
+@Composable
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
+private fun ChatFoldersAccountScreen(
+    appState: WhiteNoiseAppState,
+    onBack: () -> Unit,
+) {
     val accountRef = appState.activeAccountRef
+    val runtimeGeneration = remember { appState.runtimeGeneration }
     val store = appState.chatFolderPreferences
+    var active by remember { mutableStateOf(true) }
+    DisposableEffect(Unit) { onDispose { active = false } }
+
+    fun canMutate() =
+        active &&
+            accountRef != null &&
+            appState.activeAccountRef == accountRef &&
+            appState.runtimeGeneration == runtimeGeneration &&
+            !appState.signOutInProgress &&
+            !appState.wipeInProgress
     val storeState by store.state.collectAsState()
     val folders = remember(storeState, accountRef) { accountRef?.let(store::foldersFor).orEmpty() }
     val groupTitleCopy = rememberGroupTitleCopy()
@@ -104,11 +136,12 @@ internal fun ChatFoldersScreen(
         folder: ChatFolder,
         delta: Int,
     ) {
-        val ids = folders.map { it.id }.toMutableList()
+        if (!canMutate() || accountRef == null) return
+        val ids = store.foldersFor(accountRef).map { it.id }.toMutableList()
         val from = ids.indexOf(folder.id)
         val to = from + delta
         val validMove = from >= 0 && to >= 0 && to < ids.size
-        if (accountRef != null && validMove) {
+        if (validMove) {
             ids.add(to, ids.removeAt(from))
             store.reorderFolders(accountRef, ids)
         }
@@ -137,25 +170,31 @@ internal fun ChatFoldersScreen(
     ChatFoldersContent(
         state = chatFoldersState(folderItems, defaultsMissing),
         onBack = onBack,
-        onCreate = { editorOpenFor = ChatFolderEditorTarget(folderId = null) },
+        onCreate = { if (canMutate()) editorOpenFor = ChatFolderEditorTarget(folderId = null) },
         onMove = { id, delta ->
             folders.firstOrNull { it.id == id }?.let { move(it, delta) }
         },
-        onEdit = { id -> editorOpenFor = ChatFolderEditorTarget(folderId = id) },
-        onDelete = { id -> pendingDelete = id },
-        onRestoreDefaults = { accountRef?.let(store::restoreDefaultFolders) },
+        onEdit = { id -> if (canMutate()) editorOpenFor = ChatFolderEditorTarget(folderId = id) },
+        onDelete = { id -> if (canMutate()) pendingDelete = id },
+        onRestoreDefaults = {
+            if (canMutate()) accountRef?.let(store::restoreDefaultFolders)
+        },
     )
 
     folders.firstOrNull { it.id == pendingDelete }?.let { folder ->
         WhiteNoiseAlertDialog(
+            modifier = Modifier.testTag("folder.delete_dialog"),
             onDismissRequest = { pendingDelete = null },
             title = { Text(stringResource(R.string.folder_delete_title, chatFolderDisplayName(folder))) },
             text = { Text(stringResource(R.string.folder_delete_detail)) },
             confirmButton = {
                 TextButton(
+                    modifier = Modifier.testTag("folder.delete_confirm"),
                     onClick = {
                         pendingDelete = null
-                        accountRef?.let { store.deleteFolder(it, folder.id) }
+                        if (canMutate()) {
+                            accountRef?.let { store.deleteFolder(it, folder.id) }
+                        }
                     },
                 ) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
             },
@@ -183,16 +222,21 @@ internal fun ChatFoldersContent(
         onBack = onBack,
         topBarActions = {
             IconButton(onClick = onCreate) {
-                Icon(painterResource(R.drawable.ic_add), stringResource(R.string.chat_folder_new))
+                Icon(painterResource(R.drawable.ic_add), stringResource(R.string.folder_new_title))
             }
         },
     ) {
-        SettingsList(modifier = Modifier.testTag(CHAT_FOLDERS_CONTENT_TAG)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().testTag(CHAT_FOLDERS_CONTENT_TAG),
+            contentPadding = PaddingValues(vertical = WhiteNoiseSpacing.CompactScreenMargin),
+            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+        ) {
             if (state.folders.isEmpty()) {
                 item {
                     WhiteNoiseEmptyState(
                         title = stringResource(R.string.folder_none),
                         detail = stringResource(R.string.folder_none_detail),
+                        modifier = Modifier.padding(WhiteNoiseSpacing.CompactScreenMargin),
                     )
                 }
             }
@@ -216,7 +260,7 @@ internal fun ChatFoldersContent(
                     row("restore") { context ->
                         SettingsAction(
                             context = context,
-                            title = stringResource(R.string.chat_folder_restore_defaults),
+                            title = stringResource(R.string.folder_restore_defaults),
                             onClick = onRestoreDefaults,
                             enabled = state.defaultsMissing,
                         )
@@ -231,6 +275,7 @@ internal fun ChatFoldersContent(
 /** One folder: icon, name over "N chats · description", and the actions menu; long-press opens the same menu. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
+@OptIn(ExperimentalMaterial3Api::class)
 private fun FolderManageRow(
     context: SettingsRowContext,
     folder: ChatFolderManageItem,
@@ -245,10 +290,10 @@ private fun FolderManageRow(
         buildList {
             add(WhiteNoiseMenuItem(editLabel, onClick = onEdit))
             if (folder.canMoveUp) {
-                add(WhiteNoiseMenuItem(stringResource(R.string.chat_folder_move_up), onClick = { onMove(-1) }))
+                add(WhiteNoiseMenuItem(stringResource(R.string.folder_move_up), onClick = { onMove(-1) }))
             }
             if (folder.canMoveDown) {
-                add(WhiteNoiseMenuItem(stringResource(R.string.chat_folder_move_down), onClick = { onMove(1) }))
+                add(WhiteNoiseMenuItem(stringResource(R.string.folder_move_down), onClick = { onMove(1) }))
             }
             add(WhiteNoiseMenuItem(stringResource(R.string.delete), onClick = onDelete, destructive = true))
         }
@@ -259,16 +304,19 @@ private fun FolderManageRow(
                 .takeIf { it.isNotBlank() }
                 ?.let { " · $it" }
                 .orEmpty()
-    SettingsGroupPanel(context, Modifier.testTag("folder.row.${folder.id}")) {
-        Row(
+    ListItem(
+        shapes = WhiteNoiseListItemDefaults.shapes(),
+        onClick = onEdit,
+        onLongClick = { menu = true },
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        modifier =
             Modifier
                 .fillMaxWidth()
-                .combinedClickable(
-                    onClickLabel = editLabel,
-                    role = Role.Button,
-                    onLongClick = { menu = true },
-                    onClick = onEdit,
-                ).semantics {
+                .settingsRowBorder(context, editable = true)
+                .testTag("folder.row.${folder.id}")
+                .semantics {
+                    role = Role.Button
+                    onClick(label = editLabel, action = null)
                     customActions =
                         choices.map { choice ->
                             CustomAccessibilityAction(choice.label) {
@@ -276,36 +324,31 @@ private fun FolderManageRow(
                                 true
                             }
                         }
-                }.padding(
-                    start = FolderRowInset,
-                    top = FolderRowVertical,
-                    end = FolderRowMenuInset,
-                    bottom = FolderRowVertical,
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(FolderRowInset),
-        ) {
+                },
+        leadingContent = {
             Icon(
                 painterResource(R.drawable.ic_folder),
                 contentDescription = null,
-                modifier = Modifier.size(FolderIconSize),
+                modifier = Modifier.size(24.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Column(Modifier.weight(1f)) {
-                Text(name, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(
-                    supporting,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        },
+        supportingContent = { Text(supporting) },
+        trailingContent = {
             Box {
                 IconButton(onClick = { menu = true }) {
                     Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.actions_for, name))
                 }
-                WhiteNoiseDropdownMenu(expanded = menu, onDismissRequest = { menu = false }, items = choices)
+                WhiteNoiseDropdownMenu(
+                    expanded = menu,
+                    onDismissRequest = { menu = false },
+                    items = choices,
+                    modifier = Modifier.testTag("folder.menu.${folder.id}"),
+                )
             }
-        }
+        },
+    ) {
+        Text(name, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -324,11 +367,15 @@ private fun chatFolderDisplayName(
     systemKind: SystemFolderKind?,
     name: String,
 ): String =
-    when (systemKind) {
-        SystemFolderKind.UNREAD -> stringResource(R.string.chat_list_filter_unread)
-        SystemFolderKind.ARCHIVED -> stringResource(R.string.archived)
-        SystemFolderKind.GROUPS -> stringResource(R.string.chat_list_filter_groups)
-        null -> name
+    if (name.isNotBlank()) {
+        name
+    } else {
+        when (systemKind) {
+            SystemFolderKind.UNREAD -> stringResource(R.string.chat_list_filter_unread)
+            SystemFolderKind.ARCHIVED -> stringResource(R.string.archived)
+            SystemFolderKind.GROUPS -> stringResource(R.string.chat_list_filter_groups)
+            null -> name
+        }
     }
 
 // Counts what selecting the folder's chip would show, so this stays in
@@ -355,8 +402,3 @@ private fun folderChatCount(
         )
     return source.count { it.group.groupIdHex.lowercase(Locale.ROOT) in ids }
 }
-
-private val FolderRowInset = 16.dp
-private val FolderRowMenuInset = 4.dp
-private val FolderRowVertical = 8.dp
-private val FolderIconSize = 24.dp

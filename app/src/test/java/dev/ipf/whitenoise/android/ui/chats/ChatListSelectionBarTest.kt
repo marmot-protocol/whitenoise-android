@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -38,43 +39,46 @@ class ChatListSelectionBarTest {
         var selectAll = 0
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChatListSelectionBar(
-                    count = 2,
-                    archiveAction = ChatListBulkArchiveAction.Archive,
-                    actionsEnabled = true,
-                    allVisibleSelected = false,
-                    showMarkRead = false,
-                    showMarkUnread = false,
-                    showMuteToggle = false,
-                    muted = false,
-                    showPinToggle = false,
-                    pinned = false,
-                    showMovePinnedUp = false,
-                    showMovePinnedDown = false,
-                    onClose = { closes++ },
-                    onArchive = { archives++ },
-                    onDelete = { deletes++ },
-                    onAddToFolder = {},
-                    onMarkRead = {},
-                    onMarkUnread = {},
-                    onMuteToggle = {},
-                    onPinToggle = {},
-                    onMovePinned = {},
-                    onSelectAll = { selectAll++ },
-                    onDeselectAll = {},
-                )
+                Column {
+                    ChatListSelectionBar(onClose = { closes++ })
+                    ChatListSelectionControls(
+                        count = 2,
+                        archiveAction = ChatListBulkArchiveAction.Archive,
+                        actionsEnabled = true,
+                        allVisibleSelected = false,
+                        showMarkRead = false,
+                        showMarkUnread = false,
+                        showMuteToggle = false,
+                        muted = false,
+                        showPinToggle = false,
+                        pinned = false,
+                        showMovePinnedUp = false,
+                        showMovePinnedDown = false,
+                        onArchive = { archives++ },
+                        onDelete = { deletes++ },
+                        onAddToFolder = {},
+                        onMarkRead = {},
+                        onMarkUnread = {},
+                        onMuteToggle = {},
+                        onPinToggle = {},
+                        onMovePinned = {},
+                        onSelectAll = { selectAll++ },
+                        onDeselectAll = {},
+                    )
+                }
             }
         }
 
-        composeRule.onNodeWithText("2").assertIsDisplayed()
+        composeRule.onNodeWithText(plural(R.plurals.chat_list_selected_count, 2, 2)).assertIsDisplayed()
         composeRule
             .onNodeWithContentDescription(
                 plural(R.plurals.chat_list_selected_count, 2, 2),
             ).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.close)).performClick()
-        composeRule.onNodeWithContentDescription(string(R.string.archive)).performClick()
-        composeRule.onNodeWithContentDescription(string(R.string.delete)).performClick()
         composeRule.onNodeWithContentDescription(string(R.string.actions)).performClick()
+        composeRule.onNodeWithText(string(R.string.archive)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.actions)).performClick()
+        composeRule.onNodeWithText(string(R.string.delete)).performClick()
         composeRule.onNodeWithText(string(R.string.chat_list_select_all)).performClick()
 
         assertEquals(1, closes)
@@ -89,7 +93,7 @@ class ChatListSelectionBarTest {
         var deselectAll = 0
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChatListSelectionBar(
+                ChatListSelectionControls(
                     count = 1,
                     archiveAction = ChatListBulkArchiveAction.Archive,
                     actionsEnabled = true,
@@ -102,7 +106,6 @@ class ChatListSelectionBarTest {
                     pinned = false,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
-                    onClose = {},
                     onArchive = {},
                     onDelete = {},
                     onAddToFolder = {},
@@ -117,7 +120,6 @@ class ChatListSelectionBarTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription(string(R.string.actions)).performClick()
         composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.chat_list_deselect_all)).assertDoesNotExist()
         composeRule.onNodeWithText(string(R.string.chat_list_select_all)).performClick()
@@ -132,7 +134,7 @@ class ChatListSelectionBarTest {
         var deselectAll = 0
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChatListSelectionBar(
+                ChatListSelectionControls(
                     count = 2,
                     archiveAction = ChatListBulkArchiveAction.Archive,
                     actionsEnabled = true,
@@ -145,7 +147,6 @@ class ChatListSelectionBarTest {
                     pinned = false,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
-                    onClose = {},
                     onArchive = {},
                     onDelete = {},
                     onAddToFolder = {},
@@ -160,7 +161,6 @@ class ChatListSelectionBarTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription(string(R.string.actions)).performClick()
         composeRule.onNodeWithText(string(R.string.chat_list_deselect_all)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertDoesNotExist()
         composeRule.onNodeWithText(string(R.string.chat_list_deselect_all)).performClick()
@@ -173,7 +173,7 @@ class ChatListSelectionBarTest {
     fun disablesActionsWhenNothingSelected() {
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChatListSelectionBar(
+                ChatListSelectionControls(
                     count = 0,
                     archiveAction = ChatListBulkArchiveAction.Unarchive,
                     actionsEnabled = false,
@@ -186,7 +186,6 @@ class ChatListSelectionBarTest {
                     pinned = false,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
-                    onClose = {},
                     onArchive = {},
                     onDelete = {},
                     onAddToFolder = {},
@@ -201,8 +200,8 @@ class ChatListSelectionBarTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription(string(R.string.unarchive)).assertIsNotEnabled()
-        composeRule.onNodeWithContentDescription(string(R.string.delete)).assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription(string(R.string.actions)).assertIsNotEnabled()
+        composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertIsNotEnabled()
     }
 
     @Test
@@ -211,7 +210,7 @@ class ChatListSelectionBarTest {
         var muteToggle = 0
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChatListSelectionBar(
+                ChatListSelectionControls(
                     count = 1,
                     archiveAction = ChatListBulkArchiveAction.Archive,
                     actionsEnabled = true,
@@ -224,7 +223,6 @@ class ChatListSelectionBarTest {
                     pinned = false,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
-                    onClose = {},
                     onArchive = {},
                     onDelete = {},
                     onAddToFolder = {},
@@ -257,7 +255,7 @@ class ChatListSelectionBarTest {
         val moves = mutableListOf<Int>()
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChatListSelectionBar(
+                ChatListSelectionControls(
                     count = 1,
                     archiveAction = ChatListBulkArchiveAction.Archive,
                     actionsEnabled = true,
@@ -270,7 +268,6 @@ class ChatListSelectionBarTest {
                     pinned = true,
                     showMovePinnedUp = true,
                     showMovePinnedDown = true,
-                    onClose = {},
                     onArchive = {},
                     onDelete = {},
                     onAddToFolder = {},
@@ -302,7 +299,7 @@ class ChatListSelectionBarTest {
     fun multiSelectionOverflowHidesSingleChatActions() {
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChatListSelectionBar(
+                ChatListSelectionControls(
                     count = 2,
                     archiveAction = ChatListBulkArchiveAction.Archive,
                     actionsEnabled = true,
@@ -315,7 +312,6 @@ class ChatListSelectionBarTest {
                     pinned = false,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
-                    onClose = {},
                     onArchive = {},
                     onDelete = {},
                     onAddToFolder = {},
@@ -342,7 +338,7 @@ class ChatListSelectionBarTest {
         var addToFolder = 0
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChatListSelectionBar(
+                ChatListSelectionControls(
                     count = 2,
                     archiveAction = ChatListBulkArchiveAction.Archive,
                     actionsEnabled = true,
@@ -355,7 +351,6 @@ class ChatListSelectionBarTest {
                     pinned = false,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
-                    onClose = {},
                     onArchive = {},
                     onDelete = {},
                     onAddToFolder = { addToFolder++ },
@@ -381,7 +376,7 @@ class ChatListSelectionBarTest {
         var addToFolder = 0
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChatListSelectionBar(
+                ChatListSelectionControls(
                     count = 1,
                     archiveAction = ChatListBulkArchiveAction.Archive,
                     actionsEnabled = true,
@@ -394,7 +389,6 @@ class ChatListSelectionBarTest {
                     pinned = false,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
-                    onClose = {},
                     onArchive = {},
                     onDelete = {},
                     onAddToFolder = { addToFolder++ },
@@ -420,7 +414,7 @@ class ChatListSelectionBarTest {
     fun singleSelectionShowsUnmuteWhenMuted() {
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChatListSelectionBar(
+                ChatListSelectionControls(
                     count = 1,
                     archiveAction = ChatListBulkArchiveAction.Archive,
                     actionsEnabled = true,
@@ -433,7 +427,6 @@ class ChatListSelectionBarTest {
                     pinned = false,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
-                    onClose = {},
                     onArchive = {},
                     onDelete = {},
                     onAddToFolder = {},

@@ -3,19 +3,20 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
@@ -31,11 +32,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -44,18 +46,21 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import dev.ipf.marmotkit.ChatListAttachmentKindFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
-import dev.ipf.whitenoise.android.core.chatListItemEvicted
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.OutgoingMessageIndicator
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -65,6 +70,7 @@ import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.messages.OutgoingIndicatorIcon
+import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -115,6 +121,8 @@ internal fun ChatListRow(
     // Non-null when this row matched the chat-list search on a message body
     // (issue #290); drives the highlighted snippet line under the row.
     bodyMatch: MessageBodyMatch? = null,
+    menuHighlighted: Boolean = false,
+    onActionsHeldChange: (Boolean) -> Unit = {},
 ) {
     ChatRow(
         item = item,
@@ -122,6 +130,8 @@ internal fun ChatListRow(
         accountRef = accountRef,
         selectionMode = selectionMode,
         selected = selected,
+        menuHighlighted = menuHighlighted,
+        onActionsHeldChange = onActionsHeldChange,
         onClick =
             if (selectionMode) {
                 onToggleSelection
@@ -165,6 +175,7 @@ private fun highlightedSnippet(
     }
 }
 
+/** Renders only immutable row projection and current account-owned draft/identity data; native work stays in owners. */
 @Composable
 internal fun ChatRow(
     item: ChatListItem,
@@ -186,6 +197,8 @@ internal fun ChatRow(
     // second supporting line shows the matched message with the needle
     // highlighted, so the user can see why the chat appeared in the results.
     bodyMatch: MessageBodyMatch? = null,
+    menuHighlighted: Boolean = false,
+    onActionsHeldChange: (Boolean) -> Unit = {},
 ) {
     val haptics = LocalHapticFeedback.current
     val rowCoordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
@@ -221,36 +234,36 @@ internal fun ChatRow(
     val rowModifier =
         when {
             selectionMode && !rangeDragActive ->
-                Modifier.chatListSelectionRow(
-                    selected = selected,
-                    interactionsEnabled = interactionsEnabled,
-                    onClick = onClick,
-                )
+                Modifier.fillMaxWidth().semantics { this.selected = selected }
             onLongClick != null ->
                 Modifier
-                    .clickable(enabled = interactionsEnabled, onClick = onClick)
                     .then(
                         if (interactionsEnabled) {
                             Modifier
                                 .longPressOrVerticalDrag(
                                     onLongPressStart = {
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onActionsHeldChange(true)
                                         onLongClick()
                                     },
-                                    // The sheet is already visible at the platform
-                                    // long-press threshold. Keep owning the pointer
-                                    // through up, but never open it a second time.
-                                    onLongPressRelease = {},
+                                    // The nonfocusable menu is visible at the threshold; this gesture
+                                    // still owns movement until release transfers popup focus.
+                                    onLongPressRelease = { onActionsHeldChange(false) },
                                     onDragStart = { position ->
+                                        onActionsHeldChange(false)
                                         pointerWindowY(position)?.let { onDragSelectionStart?.invoke(it) }
                                     },
                                     onDrag = { position ->
                                         pointerWindowY(position)?.let { onDragSelection?.invoke(it) } == true
                                     },
                                     onDragEnd = { onDragSelectionEnd?.invoke() },
-                                    onGestureCancel = { onDragSelectionCancel?.invoke() },
+                                    onGestureCancel = {
+                                        onActionsHeldChange(false)
+                                        onDragSelectionCancel?.invoke()
+                                    },
                                 ).semantics {
                                     onLongClick(label = actionsLabel) {
+                                        onActionsHeldChange(false)
                                         onLongClick()
                                         true
                                     }
@@ -259,175 +272,236 @@ internal fun ChatRow(
                             Modifier
                         },
                     )
-            else -> Modifier.clickable(enabled = interactionsEnabled, onClick = onClick)
+            else -> Modifier
         }
     val pinned = item.pinned()
-    val evicted = chatListItemEvicted(item)
-    val hasSupportingMetadata = item.group.pendingConfirmation || rowHasUnread || pinned || evicted
+    val hasSupportingMetadata = item.group.pendingConfirmation || rowHasUnread
     val actionColors = accountActionColors(appState)
-    Box(modifier = rowModifier) {
-        ChatRowLayout(
-            modifier = Modifier.fillMaxWidth(),
-            title = title,
-            timestampAt = timestampAt,
-            rowHasUnread = rowHasUnread,
-            selectionMode = selectionMode,
-            selected = selected,
-            leadingContent = {
-                Box(
-                    modifier =
-                        if (!selectionMode && openableDmAvatarAccount != null) {
-                            Modifier
-                                .clip(CircleShape)
-                                .clickable(enabled = interactionsEnabled, role = Role.Button) {
-                                    onOpenProfile(appState.npub(openableDmAvatarAccount))
-                                }
-                        } else {
-                            Modifier
-                        },
-                ) {
-                    GroupAvatar(
-                        appState = appState,
-                        group = item.group,
-                        title = title,
-                        seed = item.selectedAvatarSeed ?: avatarAccount ?: item.group.groupIdHex,
-                        size = 48.dp,
-                        fallbackPictureUrl =
-                            item.selectedAvatarUrl
-                                ?: avatarAccount
-                                    ?.takeIf { item.selectedPresentation == null }
-                                    ?.let { appState.avatarUrl(it) },
-                        firstFrameAvatar = item.firstFrameAvatar,
-                    )
-                    if (isMuted) {
-                        Icon(
-                            imageVector = Icons.Default.NotificationsOff,
-                            contentDescription = stringResource(R.string.chat_muted_badge),
-                            modifier =
-                                Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .size(18.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surface)
-                                    .padding(2.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+    ChatRowLayout(
+        modifier = rowModifier.fillMaxWidth().padding(horizontal = 8.dp).testTag("chat.row.${item.id}"),
+        onClick = onClick,
+        interactionsEnabled = interactionsEnabled,
+        consumeSelectionLongPress = selectionMode && !rangeDragActive,
+        titleMetadata = {
+            if (isMuted) {
+                ChatRowTitleStatus(R.drawable.ic_notifications_off, stringResource(R.string.chat_muted_badge))
+            }
+            if (item.group.disappearingMessageSecs > 0uL) {
+                val seconds =
+                    item.group.disappearingMessageSecs
+                        .coerceAtMost(Long.MAX_VALUE.toULong())
+                        .toLong()
+                val duration = disappearingMessagesLabel(seconds)
+                ChatRowTitleStatus(R.drawable.ic_timer, "${stringResource(R.string.disappearing_messages)}: $duration")
+            }
+            if (!item.group.pendingConfirmation) {
+                chatRowMembershipStatus(item, activeAccountIdHex)?.let { status ->
+                    ChatRowTitleStatus(R.drawable.ic_logout, stringResource(status))
                 }
-            },
-            supportingContent = supportingContent@{
-                val deliveryIndicator = item.projectedDeliveryIndicator()
-                val draft =
-                    appState
-                        .chatRowDraftFor(accountRef, item.group.groupIdHex)
-                        ?.takeIf { it.isNotBlank() }
-                // Tokens only ever describe the last message's body, so they're
-                // ignored whenever the line shows something else (invite copy,
-                // draft). When the controller hasn't parsed yet (or the parse
-                // produced nothing), fall back to today's plaintext line. No
-                // parsing happens here — composition stays parse-free.
-                val markdownPreview =
-                    item.previewTokens
-                        ?.takeIf { !item.group.pendingConfirmation && draft == null && it.blocks.isNotEmpty() }
-                val preview =
-                    if (markdownPreview != null) {
-                        rememberMarkdownPreviewText(
-                            markdownPreview,
-                            mentionDisplayName =
-                                remember(appState) {
-                                    { bech32: String -> appState.mentionDisplayName(bech32) }
-                                },
-                        )
-                    } else {
-                        AnnotatedString(
-                            when {
-                                item.group.pendingConfirmation -> stringResource(R.string.invitation)
-                                draft != null -> stringResource(R.string.chat_row_draft_prefix) + draft
-                                else ->
-                                    item.projectedPreviewText(
-                                        copy = messageTextCopy,
-                                        empty = stringResource(R.string.no_messages_yet),
-                                    )
-                            },
-                        )
-                    }
-                // A body-content hit makes the matched message itself the subtitle:
-                // the highlighted snippet replaces the last-message preview (its
-                // timestamp already rides `timestampAt` above), so the line the user
-                // reads is the one that actually matched. Title/preview-only hits
-                // (bodyMatch null) keep the normal last-message preview.
-                if (bodyMatch != null) {
-                    val highlightStyle =
-                        SpanStyle(
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    val snippetText =
-                        remember(bodyMatch.snippet, highlightStyle) {
-                            highlightedSnippet(bodyMatch.snippet, highlightStyle)
-                        }
-                    Text(
-                        text = snippetText,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                } else {
-                    ChatRowPreviewLine(
-                        preview = preview,
-                        fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
-                        deliveryIndicator =
-                            deliveryIndicator?.takeIf { draft == null && !item.group.pendingConfirmation },
-                    )
-                }
-            },
-            supportingMetadata =
-                if (hasSupportingMetadata) {
-                    {
-                        ChatRowSupportingMetadata(
-                            pendingConfirmation = item.group.pendingConfirmation,
-                            rowHasUnread = rowHasUnread,
-                            rowUnreadCount = rowUnreadCount,
-                            unreadMention = item.unreadMention,
-                            actionColors = actionColors,
-                            pinned = pinned,
-                            evicted = evicted,
-                        )
-                    }
-                } else {
-                    null
-                },
-        )
-        if (selectionMode) {
+            }
+        },
+        title = title,
+        timestampAt = timestampAt,
+        rowHasUnread = rowHasUnread,
+        selectionMode = selectionMode,
+        selected = selected,
+        menuHighlighted = menuHighlighted,
+        leadingContent = {
             Box(
-                Modifier
-                    .matchParentSize()
-                    .background(
-                        if (selected) {
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                        } else {
-                            Color.Transparent
+                modifier =
+                    if (!selectionMode && openableDmAvatarAccount != null) {
+                        Modifier
+                            .clip(CircleShape)
+                            .clickable(enabled = interactionsEnabled, role = Role.Button) {
+                                onOpenProfile(appState.npub(openableDmAvatarAccount))
+                            }
+                    } else {
+                        Modifier
+                    },
+            ) {
+                GroupAvatar(
+                    appState = appState,
+                    group = item.group,
+                    title = title,
+                    seed = item.selectedAvatarSeed ?: avatarAccount ?: item.group.groupIdHex,
+                    size = 52.dp,
+                    fallbackPictureUrl =
+                        item.selectedAvatarUrl
+                            ?: avatarAccount
+                                ?.takeIf { item.selectedPresentation == null }
+                                ?.let { appState.avatarUrl(it) },
+                    firstFrameAvatar = item.firstFrameAvatar,
+                )
+                if (pinned) {
+                    Surface(
+                        modifier = Modifier.align(Alignment.BottomEnd).size(20.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surface,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) { PinnedBadge() }
+                    }
+                }
+            }
+        },
+        supportingContent = supportingContent@{
+            val deliveryIndicator = item.projectedDeliveryIndicator()
+            val draft =
+                appState
+                    .chatRowDraftFor(accountRef, item.group.groupIdHex)
+                    ?.takeIf { it.isNotBlank() }
+            // Tokens only ever describe the last message's body, so they're
+            // ignored whenever the line shows something else (invite copy,
+            // draft). When the controller hasn't parsed yet (or the parse
+            // produced nothing), fall back to today's plaintext line. No
+            // parsing happens here — composition stays parse-free.
+            val markdownPreview =
+                item.previewTokens
+                    ?.takeIf { !item.group.pendingConfirmation && draft == null && it.blocks.isNotEmpty() }
+            val preview =
+                if (markdownPreview != null) {
+                    rememberMarkdownPreviewText(
+                        markdownPreview,
+                        mentionDisplayName =
+                            remember(appState) {
+                                { bech32: String -> appState.mentionDisplayName(bech32) }
+                            },
+                    )
+                } else {
+                    AnnotatedString(
+                        when {
+                            item.group.pendingConfirmation -> stringResource(R.string.invitation)
+                            draft != null -> stringResource(R.string.chat_row_draft_prefix) + draft
+                            else ->
+                                item.projectedPreviewText(
+                                    copy = messageTextCopy,
+                                    empty = stringResource(R.string.no_messages_yet),
+                                )
                         },
-                    ),
-            )
-        }
-    }
+                    )
+                }
+            // A body-content hit makes the matched message itself the subtitle:
+            // the highlighted snippet replaces the last-message preview (its
+            // timestamp already rides `timestampAt` above), so the line the user
+            // reads is the one that actually matched. Title/preview-only hits
+            // (bodyMatch null) keep the normal last-message preview.
+            if (bodyMatch != null) {
+                val highlightStyle =
+                    SpanStyle(
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                val snippetText =
+                    remember(bodyMatch.snippet, highlightStyle) {
+                        highlightedSnippet(bodyMatch.snippet, highlightStyle)
+                    }
+                Text(
+                    text = snippetText,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            } else {
+                ChatRowPreviewLine(
+                    preview = preview,
+                    fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
+                    deliveryIndicator =
+                        deliveryIndicator?.takeIf { draft == null && !item.group.pendingConfirmation },
+                    attachmentKind =
+                        item.projection
+                            ?.lastMessage
+                            ?.takeIf {
+                                draft == null &&
+                                    !item.group.pendingConfirmation &&
+                                    !it.deleted &&
+                                    (
+                                        it.kind == LEGACY_NOTE_KIND ||
+                                            it.kind == CHAT_MESSAGE_KIND ||
+                                            it.kind == AGENT_STREAM_FINAL_KIND
+                                    )
+                            }?.attachmentKind,
+                )
+            }
+        },
+        supportingMetadata =
+            if (hasSupportingMetadata) {
+                {
+                    ChatRowSupportingMetadata(
+                        pendingConfirmation = item.group.pendingConfirmation,
+                        rowHasUnread = rowHasUnread,
+                        rowUnreadCount = rowUnreadCount,
+                        unreadMention = item.unreadMention,
+                        actionColors = actionColors,
+                        pinned = false,
+                        evicted = false,
+                    )
+                }
+            } else {
+                null
+            },
+    )
 }
 
+/** Quiet title-adjacent native status marker; descriptions distinguish muted, timed and ended membership. */
 @Suppress("FunctionNaming")
+@Composable
+private fun ChatRowTitleStatus(
+    @androidx.annotation.DrawableRes icon: Int,
+    description: String,
+) {
+    Icon(
+        painter = painterResource(icon),
+        contentDescription = description,
+        modifier = Modifier.size(16.dp),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/** Two-line production preview with native typed attachment decoration and the existing outgoing status. */
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 internal fun ChatRowPreviewLine(
     preview: AnnotatedString,
     fontStyle: FontStyle,
     deliveryIndicator: OutgoingMessageIndicator?,
     modifier: Modifier = Modifier,
+    attachmentKind: ChatListAttachmentKindFfi? = null,
 ) {
+    val text =
+        remember(preview, attachmentKind) {
+            if (attachmentKind == null) {
+                preview
+            } else {
+                buildAnnotatedString {
+                    appendInlineContent("attachment")
+                    append(" ")
+                    append(preview)
+                }
+            }
+        }
+    val inlineContent =
+        remember(attachmentKind) {
+            attachmentKind
+                ?.let { kind ->
+                    mapOf(
+                        "attachment" to
+                            InlineTextContent(Placeholder(1.em, 1.em, PlaceholderVerticalAlign.TextCenter)) {
+                                Icon(
+                                    painter = painterResource(chatRowAttachmentIcon(kind)),
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
+                    )
+                }.orEmpty()
+        }
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = preview,
-            maxLines = 1,
+            text = text,
+            inlineContent = inlineContent,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             fontStyle = fontStyle,
             modifier = Modifier.weight(1f),
@@ -466,6 +540,7 @@ internal fun ChatRowPreviewLine(
     }
 }
 
+/** Decoration follows the engine's typed attachment kind; text remains the production projected preview. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun PinnedBadge(modifier: Modifier = Modifier) {
@@ -516,3 +591,7 @@ internal fun MentionBadge(modifier: Modifier = Modifier) {
         Text("@")
     }
 }
+
+private const val LEGACY_NOTE_KIND = 1uL
+private const val CHAT_MESSAGE_KIND = 9uL
+private const val AGENT_STREAM_FINAL_KIND = 1209uL

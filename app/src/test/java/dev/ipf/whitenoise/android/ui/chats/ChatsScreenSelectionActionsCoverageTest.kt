@@ -10,8 +10,8 @@ class ChatsScreenSelectionActionsCoverageTest {
         val source = chatsScreenSource().readText()
         val selectionBar =
             source.requiredSection(
-                start = "ChatListSelectionBar(",
-                end = "\n                    )\n                } else {",
+                start = "ChatListSelectionControls(",
+                end = "\n                    )\n                }\n            }\n        },",
             )
         val markReadHandler =
             selectionBar.requiredSection(
@@ -58,8 +58,8 @@ class ChatsScreenSelectionActionsCoverageTest {
         val source = chatsScreenSource().readText()
         val selectionBar =
             source.requiredSection(
-                start = "ChatListSelectionBar(",
-                end = "\n                    )\n                } else {",
+                start = "ChatListSelectionControls(",
+                end = "\n                    )\n                }\n            }\n        },",
             )
         val muteHandler =
             selectionBar.requiredSection(
@@ -89,8 +89,8 @@ class ChatsScreenSelectionActionsCoverageTest {
         val source = chatsScreenSource().readText()
         val selectionBar =
             source.requiredSection(
-                start = "ChatListSelectionBar(",
-                end = "\n                    )\n                } else {",
+                start = "ChatListSelectionControls(",
+                end = "\n                    )\n                }\n            }\n        },",
             )
         val pinHandler =
             selectionBar.requiredSection(
@@ -147,8 +147,8 @@ class ChatsScreenSelectionActionsCoverageTest {
 
         val actionSheet =
             source.requiredSection(
-                start = "ChatActionSheet(",
-                end = "\n            )\n        }",
+                start = "ChatContextMenu(",
+                end = "\n                        )\n                    }",
             )
         assertTrue(
             "the long-press sheet must expose the same unarchived pin toggle",
@@ -168,8 +168,8 @@ class ChatsScreenSelectionActionsCoverageTest {
         val source = chatsScreenSource().readText()
         val selectionBar =
             source.requiredSection(
-                start = "ChatListSelectionBar(",
-                end = "\n                    )\n                } else {",
+                start = "ChatListSelectionControls(",
+                end = "\n                    )\n                }\n            }\n        },",
             )
         val addToFolderHandler =
             selectionBar.requiredSection(
@@ -211,7 +211,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         listOf(
             "globalSearchState:",
             "onGlobalSearchStateChange:",
-            "val chatListState = key(showArchived) { rememberLazyListState() }",
+            "val chatListState = key(showArchived, effectiveChatScope) { rememberLazyListState() }",
         ).forEach { declaration ->
             assertTrue(
                 "$declaration must remain outside the editor swap so closing it preserves list state",

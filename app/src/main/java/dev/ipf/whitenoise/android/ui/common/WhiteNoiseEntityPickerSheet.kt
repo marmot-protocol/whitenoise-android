@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -185,9 +186,12 @@ private fun PickerRow(
     }
 }
 
-/** A pill-shaped single-line search field with a leading glyph and a clear action while text is present. */
+/**
+ * Shared compact search. Empty trailing actions, IME options and accessibility labels remain caller-owned;
+ * existing entity pickers retain their defaults, while Chats supplies native voice entry and its clear label.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
-@Suppress("FunctionNaming", "LongMethod")
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 fun WhiteNoiseCompactSearchField(
     value: String,
@@ -195,8 +199,19 @@ fun WhiteNoiseCompactSearchField(
     placeholder: String,
     modifier: Modifier = Modifier,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    emptyTrailingIcon: (@Composable () -> Unit)? = null,
+    keyboardOptions: KeyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+    clearDescription: String = stringResource(R.string.clear_search),
+    outlined: Boolean = false,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val outline =
+        if (outlined) {
+            dev.ipf.whitenoise.android.ui.theme
+                .amoledOutlineBorder()
+        } else {
+            null
+        }
     val fieldColors =
         TextFieldDefaults.colors(
             focusedContainerColor = containerColor,
@@ -212,7 +227,7 @@ fun WhiteNoiseCompactSearchField(
         modifier = modifier.heightIn(min = SearchFieldMinHeight),
         textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardOptions = keyboardOptions,
         singleLine = true,
         interactionSource = interactionSource,
         decorationBox = { innerTextField ->
@@ -229,17 +244,23 @@ fun WhiteNoiseCompactSearchField(
                     if (value.isNotEmpty()) {
                         {
                             IconButton(onClick = { onValueChange("") }) {
-                                Icon(painterResource(R.drawable.ic_close), stringResource(R.string.clear_search))
+                                Icon(painterResource(R.drawable.ic_close), clearDescription)
                             }
                         }
                     } else {
-                        null
+                        emptyTrailingIcon
                     },
                 shape = MaterialTheme.shapes.extraLarge,
                 colors = fieldColors,
                 contentPadding = TextFieldDefaults.contentPaddingWithoutLabel(top = 0.dp, bottom = 0.dp),
                 container = {
                     TextFieldDefaults.Container(
+                        modifier =
+                            if (outline != null) {
+                                Modifier.border(outline, MaterialTheme.shapes.extraLarge)
+                            } else {
+                                Modifier
+                            },
                         enabled = true,
                         isError = false,
                         interactionSource = interactionSource,

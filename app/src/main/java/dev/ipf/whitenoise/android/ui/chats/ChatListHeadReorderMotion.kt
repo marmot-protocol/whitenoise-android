@@ -67,6 +67,7 @@ internal data class ChatListDatasetKey(
     val query: String,
     val accountRef: String? = null,
     val runtimeGeneration: Int = 0,
+    val chatScope: ChatScope = ChatScope.Chats,
 )
 
 /** Stable domain-row and scroll coordinates captured from the current lazy-list viewport. */
