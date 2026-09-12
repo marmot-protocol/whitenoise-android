@@ -32,9 +32,9 @@ import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 
-// Reached only through the hidden gate in About (see AboutScreen), so the row
-// is invisible to non-developers. Telemetry and audit logs stay in Device
-// privacy — they are privacy controls, not developer tools.
+// Reached from the Developer Tools row in Settings, which owns the developer
+// switch itself. Telemetry and audit logs stay in Device privacy — they are
+// privacy controls, not developer tools.
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun DeveloperScreen(

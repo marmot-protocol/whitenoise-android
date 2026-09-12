@@ -1134,6 +1134,8 @@ class LocalizationResourceTest {
             mapOf(
                 "values-de" to
                     setOf(
+                        // "Version" is the German word for the About version label.
+                        "about_version",
                         // "Details" is also the standard German label for additional information.
                         "setup_details",
                         // "Name" is the German word for "name".
@@ -1175,6 +1177,8 @@ class LocalizationResourceTest {
                     ),
                 "values-fr" to
                     setOf(
+                        // "Version" is spelled identically in French.
+                        "about_version",
                         "disappearing_unit_minutes",
                         "disappearing_minutes_format",
                         "disappearing_5_minutes",

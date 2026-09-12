@@ -2,87 +2,61 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import android.content.Intent
-import android.widget.Toast
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.PrivacyTip
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
-import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.SettingsGroup
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 
-// Taps on the version row needed to reveal the hidden developer surface —
-// the platform "you are now a developer" gesture, so non-devs never see it.
-private const val DEV_UNLOCK_TAPS = 7
-
-@OptIn(ExperimentalMaterial3Api::class)
+/** Help: the bug report, reviewed before it leaves the app, and the build's own facts. */
+@Suppress("FunctionNaming")
 @Composable
 internal fun HelpScreen(
     onBack: () -> Unit,
+    onOpenBugReport: () -> Unit,
     onOpenAbout: () -> Unit,
 ) {
-    val context = LocalContext.current
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.help)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        LazyColumn(
-            Modifier.fillMaxSize().padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
+    SettingsScaffold(title = stringResource(R.string.help), onBack = onBack) {
+        SettingsList {
             item {
-                SettingsGroup {
-                    item {
-                        SettingsRow(
+                SettingsGroup(modifier = Modifier.testTag("help.destinations")) {
+                    row("bug_report") { context ->
+                        SettingsLink(
+                            context = context,
                             title = stringResource(R.string.report_a_bug),
+                            onClick = onOpenBugReport,
+                            modifier = Modifier.testTag("help.report_bug"),
                             subtitle = stringResource(R.string.report_a_bug_subtitle),
-                            icon = Icons.Filled.BugReport,
-                            onClick = { openUrl(context, WhiteNoiseUrls.BUG_REPORT) },
+                            leading = { HelpLeadingIcon(R.drawable.ic_bug_report) },
                         )
                     }
-                    item {
-                        SettingsRow(
+                    row("about") { context ->
+                        SettingsLink(
+                            context = context,
                             title = stringResource(R.string.about_and_licenses),
-                            subtitle = stringResource(R.string.about_and_licenses_subtitle),
-                            icon = Icons.Filled.Info,
                             onClick = onOpenAbout,
+                            modifier = Modifier.testTag("help.about"),
+                            subtitle = stringResource(R.string.about_and_licenses_subtitle),
+                            leading = { HelpLeadingIcon(R.drawable.ic_info) },
                         )
                     }
                 }
@@ -91,104 +65,238 @@ internal fun HelpScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+/** Report a bug over the shipped issue form, opened only from this screen's own action. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun BugReportScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    BugReportContent(onBack = onBack, onOpenReport = { openHelpUrl(context, WhiteNoiseUrls.BUG_REPORT) })
+}
+
+/**
+ * What the hand-off does and what it does not attach, then one action. [onOpenReport] reports whether a
+ * browser accepted it; a refusal keeps the screen and offers Retry.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun BugReportContent(
+    onBack: () -> Unit,
+    onOpenReport: () -> Boolean,
+) {
+    var openFailed by rememberSaveable { mutableStateOf(false) }
+
+    fun openReport() {
+        openFailed = !onOpenReport()
+    }
+
+    SettingsScaffold(
+        title = stringResource(R.string.report_a_bug),
+        onBack = onBack,
+        bottomBar = {
+            SettingsBottomAction {
+                WhiteNoiseButton(
+                    onClick = ::openReport,
+                    modifier = Modifier.fillMaxWidth().testTag("help.bug.open"),
+                ) { Text(stringResource(R.string.report_bug_open_github)) }
+            }
+        },
+    ) {
+        SettingsList {
+            item { SettingsSection(stringResource(R.string.report_bug_destination_section)) }
+            item {
+                SettingsGroup(modifier = Modifier.testTag("help.bug.destination")) {
+                    row("destination") { context ->
+                        SettingsValue(
+                            context = context,
+                            title = stringResource(R.string.report_bug_destination),
+                            value = stringResource(R.string.report_bug_destination_detail),
+                        )
+                    }
+                }
+            }
+            item { SettingsSection(stringResource(R.string.report_bug_privacy_section)) }
+            item {
+                SettingsCallout(
+                    text = stringResource(R.string.report_bug_no_attachments_detail),
+                    modifier = Modifier.testTag("help.bug.privacy"),
+                    title = stringResource(R.string.report_bug_no_attachments_title),
+                    leading = { HelpLeadingIcon(R.drawable.ic_settings_front_hand) },
+                )
+            }
+            item {
+                SettingsCallout(
+                    text = stringResource(R.string.report_bug_public_reminder),
+                    modifier = Modifier.testTag("help.bug.public"),
+                    icon = R.drawable.ic_warning,
+                )
+            }
+        }
+    }
+    if (openFailed) {
+        HelpOpenFailureDialog(
+            title = stringResource(R.string.report_bug_open_failed_title),
+            body = stringResource(R.string.report_bug_open_failed_detail),
+            onRetry = ::openReport,
+            onDismiss = { openFailed = false },
+        )
+    }
+}
+
+/** About & licenses: the installed build, then the bundled notices and the privacy policy. */
+@Suppress("FunctionNaming")
 @Composable
 internal fun AboutScreen(
-    appState: WhiteNoiseAppState,
     versionName: String,
+    buildNumber: String,
     mdkShortSha: String,
     onBack: () -> Unit,
-    onOpenDeveloper: () -> Unit,
 ) {
     val context = LocalContext.current
-    var tapCount by remember { mutableIntStateOf(0) }
-    val unlockedMessage = stringResource(R.string.developer_tools_unlocked)
-    val alreadyOnMessage = stringResource(R.string.developer_tools_already_enabled)
+    AboutContent(
+        versionName = versionName,
+        buildNumber = buildNumber,
+        mdkShortSha = mdkShortSha,
+        onBack = onBack,
+        onOpenLicenses = { openSourceLicenses(context) },
+        onOpenPrivacy = { openHelpUrl(context, WhiteNoiseUrls.PRIVACY_POLICY) },
+    )
+}
 
-    fun onVersionTap() {
-        if (appState.developerMode) {
-            Toast.makeText(context, alreadyOnMessage, Toast.LENGTH_SHORT).show()
-            return
-        }
-        tapCount++
-        if (tapCount >= DEV_UNLOCK_TAPS) {
-            tapCount = 0
-            appState.updateDeveloperMode(true)
-            Toast.makeText(context, unlockedMessage, Toast.LENGTH_SHORT).show()
-        }
+/** The list itself: build facts are read from the package, and each hand-off states its own failure. */
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
+@Composable
+internal fun AboutContent(
+    versionName: String,
+    buildNumber: String,
+    mdkShortSha: String,
+    onBack: () -> Unit,
+    onOpenLicenses: () -> Boolean,
+    onOpenPrivacy: () -> Boolean,
+) {
+    var failure by rememberSaveable { mutableStateOf<AboutOpenFailure?>(null) }
+
+    fun showLicenses() {
+        failure = if (onOpenLicenses()) null else AboutOpenFailure.Licenses
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.about_and_licenses)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        LazyColumn(
-            Modifier.fillMaxSize().padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
+    fun openPrivacy() {
+        failure = if (onOpenPrivacy()) null else AboutOpenFailure.Privacy
+    }
+
+    SettingsScaffold(title = stringResource(R.string.about_and_licenses), onBack = onBack) {
+        SettingsList {
+            item { SettingsSection(stringResource(R.string.about_app_section)) }
             item {
-                // Expressive reveal: when the gate unlocks, the group grows to
-                // admit the Developer row along the theme's spatial spring.
-                Column(Modifier.animateContentSize(MaterialTheme.motionScheme.fastSpatialSpec())) {
-                    SettingsGroup {
-                        item {
-                            // Seven taps here unlock the developer gate.
-                            SettingsRow(
-                                title = stringResource(R.string.settings_version_label, versionName),
-                                subtitle = stringResource(R.string.settings_mdk_version_label, mdkShortSha),
-                                icon = Icons.Filled.Info,
-                                onClick = { onVersionTap() },
-                            )
-                        }
-                        item {
-                            SettingsRow(
-                                title = stringResource(R.string.open_source_licenses),
-                                subtitle = stringResource(R.string.open_source_licenses_subtitle),
-                                icon = Icons.Filled.Description,
-                                onClick = { openLicenses(context) },
-                            )
-                        }
-                        item {
-                            SettingsRow(
-                                title = stringResource(R.string.privacy_policy),
-                                subtitle = stringResource(R.string.privacy_policy_subtitle),
-                                icon = Icons.Filled.PrivacyTip,
-                                onClick = { openUrl(context, WhiteNoiseUrls.PRIVACY_POLICY) },
-                            )
-                        }
-                        if (appState.developerMode) {
-                            item {
-                                SettingsRow(
-                                    title = stringResource(R.string.developer),
-                                    subtitle = stringResource(R.string.developer_mode_subtitle),
-                                    icon = Icons.Filled.Code,
-                                    onClick = onOpenDeveloper,
-                                )
-                            }
-                        }
+                SettingsGroup(modifier = Modifier.testTag("about.app")) {
+                    row("version") { context ->
+                        SettingsValue(context, stringResource(R.string.about_version), versionName)
+                    }
+                    row("build") { context ->
+                        SettingsValue(context, stringResource(R.string.about_build), buildNumber)
+                    }
+                    row("mdk") { context ->
+                        SettingsValue(context, stringResource(R.string.about_mdk), mdkShortSha)
+                    }
+                }
+            }
+            item { SettingsSection(stringResource(R.string.about_legal_section)) }
+            item {
+                SettingsGroup(modifier = Modifier.testTag("about.legal")) {
+                    row("licenses") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.open_source_licenses),
+                            onClick = ::showLicenses,
+                            modifier = Modifier.testTag("about.licenses"),
+                            subtitle = stringResource(R.string.open_source_licenses_subtitle),
+                            leading = { HelpLeadingIcon(R.drawable.ic_description) },
+                        )
+                    }
+                    row("privacy") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.privacy_policy),
+                            onClick = ::openPrivacy,
+                            modifier = Modifier.testTag("about.privacy_policy"),
+                            subtitle = stringResource(R.string.privacy_policy_subtitle),
+                            leading = { HelpLeadingIcon(R.drawable.ic_settings_front_hand) },
+                        )
                     }
                 }
             }
         }
     }
+    failure?.let { unavailable ->
+        HelpOpenFailureDialog(
+            title = stringResource(unavailable.titleRes),
+            body = stringResource(R.string.external_open_failed_detail),
+            onRetry = if (unavailable == AboutOpenFailure.Licenses) ::showLicenses else ::openPrivacy,
+            onDismiss = { failure = null },
+        )
+    }
 }
 
-private fun openUrl(
+/** Which About hand-off was refused, so Retry repeats that one and nothing else. */
+internal enum class AboutOpenFailure(
+    val titleRes: Int,
+) {
+    Licenses(R.string.licenses_open_failed_title),
+    Privacy(R.string.privacy_policy_open_failed_title),
+}
+
+/** A refused hand-off keeps the screen: Retry repeats the same reviewed action, Cancel closes. */
+@Suppress("FunctionNaming")
+@Composable
+private fun HelpOpenFailureDialog(
+    title: String,
+    body: String,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    WhiteNoiseAlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onDismiss()
+                    onRetry()
+                },
+            ) { Text(stringResource(R.string.retry)) }
+        },
+        modifier = Modifier.testTag("help.open_failed"),
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        title = { Text(title) },
+        text = { Text(body) },
+    )
+}
+
+/** Decorative: the row and the callout already carry their own visible names. */
+@Suppress("FunctionNaming")
+@Composable
+private fun HelpLeadingIcon(
+    @DrawableRes icon: Int,
+) {
+    Icon(
+        painter = painterResource(icon),
+        contentDescription = null,
+        modifier = Modifier.size(HelpLeadingIconSize),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/** Reports whether a browser accepted the hand-off; no app-owned data is placed in the intent. */
+private fun openHelpUrl(
     context: Context,
     url: String,
-) {
-    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
+): Boolean {
+    val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+    return runCatching { context.startActivity(intent) }.isSuccess
 }
 
-private fun openLicenses(context: Context) {
+/** Google's generated notice activity, titled as the row that opens it. */
+private fun openSourceLicenses(context: Context): Boolean {
     OssLicensesMenuActivity.setActivityTitle(context.getString(R.string.open_source_licenses))
-    runCatching { context.startActivity(Intent(context, OssLicensesMenuActivity::class.java)) }
+    return runCatching { context.startActivity(Intent(context, OssLicensesMenuActivity::class.java)) }.isSuccess
 }
+
+private val HelpLeadingIconSize = 24.dp
