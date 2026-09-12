@@ -134,7 +134,7 @@ private fun chatFolderChipLeadingIcon(
     }
 
 /** Preserves chat-list long press while using the native tri-state toggle contract for bulk actions. */
-private fun MutableInteractionSource.chatFolderChipGestureModifier(
+internal fun MutableInteractionSource.chatFolderChipGestureModifier(
     state: ToggleableState,
     showStateIndicator: Boolean,
     onClick: () -> Unit,
@@ -162,7 +162,7 @@ private fun MutableInteractionSource.chatFolderChipGestureModifier(
 
 /** Announces the complete folder label and eligible count even when the visible label is ellipsized. */
 @Composable
-private fun chatFolderChipAccessibleDescription(
+internal fun chatFolderChipAccessibleDescription(
     label: String,
     trailingCount: Int,
 ): String =

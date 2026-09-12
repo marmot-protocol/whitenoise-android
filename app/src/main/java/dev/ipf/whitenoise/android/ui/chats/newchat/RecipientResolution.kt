@@ -15,7 +15,9 @@ import dev.ipf.whitenoise.android.core.RecipientReference
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_SEARCH_DEBOUNCE_MS
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 
@@ -30,12 +32,17 @@ import kotlinx.coroutines.flow.map
 internal fun rememberRecipientResolution(
     input: String,
     appState: WhiteNoiseAppState,
+    retryKey: Int = 0,
 ): RecipientResolution {
     val trimmed = input.trim()
-    var resolving by remember(trimmed) { mutableStateOf(trimmed.isNotEmpty() && !isPlainNameQuery(trimmed)) }
-    var resolvedHex by remember(trimmed) { mutableStateOf<String?>(null) }
+    val accountRef = appState.activeAccountRef
+    val runtimeGeneration = appState.runtimeGeneration
+    var resolving by remember(trimmed, accountRef, runtimeGeneration, retryKey) {
+        mutableStateOf(trimmed.isNotEmpty() && !isPlainNameQuery(trimmed))
+    }
+    var resolvedHex by remember(trimmed, accountRef, runtimeGeneration, retryKey) { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(trimmed) {
+    LaunchedEffect(trimmed, accountRef, runtimeGeneration, retryKey) {
         if (trimmed.isEmpty() || isPlainNameQuery(trimmed)) {
             resolving = false
             resolvedHex = null
@@ -56,6 +63,12 @@ internal fun rememberRecipientResolution(
                     }
                     null -> appState.accountIdHex(trimmed)
                 }
+        currentCoroutineContext().ensureActive()
+        val replacedOwner = appState.activeAccountRef != accountRef || appState.runtimeGeneration != runtimeGeneration
+        val unavailable = appState.signOutInProgress || appState.wipeInProgress
+        if (replacedOwner || unavailable) {
+            return@LaunchedEffect
+        }
         resolvedHex = hex
         if (hex != null) appState.refreshProfile(hex)
         resolving = false

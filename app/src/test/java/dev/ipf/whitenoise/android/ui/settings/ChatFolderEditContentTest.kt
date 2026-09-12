@@ -47,7 +47,7 @@ class ChatFolderEditContentTest {
     @Test
     fun editorUsesTheScreenTitleOnly() {
         render(state = editState(name = "Work"))
-        composeRule.onAllNodesWithText(app.getString(R.string.chat_folder_new)).assertCountEquals(1)
+        composeRule.onAllNodesWithText(app.getString(R.string.folder_new_title)).assertCountEquals(1)
         composeRule.onAllNodesWithText(app.getString(R.string.details)).assertCountEquals(0)
     }
 
@@ -81,7 +81,7 @@ class ChatFolderEditContentTest {
         render(state = editState(name = "Work", manualChatCount = 3), onOpenManualChats = { opened = true })
         composeRule
             .onAllNodes(
-                hasText(app.getString(R.string.chat_folder_manual_chats)) and hasText("3") and hasClickAction(),
+                hasText(app.getString(R.string.folder_included_chats)) and hasText("3") and hasClickAction(),
             )[0]
             .performClick()
         assertEquals(true, opened)

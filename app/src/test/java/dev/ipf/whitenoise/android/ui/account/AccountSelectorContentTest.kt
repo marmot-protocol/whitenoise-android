@@ -46,7 +46,7 @@ class AccountSelectorContentTest {
         render(onAddAccount = { addCount++ })
 
         composeRule
-            .onNodeWithText(string(R.string.add_account))
+            .onNodeWithText(string(R.string.add_profile))
             .assertIsDisplayed()
             .performClick()
 
@@ -125,7 +125,7 @@ class AccountSelectorContentTest {
 
         composeRule.onNodeWithText("Personal").assertIsDisplayed()
         composeRule.onNodeWithText("Work").assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.add_account)).assertIsDisplayed().assertIsEnabled()
+        composeRule.onNodeWithText(string(R.string.add_profile)).assertIsDisplayed().assertIsEnabled()
     }
 
     /** Renders either the standard fixture or a caller-controlled account-selector state. */

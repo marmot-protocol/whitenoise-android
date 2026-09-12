@@ -60,8 +60,16 @@ import kotlinx.coroutines.flow.first
 internal fun RelaysScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
+    onFeedback: (dev.ipf.whitenoise.android.state.ToastMessage) -> Unit = {},
 ) {
     val account = appState.activeAccountRef
+    val feedbackRuntime = appState.runtimeGeneration
+
+    fun deliverFeedback(previous: dev.ipf.whitenoise.android.state.ToastMessage?) {
+        val sameOwner = appState.activeAccountRef == account && appState.runtimeGeneration == feedbackRuntime
+        val fresh = appState.toast?.takeIf { it !== previous }
+        if (sameOwner && fresh != null) onFeedback(fresh)
+    }
     var lists by remember(account) { mutableStateOf<AccountRelayListsFfi?>(null) }
     var publication by remember(account) { mutableStateOf(RelayPublicationState()) }
     val operations = remember(appState, account) { appState.relayOperationState(account) }
@@ -79,7 +87,9 @@ internal fun RelaysScreen(
             launcher = appState::launchMutation,
             onStarted = { publication = RelayPublicationState(running = operation) },
         ) {
+            val previousToast = appState.toast
             val updated = block()
+            deliverFeedback(previousToast)
             // A multi-kind publish may have partially succeeded. Always expose the authoritative projection.
             val projection = updated ?: account?.let { appState.loadAccountRelayLists(it) }
             if (appState.activeAccountRef != account) return@launch
@@ -90,7 +100,10 @@ internal fun RelaysScreen(
 
     fun runEdit(block: suspend () -> AccountRelayListsFfi?) {
         operations.launch(launcher = appState::launchMutation) {
-            val updated = block() ?: account?.let { appState.loadAccountRelayLists(it) }
+            val previousToast = appState.toast
+            val result = block()
+            deliverFeedback(previousToast)
+            val updated = result ?: account?.let { appState.loadAccountRelayLists(it) }
             if (updated != null && appState.activeAccountRef == account) lists = updated
         }
     }

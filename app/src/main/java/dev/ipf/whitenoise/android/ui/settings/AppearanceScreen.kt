@@ -16,6 +16,8 @@ import dev.ipf.whitenoise.android.state.AppFontScale
 import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.quickProfileCycling
+import dev.ipf.whitenoise.android.state.updateQuickProfileCycling
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 
 internal val AppThemeMode.labelRes: Int
@@ -56,9 +58,8 @@ private fun AppFont.pickerLabel(): String =
     }
 
 /**
- * Appearance settings. Every callback and every preference write is unchanged; the layout, copy
- * and pickers follow the shared settings language: a Theme section with an explainer, colour links
- * that lock on AMOLED, typography and Enter-key choices in dialogs, and the language destination.
+ * Appearance preserves existing preference owners and adds the explicit app-wide profile-cycle opt-in.
+ * Shared groups retain Theme, AMOLED color rules, typography, Enter-key choices and the language destination.
  */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
@@ -120,6 +121,19 @@ internal fun AppearanceScreen(
     }
     SettingsScaffold(title = stringResource(R.string.appearance), onBack = onBack) {
         SettingsList {
+            item {
+                SettingsGroup(modifier = Modifier.testTag("appearance.quick_account_switching")) {
+                    row("quick_account_switching") { context ->
+                        SettingsSwitch(
+                            context = context,
+                            title = stringResource(R.string.quick_account_switching),
+                            checked = appState.quickProfileCycling,
+                            subtitle = stringResource(R.string.quick_account_switching_detail),
+                            onCheckedChange = appState::updateQuickProfileCycling,
+                        )
+                    }
+                }
+            }
             item { SettingsSection(stringResource(R.string.appearance_theme)) }
             item {
                 SettingsGroup(modifier = Modifier.selectableGroup().testTag("appearance.theme.group")) {

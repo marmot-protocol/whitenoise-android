@@ -103,6 +103,91 @@ class ChatFolderPreferences(
         }
     }
 
+    /**
+     * Apply every editor field in one preference edit and one observable state transition.
+     * A null [name] preserves an existing folder's stored name, including an unnamed localized default.
+     * The caller must first initialize this account through [foldersFor]; an unloaded account is rejected
+     * without seeding, migrating or publishing. New folders require a nonblank name; missing targets are
+     * never recreated. Disk persistence keeps
+     * the store's existing asynchronous apply policy; this does not claim synchronous durable storage.
+     */
+    fun commitFolderDraft(
+        accountRef: String,
+        folderId: String?,
+        name: String?,
+        description: String,
+        manualChatIds: Set<String>,
+        rule: ChatFolderRule?,
+    ): ChatFolder? {
+        val account = normalizedAccount(accountRef)
+        val trimmedName = name?.trim()
+        val invalidName = trimmedName != null && trimmedName.isEmpty()
+        val unnamedNewFolder = folderId == null && trimmedName == null
+        if (account == null || invalidName || unnamedNewFolder) return null
+        return synchronized(mutationLock) {
+            val current = _state.value[account] ?: return@synchronized null
+            val existing = folderId?.let { id -> current.folders.firstOrNull { it.id == id } }
+            if (folderId != null && existing == null) return@synchronized null
+            val folder =
+                existing?.copy(
+                    name = trimmedName ?: existing.name,
+                    description = description.trim(),
+                ) ?: ChatFolder(
+                    id = UUID.randomUUID().toString(),
+                    name = requireNotNull(trimmedName),
+                    description = description.trim(),
+                    order = (current.folders.maxOfOrNull { it.order } ?: -1) + 1,
+                    systemKind = null,
+                )
+            persistFolderDraft(account, current, folder, existing == null, manualChatIds, rule)
+            folder
+        }
+    }
+
+    /**
+     * Persist the entire draft atomically before publishing its single observable projection; caller holds
+     * mutationLock.
+     */
+    @Suppress("LongParameterList")
+    private fun persistFolderDraft(
+        account: String,
+        current: ChatFolderAccountState,
+        folder: ChatFolder,
+        isNew: Boolean,
+        manualChatIds: Set<String>,
+        rule: ChatFolderRule?,
+    ) {
+        val chats = manualChatIds.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
+        val folders =
+            if (isNew) {
+                current.folders + folder
+            } else {
+                current.folders.map {
+                    if (it.id == folder.id) folder else it
+                }
+            }
+        val updated =
+            current.copy(
+                folders = folders.sortedBy { it.order },
+                membership = current.membership + (folder.id to chats),
+                rules = if (rule == null) current.rules - folder.id else current.rules + (folder.id to rule),
+            )
+        val edit = preferences.edit()
+        edit.putString(foldersKey(account), folderListJson(updated.folders))
+        if (chats.isEmpty()) {
+            edit.remove(membershipKey(account, folder.id))
+        } else {
+            edit.putStringSet(membershipKey(account, folder.id), chats)
+        }
+        if (rule == null) {
+            edit.remove(ruleKey(account, folder.id))
+        } else {
+            edit.putString(ruleKey(account, folder.id), ruleJson(rule).toString())
+        }
+        edit.apply()
+        _state.value = _state.value + (account to updated)
+    }
+
     fun renameFolder(
         accountRef: String,
         folderId: String,
@@ -390,12 +475,18 @@ class ChatFolderPreferences(
         _state.value = _state.value + (account to normalized)
     }
 
+    /** Keep existing single-field callers on their original asynchronous persistence policy. */
     private fun persistFolderList(
         account: String,
         folders: List<ChatFolder>,
     ) {
-        val json =
-            JSONArray().apply {
+        preferences.edit().putString(foldersKey(account), folderListJson(folders)).apply()
+    }
+
+    /** Shared serialization ensures atomic editor saves retain the existing on-disk folder schema. */
+    private fun folderListJson(folders: List<ChatFolder>): String =
+        JSONArray()
+            .apply {
                 folders.forEach { folder ->
                     put(
                         JSONObject()
@@ -406,9 +497,7 @@ class ChatFolderPreferences(
                             .put(FIELD_SYSTEM_KIND, folder.systemKind?.name),
                     )
                 }
-            }
-        preferences.edit().putString(foldersKey(account), json.toString()).apply()
-    }
+            }.toString()
 
     // Null only when the blob is unparseable JSON — the caller then reseeds.
     // A parsed empty list is respected: deleting every folder is a valid

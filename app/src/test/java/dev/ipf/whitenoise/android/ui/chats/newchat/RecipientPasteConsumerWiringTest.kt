@@ -5,17 +5,26 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** Guards the shared recipient boundary across its four intended surfaces only. */
+/** Guards the shared recipient paste boundary across its intended surfaces. */
 class RecipientPasteConsumerWiringTest {
     @Test
-    fun allRecipientSurfacesRouteThroughTheSharedField() {
+    fun allRecipientSurfacesRouteThroughTheSharedPastePolicy() {
         val newChat = source("ui/chats/newchat/NewChatFlow.kt")
+        val newMessageContent = source("ui/chats/newchat/NewMessagePresentation.kt")
         val contactPicker = source("ui/chats/newchat/ContactPickerScreen.kt")
         val conversation = source("ui/conversation/ConversationScreen.kt")
         val groupDetails = source("ui/group/GroupDetailsScreen.kt")
 
-        assertTrue(newChat.contains("RecipientSearchField("))
-        assertTrue(newChat.contains("ContactPickerScreen("))
+        assertTrue(newChat.contains("NewMessageContent("))
+        assertTrue(newMessageContent.contains("RecipientSearchField("))
+        val groupFlow = source("ui/chats/newchat/NewGroupCreationFlow.kt")
+        val groupPicker = source("ui/chats/newchat/NewGroupRecipientPickerScreen.kt")
+        val groupContent = source("ui/chats/newchat/NewGroupRecipientContent.kt")
+        val groupSearch = source("ui/chats/newchat/NewGroupRecipientSearchField.kt")
+        assertTrue(groupFlow.contains("NewGroupRecipientPickerScreen("))
+        assertTrue(groupPicker.contains("NewGroupRecipientContent("))
+        assertTrue(groupContent.contains("NewGroupRecipientSearchField("))
+        assertTrue(groupSearch.contains("dispatchRecipientPaste("))
         assertTrue(contactPicker.contains("RecipientSearchField("))
         assertTrue(conversation.contains("ContactPickerScreen("))
         assertTrue(groupDetails.contains("ContactPickerScreen("))

@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -57,6 +58,8 @@ internal fun RecipientSearchField(
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
     onScanQr: (() -> Unit)? = null,
+    shape: Shape = RoundedCornerShape(28.dp),
+    enabled: Boolean = true,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val clipboardManager =
@@ -84,22 +87,23 @@ internal fun RecipientSearchField(
                 }
             }
         }
-    val shape = RoundedCornerShape(28.dp)
 
     TextField(
         state = state,
+        enabled = enabled,
         placeholder = { Text(placeholder, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
         trailingIcon = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 when {
                     state.text.isNotEmpty() -> {
-                        IconButton(onClick = { state.replaceRecipientText("") }) {
+                        IconButton(onClick = { state.replaceRecipientText("") }, enabled = enabled) {
                             Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear))
                         }
                     }
                     canOfferPaste -> {
                         IconButton(
+                            enabled = enabled,
                             onClick = {
                                 dispatchRecipientPaste(
                                     state = state,
@@ -114,7 +118,7 @@ internal fun RecipientSearchField(
                     }
                 }
                 if (state.text.isEmpty() && onScanQr != null) {
-                    IconButton(onClick = onScanQr) {
+                    IconButton(onClick = onScanQr, enabled = enabled) {
                         Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_qr_code))
                     }
                 }

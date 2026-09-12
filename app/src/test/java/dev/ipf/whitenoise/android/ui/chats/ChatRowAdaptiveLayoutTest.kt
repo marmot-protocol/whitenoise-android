@@ -26,8 +26,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w240dp-h480dp-mdpi")
 class ChatRowAdaptiveLayoutTest {
     @get:Rule
@@ -47,7 +49,17 @@ class ChatRowAdaptiveLayoutTest {
                 .fetchSemanticsNode()
                 .boundsInRoot
 
-        assertEquals(72f, rowBounds.height, 0.5f)
+        val titleHeight =
+            composeRule
+                .onNodeWithText(TITLE, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        val previewHeight =
+            composeRule
+                .onNodeWithTag(PREVIEW_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        assertEquals("Compact row: title=$titleHeight preview=$previewHeight", 72f, rowBounds.height, 0.5f)
     }
 
     @Test

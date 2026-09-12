@@ -9,9 +9,12 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.SystemFolderKind
@@ -59,7 +62,7 @@ class ChatFoldersContentTest {
         assertEquals(
             listOf(
                 app.getString(R.string.folder_edit),
-                app.getString(R.string.chat_folder_move_down),
+                app.getString(R.string.folder_move_down),
                 app.getString(R.string.delete),
             ),
             actions.map { it.label },
@@ -104,7 +107,7 @@ class ChatFoldersContentTest {
         composeRule.onNodeWithText(app.getString(R.string.folder_edit)).performClick()
         assertEquals("work", editedId)
         composeRule.onNodeWithContentDescription(menu).performClick()
-        composeRule.onNodeWithText(app.getString(R.string.chat_folder_move_up)).performClick()
+        composeRule.onNodeWithText(app.getString(R.string.folder_move_up)).performClick()
         assertEquals("work" to -1, moved)
         composeRule.onNodeWithContentDescription(menu).performClick()
         composeRule.onNodeWithText(app.getString(R.string.delete)).performClick()
@@ -148,7 +151,7 @@ class ChatFoldersContentTest {
             onRestoreDefaults = { restored = true },
         )
         composeRule
-            .onNodeWithText(app.getString(R.string.chat_folder_restore_defaults))
+            .onNodeWithText(app.getString(R.string.folder_restore_defaults))
             .assertIsEnabled()
             .performClick()
         assertEquals(true, restored)
@@ -158,7 +161,7 @@ class ChatFoldersContentTest {
     @Test
     fun restoreDefaultsIsDisabledWhenDefaultsArePresent() {
         render(folders = listOf(folderRow(id = "unread", name = "Unread")), defaultsMissing = false)
-        composeRule.onNodeWithText(app.getString(R.string.chat_folder_restore_defaults)).assertIsNotEnabled()
+        composeRule.onNodeWithText(app.getString(R.string.folder_restore_defaults)).assertIsNotEnabled()
     }
 
     /** An empty list shows the empty state and still offers New folder in the top bar. */
@@ -167,8 +170,25 @@ class ChatFoldersContentTest {
         var created = false
         render(folders = emptyList(), onCreate = { created = true })
         composeRule.onNodeWithText(app.getString(R.string.folder_none)).assertExists()
-        composeRule.onNodeWithContentDescription(app.getString(R.string.chat_folder_new)).performClick()
+        composeRule.onNodeWithContentDescription(app.getString(R.string.folder_new_title)).performClick()
         assertEquals(true, created)
+    }
+
+    /** Native long-press opens the menu without also editing; choosing a move closes that menu. */
+    @Test
+    fun nativeLongPressDoesNotAlsoEditAndMoveClosesMenu() {
+        var edited: String? = null
+        var moved: Pair<String, Int>? = null
+        render(
+            folders = listOf(folderRow("work", "Work", systemKind = null)),
+            onEdit = { edited = it },
+            onMove = { id, delta -> moved = id to delta },
+        )
+        composeRule.onNodeWithTag("folder.row.work").performTouchInput { longClick() }
+        assertEquals(null, edited)
+        composeRule.onNodeWithText(app.getString(R.string.folder_move_down)).performClick()
+        assertEquals("work" to 1, moved)
+        composeRule.onNodeWithTag("folder.menu.work").assertDoesNotExist()
     }
 
     private fun folderRow(

@@ -12,7 +12,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,19 +29,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -53,25 +44,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetProperties
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.ContentScale
@@ -79,15 +67,12 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
@@ -105,13 +90,13 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
+import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentationNpubFromReference
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
-import dev.ipf.whitenoise.android.ui.chats.newchat.QuickActionButton
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.chats.newchat.SettingsActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatAttemptResult
@@ -120,16 +105,16 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorUiState
 import dev.ipf.whitenoise.android.ui.chats.newchat.attemptOpenOrStartProfileChat
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
 import dev.ipf.whitenoise.android.ui.common.AppDivider
-import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
-import dev.ipf.whitenoise.android.ui.common.CopyableValueRow
-import dev.ipf.whitenoise.android.ui.common.SectionCard
+import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
 import dev.ipf.whitenoise.android.ui.group.groupMemberMenuActions
+import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 
@@ -363,6 +348,7 @@ internal fun ProfileSheetAdminActionRows(
 
 private enum class ProfileSheetPage {
     PROFILE,
+    GROUPS_IN_COMMON,
     ADD_TO_GROUPS,
     MAKE_ADMIN,
 }
@@ -391,6 +377,31 @@ internal fun ProfileSheet(
 ) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
+    val currentDismiss by rememberUpdatedState(onDismiss)
+    val accountAtOpen = remember(appState, npub) { appState.activeAccountRef }
+    val runtimeAtOpen = remember(appState, npub) { appState.runtimeGeneration }
+    val owner =
+        remember(appState, npub) {
+            PersonProfileOwner {
+                appState.activeAccountRef == accountAtOpen &&
+                    appState.runtimeGeneration == runtimeAtOpen &&
+                    !appState.signOutInProgress &&
+                    !appState.wipeInProgress &&
+                    appState.retainedAccountReactivationRef == null
+            }
+        }
+    DisposableEffect(owner) { onDispose { owner.dispose() } }
+    LaunchedEffect(
+        owner,
+        appState.activeAccountRef,
+        appState.runtimeGeneration,
+        appState.signOutInProgress,
+        appState.wipeInProgress,
+        appState.retainedAccountReactivationRef,
+    ) {
+        if (!owner.canAct()) currentDismiss()
+    }
+    if (!owner.canAct()) return
     // Seed the identity synchronously so the first composed frame already has
     // the content it will settle on. ModalBottomSheet animates toward its
     // measured height, so rows that resolve a frame later — about, NIP-05,
@@ -401,9 +412,16 @@ internal fun ProfileSheet(
     // covers references it can't normalize locally.
     var hex by remember(npub) { mutableStateOf(appState.profileReferenceAccountIdHex(npub)) }
     var fullPictureOpen by remember(npub) { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val contentScrollState = rememberScrollState()
-    val compactMemberSheet = adminController != null
+    var fullBannerOpen by remember(npub) { mutableStateOf(false) }
+    var copied by remember(npub) { mutableStateOf(false) }
+    var feedback by remember(npub) { mutableStateOf<ToastMessage?>(null) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(PROFILE_COPY_FEEDBACK_MILLIS)
+            copied = false
+        }
+    }
 
     LaunchedEffect(npub) {
         // Only pay the IO hop when the local decode couldn't normalize the
@@ -457,6 +475,7 @@ internal fun ProfileSheet(
     var creatingChat by remember(npub) { mutableStateOf(false) }
     var startChatError by remember(npub) { mutableStateOf<StartChatErrorUiState?>(null) }
     var page by remember(npub) { mutableStateOf(ProfileSheetPage.PROFILE) }
+    var pickerParent by remember(npub) { mutableStateOf(ProfileSheetPage.PROFILE) }
     var showContactEditorDialog by remember(npub) { mutableStateOf(false) }
     var addingToGroups by remember(npub) { mutableStateOf(false) }
     var promotingAdmin by remember(npub) { mutableStateOf(false) }
@@ -494,6 +513,29 @@ internal fun ProfileSheet(
     val inviteTitle = stringResource(R.string.invite_to_white_noise)
     val inviteMessage = stringResource(R.string.invite_message)
     val groupPickerRevision = appState.profileGroupPickerRevision
+    val liveGroupsRevision = appState.forwardTargetsRevision
+    val shared =
+        remember(hex, activeAccountHex, liveGroupsRevision, groupPickerRevision) {
+            // Existing on-demand projection includes archived groups and remains live behind a conversation.
+            appState.personSharedGroupsForProfile(hex)
+        }
+    val groupTitleCopy = rememberGroupTitleCopy()
+    val sharedRows =
+        remember(shared.groups, groupTitleCopy) {
+            shared.groups.map {
+                PersonSharedGroupRow(
+                    it.group.groupIdHex,
+                    chatListItemDisplayTitle(it, appState, groupTitleCopy),
+                    it.memberCount,
+                )
+            }
+        }
+    val sharedItems = remember(shared.groups) { shared.groups.associateBy { it.group.groupIdHex } }
+    LaunchedEffect(hex, shared.unresolvedGroupIds) {
+        if (owner.canAct() && shared.unresolvedGroupIds.isNotEmpty()) {
+            appState.requestProfileGroupMembers(shared.unresolvedGroupIds)
+        }
+    }
     val addableGroupsState =
         remember(hex, appState.chatListItems, groupPickerRevision) {
             hex?.let(appState::profileAddableGroupsState) ?: ProfileGroupPickerState.empty()
@@ -507,7 +549,7 @@ internal fun ProfileSheet(
             when (page) {
                 ProfileSheetPage.ADD_TO_GROUPS -> addableGroupsState.pendingGroupIds
                 ProfileSheetPage.MAKE_ADMIN -> promotableGroupsState.pendingGroupIds
-                ProfileSheetPage.PROFILE -> emptySet()
+                ProfileSheetPage.PROFILE, ProfileSheetPage.GROUPS_IN_COMMON -> emptySet()
             }
         if (pendingGroupIds.isNotEmpty()) {
             appState.requestProfileGroupMembers(pendingGroupIds)
@@ -520,15 +562,18 @@ internal fun ProfileSheet(
             initialNotes = contactNotes.orEmpty(),
             onDismiss = { showContactEditorDialog = false },
             onSave = { nickname, notes ->
-                appState.setContactNickname(hex!!, nickname)
-                appState.setContactNotes(hex!!, notes)
-                showContactEditorDialog = false
+                if (owner.canAct()) {
+                    appState.setContactNickname(hex!!, nickname)
+                    appState.setContactNotes(hex!!, notes)
+                    showContactEditorDialog = false
+                }
             },
+            securePolicy = securePolicy,
         )
     }
 
     fun openOrCreateProfileChat(retryGroupIdHex: String? = null) {
-        if (creatingChat) return
+        if (!owner.canAct() || creatingChat) return
         val progressHex = hex ?: return
         startChatError = null
         creatingChat = true
@@ -542,16 +587,25 @@ internal fun ProfileSheet(
                             progressHex = progressHex,
                             recipientName = displayTitle,
                             retryGroupIdHex = retryGroupIdHex,
-                            resolveDirectChat = { appState.resolveExistingDirectChat(npub) },
-                            createGroup = appState::createProfileChatGroup,
-                            loadCreatedChatListItem = appState::loadCreatedChatListItem,
+                            resolveDirectChat = {
+                                owner.requireCurrent()
+                                appState.resolveExistingDirectChat(npub)
+                            },
+                            createGroup = { reference ->
+                                owner.requireCurrent()
+                                appState.createProfileChatGroup(reference)
+                            },
+                            loadCreatedChatListItem = { id ->
+                                owner.requireCurrent()
+                                appState.loadCreatedChatListItem(id)
+                            },
                             displayName = appState::displayName,
                             markCreateOpenStage = appState::markChatCreateOpenStage,
                             abandonCreateOpenTiming = appState::abandonChatCreateOpenTiming,
                         )
                 ) {
-                    is StartChatAttemptResult.Open -> onOpenGroup(result.item, result.newlyCreated)
-                    is StartChatAttemptResult.Failed -> startChatError = result.error
+                    is StartChatAttemptResult.Open -> owner.leave { onOpenGroup(result.item, result.newlyCreated) }
+                    is StartChatAttemptResult.Failed -> if (owner.canAct()) startChatError = result.error
                 }
             } finally {
                 creatingChat = false
@@ -561,16 +615,21 @@ internal fun ProfileSheet(
 
     fun addProfileToGroups(selected: List<ChatListItem>) {
         val targetHex = hex ?: return
-        if (addingToGroups) return
+        if (!owner.canAct() || addingToGroups) return
         addingToGroups = true
         appState.launchMutation {
             try {
+                owner.requireCurrent()
+                val previousToast = appState.toast
                 val allAdded =
                     appState.inviteProfileToGroups(
                         targetRef = targetHex,
                         targetGroupIds = selected.map { it.group.groupIdHex },
                     )
-                if (allAdded) page = ProfileSheetPage.PROFILE
+                if (owner.canAct()) {
+                    feedback = personProfileFeedback(previousToast, appState.toast)
+                    if (allAdded) page = pickerParent
+                }
             } finally {
                 addingToGroups = false
             }
@@ -579,12 +638,17 @@ internal fun ProfileSheet(
 
     fun makeProfileAdmin(group: ChatListItem) {
         val targetHex = hex ?: return
-        if (promotingAdmin) return
+        if (!owner.canAct() || promotingAdmin) return
         promotingAdmin = true
         appState.launchMutation {
             try {
+                owner.requireCurrent()
+                val previousToast = appState.toast
                 val promoted = appState.promoteProfileInGroup(targetHex, group.group.groupIdHex)
-                if (promoted) page = ProfileSheetPage.PROFILE
+                if (owner.canAct()) {
+                    feedback = personProfileFeedback(previousToast, appState.toast)
+                    if (promoted) page = ProfileSheetPage.PROFILE
+                }
             } finally {
                 promotingAdmin = false
             }
@@ -592,260 +656,159 @@ internal fun ProfileSheet(
     }
 
     val profileContent: @Composable () -> Unit = {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .verticalScroll(contentScrollState)
-                .padding(vertical = 24.dp)
-                .testTag(PROFILE_SHEET_CONTENT_TAG),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            ProfileSheetHeaderImages(
-                bannerUrl = bannerUrl,
-                title = displayTitle,
-                seed = hex ?: npub,
-                pictureUrl = pictureUrl,
-                avatarClickable = avatarImageAvailable,
-                onAvatarClick = { fullPictureOpen = true },
-            )
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(displayTitle, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                if (contactNickname != null && title != displayTitle) {
-                    Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                if (nip05 != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (nip05Verified) {
-                            Icon(
-                                Icons.Default.Check,
-                                contentDescription = stringResource(R.string.profile_nip05_verified),
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
-                        Text(nip05, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                if (compactMemberSheet && presentationNpub.isNotBlank()) {
-                    val copyLabel = stringResource(R.string.copy)
-                    Row(
-                        modifier =
-                            Modifier
-                                .minimumInteractiveComponentSize()
-                                .semantics { contentDescription = presentationNpub }
-                                .clickable(
-                                    onClickLabel = copyLabel,
-                                    role = Role.Button,
-                                ) {
-                                    clipboard.setText(AnnotatedString(presentationNpub))
-                                }.padding(horizontal = 24.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            presentationNpubShort.orEmpty(),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontFamily = FontFamily.Monospace,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            softWrap = false,
-                        )
-                        Icon(
-                            Icons.Default.ContentCopy,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                }
-            }
-            if (hex != null && !targetIsSelf) {
-                Row(
-                    modifier = Modifier.testTag(PROFILE_QUICK_ACTIONS_TAG),
-                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
-                ) {
-                    QuickActionButton(
-                        icon = if (followRow.showsUnfollow) Icons.Default.PersonRemove else Icons.Default.PersonAdd,
-                        label =
-                            stringResource(
-                                if (followRow.showsUnfollow) R.string.profile_unfollow else R.string.profile_follow,
-                            ),
-                        modifier = Modifier.testTag(PROFILE_FOLLOW_ACTION_TAG),
-                        enabled = followRow.enabled,
-                        inProgress = followRow.inProgress,
-                        onClick = {
-                            if (followBusy) return@QuickActionButton
-                            val desired = following != true
-                            followBusy = true
-                            appState.launchMutation {
-                                try {
-                                    runCatching { appState.setProfileFollowing(hex!!, desired) }
-                                        .onSuccess { following = desired }
-                                        .onFailure { error ->
-                                            rethrowIfCancellation(error)
-                                            appState.present(R.string.profile_follow_failed)
-                                        }
-                                } finally {
-                                    followBusy = false
-                                }
-                            }
-                        },
-                    )
-                    QuickActionButton(
-                        icon = Icons.AutoMirrored.Filled.Chat,
-                        label = stringResource(R.string.message),
-                        modifier = Modifier.testTag(PROFILE_MESSAGE_ACTION_TAG),
-                        enabled = !creatingChat,
-                        inProgress = creatingChat,
-                        // Opens the existing 1:1 DM, or starts a new one with this
-                        // person when none exists yet. The create runs in the
-                        // process-lifetime mutation scope (Main.immediate) so the MLS
-                        // commit + Nostr publish finish regardless; we keep the sheet up
-                        // with a spinner until the conversation is ready, then navigate
-                        // straight in — no dismiss-into-a-blank-gap.
-                        onClick = { openOrCreateProfileChat() },
-                    )
-                }
-            }
-            startChatError?.let { error ->
-                StartChatErrorCard(
-                    error = error,
-                    onRetry = { openOrCreateProfileChat(error.retryGroupIdHex) },
-                    onInvite = {
-                        launchInviteShare(context, inviteMessage, inviteTitle)
-                            .onFailure { appState.presentOutboundShareFailure("PROFILE_INVITE_SHARE", it) }
-                    },
-                    onCopy = { detail -> clipboard.setText(AnnotatedString(detail)) },
-                )
-            }
-            if (!compactMemberSheet) {
-                Column(
-                    Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    if (presentationNpub.isNotBlank()) {
-                        CopyableValueRow(
-                            label = "npub",
-                            value = presentationNpub,
-                            clipboard = clipboard,
-                            displayValue = presentationNpubShort.orEmpty(),
-                        )
-                    }
-                    SectionCard(title = stringResource(R.string.about)) {
-                        Text(
-                            about ?: stringResource(R.string.profile_no_bio),
-                            color =
-                                if (about == null) {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                } else {
-                                    Color.Unspecified
-                                },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    if (lightningAddress != null) {
-                        CopyableValueRow(
-                            label = stringResource(R.string.lightning),
-                            value = lightningAddress,
-                            clipboard = clipboard,
-                        )
-                    }
-                }
-            }
-            if (hex == null) {
-                Text(stringResource(R.string.couldnt_read_profile_code), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (hex != null && !targetIsSelf) {
-                Column(Modifier.fillMaxWidth()) {
-                    SettingsActionRow(
-                        icon = Icons.Default.Edit,
-                        title =
-                            stringResource(
-                                if (contactNickname == null) {
-                                    R.string.profile_add_nickname_and_notes
-                                } else {
-                                    R.string.profile_nickname_and_notes
-                                },
-                            ),
-                        value =
-                            profileSheetContactPrivateDetailsRowValue(
-                                contactNickname = contactNickname,
-                                contactNotes = contactNotes,
-                                addNicknameAndNotesLabel = stringResource(R.string.profile_add_nickname_and_notes),
-                                notesLabel = stringResource(R.string.profile_contact_notes_hint),
-                            ),
-                        enabled = !creatingChat,
-                        onClick = { showContactEditorDialog = true },
-                    )
-                    SettingsActionRow(
-                        icon = Icons.Default.Group,
-                        title = stringResource(R.string.profile_start_new_group_with, displayTitle),
-                        enabled = !creatingChat,
-                        onClick = {
-                            hex?.let { accountIdHex ->
-                                onStartGroup(
-                                    RecipientSearch.Candidate(
-                                        accountIdHex = accountIdHex,
-                                        displayName = displayTitle,
-                                        npub = npub,
-                                    ),
+        PersonProfileContent(
+            person =
+                PersonProfilePresentation(
+                    displayTitle,
+                    title,
+                    hex ?: npub,
+                    pictureUrl,
+                    bannerUrl,
+                    avatarImageAvailable,
+                    about,
+                    presentationNpub,
+                    nip05,
+                    nip05Verified,
+                    lightningAddress,
+                    hasTarget = hex != null,
+                    self = targetIsSelf,
+                    roleLabel =
+                        adminController
+                            ?.presentedMembers
+                            ?.firstOrNull {
+                                it.memberIdHex.equals(hex, ignoreCase = true)
+                            }?.let { member ->
+                                stringResource(
+                                    if (adminController?.isAuthoritativeAdmin(member) == true) {
+                                        R.string.admin
+                                    } else {
+                                        R.string.person_profile_member
+                                    },
                                 )
-                            }
-                        },
-                    )
-                    SettingsActionRow(
-                        icon = Icons.Default.Add,
-                        title = stringResource(R.string.profile_add_to_another_group),
-                        enabled = !creatingChat,
-                        onClick = { page = ProfileSheetPage.ADD_TO_GROUPS },
-                    )
-                    if (
-                        adminController == null &&
-                        (
-                            promotableGroupsState.groups.isNotEmpty() ||
-                                promotableGroupsState.loadState != ProfileGroupPickerLoadState.READY
-                        )
-                    ) {
-                        SettingsActionRow(
-                            icon = Icons.Default.Shield,
-                            title = stringResource(R.string.make_admin),
-                            enabled = !creatingChat,
-                            onClick = { page = ProfileSheetPage.MAKE_ADMIN },
-                        )
+                            },
+                ),
+            scroll = contentScrollState,
+            follow = followRow,
+            busy = creatingChat,
+            canPromote =
+                adminController == null &&
+                    (
+                        promotableGroupsState.groups.isNotEmpty() ||
+                            promotableGroupsState.loadState != ProfileGroupPickerLoadState.READY
+                    ),
+            showSharedGroups = sharedRows.isNotEmpty() || shared.unresolvedGroupIds.isNotEmpty(),
+            copied = copied,
+            onBack = { if (!creatingChat) owner.leave { currentDismiss() } },
+            onMessage = { openOrCreateProfileChat() },
+            onFollow = {
+                if (owner.canAct() && followRow.enabled && !followBusy) {
+                    val target = checkNotNull(hex)
+                    val desired = following != true
+                    followBusy = true
+                    appState.launchMutation {
+                        try {
+                            owner.requireCurrent()
+                            runCatching { appState.setProfileFollowing(target, desired) }
+                                .onSuccess { if (owner.canAct()) following = desired }
+                                .onFailure { error ->
+                                    rethrowIfCancellation(error)
+                                    if (owner.canAct()) {
+                                        appState.present(R.string.profile_follow_failed)
+                                        feedback = appState.toast
+                                    }
+                                }
+                        } finally {
+                            followBusy = false
+                        }
                     }
                 }
-            }
-            // Group-admin moderation actions (issue #635). Only rendered when the
-            // sheet was opened from inside a conversation (adminController != null)
-            // AND the resolved user is a member of that group. The action set is
-            // derived from profileSheetAdminActions, which reuses the members-list
-            // scope rules (#444) verbatim, so an empty list (viewer not an admin
-            // member, or the viewed user is self / not a member) renders nothing
-            // and the sheet stays exactly as it is for every other entry point.
-            if (adminController != null && hex != null) {
-                ProfileSheetAdminActions(
-                    controller = adminController,
-                    appState = appState,
-                    targetHex = hex!!,
-                )
-            }
-        }
+            },
+            onPrivateDetails = { if (owner.canAct()) showContactEditorDialog = true },
+            onStartGroup = {
+                if (owner.canAct()) {
+                    hex?.let { target ->
+                        owner.leave {
+                            onStartGroup(RecipientSearch.Candidate(target, displayTitle, npub))
+                        }
+                    }
+                }
+            },
+            onGroupEntry = {
+                if (owner.canAct()) {
+                    pickerParent = ProfileSheetPage.PROFILE
+                    page =
+                        if (sharedRows.isNotEmpty() || shared.unresolvedGroupIds.isNotEmpty()) {
+                            ProfileSheetPage.GROUPS_IN_COMMON
+                        } else {
+                            ProfileSheetPage.ADD_TO_GROUPS
+                        }
+                }
+            },
+            onPromote = { if (owner.canAct()) page = ProfileSheetPage.MAKE_ADMIN },
+            onCopy = {
+                if (owner.canAct()) {
+                    clipboard.setText(AnnotatedString(presentationNpub))
+                    copied = true
+                }
+            },
+            onAvatar = { if (owner.canAct()) fullPictureOpen = true },
+            onBanner = { if (owner.canAct()) fullBannerOpen = true },
+            onCopyLightning = { if (owner.canAct()) lightningAddress?.let { clipboard.setText(AnnotatedString(it)) } },
+            sharedAvatars = {
+                PersonSharedGroupAvatars(sharedRows) { id ->
+                    sharedItems[id]?.let { rememberEncryptedGroupAvatar(appState, it.group) }
+                }
+            },
+            error = {
+                startChatError?.let { error ->
+                    StartChatErrorCard(
+                        error,
+                        onRetry = { openOrCreateProfileChat(error.retryGroupIdHex) },
+                        onInvite = {
+                            if (owner.canAct()) {
+                                launchInviteShare(context, inviteMessage, inviteTitle)
+                                    .onFailure { appState.presentOutboundShareFailure("PROFILE_INVITE_SHARE", it) }
+                            }
+                        },
+                        onCopy = { clipboard.setText(AnnotatedString(it)) },
+                    )
+                }
+            },
+            adminActions = {
+                if (adminController != null && hex != null) {
+                    ProfileSheetAdminActions(
+                        adminController,
+                        appState,
+                        hex!!,
+                        isCurrent = owner::canAct,
+                        onFeedback = { if (owner.canAct()) feedback = it },
+                    )
+                }
+            },
+        )
     }
 
-    ModalBottomSheet(
-        // Back while the picker is visible is intercepted within this host.
-        // Scrim/swipe dismiss the whole flow instead of recreating the profile
-        // as a second modal window (#1868).
-        onDismissRequest = { if (!creatingChat && !addingToGroups && !promotingAdmin) onDismiss() },
-        sheetState = sheetState,
-        containerColor = amoledSheetContainerColor(),
-        properties = ModalBottomSheetProperties(securePolicy = securePolicy),
+    Dialog(
+        onDismissRequest = {
+            if (!creatingChat && !addingToGroups && !promotingAdmin) owner.leave { currentDismiss() }
+        },
+        properties =
+            DialogProperties(
+                securePolicy = securePolicy,
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
     ) {
         // Register against the modal dialog's dispatcher, not the activity's;
         // otherwise the dialog consumes Back before this nested route sees it.
-        BackHandler(enabled = page != ProfileSheetPage.PROFILE) {
-            if (!addingToGroups && !promotingAdmin) page = ProfileSheetPage.PROFILE
+        BackHandler {
+            if (!creatingChat && !addingToGroups && !promotingAdmin) {
+                if (page == ProfileSheetPage.PROFILE) {
+                    owner.leave { currentDismiss() }
+                } else {
+                    page = if (page == ProfileSheetPage.ADD_TO_GROUPS) pickerParent else ProfileSheetPage.PROFILE
+                }
+            }
         }
         AnimatedContent(
             targetState = if (hex == null) ProfileSheetPage.PROFILE else page,
@@ -861,44 +824,97 @@ internal fun ProfileSheet(
                 transition.using(SizeTransform(clip = false))
             },
             label = "profile-group-picker",
-            modifier = Modifier.fillMaxWidth().testTag(PROFILE_SHEET_HOST_TAG),
+            modifier = Modifier.fillMaxSize().testTag(PROFILE_SHEET_HOST_TAG),
         ) { targetPage ->
             when (targetPage) {
                 ProfileSheetPage.ADD_TO_GROUPS ->
-                    ProfileAddToGroupsContent(
-                        appState = appState,
-                        targetName = displayTitle,
-                        state = addableGroupsState,
-                        busy = addingToGroups,
-                        onClose = { if (!addingToGroups) page = ProfileSheetPage.PROFILE },
-                        onRetry = {
-                            appState.requestProfileGroupMembers(
-                                addableGroupsState.pendingGroupIds,
-                                retry = true,
+                    SettingsScaffold(
+                        title = stringResource(R.string.person_add_to_group),
+                        onBack = { if (!addingToGroups) page = pickerParent },
+                    ) {
+                        Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                            ProfileAddToGroupsContent(
+                                appState = appState,
+                                targetName = displayTitle,
+                                state = addableGroupsState,
+                                busy = addingToGroups,
+                                onClose = { if (!addingToGroups) page = pickerParent },
+                                onRetry = {
+                                    appState.requestProfileGroupMembers(
+                                        addableGroupsState.pendingGroupIds,
+                                        retry = true,
+                                    )
+                                },
+                                onAdd = ::addProfileToGroups,
                             )
-                        },
-                        onAdd = ::addProfileToGroups,
-                    )
+                        }
+                    }
                 ProfileSheetPage.MAKE_ADMIN ->
-                    ProfileMakeAdminContent(
-                        appState = appState,
-                        targetName = displayTitle,
-                        state = promotableGroupsState,
-                        busy = promotingAdmin,
-                        onClose = { if (!promotingAdmin) page = ProfileSheetPage.PROFILE },
-                        onRetry = {
-                            appState.requestProfileGroupMembers(
-                                promotableGroupsState.pendingGroupIds,
-                                retry = true,
+                    SettingsScaffold(
+                        title = stringResource(R.string.person_promote_groups),
+                        onBack = { if (!promotingAdmin) page = ProfileSheetPage.PROFILE },
+                    ) {
+                        Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                            ProfileMakeAdminContent(
+                                appState = appState,
+                                targetName = displayTitle,
+                                state = promotableGroupsState,
+                                busy = promotingAdmin,
+                                onClose = { if (!promotingAdmin) page = ProfileSheetPage.PROFILE },
+                                onRetry = {
+                                    appState.requestProfileGroupMembers(
+                                        promotableGroupsState.pendingGroupIds,
+                                        retry = true,
+                                    )
+                                },
+                                onPromote = ::makeProfileAdmin,
                             )
+                        }
+                    }
+                ProfileSheetPage.GROUPS_IN_COMMON ->
+                    PersonGroupsInCommonContent(
+                        rows = sharedRows,
+                        unresolved = shared.unresolvedGroupIds.isNotEmpty(),
+                        onBack = { page = ProfileSheetPage.PROFILE },
+                        onOpen = { id ->
+                            if (owner.canAct()) {
+                                appState
+                                    .personSharedGroupsForProfile(hex)
+                                    .groups
+                                    .firstOrNull { it.group.groupIdHex == id }
+                                    ?.let { item -> owner.leave { onOpenGroup(item, false) } }
+                            }
                         },
-                        onPromote = ::makeProfileAdmin,
+                        onAdd = {
+                            if (owner.canAct()) {
+                                pickerParent = ProfileSheetPage.GROUPS_IN_COMMON
+                                page = ProfileSheetPage.ADD_TO_GROUPS
+                            }
+                        },
+                        onRetry = {
+                            if (owner.canAct()) {
+                                appState.requestProfileGroupMembers(shared.unresolvedGroupIds, retry = true)
+                            }
+                        },
+                        avatar = { id -> sharedItems[id]?.let { rememberEncryptedGroupAvatar(appState, it.group) } },
                     )
                 ProfileSheetPage.PROFILE -> profileContent()
             }
         }
     }
 
+    feedback?.let { result ->
+        PersonProfileFeedbackDialog(result, onDismiss = { feedback = null }, securePolicy = securePolicy)
+    }
+    if (fullBannerOpen && bannerUrl != null) {
+        AvatarFullScreenViewer(
+            title = displayTitle,
+            seed = hex ?: npub,
+            pictureUrl = bannerUrl,
+            onDismiss = { fullBannerOpen = false },
+            securePolicy = securePolicy,
+        )
+    }
     if (fullPictureOpen && pictureUrl != null && avatarImageAvailable) {
         AvatarFullScreenViewer(
             title = displayTitle,
@@ -909,68 +925,6 @@ internal fun ProfileSheet(
         )
     }
 }
-
-/**
- * The sheet header mirrors the own-profile header: the ringed avatar straddles
- * the banner's bottom edge instead of sitting in its own row below it.
- *
- * A profile with no banner — and one whose banner load fails, which
- * [ProfileBannerLoadState] reports the same way — keeps the plain, unoverlapped
- * avatar. Reserving the overlap for a banner that will never render would leave
- * a hole, and inventing a placeholder banner would make every bannerless profile
- * taller than it is today.
- */
-@Composable
-@Suppress("FunctionNaming")
-private fun ProfileSheetHeaderImages(
-    bannerUrl: String?,
-    title: String,
-    seed: String,
-    pictureUrl: String?,
-    avatarClickable: Boolean,
-    onAvatarClick: () -> Unit,
-) {
-    val banner = bannerUrl?.let { rememberProfileBannerLoadState(it) }
-    val viewPictureLabel = stringResource(R.string.profile_view_picture)
-    val avatar: @Composable () -> Unit = {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 4.dp,
-            modifier =
-                Modifier
-                    .clip(CircleShape)
-                    .clickable(
-                        enabled = avatarClickable,
-                        onClickLabel = viewPictureLabel,
-                        role = Role.Button,
-                        onClick = onAvatarClick,
-                    ),
-        ) {
-            Box(Modifier.padding(PROFILE_AVATAR_RING)) {
-                Avatar(title = title, seed = seed, size = PROFILE_AVATAR_SIZE, pictureUrl = pictureUrl)
-            }
-        }
-    }
-    if (banner?.visible != true) {
-        avatar()
-        return
-    }
-    Box(
-        modifier = Modifier.fillMaxWidth().padding(bottom = PROFILE_AVATAR_OVERLAP),
-        contentAlignment = Alignment.BottomCenter,
-    ) {
-        ProfileBannerImage(banner)
-        // The offset overflows the banner; the bottom padding above reserves it.
-        Box(Modifier.offset(y = PROFILE_AVATAR_OVERLAP)) { avatar() }
-    }
-}
-
-private val PROFILE_AVATAR_SIZE = 96.dp
-private val PROFILE_AVATAR_RING = 4.dp
-
-/** Half the ringed avatar, so it sits centred on the banner's bottom edge. */
-private val PROFILE_AVATAR_OVERLAP = 52.dp
 
 /**
  * [AvatarImageLoader.load] answers null both while it is working and when the
@@ -1052,66 +1006,82 @@ internal const val PROFILE_SHEET_CONTENT_TAG = "profile-sheet-content"
 internal const val PROFILE_ADD_TO_GROUPS_CONTENT_TAG = "profile-add-to-groups-content"
 internal const val PROFILE_MAKE_ADMIN_CONTENT_TAG = "profile-make-admin-content"
 
+/** Edits viewer-local contact details with explicit Save/Cancel and the caller's secure-window policy. */
 @Composable
+@Suppress("LongMethod", "FunctionNaming")
 internal fun ContactPrivateDetailsDialog(
     profileName: String,
     initialNickname: String,
     initialNotes: String,
     onDismiss: () -> Unit,
     onSave: (nickname: String, notes: String) -> Unit,
+    securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
 ) {
-    var nickname by remember(initialNickname) { mutableStateOf(initialNickname) }
-    var notes by remember(initialNotes) { mutableStateOf(initialNotes) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.profile_nickname_and_notes)) },
-        text = {
-            Column(
-                modifier =
-                    Modifier
-                        .heightIn(max = 360.dp)
-                        .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    stringResource(R.string.profile_name_from_profile, profileName),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedTextField(
-                    value = nickname,
-                    onValueChange = { nickname = it },
-                    label = { Text(stringResource(R.string.profile_contact_name_hint)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = notes,
-                    onValueChange = { notes = it },
-                    label = { Text(stringResource(R.string.profile_contact_notes_hint)) },
-                    singleLine = false,
-                    minLines = 3,
-                    maxLines = 8,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    stringResource(R.string.profile_contact_editor_private_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onSave(nickname, notes) }) {
-                Text(stringResource(R.string.save))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        },
-    )
+    val nickname =
+        remember(initialNickname) {
+            androidx.compose.foundation.text.input
+                .TextFieldState(initialNickname)
+        }
+    val notes =
+        remember(initialNotes) {
+            androidx.compose.foundation.text.input
+                .TextFieldState(initialNotes)
+        }
+    val scheme = MaterialTheme.colorScheme
+    val outline =
+        dev.ipf.whitenoise.android.ui.theme
+            .amoledOutlineBorder()
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalWhiteNoiseTextFieldContainerColor provides scheme.surfaceContainerLowest,
+    ) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            modifier = if (outline != null) Modifier.border(outline, MaterialTheme.shapes.extraLarge) else Modifier,
+            properties = DialogProperties(securePolicy = securePolicy),
+            containerColor = scheme.surfaceContainerLow,
+            textContentColor = scheme.onSurfaceVariant,
+            title = { Text(stringResource(R.string.profile_nickname_and_notes)) },
+            text = {
+                Column(
+                    Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Text(stringResource(R.string.profile_name_from_profile, profileName))
+                    dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField(
+                        state = nickname,
+                        label = { Text(stringResource(R.string.profile_contact_name_hint)) },
+                        lineLimits = androidx.compose.foundation.text.input.TextFieldLineLimits.SingleLine,
+                        modifier = Modifier.fillMaxWidth().testTag("person_profile.nickname"),
+                    )
+                    dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField(
+                        state = notes,
+                        label = { Text(stringResource(R.string.profile_contact_notes_hint)) },
+                        lineLimits =
+                            androidx.compose.foundation.text.input.TextFieldLineLimits.MultiLine(
+                                minHeightInLines = 3,
+                                maxHeightInLines = 8,
+                            ),
+                        modifier = Modifier.fillMaxWidth().testTag("person_profile.notes"),
+                    )
+                    Text(
+                        stringResource(R.string.profile_contact_editor_private_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { onSave(nickname.text.toString(), notes.text.toString()) },
+                    modifier = Modifier.testTag("person_profile.private_save"),
+                ) { Text(stringResource(R.string.save)) }
+            },
+            dismissButton = {
+                TextButton(onDismiss, Modifier.testTag("person_profile.private_cancel")) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
 }
 
 internal fun stableAdminActionTargetIsAdmin(
@@ -1480,6 +1450,8 @@ private fun ProfileSheetAdminActions(
     controller: ConversationController,
     appState: WhiteNoiseAppState,
     targetHex: String,
+    isCurrent: () -> Boolean = { true },
+    onFeedback: (ToastMessage?) -> Unit = {},
 ) {
     // Keep the initiated action stable until its coroutine completes. Detailed
     // MDK state can land one frame before the local pending flag clears.
@@ -1510,19 +1482,26 @@ private fun ProfileSheetAdminActions(
     // The action-scoped local state both disables immediately and identifies the
     // row that owns progress. mutationInFlight only disables for work started
     // elsewhere; it must not assign that work to a row in this sheet.
-    val busy = pendingAction != null || controller.mutationInFlight
+    val busy = !isCurrent() || pendingAction != null || controller.mutationInFlight
 
     fun runMutation(
         action: GroupMemberMenuAction,
         mutation: suspend () -> Unit,
     ) {
+        if (!isCurrent()) return
         runProfileSheetAdminMutation(
             action = action,
             isBusy = { pendingAction != null || controller.mutationInFlight },
             onPendingActionChange = { pendingAction = it },
             clearLastMutationError = controller::clearLastMutationError,
             launchMutation = appState::launchMutation,
-            mutation = mutation,
+            mutation = {
+                if (isCurrent()) {
+                    val previousToast = appState.toast
+                    mutation()
+                    if (isCurrent()) onFeedback(personProfileFeedback(previousToast, appState.toast))
+                }
+            },
         )
     }
 
@@ -1540,7 +1519,7 @@ private fun ProfileSheetAdminActions(
                 controller.setMemberAdmin(targetMember, admin = false)
             }
         },
-        onRemoveMember = { confirmRemove = true },
+        onRemoveMember = { if (isCurrent()) confirmRemove = true },
     )
 
     if (confirmRemove) {
@@ -1563,3 +1542,5 @@ private fun ProfileSheetAdminActions(
         )
     }
 }
+
+private const val PROFILE_COPY_FEEDBACK_MILLIS = 2_000L

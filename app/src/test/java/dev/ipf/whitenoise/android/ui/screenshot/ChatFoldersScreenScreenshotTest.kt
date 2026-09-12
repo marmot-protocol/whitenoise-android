@@ -1,7 +1,13 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderManageItem
@@ -35,26 +41,67 @@ class ChatFoldersScreenScreenshotTest {
     @Test
     fun chatFoldersScreenAmoled() = capture("chat_folders_screen_amoled", dark = true, amoled = true)
 
+    /** Empty folders still show the exact create/restore recovery actions. */
+    @Test fun emptyFoldersLight() =
+        capture(
+            "chat_folders_empty_light",
+            dark = false,
+            amoled = false,
+            empty = true,
+        )
+
+    /** Native long-press anchors the move/edit/delete menu to the folder row. */
+    @Test fun folderActionsDark() =
+        capture(
+            "chat_folders_actions_dark",
+            dark = true,
+            amoled = false,
+            menu = true,
+        )
+
+    /** Large RTL labels preserve native row content, trailing actions and minimum targets. */
+    @Test
+    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h780dp-mdpi")
+    fun foldersRtlLarge() =
+        capture(
+            "chat_folders_rtl_large",
+            dark = false,
+            amoled = false,
+            largeRtl = true,
+        )
+
     /** Renders the list for one fixed arrangement and records the window. */
     private fun capture(
         name: String,
         dark: Boolean,
         amoled: Boolean,
+        empty: Boolean = false,
+        menu: Boolean = false,
+        largeRtl: Boolean = false,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
-                ChatFoldersContent(
-                    state = previewState(),
-                    onBack = {},
-                    onCreate = {},
-                    onMove = { _, _ -> },
-                    onEdit = {},
-                    onDelete = {},
-                    onRestoreDefaults = {},
-                )
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
+                    ChatFoldersContent(
+                        state = if (empty) chatFoldersState(emptyList()) else previewState(),
+                        onBack = {},
+                        onCreate = {},
+                        onMove = { _, _ -> },
+                        onEdit = {},
+                        onDelete = {},
+                        onRestoreDefaults = {},
+                    )
+                }
             }
         }
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+        if (menu) {
+            composeRule.onNodeWithTag("folder.row.work").performTouchInput { longClick() }
+            composeRule.onNodeWithTag("folder.menu.work").captureRoboImage("src/test/snapshots/$name.png")
+        } else {
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+        }
     }
 
     private fun previewState() =

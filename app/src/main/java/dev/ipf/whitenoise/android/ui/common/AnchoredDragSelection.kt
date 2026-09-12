@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LocalPinnableContainer
@@ -138,12 +139,19 @@ internal fun Modifier.longPressOrVerticalDrag(
 
                     while (true) {
                         val change =
-                            awaitPointerEvent().changes.firstOrNull { it.id == down.id }
+                            // Consume the won hold before a descendant ListItem sees its release.
+                            awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id }
                                 ?: run {
                                     terminalCallbackDelivered = true
                                     currentGestureCancel()
                                     break
                                 }
+                        // Compose cancellation synthesizes a consumed up. It must never commit a range.
+                        if (change.isConsumed) {
+                            terminalCallbackDelivered = true
+                            currentGestureCancel()
+                            break
+                        }
                         val displacement = change.position - origin
                         if (!dragging && !horizontalGestureWon) {
                             val verticalDistance = abs(displacement.y)

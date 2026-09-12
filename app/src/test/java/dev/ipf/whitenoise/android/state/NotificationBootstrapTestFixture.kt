@@ -97,6 +97,8 @@ internal class NotificationBootstrapTestFixture(
     private val onPrivacyRuntimeConfig: (() -> Unit)? = null,
     private val onUserProfile: ((accountIdHex: String) -> UserProfileMetadataFfi?)? = null,
     private val onChatList: ((accountRef: String) -> List<ChatListRowFfi>)? = null,
+    // Separate activation's presented-row boundary from concurrent raw unread folds.
+    private val onPresentedChatList: ((accountRef: String) -> List<ChatListRowFfi>)? = null,
     private val onGroupMemberIdsPage: ((groupIds: List<String>) -> List<AppGroupMemberIdsFfi>)? = null,
     private val onMarkTimelineMessageRead: (() -> ChatListRowFfi?)? = null,
     private val onSendText: ((accountRef: String, groupIdHex: String, text: String) -> SendSummaryFfi)? = null,
@@ -367,7 +369,10 @@ internal class NotificationBootstrapTestFixture(
                 }
                 "presentedChatList" -> {
                     directChatListCalls.incrementAndGet()
-                    presentedChatListSnapshot(onChatList?.invoke(arguments?.get(0) as String) ?: chatListRows)
+                    val accountRef = arguments?.get(0) as String
+                    presentedChatListSnapshot(
+                        onPresentedChatList?.invoke(accountRef) ?: onChatList?.invoke(accountRef) ?: chatListRows,
+                    )
                 }
                 "timelineMessages" -> {
                     notificationTimelineCalls.incrementAndGet()

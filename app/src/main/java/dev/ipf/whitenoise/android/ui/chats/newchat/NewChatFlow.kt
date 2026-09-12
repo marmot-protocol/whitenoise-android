@@ -1,39 +1,30 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
-import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -46,6 +37,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.share.launchInviteShare
@@ -270,10 +262,6 @@ internal suspend fun attemptOpenOrStartProfileChat(
     )
 }
 
-internal fun inviteShareIntent(message: String): Intent =
-    dev.ipf.whitenoise.android.share
-        .inviteShareIntent(message)
-
 /**
  * Full-screen New Message flow: pick a person to open/start a direct chat, or
  * branch into the New Group picker + setup steps.
@@ -324,61 +312,95 @@ internal fun NewGroupFlow(
     onCreateFlowSuperseded: () -> Unit = {},
     initialMembers: List<RecipientSearch.Candidate> = emptyList(),
 ) {
-    val selected = remember { mutableStateListOf<RecipientSearch.Candidate>().apply { addAll(initialMembers) } }
-    var setupOpen by rememberSaveable { mutableStateOf(false) }
-    if (setupOpen) {
-        NewGroupSetupScreen(
-            appState = appState,
-            members = selected,
-            onBack = {
-                setupOpen = false
-                onCreateFlowSuperseded()
-            },
-            onCreateCompletedOpen = onCreateCompletedOpen,
-            onCreateSubmitted = onCreateSubmitted,
-        )
-    } else {
-        ContactPickerScreen(
-            appState = appState,
-            title = stringResource(R.string.new_group),
-            selected = selected,
-            onBack = onClose,
-            onConfirm = { setupOpen = true },
-            // Members are optional: you can proceed to name the group and create
-            // it with nobody selected, then add people afterward from the group.
-            allowEmptyConfirm = true,
-        )
+    NewGroupCreationFlow(
+        appState = appState,
+        onCreateCompletedOpen = onCreateCompletedOpen,
+        onClose = onClose,
+        onCreateSubmitted = onCreateSubmitted,
+        onCreateFlowSuperseded = onCreateFlowSuperseded,
+        initialMembers = initialMembers,
+    )
+}
+
+/** Owns recipient presentation state per active account while native mutations retain their owner. */
+@Suppress("FunctionNaming") // Framework naming for the account-owned composable wrapper.
+@Composable
+internal fun NewMessageScreen(
+    appState: WhiteNoiseAppState,
+    onBack: () -> Unit,
+    onNewGroup: () -> Unit,
+    onOpenConversation: (ChatListItem, Boolean) -> Unit,
+    scannerContent: @Composable (() -> Unit, (String) -> Unit) -> Unit = { dismiss, scan ->
+        QrScannerSheet(onDismiss = dismiss, onScan = scan)
+    },
+) {
+    if (appState.signOutInProgress || appState.wipeInProgress) return
+    key(appState.activeAccountRef, appState.runtimeGeneration) {
+        NewMessageAccountScreen(appState, onBack, onNewGroup, onOpenConversation, scannerContent)
     }
 }
 
 /** Opens the recipient picker and records a content-free compose observation. */
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod") // One captured UI/native callback owner.
 @Composable
-private fun NewMessageScreen(
+private fun NewMessageAccountScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     onNewGroup: () -> Unit,
     onOpenConversation: (ChatListItem, Boolean) -> Unit,
+    scannerContent: @Composable (() -> Unit, (String) -> Unit) -> Unit,
 ) {
     androidx.compose.runtime.LaunchedEffect(Unit) {
         appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.COMPOSE)
     }
+    val accountRef = appState.activeAccountRef
+    val runtimeGeneration = remember { appState.runtimeGeneration }
+    val session =
+        remember(accountRef) {
+            NewMessageSession {
+                val sameOwner =
+                    accountRef != null &&
+                        appState.activeAccountRef == accountRef &&
+                        appState.runtimeGeneration == runtimeGeneration
+                sameOwner && !appState.signOutInProgress && !appState.wipeInProgress
+            }
+        }
     val queryState = rememberTextFieldState()
+    var searchRetry by remember { mutableIntStateOf(0) }
     val query = queryState.text.toString()
-    var showScanner by remember { mutableStateOf(false) }
+    var scannerSession by remember { mutableStateOf<Long?>(null) }
+    var nextScannerSession by remember { mutableStateOf(0L) }
     var showMyQr by remember { mutableStateOf(false) }
     var creatingHex by remember { mutableStateOf<String?>(null) }
     var startChatError by remember { mutableStateOf<StartChatErrorUiState?>(null) }
+    DisposableEffect(session) {
+        onDispose {
+            session.dispose()
+            scannerSession = null
+        }
+    }
+    LaunchedEffect(creatingHex, appState.signOutInProgress, appState.wipeInProgress) {
+        if (creatingHex != null || !session.isCurrent()) scannerSession = null
+    }
     LaunchedEffect(query) { startChatError = null }
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
-    val showMyQrLabel = stringResource(R.string.show_my_qr_code)
     val inviteTitle = stringResource(R.string.invite_to_white_noise)
     val inviteMessage = stringResource(R.string.invite_message)
 
     fun shareInvite() {
+        if (!session.isCurrent() || creatingHex != null) return
         launchInviteShare(context, inviteMessage, inviteTitle)
             .onFailure { appState.presentOutboundShareFailure("INVITE_SHARE", it) }
+    }
+
+    fun leaveScreen(action: () -> Unit) {
+        if (!session.isCurrent() || creatingHex != null) return
+        scannerSession = null
+        showMyQr = false
+        session.dispose()
+        action()
     }
 
     // Back must stay installed (a disabled handler lets the event fall through
@@ -386,7 +408,7 @@ private fun NewMessageScreen(
     // otherwise the process-lifetime create would yank the user into the new
     // conversation seconds after they left this screen.
     BackHandler {
-        if (creatingHex == null) onBack()
+        leaveScreen(onBack)
     }
 
     val activeHex = appState.activeAccount?.accountIdHex
@@ -397,8 +419,10 @@ private fun NewMessageScreen(
             deriveRecipientCandidates(appState, activeHex)
         }
     val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query)
-    val resolution = rememberRecipientResolution(query, appState)
-    val userSearch by rememberRecipientUserSearchState(query, appState)
+    val resolution = rememberRecipientResolution(query, appState, retryKey = searchRetry)
+    val userSearch by key(query, searchRetry, appState.relationshipRevision) {
+        rememberRecipientUserSearchState(query, appState, retryKey = searchRetry)
+    }
     val discovered = userSearch.candidates
     val followedIds = userSearch.followedAccountIds
     val matches =
@@ -416,6 +440,7 @@ private fun NewMessageScreen(
             }
         }
 
+    @Suppress("LongMethod") // Native attempt callbacks share the same captured recipient and lifetime.
     fun openOrCreateChat(
         npub: String,
         hexForProgress: String,
@@ -423,12 +448,14 @@ private fun NewMessageScreen(
         retryGroupIdHex: String? = null,
         existingDmGroupIdHex: String? = null,
     ) {
-        if (creatingHex != null) return
+        if (!session.isCurrent() || creatingHex != null || queryState.text.toString() != query) return
         startChatError = null
         creatingHex = hexForProgress
+        scannerSession = null
         appState.beginChatCreateOpenTiming()
         appState.launchMutation {
             try {
+                session.ensureCurrent()
                 when (
                     val result =
                         attemptOpenOrStartProfileChat(
@@ -437,25 +464,42 @@ private fun NewMessageScreen(
                             recipientName = recipientName,
                             retryGroupIdHex = retryGroupIdHex,
                             resolveDirectChat = {
-                                resolveNewMessageDirectChat(
-                                    npub = npub,
-                                    existingDmGroupIdHex = existingDmGroupIdHex,
-                                    provenanceDirectChat = appState::resolveProvenanceDirectChat,
-                                    existingDirectChat = { target ->
-                                        appState.resolveExistingDirectChat(target, existingDmGroupIdHex)
-                                    },
-                                )
+                                session.currentValue {
+                                    resolveNewMessageDirectChat(
+                                        npub = npub,
+                                        existingDmGroupIdHex = existingDmGroupIdHex,
+                                        provenanceDirectChat = { provenance, target ->
+                                            session.currentValue {
+                                                appState.resolveProvenanceDirectChat(provenance, target)
+                                            }
+                                        },
+                                        existingDirectChat = { target ->
+                                            session.currentValue {
+                                                appState.resolveExistingDirectChat(target, existingDmGroupIdHex)
+                                            }
+                                        },
+                                    )
+                                }
                             },
-                            createGroup = appState::createProfileChatGroup,
-                            loadCreatedChatListItem = appState::loadCreatedChatListItem,
+                            createGroup = { target ->
+                                session.currentValue { appState.createProfileChatGroup(target) }
+                            },
+                            loadCreatedChatListItem = { id ->
+                                session.currentValue { appState.loadCreatedChatListItem(id) }
+                            },
                             displayName = appState::displayName,
-                            markCreateOpenStage = appState::markChatCreateOpenStage,
-                            abandonCreateOpenTiming = appState::abandonChatCreateOpenTiming,
+                            markCreateOpenStage = { if (session.isCurrent()) appState.markChatCreateOpenStage(it) },
+                            abandonCreateOpenTiming = {
+                                if (session.isCurrent()) appState.abandonChatCreateOpenTiming(it)
+                            },
                         )
                 ) {
                     is StartChatAttemptResult.Open ->
-                        onOpenConversation(result.item, result.newlyCreated)
-                    is StartChatAttemptResult.Failed -> startChatError = result.error
+                        if (session.isCurrent()) {
+                            session.dispose()
+                            onOpenConversation(result.item, result.newlyCreated)
+                        }
+                    is StartChatAttemptResult.Failed -> if (session.isCurrent()) startChatError = result.error
                 }
             } finally {
                 creatingHex = null
@@ -472,184 +516,89 @@ private fun NewMessageScreen(
         )
     }
 
-    Scaffold(
-        modifier = Modifier.imePadding(),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.new_message)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack, enabled = creatingHex == null) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
+    val resolvedHex = resolution.resolvedHex?.takeUnless { it.equals(activeHex, ignoreCase = true) }
+    val displayedCandidates =
+        if (identifierQuery) {
+            resolvedHex
+                ?.let {
+                    listOf(RecipientSearch.Candidate(it, appState.displayName(it), appState.npub(it)))
+                }.orEmpty()
+        } else {
+            matches
+        }
+    val people =
+        displayedCandidates.map { candidate ->
+            NewMessagePerson(
+                candidate = candidate,
+                subtitle = appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() },
+                avatarUrl =
+                    appState.avatarUrl(candidate.accountIdHex)
+                        ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
             )
-        },
-    ) { padding ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .consumeWindowInsets(padding),
-        ) {
-            RecipientSearchField(
-                state = queryState,
-                placeholder = stringResource(R.string.search_people_hint),
-                onPasteRejected = { appState.present(R.string.error_invalid_identity_reference) },
-                onScanQr = { showScanner = true },
-                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
-            )
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = Dimens.spaceXl),
-            ) {
-                item {
-                    NewMessageQuickActions(
-                        query = query,
-                        showMyQrLabel = showMyQrLabel,
-                        showMyQrEnabled = myQrContent != null,
-                        onNewGroup = onNewGroup,
-                        onScanQr = { showScanner = true },
-                        onShowMyQr = { showMyQr = true },
-                        onInviteFriends = ::shareInvite,
-                    )
-                }
-                startChatError?.let { error ->
-                    item {
-                        StartChatErrorCard(
-                            error = error,
-                            onRetry = {
-                                openOrCreateChat(
-                                    npub = error.npub,
-                                    hexForProgress = error.progressHex,
-                                    recipientName = error.recipientName,
-                                    retryGroupIdHex = error.retryGroupIdHex,
-                                )
-                            },
-                            onInvite = ::shareInvite,
-                            onCopy = { detail ->
-                                clipboard.setText(AnnotatedString(detail))
-                            },
-                        )
-                    }
-                }
-                // A pasted/scanned self identifier is dropped like the browse
-                // list drops the active account, landing on "No matches".
-                val resolvedHex =
-                    resolution.resolvedHex?.takeUnless { it.equals(activeHex, ignoreCase = true) }
-                if (identifierQuery && resolution.state == RecipientPreviewState.Resolving) {
-                    item { ResolvingContactRow() }
-                } else if (identifierQuery && resolvedHex != null) {
-                    item {
-                        ContactRow(
-                            title = appState.displayName(resolvedHex),
-                            subtitle = appState.shortNpub(resolvedHex).takeIf { it.isNotBlank() },
-                            avatarSeed = resolvedHex,
-                            avatarUrl = appState.avatarUrl(resolvedHex),
-                            enabled = creatingHex == null,
-                            onClick = {
-                                startOrOpenConversation(
-                                    RecipientSearch.Candidate(
-                                        accountIdHex = resolvedHex,
-                                        npub = appState.npub(resolvedHex),
-                                        displayName = appState.displayName(resolvedHex),
-                                    ),
-                                )
-                            },
-                            onLongClick = { appState.presentProfile(appState.npub(resolvedHex)) },
-                            trailing =
-                                if (creatingHex == resolvedHex) {
-                                    { CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) }
-                                } else {
-                                    null
-                                },
-                        )
-                    }
-                } else if (identifierQuery || matches.isEmpty()) {
-                    // Only surface a note when the user actually typed a query that
-                    // matched nothing. The blank / no-contacts state relies on the
-                    // New group + Scan QR quick actions above, so it needs no
-                    // centered hero, paste, or scan affordance here (all redundant).
-                    if (query.isNotBlank()) {
-                        item {
-                            if (!identifierQuery && userSearch.isSearching) {
-                                UserSearchStatusRow(R.string.user_search_searching, showProgress = true)
-                            } else {
-                                Text(
-                                    stringResource(
-                                        when {
-                                            userSearch.failed -> R.string.user_search_failed
-                                            userSearch.isIncomplete -> R.string.user_search_incomplete
-                                            else -> R.string.no_matches
-                                        },
-                                    ),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    item { SectionHeader(stringResource(R.string.contacts)) }
-                    items(matches, key = { it.accountIdHex }) { candidate ->
-                        ContactRow(
-                            title = candidate.displayName,
-                            subtitle =
-                                when {
-                                    candidate.isFollowing -> stringResource(R.string.user_search_you_follow)
-                                    candidate.searchProfile != null -> stringResource(R.string.user_search_result)
-                                    else -> appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
-                                },
-                            avatarSeed = candidate.accountIdHex,
-                            avatarUrl =
-                                appState.avatarUrl(candidate.accountIdHex)
-                                    ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
-                            isFollowed = candidate.isFollowing,
-                            enabled = creatingHex == null,
-                            onClick = {
-                                if (candidate.source == null && candidate.searchProfile != null) {
-                                    appState.presentDiscoveredProfile(candidate.npub, candidate.searchProfile)
-                                } else {
-                                    startOrOpenConversation(candidate)
-                                }
-                            },
-                            onLongClick = {
-                                if (candidate.searchProfile != null) {
-                                    appState.presentDiscoveredProfile(candidate.npub, candidate.searchProfile)
-                                } else {
-                                    appState.presentProfile(candidate.npub)
-                                }
-                            },
-                            trailing =
-                                if (creatingHex == candidate.accountIdHex) {
-                                    { CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) }
-                                } else {
-                                    null
-                                },
-                        )
-                    }
-                    if (userSearch.isSearching) {
-                        item { UserSearchStatusRow(R.string.user_search_searching, showProgress = true) }
-                    } else if (userSearch.failed || userSearch.isIncomplete) {
-                        item {
-                            UserSearchStatusRow(
-                                if (userSearch.failed) R.string.user_search_failed else R.string.user_search_incomplete,
-                            )
-                        }
-                    }
-                }
-            }
+        }
+
+    fun canInteract() = session.isCurrent() && creatingHex == null && queryState.text.toString() == query
+
+    fun presentPerson(candidate: RecipientSearch.Candidate) {
+        if (!canInteract()) return
+        if (candidate.searchProfile != null) {
+            appState.presentDiscoveredProfile(candidate.npub, candidate.searchProfile)
+        } else {
+            appState.presentProfile(candidate.npub)
         }
     }
+    NewMessageContent(
+        queryState = queryState,
+        people = people,
+        search = userSearch,
+        identifierQuery = identifierQuery,
+        resolvingIdentifier = identifierQuery && resolution.state == RecipientPreviewState.Resolving,
+        showMyQrEnabled = myQrContent != null,
+        creatingHex = creatingHex,
+        error = startChatError,
+        retryableIdentifier = ChatListIdentifierSearch.classify(query) is ChatListIdentifierSearch.Identifier.Nip05,
+        actions =
+            NewMessageActions(
+                back = { leaveScreen(onBack) },
+                newGroup = { leaveScreen(onNewGroup) },
+                scanQr = {
+                    if (canInteract()) {
+                        nextScannerSession++
+                        scannerSession = nextScannerSession
+                    }
+                },
+                showMyQr = { if (canInteract() && myQrContent != null) showMyQr = true },
+                invite = ::shareInvite,
+                retrySearch = { if (canInteract()) searchRetry++ },
+                retryChat = {
+                    startChatError?.let { error ->
+                        openOrCreateChat(error.npub, error.progressHex, error.recipientName, error.retryGroupIdHex)
+                    }
+                },
+                pasteRejected = {
+                    if (session.isCurrent()) appState.present(R.string.error_invalid_identity_reference)
+                },
+                person = { candidate ->
+                    if (canInteract()) {
+                        if (candidate.source == null && candidate.searchProfile != null) {
+                            presentPerson(candidate)
+                        } else {
+                            startOrOpenConversation(candidate)
+                        }
+                    }
+                },
+                profile = ::presentPerson,
+                copyError = { if (canInteract()) clipboard.setText(AnnotatedString(it)) },
+            ),
+    )
 
-    if (showScanner) {
-        QrScannerSheet(
-            onDismiss = { showScanner = false },
-            onScan = { raw ->
-                showScanner = false
+    val scanSession = scannerSession
+    if (scanSession != null && creatingHex == null && session.isCurrent()) {
+        scannerContent(
+            { if (scannerSession == scanSession) scannerSession = null },
+            scan@{ raw ->
+                if (!session.isCurrent() || creatingHex != null || scannerSession != scanSession) return@scan
+                scannerSession = null
                 when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.ViewProfile)) {
                     is QrScanOutcome.OpenProfileNpub -> {
                         queryState.replaceRecipientText(outcome.npub)
@@ -689,14 +638,22 @@ private fun AppText.resolveForCompose(): String =
             }
     }
 
+/** Keeps native failure details and canonical retry identity actionable at large text sizes. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
+@Suppress("FunctionNaming") // Compose naming follows the framework convention.
 internal fun StartChatErrorCard(
     error: StartChatErrorUiState,
     onRetry: () -> Unit,
     onInvite: () -> Unit,
     onCopy: (String) -> Unit,
 ) {
-    val title = error.title.resolveForCompose()
+    val title =
+        if (error.retryGroupIdHex != null) {
+            stringResource(R.string.new_message_chat_created)
+        } else {
+            error.title.resolveForCompose()
+        }
     val detail = error.detail.resolveForCompose()
     Column(
         Modifier
@@ -719,7 +676,7 @@ internal fun StartChatErrorCard(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm)) {
             if (error.invitation) {
                 Button(onClick = onInvite) {
                     Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -728,7 +685,11 @@ internal fun StartChatErrorCard(
                 }
             }
             TextButton(onClick = onRetry) {
-                Text(stringResource(R.string.retry))
+                Text(
+                    stringResource(
+                        if (error.retryGroupIdHex != null) R.string.new_message_open_chat else R.string.retry,
+                    ),
+                )
             }
             if (error.copyable) {
                 TextButton(onClick = { onCopy(requireNotNull(error.diagnosticReport)) }) {
