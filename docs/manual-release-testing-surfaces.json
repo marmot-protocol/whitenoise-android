@@ -848,14 +848,6 @@
         ]
       },
       {
-        "surface": "GroupSwitchRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/SettingsGroup.kt",
-        "anchor": "fun GroupSwitchRow(",
-        "test_ids": [
-          "AXY-001"
-        ]
-      },
-      {
         "surface": "SettingsGroup",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/SettingsGroup.kt",
         "anchor": "fun SettingsGroup(",
@@ -4379,27 +4371,16 @@
         ]
       },
       {
-        "surface": "AuditLogExportConsentDialog",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
-        "anchor": "fun AuditLogExportConsentDialog(",
-        "test_ids": [
-          "SEC-001"
-        ]
-      },
-      {
-        "surface": "AuditLogExportRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
-        "anchor": "fun AuditLogExportRow(",
-        "test_ids": [
-          "SEC-001"
-        ]
-      },
-      {
         "surface": "DevicePrivacyScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
         "anchor": "fun DevicePrivacyScreen(",
         "test_ids": [
           "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
           "SEC-007"
         ]
       },
@@ -5769,6 +5750,14 @@
         ]
       },
       {
+        "surface": "SettingsDetailRoute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun SettingsDetailRoute(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
         "surface": "Modifier.amoledSurfaceBorder",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/theme/AmoledSurface.kt",
         "anchor": "fun Modifier.amoledSurfaceBorder(",
@@ -5889,17 +5878,6 @@
         "surface": "UsageDiagnosticsFeedback",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
         "anchor": "fun UsageDiagnosticsFeedback(",
-        "test_ids": [
-          "SEC-007",
-          "SEC-011",
-          "SEC-012",
-          "SEC-013"
-        ]
-      },
-      {
-        "surface": "UsageDiagnosticsSettings",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
-        "anchor": "fun UsageDiagnosticsSettings(",
         "test_ids": [
           "SEC-007",
           "SEC-011",
@@ -6067,6 +6045,45 @@
         "anchor": "fun WhiteNoiseDropdownMenu(",
         "test_ids": [
           "SET-005"
+        ]
+      },
+      {
+        "surface": "DiagnosticsImprovementsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "fun DiagnosticsImprovementsScreen(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "DiagnosticsDisclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "fun DiagnosticsDisclosure(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "AuditLogExportConsentDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "fun AuditLogExportConsentDialog(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
         ]
       }
     ],
@@ -7725,42 +7742,6 @@
         ]
       },
       {
-        "surface": "setting:audit_logs",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
-        "anchor": "R.string.audit_logs",
-        "test_ids": [
-          "SEC-001",
-          "SEC-002",
-          "SEC-003",
-          "SEC-004",
-          "SEC-005",
-          "SEC-006",
-          "SEC-007",
-          "SEC-008",
-          "SEC-009",
-          "SEC-010",
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "setting:audit_logs_settings_subtitle",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
-        "anchor": "R.string.audit_logs_settings_subtitle",
-        "test_ids": [
-          "SEC-001",
-          "SEC-002",
-          "SEC-003",
-          "SEC-004",
-          "SEC-005",
-          "SEC-006",
-          "SEC-007",
-          "SEC-008",
-          "SEC-009",
-          "SEC-010",
-          "SET-001"
-        ]
-      },
-      {
         "surface": "setting:force_incognito_keyboard",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
         "anchor": "R.string.force_incognito_keyboard",
@@ -7779,9 +7760,9 @@
         ]
       },
       {
-        "surface": "setting:force_incognito_keyboard_subtitle",
+        "surface": "string:app_lock_enabled_detail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
-        "anchor": "R.string.force_incognito_keyboard_subtitle",
+        "anchor": "R.string.app_lock_enabled_detail",
         "test_ids": [
           "SEC-001",
           "SEC-002",
@@ -7789,17 +7770,13 @@
           "SEC-004",
           "SEC-005",
           "SEC-006",
-          "SEC-007",
-          "SEC-008",
-          "SEC-009",
-          "SEC-010",
-          "SET-001"
+          "SEC-007"
         ]
       },
       {
-        "surface": "setting:require_app_unlock",
+        "surface": "string:app_lock_setup_detail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
-        "anchor": "R.string.require_app_unlock",
+        "anchor": "R.string.app_lock_setup_detail",
         "test_ids": [
           "SEC-001",
           "SEC-002",
@@ -7807,11 +7784,189 @@
           "SEC-004",
           "SEC-005",
           "SEC-006",
-          "SEC-007",
-          "SEC-008",
-          "SEC-009",
-          "SEC-010",
-          "SET-001"
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:auto_lock",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.auto_lock",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:device_protection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.device_protection",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:diagnostics",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.diagnostics",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_controls_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.diagnostics_controls_detail",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_improvements",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.diagnostics_improvements",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_summary_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.diagnostics_summary_logs",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_summary_on",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.diagnostics_summary_on",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_summary_usage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.diagnostics_summary_usage",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:incognito_keyboard_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.incognito_keyboard_detail",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:open_android_security_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.open_android_security_settings",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:require_device_authentication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.require_device_authentication",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:settings_privacy_security",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.settings_privacy_security",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:usage_diagnostics_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.usage_diagnostics_off",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
         ]
       },
       {
@@ -9001,29 +9156,9 @@
         ]
       },
       {
-        "surface": "usage_diagnostics_renew",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
-        "anchor": "R.string.usage_diagnostics_renew",
-        "test_ids": [
-          "SEC-007",
-          "SEC-012",
-          "SEC-013"
-        ]
-      },
-      {
         "surface": "usage_diagnostics_retention_unknown",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
         "anchor": "R.string.usage_diagnostics_retention_unknown",
-        "test_ids": [
-          "SEC-007",
-          "SEC-012",
-          "SEC-013"
-        ]
-      },
-      {
-        "surface": "usage_diagnostics_status",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
-        "anchor": "R.string.usage_diagnostics_status",
         "test_ids": [
           "SEC-007",
           "SEC-012",
@@ -9359,6 +9494,279 @@
         "test_ids": [
           "SET-004",
           "SET-005"
+        ]
+      },
+      {
+        "surface": "string:audit_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.audit_logs",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:audit_logs_settings_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.audit_logs_settings_subtitle",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.delete",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:delete_audit_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.delete_audit_logs",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:delete_audit_logs_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.delete_audit_logs_subtitle",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_improvements",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.diagnostics_improvements",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:export_audit_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.export_audit_logs",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:export_audit_logs_confirm_action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.export_audit_logs_confirm_action",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:export_audit_logs_confirm_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.export_audit_logs_confirm_body",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:export_audit_logs_confirm_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.export_audit_logs_confirm_title",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:export_audit_logs_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.export_audit_logs_subtitle",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:stored_audit_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.stored_audit_logs",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_export_audit_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.toast_couldnt_export_audit_logs",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:usage_diagnostics_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.usage_diagnostics_error",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:usage_diagnostics_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.usage_diagnostics_loading",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:usage_diagnostics_renew",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.usage_diagnostics_renew",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:usage_diagnostics_status",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.usage_diagnostics_status",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:usage_diagnostics_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.usage_diagnostics_subtitle",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:usage_diagnostics_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.usage_diagnostics_title",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
         ]
       }
     ],

@@ -70,31 +70,6 @@ internal fun diagnosticsStatusLabel(status: DiagnosticsExporterStatusFfi?): Int 
         null -> R.string.usage_diagnostics_unknown
     }
 
-/** Reusable opt-in control; failed reads and saves expose Retry rather than a stale checked switch. */
-@Composable
-internal fun UsageDiagnosticsSettings(appState: WhiteNoiseAppState) {
-    val state = appState.diagnostics
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        UsageDiagnosticsChoice(appState)
-        Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            UsageDiagnosticsDisclosure()
-            if (state.requiresChoice && state.snapshot?.settings?.previouslyEnabled == true) {
-                Text(stringResource(R.string.usage_diagnostics_renew), style = MaterialTheme.typography.bodySmall)
-            }
-            Text(
-                stringResource(
-                    R.string.usage_diagnostics_status,
-                    stringResource(diagnosticsStatusLabel(state.snapshot?.status?.productAnalytics)),
-                    stringResource(diagnosticsStatusLabel(state.snapshot?.status?.telemetry)),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                minLines = 2,
-            )
-            UsageDiagnosticsFeedback(appState)
-        }
-    }
-}
-
 /** Presents the pending choice immediately while the native receipt remains the collection authority. */
 @Composable
 private fun UsageDiagnosticsChoice(appState: WhiteNoiseAppState) {

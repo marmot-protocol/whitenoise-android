@@ -7,13 +7,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -38,41 +35,6 @@ internal fun segmentShape(
     val top = if (index == 0) large else small
     val bottom = if (index == count - 1) large else small
     return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
-}
-
-// A toggle row sized for a segmented group item: the segment Surface owns the
-// shape, the row owns its 16dp inset (matching ListItem-based rows).
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-internal fun GroupSwitchRow(
-    title: String,
-    subtitle: String?,
-    checked: Boolean,
-    enabled: Boolean = true,
-    busy: Boolean = false,
-    icon: ImageVector? = null,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (icon != null) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            if (subtitle != null) {
-                Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        if (busy) {
-            LoadingIndicator(modifier = Modifier.size(24.dp))
-        } else {
-            Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
-        }
-    }
 }
 
 class SettingsGroupScope internal constructor() {

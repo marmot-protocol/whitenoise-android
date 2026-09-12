@@ -1,299 +1,156 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Article
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Screenshot
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppLockDelay
+import dev.ipf.whitenoise.android.state.ProductObservation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.auditLogShareChooserIntent
-import dev.ipf.whitenoise.android.ui.common.GroupSwitchRow
-import dev.ipf.whitenoise.android.ui.common.SettingsGroup
+import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 
-/** Presents independent device privacy controls and the expanded usage disclosure. */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Privacy & Security: device protection switches, the auto-lock choice once device authentication is on, and the
+ * Diagnostics & Improvements link with a truthful one-word summary. Screen security stays one combined control
+ * because the app owns one secure-window flag (D05); there is no erase-everything backend, so that section is absent.
+ */
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 internal fun DevicePrivacyScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
+    onOpenDiagnostics: () -> Unit = {},
+    credentialAvailableOverride: Boolean? = null,
 ) {
     val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.PRIVACY)
-    }
-    var auditLogsBusy by remember { mutableStateOf(false) }
-    var exportAuditLogsConfirmOpen by remember { mutableStateOf(false) }
-    var deleteAuditLogsConfirmOpen by remember { mutableStateOf(false) }
-
-    fun runAuditMutation(block: suspend () -> Unit) {
-        auditLogsBusy = true
-        appState.launchMutation {
-            try {
-                block()
-            } finally {
-                auditLogsBusy = false
-            }
-        }
-    }
-
+    LaunchedEffect(Unit) { appState.recordProductObservation(ProductObservation.PRIVACY) }
     LaunchedEffect(appState.runtimeGeneration) {
         appState.refreshAppLockCredentialAvailability()
         appState.refreshSecurityPrivacySettings()
     }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.device_privacy)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    val secure = credentialAvailableOverride ?: appState.appLockCredentialAvailable
+    val authenticationEnabled = secure && appState.requireAppUnlock
+    var autoLockPicker by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(authenticationEnabled) {
+        if (!authenticationEnabled) autoLockPicker = false
+    }
+    val delayLabels = AppLockDelay.entries.associateWith { stringResource(it.labelRes) }
+    val summary =
+        diagnosticsSummaryRes(
+            usageGranted = appState.diagnostics.granted,
+            auditLogsEnabled = appState.auditLogSettings?.enabled == true,
+        )
+    SettingsScaffold(title = stringResource(R.string.settings_privacy_security), onBack = onBack) {
+        SettingsList {
+            item { SettingsSection(stringResource(R.string.device_protection)) }
             item {
-                SettingsGroup {
-                    item {
-                        GroupSwitchRow(
-                            title = stringResource(R.string.require_app_unlock),
+                SettingsGroup(modifier = Modifier.testTag("privacy.device_protection.group")) {
+                    row("screen_security") { rowContext ->
+                        SettingsSwitch(
+                            context = rowContext,
+                            title = stringResource(R.string.allow_chat_screenshots),
+                            checked = !appState.allowChatScreenshotsInChats,
+                            onCheckedChange = { appState.updateAllowChatScreenshotsInChats(!it) },
+                            subtitle = stringResource(R.string.allow_chat_screenshots_subtitle),
+                        )
+                    }
+                    row("incognito_keyboard") { rowContext ->
+                        SettingsSwitch(
+                            context = rowContext,
+                            title = stringResource(R.string.force_incognito_keyboard),
+                            checked = appState.forceIncognitoKeyboard,
+                            onCheckedChange = { appState.updateForceIncognitoKeyboard(it) },
+                            subtitle = stringResource(R.string.incognito_keyboard_detail),
+                        )
+                    }
+                    row("device_authentication") { rowContext ->
+                        SettingsSwitch(
+                            context = rowContext,
+                            title = stringResource(R.string.require_device_authentication),
+                            checked = authenticationEnabled,
+                            onCheckedChange = { appState.updateRequireAppUnlock(it) },
                             subtitle =
                                 stringResource(
-                                    if (appState.appLockCredentialAvailable) {
-                                        R.string.require_app_unlock_subtitle
-                                    } else {
-                                        R.string.app_lock_screen_lock_required_hint
-                                    },
+                                    if (secure) R.string.app_lock_enabled_detail else R.string.app_lock_setup_detail,
                                 ),
-                            checked = appState.requireAppUnlock,
-                            enabled = appState.appLockCredentialAvailable,
-                            icon = Icons.Filled.Lock,
-                            onCheckedChange = { appState.updateRequireAppUnlock(it) },
+                            enabled = secure,
                         )
                     }
-                    if (appState.requireAppUnlock) {
-                        item {
-                            Column(Modifier.padding(vertical = 8.dp)) {
-                                Text(
-                                    text = stringResource(R.string.app_lock_delay_title),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 16.dp),
-                                )
-                                Column(Modifier.selectableGroup()) {
-                                    AppLockDelay.entries.forEach { delay ->
-                                        SelectableSettingsRow(
-                                            title = stringResource(delay.labelRes),
-                                            selected = appState.appLockDelay == delay,
-                                            onClick = { appState.updateAppLockDelay(delay) },
-                                        )
-                                    }
-                                }
-                            }
+                    if (!secure) {
+                        row("security_settings") { rowContext ->
+                            SettingsAction(
+                                context = rowContext,
+                                title = stringResource(R.string.open_android_security_settings),
+                                onClick = { openSecuritySettings(context) },
+                            )
                         }
                     }
-                    item {
-                        GroupSwitchRow(
-                            title = stringResource(R.string.force_incognito_keyboard),
-                            subtitle = stringResource(R.string.force_incognito_keyboard_subtitle),
-                            checked = appState.forceIncognitoKeyboard,
-                            icon = Icons.Filled.Keyboard,
-                            onCheckedChange = { appState.updateForceIncognitoKeyboard(it) },
-                        )
-                    }
-                    item {
-                        GroupSwitchRow(
-                            title = stringResource(R.string.allow_chat_screenshots),
-                            subtitle = stringResource(R.string.allow_chat_screenshots_subtitle),
-                            checked = !appState.allowChatScreenshotsInChats,
-                            icon = Icons.Filled.Screenshot,
-                            onCheckedChange = { appState.updateAllowChatScreenshotsInChats(!it) },
-                        )
-                    }
-                    item { UsageDiagnosticsSettings(appState) }
-                    item {
-                        GroupSwitchRow(
-                            title = stringResource(R.string.audit_logs),
-                            subtitle = stringResource(R.string.audit_logs_settings_subtitle),
-                            checked = appState.auditLogSettings?.enabled == true,
-                            enabled = !auditLogsBusy,
-                            busy = auditLogsBusy,
-                            icon = Icons.Filled.Article,
-                            onCheckedChange = { enabled ->
-                                runAuditMutation { appState.setAuditLogsEnabled(enabled) }
-                            },
-                        )
-                    }
-                    item {
-                        AuditLogExportRow(
-                            enabled = !auditLogsBusy,
-                            onClick = { exportAuditLogsConfirmOpen = true },
-                        )
-                    }
-                    item {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable(enabled = !auditLogsBusy) { deleteAuditLogsConfirmOpen = true }
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                Icons.Filled.Delete,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
+                    if (authenticationEnabled) {
+                        row("auto_lock") { rowContext ->
+                            SettingsLink(
+                                context = rowContext,
+                                title = stringResource(R.string.auto_lock),
+                                onClick = { autoLockPicker = true },
+                                value = delayLabels.getValue(appState.appLockDelay),
                             )
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    stringResource(R.string.delete_audit_logs),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.error,
-                                )
-                                Text(
-                                    stringResource(R.string.delete_audit_logs_subtitle),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
                         }
                     }
                 }
             }
-        }
-    }
-
-    if (exportAuditLogsConfirmOpen) {
-        val chooserTitle = stringResource(R.string.export_audit_logs)
-        AuditLogExportConsentDialog(
-            onDismiss = { exportAuditLogsConfirmOpen = false },
-            onConfirm = {
-                exportAuditLogsConfirmOpen = false
-                runAuditMutation {
-                    val files = appState.prepareAuditLogsForSharing()
-                    if (files.isNotEmpty()) {
-                        runCatching {
-                            context.startActivity(
-                                auditLogShareChooserIntent(context, files, chooserTitle),
-                            )
-                        }.onFailure {
-                            appState.present(R.string.toast_couldnt_export_audit_logs)
-                        }
+            item { SettingsSection(stringResource(R.string.diagnostics)) }
+            item {
+                SettingsGroup(modifier = Modifier.testTag("privacy.diagnostics.group")) {
+                    row("diagnostics") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.diagnostics_improvements),
+                            onClick = onOpenDiagnostics,
+                            value = stringResource(summary),
+                        )
                     }
                 }
-            },
-        )
+            }
+            item { SettingsExplainer(stringResource(R.string.diagnostics_controls_detail)) }
+        }
     }
-
-    if (deleteAuditLogsConfirmOpen) {
-        AlertDialog(
-            onDismissRequest = { deleteAuditLogsConfirmOpen = false },
-            title = { Text(stringResource(R.string.delete_audit_logs)) },
-            text = { Text(stringResource(R.string.delete_audit_logs_subtitle)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        deleteAuditLogsConfirmOpen = false
-                        runAuditMutation { appState.deleteAuditLogs() }
-                    },
-                ) {
-                    Text(
-                        stringResource(R.string.delete),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { deleteAuditLogsConfirmOpen = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
+    if (autoLockPicker) {
+        ChoiceDialog(
+            title = stringResource(R.string.auto_lock),
+            values = AppLockDelay.entries,
+            selected = appState.appLockDelay,
+            label = delayLabels::getValue,
+            onDismiss = { autoLockPicker = false },
+            onSelect = {
+                appState.updateAppLockDelay(it)
+                autoLockPicker = false
             },
         )
     }
 }
 
-@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
-@Composable
-internal fun AuditLogExportConsentDialog(
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.export_audit_logs_confirm_title)) },
-        text = { Text(stringResource(R.string.export_audit_logs_confirm_body)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.export_audit_logs_confirm_action))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        },
-    )
-}
-
-@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
-@Composable
-internal fun AuditLogExportRow(
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.Filled.Share, contentDescription = null)
-        Column(Modifier.weight(1f)) {
-            Text(
-                stringResource(R.string.export_audit_logs),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Text(
-                stringResource(R.string.export_audit_logs_subtitle),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+/** One word for the state of both sharing controls: On, Usage, Logs or Off. */
+internal fun diagnosticsSummaryRes(
+    usageGranted: Boolean,
+    auditLogsEnabled: Boolean,
+): Int =
+    when {
+        usageGranted && auditLogsEnabled -> R.string.diagnostics_summary_on
+        usageGranted -> R.string.diagnostics_summary_usage
+        auditLogsEnabled -> R.string.diagnostics_summary_logs
+        else -> R.string.usage_diagnostics_off
     }
+
+/** Hands off to Android's security settings so the user can set a screen lock. */
+private fun openSecuritySettings(context: Context) {
+    runCatching { context.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS)) }
 }

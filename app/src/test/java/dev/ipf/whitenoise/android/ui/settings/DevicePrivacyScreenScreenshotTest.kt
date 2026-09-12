@@ -19,21 +19,13 @@ import androidx.compose.ui.test.performClick
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
-import dev.ipf.marmotkit.AccountSummaryFfi
-import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.DiagnosticsExporterStatusFfi
 import dev.ipf.marmotkit.MarmotInterface
-import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
-import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
-import dev.ipf.marmotkit.UsageDiagnosticsStatusFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshot
 import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshotHandoff
-import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.AppPhase
-import dev.ipf.whitenoise.android.state.DraftPersistence
-import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
@@ -353,7 +345,7 @@ class DevicePrivacyScreenScreenshotTest {
         }
     }
 
-    /** Builds one deterministic native privacy snapshot and captures the full settings surface. */
+    /** Builds one deterministic native privacy snapshot and captures Diagnostics & Improvements. */
     private fun captureConsentState(
         decision: UsageDiagnosticsDecisionFfi,
         expectedChecked: Boolean,
@@ -364,123 +356,15 @@ class DevicePrivacyScreenScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    DevicePrivacyScreen(appState = appState, onBack = {})
+                    DiagnosticsImprovementsScreen(appState = appState, onBack = {})
                 }
             }
         }
         composeRule.waitForIdle()
 
-        val diagnosticsSwitch = composeRule.onAllNodes(isToggleable())[3]
+        val diagnosticsSwitch = composeRule.onAllNodes(isToggleable())[0]
         if (expectedChecked) diagnosticsSwitch.assertIsOn() else diagnosticsSwitch.assertIsOff()
         val suffix = if (expectedChecked) "granted" else "declined"
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/device_privacy_diagnostics_$suffix.png")
-    }
-
-    /** Creates a state whose only native reads are fixed device-privacy values. */
-    private fun privacyAppState(
-        decision: UsageDiagnosticsDecisionFfi,
-        hasAccount: Boolean = true,
-        beforeSave: () -> Unit = {},
-    ): WhiteNoiseAppState {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val preferences =
-            context.getSharedPreferences(
-                "device-privacy-screenshot-${decision.name}",
-                Context.MODE_PRIVATE,
-            )
-        preferences.edit().clear().commit()
-        val marmot = privacyMarmot(decision, beforeSave)
-        return WhiteNoiseAppState(
-            context = context,
-            draftStore = DraftStore(EmptyDraftPersistence),
-            accountIdHexResolver = { null },
-            accounts =
-                if (hasAccount) {
-                    listOf(AccountSummaryFfi("account", "aa".repeat(32), true, false, false, true))
-                } else {
-                    emptyList()
-                },
-            activeAccountRef = "account",
-            marmotRuntimeFactory = { AppMarmotRuntime(rootPath = "test", marmot = marmot) },
-            preferences = preferences,
-        ).also { state ->
-            WhiteNoiseAppState::class.java
-                .getDeclaredField("marmotRuntime")
-                .apply { isAccessible = true }
-                .set(state, AppMarmotRuntime(rootPath = "test", marmot = marmot))
-        }
-    }
-
-    /** Implements device-privacy reads and explicit consent writes using disposable state. */
-    private fun privacyMarmot(
-        initialDecision: UsageDiagnosticsDecisionFfi,
-        beforeSave: () -> Unit,
-    ): MarmotInterface {
-        var decision = initialDecision
-        var auditSettings = AuditLogSettingsFfi(enabled = false)
-        return Proxy.newProxyInstance(
-            MarmotInterface::class.java.classLoader,
-            arrayOf(MarmotInterface::class.java),
-        ) { proxy, method, arguments ->
-            when (method.name) {
-                "setUsageDiagnosticsConsent" -> {
-                    beforeSave()
-                    decision =
-                        if (arguments?.firstOrNull() == true) {
-                            UsageDiagnosticsDecisionFfi.GRANTED
-                        } else {
-                            UsageDiagnosticsDecisionFfi.DECLINED
-                        }
-                    UsageDiagnosticsSettingsFfi(decision, "test-policy", "test-registry", 0L, false)
-                }
-                "usageDiagnosticsSettings" ->
-                    UsageDiagnosticsSettingsFfi(
-                        decision = decision,
-                        policyRevision = "test-policy",
-                        registryRevision = "test-registry",
-                        updatedAtMs = 0L,
-                        previouslyEnabled = decision == UsageDiagnosticsDecisionFfi.GRANTED,
-                    )
-                "usageDiagnosticsStatus" ->
-                    UsageDiagnosticsStatusFfi(
-                        consent = decision,
-                        telemetry =
-                            if (decision == UsageDiagnosticsDecisionFfi.GRANTED) {
-                                DiagnosticsExporterStatusFfi.READY
-                            } else {
-                                DiagnosticsExporterStatusFfi.DISABLED
-                            },
-                        productAnalytics = DiagnosticsExporterStatusFfi.UNCONFIGURED,
-                        queuedEvents = 0uL,
-                        droppedEvents = 0uL,
-                        acceptedBatches = 0uL,
-                        failedBatches = 0uL,
-                    )
-                "relayTelemetrySettings" ->
-                    RelayTelemetrySettingsFfi(
-                        exportEnabled = false,
-                        exportIntervalSeconds = 60uL,
-                    )
-                "auditLogSettings" -> auditSettings
-                "setAuditLogSettings" -> {
-                    beforeSave()
-                    auditSettings = arguments!!.first() as AuditLogSettingsFfi
-                    auditSettings
-                }
-                "toString" -> "DevicePrivacyScreenshotMarmotFake"
-                "hashCode" -> System.identityHashCode(proxy)
-                "equals" -> proxy === arguments?.firstOrNull()
-                else -> error("Unexpected Marmot call: ${method.name}")
-            }
-        } as MarmotInterface
-    }
-
-    private object EmptyDraftPersistence : DraftPersistence {
-        override fun read(): Map<String, String> = emptyMap()
-
-        override fun write(
-            key: String,
-            value: String?,
-        ) = Unit
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/diagnostics_improvements_$suffix.png")
     }
 }

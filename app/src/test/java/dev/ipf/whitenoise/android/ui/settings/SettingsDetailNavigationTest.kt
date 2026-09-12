@@ -22,6 +22,13 @@ class SettingsDetailNavigationTest {
         assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.ChatBubbleColors))
     }
 
+    /** Diagnostics & Improvements returns to Privacy & Security, which returns home. */
+    @Test
+    fun diagnosticsReturnsToPrivacySecurity() {
+        assertEquals(SettingsDetail.DevicePrivacy, settingsDetailParent(SettingsDetail.DiagnosticsImprovements))
+        assertNull(settingsDetailParent(SettingsDetail.DevicePrivacy))
+    }
+
     @Test
     fun topLevelDetailsReturnToHome() {
         listOf(

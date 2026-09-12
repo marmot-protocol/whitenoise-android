@@ -569,6 +569,19 @@
     <string name="export_audit_logs_confirm_action" translatable="false">Choose recipient</string>
     <string name="delete_audit_logs">Delete audit logs</string>
     <string name="delete_audit_logs_subtitle">Remove all local forensic audit files. Logging continues on a fresh file if it\'s still on.</string>
+    <string name="device_protection">Device protection</string>
+    <string name="incognito_keyboard_detail">Ask your keyboard not to learn from what you type in White Noise. Your keyboard may ignore this request.</string>
+    <string name="require_device_authentication">Require device authentication</string>
+    <string name="app_lock_enabled_detail">Use the device screen lock when returning to White Noise.</string>
+    <string name="app_lock_setup_detail">Set a device screen lock first.</string>
+    <string name="open_android_security_settings">Open Android security settings</string>
+    <string name="auto_lock">Auto-lock</string>
+    <string name="diagnostics_improvements">Diagnostics &amp; Improvements</string>
+    <string name="diagnostics_controls_detail">Control optional usage sharing and technical logs for this device.</string>
+    <string name="stored_audit_logs">Stored audit logs</string>
+    <string name="diagnostics_summary_on">On</string>
+    <string name="diagnostics_summary_usage">Usage</string>
+    <string name="diagnostics_summary_logs">Logs</string>
     <string name="developer">Developer</string>
     <string name="developer_mode">Developer mode</string>
     <string name="developer_mode_subtitle">Shows diagnostics and MLS internals.</string>
