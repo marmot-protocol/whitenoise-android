@@ -2033,4 +2033,6 @@
     <string name="developer_work_status">%1$s: %2$s</string>
     <string name="developer_package_id">Paket kimliği</string>
     <string name="developer_package_source">Kaynak</string>
+    <string name="app_unlock">Kilidi aç</string>
+    <string name="app_unlock_checking">Uygulama koruması kontrol ediliyor…</string>
 </resources>

@@ -2097,4 +2097,6 @@
     <string name="developer_work_status">%1$s: %2$s</string>
     <string name="developer_package_id">ID пакета</string>
     <string name="developer_package_source">Источник</string>
+    <string name="app_unlock">Разблокировать</string>
+    <string name="app_unlock_checking">Проверка защиты приложения…</string>
 </resources>

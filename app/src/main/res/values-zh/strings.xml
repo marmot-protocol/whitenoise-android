@@ -2008,4 +2008,6 @@
     <string name="developer_work_status">%1$s: %2$s</string>
     <string name="developer_package_id">密钥包 ID</string>
     <string name="developer_package_source">来源</string>
+    <string name="app_unlock">解锁</string>
+    <string name="app_unlock_checking">正在检查应用程序保护…</string>
 </resources>

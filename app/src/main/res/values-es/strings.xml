@@ -2035,4 +2035,6 @@
     <string name="developer_work_status">%1$s: %2$s</string>
     <string name="developer_package_id">ID del paquete</string>
     <string name="developer_package_source">Origen</string>
+    <string name="app_unlock">Desbloquear</string>
+    <string name="app_unlock_checking">Comprobando la protección de la aplicación…</string>
 </resources>
