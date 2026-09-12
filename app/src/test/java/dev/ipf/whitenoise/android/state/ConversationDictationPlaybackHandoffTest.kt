@@ -85,6 +85,44 @@ class ConversationDictationPlaybackHandoffTest {
         assertEquals(listOf(voice), resumed)
     }
 
+    /** Capture close restores both exact players before drain work and cannot restore replacements later. */
+    @Test
+    fun captureCloseRestoresExactTtsAndVoiceBeforeDrainCompletes() {
+        var tts: TtsState = speakingTts(7L)
+        var generation = 0L
+        val originalVoice = pausedVoice("clip-a")
+        val replacementVoice = pausedVoice("clip-a")
+        var currentVoiceToken: Any = originalVoice.playerToken
+        val events = mutableListOf<String>()
+        val handoff =
+            handoff(
+                ttsState = { tts },
+                ttsGeneration = { generation },
+                pauseTts = {
+                    generation += 1
+                    tts = pausedTts(7L)
+                },
+                resumeTts = { events += "tts-resume" },
+                pauseVoice = { originalVoice },
+                resumeVoice = { interrupted ->
+                    (interrupted.playerToken === currentVoiceToken).also { accepted ->
+                        if (accepted) events += "voice-resume"
+                    }
+                },
+            )
+
+        handoff.pauseActivePlayback()
+        handoff.resumeInterruptedPlayback()
+        events += "drain-complete"
+
+        generation += 1
+        tts = pausedTts(8L)
+        currentVoiceToken = replacementVoice.playerToken
+        handoff.resumeInterruptedPlayback()
+
+        assertEquals(listOf("tts-resume", "voice-resume", "drain-complete"), events)
+    }
+
     /** Verifies a replacement voice player cannot claim an earlier interruption token. */
     @Test
     fun sameKeyReplacementReceivesOnlyTheOriginalPlayerToken() {
