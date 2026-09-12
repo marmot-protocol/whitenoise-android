@@ -1658,10 +1658,10 @@
     <string name="chat_bubble_colors_chat_subtitle">Override bubble colors only for this conversation. Reset to inherit the Appearance defaults.</string>
     <string name="bubble_color_preview">Preview</string>
     <string name="bubble_color_current_theme">Current theme: %1$s</string>
-    <string name="bubble_my_messages">My messages</string>
+    <string name="bubble_my_messages">Your messages</string>
     <string name="bubble_other_messages">Other messages</string>
-    <string name="bubble_preview_other">Hello — this is how replies look.</string>
-    <string name="bubble_preview_mine">Looks good to me.</string>
+    <string name="bubble_preview_other">Their message</string>
+    <string name="bubble_preview_mine">Your message</string>
     <string name="bubble_color_swatch_content_description">Bubble color %1$s</string>
     <string name="more_colors">More colors</string>
     <string name="custom_hex_color">Custom hex color</string>
@@ -1671,6 +1671,18 @@
     <string name="color_picker_saturation">Saturation</string>
     <string name="color_picker_brightness">Brightness</string>
     <string name="reset_to_default">Reset to default</string>
+    <string name="color_preview_action">Action</string>
+    <string name="color_swatch_description">Color %1$s</string>
+    <string name="color_hue">Hue: %1$d°</string>
+    <string name="color_saturation">Saturation: %1$d%%</string>
+    <string name="color_brightness">Brightness: %1$d%%</string>
+    <string name="color_hex">Hex color</string>
+    <string name="color_hex_error">Enter six hexadecimal digits, such as #1D4ED8.</string>
+    <string name="action_color_detail">Choose the action accent for the %1$s theme. Backgrounds and neutral surfaces stay unchanged.</string>
+    <string name="chat_bubble_colors_global_detail">Choose default message colors for the %1$s theme.</string>
+    <string name="chat_bubble_colors_chat_detail">Override this chat in every theme. Reset to use the current %1$s theme defaults.</string>
+    <string name="more_options">More options</string>
+    <string name="reset_to_global_colors">Reset to global colors</string>
 
     <string name="tts_warning_title">External text-to-speech engine</string>
     <string name="tts_warning_message">The selected text-to-speech engine is a separate app that may send decrypted message text to its developer\'s servers. For on-device speech, install RHVoice or eSpeak NG from F-Droid or Zapstore and choose it in Settings.</string>

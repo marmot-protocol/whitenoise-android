@@ -1,75 +1,48 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.annotation.StringRes
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material3.Button
-import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
-import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
-import dev.ipf.whitenoise.android.state.OPAQUE_WHITE_ARGB
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.isBlueFreeAccentVisible
-import dev.ipf.whitenoise.android.state.parseOpaqueColorHex
-import dev.ipf.whitenoise.android.state.readableBlueFreeTextArgb
-import dev.ipf.whitenoise.android.state.readableTextArgb
-import dev.ipf.whitenoise.android.state.tonalBubbleColorPresets
-import dev.ipf.whitenoise.android.state.withoutBlueChannel
-import dev.ipf.whitenoise.android.ui.common.SettingsGroup
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.conversation.messages.BubblePresentationTokens
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
-import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
 import dev.ipf.whitenoise.android.ui.conversation.messages.resolveBubblePresentationArgb
-import java.util.Locale
+import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
-private const val BUBBLE_COLOR_RGB_MASK = 0xFFFFFFL
-
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Chat bubble colour editor for the account's theme defaults or, with [groupIdHex], one conversation's override.
+ * Both sides are drafted locally, previewed in the pinned header and written together on Save.
+ */
+@Suppress("FunctionNaming")
 @Composable
 internal fun ChatBubbleColorsScreen(
     appState: WhiteNoiseAppState,
@@ -77,358 +50,266 @@ internal fun ChatBubbleColorsScreen(
     groupIdHex: String? = null,
 ) {
     val bubbleTheme = BubbleTheme.resolve(appState.themeMode, isSystemInDarkTheme())
+    if (bubbleTheme == BubbleTheme.Amoled) {
+        OutlineColorNotice(stringResource(R.string.chat_bubble_colors), onBack)
+        return
+    }
     val accountScope = appState.activeAccountRef?.trim()?.takeIf(String::isNotEmpty) ?: "none"
-    val pickerScopeKey =
-        groupIdHex?.let { "account:$accountScope:chat:$it" }
-            ?: "account:$accountScope:global"
-    val scopeSubtitle =
-        stringResource(
-            if (groupIdHex == null) {
-                R.string.chat_bubble_colors_global_subtitle
-            } else {
-                R.string.chat_bubble_colors_chat_subtitle
+    val global =
+        BubbleColorPair(
+            mine = appState.globalBubbleColorArgb(bubbleTheme, BubbleSide.Mine),
+            other = appState.globalBubbleColorArgb(bubbleTheme, BubbleSide.Other),
+        )
+    val initial =
+        if (groupIdHex == null) {
+            global
+        } else {
+            BubbleColorPair(
+                mine = appState.chatBubbleColorArgb(groupIdHex, BubbleSide.Mine),
+                other = appState.chatBubbleColorArgb(groupIdHex, BubbleSide.Other),
+            )
+        }
+    val inherited = if (groupIdHex == null) BubbleColorPair(null, null) else global
+    // Source changes start a fresh editor; local drafts never mutate these inputs.
+    key(accountScope, groupIdHex, bubbleTheme, initial, inherited) {
+        ChatBubbleColorEditor(
+            perChat = groupIdHex != null,
+            theme = bubbleTheme,
+            source = BubbleColorSource(initial, inherited),
+            onBack = onBack,
+            onSave = { pair ->
+                if (groupIdHex == null) {
+                    appState.updateGlobalBubbleColor(bubbleTheme, BubbleSide.Mine, pair.mine)
+                    appState.updateGlobalBubbleColor(bubbleTheme, BubbleSide.Other, pair.other)
+                } else {
+                    appState.updateChatBubbleColor(groupIdHex, BubbleSide.Mine, pair.mine)
+                    appState.updateChatBubbleColor(groupIdHex, BubbleSide.Other, pair.other)
+                }
             },
         )
-
-    fun selectedColor(side: BubbleSide): Long? =
-        if (groupIdHex == null) {
-            appState.globalBubbleColorArgb(bubbleTheme, side)
-        } else {
-            appState.chatBubbleColorArgb(groupIdHex, side)
-        }
-
-    fun effectiveColor(side: BubbleSide): Long? =
-        if (groupIdHex == null) {
-            appState.globalBubbleColorArgb(bubbleTheme, side)
-        } else {
-            appState.effectiveBubbleColorArgb(bubbleTheme, side, groupIdHex)
-        }
-
-    fun updateColor(
-        side: BubbleSide,
-        argb: Long?,
-    ) {
-        if (groupIdHex == null) {
-            appState.updateGlobalBubbleColor(bubbleTheme, side, argb)
-        } else {
-            appState.updateChatBubbleColor(groupIdHex, side, argb)
-        }
     }
+}
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.chat_bubble_colors)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-            )
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
+@Composable
+private fun ChatBubbleColorEditor(
+    perChat: Boolean,
+    theme: BubbleTheme,
+    source: BubbleColorSource,
+    onBack: () -> Unit,
+    onSave: (BubbleColorPair) -> Unit,
+) {
+    val (initial, inherited) = source
+    var mine by rememberSaveable { mutableStateOf(initial.mine) }
+    var other by rememberSaveable { mutableStateOf(initial.other) }
+    var reset by rememberSaveable { mutableStateOf(false) }
+    var resetRevision by rememberSaveable { mutableIntStateOf(0) }
+    var mineValid by rememberSaveable { mutableStateOf(true) }
+    var otherValid by rememberSaveable { mutableStateOf(true) }
+    var menuOpen by remember { mutableStateOf(false) }
+    val mineSelected = (if (reset) null else initial.mine) ?: inherited.mine
+    val otherSelected = (if (reset) null else initial.other) ?: inherited.other
+    val canReset = mine != null || other != null || !mineValid || !otherValid
+    val changed = mine != initial.mine || other != initial.other
+    val defaults = defaultBubbleColors()
+    SettingsScaffold(
+        title = stringResource(R.string.chat_bubble_colors),
+        onBack = onBack,
+        topBarActions = {
+            Box {
+                IconButton(onClick = { menuOpen = true }, modifier = Modifier.testTag("bubble_colors.menu")) {
+                    Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.more_options))
+                }
+                WhiteNoiseDropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { menuOpen = false },
+                    items =
+                        listOf(
+                            WhiteNoiseMenuItem(
+                                label =
+                                    stringResource(
+                                        if (perChat) R.string.reset_to_global_colors else R.string.reset_to_default,
+                                    ),
+                                enabled = canReset,
+                                onClick = {
+                                    mine = null
+                                    other = null
+                                    mineValid = true
+                                    otherValid = true
+                                    reset = true
+                                    resetRevision++
+                                },
+                            ),
+                        ),
+                )
+            }
         },
-    ) { padding ->
-        LazyColumn(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item {
-                Text(scopeSubtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            item {
-                SettingsGroup(title = stringResource(R.string.bubble_color_preview)) {
-                    item {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(
-                                stringResource(R.string.bubble_color_current_theme, stringResource(bubbleTheme.labelRes)),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            BubbleColorPreview(
-                                mineOverrideArgb = effectiveColor(BubbleSide.Mine),
-                                otherOverrideArgb = effectiveColor(BubbleSide.Other),
-                                amoled = bubbleTheme == BubbleTheme.Amoled,
-                            )
-                        }
-                    }
-                }
-            }
-            item {
-                SettingsGroup(title = stringResource(R.string.bubble_my_messages)) {
-                    item {
-                        Column(Modifier.padding(16.dp)) {
-                            TonalSwatchPicker(
-                                selectedArgb = selectedColor(BubbleSide.Mine),
-                                onColorSelected = { updateColor(BubbleSide.Mine, it) },
-                                scopeKey = pickerScopeKey,
-                                theme = bubbleTheme,
-                                slotKey = BubbleSide.Mine.name,
-                            )
-                        }
-                    }
-                }
-            }
-            item {
-                SettingsGroup(title = stringResource(R.string.bubble_other_messages)) {
-                    item {
-                        Column(Modifier.padding(16.dp)) {
-                            TonalSwatchPicker(
-                                selectedArgb = selectedColor(BubbleSide.Other),
-                                onColorSelected = { updateColor(BubbleSide.Other, it) },
-                                scopeKey = pickerScopeKey,
-                                theme = bubbleTheme,
-                                slotKey = BubbleSide.Other.name,
-                            )
-                        }
-                    }
-                }
-            }
-            item {
-                TextButton(
+        bottomBar = {
+            SettingsBottomAction {
+                WhiteNoiseButton(
                     onClick = {
-                        updateColor(BubbleSide.Mine, null)
-                        updateColor(BubbleSide.Other, null)
+                        onSave(BubbleColorPair(mine, other))
+                        onBack()
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.reset_to_default))
+                    enabled = changed && mineValid && otherValid,
+                    modifier = Modifier.fillMaxWidth().testTag("bubble_colors.save"),
+                ) { Text(stringResource(R.string.save)) }
+            }
+        },
+    ) {
+        SettingsList {
+            stickyHeader {
+                Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                    SettingsGroup {
+                        row("preview") { context ->
+                            SettingsGroupPanel(context) {
+                                BubblePreview(
+                                    mineArgb = mine ?: inherited.mine,
+                                    otherArgb = other ?: inherited.other,
+                                    modifier = Modifier.padding(16.dp),
+                                )
+                            }
+                        }
+                    }
                 }
+            }
+            item { SettingsSection(stringResource(R.string.bubble_my_messages)) }
+            item {
+                SettingsGroup {
+                    row("mine") { context ->
+                        SettingsGroupPanel(context) {
+                            key(resetRevision) {
+                                FullSpectrumColorPicker(
+                                    selectedArgb = mineSelected,
+                                    fallbackArgb = defaults.mine,
+                                    onColorSelected = { mine = it },
+                                    onValidityChanged = { mineValid = it },
+                                    modifier = Modifier.padding(16.dp).testTag("bubble_colors.mine.picker"),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            item { SettingsSection(stringResource(R.string.bubble_other_messages)) }
+            item {
+                SettingsGroup {
+                    row("other") { context ->
+                        SettingsGroupPanel(context) {
+                            key(resetRevision) {
+                                FullSpectrumColorPicker(
+                                    selectedArgb = otherSelected,
+                                    fallbackArgb = defaults.other,
+                                    onColorSelected = { other = it },
+                                    onValidityChanged = { otherValid = it },
+                                    modifier = Modifier.padding(16.dp).testTag("bubble_colors.other.picker"),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            item {
+                SettingsExplainer(
+                    stringResource(
+                        if (perChat) {
+                            R.string.chat_bubble_colors_chat_detail
+                        } else {
+                            R.string.chat_bubble_colors_global_detail
+                        },
+                        stringResource(theme.labelRes),
+                    ),
+                )
             }
         }
     }
 }
 
-private val BubbleTheme.labelRes: Int
-    get() =
-        when (this) {
-            BubbleTheme.Light -> R.string.theme_light
-            BubbleTheme.Dark -> R.string.theme_dark
-            BubbleTheme.Amoled -> R.string.theme_amoled
-        }
-
+/** Received bubble at the start, then the sent bubble at the end, coloured exactly as a real chat would. */
+@Suppress("FunctionNaming")
 @Composable
-private fun BubbleColorPreview(
-    mineOverrideArgb: Long?,
-    otherOverrideArgb: Long?,
-    amoled: Boolean,
+private fun BubblePreview(
+    mineArgb: Long?,
+    otherArgb: Long?,
+    modifier: Modifier = Modifier,
 ) {
-    val scheme = MaterialTheme.colorScheme
-    val tokens =
-        BubblePresentationTokens(
-            errorBackgroundArgb = scheme.errorContainer.toArgb().toLong() and 0xFFFFFFFFL,
-            errorContentArgb = scheme.onErrorContainer.toArgb().toLong() and 0xFFFFFFFFL,
-            surfaceBackgroundArgb = scheme.surfaceVariant.toArgb().toLong() and 0xFFFFFFFFL,
-            surfaceContentArgb = scheme.onSurfaceVariant.toArgb().toLong() and 0xFFFFFFFFL,
-            mineBackgroundArgb = scheme.primaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
-            mineContentArgb = scheme.onPrimaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
-            mentionAccentArgb = scheme.primary.toArgb().toLong() and 0xFFFFFFFFL,
-        )
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        PreviewBubble(
-            text = stringResource(R.string.bubble_preview_mine),
-            mine = true,
-            presentation = resolveBubblePresentationArgb(false, amoled, true, mineOverrideArgb, tokens),
-        )
+    val tokens = previewBubbleTokens()
+    val other = resolveBubblePresentationArgb(deleted = false, amoled = false, mine = false, otherArgb, tokens)
+    val mine = resolveBubblePresentationArgb(deleted = false, amoled = false, mine = true, mineArgb, tokens)
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         PreviewBubble(
             text = stringResource(R.string.bubble_preview_other),
-            mine = false,
-            presentation = resolveBubblePresentationArgb(false, amoled, false, otherOverrideArgb, tokens),
+            container = colorFromArgb(other.backgroundArgb),
+            content = colorFromArgb(other.contentArgb),
+            modifier = Modifier.align(Alignment.Start).testTag("bubble_colors.other.preview"),
+        )
+        PreviewBubble(
+            text = stringResource(R.string.bubble_preview_mine),
+            container = colorFromArgb(mine.backgroundArgb),
+            content = colorFromArgb(mine.contentArgb),
+            modifier = Modifier.align(Alignment.End).testTag("bubble_colors.mine.preview"),
         )
     }
 }
 
+@Suppress("FunctionNaming")
 @Composable
 private fun PreviewBubble(
     text: String,
-    mine: Boolean,
-    presentation: dev.ipf.whitenoise.android.ui.conversation.messages.BubblePresentation,
+    container: Color,
+    content: Color,
+    modifier: Modifier,
 ) {
-    Box(Modifier.fillMaxWidth()) {
-        Surface(
-            modifier = Modifier.align(if (mine) Alignment.CenterEnd else Alignment.CenterStart),
-            color = colorFromArgb(presentation.backgroundArgb),
-            contentColor = colorFromArgb(presentation.contentArgb),
-            shape = RoundedCornerShape(18.dp),
-            border =
-                messageBubbleBorder(
-                    highlighted = false,
-                    mine = mine,
-                    customArgb = presentation.borderOverrideArgb,
-                ),
-        ) {
-            Text(text, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
-        }
+    Surface(
+        modifier = modifier,
+        color = container,
+        contentColor = content,
+        border = amoledOutlineBorder(),
+        shape = MaterialTheme.shapes.large,
+    ) {
+        Text(text, Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
     }
 }
 
+/** The theme roles a real message bubble resolves against, so the preview and the chat agree. */
 @Composable
-internal fun TonalSwatchPicker(
-    selectedArgb: Long?,
-    onColorSelected: (Long) -> Unit,
-    scopeKey: String,
-    theme: BubbleTheme,
-    slotKey: String,
-    @StringRes swatchContentDescriptionRes: Int = R.string.bubble_color_swatch_content_description,
-) {
+private fun previewBubbleTokens(): BubblePresentationTokens {
     val scheme = MaterialTheme.colorScheme
-    val blueFree = theme == BubbleTheme.Amoled
-
-    fun displayArgb(argb: Long): Long = if (blueFree) argb.withoutBlueChannel() else argb
-
-    val readableContentArgb: (Long) -> Long? =
-        if (blueFree) ::readableBlueFreeTextArgb else ::readableTextArgb
-
-    fun isSelectable(argb: Long): Boolean = !blueFree || argb.isBlueFreeAccentVisible()
-
-    val displayedSelectedArgb = selectedArgb?.let(::displayArgb)?.takeIf(::isSelectable)
-    val presets =
-        remember(theme) {
-            tonalBubbleColorPresets()
-                .map(::displayArgb)
-                .filter(::isSelectable)
-                .distinct()
-        }
-    var customExpanded by rememberSaveable(scopeKey, theme, slotKey) { mutableStateOf(false) }
-    var customHex by rememberSaveable(scopeKey, theme, slotKey, selectedArgb) {
-        mutableStateOf(displayedSelectedArgb?.let { "#%06X".format(Locale.ROOT, it and BUBBLE_COLOR_RGB_MASK) } ?: "")
-    }
-    val parsedCustom = parseOpaqueColorHex(customHex)
-    val contrastSafeCustom =
-        parsedCustom
-            ?.let(::displayArgb)
-            ?.takeIf(::isSelectable)
-            ?.takeIf { readableContentArgb(it) != null }
-    val moreColorsDescription = stringResource(R.string.more_colors)
-
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            presets.forEach { argb ->
-                val selected = displayedSelectedArgb == argb
-                val swatchDescription =
-                    stringResource(
-                        swatchContentDescriptionRes,
-                        "#%06X".format(Locale.ROOT, argb and BUBBLE_COLOR_RGB_MASK),
-                    )
-                Box(
-                    Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .border(
-                            width = if (selected) 3.dp else 1.dp,
-                            color = swatchBorderColor(argb, selected, scheme),
-                            shape = CircleShape,
-                        ).clickable { onColorSelected(displayArgb(argb)) }
-                        .semantics {
-                            role = Role.RadioButton
-                            this.selected = selected
-                            contentDescription = swatchDescription
-                        },
-                ) {
-                    Surface(
-                        color = colorFromArgb(argb),
-                        shape = CircleShape,
-                        modifier = Modifier.matchParentSize().padding(if (selected) 5.dp else 3.dp),
-                    ) {}
-                }
-            }
-            val customSelected = displayedSelectedArgb != null && displayedSelectedArgb !in presets
-            val customContentArgb =
-                if (customSelected && displayedSelectedArgb != null) {
-                    readableContentArgb(displayedSelectedArgb)
-                } else {
-                    null
-                }
-            Box(
-                Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .border(
-                        width = if (customSelected) 3.dp else 1.dp,
-                        color = if (customSelected) scheme.onSurface else scheme.outline,
-                        shape = CircleShape,
-                    ).clickable { customExpanded = !customExpanded }
-                    .semantics {
-                        role = Role.Button
-                        selected = customSelected
-                        contentDescription = moreColorsDescription
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Surface(
-                    color =
-                        displayedSelectedArgb
-                            ?.takeIf { customSelected }
-                            ?.let(::colorFromArgb)
-                            ?: scheme.surface,
-                    contentColor = customContentArgb?.let(::colorFromArgb) ?: scheme.onSurface,
-                    shape = CircleShape,
-                    modifier = Modifier.matchParentSize().padding(if (customSelected) 5.dp else 3.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Palette, contentDescription = null, modifier = Modifier.size(22.dp))
-                    }
-                }
-            }
-        }
-        if (customExpanded) {
-            val pickerArgb =
-                parsedCustom?.let(::displayArgb)
-                    ?: displayedSelectedArgb
-                    ?: presets.firstOrNull()
-                    ?: scheme.primary.toArgb().toLong()
-            FullSpectrumColorPicker(
-                argb = pickerArgb,
-                blueFree = blueFree,
-                isColorAccepted = { argb ->
-                    val displayedArgb = displayArgb(argb)
-                    isSelectable(displayedArgb) && readableContentArgb(displayedArgb) != null
-                },
-                onColorChanged = { argb ->
-                    val displayedArgb = displayArgb(argb)
-                    customHex = "#%06X".format(Locale.ROOT, displayedArgb and BUBBLE_COLOR_RGB_MASK)
-                    onColorSelected(displayedArgb)
-                },
-            )
-            OutlinedTextField(
-                value = customHex,
-                onValueChange = { customHex = it.take(7) },
-                label = { Text(stringResource(R.string.custom_hex_color)) },
-                placeholder = { Text("#RRGGBB") },
-                singleLine = true,
-                isError = customHex.isNotBlank() && contrastSafeCustom == null,
-                supportingText = {
-                    if (parsedCustom == null && customHex.isNotBlank()) {
-                        Text(stringResource(R.string.invalid_hex_color))
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Button(
-                onClick = { contrastSafeCustom?.let(onColorSelected) },
-                enabled = contrastSafeCustom != null,
-                modifier = Modifier.align(Alignment.End),
-            ) {
-                Text(stringResource(R.string.apply_color))
-            }
-        }
-    }
+    return BubblePresentationTokens(
+        errorBackgroundArgb = scheme.errorContainer.toOpaqueArgb(),
+        errorContentArgb = scheme.onErrorContainer.toOpaqueArgb(),
+        surfaceBackgroundArgb = scheme.surfaceVariant.toOpaqueArgb(),
+        surfaceContentArgb = scheme.onSurfaceVariant.toOpaqueArgb(),
+        mineBackgroundArgb = scheme.primaryContainer.toOpaqueArgb(),
+        mineContentArgb = scheme.onPrimaryContainer.toOpaqueArgb(),
+        mentionAccentArgb = scheme.primary.toOpaqueArgb(),
+    )
 }
 
+/** Where each picker starts when no colour is saved: the theme's own bubble fills. */
 @Composable
-private fun swatchBorderColor(
-    argb: Long,
-    selected: Boolean,
-    scheme: ColorScheme,
-): Color {
-    if (selected) return scheme.onSurface
-    return when (argb) {
-        OPAQUE_BLACK_ARGB, OPAQUE_WHITE_ARGB -> scheme.onSurfaceVariant
-        else -> scheme.outline
-    }
+private fun defaultBubbleColors(): BubbleColorDefaults {
+    val scheme = MaterialTheme.colorScheme
+    return BubbleColorDefaults(
+        mine = scheme.primaryContainer.toOpaqueArgb(),
+        other = scheme.surfaceVariant.toOpaqueArgb(),
+    )
 }
+
+/** One colour per bubble side; null means the side keeps its inherited or default fill. */
+internal data class BubbleColorPair(
+    val mine: Long?,
+    val other: Long?,
+)
+
+/** What an editor starts from: the stored colours and, per chat, the account defaults beneath them. */
+internal data class BubbleColorSource(
+    val initial: BubbleColorPair,
+    val inherited: BubbleColorPair,
+)
+
+/** The theme's own bubble fills, where a picker starts when nothing is saved. */
+private data class BubbleColorDefaults(
+    val mine: Long,
+    val other: Long,
+)

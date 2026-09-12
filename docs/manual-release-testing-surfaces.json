@@ -4138,25 +4138,25 @@
         ]
       },
       {
-        "surface": "ActionColorContent",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
-        "anchor": "fun ActionColorContent(",
-        "test_ids": [
-          "SET-004"
-        ]
-      },
-      {
-        "surface": "ActionColorPreview",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
-        "anchor": "fun ActionColorPreview(",
-        "test_ids": [
-          "SET-004"
-        ]
-      },
-      {
         "surface": "ActionColorScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
         "anchor": "fun ActionColorScreen(",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "ActionColorEditor",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "fun ActionColorEditor(",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "OutlineColorNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "fun OutlineColorNotice(",
         "test_ids": [
           "SET-004"
         ]
@@ -4274,19 +4274,11 @@
         ]
       },
       {
-        "surface": "BubbleColorPreview",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
-        "anchor": "fun BubbleColorPreview(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
         "surface": "ChatBubbleColorsScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
         "anchor": "fun ChatBubbleColorsScreen(",
         "test_ids": [
-          "SET-001"
+          "SET-005"
         ]
       },
       {
@@ -4294,15 +4286,23 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
         "anchor": "fun PreviewBubble(",
         "test_ids": [
-          "SET-001"
+          "SET-005"
         ]
       },
       {
-        "surface": "TonalSwatchPicker",
+        "surface": "ChatBubbleColorEditor",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
-        "anchor": "fun TonalSwatchPicker(",
+        "anchor": "fun ChatBubbleColorEditor(",
         "test_ids": [
-          "SET-001"
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "BubblePreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "fun BubblePreview(",
+        "test_ids": [
+          "SET-005"
         ]
       },
       {
@@ -4501,19 +4501,39 @@
         ]
       },
       {
-        "surface": "ColorChannel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
-        "anchor": "fun ColorChannel(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
         "surface": "FullSpectrumColorPicker",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
         "anchor": "fun FullSpectrumColorPicker(",
         "test_ids": [
-          "SET-001"
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "ColorPresetRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "fun ColorPresetRow(",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "ColorSwatch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "fun ColorSwatch(",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "ColorSlider",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "fun ColorSlider(",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
         ]
       },
       {
@@ -5615,6 +5635,24 @@
         ]
       },
       {
+        "surface": "SettingsBottomAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "fun SettingsBottomAction(",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "SettingsGroupPanel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "fun SettingsGroupPanel(",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
         "surface": "WhiteNoiseScaffold",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScaffold.kt",
         "anchor": "fun WhiteNoiseScaffold(",
@@ -6021,6 +6059,14 @@
         "anchor": "fun WhiteNoiseCallout(",
         "test_ids": [
           "SET-001"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseDropdownMenu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseMenus.kt",
+        "anchor": "fun WhiteNoiseDropdownMenu(",
+        "test_ids": [
+          "SET-005"
         ]
       }
     ],
@@ -6982,6 +7028,78 @@
         ]
       },
       {
+        "surface": "string:action_color_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.action_color_detail",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "string:action_color_no_active_account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.action_color_no_active_account",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "string:appearance_outline_colors_fixed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.appearance_outline_colors_fixed",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "string:color_preview_action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.color_preview_action",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "string:reset_to_default",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.reset_to_default",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "string:save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.save",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "string:theme_amoled",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.theme_amoled",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "string:theme_dark",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.theme_dark",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "string:theme_light",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.theme_light",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
         "surface": "setting:ai_agents_about_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
         "anchor": "R.string.ai_agents_about_title",
@@ -7258,14 +7376,6 @@
         ]
       },
       {
-        "surface": "setting:bubble_color_preview",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
-        "anchor": "R.string.bubble_color_preview",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
         "surface": "setting:bubble_my_messages",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
         "anchor": "R.string.bubble_my_messages",
@@ -7279,6 +7389,78 @@
         "anchor": "R.string.bubble_other_messages",
         "test_ids": [
           "SET-001"
+        ]
+      },
+      {
+        "surface": "string:bubble_preview_mine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.bubble_preview_mine",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:bubble_preview_other",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.bubble_preview_other",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:chat_bubble_colors",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.chat_bubble_colors",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:chat_bubble_colors_chat_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.chat_bubble_colors_chat_detail",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:chat_bubble_colors_global_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.chat_bubble_colors_global_detail",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:more_options",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.more_options",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:reset_to_default",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.reset_to_default",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:reset_to_global_colors",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.reset_to_global_colors",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.save",
+        "test_ids": [
+          "SET-005"
         ]
       },
       {
@@ -9123,6 +9305,60 @@
         "test_ids": [
           "SET-001",
           "NAV-004"
+        ]
+      },
+      {
+        "surface": "string:color_brightness",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "R.string.color_brightness",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:color_hex",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "R.string.color_hex",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:color_hex_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "R.string.color_hex_error",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:color_hue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "R.string.color_hue",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:color_saturation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "R.string.color_saturation",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:color_swatch_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "R.string.color_swatch_description",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
         ]
       }
     ],

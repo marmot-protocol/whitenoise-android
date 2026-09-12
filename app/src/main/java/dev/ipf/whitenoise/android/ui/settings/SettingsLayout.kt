@@ -4,11 +4,14 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,7 +19,9 @@ import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -29,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
@@ -201,3 +207,47 @@ internal fun SettingsCallout(
         leading = leading,
     )
 }
+
+/** Pinned action area above the navigation bar and keyboard; a Save button lives here. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun SettingsBottomAction(
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.surface,
+    tonalElevation: Dp = SettingsBottomActionElevation,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(modifier = modifier, color = color, tonalElevation = tonalElevation) {
+        AdaptiveContent {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .imePadding()
+                        .padding(WhiteNoiseSpacing.PinnedActionInset),
+                content = content,
+            )
+        }
+    }
+}
+
+/** Free-form content that occupies one group position: the group's shape and fill, no list-item semantics. */
+@Suppress("FunctionNaming")
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun SettingsGroupPanel(
+    context: SettingsRowContext,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        color = context.containerColor,
+        shape = context.shapes.shape,
+        modifier = modifier.fillMaxWidth().settingsRowBorder(context, editable = true),
+    ) {
+        Column(Modifier.fillMaxWidth(), content = content)
+    }
+}
+
+private val SettingsBottomActionElevation = 2.dp

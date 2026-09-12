@@ -1474,10 +1474,10 @@
     <string name="chat_bubble_colors_chat_subtitle">Balon renklerini yalnızca bu konuşma için değiştirin. Görünüm varsayılanlarını devralmak için sıfırlayın.</string>
     <string name="bubble_color_preview">Önizleme</string>
     <string name="bubble_color_current_theme">Geçerli tema: %1$s</string>
-    <string name="bubble_my_messages">Mesajlarım</string>
+    <string name="bubble_my_messages">Mesajlarınız</string>
     <string name="bubble_other_messages">Diğer mesajlar</string>
-    <string name="bubble_preview_other">Merhaba — yanıtlar böyle görünür.</string>
-    <string name="bubble_preview_mine">Bence güzel.</string>
+    <string name="bubble_preview_other">Onların mesajı</string>
+    <string name="bubble_preview_mine">Mesajınız</string>
     <string name="bubble_color_swatch_content_description">Balon rengi %1$s</string>
     <string name="more_colors">Daha fazla renk</string>
     <string name="custom_hex_color">Özel onaltılık renk</string>
@@ -1487,6 +1487,18 @@
     <string name="color_picker_saturation">Doygunluk</string>
     <string name="color_picker_brightness">Parlaklık</string>
     <string name="reset_to_default">Varsayılana sıfırla</string>
+    <string name="color_preview_action">Eylem</string>
+    <string name="color_swatch_description">Renk %1$s</string>
+    <string name="color_hue">Renk tonu: %1$d°</string>
+    <string name="color_saturation">Doygunluk: %1$d%%</string>
+    <string name="color_brightness">Parlaklık: %1$d%%</string>
+    <string name="color_hex">Altıgen renk</string>
+    <string name="color_hex_error">#1D4ED8 gibi altı onaltılık rakam girin.</string>
+    <string name="action_color_detail">%1$s teması için eylem vurgusunu seçin. Arka planlar ve nötr yüzeyler değişmeden kalır.</string>
+    <string name="chat_bubble_colors_global_detail">%1$s teması için varsayılan mesaj renklerini seçin.</string>
+    <string name="chat_bubble_colors_chat_detail">Bu sohbeti her temada geçersiz kılın. Geçerli %1$s tema varsayılanlarını kullanmak için sıfırlayın.</string>
+    <string name="more_options">Daha fazla seçenek</string>
+    <string name="reset_to_global_colors">Genel renklere sıfırla</string>
 
     <string name="tts_warning_title">Harici metin okuma motoru</string>
     <string name="tts_warning_message">Seçilen metin okuma motoru, şifresi çözülmüş mesaj metnini geliştiricisinin sunucularına gönderebilen ayrı bir uygulamadır. Cihaz üzerinde konuşma için F-Droid veya Zapstore\'dan RHVoice veya eSpeak NG yükleyin ve Ayarlar\'dan seçin.</string>

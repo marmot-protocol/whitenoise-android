@@ -1162,6 +1162,8 @@ class LocalizationResourceTest {
                         "media_counted_format",
                         // "Audio" is the standard Spanish media-type term.
                         "attachment_type_audio",
+                        // "Color" is also the Spanish word for colour.
+                        "color_swatch_description",
                     ),
                 "values-fr" to
                     setOf(
@@ -1186,6 +1188,8 @@ class LocalizationResourceTest {
                         "attachment_type_image",
                         // "Photos" is the standard French label.
                         "group_image_source_photos",
+                        // "Action" is also the French word for action.
+                        "color_preview_action",
                     ),
                 "values-it" to
                     setOf(

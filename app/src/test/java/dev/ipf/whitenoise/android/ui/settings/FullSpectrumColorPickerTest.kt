@@ -1,33 +1,19 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.click
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.pressKey
-import androidx.compose.ui.test.swipe
-import androidx.test.core.app.ApplicationProvider
-import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.BubbleSide
-import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -35,300 +21,96 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+/** Contract of the colour editor's controls: presets, sliders and the hex field all agree on one colour. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h1200dp-mdpi")
 class FullSpectrumColorPickerTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+    private var latest: Long? = null
+    private val validity = mutableListOf<Boolean>()
 
-    private fun string(resId: Int): String = context.getString(resId)
-
+    /** A preset swatch reports its colour, marks itself selected and rewrites the hex field. */
     @Test
-    fun hueSemanticsUpdatesColorWithoutTouch() {
-        var latest = 0xFFFF0000L
-        setPickerContent(initialArgb = latest) { latest = it }
+    fun presetSwatchSelectsAndFillsHex() {
+        setPicker(0xFFFF0000L)
+        composeRule.onNodeWithContentDescription("Color #1D4ED8").performClick()
+        composeRule.runOnIdle {
+            assertEquals(0xFF1D4ED8L, latest)
+            assertEquals(listOf(true), validity)
+        }
+        composeRule.onNodeWithContentDescription("Color #1D4ED8").assertIsSelected()
+        composeRule.onNodeWithTag("color.hex").assertTextContains("#1D4ED8")
+    }
 
-        composeRule
-            .onNodeWithContentDescription(string(R.string.color_picker_hue))
-            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
-                assertTrue(setProgress(120f))
-            }
-
+    /** Hue, saturation and brightness drive the colour without touch and label their current values. */
+    @Test
+    fun slidersDriveTheColour() {
+        setPicker(0xFFFF0000L)
+        setProgress("color.hue", 120f)
         composeRule.runOnIdle { assertEquals(0xFF00FF00L, latest) }
-    }
-
-    @Test
-    fun hueKeyboardInputUpdatesColor() {
-        var latest = 0xFFFF0000L
-        setPickerContent(initialArgb = latest) { latest = it }
-
-        composeRule
-            .onNodeWithContentDescription(string(R.string.color_picker_hue))
-            .performSemanticsAction(SemanticsActions.RequestFocus)
-        composeRule
-            .onNodeWithContentDescription(string(R.string.color_picker_hue))
-            .performKeyInput { pressKey(Key.DirectionRight) }
-
-        composeRule.runOnIdle { assertEquals(0xFFFF0400L, latest) }
-    }
-
-    @Test
-    fun hueSemanticsReportsDisplayedValue() {
-        setPickerContent(initialArgb = 0xFF00FF00L, onColorChanged = {})
-
-        val stateDescription =
-            composeRule
-                .onNodeWithContentDescription(string(R.string.color_picker_hue))
-                .fetchSemanticsNode()
-                .config[SemanticsProperties.StateDescription]
-
-        assertEquals("120°", stateDescription)
-    }
-
-    @Test
-    fun saturationSemanticsUpdatesColorWithoutTouch() {
-        var latest = 0xFFFF0000L
-        setPickerContent(initialArgb = latest) { latest = it }
-
-        composeRule
-            .onNodeWithContentDescription(string(R.string.color_picker_saturation))
-            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
-                assertTrue(setProgress(0f))
-            }
-
+        composeRule.onNodeWithContentDescription("Hue: 120°").assertExists()
+        setProgress("color.saturation", 0f)
         composeRule.runOnIdle { assertEquals(0xFFFFFFFFL, latest) }
+        setProgress("color.saturation", 1f)
+        setProgress("color.brightness", 0.5f)
+        composeRule.runOnIdle { assertEquals(0xFF008000L, latest) }
+        composeRule.onNodeWithTag("color.hex").assertTextContains("#008000")
     }
 
+    /** A valid hex applies the colour and moves the sliders; an invalid one flags the field and reports invalidity. */
     @Test
-    fun brightnessSemanticsUpdatesColorWithoutTouch() {
-        var latest = 0xFFFF0000L
-        setPickerContent(initialArgb = latest) { latest = it }
-
-        composeRule
-            .onNodeWithContentDescription(string(R.string.color_picker_brightness))
-            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
-                assertTrue(setProgress(0.5f))
-            }
-
-        composeRule.runOnIdle { assertEquals(0xFF800000L, latest) }
-    }
-
-    @Test
-    fun hueMaximumKeepsIndicatorAtMaximum() {
-        setPickerContent(initialArgb = 0xFFFF0000L, onColorChanged = {})
-
-        composeRule
-            .onNodeWithContentDescription(string(R.string.color_picker_hue))
-            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
-                assertTrue(setProgress(360f))
-            }
-
-        val hueRange =
-            composeRule
-                .onNodeWithContentDescription(string(R.string.color_picker_hue))
-                .fetchSemanticsNode()
-                .config[SemanticsProperties.ProgressBarRangeInfo]
-        assertEquals(360f, hueRange.current)
-    }
-
-    @Test
-    fun saturationRoundTripPreservesHueAtWhite() {
-        var latest = 0xFF00FF00L
-        setPickerContent(initialArgb = latest) { latest = it }
-
-        composeRule
-            .onNodeWithContentDescription(string(R.string.color_picker_saturation))
-            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
-                assertTrue(setProgress(0f))
-            }
-        composeRule
-            .onNodeWithContentDescription(string(R.string.color_picker_saturation))
-            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
-                assertTrue(setProgress(1f))
-            }
-
-        composeRule.runOnIdle { assertEquals(0xFF00FF00L, latest) }
-    }
-
-    @Test
-    fun brightnessRoundTripPreservesHueAndSaturationAtBlack() {
-        var latest = 0xFF0000FFL
-        setPickerContent(initialArgb = latest) { latest = it }
-
-        composeRule
-            .onNodeWithContentDescription(string(R.string.color_picker_brightness))
-            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
-                assertTrue(setProgress(0f))
-            }
-        composeRule
-            .onNodeWithContentDescription(string(R.string.color_picker_brightness))
-            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
-                assertTrue(setProgress(1f))
-            }
-
-        composeRule.runOnIdle { assertEquals(0xFF0000FFL, latest) }
-    }
-
-    @Test
-    fun tappingVisibleMaximumThumbKeepsMaximumValue() {
-        var latest = 0xFFFF0000L
-        setPickerContent(initialArgb = latest) { latest = it }
-
-        composeRule.onNodeWithContentDescription(string(R.string.color_picker_brightness)).performTouchInput {
-            click(Offset(width - 9f, centerY))
+    fun hexFieldAppliesValidColoursAndFlagsInvalidOnes() {
+        setPicker(0xFFFF0000L)
+        composeRule.onNodeWithTag("color.hex").performTextReplacement("#00FF00")
+        composeRule.runOnIdle {
+            assertEquals(0xFF00FF00L, latest)
+            assertEquals(true, validity.last())
         }
-
-        composeRule.runOnIdle { assertEquals(0xFFFF0000L, latest) }
-    }
-
-    @Test
-    fun draggingHueStreamsLiveColorUpdates() {
-        val updates = mutableListOf<Long>()
-        setPickerContent(initialArgb = 0xFFFF0000L, onColorChanged = updates::add)
-
-        composeRule.onNodeWithContentDescription(string(R.string.color_picker_hue)).performTouchInput {
-            swipe(
-                start = Offset(1f, centerY),
-                end = Offset(width - 1f, centerY),
-                durationMillis = 500,
-            )
+        val hue =
+            composeRule.onNodeWithTag("color.hue").fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo]
+        assertEquals(120f, hue.current)
+        composeRule.onNodeWithTag("color.hex").performTextReplacement("#XYZ")
+        composeRule.runOnIdle {
+            assertEquals(false, validity.last())
+            assertEquals(0xFF00FF00L, latest)
         }
-
-        composeRule.runOnIdle { assertTrue("drag should stream intermediate colors", updates.size > 2) }
+        composeRule.onNodeWithText("Enter six hexadecimal digits, such as #1D4ED8.").assertExists()
     }
 
+    /** Without a saved colour the controls start from the fallback and report nothing until touched. */
     @Test
-    fun exactHexMovesPickerAndVisualAdjustmentUpdatesHex() {
-        var latest = 0xFFFF0000L
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                var selectedArgb by remember { mutableLongStateOf(latest) }
-                TonalSwatchPicker(
-                    selectedArgb = selectedArgb,
-                    onColorSelected = {
-                        latest = it
-                        selectedArgb = it
-                    },
-                    scopeKey = "global",
-                    theme = BubbleTheme.Light,
-                    slotKey = BubbleSide.Mine.name,
-                )
-            }
+    fun fallbackSeedsTheControlsWithoutReporting() {
+        setPicker(selected = null, fallback = 0xFF1D4ED8L)
+        composeRule.onNodeWithTag("color.hex").assertTextContains("#1D4ED8")
+        composeRule.onNodeWithContentDescription("Color #1D4ED8").assertIsSelected()
+        composeRule.runOnIdle {
+            assertNull(latest)
+            assertTrue(validity.isEmpty())
         }
-
-        composeRule.onNodeWithContentDescription(string(R.string.more_colors)).performClick()
-        composeRule.onNodeWithText(string(R.string.custom_hex_color)).performTextReplacement("#00FF00")
-
-        val hueRange =
-            composeRule
-                .onNodeWithContentDescription(string(R.string.color_picker_hue))
-                .fetchSemanticsNode()
-                .config[SemanticsProperties.ProgressBarRangeInfo]
-        assertEquals(ProgressBarRangeInfo(120f, 0f..360f, 359), hueRange)
-
-        composeRule
-            .onNodeWithContentDescription(string(R.string.color_picker_hue))
-            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
-                assertTrue(setProgress(240f))
-            }
-        composeRule.onNodeWithText("#0000FF").assertExists()
-        composeRule.runOnIdle { assertEquals(0xFF0000FFL, latest) }
     }
 
-    @Test
-    fun amoledPickerNeverSelectsBlue() {
-        var latest = 0xFFFF0000L
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true, amoled = true) {
-                var selectedArgb by remember { mutableLongStateOf(latest) }
-                TonalSwatchPicker(
-                    selectedArgb = selectedArgb,
-                    onColorSelected = {
-                        latest = it
-                        selectedArgb = it
-                    },
-                    scopeKey = "amoled",
-                    theme = BubbleTheme.Amoled,
-                    slotKey = BubbleSide.Mine.name,
-                )
-            }
-        }
-
-        composeRule.onNodeWithContentDescription(string(R.string.more_colors)).performClick()
-        composeRule
-            .onNodeWithContentDescription(string(R.string.color_picker_hue))
-            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
-                assertFalse(setProgress(240f))
-            }
-
-        composeRule.runOnIdle { assertEquals(0, latest and 0xFF) }
+    /** Moves the tagged slider through its accessibility action, asserting the slider accepted the value. */
+    private fun setProgress(
+        tag: String,
+        value: Float,
+    ) {
+        composeRule.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.SetProgress) { assertTrue(it(value)) }
     }
 
-    @Test
-    fun amoledPickerRejectsInvisibleBlueFreeHueWithoutMovingControls() {
-        val initialArgb = 0xFFFF0000L
-        var latest = initialArgb
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true, amoled = true) {
-                FullSpectrumColorPicker(
-                    argb = initialArgb,
-                    blueFree = true,
-                    isColorAccepted = { it != 0xFF000000L },
-                    onColorChanged = { latest = it },
-                )
-            }
-        }
-
-        composeRule
-            .onNodeWithContentDescription(string(R.string.color_picker_hue))
-            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
-                assertFalse(setProgress(240f))
-            }
-
-        val hueRange =
-            composeRule
-                .onNodeWithContentDescription(string(R.string.color_picker_hue))
-                .fetchSemanticsNode()
-                .config[SemanticsProperties.ProgressBarRangeInfo]
-        assertEquals(0f, hueRange.current)
-        assertEquals(initialArgb, latest)
-    }
-
-    @Test
-    fun invalidExactHexCannotApply() {
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                TonalSwatchPicker(
-                    selectedArgb = 0xFFFF0000L,
-                    onColorSelected = {},
-                    scopeKey = "global",
-                    theme = BubbleTheme.Light,
-                    slotKey = BubbleSide.Mine.name,
-                )
-            }
-        }
-
-        composeRule.onNodeWithContentDescription(string(R.string.more_colors)).performClick()
-        composeRule.onNodeWithText(string(R.string.custom_hex_color)).performTextReplacement("#XYZ")
-        composeRule.onNodeWithText(string(R.string.apply_color)).assertIsNotEnabled()
-        composeRule.onNodeWithText(string(R.string.invalid_hex_color)).assertExists()
-    }
-
-    private fun setPickerContent(
-        initialArgb: Long,
-        onColorChanged: (Long) -> Unit,
+    /** Renders one picker in the light theme, recording every reported colour and validity change. */
+    private fun setPicker(
+        selected: Long?,
+        fallback: Long = 0xFF000000L,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme {
-                var argb by remember { mutableLongStateOf(initialArgb) }
+            WhiteNoiseTheme(darkTheme = false) {
                 FullSpectrumColorPicker(
-                    argb = argb,
-                    onColorChanged = {
-                        argb = it
-                        onColorChanged(it)
-                    },
+                    selectedArgb = selected,
+                    fallbackArgb = fallback,
+                    onColorSelected = { latest = it },
+                    onValidityChanged = { validity += it },
                 )
             }
         }

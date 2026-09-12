@@ -1,247 +1,234 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.changedToUp
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.setProgress
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.HsvColor
 import dev.ipf.whitenoise.android.state.opaqueArgbToHsv
-import dev.ipf.whitenoise.android.state.withoutBlueChannel
+import dev.ipf.whitenoise.android.state.parseOpaqueColorHex
+import dev.ipf.whitenoise.android.state.tonalBubbleColorPresets
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
 import java.util.Locale
 
-private const val HUE_MAX_DEGREES = 360f
-private const val HUE_STEP_COUNT = 359
-private const val HUE_STOP_COUNT = 7
-private const val HUE_STOP_INTERVAL = 60f
-private const val CHANNEL_STEP_COUNT = 99
-private const val PERCENT_SCALE = 100f
-private const val HUE_KEYBOARD_STEP = 1f
-private const val CHANNEL_KEYBOARD_STEP = 0.01f
-private val HUE_STOPS = List(HUE_STOP_COUNT) { index -> index * HUE_STOP_INTERVAL }
-private val CHANNEL_THUMB_RADIUS = 9.dp
-
-private fun Long.blueFreeWhen(enabled: Boolean): Long = if (enabled) withoutBlueChannel() else this
-
+/**
+ * The prototype's colour editor: ten preset swatches, hue / saturation / brightness sliders and a hex field with a
+ * live swatch. Every accepted colour is reported through [onColorSelected]; [onValidityChanged] follows the hex
+ * field so callers can hold Save while the text is not a colour.
+ */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
 internal fun FullSpectrumColorPicker(
-    argb: Long,
-    onColorChanged: (Long) -> Unit,
+    selectedArgb: Long?,
+    fallbackArgb: Long,
+    onColorSelected: (Long) -> Unit,
     modifier: Modifier = Modifier,
-    blueFree: Boolean = false,
-    isColorAccepted: (Long) -> Boolean = { true },
+    onValidityChanged: (Boolean) -> Unit = {},
 ) {
-    val displayedArgb = argb.blueFreeWhen(blueFree)
-    val indicatorColor = if (blueFree) MaterialTheme.colorScheme.onSurface else Color.White
-    var hsv by remember { mutableStateOf(opaqueArgbToHsv(displayedArgb)) }
-    var lastEmittedArgb by remember { mutableLongStateOf(displayedArgb) }
-    LaunchedEffect(displayedArgb) {
-        if (displayedArgb != lastEmittedArgb) {
-            hsv = opaqueArgbToHsv(displayedArgb)
-            lastEmittedArgb = displayedArgb
-        }
+    val initial = selectedArgb ?: fallbackArgb
+    val initialHsv = remember(initial) { opaqueArgbToHsv(initial) }
+    var hue by rememberSaveable(initial) { mutableFloatStateOf(initialHsv.hue) }
+    var saturation by rememberSaveable(initial) { mutableFloatStateOf(initialHsv.saturation) }
+    var brightness by rememberSaveable(initial) { mutableFloatStateOf(initialHsv.value) }
+    var hex by rememberSaveable(initial) { mutableStateOf(formatColorHex(initial)) }
+    val parsedHex = parseOpaqueColorHex(hex)
+    val sliderArgb = HsvColor(hue, saturation, brightness).toOpaqueArgb()
+
+    fun applyHsv(color: Long) {
+        val hsv = opaqueArgbToHsv(color)
+        hue = hsv.hue
+        saturation = hsv.saturation
+        brightness = hsv.value
     }
 
-    fun updateHsv(updated: HsvColor): Boolean {
-        val updatedArgb = updated.toOpaqueArgb().blueFreeWhen(blueFree)
-        if (!isColorAccepted(updatedArgb)) return false
-        hsv = updated
-        lastEmittedArgb = updatedArgb
-        onColorChanged(updatedArgb)
-        return true
+    fun updateFromSliders(
+        h: Float = hue,
+        s: Float = saturation,
+        v: Float = brightness,
+    ) {
+        val color = HsvColor(h, s, v).toOpaqueArgb()
+        hex = formatColorHex(color)
+        onValidityChanged(true)
+        onColorSelected(color)
     }
 
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        ColorChannel(
-            label = stringResource(R.string.color_picker_hue),
-            valueLabel = "${hsv.hue.toInt()}°",
-            value = hsv.hue,
-            valueRange = 0f..HUE_MAX_DEGREES,
-            steps = HUE_STEP_COUNT,
-            gradientColors =
-                HUE_STOPS.map { hue ->
-                    HsvColor(hue, 1f, 1f)
-                        .toOpaqueArgb()
-                        .blueFreeWhen(blueFree)
-                        .let(::colorFromArgb)
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(ColorPickerDefaults.Gap)) {
+        ColorPresetRow(
+            selectedArgb = parsedHex,
+            onSelect = { argb ->
+                applyHsv(argb)
+                hex = formatColorHex(argb)
+                onValidityChanged(true)
+                onColorSelected(argb)
+            },
+        )
+        ColorSlider(
+            label = stringResource(R.string.color_hue, hue.toInt()),
+            value = hue,
+            valueRange = 0f..ColorPickerDefaults.HUE_MAX,
+            testTag = "color.hue",
+            onValueChange = {
+                hue = it
+                updateFromSliders(h = it)
+            },
+        )
+        ColorSlider(
+            label = stringResource(R.string.color_saturation, (saturation * ColorPickerDefaults.PERCENT).toInt()),
+            value = saturation,
+            valueRange = 0f..1f,
+            testTag = "color.saturation",
+            onValueChange = {
+                saturation = it
+                updateFromSliders(s = it)
+            },
+        )
+        ColorSlider(
+            label = stringResource(R.string.color_brightness, (brightness * ColorPickerDefaults.PERCENT).toInt()),
+            value = brightness,
+            valueRange = 0f..1f,
+            testTag = "color.brightness",
+            onValueChange = {
+                brightness = it
+                updateFromSliders(v = it)
+            },
+        )
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(ColorPickerDefaults.Gap),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ColorSwatch(argb = parsedHex ?: sliderArgb, selected = false, modifier = Modifier.testTag("color.swatch"))
+            OutlinedTextField(
+                value = hex,
+                onValueChange = { value ->
+                    hex = value
+                    val parsed = parseOpaqueColorHex(value)
+                    onValidityChanged(parsed != null)
+                    parsed?.let { color ->
+                        onColorSelected(color)
+                        applyHsv(color)
+                    }
                 },
-            keyboardStep = HUE_KEYBOARD_STEP,
-            indicatorColor = indicatorColor,
-            onValueChange = { updateHsv(hsv.copy(hue = it)) },
-        )
-        ColorChannel(
-            label = stringResource(R.string.color_picker_saturation),
-            valueLabel = String.format(Locale.ROOT, "%.0f%%", hsv.saturation * PERCENT_SCALE),
-            value = hsv.saturation,
-            valueRange = 0f..1f,
-            steps = CHANNEL_STEP_COUNT,
-            gradientColors =
-                listOf(
-                    colorFromArgb(
-                        hsv.copy(saturation = 0f).toOpaqueArgb().blueFreeWhen(blueFree),
-                    ),
-                    colorFromArgb(
-                        hsv.copy(saturation = 1f).toOpaqueArgb().blueFreeWhen(blueFree),
-                    ),
-                ),
-            keyboardStep = CHANNEL_KEYBOARD_STEP,
-            indicatorColor = indicatorColor,
-            onValueChange = { updateHsv(hsv.copy(saturation = it)) },
-        )
-        ColorChannel(
-            label = stringResource(R.string.color_picker_brightness),
-            valueLabel = String.format(Locale.ROOT, "%.0f%%", hsv.value * PERCENT_SCALE),
-            value = hsv.value,
-            valueRange = 0f..1f,
-            steps = CHANNEL_STEP_COUNT,
-            gradientColors =
-                listOf(
-                    Color.Black,
-                    colorFromArgb(
-                        hsv.copy(value = 1f).toOpaqueArgb().blueFreeWhen(blueFree),
-                    ),
-                ),
-            keyboardStep = CHANNEL_KEYBOARD_STEP,
-            indicatorColor = indicatorColor,
-            onValueChange = { updateHsv(hsv.copy(value = it)) },
-        )
+                label = { Text(stringResource(R.string.color_hex)) },
+                supportingText = if (parsedHex == null) ({ Text(stringResource(R.string.color_hex_error)) }) else null,
+                isError = parsedHex == null,
+                singleLine = true,
+                modifier = Modifier.weight(1f).testTag("color.hex"),
+            )
+        }
     }
 }
 
-@Suppress("FunctionNaming", "LongMethod")
+/** The ten preset swatches as a wrapping row of 48 dp radio-style circles. */
+@Suppress("FunctionNaming")
 @Composable
-private fun ColorChannel(
-    label: String,
-    valueLabel: String,
-    value: Float,
-    valueRange: ClosedFloatingPointRange<Float>,
-    steps: Int,
-    gradientColors: List<Color>,
-    keyboardStep: Float,
-    indicatorColor: Color,
-    onValueChange: (Float) -> Boolean,
+private fun ColorPresetRow(
+    selectedArgb: Long?,
+    onSelect: (Long) -> Unit,
 ) {
-    val currentOnValueChange by rememberUpdatedState(onValueChange)
-    val coercedValue = value.coerceIn(valueRange.start, valueRange.endInclusive)
-    val rangeLength = valueRange.endInclusive - valueRange.start
-
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, style = MaterialTheme.typography.labelMedium)
-            Text(
-                valueLabel,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Canvas(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .onKeyEvent { event ->
-                        if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                        val delta =
-                            when (event.key) {
-                                Key.DirectionLeft, Key.DirectionDown -> -keyboardStep
-                                Key.DirectionRight, Key.DirectionUp -> keyboardStep
-                                else -> return@onKeyEvent false
-                            }
-                        currentOnValueChange(
-                            (coercedValue + delta).coerceIn(valueRange.start, valueRange.endInclusive),
-                        )
-                    }.focusable()
-                    .semantics {
-                        contentDescription = label
-                        stateDescription = valueLabel
-                        progressBarRangeInfo = ProgressBarRangeInfo(coercedValue, valueRange, steps)
-                        setProgress { target ->
-                            currentOnValueChange(target.coerceIn(valueRange.start, valueRange.endInclusive))
-                        }
-                    }.pointerInput(valueRange) {
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            down.consume()
-
-                            fun updateAt(x: Float) {
-                                val inset = CHANNEL_THUMB_RADIUS.toPx()
-                                val interactiveWidth = (size.width - inset * 2f).coerceAtLeast(1f)
-                                val fraction = ((x - inset) / interactiveWidth).coerceIn(0f, 1f)
-                                currentOnValueChange(valueRange.start + fraction * rangeLength)
-                            }
-                            updateAt(down.position.x)
-                            var finished = false
-                            while (!finished) {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
-                                change.consume()
-                                updateAt(change.position.x)
-                                finished = change.changedToUp() || !change.pressed
-                            }
-                        }
-                    },
-        ) {
-            val trackHeight = 20.dp.toPx()
-            val trackTop = (size.height - trackHeight) / 2f
-            drawRoundRect(
-                brush = Brush.horizontalGradient(gradientColors),
-                topLeft = Offset(0f, trackTop),
-                size = Size(size.width, trackHeight),
-                cornerRadius = CornerRadius(trackHeight / 2f),
-            )
-            val indicatorRadius = CHANNEL_THUMB_RADIUS.toPx()
-            val fraction = (coercedValue - valueRange.start) / rangeLength
-            val indicatorCenter =
-                Offset(
-                    indicatorRadius + fraction * (size.width - indicatorRadius * 2f),
-                    size.height / 2f,
-                )
-            drawCircle(indicatorColor, radius = indicatorRadius, center = indicatorCenter)
-            drawCircle(
-                Color.Black.copy(alpha = 0.7f),
-                radius = indicatorRadius,
-                center = indicatorCenter,
-                style = Stroke(2.dp.toPx()),
+    FlowRow(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(ColorPickerDefaults.Gap),
+        verticalArrangement = Arrangement.spacedBy(ColorPickerDefaults.Gap),
+    ) {
+        tonalBubbleColorPresets().forEach { argb ->
+            val description = stringResource(R.string.color_swatch_description, formatColorHex(argb))
+            ColorSwatch(
+                argb = argb,
+                selected = selectedArgb == argb,
+                modifier =
+                    Modifier
+                        .clickable { onSelect(argb) }
+                        .semantics {
+                            role = Role.RadioButton
+                            selected = selectedArgb == argb
+                            contentDescription = description
+                        },
             )
         }
     }
+}
+
+/** One 48 dp circle; the selected preset carries a 3 dp on-surface ring, the rest a 1 dp outline. */
+@Suppress("FunctionNaming")
+@Composable
+private fun ColorSwatch(
+    argb: Long,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier
+            .size(ColorPickerDefaults.SwatchSize)
+            .clip(CircleShape)
+            .background(colorFromArgb(argb), CircleShape)
+            .border(
+                if (selected) ColorPickerDefaults.SelectedRing else ColorPickerDefaults.RestingRing,
+                if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
+                CircleShape,
+            ),
+    )
+}
+
+/** Label above a slider; the label doubles as the slider's accessible name and carries the current value. */
+@Suppress("FunctionNaming")
+@Composable
+private fun ColorSlider(
+    label: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    testTag: String,
+    onValueChange: (Float) -> Unit,
+) {
+    Text(label, style = MaterialTheme.typography.labelLarge)
+    Slider(
+        value = value,
+        onValueChange = onValueChange,
+        valueRange = valueRange,
+        modifier = Modifier.testTag(testTag).semantics { contentDescription = label },
+    )
+}
+
+/** `#RRGGBB` for an opaque colour. */
+internal fun formatColorHex(argb: Long): String = "#%06X".format(Locale.ROOT, argb and ColorPickerDefaults.RGB_MASK)
+
+/** Geometry and ranges of the colour editor. */
+internal object ColorPickerDefaults {
+    val Gap = 12.dp
+    val SwatchSize = 48.dp
+    val SelectedRing = 3.dp
+    val RestingRing = 1.dp
+    const val HUE_MAX = 359f
+    const val PERCENT = 100f
+    const val RGB_MASK = 0xFFFFFFL
 }

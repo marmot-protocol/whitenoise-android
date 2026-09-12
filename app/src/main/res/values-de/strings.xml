@@ -1474,10 +1474,10 @@
     <string name="chat_bubble_colors_chat_subtitle">Überschreibe die Blasenfarben nur für diese Unterhaltung. Zurücksetzen übernimmt wieder die Darstellungsvorgaben.</string>
     <string name="bubble_color_preview">Vorschau</string>
     <string name="bubble_color_current_theme">Aktuelles Design: %1$s</string>
-    <string name="bubble_my_messages">Meine Nachrichten</string>
+    <string name="bubble_my_messages">Deine Nachrichten</string>
     <string name="bubble_other_messages">Andere Nachrichten</string>
-    <string name="bubble_preview_other">Hallo – so sehen Antworten aus.</string>
-    <string name="bubble_preview_mine">Sieht für mich gut aus.</string>
+    <string name="bubble_preview_other">Ihre Nachricht</string>
+    <string name="bubble_preview_mine">Deine Nachricht</string>
     <string name="bubble_color_swatch_content_description">Blasenfarbe %1$s</string>
     <string name="more_colors">Weitere Farben</string>
     <string name="custom_hex_color">Benutzerdefinierte Hex-Farbe</string>
@@ -1487,6 +1487,18 @@
     <string name="color_picker_saturation">Sättigung</string>
     <string name="color_picker_brightness">Helligkeit</string>
     <string name="reset_to_default">Auf Standard zurücksetzen</string>
+    <string name="color_preview_action">Aktion</string>
+    <string name="color_swatch_description">Farbe %1$s</string>
+    <string name="color_hue">Farbton: %1$d°</string>
+    <string name="color_saturation">Sättigung: %1$d%%</string>
+    <string name="color_brightness">Helligkeit: %1$d%%</string>
+    <string name="color_hex">Hex-Farbe</string>
+    <string name="color_hex_error">Gib sechs Hexadezimalziffern ein, zum Beispiel #1D4ED8.</string>
+    <string name="action_color_detail">Wähle die Aktionsfarbe für das Design „%1$s“. Hintergründe und neutrale Flächen bleiben unverändert.</string>
+    <string name="chat_bubble_colors_global_detail">Wähle die Standard-Nachrichtenfarben für das Design „%1$s“.</string>
+    <string name="chat_bubble_colors_chat_detail">Überschreibt diesen Chat in jedem Design. Setze zurück, um die Standardwerte des aktuellen Designs „%1$s“ zu verwenden.</string>
+    <string name="more_options">Weitere Optionen</string>
+    <string name="reset_to_global_colors">Auf globale Farben zurücksetzen</string>
 
     <string name="tts_warning_title">Externe Sprachausgabe</string>
     <string name="tts_warning_message">Die ausgewählte Sprachausgabe ist eine separate App, die entschlüsselten Nachrichtentext an die Server des Entwicklers senden kann. Für Sprache auf dem Gerät installieren Sie RHVoice oder eSpeak NG über F-Droid oder Zapstore und wählen es in den Einstellungen.</string>

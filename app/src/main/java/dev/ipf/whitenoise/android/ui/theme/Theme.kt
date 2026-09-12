@@ -213,6 +213,15 @@ private fun ColorScheme.withAccountAccent(
     )
 }
 
+/** The brand roles of a theme before any account accent, the canvas a trial accent is drawn over. */
+internal fun whiteNoiseBaseColorScheme(darkTheme: Boolean): ColorScheme {
+    if (darkTheme) return DarkColorScheme
+    return LightColorScheme
+}
+
+/** The scheme with a trial accent applied the way a saved account accent is; null keeps the monochrome roles. */
+internal fun ColorScheme.withActionColor(accentArgb: Long?): ColorScheme = withAccountAccent(accentArgb, false)
+
 private fun Color.toOpaqueArgb(): Long = toArgb().toLong() and OPAQUE_ARGB_MASK
 
 @Composable

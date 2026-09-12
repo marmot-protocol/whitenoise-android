@@ -1476,10 +1476,10 @@
     <string name="chat_bubble_colors_chat_subtitle">Sostituisci i colori dei fumetti solo per questa conversazione. Reimposta per ereditare i valori di Aspetto.</string>
     <string name="bubble_color_preview">Anteprima</string>
     <string name="bubble_color_current_theme">Tema corrente: %1$s</string>
-    <string name="bubble_my_messages">I miei messaggi</string>
+    <string name="bubble_my_messages">I tuoi messaggi</string>
     <string name="bubble_other_messages">Altri messaggi</string>
-    <string name="bubble_preview_other">Ciao, ecco come appaiono le risposte.</string>
-    <string name="bubble_preview_mine">Per me va bene.</string>
+    <string name="bubble_preview_other">Il loro messaggio</string>
+    <string name="bubble_preview_mine">Il tuo messaggio</string>
     <string name="bubble_color_swatch_content_description">Colore fumetto %1$s</string>
     <string name="more_colors">Altri colori</string>
     <string name="custom_hex_color">Colore esadecimale personalizzato</string>
@@ -1489,6 +1489,18 @@
     <string name="color_picker_saturation">Saturazione</string>
     <string name="color_picker_brightness">Luminosità</string>
     <string name="reset_to_default">Ripristina predefiniti</string>
+    <string name="color_preview_action">Azione</string>
+    <string name="color_swatch_description">Colore %1$s</string>
+    <string name="color_hue">Tonalità: %1$d°</string>
+    <string name="color_saturation">Saturazione: %1$d%%</string>
+    <string name="color_brightness">Luminosità: %1$d%%</string>
+    <string name="color_hex">Colore esadecimale</string>
+    <string name="color_hex_error">Inserisci sei cifre esadecimali, ad esempio #1D4ED8.</string>
+    <string name="action_color_detail">Scegli l’accento delle azioni per il tema %1$s. Sfondi e superfici neutre restano invariati.</string>
+    <string name="chat_bubble_colors_global_detail">Scegli i colori predefiniti dei messaggi per il tema %1$s.</string>
+    <string name="chat_bubble_colors_chat_detail">Sostituisce i colori di questa chat in ogni tema. Ripristina per usare i valori predefiniti del tema %1$s attuale.</string>
+    <string name="more_options">Altre opzioni</string>
+    <string name="reset_to_global_colors">Ripristina i colori globali</string>
 
     <string name="tts_warning_title">Motore di sintesi vocale esterno</string>
     <string name="tts_warning_message">Il motore di sintesi vocale selezionato è un\'app separata che può inviare il testo decifrato del messaggio ai server del suo sviluppatore. Per la voce sul dispositivo, installa RHVoice o eSpeak NG da F-Droid o Zapstore e sceglilo nelle impostazioni.</string>
