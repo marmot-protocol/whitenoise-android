@@ -251,3 +251,25 @@ internal fun SettingsGroupPanel(
 }
 
 private val SettingsBottomActionElevation = 2.dp
+
+/** A read-only row: the title over its value in the quiet supporting style, on the group's shape and fill. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun SettingsValue(
+    context: SettingsRowContext,
+    title: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    SettingsGroupPanel(context, modifier) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = WhiteNoiseSpacing.FormField, vertical = WhiteNoiseSpacing.Related + 4.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
