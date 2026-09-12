@@ -1,85 +1,49 @@
-@file:Suppress("FunctionNaming") // Compose UI entry points intentionally use PascalCase.
-
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Forward
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.SettingsGroup
-import kotlinx.coroutines.launch
 
-/** Displays account-scoped notification delivery controls and app-wide channel defaults. */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Notifications as the prototype lays them out: a permission group until Android allows notifications, the Delivery
+ * group (local notifications, native push), the background connection with its explainer, and the Android
+ * notification categories. Delivery and background writes stay the production mutations.
+ */
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 internal fun NotificationsScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
 ) {
-    var pendingNotificationEnable by remember { mutableStateOf(false) }
-    var pendingBackgroundConnectionEnable by remember { mutableStateOf(false) }
-    var pendingNativePushEnable by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val notificationPermissionLauncher =
+    var permissionDenied by rememberSaveable { mutableStateOf(false) }
+    val permissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             appState.refreshLocalNotificationPermission()
-            if (granted && pendingNotificationEnable) {
-                appState.launchMutation { appState.setLocalNotificationsEnabled(true) }
-            }
-            if (granted && pendingBackgroundConnectionEnable) {
-                appState.launchMutation { appState.setBackgroundConnectionEnabled(true) }
-            }
-            if (granted && pendingNativePushEnable) {
-                appState.launchMutation { appState.setNativePushEnabled(true) }
-            }
-            if (!granted) {
-                appState.present(R.string.toast_notification_permission_denied)
-            }
-            pendingNotificationEnable = false
-            pendingBackgroundConnectionEnable = false
-            pendingNativePushEnable = false
+            permissionDenied = !granted
+            if (!granted) appState.present(R.string.toast_notification_permission_denied)
         }
 
     LaunchedEffect(appState.activeAccountRef) {
@@ -87,94 +51,148 @@ internal fun NotificationsScreen(
         appState.refreshLocalNotificationSettings()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.notifications)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    val permissionGranted = appState.localNotificationPermissionGranted
+    val accountReady = appState.activeAccountRef != null && permissionGranted
+    val localEnabled = appState.localNotificationSettings?.localNotificationsEnabled == true
+    val backgroundEnabled = appState.backgroundConnectionEnabled
+
+    SettingsScaffold(title = stringResource(R.string.notifications), onBack = onBack) {
+        SettingsList {
+            if (!permissionGranted) {
+                item {
+                    NotificationPermissionGroup(
+                        denied = permissionDenied,
+                        onRequest = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
+                        onOpenSettings = { openAppNotificationSettings(context) },
+                    )
+                }
+            }
+            item { SettingsSection(stringResource(R.string.delivery)) }
             item {
                 SettingsGroup {
-                    item {
-                        NotificationSwitchRow(
+                    row("local_notifications") { rowContext ->
+                        SettingsSwitch(
+                            context = rowContext,
                             title = stringResource(R.string.local_notifications),
-                            subtitle = stringResource(R.string.local_notifications_subtitle),
-                            icon = Icons.Filled.Notifications,
-                            checked = appState.localNotificationSettings?.localNotificationsEnabled == true,
-                            enabled = appState.activeAccountRef != null,
+                            subtitle = stringResource(R.string.local_notifications_detail),
+                            checked = localEnabled,
+                            enabled = accountReady,
                             onCheckedChange = { enabled ->
-                                if (enabled && !appState.localNotificationPermissionGranted) {
-                                    pendingNotificationEnable = true
-                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                } else {
-                                    appState.launchMutation { appState.setLocalNotificationsEnabled(enabled) }
-                                }
+                                appState.launchMutation { appState.setLocalNotificationsEnabled(enabled) }
                             },
                         )
                     }
-                    item {
-                        NotificationSwitchRow(
-                            title = stringResource(R.string.keep_connected),
-                            subtitle = stringResource(R.string.keep_connected_subtitle),
-                            icon = Icons.Filled.Sync,
-                            checked = appState.backgroundConnectionEnabled,
-                            enabled = appState.activeAccountRef != null,
-                            onCheckedChange = { enabled ->
-                                if (enabled && !appState.localNotificationPermissionGranted) {
-                                    pendingBackgroundConnectionEnable = true
-                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                } else {
-                                    appState.launchMutation { appState.setBackgroundConnectionEnabled(enabled) }
-                                }
-                            },
-                        )
-                    }
-                    item {
-                        val nativePushCapability = appState.nativePushCapability()
+                    row("native_push") { rowContext ->
                         NativePushSettingRow(
-                            capability = nativePushCapability,
-                            accountReady = appState.activeAccountRef != null,
+                            context = rowContext,
+                            capability = appState.nativePushCapability(),
+                            accountReady = accountReady && localEnabled,
                             checked = appState.localNotificationSettings?.nativePushEnabled == true,
                             onCheckedChange = { enabled ->
-                                if (enabled && !appState.localNotificationPermissionGranted) {
-                                    pendingNativePushEnable = true
-                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                } else {
-                                    appState.launchMutation { appState.setNativePushEnabled(enabled) }
-                                }
+                                appState.launchMutation { appState.setNativePushEnabled(enabled) }
                             },
                         )
                     }
                 }
             }
             item {
-                GlobalNotificationCategories(
-                    onOpenChannel = { channel -> openNotificationChannelSettings(context, channel) },
+                SettingsGroup {
+                    row("background") { rowContext ->
+                        SettingsSwitch(
+                            context = rowContext,
+                            title = stringResource(R.string.keep_connected_in_background),
+                            subtitle = stringResource(R.string.keep_connected_in_background_detail),
+                            checked = backgroundEnabled,
+                            enabled = accountReady,
+                            onCheckedChange = { enabled ->
+                                appState.launchMutation { appState.setBackgroundConnectionEnabled(enabled) }
+                            },
+                        )
+                    }
+                }
+            }
+            item {
+                SettingsExplainer(
+                    stringResource(
+                        if (backgroundEnabled) {
+                            R.string.notification_background_on
+                        } else {
+                            R.string.notification_background_off
+                        },
+                    ),
+                )
+            }
+            item { SettingsSection(stringResource(R.string.notification_categories)) }
+            item { GlobalNotificationCategories(onOpenChannel = { openNotificationChannelSettings(context, it) }) }
+            item { SettingsExplainer(stringResource(R.string.notification_categories_detail)) }
+        }
+    }
+}
+
+/** Until Android allows notifications: a request action, or, once denied, a link into Android's settings. */
+@Suppress("FunctionNaming")
+@Composable
+private fun NotificationPermissionGroup(
+    denied: Boolean,
+    onRequest: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    SettingsGroup(modifier = Modifier.testTag("notifications.permission.group")) {
+        if (denied) {
+            row("blocked") { context ->
+                SettingsLink(
+                    context = context,
+                    title = stringResource(R.string.notifications_are_off),
+                    subtitle = stringResource(R.string.notifications_are_off_detail),
+                    onClick = onOpenSettings,
+                    leading = { NotificationPermissionIcon(R.drawable.ic_notifications_off) },
+                )
+            }
+        } else {
+            row("allow") { context ->
+                SettingsAction(
+                    context = context,
+                    title = stringResource(R.string.allow_notifications),
+                    subtitle = stringResource(R.string.allow_notifications_detail),
+                    onClick = onRequest,
+                    leading = { NotificationPermissionIcon(R.drawable.ic_settings_notifications) },
                 )
             }
         }
     }
 }
 
-/** Renders native push as available or with its first actionable unsupported cause. */
+/** Leading glyph of the permission rows, tinted like the hub icons. */
+@Suppress("FunctionNaming")
+@Composable
+private fun NotificationPermissionIcon(drawable: Int) {
+    Icon(
+        painter = painterResource(drawable),
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/**
+ * Native push as a whole-row switch: on with the prototype's detail when the capability is available, otherwise off,
+ * disabled and explaining its first actionable unsupported cause.
+ */
+@Suppress("FunctionNaming")
 @Composable
 internal fun NativePushSettingRow(
+    context: SettingsRowContext,
     capability: NativePushCapability,
     accountReady: Boolean,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    NotificationSwitchRow(
-        title = stringResource(R.string.native_push),
-        subtitle = stringResource(capability.subtitleResource()),
-        icon = Icons.Filled.NotificationsActive,
+    SettingsSwitch(
+        context = context,
+        title = stringResource(R.string.native_push_title),
+        subtitle =
+            stringResource(
+                if (capability.isAvailable) R.string.notification_push_detail else capability.subtitleResource(),
+            ),
         checked = capability.isAvailable && checked,
         enabled = capability.isAvailable && accountReady,
         onCheckedChange = onCheckedChange,
@@ -191,88 +209,21 @@ internal fun NativePushCapability.subtitleResource(): Int =
         NativePushCapability.Available -> R.string.native_push_subtitle
     }
 
-// A toggle row sized to sit inside a segmented SettingsGroup item (the segment
-// Surface owns the shape; the row owns its own inset, like a ListItem).
-@Composable
-private fun NotificationSwitchRow(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    checked: Boolean,
-    enabled: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
-    }
-}
-
+/** One link per Android notification channel; each opens that channel's system settings. */
+@Suppress("FunctionNaming")
 @Composable
 internal fun GlobalNotificationCategories(onOpenChannel: (NotificationChannelSpec) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = stringResource(R.string.notification_defaults_subtitle),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
-        SettingsGroup(
-            title = stringResource(R.string.notification_defaults),
-            icon = Icons.Filled.Tune,
-        ) {
-            NotificationChannelSpec.entries.forEach { channel ->
-                item {
-                    GlobalNotificationCategoryRow(
-                        channel = channel,
-                        onClick = { onOpenChannel(channel) },
-                    )
-                }
+    SettingsGroup {
+        NotificationChannelSpec.entries.forEach { channel ->
+            row(channel.id) { context ->
+                SettingsLink(
+                    context = context,
+                    title = notificationChannelTitle(channel),
+                    onClick = { onOpenChannel(channel) },
+                    modifier = Modifier.testTag("global-notification-category-${channel.id}"),
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun GlobalNotificationCategoryRow(
-    channel: NotificationChannelSpec,
-    onClick: () -> Unit,
-) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .testTag("global-notification-category-${channel.id}")
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.Filled.Notifications, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Column(Modifier.weight(1f)) {
-            Text(notificationChannelTitle(channel), style = MaterialTheme.typography.bodyLarge)
-            Text(
-                stringResource(
-                    if (channel == NotificationChannelSpec.APP_UPDATES) {
-                        R.string.notification_scope_app_wide
-                    } else {
-                        R.string.notification_scope_default_all_chats
-                    },
-                ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Icon(
-            Icons.AutoMirrored.Filled.Forward,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
@@ -290,3 +241,12 @@ private fun notificationChannelTitle(channel: NotificationChannelSpec): String =
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
         },
     )
+
+/** Opens Android's notification settings page for this app. */
+private fun openAppNotificationSettings(context: Context) {
+    val intent =
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    context.startActivity(intent)
+}

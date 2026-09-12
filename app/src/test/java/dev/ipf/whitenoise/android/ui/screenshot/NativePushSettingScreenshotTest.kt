@@ -14,8 +14,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
-import dev.ipf.whitenoise.android.ui.common.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.NativePushSettingRow
+import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -81,8 +81,9 @@ class NativePushSettingScreenshotTest {
                 WhiteNoiseTheme(darkTheme = darkTheme) {
                     Surface(modifier = Modifier.width(360.dp).testTag(TAG)) {
                         SettingsGroup {
-                            item {
+                            row("push") { context ->
                                 NativePushSettingRow(
+                                    context = context,
                                     capability = capability,
                                     accountReady = true,
                                     checked = false,

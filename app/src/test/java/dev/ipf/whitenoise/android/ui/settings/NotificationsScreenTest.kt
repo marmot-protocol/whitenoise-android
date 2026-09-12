@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.app.Application
-import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -49,14 +48,17 @@ class NotificationsScreenTest {
 
         composeRule.setContent {
             WhiteNoiseTheme {
-                Column {
+                SettingsGroup {
                     cases.forEach { (capability, _) ->
-                        NativePushSettingRow(
-                            capability = capability,
-                            accountReady = true,
-                            checked = true,
-                            onCheckedChange = { toggleCalls += 1 },
-                        )
+                        row(capability.name) { context ->
+                            NativePushSettingRow(
+                                context = context,
+                                capability = capability,
+                                accountReady = true,
+                                checked = true,
+                                onCheckedChange = { toggleCalls += 1 },
+                            )
+                        }
                     }
                 }
             }
@@ -80,16 +82,21 @@ class NotificationsScreenTest {
     fun availableCapabilityEnablesCheckedSwitchAfterAccountReadiness() {
         composeRule.setContent {
             WhiteNoiseTheme {
-                NativePushSettingRow(
-                    capability = NativePushCapability.Available,
-                    accountReady = true,
-                    checked = true,
-                    onCheckedChange = {},
-                )
+                SettingsGroup {
+                    row("push") { context ->
+                        NativePushSettingRow(
+                            context = context,
+                            capability = NativePushCapability.Available,
+                            accountReady = true,
+                            checked = true,
+                            onCheckedChange = {},
+                        )
+                    }
+                }
             }
         }
 
-        composeRule.onNodeWithText(app.getString(R.string.native_push_subtitle)).assertIsDisplayed()
+        composeRule.onNodeWithText(app.getString(R.string.notification_push_detail)).assertIsDisplayed()
         composeRule.onNode(isToggleable()).assertIsEnabled().assertIsOn()
     }
 
@@ -98,12 +105,17 @@ class NotificationsScreenTest {
     fun availableCapabilityStaysDisabledUntilAnAccountIsReady() {
         composeRule.setContent {
             WhiteNoiseTheme {
-                NativePushSettingRow(
-                    capability = NativePushCapability.Available,
-                    accountReady = false,
-                    checked = true,
-                    onCheckedChange = {},
-                )
+                SettingsGroup {
+                    row("push") { context ->
+                        NativePushSettingRow(
+                            context = context,
+                            capability = NativePushCapability.Available,
+                            accountReady = false,
+                            checked = true,
+                            onCheckedChange = {},
+                        )
+                    }
+                }
             }
         }
 
