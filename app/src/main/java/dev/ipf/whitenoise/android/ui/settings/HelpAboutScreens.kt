@@ -2,7 +2,9 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
@@ -11,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -19,11 +22,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 
@@ -146,6 +151,8 @@ internal fun BugReportContent(
 @Suppress("FunctionNaming")
 @Composable
 internal fun AboutScreen(
+    appState: WhiteNoiseAppState,
+    onOpenDeveloper: () -> Unit,
     versionName: String,
     buildNumber: String,
     mdkShortSha: String,
@@ -157,6 +164,15 @@ internal fun AboutScreen(
         buildNumber = buildNumber,
         mdkShortSha = mdkShortSha,
         onBack = onBack,
+        developerMode = appState.developerMode,
+        onEnableDeveloper = {
+            appState.updateDeveloperMode(true)
+            Toast.makeText(context, R.string.developer_tools_unlocked, Toast.LENGTH_SHORT).show()
+        },
+        onDeveloperAlreadyEnabled = {
+            Toast.makeText(context, R.string.developer_tools_already_enabled, Toast.LENGTH_SHORT).show()
+        },
+        onOpenDeveloper = onOpenDeveloper,
         onOpenLicenses = { openSourceLicenses(context) },
         onOpenPrivacy = { openHelpUrl(context, WhiteNoiseUrls.PRIVACY_POLICY) },
     )
@@ -172,7 +188,12 @@ internal fun AboutContent(
     onBack: () -> Unit,
     onOpenLicenses: () -> Boolean,
     onOpenPrivacy: () -> Boolean,
+    developerMode: Boolean = false,
+    onEnableDeveloper: () -> Unit = {},
+    onDeveloperAlreadyEnabled: () -> Unit = {},
+    onOpenDeveloper: () -> Unit = {},
 ) {
+    var versionTaps by rememberSaveable(developerMode) { mutableIntStateOf(0) }
     var failure by rememberSaveable { mutableStateOf<AboutOpenFailure?>(null) }
 
     fun showLicenses() {
@@ -189,13 +210,40 @@ internal fun AboutContent(
             item {
                 SettingsGroup(modifier = Modifier.testTag("about.app")) {
                     row("version") { context ->
-                        SettingsValue(context, stringResource(R.string.about_version), versionName)
+                        SettingsValue(
+                            context,
+                            stringResource(R.string.about_version),
+                            versionName,
+                            Modifier.testTag("about.version").clickable(role = Role.Button) {
+                                if (developerMode) {
+                                    onDeveloperAlreadyEnabled()
+                                } else if (++versionTaps == DEVELOPER_UNLOCK_TAPS) {
+                                    versionTaps = 0
+                                    onEnableDeveloper()
+                                }
+                            },
+                        )
                     }
                     row("build") { context ->
                         SettingsValue(context, stringResource(R.string.about_build), buildNumber)
                     }
                     row("mdk") { context ->
                         SettingsValue(context, stringResource(R.string.about_mdk), mdkShortSha)
+                    }
+                }
+            }
+            if (developerMode) {
+                item {
+                    SettingsGroup {
+                        row("developer") { context ->
+                            SettingsLink(
+                                context = context,
+                                title = stringResource(R.string.developer),
+                                subtitle = stringResource(R.string.developer_mode_subtitle),
+                                onClick = onOpenDeveloper,
+                                modifier = Modifier.testTag("about.developer"),
+                            )
+                        }
                     }
                 }
             }
@@ -300,3 +348,5 @@ private fun openSourceLicenses(context: Context): Boolean {
 }
 
 private val HelpLeadingIconSize = 24.dp
+
+private const val DEVELOPER_UNLOCK_TAPS = 7

@@ -11817,6 +11817,42 @@
         "test_ids": [
           "TTS-002",
           "TTS-003"
+      },
+      {
+        "surface": "string:developer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.developer",
+        "test_ids": [
+          "SET-019",
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:developer_mode_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.developer_mode_subtitle",
+        "test_ids": [
+          "SET-019",
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:developer_tools_already_enabled",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.developer_tools_already_enabled",
+        "test_ids": [
+          "SET-019",
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:developer_tools_unlocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.developer_tools_unlocked",
+        "test_ids": [
+          "SET-019",
+          "SET-020"
+        ]
         ]
       }
     ],

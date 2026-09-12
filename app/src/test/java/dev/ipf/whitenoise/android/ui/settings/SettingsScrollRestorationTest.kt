@@ -112,16 +112,66 @@ class SettingsScrollRestorationTest {
                 }
             }
         }
-        val originalBounds = scrollToAndOpenHelp()
-        composeRule.onNodeWithText(context.getString(R.string.about_and_licenses)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.developer)).performClick()
+        val helpBounds = scrollToAndOpen(help)
+        composeRule.onNodeWithText(context.getString(R.string.report_a_bug)).performClick()
+
+        // Report a bug is a second level under Help, so two backs return to the Settings home.
+        composeRule.onNodeWithContentDescription(back).performClick()
+        composeRule.onNodeWithContentDescription(back).performClick()
+        assertRestoredBounds(help, helpBounds)
+
+        // Diagnostics leaves Settings entirely; returning must land on the same viewport.
+        val developerBounds = scrollToAndOpen(context.getString(R.string.settings_developer_tools))
         composeRule.onNodeWithText(context.getString(R.string.diagnostics)).performClick()
         composeRule.runOnIdle { diagnosticsOpen = false }
 
         // Developer tools is a hub destination, so one back returns to the Settings home.
         composeRule.onNodeWithContentDescription(back).performClick()
 
-        assertRestoredHelpBounds(originalBounds)
+        assertRestoredBounds(context.getString(R.string.settings_developer_tools), developerBounds)
+    }
+
+    @Test
+    fun aboutDeveloperDiagnosticsPreservesTheSettingsViewport() {
+        var detail by mutableStateOf<SettingsDetail?>(null)
+        var diagnosticsOpen by mutableStateOf(false)
+        val appState = testAppState().also { it.updateDeveloperMode(true) }
+        composeRule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(density = 1f, fontScale = 1.6f)) {
+                WhiteNoiseTheme {
+                    var homeViewport by
+                        rememberSaveable(stateSaver = SettingsHomeViewport.Saver) {
+                            mutableStateOf(SettingsHomeViewport.Top)
+                        }
+                    if (diagnosticsOpen) {
+                        Text("Diagnostics route")
+                    } else {
+                        SettingsScreen(
+                            appState = appState,
+                            onBackToChats = {},
+                            onOpenDiagnostics = { diagnosticsOpen = true },
+                            onOpenSupportChat = {},
+                            detail = detail,
+                            onDetailChange = { detail = it },
+                            homeViewport = homeViewport,
+                            onHomeViewportChange = { homeViewport = it },
+                        )
+                    }
+                }
+            }
+        }
+        val helpBounds = scrollToAndOpenHelp()
+        composeRule.onNodeWithText(context.getString(R.string.about_and_licenses)).performClick()
+        val developer = context.getString(R.string.developer)
+        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(developer))
+        composeRule.onNodeWithText(developer).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.diagnostics)).performClick()
+        composeRule.runOnIdle { diagnosticsOpen = false }
+
+        // Developer tools is a hub destination, so one back returns to the Settings home.
+        composeRule.onNodeWithContentDescription(back).performClick()
+
+        assertRestoredHelpBounds(helpBounds)
     }
 
     @Test
@@ -217,18 +267,27 @@ class SettingsScrollRestorationTest {
         }
     }
 
-    private fun scrollToAndOpenHelp(): Rect {
-        // Help sits in a later lazy item, so scroll the list to it before the row exists in the tree.
-        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(help))
-        val helpNode = composeRule.onNodeWithText(help)
-        val bounds = helpNode.fetchSemanticsNode().boundsInRoot
-        helpNode.performClick()
+    private fun scrollToAndOpenHelp(): Rect = scrollToAndOpen(help)
+
+    /** Scrolls the home list to [label], records where that row sits, and opens it. */
+    private fun scrollToAndOpen(label: String): Rect {
+        // The row sits in a later lazy item, so scroll the list to it before it exists in the tree.
+        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(label))
+        val row = composeRule.onNodeWithText(label)
+        val bounds = row.fetchSemanticsNode().boundsInRoot
+        row.performClick()
         return bounds
     }
 
-    private fun assertRestoredHelpBounds(expected: Rect) {
+    private fun assertRestoredHelpBounds(expected: Rect) = assertRestoredBounds(help, expected)
+
+    /** The home list is restored when [label] sits within a pixel of where it was left. */
+    private fun assertRestoredBounds(
+        label: String,
+        expected: Rect,
+    ) {
         composeRule.waitForIdle()
-        val actual = composeRule.onNodeWithText(help).fetchSemanticsNode().boundsInRoot
+        val actual = composeRule.onNodeWithText(label).fetchSemanticsNode().boundsInRoot
         assertTrue("expected $expected but was $actual", kotlin.math.abs(expected.top - actual.top) <= 1f)
     }
 
