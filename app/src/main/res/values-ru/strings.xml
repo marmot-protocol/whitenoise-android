@@ -2066,4 +2066,7 @@
     <string name="usage_diagnostics_loading">Загрузка настроек передачи данных…</string>
     <string name="key_export_view_backup">Посмотреть копию</string>
     <string name="key_export_preview_help">Скопируйте или экспортируйте зашифрованную копию в безопасное место. Она скроется через 30 секунд или при выходе с этого экрана.</string>
+    <string name="diagnostics_health">Состояние и производительность</string>
+    <string name="diagnostics_events">События</string>
+    <string name="diagnostics_no_events">Нет событий</string>
 </resources>

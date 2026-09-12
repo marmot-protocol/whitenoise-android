@@ -2004,4 +2004,7 @@
     <string name="usage_diagnostics_loading">Caricamento delle impostazioni di condivisione…</string>
     <string name="key_export_view_backup">Visualizza backup</string>
     <string name="key_export_preview_help">Copia o esporta questo backup cifrato in un luogo sicuro. Viene nascosto dopo 30 secondi o quando lasci questa schermata.</string>
+    <string name="diagnostics_health">Stato e prestazioni</string>
+    <string name="diagnostics_events">Eventi</string>
+    <string name="diagnostics_no_events">Nessun evento</string>
 </resources>

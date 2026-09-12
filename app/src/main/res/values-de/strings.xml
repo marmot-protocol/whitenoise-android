@@ -2020,4 +2020,7 @@
     <string name="usage_diagnostics_loading">Freigabeeinstellungen werden geladen…</string>
     <string name="key_export_view_backup">Backup anzeigen</string>
     <string name="key_export_preview_help">Kopiere oder exportiere dieses verschlüsselte Backup an einen sicheren Ort. Es wird nach 30 Sekunden oder beim Verlassen dieses Bildschirms ausgeblendet.</string>
+    <string name="diagnostics_health">Zustand und Leistung</string>
+    <string name="diagnostics_events">Ereignisse</string>
+    <string name="diagnostics_no_events">Keine Ereignisse</string>
 </resources>

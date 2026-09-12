@@ -2002,4 +2002,7 @@
     <string name="usage_diagnostics_loading">Paylaşım ayarları yükleniyor…</string>
     <string name="key_export_view_backup">Yedeği görüntüle</string>
     <string name="key_export_preview_help">Bu şifreli yedeği güvenli bir yere kopyalayın veya dışa aktarın. 30 saniye sonra veya bu ekrandan ayrıldığınızda gizlenir.</string>
+    <string name="diagnostics_health">Durum ve performans</string>
+    <string name="diagnostics_events">Olaylar</string>
+    <string name="diagnostics_no_events">Olay yok</string>
 </resources>

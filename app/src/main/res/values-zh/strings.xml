@@ -1977,4 +1977,7 @@
     <string name="usage_diagnostics_loading">正在加载分享设置…</string>
     <string name="key_export_view_backup">查看备份</string>
     <string name="key_export_preview_help">将此加密备份复制或导出到安全的地方。30 秒后或离开此屏幕时，备份会隐藏。</string>
+    <string name="diagnostics_health">运行状态与性能</string>
+    <string name="diagnostics_events">事件</string>
+    <string name="diagnostics_no_events">暂无事件</string>
 </resources>

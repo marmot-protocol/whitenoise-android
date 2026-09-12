@@ -2004,4 +2004,7 @@
     <string name="usage_diagnostics_loading">Cargando la configuración de uso compartido…</string>
     <string name="key_export_view_backup">Ver copia de seguridad</string>
     <string name="key_export_preview_help">Copia o exporta esta copia cifrada a un lugar seguro. Se oculta a los 30 segundos o al salir de esta pantalla.</string>
+    <string name="diagnostics_health">Estado y rendimiento</string>
+    <string name="diagnostics_events">Eventos</string>
+    <string name="diagnostics_no_events">Sin eventos</string>
 </resources>

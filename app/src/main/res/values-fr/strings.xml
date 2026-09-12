@@ -2004,4 +2004,7 @@
     <string name="usage_diagnostics_loading">Chargement des paramètres de partage…</string>
     <string name="key_export_view_backup">Voir la sauvegarde</string>
     <string name="key_export_preview_help">Copiez ou exportez cette sauvegarde chiffrée dans un endroit sûr. Elle est masquée après 30 secondes ou lorsque vous quittez cet écran.</string>
+    <string name="diagnostics_health">État et performances</string>
+    <string name="diagnostics_events">Événements</string>
+    <string name="diagnostics_no_events">Aucun événement</string>
 </resources>
