@@ -2,9 +2,14 @@ package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.whitenoise.android.ui.settings.KEY_PACKAGES_CONTENT_TAG
@@ -52,32 +57,67 @@ class KeyPackagesScreenScreenshotTest {
         )
     }
 
+    /** Empty state with the prototype's publication layout and retained-material section. */
+    @Test
+    fun keyPackagesEmptyLight() {
+        capture(emptyList(), "src/test/snapshots/key_packages_empty_light.png", dark = false)
+    }
+
+    /** Monochrome outlines retain the full published provenance and a distinct local-only section. */
+    @Test
+    @Config(sdk = [36], qualifiers = "w360dp-h1600dp-mdpi")
+    fun keyPackagesPublishedAndRetainedAmoled() {
+        val published = keyPackage("34".repeat(32), "ab".repeat(32), true)
+        val retained = keyPackage("56".repeat(32), "", false)
+        capture(
+            listOf(published, retained),
+            "src/test/snapshots/key_packages_published_retained_amoled.png",
+            amoled = true,
+        )
+    }
+
+    /** Publication labels and helpers wrap at a narrow RTL width with 200 percent text. */
+    @Test
+    @Config(sdk = [36], qualifiers = "w320dp-h1600dp-mdpi")
+    fun keyPackagesEmptyRtlLargeFont() {
+        capture(emptyList(), "src/test/snapshots/key_packages_empty_rtl_large_font.png", rtl = true, fontScale = 2f)
+    }
+
     private fun capture(
         packages: List<AccountKeyPackageFfi>,
         path: String,
+        dark: Boolean = true,
+        amoled: Boolean = false,
+        rtl: Boolean = false,
+        fontScale: Float = 1f,
     ) {
         val originalTimeZone = TimeZone.getDefault()
         try {
             TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
             composeRule.setContent {
-                WhiteNoiseTheme(darkTheme = true) {
-                    Surface(modifier = Modifier.fillMaxSize()) {
-                        KeyPackagesContent(
-                            state =
-                                keyPackagesState(
-                                    hasActiveAccount = true,
-                                    loaded = true,
-                                    loading = false,
-                                    working = false,
-                                    packageCount = packages.count { it.relay },
-                                ),
-                            packages = packages,
-                            onBack = {},
-                            onRefresh = {},
-                            onRepublish = {},
-                            onPublishNew = {},
-                            onDelete = {},
-                        )
+                CompositionLocalProvider(
+                    LocalDensity provides Density(1f, fontScale),
+                    LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                ) {
+                    WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
+                        Surface(modifier = Modifier.fillMaxSize()) {
+                            KeyPackagesContent(
+                                state =
+                                    keyPackagesState(
+                                        hasActiveAccount = true,
+                                        loaded = true,
+                                        loading = false,
+                                        working = false,
+                                        packageCount = packages.count { it.relay },
+                                    ),
+                                packages = packages,
+                                onBack = {},
+                                onRefresh = {},
+                                onRepublish = {},
+                                onPublishNew = {},
+                                onDelete = {},
+                            )
+                        }
                     }
                 }
             }

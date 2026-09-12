@@ -1,38 +1,15 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Publish
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,29 +18,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.SettingsGroup
-import dev.ipf.whitenoise.android.ui.common.sectionPanelColor
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.launch
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 internal enum class KeyPackagesSection {
     Publishing,
@@ -80,6 +50,7 @@ internal data class KeyPackagesState(
     val packageCount: Int,
 )
 
+/** Keeps loading distinct from a confirmed empty inventory and gates native mutations while working. */
 internal fun keyPackagesState(
     hasActiveAccount: Boolean,
     loaded: Boolean,
@@ -103,11 +74,13 @@ internal fun keyPackagesState(
 
 private const val NOSTR_EVENT_ID_HEX_LENGTH = 64
 
+/** Only relay records with a complete event identifier can target a Nostr deletion. */
 internal fun AccountKeyPackageFfi.isRelayDeletionTarget(): Boolean =
     relay &&
         eventIdHex.length == NOSTR_EVENT_ID_HEX_LENGTH &&
         eventIdHex.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
 
+/** Published inventory follows the native relay flag, never local retention or a guessed identifier. */
 internal fun List<AccountKeyPackageFfi>.relayBacked(): List<AccountKeyPackageFfi> = filter { it.relay }
 
 internal const val KEY_PACKAGES_CONTENT_TAG = "key-packages-content"
@@ -206,7 +179,7 @@ private fun KeyPackagesScreenForAccount(
     )
 
     pendingDelete?.let { kp ->
-        AlertDialog(
+        WhiteNoiseAlertDialog(
             onDismissRequest = { pendingDelete = null },
             title = { Text(stringResource(R.string.delete_key_package_question)) },
             text = {
@@ -220,9 +193,9 @@ private fun KeyPackagesScreenForAccount(
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    val target = pendingDelete?.takeIf { it.isRelayDeletionTarget() } ?: return@Button
-                    val targetAccount = accountRef ?: return@Button
+                TextButton(onClick = {
+                    val target = pendingDelete?.takeIf { it.isRelayDeletionTarget() } ?: return@TextButton
+                    val targetAccount = accountRef ?: return@TextButton
                     pendingDelete = null
                     working = true
                     scope.launch {
@@ -234,16 +207,16 @@ private fun KeyPackagesScreenForAccount(
                             working = false
                         }
                     }
-                }) { Text(stringResource(R.string.delete)) }
+                }) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                OutlinedButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+/** Publication controls and real inventory in the prototype's Published and Retained Local Material groups. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
 internal fun KeyPackagesContent(
@@ -255,244 +228,95 @@ internal fun KeyPackagesContent(
     onPublishNew: () -> Unit,
     onDelete: (AccountKeyPackageFfi) -> Unit,
 ) {
-    val hasRetainedLocalMaterial = packages.any { it.local && !it.relay }
-    val emptyTitleRes = if (hasRetainedLocalMaterial) R.string.not_published else R.string.no_key_packages_found
-    val emptyHelpRes =
-        if (hasRetainedLocalMaterial) {
-            R.string.retained_key_packages_not_published_help
-        } else {
-            R.string.no_key_packages_found_help
-        }
-
-    Scaffold(
+    val published = packages.relayBacked()
+    val retained = packages.filter { it.local && !it.relay }
+    SettingsScaffold(
+        title = stringResource(R.string.key_packages),
+        onBack = onBack,
         modifier = Modifier.testTag(KEY_PACKAGES_CONTENT_TAG),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.key_packages)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onRefresh, enabled = state.actionsEnabled) {
-                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
-                    }
-                },
-            )
+        topBarActions = {
+            TextButton(onClick = onRefresh, enabled = state.actionsEnabled) { Text(stringResource(R.string.refresh)) }
         },
-    ) { padding ->
-        LazyColumn(
-            Modifier.fillMaxSize().padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            state.sections.forEach { section ->
-                when (section) {
-                    KeyPackagesSection.Publishing -> {
-                        item {
-                            SettingsGroup(title = stringResource(R.string.publishing), icon = Icons.Filled.Publish) {
-                                item {
-                                    Column(
-                                        Modifier.fillMaxWidth().padding(16.dp),
-                                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                                    ) {
-                                        PublishingActions(state = state, onRepublish = onRepublish, onPublishNew = onPublishNew)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    KeyPackagesSection.Published -> {
-                        item {
-                            // Match the SettingsGroup accent-label treatment so this
-                            // heading reads like the other group labels.
-                            Row(
-                                modifier = Modifier.padding(start = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Text(
-                                    stringResource(R.string.published),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                                if (state.showLoadingIndicator) {
-                                    LoadingIndicator(modifier = Modifier.size(16.dp))
-                                }
-                            }
-                        }
-                    }
-
-                    KeyPackagesSection.Empty -> {
-                        item {
-                            SettingsGroup(title = stringResource(emptyTitleRes)) {
-                                item {
-                                    Text(
-                                        stringResource(emptyHelpRes),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(16.dp),
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    KeyPackagesSection.PackageList -> {
-                        itemsIndexed(
-                            packages.relayBacked(),
-                            key = { index, kp -> "${kp.eventIdHex}:$index" },
-                        ) { _, kp ->
-                            KeyPackageCard(
-                                kp = kp,
-                                actionsEnabled = state.packageActionsEnabled,
-                                onDelete = { onDelete(kp) },
-                            )
-                        }
+    ) {
+        SettingsList {
+            item { SettingsSection(stringResource(R.string.publishing)) }
+            item { PublishingActions(state, onRepublish, onPublishNew) }
+            if (state.showLoadingIndicator) {
+                item {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
+                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                        Text(
+                            stringResource(
+                                R.string.developer_work_status,
+                                stringResource(R.string.developer_refresh_packages),
+                                stringResource(R.string.developer_work_running),
+                            ),
+                            modifier =
+                                Modifier
+                                    .testTag("key_packages.loading")
+                                    .semantics { liveRegion = LiveRegionMode.Polite },
+                        )
                     }
                 }
             }
+            item { SettingsSection(stringResource(R.string.published)) }
+            if (KeyPackagesSection.Empty in state.sections) {
+                item {
+                    SettingsExplainer(
+                        stringResource(
+                            if (retained.isEmpty()) {
+                                R.string.developer_not_published
+                            } else {
+                                R.string.retained_key_packages_not_published_help
+                            },
+                        ),
+                    )
+                }
+            }
+            itemsIndexed(published, key = { index, kp -> "published-${kp.eventIdHex}:$index" }) { _, kp ->
+                PublishedKeyPackage(kp, state.packageActionsEnabled, onDelete = { onDelete(kp) })
+            }
+            item { SettingsSection(stringResource(R.string.developer_retained)) }
+            val packagesResolved =
+                KeyPackagesSection.Empty in state.sections ||
+                    KeyPackagesSection.PackageList in state.sections
+            if (retained.isEmpty() && !state.showLoadingIndicator && packagesResolved) {
+                item { SettingsExplainer(stringResource(R.string.developer_no_retained)) }
+            }
+            itemsIndexed(retained, key = { index, kp -> "local-${kp.keyPackageId}:$index" }) { _, kp ->
+                RetainedKeyPackage(kp)
+            }
+            item { SettingsExplainer(stringResource(R.string.developer_retained_help)) }
         }
     }
 }
 
+/** Republish preserves the native material; the full-width tonal action asks production to rotate it. */
 @Composable
+@Suppress("FunctionNaming")
 private fun PublishingActions(
     state: KeyPackagesState,
     onRepublish: () -> Unit,
     onPublishNew: () -> Unit,
 ) {
-    Text(
-        stringResource(R.string.key_package_publishing_help),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        style = MaterialTheme.typography.bodySmall,
-    )
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        OutlinedButton(
-            onClick = onRepublish,
-            enabled = state.actionsEnabled,
-            modifier = Modifier.weight(1f),
-        ) {
-            Icon(Icons.Default.Refresh, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.republish))
-        }
-        Button(
-            onClick = onPublishNew,
-            enabled = state.actionsEnabled,
-            modifier = Modifier.weight(1f),
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.publish_new))
-        }
-    }
-}
-
-@Composable
-private fun KeyPackageCard(
-    kp: AccountKeyPackageFfi,
-    actionsEnabled: Boolean,
-    onDelete: () -> Unit,
-) {
-    val localLabel = stringResource(R.string.local)
-    val relayLabel = stringResource(R.string.relay)
-    val unknownLabel = stringResource(R.string.unknown)
-    val clipboard = LocalClipboardManager.current
-    val copyKeyPackageLabel = stringResource(R.string.copy)
-    // Each package renders as its own fully-rounded segment, matching the
-    // grouped-list language of the rest of Settings.
-    Surface(
-        modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(20.dp)),
-        shape = RoundedCornerShape(20.dp),
-        color = sectionPanelColor(),
-    ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    // Tap the shortened key-package id header to copy the full value.
-                    Text(
-                        IdentityFormatter.short(kp.keyPackageId),
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier =
-                            Modifier.clickable(
-                                onClickLabel = copyKeyPackageLabel,
-                                role = Role.Button,
-                            ) {
-                                clipboard.setText(AnnotatedString(kp.keyPackageId))
-                            },
-                    )
-                    Text(
-                        formatPublishedAt(kp.publishedAt, stringResource(R.string.unknown_publish_time), stringResource(R.string.published_at)),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                if (kp.isRelayDeletionTarget()) {
-                    IconButton(onClick = onDelete, enabled = actionsEnabled) {
-                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_key_package))
-                    }
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                keyPackageSourceLabels(kp, localLabel, relayLabel, unknownLabel).forEach { label ->
-                    AssistChip(onClick = {}, label = { Text(label, style = MaterialTheme.typography.labelSmall) })
-                }
-            }
-            DiagnosticRow(
-                stringResource(R.string.event),
-                IdentityFormatter.short(kp.eventIdHex),
-                copyValue = kp.eventIdHex,
-            )
-            DiagnosticRow(
-                stringResource(R.string.ref),
-                IdentityFormatter.short(kp.keyPackageRefHex),
-                copyValue = kp.keyPackageRefHex,
-            )
-            DiagnosticRow(stringResource(R.string.size), stringResource(R.string.bytes_count, kp.keyPackageBytes.toLong()))
-            if (kp.sourceRelays.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(stringResource(R.string.source_relays), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    kp.sourceRelays.forEach { relay ->
-                        Text(relay, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
-                    }
+    SettingsGroup {
+        row("republish") { context ->
+            SettingsGroupPanel(context) {
+                TextButton(onClick = onRepublish, enabled = state.actionsEnabled, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.republish))
                 }
             }
         }
     }
-}
-
-private fun keyPackageSourceLabels(
-    kp: AccountKeyPackageFfi,
-    localLabel: String,
-    relayLabel: String,
-    unknownLabel: String,
-): List<String> {
-    val out = mutableListOf<String>()
-    if (kp.local) out += localLabel
-    if (kp.relay) out += relayLabel
-    if (out.isEmpty()) out += unknownLabel
-    return out
-}
-
-private val publishedAtFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.getDefault()).withZone(ZoneId.systemDefault())
-
-private fun formatPublishedAt(
-    unixSeconds: ULong,
-    unknown: String,
-    format: String,
-): String {
-    if (unixSeconds == 0uL) return unknown
-    // ULong > Long.MAX_VALUE wraps to a negative epoch; Instant then rejects
-    // anything below Instant.MIN. Garbage from a malicious relay shouldn't
-    // crash the KeyPackage screen — fall back to "unknown" instead.
-    if (unixSeconds > Long.MAX_VALUE.toULong()) return unknown
-    val instant = runCatching { Instant.ofEpochSecond(unixSeconds.toLong()) }.getOrNull() ?: return unknown
-    return String.format(format, publishedAtFormatter.format(instant))
+    SettingsExplainer(stringResource(R.string.developer_republish_help))
+    WhiteNoiseFilledTonalButton(
+        onClick = onPublishNew,
+        enabled = state.actionsEnabled,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = WhiteNoiseSpacing.Related)
+                .testTag("key_packages.publish"),
+    ) { Text(stringResource(R.string.developer_publish_new)) }
+    SettingsExplainer(stringResource(R.string.developer_rotate_help))
 }
