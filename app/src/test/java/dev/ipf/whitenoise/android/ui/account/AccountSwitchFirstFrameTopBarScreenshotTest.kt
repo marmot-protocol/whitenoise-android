@@ -12,10 +12,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -63,6 +70,7 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
     }
 
     @Test
+    @Suppress("LongMethod") // Keep cached seed, first header and real selector checks in one ordered flow.
     fun locallySeededActiveAndOtherAccountProfilesOwnFirstFrame() =
         runTest {
             val appState = appState(includeActiveProfile = true)
@@ -100,31 +108,40 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
                 }
             }
 
-            composeRule
-                .onNodeWithTag(otherAccountAvatarTag(STUDIO_REF), useUnmergedTree = true)
-                .assertIsDisplayed()
-            composeRule
-                .onNodeWithTag(otherAccountAvatarTag(WORK_REF), useUnmergedTree = true)
-                .assertIsDisplayed()
             composeRule.onNodeWithContentDescription(ACTIVE_NAME, substring = true).assertIsDisplayed()
-            composeRule.onNodeWithContentDescription(STUDIO_NAME, substring = true).assertIsDisplayed()
-            composeRule.onNodeWithContentDescription(WORK_NAME, substring = true).assertIsDisplayed()
+            assertEquals(ACTIVE_REF, appState.activeAccountRef)
             composeRule
                 .onNodeWithTag(SCREENSHOT_TAG)
                 .captureRoboImage("src/test/snapshots/account_switch_first_frame_seeded_profiles_light.png")
+
+            // The active avatar owns the first header frame; other cached identities now live in the selector.
+            composeRule.onNodeWithTag("chats.switchProfile").assertHasClickAction().performClick()
+            composeRule.onNodeWithTag(profileRowTag(ACTIVE_REF)).assertIsDisplayed().assertIsSelected()
+            composeRule.onNodeWithTag(profileRowTag(STUDIO_REF)).assertIsDisplayed().assertIsNotSelected()
+            composeRule.onNodeWithTag(profileRowTag(WORK_REF)).assertIsDisplayed().assertIsNotSelected()
+            composeRule.onNodeWithText(ACTIVE_NAME).assertIsDisplayed()
+            composeRule.onNodeWithText(STUDIO_NAME).assertIsDisplayed()
+            composeRule.onNodeWithText(WORK_NAME).assertIsDisplayed()
+            assertEquals(ACTIVE_AVATAR, appState.avatarUrl(ACTIVE_ID))
+            assertEquals(STUDIO_AVATAR, appState.avatarUrl(STUDIO_ID))
+            assertEquals(WORK_AVATAR, appState.avatarUrl(WORK_ID))
+            composeRule
+                .onNodeWithTag(ACCOUNT_SELECTOR_CONTENT_TAG)
+                .captureRoboImage("src/test/snapshots/account_switch_seeded_profiles_selector_light.png")
         }
 
     @Test
-    fun overlappingAccountTargetsWithOverflowLtr() {
-        captureOverlappingAccountStack(LayoutDirection.Ltr, "account_switch_overlapping_targets_ltr.png")
+    fun allAccountTargetsRemainReachableInSelectorLtr() {
+        captureAllAccountTargets(LayoutDirection.Ltr, "account_switch_overlapping_targets_ltr.png")
     }
 
     @Test
-    fun overlappingAccountTargetsWithOverflowRtl() {
-        captureOverlappingAccountStack(LayoutDirection.Rtl, "account_switch_overlapping_targets_rtl.png")
+    fun allAccountTargetsRemainReachableInSelectorRtl() {
+        captureAllAccountTargets(LayoutDirection.Rtl, "account_switch_overlapping_targets_rtl.png")
     }
 
-    private fun captureOverlappingAccountStack(
+    @Suppress("LongMethod") // Keep both directions on the same real header-to-selector route.
+    private fun captureAllAccountTargets(
         layoutDirection: LayoutDirection,
         snapshotName: String,
     ) {
@@ -163,11 +180,31 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
             }
         }
 
-        composeRule.onNodeWithTag(OTHER_ACCOUNT_OVERFLOW_TAG, useUnmergedTree = true).assertIsDisplayed()
+        assertEquals(ACTIVE_REF, appState.activeAccountRef)
         composeRule
-            .onNodeWithTag(SCREENSHOT_TAG)
+            .onNodeWithTag("chats.switchProfile")
+            .assertIsDisplayed()
+            .assertHasClickAction()
+            .performClick()
+        val labels = listOf(ACTIVE_REF, STUDIO_REF, WORK_REF, "travel", "community", "archive")
+        labels.forEachIndexed { index, label ->
+            composeRule.onNode(hasScrollToIndexAction()).performScrollToIndex(index)
+            val row = composeRule.onNodeWithTag(profileRowTag(label))
+            row.assertIsDisplayed().assertHasClickAction()
+            if (label == ACTIVE_REF) row.assertIsSelected() else row.assertIsNotSelected()
+        }
+        // Former overflow accounts remain reachable through the real scrolling list; pinned actions stay available.
+        composeRule.onNodeWithTag("profile_switcher.add_profile").assertIsDisplayed().assertHasClickAction()
+        composeRule.onNodeWithTag("profile_switcher.settings").assertIsDisplayed().assertHasClickAction()
+        assertEquals(ACTIVE_REF, appState.activeAccountRef)
+        composeRule.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
+        composeRule.onNodeWithTag(profileRowTag(ACTIVE_REF)).assertIsDisplayed()
+        composeRule
+            .onNodeWithTag(ACCOUNT_SELECTOR_CONTENT_TAG)
             .captureRoboImage("src/test/snapshots/$snapshotName")
     }
+
+    private fun profileRowTag(label: String): String = "profile_switcher.profile.$label"
 
     private fun appState(
         otherAccounts: List<AccountSummaryFfi> =

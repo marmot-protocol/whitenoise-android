@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import android.content.Context
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
@@ -13,16 +12,15 @@ import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.SavedStateHandle
-import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.DiagnosticsExporterStatusFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshot
 import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshotHandoff
 import dev.ipf.whitenoise.android.state.AppPhase
@@ -63,8 +61,9 @@ class DevicePrivacyScreenScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/usage_diagnostics_welcome_deferred.png")
         composeRule.onNodeWithText("Sign In").performClick()
         composeRule
-            .onNodeWithText(ApplicationProvider.getApplicationContext<Context>().getString(R.string.nostr_nsec))
+            .onNodeWithTag("onboarding.sign_in.private_key")
             .assertIsDisplayed()
+            .assertIsEnabled()
         composeRule.onNodeWithText("Help Improve White Noise").assertDoesNotExist()
         assertEquals(AppPhase.Onboarding, state.phase)
         assertTrue(state.diagnostics.requiresChoice)

@@ -6,6 +6,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,8 +18,11 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
+import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -74,7 +78,11 @@ class DiagnosticCopySnackbarScreenshotTest {
                     ),
                 )
             }
-            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale),
+                LocalSnackbarBottomInset provides remember { mutableStateOf(0.dp) },
+                LocalSnackbarContentInset provides remember { mutableStateOf(0.dp) },
+            ) {
                 WhiteNoiseTheme(darkTheme = darkTheme) {
                     Surface(modifier = Modifier.fillMaxSize().testTag(SCREEN_TAG)) {
                         Box(modifier = Modifier.fillMaxSize()) {
