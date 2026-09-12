@@ -377,7 +377,7 @@ class AccountSetupContentTest {
         show(AccountSetupState(snapshot = setupSnapshot(ready = true)))
         composeRule.onNodeWithTag("setup-later").assertDoesNotExist()
         composeRule.onNodeWithTag("setup-details").assertDoesNotExist()
-        composeRule.onNodeWithText("Follow list").assertDoesNotExist()
+        composeRule.onNodeWithText("Follow list").assertExists()
     }
 
     /** Mounts the stateless screen with callback recorders for the supplied native setup state. */
@@ -397,6 +397,9 @@ class AccountSetupContentTest {
                     { details++ },
                 )
             }
+        }
+        state.checklistInspectionStep?.takeIf { state.editor == null }?.let {
+            composeRule.onNodeWithTag("setup-step-${it.name}").performScrollTo().performClick()
         }
     }
 }

@@ -3,7 +3,6 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -15,6 +14,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 
 /** Orders presentation only: every offered action retains its exact native revision, recovery epoch, and callback. */
 @Composable
@@ -72,7 +72,7 @@ private fun SetupActionButton(
                 enabled,
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
             ) { Text(label) }
-        primary -> Button(onClick, modifier, enabled) { Text(label) }
+        primary -> WhiteNoiseButton(onClick, modifier, enabled) { Text(label) }
         action == OnboardingActionFfi.RETRY || action == OnboardingActionFfi.CANCEL_REPAIR ->
             TextButton(onClick, modifier, enabled) { Text(label) }
         else -> OutlinedButton(onClick, modifier, enabled) { Text(label) }
