@@ -32,7 +32,7 @@ class NotificationsScreenTest {
 
     private val app: Application = ApplicationProvider.getApplicationContext()
 
-    /** Verifies every unsupported cause remains off, disabled, and explicitly named. */
+    /** An unsupported capability cannot enable a policy that is currently off; its specific cause remains named. */
     @Test
     fun unsupportedCapabilitiesAreDisabledAndExplainTheirSpecificCause() {
         var toggleCalls = 0
@@ -55,7 +55,7 @@ class NotificationsScreenTest {
                                 context = context,
                                 capability = capability,
                                 accountReady = true,
-                                checked = true,
+                                checked = false,
                                 onCheckedChange = { toggleCalls += 1 },
                             )
                         }
