@@ -2010,4 +2010,13 @@
     <string name="developer_package_source">來源</string>
     <string name="app_unlock">解鎖</string>
     <string name="app_unlock_checking">正在檢查應用程式保護…</string>
+    <string name="support_contact_title">White Noise 支援</string>
+    <string name="support_contact_subtitle">問題、故障和建議</string>
+    <string name="support_contact_explainer">詢問功能如何運作、回報問題或分享建議。</string>
+    <string name="support_relays_attention">個人資料中繼需要處理</string>
+    <string name="support_open_relays">開啟中繼</string>
+    <string name="support_relays_review">檢查此個人資料的接收中繼清單。</string>
+    <string name="support_receiving_relay_required">開始支援聊天前，請為此個人資料新增並發布接收中繼。</string>
+    <string name="support_relays_loading">正在檢查此個人資料的中繼設定…</string>
+    <string name="support_relays_unavailable">無法檢查此個人資料的中繼設定。請重試或開啟中繼。</string>
 </resources>

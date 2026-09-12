@@ -2037,4 +2037,13 @@
     <string name="developer_package_source">Origine</string>
     <string name="app_unlock">Sblocca</string>
     <string name="app_unlock_checking">Verifica della protezione dell’app…</string>
+    <string name="support_contact_title">Assistenza White Noise</string>
+    <string name="support_contact_subtitle">Domande, problemi e suggerimenti</string>
+    <string name="support_contact_explainer">Chiedi come funziona qualcosa, segnala un problema o condividi un suggerimento.</string>
+    <string name="support_relays_attention">I relay del profilo richiedono attenzione</string>
+    <string name="support_open_relays">Apri relay</string>
+    <string name="support_relays_review">Controlla la lista dei relay di ricezione di questo profilo.</string>
+    <string name="support_receiving_relay_required">Aggiungi e pubblica un relay di ricezione per questo profilo prima di avviare una chat con l’assistenza.</string>
+    <string name="support_relays_loading">Verifica della configurazione dei relay di questo profilo…</string>
+    <string name="support_relays_unavailable">Impossibile verificare la configurazione dei relay di questo profilo. Riprova o apri Relay.</string>
 </resources>

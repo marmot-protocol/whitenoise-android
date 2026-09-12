@@ -2037,4 +2037,13 @@
     <string name="developer_package_source">Source</string>
     <string name="app_unlock">Déverrouiller</string>
     <string name="app_unlock_checking">Vérification de la protection de l’application…</string>
+    <string name="support_contact_title">Assistance White Noise</string>
+    <string name="support_contact_subtitle">Questions, problèmes et suggestions</string>
+    <string name="support_contact_explainer">Demandez comment fonctionne une fonctionnalité, signalez un problème ou partagez une suggestion.</string>
+    <string name="support_relays_attention">Les relais du profil nécessitent votre attention</string>
+    <string name="support_open_relays">Ouvrir les relais</string>
+    <string name="support_relays_review">Vérifiez la liste des relais de réception de ce profil.</string>
+    <string name="support_receiving_relay_required">Ajoutez et publiez un relais de réception pour ce profil avant de démarrer une discussion avec l’assistance.</string>
+    <string name="support_relays_loading">Vérification de la configuration des relais de ce profil…</string>
+    <string name="support_relays_unavailable">Impossible de vérifier la configuration des relais de ce profil. Réessayez ou ouvrez les relais.</string>
 </resources>

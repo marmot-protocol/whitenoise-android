@@ -2149,4 +2149,13 @@
     <string name="developer_package_source">Source</string>
     <string name="app_unlock">Unlock</string>
     <string name="app_unlock_checking">Checking app protection…</string>
+    <string name="support_contact_title">White Noise Support</string>
+    <string name="support_contact_subtitle">Questions, problems, and suggestions</string>
+    <string name="support_contact_explainer">Ask how something works, report a problem, or share a suggestion.</string>
+    <string name="support_relays_attention">Profile relays need attention</string>
+    <string name="support_open_relays">Open Relays</string>
+    <string name="support_relays_review">Review this profile’s receiving relay list.</string>
+    <string name="support_receiving_relay_required">Add and publish a receiving relay for this profile before starting a support chat.</string>
+    <string name="support_relays_loading">Checking this profile’s relay configuration…</string>
+    <string name="support_relays_unavailable">Could not check this profile’s relay configuration. Retry or open Relays.</string>
 </resources>

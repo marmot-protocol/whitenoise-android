@@ -2037,4 +2037,13 @@
     <string name="developer_package_source">Origem</string>
     <string name="app_unlock">Desbloquear</string>
     <string name="app_unlock_checking">Verificando a proteção do aplicativo…</string>
+    <string name="support_contact_title">Suporte do White Noise</string>
+    <string name="support_contact_subtitle">Perguntas, problemas e sugestões</string>
+    <string name="support_contact_explainer">Pergunte como algo funciona, informe um problema ou compartilhe uma sugestão.</string>
+    <string name="support_relays_attention">Os relés do perfil precisam de atenção</string>
+    <string name="support_open_relays">Abrir relés</string>
+    <string name="support_relays_review">Confira a lista de relés de recepção deste perfil.</string>
+    <string name="support_receiving_relay_required">Adicione e publique um relé de recepção para este perfil antes de iniciar uma conversa com o suporte.</string>
+    <string name="support_relays_loading">Verificando a configuração de relés deste perfil…</string>
+    <string name="support_relays_unavailable">Não foi possível verificar a configuração de relés deste perfil. Tente novamente ou abra Relés.</string>
 </resources>

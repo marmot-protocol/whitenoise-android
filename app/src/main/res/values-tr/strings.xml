@@ -2035,4 +2035,13 @@
     <string name="developer_package_source">Kaynak</string>
     <string name="app_unlock">Kilidi aç</string>
     <string name="app_unlock_checking">Uygulama koruması kontrol ediliyor…</string>
+    <string name="support_contact_title">White Noise Destek</string>
+    <string name="support_contact_subtitle">Sorular, sorunlar ve öneriler</string>
+    <string name="support_contact_explainer">Bir şeyin nasıl çalıştığını sorun, sorun bildirin veya öneri paylaşın.</string>
+    <string name="support_relays_attention">Profil aktarıcıları dikkat gerektiriyor</string>
+    <string name="support_open_relays">Aktarıcıları Aç</string>
+    <string name="support_relays_review">Bu profilin alıcı aktarıcı listesini inceleyin.</string>
+    <string name="support_receiving_relay_required">Destek sohbeti başlatmadan önce bu profil için bir alıcı aktarıcı ekleyip yayınlayın.</string>
+    <string name="support_relays_loading">Bu profilin aktarıcı yapılandırması kontrol ediliyor…</string>
+    <string name="support_relays_unavailable">Bu profilin aktarıcı yapılandırması kontrol edilemedi. Yeniden deneyin veya Aktarıcıları açın.</string>
 </resources>

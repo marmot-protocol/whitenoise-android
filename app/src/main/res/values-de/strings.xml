@@ -2053,4 +2053,13 @@
     <string name="developer_package_source">Quelle</string>
     <string name="app_unlock">Entsperren</string>
     <string name="app_unlock_checking">App-Schutz wird geprüft…</string>
+    <string name="support_contact_title">Hilfe von White Noise</string>
+    <string name="support_contact_subtitle">Fragen, Probleme und Vorschläge</string>
+    <string name="support_contact_explainer">Frage nach einer Funktion, melde ein Problem oder teile einen Vorschlag.</string>
+    <string name="support_relays_attention">Profil-Relays benötigen Aufmerksamkeit</string>
+    <string name="support_open_relays">Relays öffnen</string>
+    <string name="support_relays_review">Prüfe die Empfangs-Relay-Liste dieses Profils.</string>
+    <string name="support_receiving_relay_required">Füge für dieses Profil ein Empfangs-Relay hinzu und veröffentliche es, bevor du einen Support-Chat startest.</string>
+    <string name="support_relays_loading">Relay-Konfiguration dieses Profils wird geprüft…</string>
+    <string name="support_relays_unavailable">Die Relay-Konfiguration dieses Profils konnte nicht geprüft werden. Versuche es erneut oder öffne Relays.</string>
 </resources>

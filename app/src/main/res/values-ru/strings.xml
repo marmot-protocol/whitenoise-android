@@ -2099,4 +2099,13 @@
     <string name="developer_package_source">Источник</string>
     <string name="app_unlock">Разблокировать</string>
     <string name="app_unlock_checking">Проверка защиты приложения…</string>
+    <string name="support_contact_title">Поддержка White Noise</string>
+    <string name="support_contact_subtitle">Вопросы, проблемы и предложения</string>
+    <string name="support_contact_explainer">Узнайте, как что-то работает, сообщите о проблеме или поделитесь предложением.</string>
+    <string name="support_relays_attention">Ретрансляторы профиля требуют внимания</string>
+    <string name="support_open_relays">Открыть ретрансляторы</string>
+    <string name="support_relays_review">Проверьте список ретрансляторов для получения сообщений этого профиля.</string>
+    <string name="support_receiving_relay_required">Добавьте и опубликуйте ретранслятор для получения сообщений этого профиля перед началом чата с поддержкой.</string>
+    <string name="support_relays_loading">Проверка настроек ретрансляторов профиля…</string>
+    <string name="support_relays_unavailable">Не удалось проверить настройки ретрансляторов профиля. Повторите попытку или откройте ретрансляторы.</string>
 </resources>
