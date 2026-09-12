@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +20,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +31,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 private object ChoiceDialogDefaults {
@@ -160,3 +163,37 @@ private fun dialogSelectionColor(): Color =
     } else {
         MaterialTheme.colorScheme.surfaceContainerHighest
     }
+
+/**
+ * Material alert dialog on the prototype's dialog surface: low container, variant body text, an AMOLED outline, and
+ * the lowest container for any text field inside.
+ */
+@Suppress("FunctionNaming", "LongParameterList")
+@Composable
+internal fun WhiteNoiseAlertDialog(
+    onDismissRequest: () -> Unit,
+    confirmButton: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    dismissButton: (@Composable () -> Unit)? = null,
+    icon: (@Composable () -> Unit)? = null,
+    title: (@Composable () -> Unit)? = null,
+    text: (@Composable () -> Unit)? = null,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val outline = amoledOutlineBorder()
+    CompositionLocalProvider(LocalWhiteNoiseTextFieldContainerColor provides scheme.surfaceContainerLowest) {
+        AlertDialog(
+            onDismissRequest = onDismissRequest,
+            confirmButton = confirmButton,
+            modifier = if (outline != null) modifier.border(outline, MaterialTheme.shapes.extraLarge) else modifier,
+            dismissButton = dismissButton,
+            icon = icon,
+            title = title,
+            text = text,
+            containerColor = scheme.surfaceContainerLow,
+            iconContentColor = scheme.onSurfaceVariant,
+            titleContentColor = scheme.onSurface,
+            textContentColor = scheme.onSurfaceVariant,
+        )
+    }
+}
