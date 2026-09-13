@@ -10094,41 +10094,9 @@
         ]
       },
       {
-        "surface": "string:app_update_settings_available_with_count",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.app_update_settings_available_with_count",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "string:app_update_settings_available",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.app_update_settings_available",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
         "surface": "string:app_update_settings_check_failed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "R.string.app_update_settings_check_failed",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "string:app_update_settings_current",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.app_update_settings_current",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "string:app_update_settings_unknown",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.app_update_settings_unknown",
         "test_ids": [
           "SET-001"
         ]
@@ -11109,7 +11077,11 @@
         "anchor": "R.string.error_not_white_noise_profile_qr",
         "test_ids": [
           "SET-001",
-          "NAV-004"
+          "NAV-004",
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
         ]
       },
       {
@@ -15791,17 +15763,6 @@
         ]
       },
       {
-        "surface": "setting:error_not_white_noise_profile_qr",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
-        "anchor": "R.string.error_not_white_noise_profile_qr",
-        "test_ids": [
-          "NCH-001",
-          "NCH-002",
-          "ACC-003",
-          "ACC-017"
-        ]
-      },
-      {
         "surface": "setting:invite_message",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
         "anchor": "R.string.invite_message",
@@ -16014,17 +15975,6 @@
         "surface": "setting:retry",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
         "anchor": "R.string.retry",
-        "test_ids": [
-          "NCH-001",
-          "NCH-002",
-          "ACC-003",
-          "ACC-017"
-        ]
-      },
-      {
-        "surface": "setting:show_my_qr_code",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
-        "anchor": "R.string.show_my_qr_code",
         "test_ids": [
           "NCH-001",
           "NCH-002",
@@ -16576,6 +16526,320 @@
         "anchor": "R.string.chat_row_removed_description",
         "test_ids": [
           "CHL-002"
+        ]
+      },
+      {
+        "surface": "R.string.copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRelayFeedbackDialog.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "R.string.ok",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRelayFeedbackDialog.kt",
+        "anchor": "R.string.ok",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "R.string.chats_check_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsNewMessageFab.kt",
+        "anchor": "R.string.chats_check_relays",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "R.string.new_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsNewMessageFab.kt",
+        "anchor": "R.string.new_message",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "R.string.members_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "R.string.members_count",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.person_add_to_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "R.string.person_add_to_group",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.person_group_memberships_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "R.string.person_group_memberships_unavailable",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.person_groups_in_common",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "R.string.person_groups_in_common",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.person_no_groups_in_common",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "R.string.person_no_groups_in_common",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.profile_add_to_another_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "R.string.profile_add_to_another_group",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.copied",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "ACC-001",
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.copy_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.copy_public_key",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.couldnt_read_profile_code",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.couldnt_read_profile_code",
+        "test_ids": [
+          "ACC-001"
+        ]
+      },
+      {
+        "surface": "R.string.message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.message",
+        "test_ids": [
+          "ACC-002",
+          "PRO-005"
+        ]
+      },
+      {
+        "surface": "R.string.not_copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.not_copied",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.person_add_to_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.person_add_to_group",
+        "test_ids": [
+          "ACC-008",
+          "PRO-005"
+        ]
+      },
+      {
+        "surface": "R.string.person_groups_in_common",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.person_groups_in_common",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.person_lightning_display",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.person_lightning_display",
+        "test_ids": [
+          "ACC-001",
+          "PRO-001"
+        ]
+      },
+      {
+        "surface": "R.string.person_profile_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.person_profile_title",
+        "test_ids": [
+          "ACC-001"
+        ]
+      },
+      {
+        "surface": "R.string.person_profile_with_role",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.person_profile_with_role",
+        "test_ids": [
+          "ACC-001",
+          "GRP-007"
+        ]
+      },
+      {
+        "surface": "R.string.person_promote_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.person_promote_groups",
+        "test_ids": [
+          "GRP-007",
+          "PRO-005"
+        ]
+      },
+      {
+        "surface": "R.string.person_start_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.person_start_group",
+        "test_ids": [
+          "PRO-005",
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_banner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.profile_banner",
+        "test_ids": [
+          "ACC-004",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_follow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.profile_follow",
+        "test_ids": [
+          "PRO-003"
+        ]
+      },
+      {
+        "surface": "R.string.profile_nickname_and_notes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.profile_nickname_and_notes",
+        "test_ids": [
+          "PRO-004",
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "R.string.profile_nip05_verified",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.profile_nip05_verified",
+        "test_ids": [
+          "ACC-001",
+          "PRO-001"
+        ]
+      },
+      {
+        "surface": "R.string.profile_unfollow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.profile_unfollow",
+        "test_ids": [
+          "PRO-003"
+        ]
+      },
+      {
+        "surface": "R.string.profile_view_picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.profile_view_picture",
+        "test_ids": [
+          "ACC-004"
+        ]
+      },
+      {
+        "surface": "R.string.copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileFeedbackDialog.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "PRO-003",
+          "ACC-008",
+          "PRO-005"
+        ]
+      },
+      {
+        "surface": "R.string.ok",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileFeedbackDialog.kt",
+        "anchor": "R.string.ok",
+        "test_ids": [
+          "PRO-003",
+          "ACC-008",
+          "PRO-005"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_search_open_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalPersonRow.kt",
+        "anchor": "R.string.chat_list_search_open_profile",
+        "test_ids": [
+          "FIND-005",
+          "FIND-007"
+        ]
+      },
+      {
+        "surface": "R.string.app_update_row_unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.app_update_row_unknown",
+        "test_ids": [
+          "SET-001",
+          "SYS-008"
+        ]
+      },
+      {
+        "surface": "R.string.app_update_row_current",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.app_update_row_current",
+        "test_ids": [
+          "SET-001",
+          "SYS-008"
+        ]
+      },
+      {
+        "surface": "R.string.app_update_row_available",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.app_update_row_available",
+        "test_ids": [
+          "SET-001",
+          "SYS-008"
+        ]
+      },
+      {
+        "surface": "Settings update retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun runSettingsAppUpdateAction(",
+        "test_ids": [
+          "SYS-008"
         ]
       }
     ],

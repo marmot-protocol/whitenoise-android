@@ -24,6 +24,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,14 +73,28 @@ private object ShareConnectDefaults {
  * Share & Connect for the active profile: identity, copyable public key, QR code and the scanner that opens a scanned
  * profile through the production profile presentation.
  */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod") // One account-owned route and scanner receipt.
 @Composable
 internal fun ShareConnectScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
+    isCurrent: () -> Boolean = { true },
+    onScannedProfile: ((QrScanOutcome) -> Unit)? = null,
+    scannerContent: @Composable (() -> Unit, (String) -> Unit) -> Unit = { dismiss, scan ->
+        QrScannerSheet(onDismiss = dismiss, onScan = scan)
+    },
 ) {
     val account = appState.activeAccount ?: return
     val accountIdHex = account.accountIdHex
+    val runtime = appState.runtimeGeneration
+    var routeActive by remember(accountIdHex, runtime) { mutableStateOf(true) }
+    DisposableEffect(accountIdHex, runtime) { onDispose { routeActive = false } }
+
+    fun ownsScreen(): Boolean {
+        val sameOwner = appState.activeAccountRef == account.label && appState.runtimeGeneration == runtime
+        val blocked = appState.signOutInProgress || appState.wipeInProgress
+        return routeActive && sameOwner && !blocked && isCurrent()
+    }
     val npub = appState.npubForDisplay(accountIdHex)
     val profile =
         ShareConnectProfile(
@@ -94,7 +109,8 @@ internal fun ShareConnectScreen(
     val clipboard = LocalClipboardManager.current
     val shareProfileTitle = stringResource(R.string.share_profile)
     var copied by rememberSaveable(accountIdHex) { mutableStateOf(false) }
-    var scannerOpen by rememberSaveable(accountIdHex) { mutableStateOf(false) }
+    var scannerSession by remember(accountIdHex, runtime) { mutableStateOf<Long?>(null) }
+    var nextScannerSession by remember(accountIdHex, runtime) { mutableStateOf(0L) }
     var scanInvalid by rememberSaveable(accountIdHex) { mutableStateOf(false) }
 
     LaunchedEffect(copied) {
@@ -109,30 +125,52 @@ internal fun ShareConnectScreen(
         qrContent = link?.qrUri ?: npub,
         copied = copied,
         scanInvalid = scanInvalid,
-        onBack = onBack,
-        onShare = {
+        onBack = {
+            if (ownsScreen()) {
+                routeActive = false
+                onBack()
+            }
+        },
+        onShare = share@{
+            if (!ownsScreen()) return@share
             val sendIntent =
                 Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, link?.uri ?: npub)
             context.startActivity(Intent.createChooser(sendIntent, shareProfileTitle))
         },
-        onCopy = {
+        onCopy = copy@{
+            if (!ownsScreen()) return@copy
             clipboard.setText(AnnotatedString(npub))
             copied = true
         },
         onOpenScanner = {
-            scanInvalid = false
-            scannerOpen = true
+            if (ownsScreen() && scannerSession == null) {
+                scanInvalid = false
+                nextScannerSession++
+                scannerSession = nextScannerSession
+            }
         },
     )
 
-    if (scannerOpen) {
-        QrScannerSheet(
-            onDismiss = { scannerOpen = false },
-            onScan = { raw ->
-                scannerOpen = false
+    val scanSession = scannerSession
+    if (scanSession != null && ownsScreen()) {
+        scannerContent(
+            { if (ownsScreen() && scannerSession == scanSession) scannerSession = null },
+            scan@{ raw ->
+                if (!ownsScreen() || scannerSession != scanSession) return@scan
+                scannerSession = null
                 when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.ViewProfile)) {
-                    is QrScanOutcome.OpenProfileNpub -> appState.presentProfile(outcome.npub)
-                    is QrScanOutcome.OpenProfileNprofile -> appState.presentNostrProfile(outcome.nprofile)
+                    is QrScanOutcome.OpenProfileNpub ->
+                        if (onScannedProfile != null) {
+                            onScannedProfile(outcome)
+                        } else {
+                            appState.presentProfile(outcome.npub)
+                        }
+                    is QrScanOutcome.OpenProfileNprofile ->
+                        if (onScannedProfile != null) {
+                            onScannedProfile(outcome)
+                        } else {
+                            appState.presentNostrProfile(outcome.nprofile)
+                        }
                     QrScanOutcome.Invalid, is QrScanOutcome.FillRecipientQuery -> scanInvalid = true
                 }
             },

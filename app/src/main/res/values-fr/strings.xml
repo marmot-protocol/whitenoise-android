@@ -2133,4 +2133,7 @@
 
     <string name="chat_selection_title">Sélectionner des discussions</string>
     <string name="chats_check_relays">Vérifier les relais</string>
+    <string name="app_update_row_unknown">Rechercher des mises à jour</string>
+    <string name="app_update_row_current">À jour</string>
+    <string name="app_update_row_available">La version %1$s est disponible sur Zapstore.</string>
 </resources>

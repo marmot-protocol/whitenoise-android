@@ -2131,4 +2131,7 @@
 
     <string name="chat_selection_title">Sohbetleri seç</string>
     <string name="chats_check_relays">Aktarıcıları kontrol et</string>
+    <string name="app_update_row_unknown">Güncellemeleri kontrol et</string>
+    <string name="app_update_row_current">Güncel</string>
+    <string name="app_update_row_available">%1$s sürümü Zapstore’da mevcut.</string>
 </resources>

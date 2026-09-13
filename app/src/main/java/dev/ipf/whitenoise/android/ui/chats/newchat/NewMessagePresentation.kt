@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -74,7 +72,6 @@ internal data class NewMessageActions(
     val back: () -> Unit,
     val newGroup: () -> Unit,
     val scanQr: () -> Unit,
-    val showMyQr: () -> Unit,
     val invite: () -> Unit,
     val retrySearch: () -> Unit,
     val retryChat: () -> Unit,
@@ -93,7 +90,7 @@ internal fun NewMessageContent(
     search: RecipientUserSearchState,
     identifierQuery: Boolean,
     resolvingIdentifier: Boolean,
-    showMyQrEnabled: Boolean,
+    connectQrEnabled: Boolean,
     creatingHex: String?,
     error: StartChatErrorUiState?,
     actions: NewMessageActions,
@@ -120,7 +117,7 @@ internal fun NewMessageContent(
                     enabled = !busy,
                 )
             }
-            item { NewMessageActionGroup(actions, showMyQrEnabled, busy) }
+            item { NewMessageActionGroup(actions, connectQrEnabled, busy) }
             error?.let { item { StartChatErrorCard(it, actions.retryChat, actions.invite, actions.copyError) } }
             item {
                 NewMessageSearchFeedback(
@@ -158,12 +155,12 @@ internal fun NewMessageContent(
     }
 }
 
-/** Keeps the production scanner and own-code entry distinct while adopting the target grouped links. */
+/** Prototype quick links open group creation, the shared QR connection route and platform invitation. */
 @Composable
 @Suppress("FunctionNaming")
 private fun NewMessageActionGroup(
     actions: NewMessageActions,
-    showMyQrEnabled: Boolean,
+    connectQrEnabled: Boolean,
     busy: Boolean,
 ) {
     SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Related)) {
@@ -182,7 +179,7 @@ private fun NewMessageActionGroup(
                 context,
                 stringResource(R.string.new_message_connect_qr),
                 actions.scanQr,
-                enabled = !busy,
+                enabled = !busy && connectQrEnabled,
                 leading = { Icon(painterResource(R.drawable.ic_qr_code_scanner), null, Modifier.size(24.dp)) },
             )
         }
@@ -193,15 +190,6 @@ private fun NewMessageActionGroup(
                 actions.invite,
                 enabled = !busy,
                 leading = { Icon(painterResource(R.drawable.ic_share), null, Modifier.size(24.dp)) },
-            )
-        }
-        row("my_qr") { context ->
-            SettingsLink(
-                context,
-                stringResource(R.string.show_my_qr_code),
-                actions.showMyQr,
-                enabled = !busy && showMyQrEnabled,
-                leading = { Icon(Icons.Default.QrCode, null, Modifier.size(24.dp)) },
             )
         }
     }

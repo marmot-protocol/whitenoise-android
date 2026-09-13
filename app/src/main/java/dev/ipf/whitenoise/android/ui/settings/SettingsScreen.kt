@@ -458,11 +458,11 @@ private fun SettingsHomeScreen(
         onAppUpdateAction = {
             if (!appState.signOutInProgress) {
                 scope.launch {
-                    // Await the check before acting so the first tap uses a fresh result.
-                    if (appState.appUpdateInfo.latestVersion == null) {
-                        appState.refreshAppUpdate(force = true, notifyIfNewer = false)
-                    }
-                    appState.handleAppUpdateAction(context)
+                    runSettingsAppUpdateAction(
+                        info = appState.appUpdateInfo,
+                        refresh = { appState.refreshAppUpdate(force = true, notifyIfNewer = false) },
+                        onUpdate = { appState.handleAppUpdateAction(context) },
+                    )
                 }
             }
         },
@@ -776,39 +776,34 @@ private fun AppUpdateGroup(
                 title = stringResource(R.string.app_updates),
                 subtitle = appUpdateSubtitle(info),
                 onClick = onClick,
-                leading = {
-                    if (info.isUpdateAvailable) {
-                        AppUpdateEmblem()
-                    } else {
-                        SettingsHubIcon(
-                            R.drawable.ic_download,
-                            "app_updates",
-                            MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
+                leading = { AppUpdateEmblem() },
             )
         }
     }
 }
 
-/** Installed and latest version summary, or the failure hint, worded as the previous row did. */
+/** Concise prototype status uses the real release version and keeps a failed check actionable. */
 @Composable
-private fun appUpdateSubtitle(info: AppUpdateInfo): String {
-    val latest = info.latestVersion
-    return when {
+private fun appUpdateSubtitle(info: AppUpdateInfo): String =
+    when {
         info.lastAttemptErrorReport != null -> stringResource(R.string.app_update_settings_check_failed)
-        latest == null -> stringResource(R.string.app_update_settings_unknown, info.installedVersion)
-        !info.isUpdateAvailable -> stringResource(R.string.app_update_settings_current, info.installedVersion)
-        info.releasesBehind != null ->
-            stringResource(
-                R.string.app_update_settings_available_with_count,
-                info.installedVersion,
-                latest,
-                info.releasesBehind,
-            )
-        else -> stringResource(R.string.app_update_settings_available, info.installedVersion, latest)
+        info.latestVersion == null -> stringResource(R.string.app_update_row_unknown)
+        !info.isUpdateAvailable -> stringResource(R.string.app_update_row_current)
+        else -> stringResource(R.string.app_update_row_available, info.latestVersion)
     }
+
+/** Retry failed/unknown/current checks before delegating to the existing verified update flow. */
+internal suspend fun runSettingsAppUpdateAction(
+    info: AppUpdateInfo,
+    refresh: suspend () -> AppUpdateInfo,
+    onUpdate: () -> Unit,
+) {
+    if (!info.isUpdateAvailable || info.lastAttemptErrorReport != null) {
+        val refreshed = refresh()
+        // A cached newer release must not turn another failed check into an install request.
+        if (refreshed.lastAttemptErrorReport != null) return
+    }
+    onUpdate()
 }
 
 /** Sign out as the last group: a destructive link that opens the production sign-out sheet. */

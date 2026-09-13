@@ -2106,4 +2106,7 @@
 
     <string name="chat_selection_title">选择聊天</string>
     <string name="chats_check_relays">检查中继</string>
+    <string name="app_update_row_unknown">检查更新</string>
+    <string name="app_update_row_current">已是最新版本</string>
+    <string name="app_update_row_available">Zapstore 上有可用版本 %1$s。</string>
 </resources>

@@ -160,8 +160,13 @@ internal fun WelcomeScreen(
             Column(
                 modifier =
                     Modifier
-                        .weight(1f, fill = false)
-                        .whiteNoiseVerticalScroll(rememberScrollState())
+                        .then(
+                            if (savedAccounts.isNotEmpty() || offlineErrorVisible) {
+                                Modifier.weight(1f, fill = false)
+                            } else {
+                                Modifier
+                            },
+                        ).whiteNoiseVerticalScroll(rememberScrollState())
                         .widthIn(max = OnboardingMaxContentWidth)
                         .fillMaxWidth()
                         .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)

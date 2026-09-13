@@ -5,6 +5,7 @@ import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -13,6 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.BoundedNpubCache
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.replaceActiveAccountForTest
 import dev.ipf.whitenoise.android.ui.common.captureClickCallbackForReplay
@@ -67,7 +69,9 @@ class NewMessageOwnershipTest {
     }
 
     /** An old camera session cannot close or fill the reopened scanner; current delivery consumes once. */
-    @Test fun closeReopenRejectsOldScannerCallbacks() {
+    @Test
+    @Suppress("LongMethod") // Keep camera reopen, route reopen and stale callbacks in their required order.
+    fun closeReopenRejectsOldScannerCallbacks() {
         val state = state()
         var dismiss: (() -> Unit)? = null
         var deliver: ((String) -> Unit)? = null
@@ -81,19 +85,34 @@ class NewMessageOwnershipTest {
         }
         val context = ApplicationProvider.getApplicationContext<Context>()
         val scanLabel = context.getString(R.string.new_message_connect_qr)
+        composeRule.onNodeWithTag("new_message.searchField").performTextReplacement("Alice")
         composeRule.onNodeWithText(scanLabel).performClick()
+        composeRule.onNodeWithTag("share_connect.screen").assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.show_my_qr_code)).assertDoesNotExist()
+        val cameraLabel = context.getString(R.string.scan_qr_code)
+        composeRule.onNodeWithText(cameraLabel).performClick()
         composeRule.waitForIdle()
         val oldDismiss = checkNotNull(dismiss)
         val oldDeliver = checkNotNull(deliver)
         composeRule.runOnIdle { oldDismiss() }
-        composeRule.onNodeWithText(scanLabel).performClick()
+        composeRule.onNodeWithText(cameraLabel).performClick()
         composeRule.waitForIdle()
-        val currentDeliver = checkNotNull(deliver)
+        val reopenedCameraDeliver = checkNotNull(deliver)
         composeRule.runOnIdle {
             oldDismiss()
             oldDeliver("npub1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0st5hsmq")
         }
-        assertEquals("", query())
+        composeRule.onNodeWithTag("share_connect.screen").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        assertEquals("Alice", query())
+        composeRule.onNodeWithText(scanLabel).performClick()
+        composeRule.onNodeWithText(cameraLabel).performClick()
+        composeRule.waitForIdle()
+        val currentDeliver = checkNotNull(deliver)
+        composeRule.runOnIdle {
+            reopenedCameraDeliver("npub1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0st5hsmq")
+        }
+        composeRule.onNodeWithTag("share_connect.screen").assertIsDisplayed()
         val currentNpub = "npub1yqsjygeyy5nzw2pf9g4jctfw9ucrzv3nxs6nvdec8yark0pa8clst3m4tg"
         composeRule.runOnIdle {
             currentDeliver(currentNpub)
@@ -185,5 +204,12 @@ class NewMessageOwnershipTest {
         emptyAppState(
             accounts = listOf(testAccount("first", "a".repeat(64)), testAccount("second", "c".repeat(64))),
             activeAccountRef = "first",
-        )
+        ).also { state ->
+            val field = WhiteNoiseAppState::class.java.getDeclaredField("npubs")
+            field.isAccessible = true
+            (field.get(state) as BoundedNpubCache).put(
+                "a".repeat(64),
+                "npub1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0st5hsmq",
+            )
+        }
 }

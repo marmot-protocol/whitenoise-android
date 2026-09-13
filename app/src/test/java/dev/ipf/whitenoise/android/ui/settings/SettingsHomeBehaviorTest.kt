@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -92,6 +93,7 @@ class SettingsHomeBehaviorTest {
         mount(profileCount = 1)
         scrollToAndClick("Sign Out")
         scrollToAndClick("App updates")
+        composeRule.onNodeWithText("Check for updates").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Back").performClick()
         composeRule.runOnIdle {
             assertEquals(1, signOutCount)
@@ -109,14 +111,56 @@ class SettingsHomeBehaviorTest {
         composeRule.onNodeWithText("Profile").assertExists()
     }
 
+    /** The concise available row reports the actual newest version without installed/count fixture text. */
+    @Test
+    fun availableUpdateRowShowsTheRealRelease() {
+        mount(profileCount = 1, updateInfo = updateInfo().copy(latestVersion = "2026.9.13", releasesBehind = 4))
+        scrollToAndClick("App updates")
+        composeRule.onNodeWithText("Version 2026.9.13 is available on Zapstore.").assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(1, appUpdateCount) }
+    }
+
+    /** A current installation retains the native explicit recheck entry without claiming a release is available. */
+    @Test
+    fun currentUpdateRowDoesNotClaimAnAvailableRelease() {
+        mount(profileCount = 1, updateInfo = updateInfo().copy(latestVersion = "2026.9.11"))
+        scrollToAndClick("App updates")
+        composeRule.onNodeWithText("Up to date").assertIsDisplayed()
+    }
+
+    /** A failed latest attempt wins over cached availability and keeps its retry wording. */
+    @Test
+    fun failedCheckShowsRetryInsteadOfCachedAvailability() {
+        mount(
+            profileCount = 1,
+            updateInfo = updateInfo().copy(latestVersion = "2026.9.13", lastAttemptErrorReport = "safe report"),
+        )
+        scrollToAndClick("App updates")
+        composeRule.onNodeWithText("Couldn't check for updates. Tap to retry.").assertIsDisplayed()
+        composeRule.onNodeWithText("Version 2026.9.13 is available on Zapstore.").assertDoesNotExist()
+    }
+
+    /** Self-managed row visibility never leaks into the Play distribution. */
+    @Test
+    fun storeManagedHomeOmitsTheUpdateRow() {
+        mount(profileCount = 1, selfUpdateEnabled = false, updateInfo = updateInfo().copy(latestVersion = "2026.9.13"))
+        composeRule.onNodeWithTag("settings.app_updates").assertDoesNotExist()
+    }
+
     private fun mount(
         profileCount: Int,
         hasActiveAccount: Boolean = true,
+        selfUpdateEnabled: Boolean = true,
+        updateInfo: AppUpdateInfo = updateInfo(),
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
                 SettingsHomeContent(
-                    state = settingsHomeState(hasActiveAccount = hasActiveAccount, selfUpdateEnabled = true),
+                    state =
+                        settingsHomeState(
+                            hasActiveAccount = hasActiveAccount,
+                            selfUpdateEnabled = selfUpdateEnabled,
+                        ),
                     account =
                         if (hasActiveAccount) {
                             SettingsHomeAccount("Alice", "npub1alice…9x2k", "alice-account-id", pictureUrl = null)
@@ -124,14 +168,7 @@ class SettingsHomeBehaviorTest {
                             null
                         },
                     profileCount = profileCount,
-                    appUpdateInfo =
-                        AppUpdateInfo(
-                            installedVersion = "2026.9.11",
-                            latestVersion = null,
-                            checkedAtMillis = null,
-                            dismissedVersion = null,
-                            releasesBehind = null,
-                        ),
+                    appUpdateInfo = updateInfo,
                     versionName = "2026.9.11",
                     onBack = { backCount++ },
                     onOpenShareConnect = { shareConnectCount++ },
@@ -145,6 +182,15 @@ class SettingsHomeBehaviorTest {
             }
         }
     }
+
+    private fun updateInfo() =
+        AppUpdateInfo(
+            installedVersion = "2026.9.11",
+            latestVersion = null,
+            checkedAtMillis = null,
+            dismissedVersion = null,
+            releasesBehind = null,
+        )
 
     private fun scrollToAndClick(title: String) {
         composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(title))

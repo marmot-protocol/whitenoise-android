@@ -85,6 +85,14 @@ class SettingsScreenScreenshotTest {
         capture("settings_screen_several_profiles_light")
     }
 
+    /** Available Settings update row uses the requested green emblem and real release-version wording. */
+    @Test
+    fun settingsScreenAvailableUpdateLight() {
+        render(darkTheme = false, latestVersion = "2026.9.13")
+        composeRule.onNodeWithText("Version 2026.9.13 is available on Zapstore.").assertIsDisplayed()
+        capture("settings_screen_available_update_light")
+    }
+
     @Test
     fun settingsScreenWithGlobalConfirmationDark() {
         composeRule.setContent {
@@ -155,7 +163,10 @@ class SettingsScreenScreenshotTest {
 
     /** The settings home with Alice signed in, a self-updating build and no-op callbacks. */
     @Composable
-    private fun settingsHomeContent(profileCount: Int = 1) {
+    private fun settingsHomeContent(
+        profileCount: Int = 1,
+        latestVersion: String? = null,
+    ) {
         SettingsHomeContent(
             state = settingsHomeState(hasActiveAccount = true, selfUpdateEnabled = true),
             account =
@@ -169,7 +180,7 @@ class SettingsScreenScreenshotTest {
             appUpdateInfo =
                 AppUpdateInfo(
                     installedVersion = "2026.9.11",
-                    latestVersion = null,
+                    latestVersion = latestVersion,
                     checkedAtMillis = null,
                     dismissedVersion = null,
                     releasesBehind = null,
@@ -191,6 +202,7 @@ class SettingsScreenScreenshotTest {
         fontScale: Float = 1f,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
         profileCount: Int = 1,
+        latestVersion: String? = null,
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -199,7 +211,7 @@ class SettingsScreenScreenshotTest {
                 LocalLayoutDirection provides layoutDirection,
             ) {
                 WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
-                    settingsHomeContent(profileCount = profileCount)
+                    settingsHomeContent(profileCount = profileCount, latestVersion = latestVersion)
                 }
             }
         }

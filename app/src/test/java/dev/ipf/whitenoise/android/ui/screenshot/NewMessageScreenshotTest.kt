@@ -108,7 +108,7 @@ class NewMessageScreenshotTest {
                         true,
                         null,
                         error,
-                        NewMessageActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}),
+                        NewMessageActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}),
                     )
                 }
             }

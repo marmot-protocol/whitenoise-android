@@ -13,6 +13,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingAction
+import dev.ipf.whitenoise.android.ui.onboarding.assertWelcomeActionsAtBottom
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -110,6 +111,7 @@ class AddProfileScreenshotTest {
             composeRule.onNodeWithTag("onboarding.sign_in.private_key").assertIsDisplayed()
             composeRule.waitForIdle()
         }
+        if (!openSignIn && action == OnboardingAction.Idle) composeRule.assertWelcomeActionsAtBottom()
         composeRule.mainClock.autoAdvance = false
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/add_profile_$name.png")

@@ -2149,4 +2149,7 @@
 
     <string name="chat_selection_title">Chats auswählen</string>
     <string name="chats_check_relays">Relays prüfen</string>
+    <string name="app_update_row_unknown">Nach Updates suchen</string>
+    <string name="app_update_row_current">Auf dem neuesten Stand</string>
+    <string name="app_update_row_available">Version %1$s ist auf Zapstore verfügbar.</string>
 </resources>
