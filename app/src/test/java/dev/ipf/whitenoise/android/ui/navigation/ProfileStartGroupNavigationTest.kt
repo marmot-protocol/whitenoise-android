@@ -171,14 +171,14 @@ class ProfileStartGroupNavigationTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText(app.getString(R.string.new_group)).assertIsDisplayed()
         composeRule.onNodeWithText(fixture.ownerSurface).assertDoesNotExist()
-        assertProfileOverlayAbsent(fixture)
+        assertProfileOverlayAbsent()
 
         composeRule.runOnIdle {
             armShellProfileForeground(ShellNavigationState(), foregroundState)
         }
         composeRule.waitForIdle()
 
-        assertProfileActionVisible(fixture, scrollToAction = false)
+        assertProfileActionVisible(scrollToAction = false)
         assertOwnerSurfaceVisible(fixture)
         composeRule
             .onNodeWithText(app.getString(R.string.new_group))
@@ -208,7 +208,7 @@ class ProfileStartGroupNavigationTest {
         }
         composeRule.waitForIdle()
         composeRule.onNodeWithText(app.getString(R.string.new_group)).assertIsDisplayed()
-        assertProfileOverlayAbsent(fixture)
+        assertProfileOverlayAbsent()
 
         composeRule.runOnIdle {
             armShellProfileForeground(ShellNavigationState(), foregroundState)
@@ -218,20 +218,11 @@ class ProfileStartGroupNavigationTest {
 
         composeRule
             .onNodeWithText(
-                app.getString(
-                    R.string.profile_start_new_group_with,
-                    fixture.replacementLabel,
-                ),
+                app.getString(R.string.person_start_group),
                 substring = false,
             ).assertIsDisplayed()
-        composeRule
-            .onNodeWithText(
-                app.getString(
-                    R.string.profile_start_new_group_with,
-                    fixture.targetLabel,
-                ),
-                substring = false,
-            ).assertDoesNotExist()
+        composeRule.onAllNodesWithText(fixture.replacementLabel!!).onFirst().assertIsDisplayed()
+        composeRule.onNodeWithText(fixture.targetLabel).assertDoesNotExist()
         composeRule
             .onNodeWithText(app.getString(R.string.new_group))
             .assertDoesNotExist()
@@ -243,10 +234,10 @@ class ProfileStartGroupNavigationTest {
         val fixture = renderProfileHandoff(conversationController = null, ownerSurface = SHELL_SURFACE)
 
         assertOwnerSurfaceVisible(fixture)
-        assertProfileActionVisible(fixture, scrollToAction = false)
-        startGroupFromProfile(fixture)
+        assertProfileActionVisible(scrollToAction = false)
+        startGroupFromProfile()
 
-        assertProfileOverlayAbsent(fixture)
+        assertProfileOverlayAbsent()
         assertOwnerSurfaceAbsent(fixture)
         assertSelectedMemberPicker(fixture)
 
@@ -262,12 +253,12 @@ class ProfileStartGroupNavigationTest {
         renderProfileHandoff(fixture, controller)
 
         assertOwnerSurfaceVisible(fixture)
-        assertProfileActionVisible(fixture, scrollToAction = true)
+        assertProfileActionVisible(scrollToAction = true)
         composeRule.onNodeWithText(app.getString(R.string.make_admin)).assertExists()
         composeRule.onNodeWithText(app.getString(R.string.remove_member)).assertExists()
-        startGroupFromProfile(fixture)
+        startGroupFromProfile()
 
-        assertProfileOverlayAbsent(fixture)
+        assertProfileOverlayAbsent()
         assertOwnerSurfaceAbsent(fixture)
         composeRule.onNodeWithText(app.getString(R.string.make_admin)).assertDoesNotExist()
         composeRule.onNodeWithText(app.getString(R.string.remove_member)).assertDoesNotExist()
@@ -377,21 +368,18 @@ class ProfileStartGroupNavigationTest {
                 ),
         )
 
-    private fun assertProfileActionVisible(
-        fixture: HandoffFixture,
-        scrollToAction: Boolean,
-    ) {
+    private fun assertProfileActionVisible(scrollToAction: Boolean) {
         val action =
             composeRule.onNodeWithText(
-                app.getString(R.string.profile_start_new_group_with, fixture.candidate.displayName),
+                app.getString(R.string.person_start_group),
             )
         if (scrollToAction) action.performScrollTo()
         action.assertIsDisplayed().assertIsEnabled()
     }
 
-    private fun startGroupFromProfile(fixture: HandoffFixture) {
+    private fun startGroupFromProfile() {
         composeRule
-            .onNodeWithText(app.getString(R.string.profile_start_new_group_with, fixture.candidate.displayName))
+            .onNodeWithText(app.getString(R.string.person_start_group))
             .assertIsEnabled()
             .performClick()
         composeRule.waitForIdle()
@@ -400,16 +388,16 @@ class ProfileStartGroupNavigationTest {
     private fun assertSelectedMemberPicker(fixture: HandoffFixture) {
         composeRule.onNodeWithText(app.getString(R.string.new_group)).assertIsDisplayed()
         composeRule
-            .onAllNodesWithText(app.resources.getQuantityString(R.plurals.selected_members_count, 1, 1))
+            .onAllNodesWithText(app.getString(R.string.group_selected_people))
             .onFirst()
             .assertIsDisplayed()
         composeRule.onAllNodesWithText(fixture.targetLabel).onFirst().assertIsDisplayed()
         composeRule.onNodeWithContentDescription(app.getString(R.string.back)).assertIsEnabled()
     }
 
-    private fun assertProfileOverlayAbsent(fixture: HandoffFixture) {
+    private fun assertProfileOverlayAbsent() {
         composeRule
-            .onNodeWithText(app.getString(R.string.profile_start_new_group_with, fixture.candidate.displayName))
+            .onNodeWithText(app.getString(R.string.person_start_group))
             .assertDoesNotExist()
     }
 
@@ -422,7 +410,7 @@ class ProfileStartGroupNavigationTest {
     }
 
     private fun assertNoProfileOrPickerOverlay(fixture: HandoffFixture) {
-        assertProfileOverlayAbsent(fixture)
+        assertProfileOverlayAbsent()
         composeRule
             .onNodeWithText(app.resources.getQuantityString(R.plurals.selected_members_count, 1, 1))
             .assertDoesNotExist()

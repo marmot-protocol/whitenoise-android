@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -203,6 +204,8 @@ fun WhiteNoiseCompactSearchField(
     keyboardOptions: KeyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
     clearDescription: String = stringResource(R.string.clear_search),
     outlined: Boolean = false,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    onClear: (() -> Unit)? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val outline =
@@ -228,6 +231,7 @@ fun WhiteNoiseCompactSearchField(
         textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
         singleLine = true,
         interactionSource = interactionSource,
         decorationBox = { innerTextField ->
@@ -243,7 +247,7 @@ fun WhiteNoiseCompactSearchField(
                 trailingIcon =
                     if (value.isNotEmpty()) {
                         {
-                            IconButton(onClick = { onValueChange("") }) {
+                            IconButton(onClick = { onClear?.invoke() ?: onValueChange("") }) {
                                 Icon(painterResource(R.drawable.ic_close), clearDescription)
                             }
                         }

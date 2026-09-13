@@ -15,15 +15,15 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties.EditableText
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_INDICATOR_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
@@ -86,7 +87,9 @@ class ConversationComposerFullScreenRetentionScreenshotTest {
         assertEquals(2f, context.resources.displayMetrics.density, 0.01f)
         val automaticHeight = composerHeight()
 
-        composeRule.onNodeWithContentDescription(context.getString(R.string.composer_resize)).performClick()
+        composeRule
+            .onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true)
+            .performTouchInput { click(center) }
         composeRule.waitForIdle()
         assertFullScreenOwner(appState, draft)
         val fullScreenHeight = composerHeight()
@@ -161,29 +164,28 @@ class ConversationComposerFullScreenRetentionScreenshotTest {
         )
     }
 
-    /** Waits for the delayed re-entry handle and verifies its visible indicator geometry. */
+    /** Re-entry restores the accessible surface and border drag target without a visible handle. */
     private fun awaitResizeHandleAfterReentry() {
         val description = context.getString(R.string.composer_resize)
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithContentDescription(description).fetchSemanticsNodes().size == 1 &&
-                composeRule
-                    .onAllNodesWithTag(COMPOSER_RESIZE_INDICATOR_TAG, useUnmergedTree = true)
-                    .fetchSemanticsNodes()
-                    .size == 1
+            composeRule.onAllNodesWithContentDescription(description).fetchSemanticsNodes().size == 1
         }
-        val handle = composeRule.onNodeWithContentDescription(description).assertIsDisplayed()
-        val indicator =
+        val target =
             composeRule
-                .onNodeWithTag(COMPOSER_RESIZE_INDICATOR_TAG, useUnmergedTree = true)
+                .onNodeWithContentDescription(description)
                 .assertIsDisplayed()
-        val handleBounds = handle.getUnclippedBoundsInRoot()
-        val indicatorBounds = indicator.getUnclippedBoundsInRoot()
-        assertEquals(96.dp, handleBounds.right - handleBounds.left)
-        assertEquals(48.dp, handleBounds.bottom - handleBounds.top)
-        assertEquals(36.dp, indicatorBounds.right - indicatorBounds.left)
-        assertEquals(4.dp, indicatorBounds.bottom - indicatorBounds.top)
-        assertEquals(handleBounds.left + handleBounds.right, indicatorBounds.left + indicatorBounds.right)
-        assertTrue(indicatorBounds.top >= handleBounds.top && indicatorBounds.bottom <= handleBounds.bottom)
+                .getUnclippedBoundsInRoot()
+        val strip =
+            composeRule
+                .onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true)
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+        assertTrue(target.bottom - target.top >= 48.dp)
+        assertEquals(target.left, strip.left)
+        assertEquals(target.right, strip.right)
+        assertEquals(target.top, strip.top)
+        assertEquals(8.dp, strip.bottom - strip.top)
+        composeRule.onNodeWithTag(COMPOSER_RESIZE_INDICATOR_TAG, useUnmergedTree = true).assertDoesNotExist()
     }
 
     /** Measures real pixels so the re-entry equality does not depend on assumed dp density. */

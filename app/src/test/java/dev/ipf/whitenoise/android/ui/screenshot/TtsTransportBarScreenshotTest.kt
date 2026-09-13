@@ -1,10 +1,13 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.audio.tts.TtsError
@@ -175,6 +178,25 @@ class TtsTransportBarScreenshotTest {
         capture("tts_resume_follow_amoled")
     }
 
+    @Test
+    fun ttsTransportBarLargeFontRtlKeepsLabeledMessageActions() {
+        render(
+            speaking(),
+            darkTheme = false,
+            amoled = false,
+            fontScale = 2f,
+            layoutDirection = LayoutDirection.Rtl,
+        )
+        capture("tts_transport_bar_large_font_rtl_light")
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "w360dp-h240dp-mdpi")
+    fun ttsTransportBarShortWindowShowsTheCappedNativeTransport() {
+        render(speaking(), darkTheme = true, amoled = false, fontScale = 2f)
+        capture("tts_transport_bar_short_window_dark")
+    }
+
     private val preview = "Alice: The quick brown fox jumps over it"
 
     private fun speaking(): TtsState =
@@ -245,29 +267,34 @@ class TtsTransportBarScreenshotTest {
 
     private fun failedEdge(): TtsHistoryEdgeState = TtsHistoryEdgeState.Failed(TtsHistoryDirection.Older)
 
+    @Suppress("LongParameterList")
     private fun render(
         state: TtsState,
         darkTheme: Boolean,
         amoled: Boolean,
         historyEdge: TtsHistoryEdgeState? = null,
+        fontScale: Float = 1f,
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
-                TtsTransportBarContent(
-                    state = state,
-                    rateOverride = 1.0f,
-                    activeRate = 1.0f,
-                    onPause = {},
-                    onResume = {},
-                    onPreviousSentence = {},
-                    onNextSentence = {},
-                    onPreviousMessage = {},
-                    onNextMessage = {},
-                    onRateSelected = {},
-                    onStop = {},
-                    modifier = Modifier.width(360.dp).testTag(TAG),
-                    historyEdge = historyEdge,
-                )
+            CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+                WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = fontScale) {
+                    TtsTransportBarContent(
+                        state = state,
+                        rateOverride = 1.0f,
+                        activeRate = 1.0f,
+                        onPause = {},
+                        onResume = {},
+                        onPreviousSentence = {},
+                        onNextSentence = {},
+                        onPreviousMessage = {},
+                        onNextMessage = {},
+                        onRateSelected = {},
+                        onStop = {},
+                        modifier = Modifier.width(360.dp).testTag(TAG),
+                        historyEdge = historyEdge,
+                    )
+                }
             }
         }
     }

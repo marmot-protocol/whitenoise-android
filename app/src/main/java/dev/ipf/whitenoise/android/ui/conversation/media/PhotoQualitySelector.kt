@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +43,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MediaQuality
 
@@ -102,12 +105,18 @@ private fun MediaQuality.sendQualityTier(): PhotoSendQualityTier =
         PhotoSendQualityTier.Hd
     }
 
+/**
+ * Preserves stable-slot quality ownership; callers may opt into themed preview colors while native editor defaults
+ * stay intact.
+ */
 @Composable
 internal fun PhotoQualitySelector(
     slotId: String,
     qualities: Map<String, PreparedPhotoQuality>,
     enabled: Boolean,
     onSelect: (String, MediaQuality) -> Unit,
+    tint: Color = Color.White,
+    themedSheet: Boolean = false,
 ) {
     val quality = qualities[slotId] ?: return
     val selectedTier = quality.selectedQuality.sendQualityTier()
@@ -126,7 +135,7 @@ internal fun PhotoQualitySelector(
     ) {
         PhotoQualityBadge(
             tier = selectedTier,
-            tint = Color.White.copy(alpha = if (enabled) 0.92f else 0.38f),
+            tint = tint.copy(alpha = tint.alpha * if (enabled) 0.92f else 0.38f),
         )
     }
     val targetSlotId = sheetSlotId
@@ -136,6 +145,7 @@ internal fun PhotoQualitySelector(
         PhotoSendQualitySheet(
             quality = targetQuality,
             selectedTier = targetTier,
+            themed = themedSheet,
             onSelect = { tier ->
                 sheetSlotId = null
                 if (tier != targetTier) onSelect(targetSlotId, tier.quality)
@@ -145,6 +155,7 @@ internal fun PhotoQualitySelector(
     }
 }
 
+/** Draws a fixed-size decorative quality emblem; its parent exposes the localized accessible label. */
 @Composable
 private fun PhotoQualityBadge(
     tier: PhotoSendQualityTier,
@@ -161,7 +172,7 @@ private fun PhotoQualityBadge(
         Text(
             text = stringResource(R.string.photo_editor_quality_hd),
             color = tint,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
             fontWeight = FontWeight.Bold,
         )
         if (tier == PhotoSendQualityTier.Standard) {
@@ -177,23 +188,26 @@ private fun PhotoQualityBadge(
     }
 }
 
+/** Shows the same truthful two output tiers with scrollable content at large accessibility font sizes. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PhotoSendQualitySheet(
     quality: PreparedPhotoQuality,
     selectedTier: PhotoSendQualityTier,
+    themed: Boolean,
     onSelect: (PhotoSendQualityTier) -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = QUALITY_SHEET_BACKGROUND,
-        contentColor = Color.White,
+        containerColor = if (themed) MaterialTheme.colorScheme.surfaceContainerLow else QUALITY_SHEET_BACKGROUND,
+        contentColor = if (themed) MaterialTheme.colorScheme.onSurface else Color.White,
     ) {
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .navigationBarsPadding()
                     .padding(start = 16.dp, end = 16.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -206,7 +220,8 @@ private fun PhotoSendQualitySheet(
             Text(
                 text = stringResource(R.string.photo_editor_quality_sheet_description),
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.64f),
+                color =
+                    if (themed) MaterialTheme.colorScheme.onSurfaceVariant else Color.White.copy(alpha = 0.64f),
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             )
             PhotoSendQualityTier.entries.forEach { tier ->
@@ -219,6 +234,7 @@ private fun PhotoSendQualitySheet(
                             quality.hdDimensions
                         },
                     selected = tier == selectedTier,
+                    themed = themed,
                     onSelect = onSelect,
                 )
             }
@@ -226,22 +242,34 @@ private fun PhotoSendQualitySheet(
     }
 }
 
+/** Pairs each native output tier with the selected surface foreground and unchanged dimensions/selection callback. */
 @Composable
+@Suppress("LongMethod", "CyclomaticComplexMethod")
 private fun PhotoQualityOption(
     tier: PhotoSendQualityTier,
     dimensions: String?,
     selected: Boolean,
+    themed: Boolean,
     onSelect: (PhotoSendQualityTier) -> Unit,
 ) {
     Surface(
         onClick = { onSelect(tier) },
         color =
             if (selected) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                if (themed) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                }
             } else {
-                Color.White.copy(alpha = 0.045f)
+                if (themed) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White.copy(alpha = 0.045f)
             },
-        contentColor = Color.White,
+        contentColor =
+            when {
+                !themed -> Color.White
+                selected -> MaterialTheme.colorScheme.onPrimaryContainer
+                else -> MaterialTheme.colorScheme.onSurface
+            },
         shape = RoundedCornerShape(18.dp),
         modifier =
             Modifier
@@ -259,19 +287,26 @@ private fun PhotoQualityOption(
         ) {
             PhotoQualityBadge(
                 tier = tier,
-                tint = if (selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.82f),
+                tint =
+                    when {
+                        themed && selected -> MaterialTheme.colorScheme.onPrimaryContainer
+                        themed -> MaterialTheme.colorScheme.onSurfaceVariant
+                        selected -> MaterialTheme.colorScheme.primary
+                        else -> Color.White.copy(alpha = 0.82f)
+                    },
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(stringResource(tier.label), style = MaterialTheme.typography.titleMedium)
                 Text(
                     text = stringResource(tier.description),
-                    color = Color.White.copy(alpha = 0.62f),
+                    color = if (themed) MaterialTheme.colorScheme.onSurfaceVariant else Color.White.copy(alpha = 0.62f),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 dimensions?.let {
                     Text(
                         text = it,
-                        color = Color.White.copy(alpha = 0.5f),
+                        color =
+                            if (themed) MaterialTheme.colorScheme.onSurfaceVariant else Color.White.copy(alpha = 0.5f),
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
@@ -282,7 +317,8 @@ private fun PhotoQualityOption(
                 colors =
                     RadioButtonDefaults.colors(
                         selectedColor = MaterialTheme.colorScheme.primary,
-                        unselectedColor = Color.White.copy(alpha = 0.5f),
+                        unselectedColor =
+                            if (themed) MaterialTheme.colorScheme.onSurfaceVariant else Color.White.copy(alpha = 0.5f),
                     ),
             )
         }

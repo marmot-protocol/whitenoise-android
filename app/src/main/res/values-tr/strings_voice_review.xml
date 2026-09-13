@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_review_title">Sesli mesajı gözden geçir</string>
+    <string name="voice_record_again">Yeniden kaydet</string>
+    <string name="voice_message_release_to_review">İncelemek için bırakın · iptal için kaydırın</string>
+    <string name="voice_recording_stop">Kaydı durdur</string>
+</resources>

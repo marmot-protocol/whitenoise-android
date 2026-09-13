@@ -21,6 +21,264 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 @Suppress("LargeClass")
 class ConversationDictationControllerTest {
+    /** Pause drains one owned result but neither writes the draft nor consumes its completion revision. */
+    @Test
+    fun pauseAndResumeKeepOneTranscriptAndFenceOldGenerationAndServiceCallbacks() {
+        var releases = 0
+        var acquisitions = 0
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                tryAcquireMicrophone = {
+                    acquisitions += 1
+                    true
+                },
+                releaseMicrophone = { releases += 1 },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val first = fixture.platform.listener
+        val oldToken = requireNotNull(fixture.controller.notificationSessionToken)
+        fixture.controller.pause()
+        first.onResult("first")
+
+        assertEquals("first", (fixture.controller.state as ConversationDictationState.Paused).transcript)
+        assertEquals(0, fixture.writes)
+        assertEquals(0, fixture.controller.completionRevision(ACCOUNT, GROUP))
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertFalse(fixture.controller.hasDurableSession)
+        assertEquals(1, releases)
+        fixture.scheduler.runThrough(90_000L)
+        assertEquals(1, fixture.platform.sessions.size)
+
+        fixture.controller.resume()
+        assertTrue(fixture.controller.ownsMicrophone)
+        assertEquals(2, acquisitions)
+        assertTrue(oldToken != fixture.controller.notificationSessionToken)
+        fixture.controller.onDurableServiceDestroyed(oldToken)
+        first.onResult("duplicate")
+        first.onError(ConversationDictationFailure.Unknown)
+        fixture.platform.listener.onBeginningOfSpeech()
+        fixture.controller.paste()
+        fixture.platform.listener.onResult("second")
+
+        assertEquals("first second", fixture.drafts.getValue(key()).text)
+        assertEquals(1, fixture.writes)
+        assertEquals(1, fixture.controller.completionRevision(ACCOUNT, GROUP))
+        assertEquals(2, releases)
+    }
+
+    /** A provider result cannot enable Resume until the old physical capture acknowledges closure. */
+    @Test
+    fun pauseWaitsForCaptureClosureBeforeAllowingResume() {
+        val platform = FakePlatform(deferCaptureCompletion = true)
+        val fixture = fixture(TextFieldValue(""), platform = platform)
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val first = platform.session
+        fixture.controller.pause()
+        platform.listener.onResult("captured tail")
+        assertTrue(fixture.controller.state is ConversationDictationState.Processing)
+        assertTrue(fixture.controller.ownsMicrophone)
+        fixture.controller.resume()
+        assertEquals(1, platform.sessions.size)
+        first.completeCapture()
+        assertTrue(fixture.controller.state is ConversationDictationState.Paused)
+        assertFalse(fixture.controller.ownsMicrophone)
+        fixture.controller.resume()
+        assertEquals(2, platform.sessions.size)
+        first.completeCapture()
+        assertTrue(fixture.controller.ownsMicrophone)
+        fixture.controller.cancel()
+        platform.session.completeCapture()
+    }
+
+    /** Pause drains every queued PCM chunk without triggering the captured send-on-finish policy. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun pauseDrainsCallerAudioAndExplicitFinishStillCarriesTheOriginalReply() =
+        runTest {
+            var request: ConversationDictationSendRequest? = null
+            val fixture =
+                fixture(
+                    draft = TextFieldValue(""),
+                    targetValidationScope = this,
+                    deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
+                    sendTranscriptIfOriginUnchanged = {
+                        request = it
+                        true
+                    },
+                )
+            fixture.platform.pendingCallerAudio = true
+            fixture.controller.requestStart(
+                ACCOUNT,
+                GROUP,
+                fixture.drafts.getValue(key()),
+                replyToMessageIdHex = REPLY_MESSAGE_ID,
+            )
+            fixture.controller.pause()
+            val first = fixture.platform.listener
+            first.onResult("first chunk")
+            assertEquals(2, fixture.platform.sessions.size)
+            assertTrue(fixture.controller.state !is ConversationDictationState.Paused)
+            fixture.platform.pendingCallerAudio = false
+            fixture.platform.listener.onResult("tail")
+            first.onResult("stale chunk")
+            advanceUntilIdle()
+            assertEquals(null, request)
+            assertEquals(0, fixture.writes)
+            assertEquals("first chunk tail", (fixture.controller.state as ConversationDictationState.Paused).transcript)
+            fixture.controller.stop()
+            advanceUntilIdle()
+            assertEquals(REPLY_MESSAGE_ID, request?.replyToMessageIdHex)
+            assertEquals("first chunk tail", request?.payload)
+        }
+
+    /** Editing during pause retains the captured anchor and routes an ambiguous finish to native review. */
+    @Test
+    fun resumeNeverRecapturesAnEditedDraftAsANewInsertionAnchor() {
+        val original = TextFieldValue("Original anchor", TextRange(8))
+        val fixture = fixture(original)
+        fixture.controller.requestStart(ACCOUNT, GROUP, original)
+        fixture.controller.pause()
+        fixture.platform.listener.onResult("first")
+        fixture.edit(key(), TextFieldValue("Rewritten", TextRange(9)))
+        fixture.controller.resume()
+        assertEquals(
+            original,
+            fixture.controller.state.target
+                ?.capturedDraft,
+        )
+        assertEquals("Rewritten", fixture.drafts.getValue(key()).text)
+        assertEquals(0, fixture.writes)
+        assertEquals(1, fixture.platform.sessions.size)
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertEquals("first", (fixture.controller.state as ConversationDictationState.ReviewRequired).transcript)
+    }
+
+    /** A removed reply cannot silently erase recognized words or recapture them as standalone speech. */
+    @Test
+    fun replyRemovedWhilePausedRetainsTranscriptWithoutRestartingCapture() {
+        var replyAvailable = true
+        val fixture = fixture(TextFieldValue("Keep"), targetReplyAvailable = { replyAvailable })
+        fixture.controller.requestStart(
+            ACCOUNT,
+            GROUP,
+            fixture.drafts.getValue(key()),
+            replyToMessageIdHex = REPLY_MESSAGE_ID,
+        )
+        fixture.controller.pause()
+        fixture.platform.listener.onResult("reply words")
+        replyAvailable = false
+        fixture.controller.resume()
+        val review = fixture.controller.state as ConversationDictationState.ReviewRequired
+        assertEquals("reply words", review.transcript)
+        assertEquals(REPLY_MESSAGE_ID, review.target.replyToMessageIdHex)
+        assertEquals(1, fixture.platform.sessions.size)
+        assertEquals("Keep", fixture.drafts.getValue(key()).text)
+        assertFalse(fixture.controller.ownsMicrophone)
+    }
+
+    /** Explicit sign-out retains the existing privacy boundary even when undelivered speech is paused. */
+    @Test
+    fun accountRemovalCancelsPausedWordsAndLateResumeCannotCapture() {
+        val fixture = fixture(TextFieldValue("Keep"))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.controller.pause()
+        fixture.platform.listener.onResult("private words")
+        fixture.controller.onAccountUnavailable(ACCOUNT)
+        fixture.controller.resume()
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertEquals(1, fixture.platform.sessions.size)
+        assertEquals("Keep", fixture.drafts.getValue(key()).text)
+        assertEquals(0, fixture.writes)
+    }
+
+    /** Fresh service IDs consume the original capture deadline instead of granting another65minutes. */
+    @Test
+    fun resumeUsesOnlyTheRemainingOriginalCaptureBudget() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.controller.pause()
+        fixture.platform.listener.onResult("captured")
+        fixture.scheduler.advanceBy(65L * 60L * 1_000L - 1_000L)
+        fixture.controller.resume()
+        fixture.platform.listener.onReady()
+        fixture.scheduler.advanceBy(999L)
+        assertTrue(fixture.controller.state is ConversationDictationState.Listening)
+        fixture.scheduler.advanceBy(1L)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertEquals("captured", fixture.drafts.getValue(key()).text)
+        assertEquals(1, fixture.writes)
+        assertFalse(fixture.controller.ownsMicrophone)
+    }
+
+    /** An expired paused session preserves its text for review and cannot reacquire capture. */
+    @Test
+    fun resumeAtOriginalCaptureDeadlineRetainsWordsWithoutStartingAnotherSession() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.controller.pause()
+        fixture.platform.listener.onResult("captured")
+        fixture.scheduler.advanceBy(65L * 60L * 1_000L)
+        fixture.controller.resume()
+        assertEquals("captured", (fixture.controller.state as ConversationDictationState.ReviewRequired).transcript)
+        assertEquals(1, fixture.platform.sessions.size)
+        assertEquals(0, fixture.writes)
+        assertFalse(fixture.controller.ownsMicrophone)
+    }
+
+    /** A real drain overflow retains recovery text; it cannot be relabeled as a successfully paused capture. */
+    @Test
+    fun pauseDrainOverflowRequiresReviewAndNeverOffersResume() {
+        val fixture = fixture(TextFieldValue("Keep"))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("recognized chunk")
+        fixture.scheduler.runDelay(250L)
+        fixture.platform.listener.onBeginningOfSpeech()
+        fixture.controller.pause()
+        fixture.platform.listener.onError(ConversationDictationFailure.AudioBufferFull)
+        assertEquals(
+            "recognized chunk",
+            (fixture.controller.state as ConversationDictationState.ReviewRequired).transcript,
+        )
+        fixture.controller.resume()
+        assertEquals(2, fixture.platform.sessions.size)
+        assertEquals(0, fixture.writes)
+        assertFalse(fixture.controller.ownsMicrophone)
+    }
+
+    /** Silence pauses cleanly; later capture can begin without inheriting a terminal NoSpeech failure. */
+    @Test
+    fun emptyPauseCanResumeAndCancellationDiscardsItsUndeliveredText() {
+        val fixture = fixture(TextFieldValue("Keep"))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.controller.pause()
+        fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+        assertEquals("", (fixture.controller.state as ConversationDictationState.Paused).transcript)
+        fixture.controller.resume()
+        val resumed = fixture.platform.listener
+        fixture.controller.pause()
+        resumed.onResult("discard me")
+        fixture.controller.cancel()
+        resumed.onResult("late")
+        assertEquals("Keep", fixture.drafts.getValue(key()).text)
+        assertEquals(0, fixture.writes)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
+    /** A failed resume preflight retains already recognized words for the existing recovery UI. */
+    @Test
+    fun resumeMicrophoneFailureRetainsPausedTranscriptForReview() {
+        val fixture = fixture(TextFieldValue("Keep"))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.controller.pause()
+        fixture.platform.listener.onResult("retain me")
+        fixture.platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted
+        fixture.controller.resume()
+        assertEquals("retain me", (fixture.controller.state as ConversationDictationState.ReviewRequired).transcript)
+        assertEquals("Keep", fixture.drafts.getValue(key()).text)
+        assertFalse(fixture.controller.ownsMicrophone)
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun unacceptedSendOnFinishRestoresTheDraftAndCarriesTheCapturedReplyIdentity() =

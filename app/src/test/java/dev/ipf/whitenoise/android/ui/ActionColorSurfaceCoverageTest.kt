@@ -10,7 +10,7 @@ class ActionColorSurfaceCoverageTest {
     /** Every named action and unread surface resolves its colours through the account action token. */
     @Test
     fun namedActionAndUnreadSurfacesConsumeTheAccountActionToken() {
-        val chats = source("chats/ChatsScreen.kt")
+        val chats = source("chats/ChatsNewMessageFab.kt")
         val composer = source("conversation/composer/ComposerBar.kt")
         val chatRow = source("chats/ChatRow.kt")
         val topBar = source("chats/ChatListTopBar.kt")
@@ -18,8 +18,8 @@ class ActionColorSurfaceCoverageTest {
         val accountSelector = source("account/AccountSelectorSheet.kt")
 
         assertTrue("New message must resolve the active account token", "accountActionColors(appState)" in chats)
-        assertTrue("New message must use the resolved container", "containerColor = actionColors.container" in chats)
-        assertTrue("New message must use the resolved foreground", "contentColor = actionColors.content" in chats)
+        assertTrue("New message must use the resolved container", "colors.container" in chats)
+        assertTrue("New message must use the resolved foreground", "colors.content" in chats)
 
         assertEquals(
             "Both text Send and locked-voice Send must use the resolved container",

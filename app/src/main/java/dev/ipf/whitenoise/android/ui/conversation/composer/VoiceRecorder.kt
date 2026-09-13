@@ -82,7 +82,7 @@ internal fun MicHoldButton(controller: dev.ipf.whitenoise.android.audio.VoiceRec
                         // Consume the down so the FAB's internal clickable
                         // doesn't ALSO interpret this press as a tap and fire
                         // its accessibility onClick after our hold gesture
-                        // already handled stop/send/cancel.
+                        // already handled stop/review/cancel.
                         down.consume()
                         haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                         var canceled = false
@@ -216,7 +216,7 @@ internal fun RecordingStripLeading(
                 modifier = Modifier.size(14.dp),
             )
             Text(
-                stringResource(R.string.voice_message_release_to_send),
+                stringResource(R.string.voice_message_release_to_review),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 maxLines = 1,

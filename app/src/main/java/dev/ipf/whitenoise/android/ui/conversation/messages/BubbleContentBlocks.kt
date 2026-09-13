@@ -120,9 +120,10 @@ internal fun VisualMediaFooterFrame(
     status: MessageStatus,
     retention: RetentionIndicatorInput?,
     reserveRetentionSpace: Boolean,
+    focusedPreview: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    Box {
+    Box(modifier = focusedVisualCanvasModifier(focusedPreview)) {
         content()
         if (showFooter) {
             MediaFooterOverlay(
@@ -163,6 +164,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
     fileFooterWarning: String?,
     onMediaLongPress: () -> Unit,
     attachedToCaption: Boolean,
+    focusedPreview: Boolean = false,
 ) {
     val retentionInput =
         record.retentionIndicatorInput(
@@ -219,6 +221,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 status = item.status,
                 retention = retentionInput,
                 reserveRetentionSpace = reserveRetentionSpace,
+                focusedPreview = focusedPreview,
             ) {
                 if (MediaReferenceSupport.isVideoMedia(entry.value)) {
                     MediaVideoBubble(
@@ -254,6 +257,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 status = item.status,
                 retention = retentionInput,
                 reserveRetentionSpace = reserveRetentionSpace,
+                focusedPreview = focusedPreview,
             ) {
                 MediaVisualGridBubble(
                     item = item,
@@ -365,6 +369,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 status = item.status,
                 retention = retentionInput,
                 reserveRetentionSpace = reserveRetentionSpace,
+                focusedPreview = focusedPreview,
             ) {
                 if (MediaReferenceSupport.isVideoMedia(entry.value)) {
                     MediaVideoBubble(
@@ -404,6 +409,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 status = item.status,
                 retention = retentionInput,
                 reserveRetentionSpace = reserveRetentionSpace,
+                focusedPreview = focusedPreview,
             ) {
                 MediaVisualGridBubble(
                     item = item,

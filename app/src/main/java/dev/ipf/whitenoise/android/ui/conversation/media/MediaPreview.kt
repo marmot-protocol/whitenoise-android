@@ -22,12 +22,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -35,6 +30,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedTextField
@@ -59,6 +55,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
@@ -81,14 +78,15 @@ import kotlinx.coroutines.withContext
 
 private const val PREVIEW_STRIP_MAX_EDGE_PX = 256
 
-private data class LocalPreviewMetadata(
+internal data class LocalPreviewMetadata(
     val isVideo: Boolean,
     val displayName: String?,
+    val isGif: Boolean = false,
 )
 
 /** Resolve provider-backed MIME types and names once, off the composition thread. */
 @Composable
-private fun rememberPreviewMetadata(items: List<StagedPreviewItem>): Map<android.net.Uri, LocalPreviewMetadata> {
+internal fun rememberPreviewMetadata(items: List<StagedPreviewItem>): Map<android.net.Uri, LocalPreviewMetadata> {
     val context = LocalContext.current
     val metadata by
         produceState<Map<android.net.Uri, LocalPreviewMetadata>>(
@@ -102,6 +100,7 @@ private fun rememberPreviewMetadata(items: List<StagedPreviewItem>): Map<android
                         item.uri to
                             LocalPreviewMetadata(
                                 isVideo = mime.startsWith("video/", ignoreCase = true),
+                                isGif = mime.equals("image/gif", ignoreCase = true),
                                 displayName =
                                     if (item is StagedPreviewItem.Document) {
                                         queryDisplayName(context.contentResolver, item.uri)
@@ -122,7 +121,7 @@ internal data class PreparedPhotoPreview(
 
 /** Decode the prepared send artifact when available, otherwise the original local Uri. */
 @Composable
-private fun rememberMediaPreviewBitmap(
+internal fun rememberMediaPreviewBitmap(
     uri: android.net.Uri,
     isVideo: Boolean,
     maxEdgePx: Int,
@@ -258,6 +257,8 @@ internal fun MediaPreviewScreen(
     nonEditableMediaSlotIds: Set<String> = emptySet(),
     nonEditableMediaDescriptions: Map<String, String> = emptyMap(),
     initialCaption: String = "",
+    previewOnly: Boolean = false,
+    initialIndex: Int = 0,
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -272,6 +273,8 @@ internal fun MediaPreviewScreen(
             documentUris = documentUris,
             chatTitle = chatTitle,
             initialCaption = initialCaption,
+            previewOnly = previewOnly,
+            initialIndex = initialIndex,
             onClose = onDismiss,
             onSend = onSend,
             onRemoveMediaAt = onRemoveAt,
@@ -289,6 +292,10 @@ internal fun MediaPreviewScreen(
     }
 }
 
+/**
+ * Renders the native stable-slot staging owner in app-theme colors; preview-only mode still delegates Send to the
+ * composer.
+ */
 @Composable
 internal fun MediaPreviewContent(
     mediaSlots: List<PendingMediaSlot>,
@@ -308,9 +315,11 @@ internal fun MediaPreviewContent(
     nonEditableMediaSlotIds: Set<String> = emptySet(),
     nonEditableMediaDescriptions: Map<String, String> = emptyMap(),
     initialCaption: String = "",
+    previewOnly: Boolean = false,
+    initialIndex: Int = 0,
 ) {
     val items = remember(mediaSlots, documentUris) { stagedPreviewItems(mediaSlots, documentUris) }
-    var currentIndex by rememberSaveable { mutableIntStateOf(0) }
+    var currentIndex by rememberSaveable { mutableIntStateOf(initialIndex) }
     // Seeded from the composer draft so text typed before attaching carries
     // into the caption instead of silently waiting behind the send.
     var caption by rememberSaveable { mutableStateOf(initialCaption) }
@@ -334,12 +343,12 @@ internal fun MediaPreviewContent(
         }
     }
 
-    // Deliberately dark in both app themes, matching the full-screen viewer.
+    // Preserve this native staging route inside the same themed shell as the redesigned full viewer.
     Column(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(Color.Black),
+                .background(MaterialTheme.colorScheme.background),
     ) {
         Row(
             modifier =
@@ -349,13 +358,16 @@ internal fun MediaPreviewContent(
                     .padding(horizontal = 4.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onClose) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
+            IconButton(
+                onClick = onClose,
+                colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
+            ) {
+                Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.close))
             }
             Text(
                 text = chatTitle.orEmpty(),
                 modifier = Modifier.weight(1f),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -370,6 +382,8 @@ internal fun MediaPreviewContent(
                     qualities = preparedPhotoQualities,
                     enabled = !sending && !currentPreparing,
                     onSelect = onSelectMediaQuality,
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    themedSheet = true,
                 )
             }
             if (currentMedia != null && currentMetadata?.isVideo == false && onEditMediaAt != null) {
@@ -381,6 +395,7 @@ internal fun MediaPreviewContent(
                 IconButton(
                     onClick = { onEditMediaAt(currentIndex) },
                     enabled = !sending && !currentPreparing && editable,
+                    colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
                     modifier =
                         Modifier.semantics {
                             contentDescription =
@@ -394,18 +409,18 @@ internal fun MediaPreviewContent(
                     if (currentPreparing) {
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     } else {
-                        Icon(Icons.Default.Edit, contentDescription = null, tint = Color.White)
+                        Icon(painterResource(R.drawable.ic_edit), contentDescription = null)
                     }
                 }
             }
             IconButton(
                 onClick = { removeAt(currentIndex) },
                 enabled = items.isNotEmpty() && !sending,
+                colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
             ) {
                 Icon(
-                    Icons.Default.Delete,
+                    painterResource(R.drawable.ic_delete),
                     contentDescription = stringResource(R.string.media_attachment_remove),
-                    tint = Color.White,
                 )
             }
         }
@@ -465,56 +480,61 @@ internal fun MediaPreviewContent(
                     )
                 }
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedTextField(
-                    value = caption,
-                    onValueChange = { caption = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text(stringResource(R.string.add_caption)) },
-                    maxLines = 4,
-                    enabled = !sending,
-                    colors = previewCaptionFieldColors(),
-                )
-                FloatingActionButton(
-                    onClick = {
-                        if (!sending && !preparingAttachments && items.isNotEmpty()) {
-                            sending = true
-                            onSend(caption) { accepted ->
-                                if (!accepted) sending = false
-                            }
-                        }
-                    },
-                    modifier =
-                        Modifier.semantics {
-                            if (sending || preparingAttachments || items.isEmpty()) disabled()
-                        },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
+            if (!previewOnly) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.Send,
-                        contentDescription = stringResource(R.string.send),
+                    OutlinedTextField(
+                        value = caption,
+                        onValueChange = { caption = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text(stringResource(R.string.add_caption)) },
+                        maxLines = 4,
+                        enabled = !sending,
+                        colors = previewCaptionFieldColors(),
                     )
+                    FloatingActionButton(
+                        onClick = {
+                            if (!sending && !preparingAttachments && items.isNotEmpty()) {
+                                sending = true
+                                onSend(caption) { accepted ->
+                                    if (!accepted) sending = false
+                                }
+                            }
+                        },
+                        modifier =
+                            Modifier.semantics {
+                                if (sending || preparingAttachments || items.isEmpty()) disabled()
+                            },
+                        shape = CircleShape,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_arrow_upward),
+                            contentDescription = stringResource(R.string.send),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
             }
         }
     }
 }
 
+/** Pairs native caption, cursor and outline colors with the current viewer surface. */
 @Composable
 private fun previewCaptionFieldColors() =
     OutlinedTextFieldDefaults.colors(
-        focusedTextColor = Color.White,
-        unfocusedTextColor = Color.White,
-        disabledTextColor = Color.White.copy(alpha = 0.6f),
+        focusedTextColor = MaterialTheme.colorScheme.onBackground,
+        unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+        disabledTextColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
         cursorColor = MaterialTheme.colorScheme.primary,
-        focusedBorderColor = Color.White.copy(alpha = 0.5f),
-        unfocusedBorderColor = Color.White.copy(alpha = 0.25f),
-        focusedPlaceholderColor = Color.White.copy(alpha = 0.6f),
-        unfocusedPlaceholderColor = Color.White.copy(alpha = 0.6f),
+        focusedBorderColor = MaterialTheme.colorScheme.primary,
+        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+        focusedPlaceholderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+        unfocusedPlaceholderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
     )
 
 @Composable
@@ -539,7 +559,7 @@ private fun HeroMediaPreview(
             CircularProgressIndicator(
                 modifier = Modifier.size(32.dp),
                 strokeWidth = 2.dp,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
             )
         }
         if (metadata?.isVideo == true) {
@@ -558,6 +578,7 @@ private fun HeroMediaPreview(
     }
 }
 
+/** Keeps native document metadata readable against the current themed viewer shell. */
 @Composable
 private fun HeroDocumentPreview(
     uri: android.net.Uri,
@@ -572,13 +593,13 @@ private fun HeroDocumentPreview(
             Icons.Default.Description,
             contentDescription = null,
             modifier = Modifier.size(56.dp),
-            tint = Color.White,
+            tint = MaterialTheme.colorScheme.onBackground,
         )
         Spacer(Modifier.height(12.dp))
         Text(
             text = displayName,
             style = MaterialTheme.typography.bodyMedium,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onBackground,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
@@ -629,13 +650,13 @@ private fun PreviewStripThumb(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .background(Color.White.copy(alpha = 0.12f)),
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                         contentAlignment = Alignment.Center,
                     ) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(16.dp),
                             strokeWidth = 2.dp,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onBackground,
                         )
                     }
                 }
@@ -660,14 +681,14 @@ private fun PreviewStripThumb(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .background(Color.White.copy(alpha = 0.12f)),
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         Icons.Default.Description,
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onBackground,
                     )
                 }
         }
@@ -690,6 +711,7 @@ private fun PreviewStripThumb(
     }
 }
 
+/** Retains the native photo/document acquisition choices beside the staged send-order thumbnails. */
 @Composable
 private fun AddMoreThumb(
     enabled: Boolean,
@@ -707,12 +729,12 @@ private fun AddMoreThumb(
                 Modifier
                     .size(64.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White.copy(alpha = 0.12f)),
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
             Icon(
-                Icons.Default.Add,
+                painterResource(R.drawable.ic_add),
                 contentDescription = stringResource(R.string.media_attachment_add_more),
-                tint = Color.White,
+                tint = MaterialTheme.colorScheme.onBackground,
             )
         }
         DropdownMenu(

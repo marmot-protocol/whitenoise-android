@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
@@ -75,8 +76,9 @@ internal fun TimelineRow(
     ttsQuickTransportViewportLock: TtsQuickTransportViewportLock? = null,
     ttsSentenceLayoutSink: ConversationTtsSentenceLayoutSink? = null,
     onTtsSentenceSeek: (TtsState) -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
-    Column(Modifier.fillMaxWidth()) {
+    Column(modifier.fillMaxWidth()) {
         val daySeparatorLabel =
             remember(older?.record?.recordedAt, item.record.recordedAt, transcriptLocale) {
                 if (older == null || differentDay(older.record.recordedAt, item.record.recordedAt)) {
@@ -85,18 +87,33 @@ internal fun TimelineRow(
                     null
                 }
             }
-        if (daySeparatorLabel != null) {
-            DaySeparator(daySeparatorLabel)
-        }
-        if (
+        val followsGroupEvent = older?.record?.let { MessageProjector.isGroupSystem(it) } == true
+        val showUnreadDivider =
             shouldShowConversationEntryUnreadDivider(
                 entryUnreadCount = entryUnreadCount,
                 dividerRetired = entryUnreadDividerRetired,
                 messageId = item.record.messageIdHex,
                 firstUnreadMessageId = entryFirstUnreadMessageId,
             )
-        ) {
-            UnreadMessagesDivider(count = entryUnreadCount)
+        if (daySeparatorLabel != null) {
+            val hasLeadingHeader =
+                controller.hasMoreBefore ||
+                    controller.isLoadingOlder ||
+                    (controller.error != null && controller.errorEdge == ConversationLoadFailureEdge.TOP) ||
+                    controller.groupRecoveryReadFailed ||
+                    controller.groupRecoveryStatus?.hasVisibleRecoveryState() == true
+            DaySeparator(
+                label = daySeparatorLabel,
+                atTranscriptStart = older == null && !hasLeadingHeader,
+                followsGroupEvent = followsGroupEvent,
+            )
+        }
+        if (showUnreadDivider) {
+            UnreadMessagesDivider(
+                count = entryUnreadCount,
+                followsDayHeader = daySeparatorLabel != null,
+                followsGroupEvent = followsGroupEvent,
+            )
         }
         Column(
             Modifier
@@ -117,6 +134,7 @@ internal fun TimelineRow(
                         record = item.record,
                         appState = appState,
                         groupSystem = item.projected?.groupSystem,
+                        followsStructuralHeader = daySeparatorLabel != null || showUnreadDivider || followsGroupEvent,
                         onDeleteForMe =
                             if (controller.group.pendingConfirmation) {
                                 null

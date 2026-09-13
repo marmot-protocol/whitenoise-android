@@ -1,8 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -10,7 +10,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.unit.Density
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
@@ -313,7 +314,7 @@ class MessageActionMenuLayoutTest {
     }
 
     @Test
-    fun maximumMenuUsesRowMajorTwoColumnGridWithDeleteLast() {
+    fun maximumMenuUsesPrototypeSingleColumnWithDeleteLast() {
         renderMenu(fontScale = 1f)
 
         val reply = bounds("Reply")
@@ -322,13 +323,13 @@ class MessageActionMenuLayoutTest {
         val selectText = bounds("Select text")
         val delete = bounds("Delete")
 
-        assertEquals(reply.top, edit.top, 0.5f)
-        assertTrue(reply.left < edit.left)
-        assertEquals(select.top, selectText.top, 0.5f)
+        assertTrue(edit.top > reply.top)
+        assertEquals(reply.left, edit.left, 0.5f)
+        assertTrue(selectText.top > select.top)
         assertTrue(select.top > reply.top)
         val save = bounds("Save")
         val info = bounds("Message info")
-        assertEquals(save.top, info.top, 0.5f)
+        assertTrue(info.top > save.top)
         assertTrue(delete.top > info.top)
         assertEquals(reply.width, delete.width, 0.5f)
     }
@@ -344,19 +345,34 @@ class MessageActionMenuLayoutTest {
 
     @Test
     fun largeFontFallsBackToOneReadableColumn() {
-        renderMenu(fontScale = 2f)
+        renderMenu(fontScale = 2f, literalCode = true)
 
         assertTrue(bounds("Edit").top > bounds("Reply").top)
         assertTrue(bounds("Select text").top > bounds("Select").top)
         composeRule.onNodeWithText("Delete", substring = false).performScrollTo().assertIsDisplayed()
+        val layouts = mutableListOf<TextLayoutResult>()
+        composeRule
+            .onNodeWithText("Read code literally")
+            .performScrollTo()
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertTrue(layouts.isNotEmpty())
+        assertTrue(
+            "The popup must render the requested 200% typography",
+            layouts.all { it.layoutInput.style.fontSize.value >= 32f },
+        )
+        assertTrue(
+            "literal-code label must fit: " +
+                layouts.joinToString { "size=${it.size}, lines=${it.lineCount}, height=${it.multiParagraph.height}" },
+            layouts.none { it.hasVisualOverflow },
+        )
     }
 
     @Test
-    fun rtlKeepsRowMajorOrderFromTheStartEdge() {
+    fun rtlKeepsSingleColumnCommandOrder() {
         renderMenu(fontScale = 1f, layoutDirection = LayoutDirection.Rtl)
 
-        assertEquals(bounds("Reply").top, bounds("Edit").top, 0.5f)
-        assertTrue(bounds("Reply").left > bounds("Edit").left)
+        assertTrue(bounds("Edit").top > bounds("Reply").top)
+        assertEquals(bounds("Reply").right, bounds("Edit").right, 0.5f)
     }
 
     @Test
@@ -376,7 +392,7 @@ class MessageActionMenuLayoutTest {
             "Save",
             "Message info",
             "Delete",
-        ).forEach { composeRule.onNodeWithText(it, substring = false).performClick() }
+        ).forEach { composeRule.onNodeWithText(it, substring = false).performScrollTo().performClick() }
 
         assertEquals(
             listOf(
@@ -455,10 +471,8 @@ class MessageActionMenuLayoutTest {
         quickReactionEmojis: List<String> = if (canReact) listOf("👍") else emptyList(),
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme {
-                val density = LocalDensity.current
+            WhiteNoiseTheme(fontScale = fontScale) {
                 CompositionLocalProvider(
-                    LocalDensity provides Density(density.density, fontScale),
                     LocalLayoutDirection provides layoutDirection,
                 ) {
                     MessageActionMenu(
@@ -493,6 +507,18 @@ class MessageActionMenuLayoutTest {
                         onSave = { callbacks += "save" },
                         onInfo = { callbacks += "info" },
                         onDelete = { callbacks += "delete" },
+                        previewDescription = "A real presentation-only message preview",
+                        preview = {
+                            FocusedTextMessagePreview(
+                                presentation = messageBubblePresentation(deleted = false, mine = false),
+                                mine = false,
+                                text = "A real presentation-only message preview",
+                                document = null,
+                                time = "12:34",
+                                status = dev.ipf.whitenoise.android.state.MessageStatus.Received,
+                                showStatus = false,
+                            )
+                        },
                     )
                 }
             }

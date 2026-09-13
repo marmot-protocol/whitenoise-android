@@ -94,6 +94,26 @@ class ConversationDictationPersistentControlTest {
             )
     }
 
+    /** Real Pause and Resume preserve the draft while keeping Cancel/Paste/Send independently reachable. */
+    @Test
+    fun pauseAndResumeAreExplicitActionsWithoutTerminalDelivery() {
+        val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        render(fixture)
+        composeRule.onNodeWithContentDescription("Pause dictation").assertIsDisplayed().performClick()
+        fixture.platform.listener.onResult("first")
+        composeRule.onNodeWithContentDescription("Resume dictation").assertIsDisplayed()
+        assertEquals("Draft", fixture.draft.text)
+        listOf("Cancel", "Paste", "Send").forEach { label ->
+            composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
+        }
+        composeRule.onNodeWithContentDescription("Resume dictation").performClick()
+        fixture.platform.listener.onBeginningOfSpeech()
+        composeRule.onNodeWithContentDescription("Paste").performClick()
+        fixture.platform.listener.onResult("second")
+        assertEquals("Draft first second", fixture.draft.text)
+    }
+
     /** Verifies an ambiguous merge retains explicit copy, insert, and discard choices. */
     @Test
     fun ambiguousMergeOffersExplicitCopyInsertOrDiscardReview() {

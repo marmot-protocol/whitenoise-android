@@ -148,42 +148,47 @@ class KeyboardSafePopupCoverageTest {
     @Test
     fun messageActionMenuUsesKeyboardSafePopup() {
         val body = messageActionsSource().readText().functionBody("MessageActionMenu")
+        val focusedSource = focusedMessageActionsSource().readText()
+        val focusedBody = focusedSource.functionBody("FocusedMessageActions")
 
-        assertTrue("MessageActionMenu should delegate overlay plumbing", "KeyboardSafePopup(" in body)
-        assertFalse(
-            "MessageActionMenu should not duplicate the scrim popup",
-            Regex("""Popup\s*\(\s*properties\s*=\s*PopupProperties\(""")
-                .containsMatchIn(body),
+        assertTrue("Native commands must reach the focused presentation", "FocusedMessageActions(" in body)
+        listOf(
+            "sourceBounds = anchorBoundsInWindow",
+            "touchY = anchorWindowYPx",
+            "actions = actions",
+            "previewReady = previewReady",
+            "onDismiss = onDismissRequest",
+        ).forEach { binding -> assertTrue("Missing native binding: $binding", binding in body) }
+        assertTrue("Focused presentation must use the keyboard-safe owner", "KeyboardSafePopup(" in focusedBody)
+        assertTrue("Dismissal must reach the native owner", "onDismissRequest = onDismiss" in focusedBody)
+        listOf(body, focusedBody).forEach { layer ->
+            assertFalse(
+                "Message presentation should not duplicate the scrim popup",
+                Regex("""Popup\s*\(\s*properties\s*=\s*PopupProperties\(""").containsMatchIn(layer),
+            )
+        }
+        assertTrue(
+            "Frozen message bounds and the original touch point must own positioning",
+            "remember(sourceBounds, touchY)" in focusedBody &&
+                "FocusedMessageActionsPositionProvider(sourceBounds, touchY)" in focusedBody &&
+                "popupPositionProvider = position" in focusedBody,
+        )
+        val provider = focusedSource.functionBody("calculatePosition")
+        assertTrue(
+            "The measured preview/action stack must center on its anchor and clamp within the usable window",
+            "sourceBounds?.center?.y ?: touchY?.roundToInt()" in provider &&
+                "popupContentSize.height / 2" in provider &&
+                "(windowSize.width - popupContentSize.width) / 2" in provider &&
+                "desiredY.coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0))" in provider,
         )
         assertTrue(
-            "touch-point positioning must remain caller-owned",
-            "popupPositionProvider = positionProvider" in body,
+            "Tall action content must scroll within the keyboard-safe frame",
+            ".heightIn(max = maxHeight)" in focusedBody && ".verticalScroll(rememberScrollState())" in focusedBody,
         )
         assertTrue(
-            "first-frame height estimate for placement must remain in MessageActionMenu",
-            "estimatedOneColumnHeightPx" in body &&
-                "estimatedTwoColumnHeightPx" in body &&
-                "MessageActionMenuPositionProvider(" in body,
-        )
-        val provider = positionSource().readText()
-        assertTrue(
-            "the estimated height must own both side choice and final clamp to prevent a measured-frame jump",
-            "verticalPosition(windowSize.height, effectiveHeight)" in provider &&
-                "windowHeight - popupHeight - edgeInsetPx" in provider,
-        )
-        assertTrue(
-            "message bounds must center the popup on the selected bubble rather than a screen edge",
-            "bounds.center.x - popupWidth / 2" in provider,
-        )
-        assertTrue(
-            "rendered content must be clipped to the same deterministic height used for placement",
-            "minOf(estimatedMenuHeight" in body,
-        )
-        assertTrue(
-            "action menu content must stay transparent until its first stable measured position",
-            "var actionMenuMeasured" in body &&
-                ".onSizeChanged" in body &&
-                "alpha = if (actionMenuMeasured) 1f else 0f" in body,
+            "The stack must remain transparent until both its layout and the real preview are ready",
+            ".onSizeChanged { measured = it.width > 0 && it.height > 0 }" in focusedBody &&
+                "alpha = if (measured && previewReady) 1f else 0f" in focusedBody,
         )
     }
 
@@ -219,7 +224,7 @@ class KeyboardSafePopupCoverageTest {
 
     private fun forwardPickerSource(): File = sourceFile("ui/conversation/messages/ForwardMessagePicker.kt")
 
-    private fun positionSource(): File = sourceFile("ui/conversation/messages/MessageActionMenuPositionProvider.kt")
+    private fun focusedMessageActionsSource(): File = sourceFile("ui/conversation/messages/FocusedMessageActions.kt")
 
     private fun reactionsSource(): File = sourceFile("ui/conversation/reactions/Reactions.kt")
 

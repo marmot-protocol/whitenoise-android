@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shared_content_in_chat">聊天中的共享内容</string>
+    <string name="shared_content_photos_videos">照片和视频</string>
+    <string name="shared_content_loaded_count">已加载 %1$d 项</string>
+    <string name="shared_content_loaded_scope">仅显示此聊天中已加载的消息。</string>
+    <string name="shared_content_loading">正在加载共享内容…</string>
+    <string name="shared_content_empty">没有共享内容</string>
+    <string name="shared_content_go_to_message">前往消息</string>
+</resources>

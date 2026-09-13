@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="conversation_select_messages">Sélectionner des messages</string>
+    <string name="conversation_search_messages">Messages</string>
+    <string name="conversation_jump_to_date">Aller à une date</string>
+    <string name="conversation_edit_revision">Révision %1$d</string>
+</resources>

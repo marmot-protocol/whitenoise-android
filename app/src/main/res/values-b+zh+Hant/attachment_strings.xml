@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="attachment_camera">相機</string>
+    <string name="attachment_photos_videos">照片和影片</string>
+    <string name="attachment_device_contact">裝置聯絡人</string>
+    <string name="attachment_recent_media">最近的媒體</string>
+</resources>

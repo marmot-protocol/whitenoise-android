@@ -10,7 +10,6 @@ import android.graphics.PorterDuffXfermode
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -18,57 +17,46 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.systemGestureExclusion
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Redo
-import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.Brush
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Crop
-import androidx.compose.material.icons.filled.RestartAlt
-import androidx.compose.material.icons.filled.RotateRight
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -118,6 +106,7 @@ internal fun PhotoEditorDialog(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("LongMethod") // Screen-level orchestration keeps save/back semantics alongside editor state.
 internal fun PhotoEditorScreen(
@@ -137,39 +126,50 @@ internal fun PhotoEditorScreen(
     }
 
     BackHandler(enabled = true, onBack = ::requestCancel)
-    Surface(modifier = modifier.fillMaxSize(), color = Color.Black) {
-        Column(Modifier.fillMaxSize()) {
+    Scaffold(
+        modifier = modifier.fillMaxSize().testTag("photo.editor"),
+        contentWindowInsets = WindowInsets.safeDrawing,
+        topBar = {
             PhotoEditorTopBar(
                 saving = state.isSaving,
                 onCancel = ::requestCancel,
-                canUndo = state.canUndo,
-                onUndo = stateHolder::undo,
-                canRedo = state.canRedo,
-                onRedo = stateHolder::redo,
-                onReset = stateHolder::reset,
                 onSave = {
                     stateHolder.beginSaving()
                     onSave(state.recipe, state.quality)
                 },
             )
-            PhotoEditorCanvas(
-                previewBitmap = previewBitmap,
-                sourceInfo = sourceInfo,
-                state = state,
-                onFreeCrop = stateHolder::commitFreeCrop,
-                onStroke = stateHolder::commitStroke,
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .heightIn(min = 160.dp)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-            )
-            PhotoEditorControls(
-                state = state,
-                stateHolder = stateHolder,
-                modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
-            )
+        },
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            PhotoEditorHistoryActions(state, stateHolder)
+            if (state.isSaving) LinearProgressIndicator(Modifier.fillMaxWidth())
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                val wide = maxWidth >= 600.dp || maxHeight < 360.dp
+                val sidePanelWidth = minOf(280.dp, maxWidth / 2)
+                val photo: @Composable (Modifier) -> Unit = { canvasModifier ->
+                    PhotoEditorCanvas(
+                        previewBitmap = previewBitmap,
+                        sourceInfo = sourceInfo,
+                        state = state,
+                        onFreeCrop = stateHolder::commitFreeCrop,
+                        onStroke = stateHolder::commitStroke,
+                        modifier = canvasModifier.padding(8.dp),
+                    )
+                }
+                if (wide) {
+                    Row(Modifier.fillMaxSize()) {
+                        photo(Modifier.weight(1f).fillMaxHeight())
+                        val controlsWidth = sidePanelWidth
+                        PhotoEditorControls(state, stateHolder, Modifier.width(controlsWidth).fillMaxHeight())
+                    }
+                } else {
+                    Column(Modifier.fillMaxSize()) {
+                        photo(Modifier.weight(1f).fillMaxWidth().heightIn(min = 120.dp))
+                        PhotoEditorControls(state, stateHolder, Modifier.fillMaxWidth().heightIn(max = 300.dp))
+                    }
+                }
+            }
+            EditorStatus(state)
         }
     }
     if (showDiscardDialog) {
@@ -194,294 +194,169 @@ internal fun PhotoEditorScreen(
     }
 }
 
+/** Keeps cancel/save on the prototype app bar while the native holder owns save acceptance. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("LongMethod") // The compact top bar keeps all icon actions and saving state in one accessibility group.
 private fun PhotoEditorTopBar(
     saving: Boolean,
     onCancel: () -> Unit,
-    canUndo: Boolean,
-    onUndo: () -> Unit,
-    canRedo: Boolean,
-    onRedo: () -> Unit,
-    onReset: () -> Unit,
     onSave: () -> Unit,
 ) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 4.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        EditorIconButton(
-            description = stringResource(R.string.cancel),
-            enabled = !saving,
-            onClick = onCancel,
-        ) {
-            Icon(Icons.Default.Close, contentDescription = null)
-        }
-        Spacer(Modifier.weight(1f))
-        EditorIconButton(
-            description = stringResource(R.string.photo_editor_undo),
-            enabled = canUndo,
-            onClick = onUndo,
-        ) {
-            Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null)
-        }
-        EditorIconButton(
-            description = stringResource(R.string.photo_editor_redo),
-            enabled = canRedo,
-            onClick = onRedo,
-        ) {
-            Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = null)
-        }
-        EditorIconButton(
-            description = stringResource(R.string.photo_editor_reset),
-            enabled = !saving,
-            onClick = onReset,
-        ) {
-            Icon(Icons.Default.RestartAlt, contentDescription = null)
-        }
-        Surface(
-            modifier = Modifier.size(48.dp),
-            shape = CircleShape,
-            color = if (saving) Color.White.copy(alpha = 0.1f) else MaterialTheme.colorScheme.primary,
-            contentColor = if (saving) Color.White.copy(alpha = 0.45f) else MaterialTheme.colorScheme.onPrimary,
-        ) {
-            val saveDescription = stringResource(R.string.save)
-            IconButton(
-                onClick = onSave,
-                enabled = !saving,
-                modifier = Modifier.semantics { contentDescription = saveDescription },
-            ) {
-                if (saving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = Color.White,
-                    )
-                } else {
-                    Icon(Icons.Default.Check, contentDescription = null)
-                }
+    TopAppBar(
+        title = { Text(stringResource(R.string.photo_editor_title)) },
+        navigationIcon = {
+            IconButton(onClick = onCancel, enabled = !saving) {
+                Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.cancel))
             }
-        }
+        },
+        actions = {
+            EditorTextAction(stringResource(R.string.save), !saving, onSave)
+        },
+    )
+}
+
+/** Exposes every existing history command as a labeled, horizontally scrollable action. */
+@Composable
+private fun PhotoEditorHistoryActions(
+    state: PhotoEditorUiState,
+    holder: PhotoEditorStateHolder,
+) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        EditorTextAction(stringResource(R.string.photo_editor_undo), state.canUndo, holder::undo)
+        EditorTextAction(stringResource(R.string.photo_editor_redo), state.canRedo, holder::redo)
+        EditorTextAction(stringResource(R.string.photo_editor_reset), !state.isSaving, holder::reset)
+        EditorTextAction(
+            stringResource(R.string.photo_editor_rotate_clockwise),
+            !state.isSaving,
+            holder::rotateClockwise,
+        )
     }
 }
 
+/** Retains the named native action and its accessible minimum touch target. */
+@Composable
+private fun EditorTextAction(
+    description: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = description },
+    ) { Text(description) }
+}
+
+/** Arranges the native tool/preset/color/width commands in the prototype labeled chip rows. */
 @Composable
 private fun PhotoEditorControls(
     state: PhotoEditorUiState,
     stateHolder: PhotoEditorStateHolder,
     modifier: Modifier,
 ) {
-    Surface(
-        modifier = modifier,
-        color = Color(0xFF111315),
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+    Column(
+        modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                when (state.activeTool) {
-                    PhotoEditorTool.Crop -> CropControls(state, stateHolder)
-                    PhotoEditorTool.Draw -> DrawControls(state, stateHolder, showColors = true)
-                    PhotoEditorTool.Erase -> DrawControls(state, stateHolder, showColors = false)
+            PhotoEditorTool.entries.forEach { tool ->
+                EditorChoiceChip(toolLabel(tool), state.activeTool == tool, !state.isSaving) {
+                    stateHolder.selectTool(tool)
                 }
             }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-            Row(
-                modifier = Modifier.fillMaxWidth().selectableGroup(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                EditorToolButton(
-                    selected = state.activeTool == PhotoEditorTool.Crop,
-                    description = stringResource(R.string.photo_editor_crop),
-                    enabled = !state.isSaving,
-                    onClick = { stateHolder.selectTool(PhotoEditorTool.Crop) },
-                ) {
-                    Icon(Icons.Default.Crop, contentDescription = null)
-                }
-                EditorToolButton(
-                    selected = state.activeTool == PhotoEditorTool.Draw,
-                    description = stringResource(R.string.photo_editor_draw),
-                    enabled = !state.isSaving,
-                    onClick = { stateHolder.selectTool(PhotoEditorTool.Draw) },
-                ) {
-                    Icon(Icons.Default.Brush, contentDescription = null)
-                }
-                EditorToolButton(
-                    selected = state.activeTool == PhotoEditorTool.Erase,
-                    description = stringResource(R.string.photo_editor_erase),
-                    enabled = !state.isSaving,
-                    onClick = { stateHolder.selectTool(PhotoEditorTool.Erase) },
-                ) {
-                    EraserIcon()
-                }
-            }
-            EditorStatus(state)
+        }
+        if (state.activeTool == PhotoEditorTool.Crop) {
+            CropControls(state, stateHolder)
+        } else {
+            DrawControls(state, stateHolder, showColors = state.activeTool == PhotoEditorTool.Draw)
         }
     }
 }
 
-@Suppress("DEPRECATION") // A mirrored icon would promise counter-clockwise rotation in RTL.
+/** Keeps all native crop presets available without requiring a canvas gesture. */
 @Composable
 private fun CropControls(
     state: PhotoEditorUiState,
     stateHolder: PhotoEditorStateHolder,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        Modifier.horizontalScroll(rememberScrollState()).selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        EditorIconButton(
-            description = stringResource(R.string.photo_editor_rotate_clockwise),
-            enabled = !state.isSaving,
-            onClick = stateHolder::rotateClockwise,
-        ) { Icon(Icons.Default.RotateRight, contentDescription = null) }
         PhotoCropPreset.entries.forEach { preset ->
-            CropPresetButton(
-                preset = preset,
-                selected = state.cropPreset == preset,
-                enabled = !state.isSaving,
-                onClick = { stateHolder.selectCropPreset(preset) },
-            )
+            EditorChoiceChip(cropPresetLabel(preset), state.cropPreset == preset, !state.isSaving) {
+                stateHolder.selectCropPreset(preset)
+            }
         }
     }
 }
 
+/** Keeps drawing colors and stroke widths on distinct rows with native selection state. */
 @Composable
 private fun DrawControls(
     state: PhotoEditorUiState,
     stateHolder: PhotoEditorStateHolder,
     showColors: Boolean,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (showColors) {
+    if (showColors) {
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             editorColors().forEach { color ->
                 val selected = state.drawColorArgb == color.argb
-                ColorButton(
-                    color = color,
+                FilterChip(
                     selected = selected,
-                    enabled = !state.isSaving,
                     onClick = { stateHolder.selectColor(color.argb) },
+                    label = { Text(color.name) },
+                    enabled = !state.isSaving,
+                    leadingIcon = {
+                        Canvas(Modifier.size(20.dp)) {
+                            drawCircle(Color(color.argb))
+                            drawCircle(Color.Gray, style = Stroke(1.dp.toPx()))
+                        }
+                    },
+                    modifier =
+                        Modifier.heightIn(min = 48.dp).semantics {
+                            contentDescription = if (selected) color.selectedDescription else color.name
+                        },
                 )
             }
-            Spacer(Modifier.width(4.dp))
-            VerticalDivider(
-                modifier = Modifier.width(1.dp).height(28.dp),
-                color = Color.White.copy(alpha = 0.16f),
-            )
-            Spacer(Modifier.width(4.dp))
         }
+    }
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()).selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         PhotoStrokeWidth.entries.forEach { width ->
-            StrokeWidthButton(
-                width = width,
-                selected = state.strokeWidth == width,
-                enabled = !state.isSaving,
-                onClick = { stateHolder.selectStrokeWidth(width) },
-            )
+            EditorChoiceChip(strokeWidthLabel(width), state.strokeWidth == width, !state.isSaving) {
+                stateHolder.selectStrokeWidth(width)
+            }
         }
     }
 }
 
+/** Presents one state-holder choice with an explicit label and unchanged selected semantics. */
 @Composable
-private fun EditorToolButton(
+private fun EditorChoiceChip(
+    description: String,
     selected: Boolean,
-    description: String,
     enabled: Boolean,
     onClick: () -> Unit,
-    icon: @Composable () -> Unit,
 ) {
-    val contentColor =
-        when {
-            !enabled -> Color.White.copy(alpha = 0.35f)
-            selected -> MaterialTheme.colorScheme.primary
-            else -> Color.White.copy(alpha = 0.82f)
-        }
-    Surface(
-        modifier =
-            Modifier
-                .size(48.dp)
-                .selectable(
-                    selected = selected,
-                    enabled = enabled,
-                    role = Role.RadioButton,
-                    onClick = onClick,
-                ).semantics {
-                    contentDescription = description
-                    this.selected = selected
-                },
-        shape = CircleShape,
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent,
-        contentColor = contentColor,
-    ) {
-        Box(contentAlignment = Alignment.Center) { icon() }
-    }
-}
-
-@Composable
-private fun EraserIcon() {
-    val tint = LocalContentColor.current
-    Canvas(Modifier.size(24.dp)) {
-        rotate(-40f, pivot = center) {
-            val left = size.width * 0.18f
-            val top = size.height * 0.32f
-            val width = size.width * 0.64f
-            val height = size.height * 0.36f
-            drawRoundRect(
-                color = tint,
-                topLeft = Offset(left, top),
-                size =
-                    androidx.compose.ui.geometry
-                        .Size(width, height),
-                cornerRadius =
-                    androidx.compose.ui.geometry
-                        .CornerRadius(2.dp.toPx()),
-                style = Stroke(width = 2.dp.toPx()),
-            )
-            drawLine(
-                color = tint,
-                start = Offset(left + width * 0.58f, top),
-                end = Offset(left + width * 0.58f, top + height),
-                strokeWidth = 2.dp.toPx(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun EditorIconButton(
-    description: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    icon: @Composable () -> Unit,
-) {
-    IconButton(
+    FilterChip(
+        selected = selected,
         onClick = onClick,
+        label = { Text(description) },
         enabled = enabled,
-        modifier = Modifier.size(48.dp).semantics { contentDescription = description },
-    ) {
-        Surface(
-            modifier = Modifier.size(40.dp),
-            shape = CircleShape,
-            color = Color.White.copy(alpha = if (enabled) 0.08f else 0.03f),
-            contentColor = Color.White.copy(alpha = if (enabled) 0.82f else 0.32f),
-        ) {
-            Box(contentAlignment = Alignment.Center) { icon() }
-        }
-    }
+        modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = description },
+    )
 }
 
 @Composable
@@ -498,7 +373,7 @@ private fun EditorStatus(state: PhotoEditorUiState) {
         state.isSaving ->
             Text(
                 text = stringResource(R.string.photo_editor_saving),
-                color = Color.White.copy(alpha = 0.8f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(horizontal = 8.dp).semantics { liveRegion = LiveRegionMode.Polite },
             )
@@ -513,163 +388,6 @@ private fun EditorStatus(state: PhotoEditorUiState) {
                         },
                 )
             }
-    }
-}
-
-@Composable
-private fun CropPresetButton(
-    preset: PhotoCropPreset,
-    selected: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    val description = cropPresetLabel(preset)
-    val tint =
-        when {
-            !enabled -> Color.White.copy(alpha = 0.3f)
-            selected -> MaterialTheme.colorScheme.primary
-            else -> Color.White.copy(alpha = 0.78f)
-        }
-    Surface(
-        modifier =
-            Modifier
-                .size(48.dp)
-                .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
-                .semantics {
-                    contentDescription = description
-                    this.selected = selected
-                },
-        shape = CircleShape,
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent,
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            CropPresetGlyph(preset = preset, tint = tint)
-        }
-    }
-}
-
-@Composable
-private fun CropPresetGlyph(
-    preset: PhotoCropPreset,
-    tint: Color,
-) {
-    Canvas(Modifier.size(28.dp)) {
-        val strokeWidth = 1.8.dp.toPx()
-        if (preset == PhotoCropPreset.Free) {
-            val inset = size.minDimension * 0.18f
-            val arm = size.minDimension * 0.25f
-            listOf(
-                Offset(inset, inset) to Offset(inset + arm, inset),
-                Offset(inset, inset) to Offset(inset, inset + arm),
-                Offset(size.width - inset, inset) to Offset(size.width - inset - arm, inset),
-                Offset(size.width - inset, inset) to Offset(size.width - inset, inset + arm),
-                Offset(inset, size.height - inset) to Offset(inset + arm, size.height - inset),
-                Offset(inset, size.height - inset) to Offset(inset, size.height - inset - arm),
-                Offset(size.width - inset, size.height - inset) to Offset(size.width - inset - arm, size.height - inset),
-                Offset(size.width - inset, size.height - inset) to Offset(size.width - inset, size.height - inset - arm),
-            ).forEach { (start, end) -> drawLine(tint, start, end, strokeWidth = strokeWidth) }
-        } else {
-            val ratio = preset.outputAspectRatio ?: (4f / 3f)
-            val maxWidth = size.width * 0.78f
-            val maxHeight = size.height * 0.7f
-            val width = min(maxWidth, maxHeight * ratio)
-            val height = min(maxHeight, maxWidth / ratio)
-            val topLeft = Offset((size.width - width) / 2f, (size.height - height) / 2f)
-            drawRect(
-                color = tint,
-                topLeft = topLeft,
-                size =
-                    androidx.compose.ui.geometry
-                        .Size(width, height),
-                style = Stroke(width = strokeWidth),
-            )
-            if (preset == PhotoCropPreset.Original) {
-                drawCircle(
-                    color = tint,
-                    radius = 1.7.dp.toPx(),
-                    center = Offset(topLeft.x + width - 4.dp.toPx(), topLeft.y + 4.dp.toPx()),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ColorButton(
-    color: EditorColor,
-    selected: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier =
-            Modifier
-                .size(44.dp)
-                .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
-                .semantics {
-                    this.selected = selected
-                    contentDescription = if (selected) color.selectedDescription else color.name
-                }.padding(6.dp)
-                .border(
-                    width = if (selected) 2.5.dp else 1.dp,
-                    color = if (selected) Color.White else Color.White.copy(alpha = 0.35f),
-                    shape = CircleShape,
-                ).padding(4.dp)
-                .background(Color(color.argb), CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (selected) {
-            Icon(
-                Icons.Default.Check,
-                contentDescription = null,
-                tint = contrastingColor(color.argb),
-                modifier = Modifier.size(16.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun StrokeWidthButton(
-    width: PhotoStrokeWidth,
-    selected: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    val description = strokeWidthLabel(width)
-    val tint =
-        when {
-            !enabled -> Color.White.copy(alpha = 0.3f)
-            selected -> MaterialTheme.colorScheme.primary
-            else -> Color.White.copy(alpha = 0.78f)
-        }
-    Surface(
-        modifier =
-            Modifier
-                .size(44.dp)
-                .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
-                .semantics {
-                    contentDescription = description
-                    this.selected = selected
-                },
-        shape = CircleShape,
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent,
-    ) {
-        Canvas(Modifier.padding(10.dp)) {
-            val lineWidth =
-                when (width) {
-                    PhotoStrokeWidth.Small -> 1.5.dp
-                    PhotoStrokeWidth.Medium -> 3.dp
-                    PhotoStrokeWidth.Large -> 5.dp
-                    PhotoStrokeWidth.ExtraLarge -> 7.dp
-                }.toPx()
-            drawLine(
-                color = tint,
-                start = Offset(0f, size.height / 2f),
-                end = Offset(size.width, size.height / 2f),
-                strokeWidth = lineWidth,
-            )
-        }
     }
 }
 
@@ -690,7 +408,7 @@ private fun PhotoEditorCanvas(
     var transientStroke by remember { mutableStateOf<List<NormalizedPoint>>(emptyList()) }
     val canvasDescription = stringResource(R.string.photo_editor_image_description)
 
-    BoxWithConstraints(modifier.background(Color(0xFF161616), RoundedCornerShape(12.dp))) {
+    BoxWithConstraints(modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
         val viewWidth = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
         val viewHeight = with(density) { maxHeight.toPx() }.coerceAtLeast(1f)
         val cropMode = state.activeTool == PhotoEditorTool.Crop
@@ -998,8 +716,6 @@ private fun editorColors(): List<EditorColor> {
         color(0xFFFFFFFF.toInt(), R.string.photo_editor_color_white),
     )
 }
-
-private fun contrastingColor(argb: Int): Color = if (android.graphics.Color.luminance(argb) > 0.6f) Color.Black else Color.White
 
 @Composable
 private fun cropPresetLabel(preset: PhotoCropPreset): String =

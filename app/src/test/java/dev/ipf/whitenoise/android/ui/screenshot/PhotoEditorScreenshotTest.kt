@@ -4,9 +4,16 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.editor.EditorPixelSize
 import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
@@ -16,6 +23,8 @@ import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorScreen
 import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorStateHolder
 import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorTool
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -68,6 +77,89 @@ class PhotoEditorScreenshotTest {
             composeRule.runOnIdle { holder.selectTool(PhotoEditorTool.Draw) }
             composeRule.waitForIdle()
             composeRule.onRoot().captureRoboImage("src/test/snapshots/photo_editor_cropped_draw.png")
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w240dp-h320dp-mdpi")
+    fun narrowShortWindowKeepsCanvasAndScrollableCommandsReachable() {
+        val bitmap = editorSourceBitmap()
+        val size = EditorPixelSize(bitmap.width, bitmap.height)
+        val holder = PhotoEditorStateHolder(PhotoEditRecipe.Original, MediaQuality.Standard, size)
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = false) {
+                    PhotoEditorScreen(
+                        previewBitmap = bitmap,
+                        sourceInfo = PhotoEditorSourceInfo(size, size, 1, "image/png", false),
+                        stateHolder = holder,
+                        onCancel = {},
+                        onSave = { _, _ -> },
+                    )
+                }
+            }
+            val canvas =
+                composeRule
+                    .onNodeWithContentDescription(
+                        context.getString(R.string.photo_editor_image_description),
+                    ).fetchSemanticsNode()
+                    .boundsInRoot
+            assertTrue(canvas.width > 0f && canvas.height > 0f)
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.photo_editor_draw))
+                .performScrollTo()
+                .assertIsDisplayed()
+                .performClick()
+            assertEquals(PhotoEditorTool.Draw, holder.state.activeTool)
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.photo_editor_width_extra_large))
+                .performScrollTo()
+                .assertIsDisplayed()
+                .performClick()
+            assertEquals(
+                dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoStrokeWidth.ExtraLarge,
+                holder.state.strokeWidth,
+            )
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w840dp-h400dp-mdpi")
+    fun lightLandscapeRetainsLabeledToolsAndNativeHistory() {
+        val bitmap = editorSourceBitmap()
+        val size = EditorPixelSize(bitmap.width, bitmap.height)
+        val holder = PhotoEditorStateHolder(PhotoEditRecipe.Original, MediaQuality.Standard, size)
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = false) {
+                    PhotoEditorScreen(
+                        previewBitmap = bitmap,
+                        sourceInfo = PhotoEditorSourceInfo(size, size, 1, "image/png", false),
+                        stateHolder = holder,
+                        onCancel = {},
+                        onSave = { _, _ -> },
+                    )
+                }
+            }
+            composeRule.onNodeWithText(context.getString(R.string.photo_editor_title)).assertIsDisplayed()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.save)).assertIsDisplayed()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.photo_editor_draw)).performClick()
+            assertEquals(PhotoEditorTool.Draw, holder.state.activeTool)
+            composeRule.onNodeWithContentDescription(context.getString(R.string.photo_editor_crop)).performClick()
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.photo_editor_rotate_clockwise))
+                .performClick()
+            assertEquals(1, holder.state.recipe.quarterTurnsClockwise)
+            composeRule.onNodeWithContentDescription(context.getString(R.string.photo_editor_undo)).performClick()
+            assertEquals(PhotoEditRecipe.Original, holder.state.recipe)
+            composeRule.waitForIdle()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/photo_editor_light_landscape.png")
         } finally {
             bitmap.recycle()
         }

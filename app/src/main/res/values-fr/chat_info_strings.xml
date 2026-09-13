@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="disappearing">Éphémères</string>
+    <string name="advanced">Avancé</string>
+    <string name="save_conversation_transcript">Enregistrer la transcription</string>
+</resources>

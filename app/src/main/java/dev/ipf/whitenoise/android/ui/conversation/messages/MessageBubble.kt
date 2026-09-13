@@ -42,19 +42,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -94,6 +100,7 @@ import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
+import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
@@ -105,6 +112,7 @@ import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
+import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsFollowTarget
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutReport
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutSink
@@ -138,6 +146,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.markdownHasLinkAnnotationAt
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
+import dev.ipf.whitenoise.android.ui.theme.LocalMessageBubbleBaseColorScheme
 import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.Job
@@ -182,6 +191,16 @@ internal fun messageBubblePresentation(
     persistedFailure: Boolean = false,
 ): BubblePresentation {
     val colorScheme = MaterialTheme.colorScheme
+    val bubbleScheme = LocalMessageBubbleBaseColorScheme.current ?: colorScheme
+    // Keep tombstone and AMOLED foregrounds stable; live bubbles use the prototype's paired roles.
+    val preserveSemanticSurface = deleted || isAmoledSurfaceTheme()
+    val surfaceBackground =
+        if (preserveSemanticSurface) {
+            colorScheme.surfaceVariant
+        } else {
+            bubbleScheme.surfaceContainerHigh
+        }
+    val surfaceContent = if (preserveSemanticSurface) colorScheme.onSurfaceVariant else bubbleScheme.onSurface
     return resolveBubblePresentationArgb(
         deleted = deleted,
         amoled = isAmoledSurfaceTheme(),
@@ -191,10 +210,10 @@ internal fun messageBubblePresentation(
             BubblePresentationTokens(
                 errorBackgroundArgb = colorScheme.errorContainer.toArgb().toLong() and 0xFFFFFFFFL,
                 errorContentArgb = colorScheme.onErrorContainer.toArgb().toLong() and 0xFFFFFFFFL,
-                surfaceBackgroundArgb = colorScheme.surfaceVariant.toArgb().toLong() and 0xFFFFFFFFL,
-                surfaceContentArgb = colorScheme.onSurfaceVariant.toArgb().toLong() and 0xFFFFFFFFL,
-                mineBackgroundArgb = colorScheme.primaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
-                mineContentArgb = colorScheme.onPrimaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
+                surfaceBackgroundArgb = surfaceBackground.toArgb().toLong() and 0xFFFFFFFFL,
+                surfaceContentArgb = surfaceContent.toArgb().toLong() and 0xFFFFFFFFL,
+                mineBackgroundArgb = bubbleScheme.primary.toArgb().toLong() and 0xFFFFFFFFL,
+                mineContentArgb = bubbleScheme.onPrimary.toArgb().toLong() and 0xFFFFFFFFL,
                 mentionAccentArgb = colorScheme.primary.toArgb().toLong() and 0xFFFFFFFFL,
             ),
         persistedFailure = persistedFailure,
@@ -219,8 +238,8 @@ internal fun messageBubbleTimestampColor(
     return when {
         persistedFailure -> colorScheme.onErrorContainer
         amoledAccent != null -> amoledAccent
-        mine && !deleted -> colorScheme.onPrimaryContainer
-        else -> colorScheme.onSurfaceVariant
+        deleted -> colorScheme.onSurfaceVariant
+        else -> colorFromArgb(messageBubblePresentation(deleted = false, mine = mine).contentArgb)
     }
 }
 
@@ -375,6 +394,19 @@ internal fun MessageBubble(
         )
     val bubbleBackgroundColor = colorFromArgb(bubblePresentation.backgroundArgb)
     val bubbleContentColor = colorFromArgb(bubblePresentation.contentArgb)
+    val outgoingReply = mine && bubbleTheme != BubbleTheme.Amoled
+    val replyFillColor =
+        when {
+            customBubbleColorActive -> Color.Transparent
+            outgoingReply -> bubbleContentColor.copy(alpha = REPLY_QUOTE_FILL_ALPHA)
+            else -> colorScheme.surface
+        }
+    val replySecondaryColor =
+        if (outgoingReply || customBubbleColorActive) {
+            bubbleContentColor.copy(alpha = REPLY_QUOTE_SECONDARY_ALPHA)
+        } else {
+            colorScheme.onSurfaceVariant
+        }
     // #414: "you were mentioned" treatment. A received (not mine), live
     // message whose markdown body @-mentions the current
     // account gets a logical-start outer-frame accent so a self-mention is
@@ -404,6 +436,34 @@ internal fun MessageBubble(
     var actionMenuAnchorBounds by remember(record.messageIdHex) { mutableStateOf<IntRect?>(null) }
     val rowCoordinates = remember(record.messageIdHex) { arrayOfNulls<LayoutCoordinates>(1) }
     val messageBoundsInWindow = remember(record.messageIdHex) { arrayOfNulls<IntRect>(1) }
+    val focusedMessageLayer = if (isActionMenuOpen) rememberGraphicsLayer() else null
+    var focusedMediaReady by remember(record.messageIdHex, focusedMessageLayer) { mutableStateOf(false) }
+    var focusedMediaSize by remember(record.messageIdHex) {
+        mutableStateOf(androidx.compose.ui.unit.IntSize.Zero)
+    }
+    val focusedWindowWidth =
+        LocalWindowInfo.current.containerSize.width
+            .takeIf { it > 0 } ?: Int.MAX_VALUE
+    val focusedMediaWidthLimit =
+        with(LocalDensity.current) {
+            (minOf(focusedWindowWidth, 560.dp.roundToPx()) - 32.dp.roundToPx()).coerceAtLeast(1)
+        }
+    val focusedMediaCaptureModifier =
+        Modifier
+            .focusedMediaFootprint(
+                focused = isActionMenuOpen,
+                maximumPreviewWidth = focusedMediaWidthLimit,
+                mine = mine,
+            ).onSizeChanged { focusedMediaSize = it }
+            .drawWithContent {
+                if (focusedMessageLayer != null) {
+                    focusedMessageLayer.record { this@drawWithContent.drawContent() }
+                    focusedMediaReady = true
+                    drawLayer(focusedMessageLayer)
+                } else {
+                    drawContent()
+                }
+            }
     val actionAnchorBoundsModifier =
         Modifier.onGloballyPositioned { coordinates ->
             val bounds = coordinates.boundsInWindow()
@@ -1827,7 +1887,7 @@ internal fun MessageBubble(
                             appState.displayName(record.sender),
                             style = MaterialTheme.typography.labelMedium,
                             color =
-                                if (insideBubble && customBubbleColorActive) {
+                                if (insideBubble) {
                                     bubbleContentColor
                                 } else {
                                     colorScheme.onSurfaceVariant
@@ -1854,7 +1914,7 @@ internal fun MessageBubble(
                 // standalone above the media card.
                 val replyPreviewCard: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
                     replyPreview?.let { preview ->
-                        val useCustomFillColors = insideBubble && customBubbleColorActive
+                        val pairedReplyAccent = bubbleContentColor.takeIf { insideBubble }
                         val replyAccentArgb =
                             replyPreviewAccentArgb(
                                 insideBubble = insideBubble,
@@ -1896,9 +1956,10 @@ internal fun MessageBubble(
                                 remember(appState, appState.profileRevisionForCompose) {
                                     { bech32: String -> appState.mentionDisplayName(bech32) }
                                 },
-                            containerColor = if (useCustomFillColors) Color.Transparent else null,
-                            contentColor = if (useCustomFillColors) bubbleContentColor else null,
-                            accentColor = replyAccentArgb?.let(::colorFromArgb),
+                            containerColor = replyFillColor.takeIf { insideBubble },
+                            contentColor = bubbleContentColor.takeIf { insideBubble },
+                            accentColor = replyAccentArgb?.let(::colorFromArgb) ?: pairedReplyAccent,
+                            secondaryColor = replySecondaryColor.takeIf { insideBubble },
                         )
                     }
                 }
@@ -1962,26 +2023,35 @@ internal fun MessageBubble(
                                 alignEnd = mine,
                                 contentModifier = textSelectionBoundsModifier,
                                 media = {
-                                    BubbleMediaBlocks(
-                                        item = item,
-                                        record = record,
-                                        controller = controller,
-                                        appState = appState,
-                                        onOpenConversationMedia = onOpenConversationMedia,
-                                        bubbleMedia = bubbleMedia,
-                                        sharedLocation = sharedLocation,
-                                        sharedContact = sharedContact,
-                                        sharedUser = sharedUser,
-                                        deleted = deleted,
-                                        mine = mine,
-                                        showStatus = showOutgoingStatus,
-                                        footerOnVisualMedia = footerOnVisualMedia,
-                                        footerOnPendingVisual = footerOnPendingVisual,
-                                        showPendingPlaceholder = showPendingPlaceholder,
-                                        fileFooterWarning = fileFooterWarning,
-                                        onMediaLongPress = onMediaLongPress,
-                                        attachedToCaption = true,
-                                    )
+                                    LookaheadScope {
+                                        Column(
+                                            modifier = focusedMediaCaptureModifier,
+                                            horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
+                                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                                        ) {
+                                            BubbleMediaBlocks(
+                                                item = item,
+                                                record = record,
+                                                controller = controller,
+                                                appState = appState,
+                                                onOpenConversationMedia = onOpenConversationMedia,
+                                                bubbleMedia = bubbleMedia,
+                                                sharedLocation = sharedLocation,
+                                                sharedContact = sharedContact,
+                                                sharedUser = sharedUser,
+                                                deleted = deleted,
+                                                mine = mine,
+                                                showStatus = showOutgoingStatus,
+                                                footerOnVisualMedia = footerOnVisualMedia,
+                                                footerOnPendingVisual = footerOnPendingVisual,
+                                                showPendingPlaceholder = showPendingPlaceholder,
+                                                fileFooterWarning = fileFooterWarning,
+                                                onMediaLongPress = onMediaLongPress,
+                                                attachedToCaption = true,
+                                                focusedPreview = isActionMenuOpen,
+                                            )
+                                        }
+                                    }
                                 },
                             ) {
                                 BubbleBodyFooterAndRetry(
@@ -2030,26 +2100,35 @@ internal fun MessageBubble(
                                 modifier = actionAnchorBoundsModifier,
                                 alignEnd = mine,
                                 media = {
-                                    BubbleMediaBlocks(
-                                        item = item,
-                                        record = record,
-                                        controller = controller,
-                                        appState = appState,
-                                        onOpenConversationMedia = onOpenConversationMedia,
-                                        bubbleMedia = bubbleMedia,
-                                        sharedLocation = sharedLocation,
-                                        sharedContact = sharedContact,
-                                        sharedUser = sharedUser,
-                                        deleted = deleted,
-                                        mine = mine,
-                                        showStatus = showOutgoingStatus,
-                                        footerOnVisualMedia = footerOnVisualMedia,
-                                        footerOnPendingVisual = footerOnPendingVisual,
-                                        showPendingPlaceholder = showPendingPlaceholder,
-                                        fileFooterWarning = fileFooterWarning,
-                                        onMediaLongPress = onMediaLongPress,
-                                        attachedToCaption = false,
-                                    )
+                                    LookaheadScope {
+                                        Column(
+                                            modifier = focusedMediaCaptureModifier,
+                                            horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
+                                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                                        ) {
+                                            BubbleMediaBlocks(
+                                                item = item,
+                                                record = record,
+                                                controller = controller,
+                                                appState = appState,
+                                                onOpenConversationMedia = onOpenConversationMedia,
+                                                bubbleMedia = bubbleMedia,
+                                                sharedLocation = sharedLocation,
+                                                sharedContact = sharedContact,
+                                                sharedUser = sharedUser,
+                                                deleted = deleted,
+                                                mine = mine,
+                                                showStatus = showOutgoingStatus,
+                                                footerOnVisualMedia = footerOnVisualMedia,
+                                                footerOnPendingVisual = footerOnPendingVisual,
+                                                showPendingPlaceholder = showPendingPlaceholder,
+                                                fileFooterWarning = fileFooterWarning,
+                                                onMediaLongPress = onMediaLongPress,
+                                                attachedToCaption = false,
+                                                focusedPreview = isActionMenuOpen,
+                                            )
+                                        }
+                                    }
                                 },
                             ) {
                                 // No caption: the footer (time/status) for audio,
@@ -2171,7 +2250,6 @@ internal fun MessageBubble(
                     expanded = isActionMenuOpen && !selectionMode && !textSelectionMode,
                     anchorBoundsInWindow = actionMenuAnchorBounds,
                     anchorWindowYPx = longPressWindowY,
-                    centerOverAnchor = hasMedia,
                     canReply = !deleted && !readOnly,
                     canReact = !deleted && !readOnly,
                     canDelete = deleteCapability.canDeleteAtAll,
@@ -2245,6 +2323,203 @@ internal fun MessageBubble(
                     },
                     onInfo = ::openInfoSheet,
                     onDelete = ::requestDelete,
+                    mine = mine,
+                    selectedReactionEmojis = reactionTallies.filter { it.mine }.mapTo(mutableSetOf()) { it.emoji },
+                    previewDescription =
+                        if (isActionMenuOpen) {
+                            focusedMessagePreviewDescription(
+                                author = appState.displayName(record.sender),
+                                body =
+                                    focusedMessagePreviewText(
+                                        displayedBody,
+                                        displayedMarkdownDocument,
+                                        appState::mentionDisplayName,
+                                    ).text,
+                                mediaLabels =
+                                    if (hasMedia) {
+                                        mediaReferences.map { it.fileName }.filter(String::isNotBlank).ifEmpty {
+                                            listOf(
+                                                mediaPendingName?.takeIf(String::isNotBlank)
+                                                    ?: stringResource(R.string.media_attachment),
+                                            )
+                                        }
+                                    } else {
+                                        emptyList()
+                                    },
+                                time = rememberedMessageBubbleTime(record.recordedAt),
+                                status =
+                                    if (showOutgoingStatus) {
+                                        when (item.status) {
+                                            MessageStatus.Pending -> stringResource(R.string.sending)
+                                            MessageStatus.Sent -> stringResource(R.string.sent)
+                                            MessageStatus.Failed -> stringResource(R.string.send_failed)
+                                            else -> null
+                                        }
+                                    } else {
+                                        null
+                                    },
+                                warning = invalidationWarning,
+                            )
+                        } else {
+                            ""
+                        },
+                    previewReady = !hasMedia || focusedMediaReady,
+                    preview = {
+                        val previewRetention =
+                            record
+                                .retentionIndicatorInput(
+                                    controllerKey = controller,
+                                    accountRef = controller.boundAccountRef,
+                                    deleted = deleted,
+                                    retentionAtSendSeconds = item.retentionAtSendSeconds,
+                                ).takeUnless { fileFooterInCard }
+                        val previewReserveRetention =
+                            !fileFooterInCard &&
+                                !deleted &&
+                                shouldReserveRetentionIndicatorSpace(
+                                    input = previewRetention,
+                                    projectedRetentionSeconds = record.retentionSeconds,
+                                    mine = mine,
+                                    status = item.status,
+                                    groupRetentionSeconds = controller.group.disappearingMessageSecs,
+                                )
+                        val previewFooter: @Composable () -> Unit = {
+                            MessageInlineFooter(
+                                timeText = rememberedMessageBubbleTime(record.recordedAt),
+                                color = timestampColor,
+                                showStatus = showOutgoingStatus && !fileFooterInCard,
+                                status = item.status,
+                                editedLabel = editedLabel,
+                                onEditedClick = null,
+                                retention = previewRetention,
+                                reserveRetentionSpace = previewReserveRetention,
+                                showTime = !fileFooterInCard,
+                            )
+                        }
+                        val mediaPreview: (@Composable () -> Unit)? =
+                            if (hasMedia) {
+                                {
+                                    FocusedRenderedMessagePreview(
+                                        layer = checkNotNull(focusedMessageLayer),
+                                        sourceSize = focusedMediaSize,
+                                    )
+                                }
+                            } else {
+                                null
+                            }
+                        if (hasMedia && !bodyOrWarningInsideBubble) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                replyPreview?.let { preview ->
+                                    ReplyPreviewCard(
+                                        senderTitle =
+                                            if (preview.originalUnavailable) {
+                                                ""
+                                            } else {
+                                                senderTitleForReply(preview.sender, appState)
+                                            },
+                                        isOwn =
+                                            if (preview.originalUnavailable) {
+                                                mine
+                                            } else {
+                                                isOwnReplySender(preview.sender, appState)
+                                            },
+                                        body = preview.body,
+                                        mediaKind = preview.mediaKind,
+                                        mediaFileName = preview.mediaFileName,
+                                        mediaType = preview.mediaType,
+                                        originalUnavailable = preview.originalUnavailable,
+                                        warning = preview.warning,
+                                        onClick = null,
+                                        onDismiss = null,
+                                        fillWidth = true,
+                                        mentionDisplayName = appState::mentionDisplayName,
+                                        containerColor = null,
+                                        contentColor = null,
+                                        accentColor =
+                                            replyPreviewAccentArgb(
+                                                insideBubble = false,
+                                                customBubbleColorActive = customBubbleColorActive,
+                                                presentation = bubblePresentation,
+                                            )?.let(::colorFromArgb),
+                                    )
+                                }
+                                mediaPreview?.invoke()
+                                if (!footerOnVisualMedia && !footerOnPendingVisual) {
+                                    previewFooter()
+                                }
+                            }
+                        } else {
+                            FocusedTextMessagePreview(
+                                presentation = bubblePresentation,
+                                mine = mine,
+                                text = bodyTextToRender ?: displayedBody.takeUnless { hasMedia }.orEmpty(),
+                                document = displayedMarkdownDocument,
+                                time = rememberedMessageBubbleTime(record.recordedAt),
+                                status = item.status,
+                                showStatus = showOutgoingStatus,
+                                senderName = appState.displayName(record.sender).takeIf { showSenderName },
+                                mentionDisplayName = appState::mentionDisplayName,
+                                isGroupMember =
+                                    if (controller.membersLoaded) {
+                                        { bech32 -> appState.isRosterMember(bech32, controller.members) }
+                                    } else {
+                                        null
+                                    },
+                                media = mediaPreview,
+                                footerContent = previewFooter,
+                                warning = outerInvalidationWarning,
+                                editedLabel = editedLabel,
+                                retention =
+                                    record.retentionIndicatorInput(
+                                        controllerKey = controller,
+                                        accountRef = controller.boundAccountRef,
+                                        deleted = deleted,
+                                        retentionAtSendSeconds = item.retentionAtSendSeconds,
+                                    ),
+                                mentionedSelf = mentionedSelf,
+                                mentionedYouLabel = mentionedYouLabel,
+                                reply =
+                                    replyPreview?.let { preview ->
+                                        {
+                                            ReplyPreviewCard(
+                                                senderTitle =
+                                                    if (preview.originalUnavailable) {
+                                                        ""
+                                                    } else {
+                                                        senderTitleForReply(preview.sender, appState)
+                                                    },
+                                                isOwn =
+                                                    if (preview.originalUnavailable) {
+                                                        mine
+                                                    } else {
+                                                        isOwnReplySender(preview.sender, appState)
+                                                    },
+                                                body = preview.body,
+                                                mediaKind = preview.mediaKind,
+                                                mediaFileName = preview.mediaFileName,
+                                                mediaType = preview.mediaType,
+                                                originalUnavailable = preview.originalUnavailable,
+                                                warning = preview.warning,
+                                                onClick = null,
+                                                onDismiss = null,
+                                                fillWidth = true,
+                                                mentionDisplayName = appState::mentionDisplayName,
+                                                containerColor = replyFillColor.takeUnless { hasMedia },
+                                                contentColor = bubbleContentColor.takeUnless { hasMedia },
+                                                accentColor =
+                                                    replyPreviewAccentArgb(
+                                                        insideBubble = !hasMedia,
+                                                        customBubbleColorActive = customBubbleColorActive,
+                                                        presentation = bubblePresentation,
+                                                    )?.let(::colorFromArgb)
+                                                        ?: bubbleContentColor.takeUnless { hasMedia },
+                                                secondaryColor = replySecondaryColor.takeUnless { hasMedia },
+                                            )
+                                        }
+                                    },
+                            )
+                        }
+                    },
                 )
                 if (expandedFullView && !deleted) {
                     val groupIdHex = controller.group.groupIdHex
@@ -2518,3 +2793,6 @@ internal fun MessageBubble(
 // A body longer than this many rendered lines collapses to a Read More that
 // opens the full-screen view rather than spilling down the transcript (#325).
 internal const val MESSAGE_COLLAPSE_LINE_LIMIT = 52
+
+private const val REPLY_QUOTE_FILL_ALPHA = 0.16f
+private const val REPLY_QUOTE_SECONDARY_ALPHA = 0.78f

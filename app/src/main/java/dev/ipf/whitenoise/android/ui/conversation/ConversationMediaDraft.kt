@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -479,9 +480,23 @@ internal fun ConversationMediaDraftContent(
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
     onAfterSend: () -> Unit,
+    previewIndex: Int? = 0,
+    onClosePreview: (() -> Unit)? = null,
 ) {
     val previewStateHolder = rememberSaveableStateHolder()
-    if ((mediaSlots.isNotEmpty() || documentUris.isNotEmpty()) && state.activeEditor == null) {
+    val previewKey =
+        rememberSaveable(previewIndex) {
+            java.util.UUID
+                .randomUUID()
+                .toString()
+        }
+    DisposableEffect(previewKey, onClosePreview != null) {
+        onDispose {
+            if (onClosePreview != null) previewStateHolder.removeState(previewKey)
+        }
+    }
+    val hasStagedAttachments = mediaSlots.isNotEmpty() || documentUris.isNotEmpty()
+    if (previewIndex != null && hasStagedAttachments && state.activeEditor == null) {
         // Preserve the caption's acceptance generation for the lifetime of this
         // preview; recomposition must not rebind its eventual callback to newer text.
         val seededCaption = remember(state, chatId) { composerText() }
@@ -493,16 +508,22 @@ internal fun ConversationMediaDraftContent(
             remember(state.backedPhotos) {
                 state.preparedQualities()
             }
-        previewStateHolder.SaveableStateProvider(chatId) {
+        previewStateHolder.SaveableStateProvider(if (onClosePreview == null) chatId else previewKey) {
             MediaPreviewScreen(
                 mediaSlots = mediaSlots,
                 documentUris = documentUris,
                 chatTitle = chatTitle,
                 initialCaption = seededCaption.text,
+                previewOnly = onClosePreview != null,
+                initialIndex = previewIndex,
                 onDismiss = {
-                    (state.backedPhotos.keys + state.preparedPhotos.keys).forEach(state::releasePreparedPhoto)
-                    onMediaSlotsChange(emptyList())
-                    onDocumentUrisChange(emptyList())
+                    if (onClosePreview != null) {
+                        onClosePreview()
+                    } else {
+                        (state.backedPhotos.keys + state.preparedPhotos.keys).forEach(state::releasePreparedPhoto)
+                        onMediaSlotsChange(emptyList())
+                        onDocumentUrisChange(emptyList())
+                    }
                 },
                 onSend = { caption, onResult ->
                     mediaSender.sendStagedAttachments(

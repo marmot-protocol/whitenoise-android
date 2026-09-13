@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,7 +33,6 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
 import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
-import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleTimestampColor
 import dev.ipf.whitenoise.android.ui.conversation.messages.replyPreviewAccentArgb
@@ -366,6 +364,8 @@ class MessageBubbleChromeScreenshotTest {
                     Column(modifier = Modifier.width(360.dp).padding(8.dp).testTag(TAG)) {
                         FontSizePreviewBubble(text = "Incoming message bubble", mine = false)
                         FontSizePreviewBubble(text = "Outgoing message bubble", mine = true)
+                        DirectionalBubble(text = "Incoming conversation bubble", time = "12:34", mine = false)
+                        DirectionalBubble(text = "Outgoing conversation bubble", time = "12:35", mine = true)
                         MessageInlineFooter(
                             timeText = "12:34",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -526,13 +526,14 @@ private fun DirectionalBubble(
     time: String,
     mine: Boolean,
 ) {
-    Surface(
-        color = Color.Black,
-        contentColor = Color.White,
-        shape = RoundedCornerShape(18.dp),
-        border = messageBubbleBorder(highlighted = false, mine = mine),
+    MessageBubbleFrame(
+        presentation = messageBubblePresentation(deleted = false, mine = mine),
+        highlighted = false,
+        mine = mine,
+        mentionedSelf = false,
+        mentionedYouLabel = "Mentioned you",
     ) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+        Column {
             Text(text)
             MessageInlineFooter(
                 timeText = time,

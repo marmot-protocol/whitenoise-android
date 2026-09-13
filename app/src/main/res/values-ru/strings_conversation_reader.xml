@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="conversation_select_messages">Выберите сообщения</string>
+    <string name="conversation_search_messages">Сообщения</string>
+    <string name="conversation_jump_to_date">Перейти к дате</string>
+    <string name="conversation_edit_revision">Версия %1$d</string>
+</resources>

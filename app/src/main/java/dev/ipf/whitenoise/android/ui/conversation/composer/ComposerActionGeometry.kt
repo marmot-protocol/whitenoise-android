@@ -4,49 +4,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 
-private val ExpandedComposerActionInset = 4.dp
-private val CompactComposerActionSize = 44.dp
-private val ExpandedComposerActionSize = 48.dp
-
-internal fun Modifier.expandedComposerActionRow(progress: () -> Float): Modifier =
+/** Keeps the trailing native action owner inside the shared 48dp composer toolbar. */
+internal fun Modifier.expandedComposerActionRow(): Modifier =
     layout { measurable, constraints ->
-        val fraction = progress().coerceIn(0f, 1f)
-        val actionSize =
-            (
-                CompactComposerActionSize +
-                    (ExpandedComposerActionSize - CompactComposerActionSize) * fraction
-            ).roundToPx()
-        val inset = (ExpandedComposerActionInset * fraction).roundToPx()
+        val rowHeight = 48.dp.roundToPx().coerceAtMost(constraints.maxHeight)
+        val endInset = 4.dp.roundToPx()
         val placeable =
             measurable.measure(
-                constraints.copy(
-                    minHeight = actionSize,
-                    maxHeight = actionSize,
-                ),
+                constraints.copy(minHeight = rowHeight, maxHeight = rowHeight),
             )
-        layout(placeable.width + inset, placeable.height + inset) {
+        layout(placeable.width + endInset, placeable.height) {
             placeable.placeRelative(0, 0)
         }
     }
 
-internal fun Modifier.composerActionSize(progress: () -> Float): Modifier =
+/** Centers the 32dp send disc in the prototype's 40dp action slot without replacing its send callback. */
+internal fun Modifier.composerActionSize(): Modifier =
     layout { measurable, constraints ->
-        val fraction = progress().coerceIn(0f, 1f)
-        val size =
-            (
-                CompactComposerActionSize +
-                    (ExpandedComposerActionSize - CompactComposerActionSize) * fraction
-            ).roundToPx()
+        val discSize = 32.dp.roundToPx().coerceAtMost(minOf(constraints.maxWidth, constraints.maxHeight))
+        val width = 40.dp.roundToPx().coerceIn(constraints.minWidth, constraints.maxWidth)
+        val height = 48.dp.roundToPx().coerceIn(constraints.minHeight, constraints.maxHeight)
         val placeable =
             measurable.measure(
-                constraints.copy(
-                    minWidth = size,
-                    maxWidth = size,
-                    minHeight = size,
-                    maxHeight = size,
-                ),
+                constraints.copy(minWidth = discSize, maxWidth = discSize, minHeight = discSize, maxHeight = discSize),
             )
-        layout(size, size) {
-            placeable.placeRelative(0, 0)
+        layout(width, height) {
+            placeable.placeRelative((width - placeable.width) / 2, (height - placeable.height) / 2)
         }
     }

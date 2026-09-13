@@ -157,6 +157,7 @@ internal fun isNearBottom(
     timelineSize: Int,
     hasOlderHeader: Boolean,
     hasInlineTopError: Boolean = false,
+    timelineViewport: ConversationTimelineViewport? = null,
 ): Boolean {
     if (!listState.canScrollForward) return true
     val leadingStructuralRowCount =
@@ -171,7 +172,7 @@ internal fun isNearBottom(
     // truthful when the viewport shrinks (e.g. keyboard open) and fewer
     // items fit, which pushes firstVisibleItemIndex earlier even though
     // the bottom is still on-screen.
-    val layoutInfo = listState.layoutInfo
+    val layoutInfo = (timelineViewport?.readingLayoutInfo() ?: listState.layoutInfo)
     val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull() ?: return false
     if (lastVisible.index > tailTimelineIndex) return true
     if (lastVisible.index < tailTimelineIndex) return false
@@ -193,8 +194,9 @@ internal fun isConversationItemTopAligned(
     listState: LazyListState,
     targetIndex: Int,
     tolerancePx: Int = 1,
+    timelineViewport: ConversationTimelineViewport? = null,
 ): Boolean {
-    val layoutInfo = listState.layoutInfo
+    val layoutInfo = (timelineViewport?.readingLayoutInfo() ?: listState.layoutInfo)
     val target = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex } ?: return false
     return abs(target.offset - layoutInfo.viewportStartOffset) <= tolerancePx.coerceAtLeast(0)
 }
@@ -210,10 +212,17 @@ internal fun rememberConversationNearBottom(
     renderedTimelineSize: Int,
     hasOlderHeader: Boolean,
     hasInlineTopError: Boolean = false,
+    timelineViewport: ConversationTimelineViewport? = null,
 ): Boolean {
-    val nearBottom by remember(listState, renderedTimelineSize, hasOlderHeader, hasInlineTopError) {
+    val nearBottom by remember(listState, renderedTimelineSize, hasOlderHeader, hasInlineTopError, timelineViewport) {
         derivedStateOf {
-            isNearBottom(listState, renderedTimelineSize, hasOlderHeader, hasInlineTopError)
+            isNearBottom(
+                listState,
+                renderedTimelineSize,
+                hasOlderHeader,
+                hasInlineTopError,
+                timelineViewport,
+            )
         }
     }
     return nearBottom

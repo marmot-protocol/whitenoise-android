@@ -14,6 +14,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -23,6 +24,9 @@ import dev.ipf.whitenoise.android.state.contrastRatio
 import dev.ipf.whitenoise.android.state.resolveActionColorArgb
 
 private const val OPAQUE_ARGB_MASK = 0xFFFFFFFFL
+
+/** Bubble defaults use the active base palette without inheriting the account action accent. */
+internal val LocalMessageBubbleBaseColorScheme = staticCompositionLocalOf<ColorScheme?> { null }
 
 // Locked brand scheme — strictly monochrome Material roles over neutral surfaces,
 // with a clean red reserved for errors. Every role is defined explicitly so nothing
@@ -257,7 +261,10 @@ fun WhiteNoiseTheme(
             .withAmoledPalette(amoledActive)
             .withAccountAccent(accentColorArgb, amoledActive)
 
-    CompositionLocalProvider(LocalAmoledSurfaceTheme provides amoledActive) {
+    CompositionLocalProvider(
+        LocalAmoledSurfaceTheme provides amoledActive,
+        LocalMessageBubbleBaseColorScheme provides baseColorScheme.withAmoledPalette(amoledActive),
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             // Expressive spring-based motion for M3 components app-wide (M3E).

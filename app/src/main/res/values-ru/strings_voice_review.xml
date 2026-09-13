@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_review_title">Проверить голосовое сообщение</string>
+    <string name="voice_record_again">Записать заново</string>
+    <string name="voice_message_release_to_review">Отпустите для проверки · сдвиньте для отмены</string>
+    <string name="voice_recording_stop">Остановить запись</string>
+</resources>

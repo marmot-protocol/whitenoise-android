@@ -5,25 +5,24 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.NavigateBefore
-import androidx.compose.material.icons.automirrored.filled.NavigateNext
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -31,7 +30,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -110,8 +112,21 @@ internal fun TtsTransportBarContent(
     val isPreparing = state is TtsState.Preparing
     val actionableBodyClick = onBodyClick.takeUnless { isError }
     val navigationEnabled = ttsNavigationEnabled(state, historyEdge)
-    Surface(modifier = modifier.fillMaxWidth(), tonalElevation = 3.dp) {
-        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+    val maximumHeight =
+        with(LocalDensity.current) {
+            (
+                LocalWindowInfo.current.containerSize.height
+                    .toDp() * 0.45f
+            ).coerceAtLeast(96.dp)
+        }
+    Surface(modifier = modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Column(
+            modifier =
+                Modifier
+                    .heightIn(max = maximumHeight)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp),
+        ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -137,71 +152,62 @@ internal fun TtsTransportBarContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.VolumeUp,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
                     Column(modifier = Modifier.weight(1f)) {
                         TtsTransportPreview(state, isError, isPreparing, historyEdge)
                     }
+                }
+                IconButton(onClick = onStop) {
+                    Icon(
+                        painterResource(R.drawable.ic_stop),
+                        contentDescription = stringResource(R.string.tts_bar_stop),
+                    )
+                }
+            }
+            TtsTransportProgress(state, isError, isPreparing)
+            FlowRow(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                IconButton(onClick = onPreviousSentence, enabled = navigationEnabled) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.tts_bar_skip_previous),
+                    )
+                }
+                when (state) {
+                    is TtsState.Speaking ->
+                        FilledTonalIconButton(onClick = onPause) {
+                            Icon(painterResource(R.drawable.ic_pause), stringResource(R.string.tts_bar_pause))
+                        }
+                    is TtsState.Paused ->
+                        FilledTonalIconButton(onClick = onResume) {
+                            Icon(painterResource(R.drawable.ic_play_arrow), stringResource(R.string.tts_bar_play))
+                        }
+                    // Native terminal/error states have no resumable queue.
+                    else -> Unit
+                }
+                IconButton(onClick = onNextSentence, enabled = navigationEnabled) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = stringResource(R.string.tts_bar_skip_next),
+                    )
+                }
+            }
+            FlowRow(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                TextButton(onClick = onPreviousMessage, enabled = navigationEnabled) {
+                    Text(stringResource(R.string.tts_bar_previous_message))
+                }
+                TextButton(onClick = onNextMessage, enabled = navigationEnabled) {
+                    Text(stringResource(R.string.tts_bar_next_message))
                 }
                 if (!isError) {
                     TtsTransportRatePicker(
                         rateOverride = rateOverride,
                         activeRate = activeRate,
                         onRateSelected = onRateSelected,
-                    )
-                }
-                IconButton(onClick = onStop) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.tts_bar_stop))
-                }
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                IconButton(onClick = onPreviousMessage, enabled = navigationEnabled) {
-                    Icon(
-                        Icons.Default.SkipPrevious,
-                        contentDescription = stringResource(R.string.tts_bar_previous_message),
-                    )
-                }
-                IconButton(onClick = onPreviousSentence, enabled = navigationEnabled) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.NavigateBefore,
-                        contentDescription = stringResource(R.string.tts_bar_skip_previous),
-                    )
-                }
-                when (state) {
-                    is TtsState.Speaking ->
-                        IconButton(onClick = onPause) {
-                            Icon(Icons.Default.Pause, contentDescription = stringResource(R.string.tts_bar_pause))
-                        }
-                    is TtsState.Paused ->
-                        IconButton(onClick = onResume) {
-                            Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = stringResource(R.string.tts_bar_play),
-                            )
-                        }
-                    // Error clears the queue, so a disabled resume slot could
-                    // never enable — render no control rather than lie to
-                    // accessibility focus.
-                    else -> Unit
-                }
-                IconButton(onClick = onNextSentence, enabled = navigationEnabled) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.NavigateNext,
-                        contentDescription = stringResource(R.string.tts_bar_skip_next),
-                    )
-                }
-                IconButton(onClick = onNextMessage, enabled = navigationEnabled) {
-                    Icon(
-                        Icons.Default.SkipNext,
-                        contentDescription = stringResource(R.string.tts_bar_next_message),
                     )
                 }
             }
@@ -226,7 +232,7 @@ private fun HistoryEdgeStatus(historyEdge: TtsHistoryEdgeState?) {
         }
     Text(
         text = text,
-        style = MaterialTheme.typography.labelSmall,
+        style = MaterialTheme.typography.labelMedium,
         color = color,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
@@ -260,7 +266,7 @@ private fun TtsTransportPreview(
             text = preview,
             style = MaterialTheme.typography.bodySmall,
             color = if (isError) colors.error else colors.onSurfaceVariant,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
     }
@@ -274,12 +280,30 @@ private fun TtsTransportPreview(
                     ttsMessageIndex(state) + 1,
                     ttsMessageCount(state),
                 ),
-            style = MaterialTheme.typography.labelSmall,
+            style =
+                if (historyEdge == null) {
+                    MaterialTheme.typography.labelMedium
+                } else {
+                    MaterialTheme.typography.labelSmall
+                },
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
     }
+
+    HistoryEdgeStatus(historyEdge)
+}
+
+/** Reports the native message progress at full transport width without inventing utterance seeking. */
+@Suppress("FunctionNaming")
+@Composable
+private fun TtsTransportProgress(
+    state: TtsState,
+    isError: Boolean,
+    isPreparing: Boolean,
+) {
+    val showProgress = !isError && !isPreparing && ttsMessageCount(state) > 0
     if (showProgress) {
         val targetProgress = ttsMessageProgressFraction(state)
         val animatedProgress =
@@ -294,6 +318,7 @@ private fun TtsTransportPreview(
         // The progress text above already narrates the position.
         LinearProgressIndicator(
             progress = { animatedProgress },
+            drawStopIndicator = {},
             modifier =
                 Modifier
                     .fillMaxWidth()
@@ -301,5 +326,4 @@ private fun TtsTransportPreview(
                     .clearAndSetSemantics {},
         )
     }
-    HistoryEdgeStatus(historyEdge)
 }

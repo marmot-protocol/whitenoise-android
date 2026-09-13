@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,7 +45,7 @@ internal fun MessageBubbleFrame(
     mentionedYouLabel: String,
     modifier: Modifier = Modifier,
     contentModifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(18.dp),
+    shape: Shape = MaterialTheme.shapes.large,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val highlightProgress =
@@ -86,7 +85,6 @@ internal fun MessageBubbleFrame(
                 mine = mine,
                 persistedFailure = presentation.suppressBorder,
             ),
-        tonalElevation = if (mine) 1.dp else 0.dp,
     ) {
         Column(
             modifier = bubbleContentModifier(contentModifier),
@@ -114,7 +112,7 @@ internal fun MediaCaptionFrame(
     alignEnd: Boolean,
     modifier: Modifier = Modifier,
     contentModifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(18.dp),
+    shape: Shape = MaterialTheme.shapes.large,
     media: @Composable ColumnScope.() -> Unit,
     caption: @Composable ColumnScope.() -> Unit,
 ) {
@@ -155,7 +153,6 @@ internal fun MediaCaptionFrame(
                 mine = mine,
                 persistedFailure = presentation.suppressBorder,
             ),
-        tonalElevation = if (mine) 1.dp else 0.dp,
     ) {
         MediaSupplementEnvelope(
             alignEnd = alignEnd,
@@ -230,7 +227,7 @@ private val bubbleContentArrangement = Arrangement.spacedBy(6.dp)
 
 private fun bubbleContentModifier(contentModifier: Modifier): Modifier =
     contentModifier
-        .padding(horizontal = 14.dp, vertical = 10.dp)
+        .padding(horizontal = 12.dp, vertical = 8.dp)
 
 @Composable
 @Suppress("FunctionNaming")
@@ -275,9 +272,9 @@ private fun messageTargetHighlightModifier(
                 size = Size((size.width - inset * 2).coerceAtLeast(0f), (size.height - inset * 2).coerceAtLeast(0f)),
                 cornerRadius =
                     if (customBorderArgb != null) {
-                        CornerRadius(14.dp.toPx(), 14.dp.toPx())
+                        CornerRadius(12.dp.toPx(), 12.dp.toPx())
                     } else {
-                        CornerRadius(17.dp.toPx(), 17.dp.toPx())
+                        CornerRadius(15.dp.toPx(), 15.dp.toPx())
                     },
                 style = Stroke(width = 2.dp.toPx()),
             )

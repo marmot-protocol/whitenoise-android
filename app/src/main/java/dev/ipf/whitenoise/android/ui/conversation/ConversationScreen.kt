@@ -40,13 +40,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -65,6 +65,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
@@ -72,7 +73,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -140,6 +140,7 @@ import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
@@ -148,6 +149,7 @@ import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
+import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerAttachmentSheetState
@@ -171,6 +173,8 @@ import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachme
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberConversationMediaViewerSessionState
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberDocumentSaveFallback
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerForwardActions
+import dev.ipf.whitenoise.android.ui.conversation.media.removeAcceptedDocumentOccurrences
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
@@ -701,6 +705,7 @@ internal fun ConversationScreen(
                 initialFirstVisibleItemScrollOffset = positionalScrollRestore?.firstVisibleItemScrollOffset ?: 0,
             )
         }
+    val timelineViewport = remember(listState) { ConversationTimelineViewport(listState) }
     val scrollEvidenceSink = LocalConversationScrollEvidenceSink.current
     val ttsQuickTransportViewportLock = rememberTtsQuickTransportViewportLock(listState)
     var unreadJumpState by
@@ -839,7 +844,7 @@ internal fun ConversationScreen(
                     initialTimelineAnchored = initialTimelineAnchored,
                     anchorTailImmediately = firstFrameSeed.anchorTailImmediately,
                     seededTailAlignmentCommitted = seededTailAlignmentCommitted,
-                    viewportMeasured = listState.layoutInfo.viewportSize.height > 0,
+                    viewportMeasured = timelineViewport.readingLayoutInfo().viewportSize.height > 0,
                     canScrollForward = listState.canScrollForward,
                 )
             }
@@ -1065,12 +1070,23 @@ internal fun ConversationScreen(
     var dragPointerWindowY by
         remember(controller, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf<Float?>(null) }
 
+    LaunchedEffect(timelineViewport, ttsFollowHandle) {
+        snapshotFlow { timelineViewport.readingBoundsInWindow }.collect { bounds ->
+            if (bounds != null) {
+                transcriptWindowTop = bounds.top
+                transcriptHeightPx = bounds.height
+                ttsFollowHandle.sentenceLayouts.updateViewportBounds(bounds)
+            }
+        }
+    }
+
     /** Captures the logical first visible message against the latest filtered timeline. */
     fun currentScrollAnchor(): ConversationScrollAnchor {
         val liveRenderedTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
         return conversationScrollAnchor(
             listState = listState,
+            timelineViewport = timelineViewport,
             renderedItemIds = liveRenderedTimeline.map { it.id },
             renderedMessageIds = liveRenderedTimeline.map { it.record.messageIdHex },
             hasOlderHeader = liveHasOlderHeader,
@@ -1085,7 +1101,7 @@ internal fun ConversationScreen(
     LaunchedEffect(listState, controller, scrollEvidenceSink, viewportCaptureRevision) {
         val sink = scrollEvidenceSink ?: return@LaunchedEffect
         snapshotFlow {
-            val layoutInfo = listState.layoutInfo
+            val layoutInfo = timelineViewport.readingLayoutInfo()
             ConversationViewportEvidence(
                 captureRevision = viewportCaptureRevision,
                 accountRef = conversationAccountRef,
@@ -1113,7 +1129,7 @@ internal fun ConversationScreen(
         val anchorId = dragAnchorTimelineId ?: return false
         val endpointId =
             dragSelectionEndpoint(
-                listState.layoutInfo.visibleItemsInfo.mapNotNull { visible ->
+                timelineViewport.readingLayoutInfo().visibleItemsInfo.mapNotNull { visible ->
                     val id = visible.key as? String
                     id
                         ?.takeIf(timelineIdSet::contains)
@@ -1222,6 +1238,14 @@ internal fun ConversationScreen(
         }
     }
     val composerGate = conversationControllerComposerGate(controller, notificationOpenRequestId)
+    val timelineUnderlayEnabled =
+        composerGate == ComposerGate.COMPOSER &&
+            !selectionMode &&
+            !navigationState.searchOpen &&
+            loadFailurePlacement != LoadFailurePlacement.FullScreen &&
+            !navigationState.initialTimelineBackfillNoProgress &&
+            !transcriptPresentationNeedsRetry
+    SideEffect { timelineViewport.enabled = timelineUnderlayEnabled }
     val batchSelectionUi =
         rememberConversationBatchSelectionUiState(
             selectedMessages = selectedMessages,
@@ -1235,6 +1259,7 @@ internal fun ConversationScreen(
     val nearBottom =
         rememberConversationNearBottom(
             listState = listState,
+            timelineViewport = timelineViewport,
             renderedTimelineSize = renderedSize,
             hasOlderHeader = hasOlderHeader,
             hasInlineTopError = hasInlineTopError,
@@ -1280,6 +1305,7 @@ internal fun ConversationScreen(
                     currentScrollAnchor(),
                     isNearBottom(
                         listState = listState,
+                        timelineViewport = timelineViewport,
                         timelineSize = liveRenderedSize,
                         hasOlderHeader = liveHasOlderHeader,
                         hasInlineTopError =
@@ -1635,8 +1661,8 @@ internal fun ConversationScreen(
 
     // Voice-message recording surface — owned per ConversationScreen so a
     // backgrounded recording is dropped on dispose. The recorder writes
-    // into a per-session temp dir; the file is consumed by `sendVoiceMessage`
-    // below and then removed.
+    // into a per-session temp dir. Completion opens review; only explicit Send
+    // transfers the file to the native sender. Unsent review files are removed on disposal.
     val voiceOutputDir =
         remember(context) {
             java.io.File(context.cacheDir, "voice-recordings").apply { mkdirs() }
@@ -1649,13 +1675,41 @@ internal fun ConversationScreen(
             ActivityResultContracts.RequestPermission(),
         ) { granted -> if (!granted) appState.present(micPermissionDeniedMsg) }
 
+    val voiceReviewRecovery =
+        dev.ipf.whitenoise.android.ui.conversation.composer.rememberVoiceReviewRecoveryMarker(
+            conversationAccountRef,
+            controller.group.groupIdHex,
+        )
+    val voiceReviewRuntime = appState.runtimeGeneration
+    val voiceReview =
+        remember(controller, conversationAccountRef, voiceReviewRuntime, mediaSender, voiceReviewRecovery) {
+            dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingReview(
+                scope = scope,
+                ownerIsCurrent = {
+                    conversationAccountRef != null &&
+                        appState.activeAccountRef == conversationAccountRef &&
+                        appState.runtimeGeneration == voiceReviewRuntime &&
+                        controller.boundAccountRef == conversationAccountRef
+                },
+                send = { file, duration, canSend, onQueued ->
+                    mediaSender.sendVoiceAttachment(file, duration, canSend, onQueued)
+                },
+                onSendFailure = { appState.present(R.string.send_failed) },
+                onPlaybackFailure = { appState.present(R.string.voice_message_failed) },
+                onReviewPresenceChanged = voiceReviewRecovery::updatePresence,
+            )
+        }
+    DisposableEffect(voiceReview) {
+        onDispose { voiceReview.release() }
+    }
+
     val voiceRecordingController =
         // Re-key on every captured dependency: chat.id (basic), controller
         // (avoids dispatching through a stale ConversationController when
         // appState.runtimeGeneration changes), and voiceOutputDir (a fresh
         // File reference if context/cacheDir flips — also future-proofs an
         // account-scoped dir).
-        remember(chat.id, controller, voiceOutputDir) {
+        remember(chat.id, controller, voiceOutputDir, voiceReview) {
             dev.ipf.whitenoise.android.audio.VoiceRecordingController(
                 context = context,
                 outputDirectory = voiceOutputDir,
@@ -1670,7 +1724,7 @@ internal fun ConversationScreen(
                     }
                     granted
                 },
-                onRecordingComplete = { file, durationMs -> mediaSender.sendVoiceAttachment(file, durationMs) },
+                onRecordingComplete = { file, durationMs -> voiceReview.offer(file, durationMs) },
                 onError = { throwable ->
                     presentVoiceRecordingFailure(appState, throwable, voiceTooShortMsg)
                 },
@@ -1681,6 +1735,30 @@ internal fun ConversationScreen(
                 microphoneCaptures = appState.microphoneCaptureCoordinator,
             )
         }
+    LaunchedEffect(voiceRecordingController.isRecording, voiceReview.clip) {
+        if (voiceRecordingController.isRecording) {
+            voiceReview.discardForNewRecording()
+            voiceReviewRecovery.updatePresence(false)
+        }
+    }
+    if (voiceReviewRecovery.hasReview && voiceReview.clip == null && !voiceRecordingController.isRecording) {
+        dev.ipf.whitenoise.android.ui.conversation.composer.VoiceReviewUnavailableNotice(
+            onDismiss = { voiceReviewRecovery.updatePresence(false) },
+            onRecordAgain = {
+                voiceReviewRecovery.consume {
+                    val ownsRecorder =
+                        conversationAccountRef != null &&
+                            appState.activeAccountRef == conversationAccountRef &&
+                            appState.runtimeGeneration == voiceReviewRuntime &&
+                            controller.boundAccountRef == conversationAccountRef
+                    if (ownsRecorder && voiceRecordingController.start()) {
+                        voiceReviewRecovery.updatePresence(false)
+                        voiceRecordingController.lock()
+                    }
+                }
+            },
+        )
+    }
     DisposableEffect(voiceRecordingController) {
         onDispose { voiceRecordingController.release() }
     }
@@ -1787,6 +1865,7 @@ internal fun ConversationScreen(
         appState = appState,
         controller = controller,
         listState = listState,
+        timelineViewport = timelineViewport,
         scrollCoordinator = scrollCoordinator,
         handle = ttsFollowHandle,
         initialTimelineAnchored = initialTimelineAnchored,
@@ -1820,7 +1899,7 @@ internal fun ConversationScreen(
                 reason = reason,
             ) {
                 val targetIndex = currentTimelineListIndex(targetMessageId) ?: fallbackTargetIndex
-                val layoutInfo = listState.layoutInfo
+                val layoutInfo = timelineViewport.readingLayoutInfo()
                 val viewportHeight = layoutInfo.viewportSize.height
                 if (viewportHeight <= 0) {
                     // Layout not measured yet (rare on a fresh open): fall back to the
@@ -1861,7 +1940,7 @@ internal fun ConversationScreen(
                 // newer drag/jump cancels this whole block before it can snap back.
                 withFrameNanos { }
                 val resolvedTargetIndex = currentTimelineListIndex(targetMessageId) ?: targetIndex
-                val postScrollLayoutInfo = listState.layoutInfo
+                val postScrollLayoutInfo = timelineViewport.readingLayoutInfo()
                 val measuredItemHeight =
                     postScrollLayoutInfo.visibleItemsInfo.firstOrNull { it.index == resolvedTargetIndex }?.size
                         ?: navigationState.timelineItemHeightsPx[targetMessageId]
@@ -2013,6 +2092,7 @@ internal fun ConversationScreen(
         enabled = seededTailAlignmentReady,
         retryGeneration = seededTailAlignmentRetryGeneration,
         listState = listState,
+        timelineViewport = timelineViewport,
         scrollCoordinator = scrollCoordinator,
         currentTailIndex = { currentTailIndex },
         postInitialReanchorGate = postInitialReanchorGate,
@@ -2301,7 +2381,7 @@ internal fun ConversationScreen(
                             resolveScrollAnchorIndex(saved)
                                 ?: saved.listIndex.coerceIn(
                                     0,
-                                    (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0),
+                                    (timelineViewport.readingLayoutInfo().totalItemsCount - 1).coerceAtLeast(0),
                                 )
                         },
                     )
@@ -2403,7 +2483,9 @@ internal fun ConversationScreen(
                         // forward paging from its last structural header/spacer.
                         ?: liveLeadingStructuralRowCount
                 val lastVisibleIndex =
-                    listState.layoutInfo.visibleItemsInfo
+                    timelineViewport
+                        .readingLayoutInfo()
+                        .visibleItemsInfo
                         .lastOrNull()
                         ?.index ?: -1
                 // The removed bottom sentinel sat one slot after the real tail.
@@ -2468,6 +2550,7 @@ internal fun ConversationScreen(
         scrollCoordinator = scrollCoordinator,
         lifecycleOwner = resumeLifecycleOwner,
         listState = listState,
+        timelineViewport = timelineViewport,
         bottomChromeHeightObserver = bottomChromeHeightObserver,
         composerFocused = composerFocused,
         searchOpen = navigationState.searchOpen,
@@ -2481,7 +2564,7 @@ internal fun ConversationScreen(
         currentTailIndex = { currentTailIndex },
     )
     LaunchedEffect(listState, scrollCoordinator, postInitialReanchorGate) {
-        snapshotFlow { listState.layoutInfo.viewportSize.height }.collect { viewportHeight ->
+        snapshotFlow { timelineViewport.readingLayoutInfo().viewportSize.height }.collect { viewportHeight ->
             val viewportChanged = postInitialReanchorGate.onViewportHeight(viewportHeight)
             if (!viewportChanged || !currentInitialTimelineAnchored || currentImeIsOpen) {
                 return@collect
@@ -2561,7 +2644,7 @@ internal fun ConversationScreen(
                 targetIndex = targetIndex,
                 pixelOffset = restore.firstVisibleItemScrollOffset,
                 captureLayout = {
-                    val layoutInfo = listState.layoutInfo
+                    val layoutInfo = timelineViewport.readingLayoutInfo()
                     ConversationInitialAnchorLayout(
                         viewportHeight = layoutInfo.viewportSize.height,
                         targetItemSize = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size,
@@ -2605,7 +2688,7 @@ internal fun ConversationScreen(
                     olderHeaderCount = restoredOlderHeaderCount,
                     inlineTopErrorCount = restoredInlineTopErrorCount,
                 ),
-            viewportHeight = listState.layoutInfo.viewportSize.height,
+            viewportHeight = timelineViewport.readingLayoutInfo().viewportSize.height,
         )
         initialTimelineAnchored = true
         navigationState.lastFollowedLatestId = restoredRendered.lastOrNull()?.id
@@ -2679,7 +2762,7 @@ internal fun ConversationScreen(
             entryUnreadDividerRetired = true
         }
         val captureInitialLayout = {
-            val layoutInfo = listState.layoutInfo
+            val layoutInfo = timelineViewport.readingLayoutInfo()
             ConversationInitialAnchorLayout(
                 viewportHeight = layoutInfo.viewportSize.height,
                 targetItemSize =
@@ -2727,7 +2810,7 @@ internal fun ConversationScreen(
                     olderHeaderCount = anchoredOlderHeaderCount,
                     inlineTopErrorCount = anchoredInlineTopErrorCount,
                 ),
-            viewportHeight = listState.layoutInfo.viewportSize.height,
+            viewportHeight = timelineViewport.readingLayoutInfo().viewportSize.height,
         )
         initialTimelineAnchored = true
         navigationState.lastFollowedLatestId = anchoredTimeline.lastOrNull()?.id
@@ -2794,7 +2877,7 @@ internal fun ConversationScreen(
             scrollCoordinator.settleTailAfterLayoutChange(
                 resolveTailIndex = { currentTailIndex },
                 captureLayout = {
-                    val layoutInfo = listState.layoutInfo
+                    val layoutInfo = timelineViewport.readingLayoutInfo()
                     val tailInfo =
                         layoutInfo.visibleItemsInfo.firstOrNull { visible ->
                             visible.index == currentTailIndex
@@ -2912,6 +2995,15 @@ internal fun ConversationScreen(
             mediaSlots = pendingMediaSlots,
         )
 
+    var mediaPreviewIndex by rememberSaveable(controller.boundAccountRef, chat.id) { mutableStateOf<Int?>(null) }
+    var attachmentSendPending by remember(controller, chat.id) { mutableStateOf(false) }
+    LaunchedEffect(pendingMediaSlots.size, pendingDocumentUris.size) {
+        if (pendingMediaSlots.isEmpty() && pendingDocumentUris.isEmpty()) mediaPreviewIndex = null
+    }
+
+    key(controller, appState.runtimeGeneration) {
+        RestoredForwardRequestHost(appState = appState, controller = controller)
+    }
     if (showDetails) {
         GroupDetailsScreen(
             appState = appState,
@@ -2945,6 +3037,7 @@ internal fun ConversationScreen(
         return
     }
 
+    val mediaViewerForwardActions = rememberMediaViewerForwardActions(controller, appState)
     val mediaViewerSessionState =
         rememberConversationMediaViewerSessionState(
             owner =
@@ -3109,10 +3202,11 @@ internal fun ConversationScreen(
                 forwardPayloads = batchSelectionUi.forwardPayloads,
             )
     }
-    Scaffold(
+    WhiteNoiseScaffold(
         modifier =
             Modifier
                 .fillMaxSize()
+                .blur(if (openActionMenuId != null) 24.dp else 0.dp)
                 .dismissTextSelectionOnOutsideTap(
                     active = textSelectionMessageId != null,
                     selectedBoundsInWindow = textSelectionBubbleBounds,
@@ -3321,6 +3415,64 @@ internal fun ConversationScreen(
                 onDraftChange = { appState.setDraft(draftAccountRef, controller.group.groupIdHex, it) },
                 composerTextState = composerTextState,
                 composerAttachmentSheet = composerAttachmentSheet,
+                hasPendingAttachments = pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty(),
+                attachmentsPreparing = mediaDraftState.preparingSlotIds.isNotEmpty(),
+                attachmentContent =
+                    if (pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty()) {
+                        {
+                            dev.ipf.whitenoise.android.ui.conversation.media.ComposerAttachmentShelf(
+                                mediaSlots = pendingMediaSlots,
+                                documentUris = pendingDocumentUris,
+                                enabled = !attachmentSendPending,
+                                prepared = mediaDraftState.preparedPreviews(),
+                                onPreview = { if (!attachmentSendPending) mediaPreviewIndex = it },
+                                onRemoveMedia = { slot ->
+                                    if (!attachmentSendPending) {
+                                        mediaDraftState.releasePreparedPhoto(slot.id)
+                                        pendingMediaSlots = pendingMediaSlots.filterNot { it.id == slot.id }
+                                    }
+                                },
+                                onRemoveDocument = { index ->
+                                    if (!attachmentSendPending) {
+                                        pendingDocumentUris = pendingDocumentUris.filterIndexed { i, _ -> i != index }
+                                    }
+                                },
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                onSendAttachments = { caption, onResult ->
+                    attachmentSendPending = true
+                    var dispatched = false
+                    try {
+                        val sendingMedia = pendingMediaSlots
+                        val sendingDocuments = pendingDocumentUris
+                        mediaSender.sendStagedAttachments(
+                            sendingMedia,
+                            sendingDocuments,
+                            caption,
+                            preparedImageAttachments = mediaDraftState.preparedAttachments(),
+                            onAccepted = {
+                                val acceptedIds = sendingMedia.map { it.id }.toSet()
+                                acceptedIds.forEach(mediaDraftState::releasePreparedPhoto)
+                                pendingMediaSlots = pendingMediaSlots.filterNot { it.id in acceptedIds }
+                                pendingDocumentUris =
+                                    removeAcceptedDocumentOccurrences(pendingDocumentUris, sendingDocuments)
+                                attachmentSendPending = false
+                                onResult(true)
+                            },
+                            onRejected = {
+                                attachmentSendPending = false
+                                onResult(false)
+                            },
+                            onAfterSend = { revealSentMessage() },
+                        )
+                        dispatched = true
+                    } finally {
+                        if (!dispatched) attachmentSendPending = false
+                    }
+                },
                 onAfterSend = {
                     revealSentMessage()
                 },
@@ -3376,6 +3528,7 @@ internal fun ConversationScreen(
                     }
                 },
                 voiceRecordingController = voiceRecordingController,
+                voiceReview = voiceReview,
                 mentionCandidates = mentionPicker.candidates,
                 mentionPickerEnabled = mentionPicker.enabled,
                 autoFocusOnEnter = justCreated && !freezeRoutePresentation,
@@ -3410,7 +3563,9 @@ internal fun ConversationScreen(
                 onKeyboardRestoreFromCustomInputFailed = { suppressNextImeOpenReanchor.set(false) },
                 recentEmojis = recentEmojiRecentsOwner.recents,
                 onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
+                onTimelineComposerMeasured = timelineViewport::onComposerMeasured,
                 onBottomChromeMeasured = { heightPx, chromeBottomPx ->
+                    timelineViewport.onBottomChromeMeasured(heightPx)
                     bottomChromeHeightObserver.onMeasured(heightPx)
                     if (measuredBottomChromeHeightPx != heightPx) {
                         measuredBottomChromeHeightPx = heightPx
@@ -3421,6 +3576,7 @@ internal fun ConversationScreen(
             )
         },
     ) { padding ->
+        val overlayPadding = timelineViewport.overlayPadding(density, timelineUnderlayEnabled)
         ConversationTransientNoticeLayout(
             notice = appState.transientNotice,
             accountRef = conversationAccountRef,
@@ -3428,7 +3584,7 @@ internal fun ConversationScreen(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(padding)
+                    .padding(conversationUnderlayScaffoldPadding(padding, overlayPadding))
                     // The composer bottomBar owns IME padding; consume here so the
                     // transcript does not count the keyboard a second time (#895).
                     .consumeWindowInsets(WindowInsets.ime),
@@ -3525,6 +3681,11 @@ internal fun ConversationScreen(
                             modifier =
                                 Modifier
                                     .fillMaxSize()
+                                    .measureConversationTimelinePadding(
+                                        timelineViewport,
+                                        CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset.value,
+                                        overlayPadding,
+                                    ).trackWhiteNoiseHeader(listState)
                                     .padding(horizontal = 12.dp)
                                     // Paint, TalkBack exposure, and first-useful-frame
                                     // reporting share one predicate. An oversized cached
@@ -3539,25 +3700,14 @@ internal fun ConversationScreen(
                                     }.performanceTestTag(
                                         PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE,
                                         enabled = transcriptReadyToReveal && renderedTimeline.isNotEmpty(),
-                                    ).onGloballyPositioned { coordinates ->
-                                        val position = coordinates.positionInWindow()
-                                        transcriptWindowTop = position.y
-                                        transcriptHeightPx = coordinates.size.height.toFloat()
-                                        ttsFollowHandle.sentenceLayouts.updateViewportBounds(
-                                            Rect(
-                                                left = position.x,
-                                                top = position.y,
-                                                right = position.x + coordinates.size.width,
-                                                bottom = position.y + coordinates.size.height,
-                                            ),
-                                        )
-                                    },
+                                    ).onGloballyPositioned(timelineViewport::onPaintViewportMeasured),
                             verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
                             // Content padding owns the final composer interval
                             // and temporary notice clearance. Keeping spacing
                             // out of a lazy sentinel leaves the real last row as
                             // the stable tail anchor.
-                            contentPadding = conversationTimelineContentPadding(snackbarContentInset.value),
+                            contentPadding =
+                                conversationTimelineContentPadding(snackbarContentInset.value, overlayPadding),
                         ) {
                             item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
                             if (
@@ -3607,6 +3757,7 @@ internal fun ConversationScreen(
                             ) { index, item ->
                                 val messageId = item.record.messageIdHex
                                 TimelineRow(
+                                    modifier = Modifier.timelineReadingExposure(timelineViewport),
                                     item = item,
                                     older = renderedTimeline.getOrNull(index - 1),
                                     newer = renderedTimeline.getOrNull(index + 1),
@@ -3743,6 +3894,7 @@ internal fun ConversationScreen(
                                 modifier =
                                     Modifier
                                         .align(Alignment.BottomEnd)
+                                        .padding(bottom = overlayPadding)
                                         .padding(12.dp),
                                 horizontalAlignment = Alignment.End,
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -3797,7 +3949,11 @@ internal fun ConversationScreen(
                                                             val targetIndex =
                                                                 pendingMessageId?.let(::currentTimelineListIndex)
                                                             targetIndex != null &&
-                                                                isConversationItemTopAligned(listState, targetIndex)
+                                                                isConversationItemTopAligned(
+                                                                    listState,
+                                                                    targetIndex,
+                                                                    timelineViewport = timelineViewport,
+                                                                )
                                                         },
                                                         prepareTail = {
                                                             loadConversationTimelineToNewest(
@@ -3861,8 +4017,6 @@ internal fun ConversationScreen(
             },
         )
     }
-
-    RestoredForwardRequestHost(appState = appState, controller = controller)
 
     batchInfoSelection?.let { infoSelection ->
         val infoRecord = infoSelection.record
@@ -3990,10 +4144,12 @@ internal fun ConversationScreen(
     ConversationMediaDraftContent(
         state = mediaDraftState,
         chatId = chat.id,
+        previewIndex = mediaPreviewIndex,
+        onClosePreview = { mediaPreviewIndex = null },
         mediaSlots = pendingMediaSlots,
         documentUris = pendingDocumentUris,
-        onMediaSlotsChange = { pendingMediaSlots = it },
-        onDocumentUrisChange = { pendingDocumentUris = it },
+        onMediaSlotsChange = { if (!attachmentSendPending) pendingMediaSlots = it },
+        onDocumentUrisChange = { if (!attachmentSendPending) pendingDocumentUris = it },
         mediaSender = mediaSender,
         chatTitle = controller.title(groupTitleCopy),
         composerText = composerTextState::acceptanceToken,
@@ -4020,6 +4176,10 @@ internal fun ConversationScreen(
             recordedAt = request.recordedAt,
             mine = request.mine,
             onDismiss = { mediaViewerSessionState.dismiss(active.sessionId) },
+            forwardActions = mediaViewerForwardActions,
+            onGoToMessage = { page ->
+                if (mediaViewerSessionState.dismiss(active.sessionId)) scrollToSearchMatch(page.messageIdHex)
+            },
             selectedAttachment = active.selectedAttachment,
             onSelectedAttachmentChange = { selected ->
                 mediaViewerSessionState.selectPage(active.sessionId, selected)

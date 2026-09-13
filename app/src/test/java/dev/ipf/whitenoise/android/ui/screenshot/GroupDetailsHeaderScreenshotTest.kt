@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -15,6 +17,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
@@ -26,6 +29,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsHeader
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -52,6 +56,7 @@ class GroupDetailsHeaderScreenshotTest {
     @Test
     fun groupDetailsHeaderLight() {
         render(darkTheme = false)
+        composeRule.onNodeWithTag("chat_info.avatar").assertHeightIsEqualTo(115.2.dp)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/group_details_header_light.png")
     }
 
@@ -87,6 +92,40 @@ class GroupDetailsHeaderScreenshotTest {
         composeRule
             .onNodeWithTag(TAG)
             .captureRoboImage("src/test/snapshots/group_details_header_empty_description_dark.png")
+    }
+
+    /** The public-key capsule retains the complete native copy value behind its shortened visual. */
+    @Test
+    fun directDetailsPublicKeyCopiesTheCompleteIdentity() {
+        val publicKey = "npub1424242424242424242424242424242424242424242424242424qamrcaj"
+        render(darkTheme = true, description = publicKey, descriptionCopyValue = publicKey)
+        composeRule.onNodeWithTag("chat_info.copy_public_key").assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/direct_details_copy_header_dark.png")
+        composeRule.onNodeWithTag("chat_info.copy_public_key").performClick()
+        val clipboard =
+            ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
+        assertEquals(
+            publicKey,
+            clipboard.primaryClip
+                ?.getItemAt(0)
+                ?.text
+                ?.toString(),
+        )
+    }
+
+    /** The migrated identity retains its contrast and bounded avatar in pure-black mode. */
+    @Test
+    fun groupDetailsHeaderAmoled() {
+        render(darkTheme = true, amoled = true)
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/group_details_header_amoled.png")
+    }
+
+    /** Long group descriptions remain available at large text and right-to-left layout. */
+    @Test
+    @Config(qualifiers = "ar-rSA-w360dp-h780dp-mdpi")
+    fun groupDetailsHeaderLargeTextRtl() {
+        render(darkTheme = false, fontScale = 2f, description = "Trail plans, accessible meeting points and photos.")
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/group_details_header_large_rtl.png")
     }
 
     @Test
@@ -180,10 +219,16 @@ class GroupDetailsHeaderScreenshotTest {
         onEdit: () -> Unit = {},
         description: String = "Trail plans and photos.",
         onAddDescription: (() -> Unit)? = null,
+        amoled: Boolean = false,
+        fontScale: Float = 1f,
+        descriptionCopyValue: String? = null,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme) {
-                Surface(modifier = Modifier.width(360.dp).testTag(TAG)) {
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = fontScale) {
+                Surface(
+                    modifier = Modifier.width(360.dp).testTag(TAG),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                ) {
                     GroupDetailsHeader(
                         title = "Weekend hikers",
                         subtitle = "8 members",
@@ -194,6 +239,7 @@ class GroupDetailsHeaderScreenshotTest {
                         onEdit = onEdit.takeIf { editable },
                         editEnabled = editEnabled,
                         onAddDescription = onAddDescription,
+                        descriptionCopyValue = descriptionCopyValue,
                     )
                 }
             }

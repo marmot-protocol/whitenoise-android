@@ -391,7 +391,17 @@ internal fun MediaFileBubble(
         )
     }
     if (readerOpen && textCandidate != null) {
+        val readerActions =
+            rememberTextAttachmentNativeActions(
+                controller,
+                appState,
+                messageIdHex,
+                attachmentIndex,
+                reference,
+                mine,
+            )
         TextAttachmentReaderDialog(
+            actions = readerActions,
             candidate = textCandidate,
             appState = appState,
             senderKey = senderKey,

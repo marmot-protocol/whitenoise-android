@@ -20,6 +20,7 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -103,7 +104,7 @@ class ChatsScreenFolderSelectionRecompositionTest {
             }
         }
         composeRule.onNodeWithText("Pending consent").assertExists()
-        composeRule.onNodeWithContentDescription("New message").performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.new_message)).performClick()
         composeRule.onNodeWithText("Pending consent").assertDoesNotExist()
         controller.onCleared()
     }

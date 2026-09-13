@@ -38,12 +38,16 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.RecordingStripLeading
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -108,9 +112,9 @@ class ComposerBarScreenshotTest {
     }
 
     @Test
-    fun composerResizeHandlePressedLight() {
+    fun composerResizeBorderPressedLight() {
         renderLongComposer(darkTheme = false)
-        val resizeHandle = composeRule.onNodeWithContentDescription(app.getString(R.string.composer_resize))
+        val resizeHandle = composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true)
         composeRule.mainClock.autoAdvance = false
         try {
             resizeHandle.performTouchInput { down(center) }
@@ -360,6 +364,7 @@ class ComposerBarScreenshotTest {
     @Test
     fun composerReplyShowsConvergenceWarning() {
         val warning = "May not be visible to everyone"
+        var cancelled = 0
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
@@ -372,13 +377,50 @@ class ComposerBarScreenshotTest {
                             warning = warning,
                         ),
                     messageTextCopy = MessageTextCopy.Default,
-                    onCancelReply = {},
+                    onCancelReply = { cancelled += 1 },
                     onSend = { _, _ -> },
                 )
             }
         }
 
         composeRule.onNodeWithText(warning).assertIsDisplayed()
+        assertAccessoryInsideSurface(R.string.cancel_reply)
+        composeRule.onNodeWithContentDescription(app.getString(R.string.cancel_reply)).performClick()
+        assertEquals(1, cancelled)
+    }
+
+    /** The edit accessory shares the surface while retaining its native cancellation callback. */
+    @Test
+    fun editingAccessoryIsInsideTheSurfaceAndStillCancels() {
+        var cancelled = 0
+        render(
+            darkTheme = true,
+            draft = "Preserved draft",
+            width = 320,
+            fontScale = 2f,
+            rtl = true,
+            showEdit = true,
+            onCancelEdit = { cancelled += 1 },
+        )
+        assertAccessoryInsideSurface(R.string.cancel_edit)
+        composeRule.onNodeWithContentDescription(app.getString(R.string.cancel_edit)).performClick()
+        assertEquals(1, cancelled)
+    }
+
+    /** Checks the real accessory control, editor, and border target occupy one bounded surface. */
+    private fun assertAccessoryInsideSurface(label: Int) {
+        val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
+        val accessory = composeRule.onNodeWithContentDescription(app.getString(label)).fetchSemanticsNode().boundsInRoot
+        val editor = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot
+        val border =
+            composeRule
+                .onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        assertTrue(accessory.left >= surface.left && accessory.right <= surface.right)
+        assertTrue(accessory.top >= border.bottom && accessory.bottom <= editor.top)
+        assertTrue(editor.bottom <= surface.bottom)
+        assertTrue(editor.width > 0f && editor.height > 0f)
     }
 
     private fun render(
@@ -393,6 +435,7 @@ class ComposerBarScreenshotTest {
         showEdit: Boolean = false,
         voiceRecordingController: VoiceRecordingController? = null,
         attachmentsEnabled: Boolean = false,
+        onCancelEdit: () -> Unit = {},
     ) {
         val dictation = dictationPreview?.let { createDictationPreview(it, TextFieldValue(draft)) }
         composeRule.setContent {
@@ -416,6 +459,7 @@ class ComposerBarScreenshotTest {
                             onPickFromGallery = {}.takeIf { attachmentsEnabled },
                             onPickDocument = {}.takeIf { attachmentsEnabled },
                             initialDraft = TextFieldValue(draft),
+                            onCancelEdit = onCancelEdit,
                             editingMessageId = "edited-message".takeIf { showEdit },
                             editingInitialText = "Message being edited".takeIf { showEdit },
                             dictationController = dictation,

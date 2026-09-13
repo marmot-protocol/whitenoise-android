@@ -10,15 +10,12 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -33,10 +30,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
@@ -150,7 +148,11 @@ internal fun ChatListTopBar(
                             }
                         },
                     )
-                else -> ChatListInlineConnectivityIndicator(state = connectivityState)
+                else ->
+                    ChatListInlineConnectivityIndicator(
+                        state = connectivityState,
+                        modifier = Modifier.padding(start = 12.dp),
+                    )
             }
         },
         navigationIcon = {
@@ -263,37 +265,21 @@ internal fun ConversationSearchTopBar(
     onSearchAction: () -> Unit,
     focusRequester: FocusRequester,
 ) {
-    val hasQuery = query.isNotBlank()
+    val searchDescription = stringResource(R.string.conversation_search_hint)
     TopAppBar(
         title = {
-            OutlinedTextField(
+            dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField(
                 value = query,
                 onValueChange = onQueryChange,
+                placeholder = stringResource(R.string.conversation_search_messages),
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .focusRequester(focusRequester),
-                singleLine = true,
-                placeholder = { Text(stringResource(R.string.conversation_search_hint)) },
-                colors =
-                    OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                    ),
-                // Clear sits inline in the field; match navigation and the
-                // result count live on the bottom bar above the keyboard.
-                trailingIcon = {
-                    if (hasQuery) {
-                        IconButton(onClick = onClear) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = stringResource(R.string.conversation_search_clear),
-                            )
-                        }
-                    }
-                },
+                        .focusRequester(focusRequester)
+                        .testTag("conversation.searchField")
+                        .semantics { contentDescription = searchDescription },
+                clearDescription = stringResource(R.string.conversation_search_clear),
+                onClear = onClear,
                 keyboardOptions =
                     KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
@@ -305,11 +291,19 @@ internal fun ConversationSearchTopBar(
         navigationIcon = {
             IconButton(onClick = onClose) {
                 Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
+                    painterResource(R.drawable.ic_arrow_back),
                     contentDescription = stringResource(R.string.conversation_search_close),
                 )
             }
         },
+        actions = {
+            // Date-jump has no native owner yet (M128); expose the prototype affordance truthfully as disabled.
+            IconButton(onClick = {}, enabled = false, modifier = Modifier.testTag("conversation.search.calendar")) {
+                Icon(painterResource(R.drawable.ic_calendar_month), stringResource(R.string.conversation_jump_to_date))
+            }
+        },
+        scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
     )
 }
 

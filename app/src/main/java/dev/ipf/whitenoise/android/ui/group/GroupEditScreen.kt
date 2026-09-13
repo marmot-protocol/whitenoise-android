@@ -16,21 +16,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -62,11 +59,13 @@ import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
+import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.CancellationException
@@ -255,10 +254,9 @@ internal fun GroupEditScreen(
             },
         )
 
-    Scaffold(
-        topBar = {
-            GroupEditTopBar(onBack = onBack)
-        },
+    val listState = rememberLazyListState()
+    GroupEditScaffold(
+        onBack = onBack,
         bottomBar = {
             if (canEdit) {
                 StickyFormActionBar {
@@ -278,12 +276,13 @@ internal fun GroupEditScreen(
                 }
             }
         },
-    ) { padding ->
+    ) {
         LazyColumn(
+            state = listState,
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(padding),
+                    .trackWhiteNoiseHeader(listState),
             contentPadding = PaddingValues(Dimens.spaceLg),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
         ) {
@@ -448,16 +447,18 @@ internal fun GroupEditScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Settings frame shared by the native editor and its descriptive-title screenshot coverage. */
 @Composable
-@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
-internal fun GroupEditTopBar(onBack: () -> Unit) {
-    TopAppBar(
-        title = { Text(stringResource(R.string.edit_group_info_title)) },
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-            }
-        },
+@Suppress("FunctionNaming")
+internal fun GroupEditScaffold(
+    onBack: () -> Unit,
+    bottomBar: @Composable () -> Unit = {},
+    content: @Composable () -> Unit = {},
+) {
+    SettingsScaffold(
+        title = stringResource(R.string.edit_group_info_title),
+        onBack = onBack,
+        bottomBar = bottomBar,
+        content = content,
     )
 }

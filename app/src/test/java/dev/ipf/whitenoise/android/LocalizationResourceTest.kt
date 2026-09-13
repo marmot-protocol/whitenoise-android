@@ -1179,6 +1179,8 @@ class LocalizationResourceTest {
                     ),
                 "values-fr" to
                     setOf(
+                        // "Messages" is also the French plural.
+                        "conversation_search_messages",
                         // Source is also the standard French provenance label.
                         "developer_package_source",
                         // "Version" is spelled identically in French.
@@ -1213,6 +1215,8 @@ class LocalizationResourceTest {
                     ),
                 "values-it" to
                     setOf(
+                        // "File" is the standard Italian computing term, as in attachment_type_file.
+                        "text_attachment_reader_title",
                         // "Password" is the standard Italian loan word.
                         "password",
                         // "chat" is a common loan word in Italian.

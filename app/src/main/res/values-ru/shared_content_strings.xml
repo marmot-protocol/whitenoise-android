@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shared_content_in_chat">Общее в чате</string>
+    <string name="shared_content_photos_videos">Фото и видео</string>
+    <string name="shared_content_loaded_count">Загружено: %1$d</string>
+    <string name="shared_content_loaded_scope">Показаны только уже загруженные сообщения этого чата.</string>
+    <string name="shared_content_loading">Загрузка общего контента…</string>
+    <string name="shared_content_empty">Нет общего контента</string>
+    <string name="shared_content_go_to_message">Перейти к сообщению</string>
+</resources>

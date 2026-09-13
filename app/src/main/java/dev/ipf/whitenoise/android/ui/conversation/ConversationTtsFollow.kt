@@ -547,6 +547,7 @@ internal suspend fun followTtsTargetInViewport(
     resolveTargetIndex: () -> Int?,
     isCurrentTarget: () -> Boolean,
     currentScrollAnchor: () -> ConversationScrollAnchor,
+    timelineViewport: ConversationTimelineViewport? = null,
 ): Boolean {
     if (!isCurrentTarget()) return false
     var completed = false
@@ -555,7 +556,7 @@ internal suspend fun followTtsTargetInViewport(
             targetMessageId = target.messageIdHex,
             reason = ConversationScrollReason.ReadAloudFollow,
         ) {
-            var layoutInfo = listState.layoutInfo
+            var layoutInfo = (timelineViewport?.readingLayoutInfo() ?: listState.layoutInfo)
             val viewportSize = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
             if (!isCurrentTarget() || viewportSize <= 0) return@programmaticJump
             var visibleTarget = layoutInfo.visibleItemsInfo.firstOrNull { it.key == itemKey }
@@ -577,7 +578,7 @@ internal suspend fun followTtsTargetInViewport(
                 awaitCompleteTtsSentenceLayout(target, sentenceLayouts, isCurrentTarget)
                     ?: return@programmaticJump
             if (!isCurrentTarget()) return@programmaticJump
-            layoutInfo = listState.layoutInfo
+            layoutInfo = (timelineViewport?.readingLayoutInfo() ?: listState.layoutInfo)
             visibleTarget = layoutInfo.visibleItemsInfo.firstOrNull { it.key == itemKey } ?: return@programmaticJump
             val viewportStart = layoutInfo.viewportStartOffset
             val viewportWindowTop = measured.viewportBoundsInWindow.top

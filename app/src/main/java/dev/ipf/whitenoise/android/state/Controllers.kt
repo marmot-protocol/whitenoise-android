@@ -8210,12 +8210,16 @@ class ConversationController(
      * and republishes the timeline so the bubble appears immediately.
      * Returns null when the send can't proceed (no account, can't send,
      * empty, or oversize). Caller pairs each non-null result with a
-     * matching [uploadQueued] call to drive the FFI work.
+     * matching [uploadQueued] call to drive the FFI work. [canQueue] rechecks a caller's
+     * presentation owner after Markdown preparation, before publishing any optimistic state.
      */
+    @Suppress("LongMethod", "ReturnCount") // Admission guards precede the single optimistic publication.
     suspend fun queueAttachments(
         attachments: List<PendingAttachment>,
         caption: String?,
+        canQueue: () -> Boolean = { true },
     ): QueuedAttachmentSend? {
+        if (!canQueue()) return null
         val account =
             conversationAccountRef
                 ?.takeIf {
@@ -8236,7 +8240,7 @@ class ConversationController(
         val tempId = UUID.randomUUID().toString()
         val key = "msg:$tempId"
         val now = nowSeconds()
-        val retentionAtSendSeconds = rememberRetentionAtSend(tempId, group.disappearingMessageSecs)
+        val retentionSnapshot = group.disappearingMessageSecs
         val trimmedCaption = caption?.trim()?.takeIf { it.isNotBlank() }
         val placeholderName =
             if (attachments.size == 1) {
@@ -8252,6 +8256,9 @@ class ConversationController(
                 attachments = attachments,
                 now = now,
             )
+        // Markdown preparation can suspend: a reviewed take must still belong to its visible owner.
+        if (!canQueue()) return null
+        val retentionAtSendSeconds = rememberRetentionAtSend(tempId, retentionSnapshot)
         val optimisticOrder = nextOptimisticTimelineOrder()
         retainedMediaUploads.put(key, RetainedMediaUpload(attachments, trimmedCaption))
         // Mark this slot as "still needed by a pending send" so the screen
@@ -8294,7 +8301,7 @@ class ConversationController(
             groupIdHex = group.groupIdHex,
             sender = conversationAccountIdHex ?: "",
             plaintext = body,
-            contentTokens = appState.parseMarkdownOrEmpty(body),
+            contentTokens = markdownParser(body),
             kind = 9uL,
             tags =
                 attachments.map {

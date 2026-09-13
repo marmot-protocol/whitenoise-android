@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.group
 
+import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -81,28 +82,26 @@ class GroupEditScreenTitleTest {
     }
 
     @Test
-    fun editScreenDelegatesToGroupEditTopBar() {
+    fun editScreenDelegatesToItsSettingsFrame() {
         val screenBody = functionBody("GroupEditScreen")
-
         assertTrue(
-            "GroupEditScreen must delegate its top bar to GroupEditTopBar",
-            Regex("""topBar\s*=\s*\{\s*GroupEditTopBar\s*\(\s*onBack\s*=\s*onBack\s*\)\s*}""")
-                .containsMatchIn(screenBody),
+            "GroupEditScreen must delegate its title and actions to GroupEditScaffold",
+            Regex("""GroupEditScaffold\s*\(\s*onBack\s*=\s*onBack""").containsMatchIn(screenBody),
         )
     }
 
     @Test
-    fun groupEditTopBarUsesDedicatedTitle() {
-        val topBarBody = functionBody("GroupEditTopBar")
+    fun groupEditFrameUsesDedicatedTitle() {
+        val topBarBody = functionBody("GroupEditScaffold")
 
         assertTrue(
-            "GroupEditTopBar title must use edit_group_info_title",
-            Regex("""title\s*=\s*\{\s*Text\s*\(\s*stringResource\s*\(\s*R\.string\.edit_group_info_title""")
+            "GroupEditScaffold title must use edit_group_info_title",
+            Regex("""title\s*=\s*stringResource\s*\(\s*R\.string\.edit_group_info_title""")
                 .containsMatchIn(topBarBody),
         )
         assertTrue(
-            "GroupEditTopBar title must not use the bare generic edit resource",
-            !Regex("""title\s*=\s*\{\s*Text\s*\(\s*stringResource\s*\(\s*R\.string\.edit\s*\)""")
+            "GroupEditScaffold title must not use the bare generic edit resource",
+            !Regex("""title\s*=\s*stringResource\s*\(\s*R\.string\.edit\s*\)""")
                 .containsMatchIn(topBarBody),
         )
     }
@@ -125,21 +124,6 @@ class GroupEditScreenTitleTest {
             text
                 .replace(Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL), "")
                 .replace(Regex("""//[^\n]*"""), "")
-        val signature =
-            Regex("""(?:internal\s+)?fun\s+${Regex.escape(functionName)}\s*\(""").find(noComments)
-                ?: error("Missing $functionName function")
-        val openingBrace = noComments.indexOf('{', signature.range.last)
-        require(openingBrace >= 0) { "Missing $functionName body" }
-        var depth = 0
-        for (index in openingBrace until noComments.length) {
-            when (noComments[index]) {
-                '{' -> depth++
-                '}' -> {
-                    depth--
-                    if (depth == 0) return noComments.substring(openingBrace + 1, index)
-                }
-            }
-        }
-        error("Unclosed $functionName body")
+        return noComments.functionBody(functionName)
     }
 }

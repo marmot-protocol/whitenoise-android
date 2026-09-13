@@ -51,12 +51,12 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
+import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_BOTTOM_BAR_TAG
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_INITIAL_LOADING_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_TIMELINE_TAIL_GAP
 import dev.ipf.whitenoise.android.ui.conversation.ConversationInitialLoadingOverlay
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
-import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -454,11 +454,11 @@ class ConversationImeCollapseFocusTest {
 
     /** Asserts that the real cached row, rather than a sentinel, owns the tail. */
     private fun assertSingleTailGap(messageId: String) {
-        val transcriptBottom =
+        val composerTop =
             composeRule
-                .onNodeWithTag(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE)
+                .onNodeWithTag(CONVERSATION_BOTTOM_BAR_TAG)
                 .fetchSemanticsNode()
-                .boundsInRoot.bottom
+                .boundsInRoot.top
         val tailBottom =
             composeRule
                 .onNodeWithTag(messageBubbleRowTestTag(messageId), useUnmergedTree = true)
@@ -466,7 +466,7 @@ class ConversationImeCollapseFocusTest {
                 .boundsInRoot.bottom
         assertEquals(
             with(composeRule.density) { CONVERSATION_TIMELINE_TAIL_GAP.toPx() },
-            transcriptBottom - tailBottom,
+            composerTop - tailBottom,
             1f,
         )
     }

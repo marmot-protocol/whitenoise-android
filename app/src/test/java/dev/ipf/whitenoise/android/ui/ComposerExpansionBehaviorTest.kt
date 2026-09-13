@@ -5,8 +5,10 @@ import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
@@ -56,6 +58,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_INDICATOR_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOverlayBackRegistrar
@@ -91,7 +94,7 @@ class ComposerExpansionBehaviorTest {
                 .fetchSemanticsNode()
                 .boundsInRoot.height
 
-        resizeHandle().performClick()
+        resizeGesture().performClick()
         composeRule.waitForIdle()
 
         val fullHeight =
@@ -102,7 +105,7 @@ class ComposerExpansionBehaviorTest {
         assertTrue("full screen should be materially taller than auto-grow", fullHeight > automaticHeight * 1.5f)
         composeRule.onNodeWithText(draft).assertExists()
 
-        resizeHandle().performClick()
+        resizeGesture().performClick()
         composeRule.waitForIdle()
 
         val collapsedHeight =
@@ -132,7 +135,7 @@ class ComposerExpansionBehaviorTest {
 
         val expansionFrames =
             withManualClock {
-                resizeHandle().performClick()
+                resizeGesture().performClick()
                 composeRule.runOnIdle { }
                 sampleComposerHeights(expectedBottom = fixedBottom)
             }
@@ -149,7 +152,7 @@ class ComposerExpansionBehaviorTest {
 
         val collapseFrames =
             withManualClock {
-                resizeHandle().performClick()
+                resizeGesture().performClick()
                 composeRule.runOnIdle { }
                 sampleComposerHeights(expectedBottom = fixedBottom)
             }
@@ -184,11 +187,11 @@ class ComposerExpansionBehaviorTest {
         listOf(TextRange(0), TextRange(draft.length / 2), TextRange(draft.length)).forEach { selection ->
             editor.performTextInputSelection(selection)
             composeRule.waitForIdle()
-            resizeHandle().performClick()
+            resizeGesture().performClick()
             composeRule.waitForIdle()
 
             withManualClock {
-                resizeHandle().performClick()
+                resizeGesture().performClick()
                 composeRule.runOnIdle { }
                 // Drive well past the collapse animation before judging rest.
                 sampleComposerHeights(frameCount = 30)
@@ -220,61 +223,42 @@ class ComposerExpansionBehaviorTest {
         val send = composerControlBounds(R.string.send)
         val resize = composerControlBounds(R.string.composer_resize)
 
-        assertTrue(emoji.center.x < attach.center.x)
-        assertTrue(attach.center.x < send.center.x)
-        assertTrue(abs(emoji.bottom - send.bottom) <= 4f)
-        assertTrue(abs(attach.bottom - send.bottom) <= 4f)
-        // The semantics and gesture layer meets the accessibility target while
-        // the visual handle remains in the compact 36dp top inset.
+        assertTrue(attach.center.x < emoji.center.x)
+        assertTrue(emoji.center.x < send.center.x)
+        assertEquals(emoji.center.y, send.center.y, 1f)
+        assertEquals(attach.center.y, send.center.y, 1f)
+        // Accessibility targets the whole surface; border gestures reserve no extra height.
         assertTrue("resize handle should meet the 48dp touch minimum", resize.height >= 48f)
         assertTrue("resize handle should stay wide", resize.width >= 96f)
         assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
     }
 
+    /** The accessible surface keeps a large target without adding a visible handle. */
     @Test
-    fun visibleResizeIndicatorIsCenteredInsideItsUnchangedTouchTarget() {
+    fun resizeAccessibilityBelongsToTheWholeSurfaceWithoutVisibleHandle() {
         render(longDraft())
-
         val target = composerControlBounds(R.string.composer_resize)
-        val indicator =
-            composeRule
-                .onNodeWithTag(COMPOSER_RESIZE_INDICATOR_TAG, useUnmergedTree = true)
-                .fetchSemanticsNode()
-                .boundsInRoot
-        val topGap = indicator.top - target.top
-        val bottomGap = target.bottom - indicator.bottom
-
-        assertTrue("visible handle breathing room should be balanced", abs(topGap - bottomGap) <= 1f)
-        assertTrue("resize target must retain its 48dp minimum", target.height >= 48f)
-        assertTrue("resize target must retain its 96dp width", target.width >= 96f)
+        val surface = pillSurface().fetchSemanticsNode().boundsInRoot
+        assertEquals(surface, target)
+        assertTrue(target.height >= 48f && target.width >= 96f)
+        composeRule.onNodeWithTag(COMPOSER_RESIZE_INDICATOR_TAG, useUnmergedTree = true).assertDoesNotExist()
+        val actions = resizeHandle().fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        assertTrue(actions.any { it.label == app.getString(R.string.composer_expand_full_screen) })
     }
 
+    /** The eight-pixel border gesture stays above the first editable line with no outside reservation. */
     @Test
-    fun resizeHandleIsCenteredOnThePillBorderAndTheTargetStopsAtTheFirstLine() {
+    fun resizeBorderDoesNotCoverTheEditorOrAddAnExpandedHeader() {
         val draft = longDraft()
         render(draft)
-
-        val target = composerControlBounds(R.string.composer_resize)
-        val surface =
-            composeRule
-                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG, useUnmergedTree = true)
-                .fetchSemanticsNode()
-                .boundsInRoot
+        val strip = resizeGesture().fetchSemanticsNode().boundsInRoot
+        val surface = pillSurface().fetchSemanticsNode().boundsInRoot
         val editor = composeRule.onNodeWithText(draft).fetchSemanticsNode().boundsInRoot
-        val indicator =
-            composeRule
-                .onNodeWithTag(COMPOSER_RESIZE_INDICATOR_TAG, useUnmergedTree = true)
-                .fetchSemanticsNode()
-                .boundsInRoot
-
-        assertTrue("resize target must extend above the pill", target.top < surface.top)
-        assertTrue("resize target must extend into the pill", target.bottom > surface.top)
-        assertTrue(
-            "the visible handle must be centered on the pill border",
-            abs(indicator.center.y - surface.top) <= 1f,
-        )
-        assertTrue("expanded editor top inset should match half the target", abs(editor.top - surface.top - 24f) <= 1f)
-        assertTrue("first-line gestures must start below the resize target", editor.top >= target.bottom - 1f)
+        assertEquals(surface.top, strip.top, 1f)
+        assertEquals(surface.width, strip.width, 1f)
+        assertEquals(8f, strip.height, 1f)
+        assertEquals(12f, editor.top - surface.top, 1f)
+        assertTrue(editor.top >= strip.bottom)
     }
 
     @Test
@@ -315,7 +299,7 @@ class ComposerExpansionBehaviorTest {
                 editor.performTextInputSelection(TextRange(twoLines.length))
                 editor.performTextInput("\nThird line")
                 composeRule.runOnIdle { }
-                resizeHandle().assertDoesNotExist()
+                resizeGesture().assertExists()
                 sampleComposerHeights()
             }
         composeRule.waitForIdle()
@@ -381,7 +365,7 @@ class ComposerExpansionBehaviorTest {
             withManualClock {
                 editor.performTextReplacement(twoLines)
                 buildList {
-                    repeat(4) {
+                    repeat(14) {
                         composeRule.mainClock.advanceTimeByFrame()
                         composeRule.runOnIdle { }
                         assertEquals(
@@ -400,14 +384,18 @@ class ComposerExpansionBehaviorTest {
                 abs(geometry.composer.bottom - fixedBottom) <= 1f,
             )
         }
-        val allocatedHeight = frames.first().composer.height
+        assertMonotonic(frames.map { it.composer.height }, increasing = true)
+        assertMonotonic(frames.map { it.pill.height }, increasing = true)
+        assertMonotonic(frames.map { it.editor.height }, increasing = true)
+        assertEditorState(editor, twoLines, TextRange(twoLines.length))
+        val allocatedHeight = frames.last().composer.height
         assertTrue(
-            "two text lines must receive more composer height immediately",
+            "two text lines must receive more composer height after the 160ms animation",
             allocatedHeight > oneLineGeometry.composer.height + 10f,
         )
         assertTrue(
-            "the editor viewport must expose the newly added line immediately",
-            frames.first().editor.height > oneLineGeometry.editor.height + 10f,
+            "the settled editor viewport must expose the newly added line",
+            frames.last().editor.height > oneLineGeometry.editor.height + 10f,
         )
     }
 
@@ -602,18 +590,15 @@ class ComposerExpansionBehaviorTest {
             )
         }
         assertMonotonic(allFrames.map { it.composer.height }, increasing = true)
-        assertMonotonic(allFrames.map { it.pill.width }, increasing = true)
-        val expandedWidth = allFrames.last().pill.width
-        assertTrue(
-            "wide transition must expose intermediate pill widths",
-            allFrames.any { it.pill.width > compact.pill.width + 1f && it.pill.width < expandedWidth - 1f },
-        )
+        allFrames.forEach { geometry ->
+            assertEquals("the shared surface keeps its full width", compact.pill.width, geometry.pill.width, 1f)
+        }
         assertEditorState(editor, "$twoLines\nThird line", TextRange("$twoLines\nThird line".length))
     }
 
     @Test
     fun thresholdDraftWithDictationAndAttachmentsSettlesWithoutLayoutOscillation() {
-        val draft = "#938 close as done, win obtained"
+        val draft = "#938 close as done\nwin obtained\nthird line"
 
         render(
             draft = draft,
@@ -668,13 +653,13 @@ class ComposerExpansionBehaviorTest {
     }
 
     @Test
-    fun dragHandleContinuouslyAddsTheDraggedDistance() {
+    fun upwardFlingSettlesAtTheFullScreenEndpoint() {
         render(longDraft())
         val initialBounds = composerBounds()
         val initialHeight = initialBounds.height
 
         composeRule
-            .onNodeWithContentDescription(app.getString(R.string.composer_resize))
+            .onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true)
             .performTouchInput {
                 val start = center
                 swipe(start, Offset(start.x, start.y - 96f), durationMillis = 320)
@@ -686,33 +671,27 @@ class ComposerExpansionBehaviorTest {
                 .onNodeWithTag(TAG)
                 .fetchSemanticsNode()
                 .boundsInRoot.height
-        assertTrue("upward drag should grow the composer", draggedHeight > initialHeight + 64f)
-        assertTrue("a short drag must not jump directly to full screen", draggedHeight < initialHeight + 140f)
+        assertTrue("upward fling should grow the composer", draggedHeight > initialHeight + 64f)
+        assertResizeHandleToggleLabel(R.string.composer_collapse)
         assertComposerBottom(initialBounds.bottom)
         composeRule.onNodeWithText(longDraft()).assertExists()
     }
 
     @Test
-    fun longAutomaticDraftCanBeDraggedDownToAShortManualViewport() {
+    fun downwardDragKeepsTheCurrentDraftsCompactEndpoint() {
         val draft = (1..40).joinToString("\n") { "Draft line $it" }
         render(draft)
         val automaticBounds = composerBounds()
 
-        resizeHandle().performTouchInput {
+        resizeGesture().performTouchInput {
             val start = center
             swipe(start, Offset(start.x, start.y + 220f), durationMillis = 320)
         }
         composeRule.waitForIdle()
 
         val manualBounds = composerBounds()
-        assertTrue(
-            "manual resize must shrink independently of natural draft height",
-            manualBounds.height < automaticBounds.height - 140f,
-        )
-        assertTrue(
-            "manual viewport must retain a usable one-line minimum",
-            manualBounds.height >= 140f,
-        )
+        assertEquals("compact remains content-sized", automaticBounds.height, manualBounds.height, 1f)
+        assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
         assertTrue(
             "manual resize must preserve the anchored bottom edge",
             abs(manualBounds.bottom - automaticBounds.bottom) <= 1f,
@@ -723,16 +702,7 @@ class ComposerExpansionBehaviorTest {
     @Test
     fun shrunkLongDraftCanScrollBackTowardItsFirstLine() {
         val draft = (1..40).joinToString("\n") { "Draft line $it" }
-        render(draft)
-        val editor = composeRule.onNode(hasSetTextAction())
-        editor.performClick()
-        composeRule.waitForIdle()
-
-        resizeHandle().performTouchInput {
-            val start = center
-            swipe(start, Offset(start.x, start.y + 220f), durationMillis = 320)
-        }
-        composeRule.waitForIdle()
+        prepareShrunkDraftAtEnd(draft)
 
         val before = editorScrollValue()
         assertTrue("the shrunk editor should sit at a nonzero end offset, was $before", before > 0f)
@@ -750,18 +720,32 @@ class ComposerExpansionBehaviorTest {
         assertTrue("a downward swipe must reveal earlier draft text: before=$before after=$after", after < before)
     }
 
+    /** Establishes a real full-to-compact resize with an end caret before exercising reading scroll. */
+    private fun prepareShrunkDraftAtEnd(draft: String) {
+        render(draft)
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performClick()
+        editor.performTextInputSelection(TextRange(draft.length))
+        resizeGesture().performClick()
+        composeRule.waitForIdle()
+        val expandedHeight = composerHeight()
+        resizeGesture().performTouchInput {
+            swipe(center, Offset(center.x, center.y + 220f), durationMillis = 320)
+        }
+        composeRule.waitForIdle()
+        assertTrue("the fixture must actually shrink the composer", composerHeight() < expandedHeight - 1f)
+        val range = editor.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        assertTrue("the shrunk editor must have overflowing text", range.maxValue() > 0f)
+        assertEditorState(editor, draft, TextRange(draft.length))
+    }
+
     private fun pillSurface() = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
 
     @Test
     fun mouseWheelScrollsTheShrunkEditorWithoutResizingIt() {
         val draft = (1..40).joinToString("\n") { "Draft line $it" }
-        render(draft)
-        composeRule.onNode(hasSetTextAction()).performClick()
-        composeRule.waitForIdle()
-        resizeHandle().performTouchInput {
-            swipe(center, Offset(center.x, center.y + 220f), durationMillis = 320)
-        }
-        composeRule.waitForIdle()
+        prepareShrunkDraftAtEnd(draft)
+
         val shrunkHeight = composerHeight()
         val before = editorScrollValue()
 
@@ -796,7 +780,7 @@ class ComposerExpansionBehaviorTest {
         val editor = composeRule.onNode(hasSetTextAction())
         editor.performClick()
         composeRule.waitForIdle()
-        resizeHandle().performTouchInput {
+        resizeGesture().performTouchInput {
             swipe(center, Offset(center.x, center.y + 220f), durationMillis = 320)
         }
         composeRule.waitForIdle()
@@ -823,14 +807,9 @@ class ComposerExpansionBehaviorTest {
     @Test
     fun shrunkEditorScrollsBothWaysWithoutResizingOrEditingTheDraft() {
         val draft = (1..40).joinToString("\n") { "Draft line $it" }
-        render(draft)
+        prepareShrunkDraftAtEnd(draft)
         val editor = composeRule.onNode(hasSetTextAction())
-        editor.performClick()
-        composeRule.waitForIdle()
-        resizeHandle().performTouchInput {
-            swipe(center, Offset(center.x, center.y + 220f), durationMillis = 320)
-        }
-        composeRule.waitForIdle()
+
         val shrunkHeight = composerHeight()
         val end = editorScrollValue()
 
@@ -857,13 +836,8 @@ class ComposerExpansionBehaviorTest {
     @Test
     fun accessibilityScrollActionMovesTheShrunkEditorViewport() {
         val draft = (1..40).joinToString("\n") { "Draft line $it" }
-        render(draft)
-        composeRule.onNode(hasSetTextAction()).performClick()
-        composeRule.waitForIdle()
-        resizeHandle().performTouchInput {
-            swipe(center, Offset(center.x, center.y + 220f), durationMillis = 320)
-        }
-        composeRule.waitForIdle()
+        prepareShrunkDraftAtEnd(draft)
+
         val before = editorScrollValue()
         assertTrue(before > 0f)
 
@@ -887,7 +861,7 @@ class ComposerExpansionBehaviorTest {
         render(draft)
         composeRule.onNode(hasSetTextAction()).performClick()
         composeRule.waitForIdle()
-        resizeHandle().performTouchInput {
+        resizeGesture().performTouchInput {
             swipe(center, Offset(center.x, center.y + 220f), durationMillis = 320)
         }
         composeRule.waitForIdle()
@@ -928,7 +902,7 @@ class ComposerExpansionBehaviorTest {
         editor.performClick()
         editor.performTextInputSelection(TextRange(draft.length))
         composeRule.waitForIdle()
-        resizeHandle().performTouchInput {
+        resizeGesture().performTouchInput {
             swipe(center, Offset(center.x, center.y + 220f), durationMillis = 320)
         }
         composeRule.waitForIdle()
@@ -975,7 +949,7 @@ class ComposerExpansionBehaviorTest {
         renderRotatable(draft) { landscape }
         composeRule.waitForIdle()
 
-        resizeHandle().performClick()
+        resizeGesture().performClick()
         composeRule.waitForIdle()
         val fullScreenHeight = composerHeight()
         assertTrue("full-screen mode should consume most of the viewport", fullScreenHeight > 500f)
@@ -1055,12 +1029,13 @@ class ComposerExpansionBehaviorTest {
             onTopBarClick = { topBarClicks += 1 },
         )
 
-        resizeHandle().performClick()
+        resizeGesture().performClick()
         composeRule.waitForIdle()
         val fullScreenHandle = composerControlBounds(R.string.composer_resize)
         assertTrue("full-screen resize target must stay below top-bar interactions", fullScreenHandle.top >= 64f)
+        assertEquals("prototype surface top clearance", 64f + statusBarInsetPx + 24f, fullScreenHandle.top, 1f)
 
-        resizeHandle().performTouchInput { click(center) }
+        resizeGesture().performTouchInput { click(center) }
         composeRule.waitForIdle()
 
         assertEquals("resize handle tap must not reach the top bar", 0, topBarClicks)
@@ -1072,7 +1047,7 @@ class ComposerExpansionBehaviorTest {
         val draft = longDraft()
         render(draft)
         val editor = composeRule.onNodeWithText(draft)
-        val resizeBounds = composerControlBounds(R.string.composer_resize)
+        val resizeBounds = resizeGesture().fetchSemanticsNode().boundsInRoot
         val editorBounds = editor.fetchSemanticsNode().boundsInRoot
         val initialHeight =
             composeRule
@@ -1113,7 +1088,7 @@ class ComposerExpansionBehaviorTest {
 
         editor.performClick()
         editor.assertIsFocused()
-        resizeHandle().performClick()
+        resizeGesture().performClick()
         composeRule.waitForIdle()
         assertResizeHandleToggleLabel(R.string.composer_collapse)
         assertEquals(OnBackInvokedDispatcher.PRIORITY_OVERLAY, overlayPriority)
@@ -1140,6 +1115,7 @@ class ComposerExpansionBehaviorTest {
         var value by mutableStateOf(TextFieldValue(draft))
         composeRule.setContent {
             val density = LocalDensity.current
+            statusBarInsetPx = WindowInsets.statusBars.getTop(density)
             CompositionLocalProvider(
                 LocalLayoutDirection provides layoutDirection,
                 LocalDensity provides Density(density.density, fontScale),
@@ -1208,6 +1184,11 @@ class ComposerExpansionBehaviorTest {
             elapsedRealtime = { 0L },
         )
 
+    /** The pointer target occupies only the existing border padding. */
+    private fun resizeGesture() = composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true)
+
+    private var statusBarInsetPx = 0
+
     private fun resizeHandle() = composeRule.onNodeWithContentDescription(app.getString(R.string.composer_resize))
 
     private fun composerHeight() = composerBounds().height
@@ -1256,8 +1237,12 @@ class ComposerExpansionBehaviorTest {
                 .boundsInRoot
         val send = composerControlBounds(R.string.send)
 
-        assertTrue("Send must keep at least a 48dp semantics target", send.width >= 48f && send.height >= 48f)
-        assertTrue("Send must keep bottom breathing room", surface.bottom - send.bottom >= 4f)
+        val sendNode = composeRule.onNodeWithContentDescription(app.getString(R.string.send)).fetchSemanticsNode()
+        assertTrue(
+            "Send keeps its accessible touch target around the visual disc",
+            sendNode.touchBoundsInRoot.width >= 48f && sendNode.touchBoundsInRoot.height >= 48f,
+        )
+        assertTrue("Send keeps its center inside the toolbar", send.center.y <= surface.bottom - 24f + 1f)
         if (layoutDirection == LayoutDirection.Ltr) {
             assertTrue("LTR Send must keep end breathing room", surface.right - send.right >= 4f)
         } else {

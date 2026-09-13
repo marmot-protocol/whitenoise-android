@@ -64,11 +64,23 @@ internal class ComposerAttachmentSheetState {
     var isOpen by mutableStateOf(false)
         private set
 
+    var recentMediaOpen by mutableStateOf(false)
+        private set
+
+    /** Opens the anchored action menu without taking focus from the editor. */
     fun open() {
+        recentMediaOpen = false
+        isOpen = true
+    }
+
+    /** The explicit recent-media destination retains the native opt-in permission surface. */
+    fun openRecentMedia() {
+        recentMediaOpen = true
         isOpen = true
     }
 
     fun dismiss() {
+        recentMediaOpen = false
         isOpen = false
     }
 }
@@ -144,6 +156,7 @@ internal fun ComposerAttachmentSheetPane(
     onShareUser: (() -> Unit)?,
     onShareContact: (() -> Unit)?,
     onComingSoon: () -> Unit,
+    recentMediaOnly: Boolean = false,
     bottomCornersOverride: ComposerAttachmentPaneBottomCorners? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -188,6 +201,7 @@ internal fun ComposerAttachmentSheetPane(
             if (onPickRecentMedia != null) {
                 RecentMediaStrip(onPick = onPickRecentMedia)
             }
+            if (recentMediaOnly) return@Column
             // Two rows of three. Row 1 is capture/files (Gallery, Camera,
             // Document); row 2 is place/people (Location, User, Contact).
             // User (npub, actionable) and Contact (phone, informational) sit

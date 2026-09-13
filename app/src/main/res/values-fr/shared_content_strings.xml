@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shared_content_in_chat">Partagé dans la discussion</string>
+    <string name="shared_content_photos_videos">Photos et vidéos</string>
+    <string name="shared_content_loaded_count">%1$d chargés</string>
+    <string name="shared_content_loaded_scope">Seuls les messages déjà chargés dans cette discussion sont affichés.</string>
+    <string name="shared_content_loading">Chargement du contenu partagé…</string>
+    <string name="shared_content_empty">Aucun contenu partagé</string>
+    <string name="shared_content_go_to_message">Aller au message</string>
+</resources>

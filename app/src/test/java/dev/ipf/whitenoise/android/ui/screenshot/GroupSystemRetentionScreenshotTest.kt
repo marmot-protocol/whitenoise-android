@@ -1,12 +1,15 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
@@ -20,8 +23,10 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.DaySeparator
 import dev.ipf.whitenoise.android.ui.conversation.GroupSystemRow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -68,6 +73,47 @@ class GroupSystemRetentionScreenshotTest {
         composeRule
             .onNodeWithTag(SCREENSHOT_TAG)
             .captureRoboImage("src/test/snapshots/group_system_retention_history_dark.png")
+    }
+
+    /** Adjacent real event rows and their following date retain prototype gaps after native slot compensation. */
+    @Test
+    fun adjacentEventsAndFollowingDayHavePrototypeSpacing() {
+        val appState = testAppState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(Modifier.width(360.dp)) {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item {
+                            GroupSystemRow(
+                                record = retentionChangeRecord(),
+                                appState = appState,
+                                groupSystem = retentionChangeEvent(),
+                            )
+                        }
+                        item {
+                            GroupSystemRow(
+                                record = retentionChangeRecord(),
+                                appState = appState,
+                                groupSystem = retentionChangeEvent(),
+                                followsStructuralHeader = true,
+                            )
+                        }
+                        item { DaySeparator("September 13, 2026", followsGroupEvent = true) }
+                    }
+                }
+            }
+        }
+        val expected =
+            context.getString(
+                R.string.group_system_disappearing_set_you,
+                context.getString(R.string.disappearing_5_minutes),
+            )
+        val summaries = composeRule.onAllNodesWithText(expected)
+        val first = summaries[0].fetchSemanticsNode().boundsInRoot
+        val second = summaries[1].fetchSemanticsNode().boundsInRoot
+        val date = composeRule.onNodeWithTag("conversation.date.inline").fetchSemanticsNode().boundsInRoot
+        assertEquals(18f, second.top - first.bottom, 1f)
+        assertEquals(26f, date.top - second.bottom, 1f)
     }
 
     private fun testAppState(): WhiteNoiseAppState =

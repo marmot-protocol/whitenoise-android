@@ -325,7 +325,7 @@ class ComposerCaretVisibilityTest {
 
         composeRule
             .onNodeWithContentDescription(app.getString(R.string.composer_resize))
-            .performClick()
+            .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitForIdle()
 
         assertEquals(initialChangeCount + 2, bottomInputChanges)

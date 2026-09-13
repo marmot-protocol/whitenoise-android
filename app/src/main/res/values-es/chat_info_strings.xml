@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="disappearing">Temporales</string>
+    <string name="advanced">Avanzado</string>
+    <string name="save_conversation_transcript">Guardar transcripción</string>
+</resources>

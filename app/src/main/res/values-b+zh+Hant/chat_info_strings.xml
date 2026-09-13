@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="disappearing">自動消失</string>
+    <string name="advanced">進階</string>
+    <string name="save_conversation_transcript">儲存聊天記錄</string>
+</resources>

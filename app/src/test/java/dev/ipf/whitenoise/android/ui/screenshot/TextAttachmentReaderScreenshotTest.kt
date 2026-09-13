@@ -15,6 +15,7 @@ import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
@@ -165,6 +166,7 @@ class TextAttachmentReaderScreenshotTest {
         var copied = ""
         var spoken = 0
         var opened = 0
+        var saved = 0
         render(
             candidate = markdownCandidate,
             state = TextAttachmentReaderState.Ready(markdownPreview()),
@@ -172,22 +174,49 @@ class TextAttachmentReaderScreenshotTest {
             onCopy = { copied = it },
             onReadAloud = { spoken += 1 },
             onOpenExternal = { opened += 1 },
+            onSave = { saved += 1 },
         )
 
         composeRule.onNodeWithContentDescription(string(R.string.back)).performClick()
         composeRule.onNodeWithContentDescription(string(R.string.copy_text)).assertIsEnabled().performClick()
         composeRule.onNodeWithContentDescription(string(R.string.speak_aloud)).assertIsEnabled().performClick()
-        composeRule.onNodeWithContentDescription(string(R.string.text_attachment_open_external)).performClick()
+        composeRule.onNodeWithText(string(R.string.text_attachment_reader_title)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.more_options)).performClick()
+        composeRule.onNodeWithText(string(R.string.text_attachment_open_external)).performClick()
         composeRule
             .onNodeWithText(string(R.string.text_attachment_view_full_filename))
-            .assertDoesNotExist()
+            .assertIsDisplayed()
 
         assertEquals(1, dismissed)
         assertEquals(markdownPreview().text, copied)
         assertEquals(1, spoken)
         assertEquals(1, opened)
-        composeRule.onNodeWithText(string(R.string.save)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(string(R.string.more_options)).performClick()
+        composeRule.onNodeWithText(string(R.string.save)).assertIsEnabled().performClick()
+        assertEquals(1, saved)
         composeRule.onNodeWithText(string(R.string.edit)).assertDoesNotExist()
+    }
+
+    @Test
+    fun topBackClearsARealSelectionBeforeClosingTheReader() {
+        val source = "select a few words from this attachment"
+        var dismissed = 0
+        var copied = ""
+        render(
+            candidate = plainCandidate,
+            state = TextAttachmentReaderState.Ready(TextAttachmentPreview(plainCandidate, source)),
+            onDismiss = { dismissed += 1 },
+            onCopy = { copied = it },
+        )
+        composeRule.onNodeWithText(source).performTouchInput { longClick() }
+        composeRule.onNodeWithContentDescription(string(R.string.copy_text)).performClick()
+        assertTrue(copied.isNotBlank() && copied != source && source.contains(copied))
+        composeRule.onNodeWithContentDescription(string(R.string.back)).performClick()
+        assertEquals(0, dismissed)
+        composeRule.onNodeWithContentDescription(string(R.string.copy_text)).performClick()
+        assertEquals(source, copied)
+        composeRule.onNodeWithContentDescription(string(R.string.back)).performClick()
+        assertEquals(1, dismissed)
     }
 
     @Test
@@ -223,6 +252,7 @@ class TextAttachmentReaderScreenshotTest {
     fun ordinaryMarkdownLongPressCopiesOnlyTheSelection() {
         val fullSource = "ordinary markdown selection words"
         var copied = ""
+        var spokenSelection = ""
         render(
             candidate = markdownCandidate,
             state =
@@ -233,14 +263,17 @@ class TextAttachmentReaderScreenshotTest {
                     ),
                 ),
             onCopy = { copied = it },
+            onReadAloud = { spokenSelection = it.text },
         )
 
         composeRule.onNodeWithText(fullSource).performTouchInput { longClick() }
+        composeRule.onNodeWithContentDescription(string(R.string.speak_aloud)).performClick()
         composeRule.onNodeWithContentDescription(string(R.string.copy_text)).performClick()
 
         assertTrue(copied.isNotBlank())
         assertTrue(fullSource.contains(copied))
         assertFalse(copied == fullSource)
+        assertEquals(copied, spokenSelection)
     }
 
     @Test
@@ -322,6 +355,25 @@ class TextAttachmentReaderScreenshotTest {
         composeRule.onNodeWithText(destination).assertIsDisplayed()
     }
 
+    /** Actual native metadata and Stop reading chrome stay reachable at the real theme-owned large font. */
+    @Test
+    fun loadedByteCountAndCurrentSpeechToggleRemainVisible() {
+        var toggled = 0
+        val preview = TextAttachmentPreview(plainCandidate, "Selected reader text", byteCount = 1_024L)
+        render(
+            candidate = plainCandidate,
+            state = TextAttachmentReaderState.Ready(preview),
+            darkTheme = true,
+            fontScale = 1.6f,
+            isReading = true,
+            onReadAloud = { toggled += 1 },
+        )
+        composeRule.onNodeWithText(context.getString(R.string.bytes_count, 1_024L)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.tts_bar_stop)).assertIsEnabled().performClick()
+        assertEquals(1, toggled)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/text_reader_native_actions_dark_large.png")
+    }
+
     private fun render(
         candidate: TextAttachmentCandidate,
         state: TextAttachmentReaderState,
@@ -334,6 +386,8 @@ class TextAttachmentReaderScreenshotTest {
         onCopy: (String) -> Unit = {},
         onReadAloud: (TextAttachmentPreview) -> Unit = {},
         onOpenExternal: () -> Unit = {},
+        onSave: () -> Unit = {},
+        isReading: Boolean = false,
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -341,7 +395,7 @@ class TextAttachmentReaderScreenshotTest {
                 LocalDensity provides Density(density.density, fontScale),
                 LocalLayoutDirection provides layoutDirection,
             ) {
-                WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
+                WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = fontScale) {
                     Surface(color = MaterialTheme.colorScheme.background) {
                         TextAttachmentReaderScreen(
                             candidate = candidate,
@@ -351,6 +405,8 @@ class TextAttachmentReaderScreenshotTest {
                             onCopy = onCopy,
                             onReadAloud = onReadAloud,
                             onOpenExternal = onOpenExternal,
+                            onSave = onSave,
+                            isReading = isReading,
                         )
                     }
                 }

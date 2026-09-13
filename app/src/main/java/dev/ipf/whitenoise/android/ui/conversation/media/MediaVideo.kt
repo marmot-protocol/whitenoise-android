@@ -1296,7 +1296,7 @@ private fun VideoViewerUnavailable(
                     tint = Color.White,
                     modifier = Modifier.size(48.dp).clickable(onClick = onPlaybackRetry),
                 )
-            loadFailed -> MediaViewerLoadFailed(onRetry = onLoadRetry)
+            loadFailed -> MediaViewerLoadFailed(onRetry = onLoadRetry, contentColor = Color.White)
             else -> CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
         }
     }

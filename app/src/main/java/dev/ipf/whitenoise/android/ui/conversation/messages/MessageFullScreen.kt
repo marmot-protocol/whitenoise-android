@@ -1,39 +1,30 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.EmojiEmotions
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -45,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -63,9 +55,10 @@ import dev.ipf.whitenoise.android.state.labelFor
 import dev.ipf.whitenoise.android.state.shortHex
 import dev.ipf.whitenoise.android.state.shouldShowOriginalTimestamp
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
-import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingBottomSheet
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import java.time.ZoneId
 import java.util.Locale
 
@@ -80,7 +73,7 @@ internal const val MESSAGE_FULL_SCREEN_BODY_TAG = "message-full-screen-body"
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("FunctionNaming", "LongMethod")
+@Suppress("FunctionNaming", "LongMethod", "UnusedParameter") // Keep native caller identity inputs API-compatible.
 internal fun MessageFullScreenView(
     senderDisplayName: String,
     senderSeed: String,
@@ -124,37 +117,28 @@ internal fun MessageFullScreenView(
         var overflowOpen by remember { mutableStateOf(false) }
         Scaffold(
             modifier = Modifier.testTag(MESSAGE_FULL_SCREEN_TAG),
+            contentWindowInsets = WindowInsets.safeDrawing,
             topBar = {
                 TopAppBar(
                     title = {
-                        // The sender identity lives in the bar itself — avatar +
-                        // name with the send time (and delivery status for own
-                        // messages) as a subtitle — so the body below is just the
-                        // message, no redundant in-content header.
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Avatar(title = senderDisplayName, seed = senderSeed, size = 36.dp, pictureUrl = senderAvatarUrl)
-                            Column {
+                        Column {
+                            Text(
+                                senderDisplayName,
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
                                 Text(
-                                    senderDisplayName,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
+                                    timeText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                ) {
-                                    Text(
-                                        timeText,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                    if (showStatus) {
-                                        OutgoingMessageStatusIcon(status, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
+                                if (showStatus) {
+                                    OutgoingMessageStatusIcon(status, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -166,104 +150,78 @@ internal fun MessageFullScreenView(
                             },
                         ) {
                             Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
+                                painterResource(R.drawable.ic_arrow_back),
                                 contentDescription = stringResource(R.string.back),
                             )
                         }
                     },
                     actions = {
-                        IconButton(onClick = { overflowOpen = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.message_actions))
-                        }
-                        DropdownMenu(
-                            expanded = overflowOpen,
-                            onDismissRequest = { overflowOpen = false },
-                            shape = MenuDefaults.shape,
-                            border = amoledSurfaceBorderStroke(),
-                        ) {
-                            if (canReply) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.reply)) },
-                                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null) },
-                                    onClick = {
-                                        overflowOpen = false
-                                        onReply()
-                                    },
+                        Box {
+                            IconButton(onClick = { overflowOpen = true }) {
+                                Icon(
+                                    painterResource(R.drawable.ic_more_vert),
+                                    contentDescription = stringResource(R.string.message_actions),
                                 )
                             }
-                            if (canReact) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.message_react)) },
-                                    leadingIcon = { Icon(Icons.Default.EmojiEmotions, contentDescription = null) },
-                                    onClick = {
-                                        overflowOpen = false
-                                        onReact()
+                            WhiteNoiseDropdownMenu(
+                                expanded = overflowOpen,
+                                onDismissRequest = { overflowOpen = false },
+                                items =
+                                    buildList {
+                                        if (canReply) {
+                                            add(
+                                                WhiteNoiseMenuItem(
+                                                    label = stringResource(R.string.reply),
+                                                    icon = R.drawable.ic_reply,
+                                                    onClick = onReply,
+                                                ),
+                                            )
+                                        }
+                                        if (canReact) {
+                                            add(
+                                                WhiteNoiseMenuItem(
+                                                    label = stringResource(R.string.message_react),
+                                                    icon = R.drawable.ic_add,
+                                                    onClick = onReact,
+                                                ),
+                                            )
+                                        }
+                                        add(
+                                            WhiteNoiseMenuItem(
+                                                label = stringResource(R.string.copy_text),
+                                                icon = R.drawable.ic_content_copy,
+                                                onClick = onCopy,
+                                            ),
+                                        )
+                                        if (canDelete) {
+                                            add(
+                                                WhiteNoiseMenuItem(
+                                                    label = stringResource(R.string.delete),
+                                                    icon = R.drawable.ic_delete,
+                                                    destructive = true,
+                                                    onClick = onDelete,
+                                                ),
+                                            )
+                                        }
                                     },
-                                )
-                            }
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.copy_text)) },
-                                leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
-                                onClick = {
-                                    overflowOpen = false
-                                    onCopy()
-                                },
                             )
-                            if (canDelete) {
-                                // Single Delete entry; scope is chosen on the
-                                // shared delete surface the caller opens.
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            stringResource(R.string.delete),
-                                            color = MaterialTheme.colorScheme.error,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Default.Delete,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.error,
-                                        )
-                                    },
-                                    onClick = {
-                                        overflowOpen = false
-                                        onDelete()
-                                    },
-                                )
-                            }
                         }
                     },
                 )
             },
             bottomBar = bottomBar,
         ) { padding ->
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(18.dp),
-                    border = amoledSurfaceBorderStroke(),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    MessageFullScreenBody(
-                        body = body,
-                        markdownDocument = bodyMarkdownDocument,
-                        mentionDisplayName = mentionDisplayName,
-                        isGroupMember = isGroupMember,
-                        onNostrProfileTap = onNostrProfileTap,
-                        onCopyMarkdownLink = onCopyMarkdownLink,
-                        selectionController = selection,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    )
-                }
+            AdaptiveContent(Modifier.fillMaxSize().padding(padding)) {
+                MessageFullScreenBody(
+                    body = body,
+                    markdownDocument = bodyMarkdownDocument,
+                    mentionDisplayName = mentionDisplayName,
+                    isGroupMember = isGroupMember,
+                    onNostrProfileTap = onNostrProfileTap,
+                    onCopyMarkdownLink = onCopyMarkdownLink,
+                    selectionController = selection,
+                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+                )
             }
         }
     }

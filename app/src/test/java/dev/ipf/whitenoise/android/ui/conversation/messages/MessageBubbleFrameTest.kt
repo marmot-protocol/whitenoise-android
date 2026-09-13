@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
-import dev.ipf.whitenoise.android.state.withoutBlueChannel
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -125,11 +124,11 @@ class MessageBubbleFrameTest {
     }
 
     @Test
-    fun customAmoledReplyAccentUsesCurrentBorderColorInsideBubbleAndAboveMedia() {
+    fun savedCustomColorDoesNotOverrideNeutralAmoledReplyAccents() {
         val presentation = customAmoledPresentation()
 
         assertEquals(
-            CUSTOM_BACKGROUND.withoutBlueChannel(),
+            OPAQUE_WHITE,
             replyPreviewAccentArgb(
                 insideBubble = true,
                 customBubbleColorActive = true,
@@ -137,7 +136,7 @@ class MessageBubbleFrameTest {
             ),
         )
         assertEquals(
-            CUSTOM_BACKGROUND.withoutBlueChannel(),
+            null,
             replyPreviewAccentArgb(
                 insideBubble = false,
                 customBubbleColorActive = true,
@@ -147,7 +146,7 @@ class MessageBubbleFrameTest {
     }
 
     @Test
-    fun customAmoledBorderKeepsBlackCaptionPlainAndReplyBubbleContent() {
+    fun savedCustomColorKeepsNeutralBlackAmoledCaptionPlainAndReplyContent() {
         val captionContentArgb = AtomicInteger()
         val plainContentArgb = AtomicInteger()
         val presentation = customAmoledPresentation()
@@ -197,7 +196,7 @@ class MessageBubbleFrameTest {
 
         composeRule.waitForIdle()
         assertEquals(OPAQUE_BLACK_ARGB, presentation.backgroundArgb)
-        assertEquals(CUSTOM_BACKGROUND.withoutBlueChannel(), presentation.borderOverrideArgb)
+        assertEquals(null, presentation.borderOverrideArgb)
         assertEquals(MENTION_ACCENT, presentation.mentionAccentArgb)
         assertEquals(OPAQUE_WHITE.toInt(), captionContentArgb.get())
         assertEquals(OPAQUE_WHITE.toInt(), plainContentArgb.get())
@@ -371,7 +370,7 @@ class MessageBubbleFrameTest {
             val footerBounds = composeRule.onNodeWithTag(MEDIA_REPLY_FOOTER_TAG).fetchSemanticsNode().boundsInRoot
             assertEquals(mediaBounds.width, captionBounds.width, 1f)
             assertEquals(mediaBounds.bottom, captionBounds.top, 0.1f)
-            assertEquals(captionBounds.right - 14f, footerBounds.right, 1f)
+            assertEquals(captionBounds.right - 12f, footerBounds.right, 1f)
         }
     }
 
@@ -422,6 +421,30 @@ class MessageBubbleFrameTest {
             val bodyBounds = composeRule.onNodeWithTag(NON_REPLY_BODY_TAG).fetchSemanticsNode().boundsInRoot
             assertTrue(bodyBounds.width < columnBounds.width)
         }
+    }
+
+    @Test
+    fun plainTextFrameUsesTwelveByEightInsets() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MessageBubbleFrame(
+                    presentation = messageBubblePresentation(deleted = false, mine = true),
+                    highlighted = false,
+                    mine = true,
+                    mentionedSelf = false,
+                    mentionedYouLabel = "Mentioned you",
+                    modifier = Modifier.testTag("compact-frame"),
+                ) {
+                    Box(Modifier.size(48.dp, 24.dp).testTag("compact-content"))
+                }
+            }
+        }
+        val frame = composeRule.onNodeWithTag("compact-frame").fetchSemanticsNode().boundsInRoot
+        val content = composeRule.onNodeWithTag("compact-content").fetchSemanticsNode().boundsInRoot
+        assertEquals(72f, frame.width, 0.1f)
+        assertEquals(40f, frame.height, 0.1f)
+        assertEquals(12f, content.left - frame.left, 0.1f)
+        assertEquals(8f, content.top - frame.top, 0.1f)
     }
 
     private companion object {

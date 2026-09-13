@@ -25,7 +25,7 @@ class GroupEditTopBarScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
                 Surface {
-                    GroupEditTopBar(onBack = {})
+                    GroupEditScaffold(onBack = {})
                 }
             }
         }

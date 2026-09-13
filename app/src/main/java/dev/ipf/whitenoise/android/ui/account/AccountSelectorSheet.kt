@@ -125,7 +125,7 @@ internal fun AccountSelectorSheet(
             avatarUrl = appState::avatarUrl,
             unreadCountForAccount = appState::confirmedUnreadCountForAccount,
             hasUnreadForAccount = appState::accountShowsUnreadDot,
-            actionColorsForAccount = { accountActionColors(appState, it) },
+            actionColorsForAccount = { accountRef -> accountActionColors(appState, accountRef) },
             enabled = !appState.profileSwitcherBlocked(),
             pendingLabel = selection.pendingLabel,
             onSelectProfile = { label ->

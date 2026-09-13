@@ -7,16 +7,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipboardManager
@@ -26,6 +19,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.ui.common.CopyableValueRow
 import dev.ipf.whitenoise.android.ui.common.SectionCard
+import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
+import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -37,32 +32,38 @@ internal fun GroupInfoScreen(
     onBack: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.group_info)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                },
-            )
-        },
-    ) { padding ->
+    SettingsScaffold(title = stringResource(R.string.group_info), onBack = onBack) {
         Column(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(padding)
+                    .whiteNoiseVerticalScroll(rememberScrollState())
                     .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
         ) {
             GroupIdentifierCard(groupIdHex, nostrGroupIdHex, clipboard)
             GroupRelayCard(relays, clipboard)
+        }
+    }
+}
+
+/** Read-only chat relays from the current native group record, with full-value copy actions. */
+@Composable
+internal fun ChatRelaysScreen(
+    relays: List<String>,
+    onBack: () -> Unit,
+    feedback: @Composable () -> Unit = {},
+    bottomBar: @Composable () -> Unit = {},
+) {
+    val clipboard = LocalClipboardManager.current
+    SettingsScaffold(title = stringResource(R.string.relays), onBack = onBack, bottomBar = bottomBar) {
+        Column(Modifier.fillMaxSize()) {
+            feedback()
+            Column(
+                modifier = Modifier.weight(1f).whiteNoiseVerticalScroll(rememberScrollState()).padding(Dimens.spaceLg),
+            ) {
+                GroupRelayCard(relays, clipboard)
+            }
         }
     }
 }

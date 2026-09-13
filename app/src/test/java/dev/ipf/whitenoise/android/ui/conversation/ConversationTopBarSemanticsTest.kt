@@ -2,13 +2,25 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import android.content.Context
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
@@ -29,22 +41,87 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class ConversationTopBarSemanticsTest {
     @get:Rule
     val composeRule = createComposeRule()
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    /** The full title is one accessible 48dp action and preserves its performance selector. */
     @Test
     fun performanceSelectorIsClickableWithoutReplacingAccessibilityDescription() {
         val appState = appState()
         val controller = ConversationController(appState = appState, initialGroup = group())
-        val searchFocusRequester = FocusRequester()
         var openDetailsCalls = 0
+        render(appState, controller, onOpenDetails = { openDetailsCalls += 1 })
 
+        composeRule
+            .onNodeWithTag(PerformanceTestTags.OPEN_GROUP_DETAILS)
+            .assertHasClickAction()
+            .assertHeightIsAtLeast(48.dp)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assertContentDescriptionEquals(OPEN_DETAILS_DESCRIPTION)
+            .performClick()
+        composeRule.runOnIdle { assertEquals(1, openDetailsCalls) }
+        composeRule
+            .onNodeWithTag("conversation.header.avatar", useUnmergedTree = true)
+            .assertWidthIsEqualTo(40.dp)
+            .assertHeightIsEqualTo(40.dp)
+        composeRule
+            .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_header_regular_light.png")
+    }
+
+    /** Compact windows retain the native smaller avatar and 48dp details target; timer follows the 12dp design. */
+    @Test
+    fun compactHeaderKeepsAccessibleDetailsAndNativeTimer() {
+        val appState = appState()
+        appState.markDisappearingTooltipShown()
+        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = 60uL))
+        render(appState, controller, compactHeight = true)
+        composeRule.onNodeWithTag(PerformanceTestTags.OPEN_GROUP_DETAILS).assertHeightIsAtLeast(48.dp)
+        composeRule
+            .onNodeWithTag("conversation.header.avatar", useUnmergedTree = true)
+            .assertWidthIsEqualTo(28.dp)
+            .assertHeightIsEqualTo(28.dp)
+        composeRule
+            .onNodeWithTag("conversation.header.timer", useUnmergedTree = true)
+            .assertWidthIsEqualTo(12.dp)
+            .assertHeightIsEqualTo(12.dp)
+        composeRule
+            .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_header_compact_timer_light.png")
+    }
+
+    /** Hydration cannot replace the opening route title until the existing route owner releases its freeze. */
+    @Test
+    fun frozenRouteRetainsTitleUntilTransitionCompletes() {
+        val appState = appState()
+        val controller = ConversationController(appState, group())
+        val frozen = mutableStateOf(true)
+        render(appState, controller, frozen = frozen)
+        composeRule.runOnIdle { controller.applyGroupStateForTest(group().copy(name = "Hydrated group")) }
+        composeRule.onNodeWithText("Benchmark group").assertExists()
+        composeRule.onNodeWithText("Hydrated group").assertDoesNotExist()
+        composeRule.runOnIdle { frozen.value = false }
+        composeRule.onNodeWithText("Hydrated group").assertExists()
+        composeRule.onNodeWithText("Benchmark group").assertDoesNotExist()
+    }
+
+    /** Real controller presentation with inert navigation; no native reads or mutations are supplied. */
+    private fun render(
+        appState: WhiteNoiseAppState,
+        controller: ConversationController,
+        compactHeight: Boolean = false,
+        frozen: State<Boolean> = mutableStateOf(false),
+        onOpenDetails: () -> Unit = {},
+    ) {
+        val searchFocusRequester = FocusRequester()
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface {
@@ -63,26 +140,21 @@ class ConversationTopBarSemanticsTest {
                         controller = controller,
                         groupTitleCopy = GroupTitleCopy.Default,
                         openedAsDmHint = false,
+                        freezeRoutePresentation = frozen.value,
                         openDetailsDescription = OPEN_DETAILS_DESCRIPTION,
-                        onOpenDetails = { openDetailsCalls += 1 },
+                        onOpenDetails = onOpenDetails,
                         onBack = {},
                         menuOpen = false,
                         onMenuOpenChange = {},
                         onOpenSearch = {},
                         onToggleArchived = {},
                         onRequestLeave = {},
+                        compactHeight = compactHeight,
                         performanceSelectorsEnabled = true,
                     )
                 }
             }
         }
-
-        composeRule
-            .onNodeWithTag(PerformanceTestTags.OPEN_GROUP_DETAILS)
-            .assertHasClickAction()
-            .assertContentDescriptionEquals(OPEN_DETAILS_DESCRIPTION)
-            .performClick()
-        composeRule.runOnIdle { assertEquals(1, openDetailsCalls) }
     }
 
     private fun appState() =

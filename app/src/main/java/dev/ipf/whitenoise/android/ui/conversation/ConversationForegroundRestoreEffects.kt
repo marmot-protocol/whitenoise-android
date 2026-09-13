@@ -119,6 +119,7 @@ internal fun ConversationForegroundRestoreEffects(
     currentScrollAnchor: () -> ConversationScrollAnchor,
     resolveScrollAnchorIndex: (ConversationScrollAnchor) -> Int?,
     currentTailIndex: () -> Int,
+    timelineViewport: ConversationTimelineViewport? = null,
 ) {
     val foregroundPreDrawSignals = remember(controller) { Channel<Unit>(capacity = Channel.CONFLATED) }
     var foregroundRestoreToken by remember(controller) { mutableStateOf<ConversationForegroundRestoreToken?>(null) }
@@ -138,7 +139,8 @@ internal fun ConversationForegroundRestoreEffects(
         rememberUpdatedState(
             newValue = {
                 ConversationForegroundGeometry(
-                    viewportHeightPx = listState.layoutInfo.viewportSize.height,
+                    viewportHeightPx =
+                        (timelineViewport?.readingLayoutInfo() ?: listState.layoutInfo).viewportSize.height,
                     imeBottomPx = imeInsets.getBottom(density),
                     bottomChromeHeightPx = bottomChromeHeightObserver.currentHeightPx,
                 )

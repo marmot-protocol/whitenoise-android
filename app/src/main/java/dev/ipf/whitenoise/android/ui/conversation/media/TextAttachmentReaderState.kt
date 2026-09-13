@@ -12,6 +12,7 @@ internal data class TextAttachmentPreview(
     val candidate: TextAttachmentCandidate,
     val text: String,
     val markdownDocument: MarkdownDocumentFfi? = null,
+    val byteCount: Long? = null,
 ) {
     val isTruncated: Boolean
         get() = markdownDocument?.truncated == true
@@ -61,6 +62,7 @@ internal suspend fun loadTextAttachmentPreview(
                     candidate = candidate,
                     text = decoded.text,
                     markdownDocument = document,
+                    byteCount = bytes.size.toLong(),
                 ),
             )
         }

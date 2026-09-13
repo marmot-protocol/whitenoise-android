@@ -21,12 +21,13 @@ fun Modifier.trackWhiteNoiseHeader(state: LazyListState): Modifier =
                     state.layoutInfo.totalItemsCount,
                     state.firstVisibleItemIndex,
                     state.firstVisibleItemScrollOffset,
-                )
-            }.collect { (count, index, offset) ->
+                ) to behavior.state.heightOffsetLimit
+            }.collect { (position, heightOffsetLimit) ->
+                val (count, index, offset) = position
                 behavior.state.contentOffset =
                     when {
                         count == 0 -> 0f
-                        index > 0 -> behavior.state.heightOffsetLimit
+                        index > 0 -> heightOffsetLimit
                         else -> -offset.toFloat()
                     }
             }

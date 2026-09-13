@@ -95,15 +95,15 @@ class ChatListFolderFilterNavigationCoverageTest {
     /** Proves the permanent All chip remains the sole explicit folder-filter reset action. */
     @Test
     fun explicitAllActionClearsRememberedFolderFilter() {
-        val filterChips =
-            chatListTopBarSource().readText().requiredSection(
-                start = "internal fun ChatListFilterChips(",
-                end = "\n}",
+        val pills =
+            chatFolderPillsSource().readText().requiredSection(
+                start = "item(key = \"scope:chats\")",
+                end = "\n        }",
             )
 
         assertTrue(
             "tapping All must explicitly clear the selected folder",
-            "onClick = { onSelect(null) }" in filterChips,
+            "{ onSelect(null) }" in pills,
         )
     }
 
@@ -139,12 +139,12 @@ class ChatListFolderFilterNavigationCoverageTest {
         ).firstOrNull { it.exists() }
             ?: error("Missing MainShell.kt source file")
 
-    private fun chatListTopBarSource(): File =
+    private fun chatFolderPillsSource(): File =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt"),
+            File("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt"),
         ).firstOrNull { it.exists() }
-            ?: error("Missing ChatListTopBar.kt source file")
+            ?: error("Missing ChatFolderPills.kt source file")
 
     private fun String.requiredSection(
         start: String,

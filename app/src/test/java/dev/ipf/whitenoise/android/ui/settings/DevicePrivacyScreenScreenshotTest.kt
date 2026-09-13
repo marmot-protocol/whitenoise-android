@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import android.app.Application
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
@@ -17,10 +18,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.SavedStateHandle
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.DiagnosticsExporterStatusFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshot
 import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshotHandoff
 import dev.ipf.whitenoise.android.state.AppPhase
@@ -120,7 +123,10 @@ class DevicePrivacyScreenScreenshotTest {
         val state = privacyAppState(decision)
         runBlocking { state.refreshSecurityPrivacySettings() }
         val shell = presentBootstrappedApp(state, AppPhase.Ready)
-        composeRule.onNodeWithContentDescription("New message").assertIsDisplayed()
+        composeRule
+            .onNodeWithContentDescription(
+                ApplicationProvider.getApplicationContext<Application>().getString(R.string.new_message),
+            ).assertIsDisplayed()
         composeRule.onNodeWithText("Help Improve White Noise").assertDoesNotExist()
         assertEquals(decision, state.usageDiagnosticsSettings?.decision)
         composeRule.runOnIdle { shell.release() }

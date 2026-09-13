@@ -12,7 +12,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
 import dev.ipf.whitenoise.android.state.readableTextArgb
+import dev.ipf.whitenoise.android.state.resolveBubbleColorArgb
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import dev.ipf.whitenoise.android.ui.theme.whiteNoiseBaseColorScheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -166,7 +168,7 @@ class MessageBubbleAmoledStyleTest {
     }
 
     @Test
-    fun standardDarkBubbleChromeKeepsExistingStyling() {
+    fun standardDarkBubbleChromeUsesPairedPrototypeForegrounds() {
         var sentBorder: BorderStroke? = BorderStroke(2.dp, Color.Red)
         var receivedBorder: BorderStroke? = BorderStroke(2.dp, Color.Red)
         var sentTimestamp = Color.Unspecified
@@ -180,8 +182,8 @@ class MessageBubbleAmoledStyleTest {
                 val received = messageBubbleBorder(highlighted = false, mine = false)
                 val sentTime = messageBubbleTimestampColor(mine = true, deleted = false)
                 val receivedTime = messageBubbleTimestampColor(mine = false, deleted = false)
-                val sentExpected = MaterialTheme.colorScheme.onPrimaryContainer
-                val receivedExpected = MaterialTheme.colorScheme.onSurfaceVariant
+                val sentExpected = MaterialTheme.colorScheme.onPrimary
+                val receivedExpected = MaterialTheme.colorScheme.onSurface
 
                 SideEffect {
                     sentBorder = sent
@@ -217,7 +219,7 @@ class MessageBubbleAmoledStyleTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
                 val actual = messageBubbleFillColor(deleted = false, mine = true)
-                val expected = MaterialTheme.colorScheme.primaryContainer
+                val expected = MaterialTheme.colorScheme.primary
                 SideEffect {
                     lightMine = actual
                     lightMineExpected = expected
@@ -225,7 +227,7 @@ class MessageBubbleAmoledStyleTest {
             }
             WhiteNoiseTheme(darkTheme = true, amoled = false) {
                 val actual = messageBubbleFillColor(deleted = false, mine = false)
-                val expected = MaterialTheme.colorScheme.surfaceVariant
+                val expected = MaterialTheme.colorScheme.surfaceContainerHigh
                 val custom =
                     messageBubblePresentation(
                         deleted = false,
@@ -304,6 +306,47 @@ class MessageBubbleAmoledStyleTest {
             assertNotEquals(Color.Transparent, lightTint)
             assertNotEquals(Color.Transparent, darkTint)
         }
+    }
+
+    @Test
+    fun actionAccentDoesNotRecolorDefaultBubblesOrOverrideSavedBubbleColors() {
+        val actionArgb = 0xFF217A44L
+        val globalArgb = 0xFF445566L
+        val chatArgb = 0xFF994433L
+        composeRule.setContent {
+            listOf(false, true).forEach { dark ->
+                WhiteNoiseTheme(darkTheme = dark, accentColorArgb = actionArgb) {
+                    val base = whiteNoiseBaseColorScheme(dark)
+                    val mine = messageBubblePresentation(deleted = false, mine = true)
+                    val other = messageBubblePresentation(deleted = false, mine = false)
+                    val global =
+                        messageBubblePresentation(
+                            deleted = false,
+                            mine = true,
+                            customArgb = resolveBubbleColorArgb(null, globalArgb, 0L),
+                        )
+                    val chat =
+                        messageBubblePresentation(
+                            deleted = false,
+                            mine = false,
+                            customArgb = resolveBubbleColorArgb(chatArgb, globalArgb, 0L),
+                        )
+                    val action = MaterialTheme.colorScheme.primary
+                    SideEffect {
+                        assertEquals(Color(actionArgb), action)
+                        assertEquals(base.primary, colorFromArgb(mine.backgroundArgb))
+                        assertEquals(base.onPrimary, colorFromArgb(mine.contentArgb))
+                        assertEquals(base.surfaceContainerHigh, colorFromArgb(other.backgroundArgb))
+                        assertEquals(base.onSurface, colorFromArgb(other.contentArgb))
+                        assertEquals(globalArgb, global.backgroundArgb)
+                        assertEquals(readableTextArgb(globalArgb), global.contentArgb)
+                        assertEquals(chatArgb, chat.backgroundArgb)
+                        assertEquals(readableTextArgb(chatArgb), chat.contentArgb)
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
     }
 
     private fun borderColor(border: BorderStroke?): Color = (requireNotNull(border).brush as SolidColor).value

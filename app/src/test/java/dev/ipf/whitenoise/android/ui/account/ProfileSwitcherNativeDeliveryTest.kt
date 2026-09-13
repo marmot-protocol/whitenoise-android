@@ -128,6 +128,8 @@ class ProfileSwitcherNativeDeliveryTest {
                 }
                 Mode.Activate -> Unit
             }
+            // The UI change must be composed before the held native read returns, as it is on a live device.
+            composeRule.waitForIdle()
             release.countDown()
             val handoff =
                 WhiteNoiseAppState::class.java
