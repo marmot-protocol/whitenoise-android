@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -33,13 +34,14 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
 import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleFillColor
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleTimestampColor
 import dev.ipf.whitenoise.android.ui.conversation.messages.replyPreviewAccentArgb
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionSummaryChip
 import dev.ipf.whitenoise.android.ui.conversation.reactions.reactionSummaryAttachment
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
-import dev.ipf.whitenoise.android.ui.settings.FontSizePreviewBubble
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -613,3 +615,27 @@ private fun retentionInput(
 private const val CUSTOM_AMOLED_ARGB = 0xFFFFC107L
 private const val OUTGOING_CUSTOM_AMOLED_ARGB = 0xFF9C27B0L
 private val screenshotControllerKey = Any()
+
+/** The Appearance font-size preview bubble, kept here for the message-chrome baselines it anchors. */
+@Composable
+private fun FontSizePreviewBubble(
+    text: String,
+    mine: Boolean,
+) {
+    val bubbleColor = messageBubbleFillColor(deleted = false, mine = mine)
+    Box(Modifier.fillMaxWidth()) {
+        Surface(
+            modifier = Modifier.align(if (mine) Alignment.CenterEnd else Alignment.CenterStart),
+            color = bubbleColor,
+            shape = RoundedCornerShape(18.dp),
+            border = messageBubbleBorder(highlighted = false, mine = mine),
+            tonalElevation = if (mine) 1.dp else 0.dp,
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            )
+        }
+    }
+}

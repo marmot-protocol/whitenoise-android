@@ -55,7 +55,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
-import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -65,9 +64,12 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelectio
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
+import dev.ipf.whitenoise.android.ui.settings.SettingsPanel
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
+import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -283,7 +285,7 @@ internal fun GroupEditScreen(
                 Modifier
                     .fillMaxSize()
                     .trackWhiteNoiseHeader(listState),
-            contentPadding = PaddingValues(Dimens.spaceLg),
+            contentPadding = PaddingValues(vertical = Dimens.spaceLg),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
         ) {
             item {
@@ -348,34 +350,37 @@ internal fun GroupEditScreen(
                 }
             }
             item {
-                SectionCard(title = stringResource(R.string.edit_group_info_title)) {
-                    val profileFieldColors =
-                        TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            disabledContainerColor = Color.Transparent,
-                            errorContainerColor = Color.Transparent,
+                SettingsSection(stringResource(R.string.edit_group_info_title))
+                SettingsPanel {
+                    Column(Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.Related)) {
+                        val profileFieldColors =
+                            TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                errorContainerColor = Color.Transparent,
+                            )
+                        GroupNameEmojiField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = stringResource(R.string.group_name),
+                            emojiPickerOpen = showEmojiPicker,
+                            onEmojiPickerClick = {
+                                if (nameEditable) showEmojiPicker = true
+                            },
+                            enabled = nameEditable,
+                            modifier = Modifier.fillMaxWidth(),
                         )
-                    GroupNameEmojiField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = stringResource(R.string.group_name),
-                        emojiPickerOpen = showEmojiPicker,
-                        onEmojiPickerClick = {
-                            if (nameEditable) showEmojiPicker = true
-                        },
-                        enabled = nameEditable,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    TextField(
-                        colors = profileFieldColors,
-                        value = description,
-                        onValueChange = { description = it },
-                        label = { Text(stringResource(R.string.description)) },
-                        minLines = 3,
-                        enabled = canEdit,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                        TextField(
+                            colors = profileFieldColors,
+                            value = description,
+                            onValueChange = { description = it },
+                            label = { Text(stringResource(R.string.description)) },
+                            minLines = 3,
+                            enabled = canEdit,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
             }
         }

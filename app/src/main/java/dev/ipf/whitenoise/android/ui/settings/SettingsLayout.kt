@@ -43,6 +43,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 /** True inside a [SettingsList], where the list owns the spacing between headings, groups and helpers. */
 internal val LocalSettingsList = staticCompositionLocalOf { false }
@@ -252,6 +253,23 @@ internal fun SettingsGroupPanel(
 }
 
 private val SettingsBottomActionElevation = 2.dp
+
+/** Free-form content on the group surface at the screen margin, for panels that are not a row list. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun SettingsPanel(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        border = amoledOutlineBorder(),
+    ) {
+        Column(Modifier.fillMaxWidth(), content = content)
+    }
+}
 
 /** A read-only row: the title over its value in the quiet supporting style, on the group's shape and fill. */
 @Suppress("FunctionNaming")

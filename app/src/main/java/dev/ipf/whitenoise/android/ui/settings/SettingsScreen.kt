@@ -8,16 +8,11 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Notifications
@@ -26,11 +21,8 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,10 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -57,10 +46,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
@@ -68,12 +55,10 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.LocalSettingsRowsInsideSectionCard
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.profile.ProfileEditScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.updates.AppUpdateEmblem
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -829,165 +814,4 @@ private fun SignOutGroup(onSignOut: () -> Unit) {
 private object SettingsHomeDefaults {
     val ProfileAvatarSize = 56.dp
     val IconSize = 24.dp
-}
-
-@Composable
-internal fun Modifier.settingsRowAmoledSurfaceBorder(shape: Shape = RoundedCornerShape(12.dp)): Modifier =
-    if (LocalSettingsRowsInsideSectionCard.current) {
-        this
-    } else {
-        clip(shape).amoledSurfaceBorder(shape)
-    }
-
-@Composable
-internal fun SelectableSettingsRow(
-    title: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    ListItem(
-        modifier =
-            Modifier
-                .settingsRowAmoledSurfaceBorder()
-                .selectable(selected = selected, onClick = onClick, role = Role.RadioButton),
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        headlineContent = { Text(title) },
-        trailingContent = {
-            if (selected) {
-                Icon(
-                    Icons.Default.Check,
-                    contentDescription = stringResource(R.string.selected),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-        },
-    )
-}
-
-/**
- * Selectable row with supporting copy and optional merged accessibility text.
- * Disabled choices remain visible so the supporting line can explain why.
- */
-@Composable
-internal fun SelectableSettingsRowWithSubtitle(
-    title: String,
-    subtitle: String,
-    selected: Boolean,
-    enabled: Boolean = true,
-    accessibilityLabel: String? = null,
-    onClick: () -> Unit,
-) {
-    val rowModifier =
-        Modifier
-            .settingsRowAmoledSurfaceBorder()
-            .selectable(
-                selected = selected,
-                enabled = enabled,
-                onClick = onClick,
-                role = Role.RadioButton,
-            )
-    ListItem(
-        modifier =
-            if (accessibilityLabel == null) {
-                rowModifier
-            } else {
-                rowModifier.semantics(mergeDescendants = true) {
-                    contentDescription = accessibilityLabel
-                }
-            },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        headlineContent = {
-            Text(
-                title,
-                color = if (enabled) Color.Unspecified else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        },
-        supportingContent = {
-            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        },
-        trailingContent = {
-            if (selected) {
-                Icon(
-                    Icons.Default.Check,
-                    contentDescription = stringResource(R.string.selected),
-                    tint =
-                        if (enabled) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                )
-            }
-        },
-    )
-}
-
-/** Renders a settings toggle with optional in-row padding for segmented lists. */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-internal fun SettingsSwitchRow(
-    title: String,
-    subtitle: String?,
-    checked: Boolean,
-    enabled: Boolean = true,
-    busy: Boolean = false,
-    switchModifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(0.dp),
-    contentSpacing: Dp = 0.dp,
-    icon: ImageVector? = null,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .settingsRowAmoledSurfaceBorder()
-            .padding(contentPadding),
-        horizontalArrangement = Arrangement.spacedBy(contentSpacing),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (icon != null) {
-            Icon(
-                icon,
-                contentDescription = null,
-                modifier = Modifier.padding(end = 16.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            if (subtitle != null) {
-                Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        if (busy) {
-            LoadingIndicator(modifier = Modifier.size(24.dp))
-        } else {
-            Switch(
-                modifier = switchModifier,
-                checked = checked,
-                enabled = enabled,
-                onCheckedChange = onCheckedChange,
-            )
-        }
-    }
-}
-
-@Composable
-internal fun SettingsRow(
-    title: String,
-    subtitle: String,
-    icon: ImageVector? = null,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    ListItem(
-        modifier =
-            modifier
-                .settingsRowAmoledSurfaceBorder()
-                .clickable(onClick = onClick),
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        leadingContent = icon?.let { { Icon(it, contentDescription = null) } },
-        headlineContent = { Text(title) },
-        supportingContent = { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-    )
 }

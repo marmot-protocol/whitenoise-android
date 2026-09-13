@@ -7,12 +7,14 @@ import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,8 +31,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.automirrored.filled.WrapText
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -39,24 +39,18 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -74,10 +68,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -89,6 +81,8 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -123,12 +117,10 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.FlowQuickActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
-import dev.ipf.whitenoise.android.ui.chats.newchat.SettingsActionRow
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
-import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -148,11 +140,17 @@ import dev.ipf.whitenoise.android.ui.settings.ChatBubbleColorsScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticRow
 import dev.ipf.whitenoise.android.ui.settings.IdentifierCopyCapsule
+import dev.ipf.whitenoise.android.ui.settings.SettingsAction
+import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsLink
+import dev.ipf.whitenoise.android.ui.settings.SettingsPanel
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
+import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
 import dev.ipf.whitenoise.android.ui.settings.chatFolderDisplayName
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -1518,71 +1516,80 @@ internal fun GroupDetailsScreen(
                 onOpenCategory = { mediaLibraryCategory = it },
             )
 
-            Column {
-                SettingsSection(stringResource(if (isDm) R.string.chat_actions else R.string.advanced))
-                GroupSwitchActionRow(
-                    icon = Icons.AutoMirrored.Filled.WrapText,
-                    title = stringResource(R.string.collapse_long_messages),
-                    subtitle = stringResource(R.string.collapse_long_messages_subtitle),
-                    checked = collapseLongMessages,
-                    onCheckedChange = {
-                        appState.updateCollapseLongMessagesInGroup(controller.group.groupIdHex, it)
-                    },
-                )
-                if (appState.ttsHasUsableEngine) {
-                    TtsAutoReadGroupActionRow(
-                        title = stringResource(R.string.tts_auto_read_title),
-                        provenanceLabel = autoReadSettingLabel,
-                        onClick = { showAutoReadPicker = true },
+            SettingsSection(stringResource(if (isDm) R.string.chat_actions else R.string.advanced))
+            SettingsGroup(modifier = Modifier.testTag("chat_info.actions")) {
+                row("collapse_long_messages") { rowContext ->
+                    SettingsSwitch(
+                        context = rowContext,
+                        title = stringResource(R.string.collapse_long_messages),
+                        checked = collapseLongMessages,
+                        onCheckedChange = {
+                            appState.updateCollapseLongMessagesInGroup(controller.group.groupIdHex, it)
+                        },
+                        subtitle = stringResource(R.string.collapse_long_messages_subtitle),
                     )
                 }
-                SettingsActionRow(
-                    icon = Icons.Default.Notifications,
-                    title = stringResource(R.string.sounds_and_notifications),
-                    value = notificationModeLabel(conversationNotifyMode),
-                    modifier = Modifier.performanceTestTag(PerformanceTestTags.GROUP_NOTIFICATION_SETTINGS),
-                    onClick = { showNotificationSettings = true },
-                )
-                SettingsActionRow(
-                    icon = Icons.Default.Palette,
-                    title = stringResource(R.string.chat_bubble_colors),
-                    onClick = { showBubbleColors = true },
-                )
-                if (isDm && dmPeerCandidate != null) {
-                    DirectDetailsContactEditorRow(
-                        appState = appState,
-                        groupIdHex = controller.group.groupIdHex,
-                        peerAccountIdHex = dmPeerAccountIdHex,
-                        isDm = isDm,
-                        readOnlyInvite = readOnlyInvite,
-                        dmPeerNpub = dmPeerNpub,
-                        activeAccountRef = appState.activeAccountRef,
-                        accounts = appState.accounts,
+                if (appState.ttsHasUsableEngine) {
+                    row("auto_read") { rowContext ->
+                        TtsAutoReadGroupActionRow(
+                            context = rowContext,
+                            title = stringResource(R.string.tts_auto_read_title),
+                            provenanceLabel = autoReadSettingLabel,
+                            onClick = { showAutoReadPicker = true },
+                        )
+                    }
+                }
+                row("notifications") { rowContext ->
+                    SettingsLink(
+                        context = rowContext,
+                        title = stringResource(R.string.sounds_and_notifications),
+                        onClick = { showNotificationSettings = true },
+                        modifier = Modifier.performanceTestTag(PerformanceTestTags.GROUP_NOTIFICATION_SETTINGS),
+                        value = notificationModeLabel(conversationNotifyMode),
+                    )
+                }
+                row("bubble_colors") { rowContext ->
+                    SettingsLink(
+                        context = rowContext,
+                        title = stringResource(R.string.chat_bubble_colors),
+                        onClick = { showBubbleColors = true },
+                    )
+                }
+                row("disappearing") { rowContext ->
+                    val readOnlyHint = stringResource(R.string.disappearing_row_hint_readonly)
+                    SettingsLink(
+                        context = rowContext,
+                        title = stringResource(R.string.disappearing_messages),
+                        // Keep a disabled button semantic for role-gated rows. A missing click action looked
+                        // enabled but silently ignored touch and accessibility activation (#2201).
+                        onClick = { showDisappearingPicker = true },
+                        modifier = Modifier.semantics { if (!canEdit) stateDescription = readOnlyHint },
+                        subtitle =
+                            stringResource(
+                                if (canEdit) {
+                                    R.string.disappearing_row_hint_admin
+                                } else {
+                                    R.string.disappearing_row_hint_readonly
+                                },
+                            ),
+                        value = disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
+                        enabled = canEdit && !mutationsBlocked,
+                        busy = activeMutation?.action == GroupMutationAction.DisappearingMessages,
                     )
                 }
             }
-
-            SettingsActionRow(
-                icon = Icons.Default.Schedule,
-                title = stringResource(R.string.disappearing_messages),
-                value = disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
-                supportingText =
-                    stringResource(
-                        if (canEdit) {
-                            R.string.disappearing_row_hint_admin
-                        } else {
-                            R.string.disappearing_row_hint_readonly
-                        },
-                    ),
-                enabled = canEdit && !mutationsBlocked,
-                inProgress = activeMutation?.action == GroupMutationAction.DisappearingMessages,
-                disabledReason =
-                    stringResource(R.string.disappearing_row_hint_readonly).takeUnless { canEdit },
-                // Keep a disabled button semantic for role-gated rows. A
-                // missing click action looked enabled but silently ignored
-                // touch and accessibility activation (#2201).
-                onClick = { showDisappearingPicker = true },
-            )
+            if (isDm && dmPeerCandidate != null) {
+                DirectDetailsContactEditorRow(
+                    appState = appState,
+                    groupIdHex = controller.group.groupIdHex,
+                    peerAccountIdHex = dmPeerAccountIdHex,
+                    isDm = isDm,
+                    readOnlyInvite = readOnlyInvite,
+                    dmPeerNpub = dmPeerNpub,
+                    activeAccountRef = appState.activeAccountRef,
+                    accounts = appState.accounts,
+                )
+            }
 
             if (showAutoReadPicker) {
                 TtsAutoReadPickerSheet(
@@ -1672,29 +1679,41 @@ internal fun GroupDetailsScreen(
                         )
                     }
                     if (!sharedGroupsExpanded && dmSharedGroups.size > SHARED_GROUPS_PREVIEW_COUNT) {
-                        FlowQuickActionRow(
-                            icon = Icons.Default.ExpandMore,
-                            title = stringResource(R.string.contact_groups_see_all),
-                            onClick = { sharedGroupsExpanded = true },
-                        )
+                        SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Related)) {
+                            row("see_all_shared_groups") { rowContext ->
+                                SettingsAction(
+                                    context = rowContext,
+                                    title = stringResource(R.string.contact_groups_see_all),
+                                    onClick = { sharedGroupsExpanded = true },
+                                    leading = {
+                                        Icon(painterResource(R.drawable.ic_expand_more), contentDescription = null)
+                                    },
+                                )
+                            }
+                        }
                     }
                 }
             }
 
-            SettingsActionRow(
-                icon = Icons.Default.Tune,
-                title = stringResource(R.string.relays),
-                value =
-                    controller.group.relays.size
-                        .toString(),
-                modifier = Modifier.testTag("chat_info.relays"),
-                onClick = { showChatRelays = true },
-            )
+            SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.technical")) {
+                row("relays") { rowContext ->
+                    SettingsLink(
+                        context = rowContext,
+                        title = stringResource(R.string.relays),
+                        onClick = { showChatRelays = true },
+                        modifier = Modifier.testTag("chat_info.relays"),
+                        value =
+                            controller.group.relays.size
+                                .toString(),
+                        leading = { Icon(painterResource(R.drawable.ic_tune), contentDescription = null) },
+                    )
+                }
+            }
 
             if (appState.developerMode) {
                 Column(
-                    Modifier.padding(horizontal = Dimens.spaceLg),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    Modifier.padding(top = WhiteNoiseSpacing.Related),
+                    verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
                 ) {
                     ConversationTranscriptActions(
                         shareInFlight = transcriptExportInFlight,
@@ -1707,7 +1726,7 @@ internal fun GroupDetailsScreen(
                         },
                     )
 
-                    SectionCard(title = stringResource(R.string.mls)) {
+                    DeveloperInfoPanel(title = stringResource(R.string.mls)) {
                         when {
                             mlsLoading ->
                                 Text(
@@ -1747,21 +1766,34 @@ internal fun GroupDetailsScreen(
             memberContent()
 
             if (!isDm && canEdit) {
-                SettingsActionRow(
-                    icon = Icons.Default.Edit,
-                    title = stringResource(R.string.edit_group_info_title),
-                    enabled = activeMutation == null && !controller.mutationInFlight,
-                    onClick = { showEditGroup = true },
-                )
-                FlowQuickActionRow(
-                    icon = Icons.Default.PersonAdd,
-                    title = stringResource(R.string.add_member),
-                    modifier = Modifier.testTag("chat_info.add_people"),
-                    enabled =
-                        memberAdministrationPresentable(controller.memberRosterState, controller.seededSelfMember) &&
-                            !mutationsBlocked,
-                    onClick = { showAddMember = true },
-                )
+                SettingsGroup(
+                    modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.management"),
+                ) {
+                    row("edit_group") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.edit_group_info_title),
+                            onClick = { showEditGroup = true },
+                            enabled = activeMutation == null && !controller.mutationInFlight,
+                            leading = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null) },
+                        )
+                    }
+                    row("add_member") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.add_member),
+                            onClick = { showAddMember = true },
+                            modifier = Modifier.testTag("chat_info.add_people"),
+                            enabled =
+                                memberAdministrationPresentable(
+                                    controller.memberRosterState,
+                                    controller.seededSelfMember,
+                                ) &&
+                                    !mutationsBlocked,
+                            leading = { Icon(painterResource(R.drawable.ic_group_add), contentDescription = null) },
+                        )
+                    }
+                }
             }
 
             Column {
@@ -1804,17 +1836,24 @@ internal fun GroupDetailsScreen(
                                 if (effective) folder to manual else null
                             }
                     }
-                SettingsActionRow(
-                    icon = Icons.Default.Folder,
-                    title = stringResource(R.string.chat_folders_title),
-                    value =
-                        folderNames
-                            .takeIf { it.isNotEmpty() }
-                            ?.map { (folder, _) -> chatFolderDisplayName(folder) }
-                            ?.joinToString(", ")
-                            ?: stringResource(R.string.chat_folders_none),
-                    onClick = { showFolderPicker = true },
-                )
+                SettingsGroup(
+                    modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.folders"),
+                ) {
+                    row("folders") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.chat_folders_title),
+                            onClick = { showFolderPicker = true },
+                            value =
+                                folderNames
+                                    .takeIf { it.isNotEmpty() }
+                                    ?.map { (folder, _) -> chatFolderDisplayName(folder) }
+                                    ?.joinToString(", ")
+                                    ?: stringResource(R.string.chat_folders_none),
+                            leading = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
+                        )
+                    }
+                }
                 if (showFolderPicker) {
                     ChatFolderPickerSheet(
                         appState = appState,
@@ -1840,53 +1879,89 @@ internal fun GroupDetailsScreen(
             // sole-admin and sole-member cases get their own confirm copy. On
             // failure the controller's lastMutationError surfaces inline here
             // (in addition to the snackbar) so the user can retry in place.
-            Column {
-                AppDivider()
+            Column(Modifier.padding(top = WhiteNoiseSpacing.Section)) {
                 val selfMember =
                     controller.members.firstOrNull { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-                if (!isDm && canEdit && selfMember != null) {
-                    DangerActionRow(
-                        icon = Icons.Default.Shield,
-                        title = stringResource(R.string.step_down_as_admin),
-                        enabled = !mutationsBlocked,
-                        inProgress = activeMutation?.action == GroupMutationAction.SelfDemoteAdmin,
-                        onClick = {
-                            pendingConfirm =
-                                if (controller.isSoleAdminWithOtherMembers) {
-                                    DetailsConfirm.StepDownSoleAdmin
-                                } else {
-                                    DetailsConfirm.StepDownAdmin(selfMember)
-                                }
-                        },
-                    )
-                }
-                if (!readOnlyInvite) {
-                    DangerActionRow(
-                        icon = Icons.Default.Archive,
-                        title =
-                            stringResource(
-                                if (controller.presentedArchived) R.string.unarchive_chat else R.string.archive_chat,
-                            ),
-                        enabled = !mutationsBlocked,
-                        inProgress = activeMutation?.action == GroupMutationAction.Archive,
-                        onClick = {
-                            runGroupMutation(
-                                action = GroupMutationAction.Archive,
-                                mutation = { controller.setArchived(!controller.presentedArchived) },
+                SettingsGroup(modifier = Modifier.testTag("chat_info.lifecycle")) {
+                    if (!isDm && canEdit && selfMember != null) {
+                        row("step_down") { rowContext ->
+                            SettingsAction(
+                                context = rowContext,
+                                title = stringResource(R.string.step_down_as_admin),
+                                onClick = {
+                                    pendingConfirm =
+                                        if (controller.isSoleAdminWithOtherMembers) {
+                                            DetailsConfirm.StepDownSoleAdmin
+                                        } else {
+                                            DetailsConfirm.StepDownAdmin(selfMember)
+                                        }
+                                },
+                                enabled = !mutationsBlocked,
+                                destructive = true,
+                                leading = {
+                                    DangerLeading(
+                                        icon = R.drawable.ic_admin_panel_settings,
+                                        inProgress = activeMutation?.action == GroupMutationAction.SelfDemoteAdmin,
+                                    )
+                                },
                             )
-                        },
-                    )
+                        }
+                    }
+                    if (!readOnlyInvite) {
+                        row("archive") { rowContext ->
+                            SettingsAction(
+                                context = rowContext,
+                                title =
+                                    stringResource(
+                                        if (controller.presentedArchived) {
+                                            R.string.unarchive_chat
+                                        } else {
+                                            R.string.archive_chat
+                                        },
+                                    ),
+                                onClick = {
+                                    runGroupMutation(
+                                        action = GroupMutationAction.Archive,
+                                        mutation = { controller.setArchived(!controller.presentedArchived) },
+                                    )
+                                },
+                                enabled = !mutationsBlocked,
+                                leading = {
+                                    DangerLeading(
+                                        icon =
+                                            if (controller.presentedArchived) {
+                                                R.drawable.ic_unarchive
+                                            } else {
+                                                R.drawable.ic_archive
+                                            },
+                                        inProgress = activeMutation?.action == GroupMutationAction.Archive,
+                                        destructive = false,
+                                    )
+                                },
+                            )
+                        }
+                    }
+                    if (controller.isSelfMember) {
+                        row("leave") { rowContext ->
+                            SettingsAction(
+                                context = rowContext,
+                                title = stringResource(if (isDm) R.string.leave_chat else R.string.leave_group),
+                                // The engine refuses Leave for disbanding/terminal groups; local delete below is the
+                                // exit for a dead group.
+                                onClick = { requestLeave(controller.title(groupTitleCopy)) },
+                                enabled = !mutationsBlocked && controller.membersLoaded && !groupTerminal,
+                                destructive = true,
+                                leading = {
+                                    DangerLeading(
+                                        icon = R.drawable.ic_logout,
+                                        inProgress = activeMutation?.action == GroupMutationAction.Leave,
+                                    )
+                                },
+                            )
+                        }
+                    }
                 }
                 if (controller.isSelfMember) {
-                    DangerActionRow(
-                        icon = Icons.AutoMirrored.Filled.Logout,
-                        title = stringResource(if (isDm) R.string.leave_chat else R.string.leave_group),
-                        // The engine refuses Leave for disbanding/terminal groups;
-                        // local delete below is the exit for a dead group.
-                        enabled = !mutationsBlocked && controller.membersLoaded && !groupTerminal,
-                        inProgress = activeMutation?.action == GroupMutationAction.Leave,
-                        onClick = { requestLeave(controller.title(groupTitleCopy)) },
-                    )
                     if (!isDm) {
                         GroupDetailsDisbandControls(
                             management = controller.managementState,
@@ -2171,68 +2246,38 @@ private fun GroupMutationErrorBanner(
     }
 }
 
+/** A developer-only fact panel: the section label over free-form diagnostic rows on the group surface. */
+@Suppress("FunctionNaming")
 @Composable
-private fun GroupSwitchActionRow(
-    icon: ImageVector,
+private fun DeveloperInfoPanel(
     title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .clickable(role = Role.Switch) { onCheckedChange(!checked) }
-                .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
-    ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXxs)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+    Column {
+        SettingsSection(title)
+        SettingsPanel {
+            Column(
+                Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.FormField),
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+                content = content,
             )
         }
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-        )
     }
 }
 
+/** A lifecycle row's glyph in the row's own colour, replaced by progress while its mutation runs. */
+@Suppress("FunctionNaming")
 @Composable
-private fun GroupActionRow(
-    icon: @Composable () -> Unit,
-    title: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
+private fun DangerLeading(
+    @DrawableRes icon: Int,
+    inProgress: Boolean,
+    destructive: Boolean = true,
 ) {
-    Surface(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .clickable(enabled = enabled, onClick = onClick),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (enabled) 0.5f else 0.28f),
-        contentColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-        shape = RoundedCornerShape(12.dp),
-        border = amoledSurfaceBorderStroke(),
-    ) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
-                icon()
-            }
-            Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        }
+    val tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+    if (inProgress) {
+        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+    } else {
+        Icon(painterResource(icon), contentDescription = null, tint = tint)
     }
 }
 
@@ -2294,7 +2339,7 @@ private fun PushDeliveryDebugSection(
     loading: Boolean,
     appState: WhiteNoiseAppState,
 ) {
-    SectionCard(title = stringResource(R.string.push_delivery)) {
+    DeveloperInfoPanel(title = stringResource(R.string.push_delivery)) {
         when {
             loading ->
                 Text(

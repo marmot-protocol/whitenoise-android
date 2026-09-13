@@ -31,6 +31,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationProvider
 import dev.ipf.whitenoise.android.audio.ConversationDictationProviderCapability
 import dev.ipf.whitenoise.android.audio.ConversationDictationProviderChoice
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
 
 /** Re-enumerates on entry and return from provider setup. This list belongs only to this UI. */
 @Composable
@@ -85,7 +86,7 @@ internal fun DictationProviderSheet(
                 }
             }
             item {
-                SelectableSettingsRowWithSubtitle(
+                WhiteNoiseDialogChoiceRow(
                     title = stringResource(R.string.dictation_provider_automatic),
                     subtitle = stringResource(R.string.dictation_provider_precedence),
                     selected = selected == null,
@@ -123,7 +124,7 @@ internal fun DictationProviderSheet(
                                 } else {
                                     choice.engineName
                                 }
-                            SelectableSettingsRowWithSubtitle(
+                            WhiteNoiseDialogChoiceRow(
                                 title = engine,
                                 subtitle = capability,
                                 accessibilityLabel = "${provider.appName}, $engine, $capability",

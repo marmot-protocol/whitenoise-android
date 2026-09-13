@@ -57,6 +57,7 @@ import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
+import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
 @Composable
@@ -273,6 +274,11 @@ internal fun SectionHeader(
     )
 }
 
+/**
+ * One standalone action row on the group surface: leading glyph (or progress), title, optional value and
+ * supporting text. Disabled rows keep a button semantic and explain themselves through [disabledReason].
+ */
+@Suppress("LongParameterList", "LongMethod", "FunctionNaming")
 @Composable
 internal fun SettingsActionRow(
     icon: ImageVector,
@@ -288,61 +294,68 @@ internal fun SettingsActionRow(
     disabledReason: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
-    Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .then(
-                    if (onClick == null) {
-                        Modifier
-                    } else {
-                        Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-                    },
-                ).then(
-                    if (!enabled && disabledReason != null) {
-                        Modifier.semantics { stateDescription = disabledReason }
-                    } else {
-                        Modifier
-                    },
-                ).padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm)
-                .alpha(if (enabled) 1f else 0.45f),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        border = amoledOutlineBorder(enabled),
     ) {
-        Box(
-            modifier = Modifier.size(24.dp),
-            contentAlignment = Alignment.Center,
+        Row(
+            modifier =
+                modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp)
+                    .then(
+                        if (onClick == null) {
+                            Modifier
+                        } else {
+                            Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+                        },
+                    ).then(
+                        if (!enabled && disabledReason != null) {
+                            Modifier.semantics { stateDescription = disabledReason }
+                        } else {
+                            Modifier
+                        },
+                    ).padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm)
+                    .alpha(if (enabled) 1f else 0.45f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
         ) {
-            if (inProgress) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-            } else {
-                Icon(icon, contentDescription = null, tint = iconTint)
+            Box(
+                modifier = Modifier.size(24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (inProgress) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(icon, contentDescription = null, tint = iconTint)
+                }
             }
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXxs)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, color = titleColor)
-            if (value != null) {
-                Text(
-                    value,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXxs)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge, color = titleColor)
+                if (value != null) {
+                    Text(
+                        value,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (supportingText != null) {
+                    Text(
+                        supportingText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
-            if (supportingText != null) {
-                Text(
-                    supportingText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            if (comingSoon && !inProgress) {
+                ComingSoonBadge()
             }
-        }
-        if (comingSoon && !inProgress) {
-            ComingSoonBadge()
         }
     }
 }

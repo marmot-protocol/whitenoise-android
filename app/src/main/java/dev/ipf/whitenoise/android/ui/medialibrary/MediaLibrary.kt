@@ -26,10 +26,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -60,7 +57,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -80,7 +76,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.media.FullScreenMediaViewer
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaImageGridTile
@@ -406,49 +401,6 @@ internal fun sharedMediaFallbackContent(
             SharedMediaFallback(SharedMediaFallbackType.Urls, urlCount)
         else -> SharedMediaFallback(SharedMediaFallbackType.Generic)
     }
-
-@Composable
-internal fun SharedMediaFallbackRow(
-    fallback: SharedMediaFallback,
-    onSeeAll: () -> Unit,
-) {
-    val icon =
-        when (fallback.type) {
-            SharedMediaFallbackType.Generic -> Icons.Default.Image
-            SharedMediaFallbackType.Voice -> Icons.Default.Mic
-            SharedMediaFallbackType.Files -> Icons.Default.Description
-            SharedMediaFallbackType.Urls -> Icons.Default.Language
-        }
-    val label =
-        when (fallback.type) {
-            SharedMediaFallbackType.Generic -> stringResource(R.string.shared_media_view)
-            SharedMediaFallbackType.Voice ->
-                pluralStringResource(R.plurals.shared_media_voice_count, fallback.count, fallback.count)
-            SharedMediaFallbackType.Files ->
-                pluralStringResource(R.plurals.shared_media_files_count, fallback.count, fallback.count)
-            SharedMediaFallbackType.Urls ->
-                pluralStringResource(R.plurals.shared_media_links_count, fallback.count, fallback.count)
-        }
-    SectionCard(title = stringResource(R.string.shared_media)) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .amoledSurfaceBorder(RoundedCornerShape(8.dp))
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { onSeeAll() }
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(icon, contentDescription = null)
-            Text(
-                label,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
-    }
-}
 
 /** Opens the four native per-chat categories from the same bounded, visibility-filtered source. */
 @Composable

@@ -111,8 +111,8 @@ class GroupEditScreenTitleTest {
         val screenBody = functionBody("GroupEditScreen")
 
         assertTrue(
-            "GroupEditScreen details card must use edit_group_info_title",
-            Regex("""SectionCard\s*\(\s*title\s*=\s*stringResource\s*\(\s*R\.string\.edit_group_info_title""")
+            "GroupEditScreen details panel must use edit_group_info_title",
+            Regex("""SettingsSection\s*\(\s*stringResource\s*\(\s*R\.string\.edit_group_info_title""")
                 .containsMatchIn(screenBody),
         )
     }
