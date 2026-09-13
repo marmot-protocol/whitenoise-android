@@ -42,8 +42,9 @@ class NewMessagePresentationTest {
         composeRule.onNodeWithText(context.getString(R.string.new_group)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.new_message_connect_qr)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.new_message_invite_friend)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.show_my_qr_code)).performClick()
-        assertEquals(listOf("group", "scan", "invite", "qr"), calls)
+        composeRule.onNodeWithText(context.getString(R.string.show_my_qr_code)).assertDoesNotExist()
+        composeRule.onNodeWithText("New Message").assertExists()
+        assertEquals(listOf("group", "scan", "invite"), calls)
     }
 
     /** Material long-press opens the profile and does not also activate the chat tap callback. */
@@ -161,7 +162,7 @@ class NewMessagePresentationTest {
                     true,
                     null,
                     null,
-                    NewMessageActions({}, {}, {}, {}, {}, { calls += "retrySearch" }, {}, {}, {}, {}, {}),
+                    NewMessageActions({}, {}, {}, {}, { calls += "retrySearch" }, {}, {}, {}, {}, {}),
                 )
             }
         }
@@ -195,7 +196,6 @@ class NewMessagePresentationTest {
                         {},
                         { calls += "group" },
                         { calls += "scan" },
-                        { calls += "qr" },
                         { calls += "invite" },
                         { calls += "retrySearch" },
                         { calls += "retryChat" },

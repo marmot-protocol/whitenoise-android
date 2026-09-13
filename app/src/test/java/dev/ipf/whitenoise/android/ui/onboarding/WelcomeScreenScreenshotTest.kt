@@ -139,6 +139,7 @@ class WelcomeScreenScreenshotTest {
                 }
             }
         }
+        if (!signIn && !retained && !offline) composeRule.assertWelcomeActionsAtBottom()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 

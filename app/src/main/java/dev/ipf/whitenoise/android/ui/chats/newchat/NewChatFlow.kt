@@ -52,12 +52,10 @@ import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
 import dev.ipf.whitenoise.android.state.startProfileChatInviteDetail
-import dev.ipf.whitenoise.android.ui.profile.ProfileQrSheet
 import dev.ipf.whitenoise.android.ui.profile.profileQrContentForNpub
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
-import dev.ipf.whitenoise.android.ui.qr.QrScanResult
-import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
+import dev.ipf.whitenoise.android.ui.settings.ShareConnectScreen
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 internal enum class NewGroupCreateStage {
@@ -371,7 +369,6 @@ private fun NewMessageAccountScreen(
     val query = queryState.text.toString()
     var scannerSession by remember { mutableStateOf<Long?>(null) }
     var nextScannerSession by remember { mutableStateOf(0L) }
-    var showMyQr by remember { mutableStateOf(false) }
     var creatingHex by remember { mutableStateOf<String?>(null) }
     var startChatError by remember { mutableStateOf<StartChatErrorUiState?>(null) }
     DisposableEffect(session) {
@@ -390,15 +387,14 @@ private fun NewMessageAccountScreen(
     val inviteMessage = stringResource(R.string.invite_message)
 
     fun shareInvite() {
-        if (!session.isCurrent() || creatingHex != null) return
+        if (!session.isCurrent() || creatingHex != null || scannerSession != null) return
         launchInviteShare(context, inviteMessage, inviteTitle)
             .onFailure { appState.presentOutboundShareFailure("INVITE_SHARE", it) }
     }
 
     fun leaveScreen(action: () -> Unit) {
-        if (!session.isCurrent() || creatingHex != null) return
+        if (!session.isCurrent() || creatingHex != null || scannerSession != null) return
         scannerSession = null
-        showMyQr = false
         session.dispose()
         action()
     }
@@ -408,11 +404,11 @@ private fun NewMessageAccountScreen(
     // otherwise the process-lifetime create would yank the user into the new
     // conversation seconds after they left this screen.
     BackHandler {
-        leaveScreen(onBack)
+        if (scannerSession != null && session.isCurrent()) scannerSession = null else leaveScreen(onBack)
     }
 
     val activeHex = appState.activeAccount?.accountIdHex
-    val myNpub = activeHex?.let(appState::npub)
+    val myNpub = activeHex?.let(appState::npubForDisplay)
     val myQrContent = myNpub?.let(::profileQrContentForNpub)
     val candidates =
         remember(appState.chatListItems, activeHex, appState.profileRevisionForCompose) {
@@ -448,7 +444,8 @@ private fun NewMessageAccountScreen(
         retryGroupIdHex: String? = null,
         existingDmGroupIdHex: String? = null,
     ) {
-        if (!session.isCurrent() || creatingHex != null || queryState.text.toString() != query) return
+        val canOpen = session.isCurrent() && creatingHex == null && scannerSession == null
+        if (!canOpen || queryState.text.toString() != query) return
         startChatError = null
         creatingHex = hexForProgress
         scannerSession = null
@@ -537,7 +534,11 @@ private fun NewMessageAccountScreen(
             )
         }
 
-    fun canInteract() = session.isCurrent() && creatingHex == null && queryState.text.toString() == query
+    fun canInteract() =
+        session.isCurrent() &&
+            creatingHex == null &&
+            scannerSession == null &&
+            queryState.text.toString() == query
 
     fun presentPerson(candidate: RecipientSearch.Candidate) {
         if (!canInteract()) return
@@ -547,81 +548,69 @@ private fun NewMessageAccountScreen(
             appState.presentProfile(candidate.npub)
         }
     }
-    NewMessageContent(
-        queryState = queryState,
-        people = people,
-        search = userSearch,
-        identifierQuery = identifierQuery,
-        resolvingIdentifier = identifierQuery && resolution.state == RecipientPreviewState.Resolving,
-        showMyQrEnabled = myQrContent != null,
-        creatingHex = creatingHex,
-        error = startChatError,
-        retryableIdentifier = ChatListIdentifierSearch.classify(query) is ChatListIdentifierSearch.Identifier.Nip05,
-        actions =
-            NewMessageActions(
-                back = { leaveScreen(onBack) },
-                newGroup = { leaveScreen(onNewGroup) },
-                scanQr = {
-                    if (canInteract()) {
-                        nextScannerSession++
-                        scannerSession = nextScannerSession
-                    }
-                },
-                showMyQr = { if (canInteract() && myQrContent != null) showMyQr = true },
-                invite = ::shareInvite,
-                retrySearch = { if (canInteract()) searchRetry++ },
-                retryChat = {
-                    startChatError?.let { error ->
-                        openOrCreateChat(error.npub, error.progressHex, error.recipientName, error.retryGroupIdHex)
-                    }
-                },
-                pasteRejected = {
-                    if (session.isCurrent()) appState.present(R.string.error_invalid_identity_reference)
-                },
-                person = { candidate ->
-                    if (canInteract()) {
-                        if (candidate.source == null && candidate.searchProfile != null) {
-                            presentPerson(candidate)
-                        } else {
-                            startOrOpenConversation(candidate)
-                        }
-                    }
-                },
-                profile = ::presentPerson,
-                copyError = { if (canInteract()) clipboard.setText(AnnotatedString(it)) },
-            ),
-    )
-
-    val scanSession = scannerSession
-    if (scanSession != null && creatingHex == null && session.isCurrent()) {
-        scannerContent(
-            { if (scannerSession == scanSession) scannerSession = null },
-            scan@{ raw ->
-                if (!session.isCurrent() || creatingHex != null || scannerSession != scanSession) return@scan
-                scannerSession = null
-                when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.ViewProfile)) {
-                    is QrScanOutcome.OpenProfileNpub -> {
-                        queryState.replaceRecipientText(outcome.npub)
-                        startChatError = null
-                    }
-                    is QrScanOutcome.OpenProfileNprofile -> {
-                        queryState.replaceRecipientText(outcome.accountIdHex)
-                        startChatError = null
-                    }
-                    QrScanOutcome.Invalid ->
-                        appState.present(R.string.error_not_white_noise_profile_qr, copyable = true)
-                    is QrScanOutcome.FillRecipientQuery ->
-                        appState.present(R.string.error_not_white_noise_profile_qr, copyable = true)
-                }
-            },
-        )
-    }
-    if (showMyQr && activeHex != null && myQrContent != null) {
-        ProfileQrSheet(
+    val connectSession = scannerSession
+    if (connectSession != null && creatingHex == null && session.isCurrent()) {
+        ShareConnectScreen(
             appState = appState,
-            accountIdHex = activeHex,
-            onDismiss = { showMyQr = false },
-            showScan = false,
+            onBack = { if (scannerSession == connectSession) scannerSession = null },
+            isCurrent = { session.isCurrent() && creatingHex == null && scannerSession == connectSession },
+            onScannedProfile = scanned@{ outcome ->
+                if (!session.isCurrent() || creatingHex != null || scannerSession != connectSession) return@scanned
+                val recipient =
+                    when (outcome) {
+                        is QrScanOutcome.OpenProfileNpub -> outcome.npub
+                        is QrScanOutcome.OpenProfileNprofile -> outcome.accountIdHex
+                        QrScanOutcome.Invalid, is QrScanOutcome.FillRecipientQuery -> return@scanned
+                    }
+                scannerSession = null
+                queryState.replaceRecipientText(recipient)
+                startChatError = null
+            },
+            scannerContent = scannerContent,
+        )
+    } else {
+        NewMessageContent(
+            queryState = queryState,
+            people = people,
+            search = userSearch,
+            identifierQuery = identifierQuery,
+            resolvingIdentifier = identifierQuery && resolution.state == RecipientPreviewState.Resolving,
+            connectQrEnabled = myQrContent != null,
+            creatingHex = creatingHex,
+            error = startChatError,
+            retryableIdentifier = ChatListIdentifierSearch.classify(query) is ChatListIdentifierSearch.Identifier.Nip05,
+            actions =
+                NewMessageActions(
+                    back = { leaveScreen(onBack) },
+                    newGroup = { leaveScreen(onNewGroup) },
+                    scanQr = {
+                        if (canInteract() && myQrContent != null) {
+                            nextScannerSession++
+                            scannerSession = nextScannerSession
+                        }
+                    },
+                    invite = ::shareInvite,
+                    retrySearch = { if (canInteract()) searchRetry++ },
+                    retryChat = {
+                        startChatError?.let { error ->
+                            openOrCreateChat(error.npub, error.progressHex, error.recipientName, error.retryGroupIdHex)
+                        }
+                    },
+                    pasteRejected = {
+                        if (session.isCurrent()) appState.present(R.string.error_invalid_identity_reference)
+                    },
+                    person = { candidate ->
+                        if (canInteract()) {
+                            if (candidate.source == null && candidate.searchProfile != null) {
+                                presentPerson(candidate)
+                            } else {
+                                startOrOpenConversation(candidate)
+                            }
+                        }
+                    },
+                    profile = ::presentPerson,
+                    copyError = { if (canInteract()) clipboard.setText(AnnotatedString(it)) },
+                ),
         )
     }
 }

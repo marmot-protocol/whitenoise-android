@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
@@ -91,6 +94,40 @@ class ActionColorScreenBehaviorTest {
         composeRule.onNodeWithTag("action_color.reset").assertIsEnabled().performClick()
         composeRule.onNodeWithTag("action_color.save").assertIsEnabled().performClick()
         composeRule.runOnIdle { assertNull(appState.actionColorArgb(BubbleTheme.Light)) }
+    }
+
+    /** Resetting a saved white light accent restores dark actions only after Save; dark mode keeps light actions. */
+    @Test
+    fun resetWhiteAccentRestoresThemeActionsAfterSave() {
+        appState.updateActionColor(BubbleTheme.Light, 0xFFFFFFFFL)
+        var primary = Color.Unspecified
+        var onPrimary = Color.Unspecified
+        composeRule.setContent {
+            val dark = appState.themeMode == AppThemeMode.Dark
+            val theme = if (dark) BubbleTheme.Dark else BubbleTheme.Light
+            WhiteNoiseTheme(darkTheme = dark, accentColorArgb = appState.actionColorArgb(theme)) {
+                val scheme = MaterialTheme.colorScheme
+                SideEffect {
+                    primary = scheme.primary
+                    onPrimary = scheme.onPrimary
+                }
+                ActionColorScreen(appState = appState, onBack = { backCount++ })
+            }
+        }
+        composeRule.runOnIdle { assertEquals(Color.White, primary) }
+        composeRule.onNodeWithTag("action_color.reset").performClick()
+        composeRule.runOnIdle { assertEquals(Color.White, primary) }
+        composeRule.onNodeWithTag("action_color.save").performClick()
+        composeRule.runOnIdle {
+            assertNull(appState.actionColorArgb(BubbleTheme.Light))
+            assertEquals(Color(0xFF171717), primary)
+            assertEquals(Color.White, onPrimary)
+            appState.updateThemeMode(AppThemeMode.Dark)
+        }
+        composeRule.runOnIdle {
+            assertEquals(Color(0xFFF5F5F5), primary)
+            assertEquals(Color(0xFF171717), onPrimary)
+        }
     }
 
     /** An invalid hex holds Save and explains the format until the field is valid again. */

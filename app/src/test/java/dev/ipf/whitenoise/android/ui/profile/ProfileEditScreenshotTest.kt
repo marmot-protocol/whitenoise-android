@@ -45,6 +45,9 @@ class ProfileEditScreenshotTest {
     /** Editing reveals the separate image-source controls and pinned Save. */
     @Test fun profileEditingLight() = capture("profile_editing_light", editing = true)
 
+    /** Edit and Suggest name use light action text against the dark form surfaces. */
+    @Test fun profileEditingDark() = capture("profile_editing_dark", editing = true, dark = true)
+
     /** Long RTL text and twice-sized type use a scrollable form beneath the pinned Save. */
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h780dp-mdpi")

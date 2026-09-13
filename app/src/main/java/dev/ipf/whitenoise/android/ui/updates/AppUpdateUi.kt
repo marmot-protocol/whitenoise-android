@@ -62,7 +62,7 @@ internal fun AppUpdateEmblem(contentDescription: String? = null) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            painterResource(R.drawable.ic_download),
+            painterResource(R.drawable.ic_app_update_download),
             contentDescription = contentDescription,
             modifier = Modifier.size(20.dp),
             tint = AppUpdateEmblemForeground,

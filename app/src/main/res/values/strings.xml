@@ -1668,7 +1668,7 @@
     <string name="contacts">Contacts</string>
     <string name="next">Next</string>
     <string name="no_matches">No matches</string>
-    <string name="new_message">New message</string>
+    <string name="new_message">New Message</string>
     <string name="search_people_hint">Name, Nostr address, or npub</string>
     <string name="user_search_searching">Searching the network…</string>
     <string name="user_search_incomplete">Some network results may be missing.</string>
@@ -1733,6 +1733,9 @@
     <string name="group_add_members_after_create">You can add members after creating the group.</string>
     <string name="confirm_sole_admin_transfer_then_leave_message">You\'re the only admin. %1$s becomes admin and you leave the group.</string>
     <string name="app_updates">App updates</string>
+    <string name="app_update_row_unknown">Check for updates</string>
+    <string name="app_update_row_current">Up to date</string>
+    <string name="app_update_row_available">Version %1$s is available on Zapstore.</string>
     <string name="app_update_settings_title">Zapstore release</string>
     <string name="app_update_settings_unknown">Installed: %1$s — Latest: unknown — tap to check</string>
     <string name="app_update_settings_check_failed">Couldn\'t check for updates. Tap to retry.</string>

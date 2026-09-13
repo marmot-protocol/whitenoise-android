@@ -2133,6 +2133,9 @@
 
     <string name="chat_selection_title">Seleziona chat</string>
     <string name="chats_check_relays">Controlla i relay</string>
+    <string name="app_update_row_unknown">Controlla aggiornamenti</string>
+    <string name="app_update_row_current">Aggiornata</string>
+    <string name="app_update_row_available">La versione %1$s è disponibile su Zapstore.</string>
     <string name="audit_upload_title">Condividi log tecnici</string>
     <string name="audit_upload_subtitle">Invia automaticamente i log diagnostici a White Noise, separatamente dalla condivisione dei dati di utilizzo.</string>
     <string name="audit_upload_confirm_title">Condividere i log tecnici con White Noise?</string>
