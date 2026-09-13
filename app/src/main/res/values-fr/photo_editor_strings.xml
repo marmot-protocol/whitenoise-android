@@ -16,21 +16,18 @@
     <string name="photo_editor_crop_three_four">3:4</string>
     <string name="photo_editor_crop_sixteen_nine">16:9</string>
     <string name="photo_editor_crop_nine_sixteen">9:16</string>
-    <string name="photo_editor_color">Couleur de dessin</string>
     <string name="photo_editor_color_selected">%1$s, sélectionné</string>
     <string name="photo_editor_color_red">Rouge</string>
     <string name="photo_editor_color_yellow">Jaune</string>
     <string name="photo_editor_color_green">Vert</string>
     <string name="photo_editor_color_blue">Bleu</string>
     <string name="photo_editor_color_white">Blanc</string>
-    <string name="photo_editor_width">Épaisseur du trait</string>
     <string name="photo_editor_width_small">Fine</string>
     <string name="photo_editor_width_medium">Moyenne</string>
     <string name="photo_editor_width_large">Épaisse</string>
     <string name="photo_editor_width_extra_large">Très large</string>
     <string name="photo_editor_quality">Qualité de sortie</string>
     <string name="photo_editor_quality_sheet_description">Choisissez comment cette photo sera envoyée.</string>
-    <string name="photo_editor_quality_low">Faible</string>
     <string name="photo_editor_quality_standard">Standard</string>
     <string name="photo_editor_quality_standard_description">Plus rapide, utilise moins de données</string>
     <string name="photo_editor_quality_hd_description">Plus nette, utilise plus de données</string>
@@ -50,9 +47,6 @@
     <string name="photo_editor_discard_title">Ignorer les modifications ?</string>
     <string name="photo_editor_discard_message">Votre pièce jointe d’origine restera inchangée.</string>
     <string name="photo_editor_discard">Ignorer les modifications</string>
-    <string name="photo_editor_done">Terminé</string>
-    <string name="photo_editor_discard_operation_title">Ignorer cette opération ?</string>
-    <string name="photo_editor_discard_operation_message">Les modifications apportées depuis l’ouverture de cet outil seront supprimées.</string>
     <string name="photo_editor_limit_strokes">Limite de dessin atteinte. Annulez ou réinitialisez pour continuer.</string>
     <string name="photo_editor_limit_points">Ce trait a été simplifié pour préserver la fluidité de l’édition.</string>
     <string name="photo_editor_save_failed">Impossible d’enregistrer la photo modifiée. La pièce jointe précédente est inchangée.</string>
@@ -61,5 +55,4 @@
     <string name="photo_editor_not_editable_source">Cette image ne peut pas être modifiée en toute sécurité.</string>
     <string name="photo_editor_source_unavailable">La photo préparée peut toujours être envoyée, mais sa source de modification originale n’est pas disponible.</string>
     <string name="photo_editor_prepared">Photo préparée</string>
-    <string name="photo_editor_send_as_file">Envoyée comme fichier ; la modification de photo n’est pas disponible.</string>
 </resources>

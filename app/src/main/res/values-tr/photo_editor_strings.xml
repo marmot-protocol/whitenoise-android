@@ -16,21 +16,18 @@
     <string name="photo_editor_crop_three_four">3:4</string>
     <string name="photo_editor_crop_sixteen_nine">16:9</string>
     <string name="photo_editor_crop_nine_sixteen">9:16</string>
-    <string name="photo_editor_color">Çizim rengi</string>
     <string name="photo_editor_color_selected">%1$s, seçili</string>
     <string name="photo_editor_color_red">Kırmızı</string>
     <string name="photo_editor_color_yellow">Sarı</string>
     <string name="photo_editor_color_green">Yeşil</string>
     <string name="photo_editor_color_blue">Mavi</string>
     <string name="photo_editor_color_white">Beyaz</string>
-    <string name="photo_editor_width">Çizgi kalınlığı</string>
     <string name="photo_editor_width_small">Küçük</string>
     <string name="photo_editor_width_medium">Orta</string>
     <string name="photo_editor_width_large">Büyük</string>
     <string name="photo_editor_width_extra_large">Çok büyük</string>
     <string name="photo_editor_quality">Çıktı kalitesi</string>
     <string name="photo_editor_quality_sheet_description">Bu fotoğrafın nasıl gönderileceğini seçin.</string>
-    <string name="photo_editor_quality_low">Düşük</string>
     <string name="photo_editor_quality_standard">Standart</string>
     <string name="photo_editor_quality_standard_description">Daha hızlı, daha az veri kullanır</string>
     <string name="photo_editor_quality_hd_description">Daha net, daha fazla veri kullanır</string>
@@ -50,9 +47,6 @@
     <string name="photo_editor_discard_title">Fotoğraf düzenlemeleri silinsin mi?</string>
     <string name="photo_editor_discard_message">Orijinal ekiniz değişmeden kalacak.</string>
     <string name="photo_editor_discard">Düzenlemeleri sil</string>
-    <string name="photo_editor_done">Bitti</string>
-    <string name="photo_editor_discard_operation_title">Bu işlem iptal edilsin mi?</string>
-    <string name="photo_editor_discard_operation_message">Bu araç açıldıktan sonra yapılan değişiklikler kaldırılacak.</string>
     <string name="photo_editor_limit_strokes">Çizim sınırına ulaşıldı. Devam etmek için geri alın veya sıfırlayın.</string>
     <string name="photo_editor_limit_points">Düzenlemeyi akıcı tutmak için bu çizgi sadeleştirildi.</string>
     <string name="photo_editor_save_failed">Düzenlenen fotoğraf kaydedilemedi. Önceki ek değiştirilmedi.</string>
@@ -61,5 +55,4 @@
     <string name="photo_editor_not_editable_source">Bu görsel güvenli şekilde düzenlenemiyor.</string>
     <string name="photo_editor_source_unavailable">Hazırlanan fotoğraf gönderilebilir ancak orijinal düzenleme kaynağı kullanılamıyor.</string>
     <string name="photo_editor_prepared">Hazırlanan fotoğraf</string>
-    <string name="photo_editor_send_as_file">Dosya olarak gönderildi; fotoğraf düzenleme kullanılamıyor.</string>
 </resources>
