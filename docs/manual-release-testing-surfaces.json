@@ -19680,6 +19680,51 @@
         "test_ids": [
           "GRP-001"
         ]
+      },
+      {
+        "surface": "string:chat_list_search_mode_all",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchAttachmentModes.kt",
+        "anchor": "R.string.chat_list_search_mode_all",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "string:library_all",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchAttachmentModes.kt",
+        "anchor": "R.string.library_all",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "string:library_audio",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchAttachmentModes.kt",
+        "anchor": "R.string.library_audio",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "string:library_files",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchAttachmentModes.kt",
+        "anchor": "R.string.library_files",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "string:library_photos_videos",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchAttachmentModes.kt",
+        "anchor": "R.string.library_photos_videos",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
       }
     ],
     "manifest_permissions": [
