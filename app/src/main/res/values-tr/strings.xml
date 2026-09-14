@@ -44,6 +44,11 @@
     <string name="chat_list_search_chat_chip">Sohbet: %1$s</string>
     <string name="chat_list_search_sender_chip">Gönderen: %1$s</string>
     <string name="chat_list_search_no_folders">Klasör yok</string>
+    <string name="chat_list_search_mode_all">Tümü</string>
+    <string name="library_photos_videos">Fotoğraflar ve videolar</string>
+    <string name="library_files">Dosyalar</string>
+    <string name="library_audio">Ses</string>
+    <string name="library_all">Tüm ekler</string>
     <string name="chat_list_search_filter_remove">Filtreyi kaldır: %1$s</string>
     <string name="chat_list_filter_all">Tümü</string>
     <string name="chat_list_filter_unread">Okunmamış</string>
@@ -1226,6 +1231,7 @@
     <string name="disappearing_1_day">1 gün</string>
     <string name="disappearing_90_days">3 ay</string>
     <string name="disappearing_custom">Özel süre</string>
+    <string name="disappearing_custom_value">Özel süre: %1$s</string>
     <string name="disappearing_days_format">%1$d gün</string>
     <string name="disappearing_hours_format">%1$d saat</string>
     <string name="disappearing_minutes_format">%1$d dakika</string>
@@ -1773,6 +1779,9 @@
     <string name="find_web_image">Web\'de Resim Bul</string>
     <string name="profile_remove_banner">Bannerı kaldır</string>
     <string name="remove_photo">Fotoğrafı Kaldır</string>
+    <string name="choose_photos">Fotoğraflardan seç</string>
+    <string name="choose_files">Dosyalardan seç</string>
+    <string name="group_emoji_create">Emojiden oluştur</string>
     <string name="profile_suggest_name">İsim öner</string>
     <string name="profile_lightning_address">Lightning adresi</string>
     <string name="profile_image_failed">Bu resim yüklenemedi. Başka bir resim seçin veya tekrar deneyin.</string>

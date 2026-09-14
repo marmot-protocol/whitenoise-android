@@ -996,6 +996,8 @@ class LocalizationResourceTest {
             setOf(
                 // Two translated labels joined by locale-independent punctuation.
                 "developer_work_status",
+                // "Audio" is the established media label in German, Spanish, French and Italian.
+                "library_audio",
                 // Pure positional-format string ("current/total"); no
                 // translatable text, identical across every locale by design.
                 "conversation_search_match_count",

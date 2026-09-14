@@ -5,7 +5,6 @@ import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.MessageSearchConstraints
 import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
-import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
@@ -76,15 +75,20 @@ internal fun messageSearchConstraintsFor(
 /** Picker choices: the account's folders, the chats in the current scope and everyone who writes in them. */
 internal fun globalSearchFilterOptions(
     appState: WhiteNoiseAppState,
-    folders: List<ChatFolder>,
+    folders: List<GlobalSearchFolderOption>,
     scopedChats: List<ChatListItem>,
     titleCopy: GroupTitleCopy,
 ): GlobalSearchFilterOptions =
     GlobalSearchFilterOptions(
-        folders = folders.map { GlobalSearchFolderOption(it.id, it.name) },
+        folders = folders,
         chats =
             scopedChats.map { item ->
-                val peer = item.presentationOtherMemberAccount?.takeIf { item.isDm() }
+                val peer =
+                    GroupProjector.avatarAccount(
+                        item.group,
+                        item.presentationOtherMemberAccount,
+                        item.presentationMemberCount,
+                    )
                 WhiteNoisePickerItem(
                     id = canonicalChatListGroupId(item.group.groupIdHex),
                     title = chatListItemDisplayTitle(item, appState, titleCopy),

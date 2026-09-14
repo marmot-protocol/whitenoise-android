@@ -321,11 +321,10 @@ internal fun ChatRow(
                     size = 52.dp,
                     // A group without its own image shows its monogram, never a
                     // member's photo; only direct chats borrow the peer's picture.
-                    fallbackPictureUrl =
-                        item.selectedAvatarUrl?.takeIf { item.isDm() }
-                            ?: avatarAccount
-                                ?.takeIf { item.selectedPresentation == null || item.isDm() }
-                                ?.let { appState.avatarUrl(it) },
+                    // Only the account the projector names (the peer of an unnamed pair, an inviter)
+                    // lends its picture; MDK's selected avatar for a named group is ignored, as the
+                    // conversation header does.
+                    fallbackPictureUrl = avatarAccount?.let { item.selectedAvatarUrl ?: appState.avatarUrl(it) },
                     firstFrameAvatar = item.firstFrameAvatar,
                 )
                 if (pinned) {

@@ -416,10 +416,12 @@ internal fun ChatsScreen(
         ) {
             messageSearchConstraintsFor(globalSearchState)
         }
-    val globalSearchFolderNames = remember(accountFolders) { accountFolders.associate { it.id to it.name } }
+    val globalSearchFolderOptions = accountFolders.map { GlobalSearchFolderOption(it.id, chatFolderDisplayName(it)) }
+    val globalSearchFolderNames =
+        remember(globalSearchFolderOptions) { globalSearchFolderOptions.associate { it.id to it.name } }
     val globalSearchFilterOptions =
-        remember(accountFolders, folderTypeScopedList, groupTitleCopy, appState.profileRevisionForCompose) {
-            globalSearchFilterOptions(appState, accountFolders, folderTypeScopedList, groupTitleCopy)
+        remember(globalSearchFolderOptions, folderTypeScopedList, groupTitleCopy, appState.profileRevisionForCompose) {
+            globalSearchFilterOptions(appState, globalSearchFolderOptions, folderTypeScopedList, groupTitleCopy)
         }
     // Deleted folders and chats outside the folder / type scope leave the filters (prototype `reconcile`).
     LaunchedEffect(globalSearchState.isOpen, accountFolders, folderTypeScopedList) {
@@ -1325,6 +1327,16 @@ internal fun ChatsScreen(
                             onGlobalSearchStateChange(GlobalSearchTransitions::clearAllFilters)
                         },
                     )
+                    if (searchOpen) {
+                        GlobalSearchAttachmentModes(
+                            state = globalSearchState,
+                            onSelectionChange = { selection ->
+                                onGlobalSearchStateChange { state ->
+                                    GlobalSearchTransitions.setContentFilterSelection(state, selection)
+                                }
+                            },
+                        )
+                    }
                 }
             }
         },

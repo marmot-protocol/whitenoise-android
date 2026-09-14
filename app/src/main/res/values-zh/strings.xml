@@ -43,6 +43,11 @@
     <string name="chat_list_search_chat_chip">聊天：%1$s</string>
     <string name="chat_list_search_sender_chip">发送者：%1$s</string>
     <string name="chat_list_search_no_folders">没有文件夹</string>
+    <string name="chat_list_search_mode_all">全部</string>
+    <string name="library_photos_videos">照片和视频</string>
+    <string name="library_files">文件</string>
+    <string name="library_audio">音频</string>
+    <string name="library_all">所有附件</string>
     <string name="chat_list_search_filter_remove">移除筛选：%1$s</string>
     <string name="chat_list_filter_all">全部</string>
     <string name="chat_list_filter_unread">未读</string>
@@ -1207,6 +1212,7 @@
     <string name="disappearing_1_day">1 天</string>
     <string name="disappearing_90_days">3 个月</string>
     <string name="disappearing_custom">自定义时间</string>
+    <string name="disappearing_custom_value">自定义时间：%1$s</string>
     <string name="disappearing_days_format">%1$d 天</string>
     <string name="disappearing_hours_format">%1$d 小时</string>
     <string name="disappearing_minutes_format">%1$d 分钟</string>
@@ -1751,6 +1757,9 @@
     <string name="find_web_image">在网络上查找图像</string>
     <string name="profile_remove_banner">移除横幅</string>
     <string name="remove_photo">删除照片</string>
+    <string name="choose_photos">从照片中选择</string>
+    <string name="choose_files">从文件中选择</string>
+    <string name="group_emoji_create">用表情符号创建</string>
     <string name="profile_suggest_name">建议名称</string>
     <string name="profile_lightning_address">Lightning 地址</string>
     <string name="profile_image_failed">无法加载此图片。请选择其他图片或重试。</string>

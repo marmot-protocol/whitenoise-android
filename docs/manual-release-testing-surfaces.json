@@ -1059,6 +1059,15 @@
         ]
       },
       {
+        "surface": "GroupSetupEmptyAvatar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
+        "anchor": "fun GroupSetupEmptyAvatar(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
         "surface": "NewGroupSetupAccountScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
         "anchor": "fun NewGroupSetupAccountScreen(",
@@ -3870,9 +3879,9 @@
         ]
       },
       {
-        "surface": "DisappearingOptionRow",
+        "surface": "DisappearingPickerChoices",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
-        "anchor": "fun DisappearingOptionRow(",
+        "anchor": "fun DisappearingPickerChoices(",
         "test_ids": [
           "GRP-001"
         ]
@@ -3995,6 +4004,14 @@
         "anchor": "fun GroupEditScaffold(",
         "test_ids": [
           "GRP-002"
+        ]
+      },
+      {
+        "surface": "GroupEditPhotoMenu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "fun GroupEditPhotoMenu(",
+        "test_ids": [
+          "GRP-001"
         ]
       },
       {
@@ -7301,6 +7318,15 @@
         "anchor": "fun MessageReactionsSection(",
         "test_ids": [
           "MSG-001"
+        ]
+      },
+      {
+        "surface": "GlobalSearchAttachmentModes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchAttachmentModes.kt",
+        "anchor": "fun GlobalSearchAttachmentModes(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
         ]
       },
       {
@@ -18320,14 +18346,6 @@
         ]
       },
       {
-        "surface": "string:group_image_search_set",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
-        "anchor": "R.string.group_image_search_set",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:group_image_search_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.group_image_search_title",
@@ -18411,6 +18429,62 @@
         "surface": "string:group_private_image_detail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.group_private_image_detail",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:add_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.add_photo",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:change_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.change_photo",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:choose_files",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.choose_files",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:choose_photos",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.choose_photos",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:find_web_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.find_web_image",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:group_emoji_create",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.group_emoji_create",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:remove_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.remove_photo",
         "test_ids": [
           "GRP-001"
         ]
@@ -19319,6 +19393,30 @@
         ]
       },
       {
+        "surface": "string:archived",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.archived",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "string:chat_list_filter_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chat_list_filter_groups",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "string:chat_list_filter_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chat_list_filter_unread",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
         "surface": "string:chat_list_search_filter_chat",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
         "anchor": "R.string.chat_list_search_filter_chat",
@@ -19487,10 +19585,11 @@
       },
       {
         "surface": "string:message_status_pending",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
         "anchor": "R.string.message_status_pending",
         "test_ids": [
-          "MSG-001"
+          "DIC-001",
+          "DIC-002"
         ]
       },
       {
@@ -19531,6 +19630,55 @@
         "anchor": "R.string.sent_from",
         "test_ids": [
           "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:disappearing_custom",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
+        "anchor": "R.string.disappearing_custom",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:disappearing_custom_value",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
+        "anchor": "R.string.disappearing_custom_value",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:disappearing_explainer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
+        "anchor": "R.string.disappearing_explainer",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:disappearing_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
+        "anchor": "R.string.disappearing_messages",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
+        "anchor": "R.string.save",
+        "test_ids": [
+          "GRP-001"
         ]
       }
     ],

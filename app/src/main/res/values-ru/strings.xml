@@ -46,6 +46,11 @@
     <string name="chat_list_search_chat_chip">Чат: %1$s</string>
     <string name="chat_list_search_sender_chip">Отправитель: %1$s</string>
     <string name="chat_list_search_no_folders">Нет папок</string>
+    <string name="chat_list_search_mode_all">Все</string>
+    <string name="library_photos_videos">Фото и видео</string>
+    <string name="library_files">Файлы</string>
+    <string name="library_audio">Аудио</string>
+    <string name="library_all">Все вложения</string>
     <string name="chat_list_search_filter_remove">Удалить фильтр: %1$s</string>
     <string name="chat_list_filter_all">Все</string>
     <string name="chat_list_filter_unread">Непрочитанные</string>
@@ -1274,6 +1279,7 @@
     <string name="disappearing_1_day">1 день</string>
     <string name="disappearing_90_days">3 месяца</string>
     <string name="disappearing_custom">Своё время</string>
+    <string name="disappearing_custom_value">Своё время: %1$s</string>
     <string name="disappearing_days_format">%1$d дн.</string>
     <string name="disappearing_hours_format">%1$d ч.</string>
     <string name="disappearing_minutes_format">%1$d мин.</string>
@@ -1827,6 +1833,9 @@
     <string name="find_web_image">Найти изображение в Интернете</string>
     <string name="profile_remove_banner">Удалить баннер</string>
     <string name="remove_photo">Удалить фото</string>
+    <string name="choose_photos">Выбрать из Фото</string>
+    <string name="choose_files">Выбрать из Файлов</string>
+    <string name="group_emoji_create">Создать из эмодзи</string>
     <string name="profile_suggest_name">Предложить имя</string>
     <string name="profile_lightning_address">Lightning-адрес</string>
     <string name="profile_image_failed">Не удалось загрузить это изображение. Выберите другое изображение или повторите попытку.</string>

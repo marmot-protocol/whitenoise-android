@@ -44,6 +44,11 @@
     <string name="chat_list_search_chat_chip">Conversa: %1$s</string>
     <string name="chat_list_search_sender_chip">Remetente: %1$s</string>
     <string name="chat_list_search_no_folders">Sem pastas</string>
+    <string name="chat_list_search_mode_all">Tudo</string>
+    <string name="library_photos_videos">Fotos e vídeos</string>
+    <string name="library_files">Arquivos</string>
+    <string name="library_audio">Áudio</string>
+    <string name="library_all">Todos os anexos</string>
     <string name="chat_list_search_filter_remove">Remover filtro: %1$s</string>
     <string name="chat_list_filter_all">Todos</string>
     <string name="chat_list_filter_unread">Não lidos</string>
@@ -1228,6 +1233,7 @@
     <string name="disappearing_1_day">1 dia</string>
     <string name="disappearing_90_days">3 meses</string>
     <string name="disappearing_custom">Tempo personalizado</string>
+    <string name="disappearing_custom_value">Tempo personalizado: %1$s</string>
     <string name="disappearing_days_format">%1$d dias</string>
     <string name="disappearing_hours_format">%1$d horas</string>
     <string name="disappearing_minutes_format">%1$d minutos</string>
@@ -1775,6 +1781,9 @@
     <string name="find_web_image">Buscar imagem na Web</string>
     <string name="profile_remove_banner">Remover banner</string>
     <string name="remove_photo">Remover foto</string>
+    <string name="choose_photos">Escolher das Fotos</string>
+    <string name="choose_files">Escolher dos Arquivos</string>
+    <string name="group_emoji_create">Criar a partir de emoji</string>
     <string name="profile_suggest_name">Sugerir nome</string>
     <string name="profile_lightning_address">Endereço Lightning</string>
     <string name="profile_image_failed">Não foi possível carregar esta imagem. Escolha outra imagem ou tente novamente.</string>

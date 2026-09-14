@@ -26,6 +26,8 @@ import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.search.labelRes
+import dev.ipf.whitenoise.android.state.ChatFolder
+import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.search.globalSearchDateFilterLabel
@@ -58,6 +60,18 @@ internal fun GlobalSearchChatType.labelRes(): Int =
     when (this) {
         GlobalSearchChatType.DIRECT -> R.string.chat_list_search_direct_chats
         GlobalSearchChatType.GROUPS -> R.string.chat_list_search_groups
+    }
+
+/** System folders carry no stored name; their label comes from the same resources the folder pills use. */
+@Composable
+internal fun chatFolderDisplayName(folder: ChatFolder): String =
+    folder.name.ifEmpty {
+        when (folder.systemKind) {
+            SystemFolderKind.UNREAD -> stringResource(R.string.chat_list_filter_unread)
+            SystemFolderKind.GROUPS -> stringResource(R.string.chat_list_filter_groups)
+            SystemFolderKind.ARCHIVED -> stringResource(R.string.archived)
+            null -> ""
+        }
     }
 
 /** The prototype's filter entry beside the search field: a plain icon that fills once any filter is active. */
