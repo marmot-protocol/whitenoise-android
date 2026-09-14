@@ -19293,6 +19293,69 @@
         "test_ids": [
           "FIND-001"
         ]
+      },
+      {
+        "surface": "string:chat_list_search_filter_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "R.string.chat_list_search_filter_chat",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_filter_chat_type",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "R.string.chat_list_search_filter_chat_type",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_filter_content",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "R.string.chat_list_search_filter_content",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_filter_folders",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "R.string.chat_list_search_filter_folders",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_filter_sender",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "R.string.chat_list_search_filter_sender",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_no_folders",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "R.string.chat_list_search_no_folders",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "string:done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "R.string.done",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
       }
     ],
     "manifest_permissions": [
