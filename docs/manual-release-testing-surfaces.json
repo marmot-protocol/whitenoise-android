@@ -19380,6 +19380,158 @@
           "NCH-002",
           "ACC-017"
         ]
+      },
+      {
+        "surface": "string:back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_copy_id",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_copy_id",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_copy_sender_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_copy_sender_key",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_details",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_info_created_at",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_info_created_at",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_info_disappears_at",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_info_disappears_at",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_info_message_id",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_info_message_id",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_info_received_at",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_info_received_at",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_info_sent_at",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_info_sent_at",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_info_status",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_info_status",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_sender_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_sender_public_key",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_sender_time",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_sender_time",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_status_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_status_failed",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_status_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_status_pending",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_status_received",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_status_received",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_status_sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_status_sent",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_status_streaming",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_status_streaming",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:reactions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.reactions",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:sent_from",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.sent_from",
+        "test_ids": [
+          "MSG-001"
+        ]
       }
     ],
     "manifest_permissions": [
