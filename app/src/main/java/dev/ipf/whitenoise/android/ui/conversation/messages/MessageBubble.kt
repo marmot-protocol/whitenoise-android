@@ -117,8 +117,8 @@ import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsFollowTarget
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutReport
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutSink
+import dev.ipf.whitenoise.android.ui.conversation.InvitationActions
 import dev.ipf.whitenoise.android.ui.conversation.InviteAcceptanceResolutionStatus
-import dev.ipf.whitenoise.android.ui.conversation.InvitePreviewActionBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
@@ -2598,9 +2598,10 @@ internal fun MessageBubble(
                                 ComposerGate.FROZEN -> FrozenGroupComposerNotice()
                                 ComposerGate.DISBANDED -> DisbandedGroupComposerNotice(disbanded = groupDisbanded)
                                 ComposerGate.INVITE ->
-                                    InvitePreviewActionBar(
+                                    InvitationActions(
+                                        inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
                                         mutationInFlight = inviteMutationInFlight,
-                                        onJoin = onJoinInvite,
+                                        onAccept = onJoinInvite,
                                         onDecline = onDeclineInvite,
                                     )
                                 ComposerGate.COMPOSER ->

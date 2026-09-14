@@ -521,9 +521,8 @@ internal fun MediaVisualGridBubble(
     uploading: Boolean = false,
 ) {
     val record = item.record
-    // Show up to four tiles before collapsing the remainder into a "+N"
-    // overlay on the fourth tile, matching the image grid (#527).
-    val visible = attachments.take(4)
+    // Five frames at most; the last one carries the "+N" overflow chip.
+    val visible = attachments.take(MAX_VISIBLE_GALLERY_FRAMES)
 
     /** Opens one grid attachment through the row-independent mixed-media session owner. */
     fun dispatchViewerOpen(attachmentIndex: Int) {

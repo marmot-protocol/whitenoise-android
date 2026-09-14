@@ -73,7 +73,7 @@ class ChatRowEvictedStatusTest {
     fun aPendingInviteKeepsTheInvitedBadgeAndNoEvictionStatus() {
         render(evicted = true, pendingConfirmation = true)
 
-        composeRule.onNodeWithText(context.getString(R.string.invited)).assertExists()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.invitation_pending)).assertExists()
         composeRule.onNodeWithText(removedLabel).assertDoesNotExist()
     }
 

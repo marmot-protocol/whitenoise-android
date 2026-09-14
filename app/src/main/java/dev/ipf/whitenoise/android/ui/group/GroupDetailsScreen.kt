@@ -281,6 +281,7 @@ internal fun GroupDetailsScreen(
     // leave path and the Admins prompt so a trapped sole admin can hand the
     // role to another member (issue #417).
     var showTransferAdmin by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var disbandConfirmOpen by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     // #1131: when set, the transfer-admin picker is being used as the first step
     // of a sole-admin Leave (3+ members) — picking transfers admin then leaves,
     // rather than the standalone transfer-only action. Holds the group name for
@@ -1291,7 +1292,6 @@ internal fun GroupDetailsScreen(
                 .whiteNoiseVerticalScroll(detailsScrollState)
                 .testTag("chat_info.list")
                 .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             GroupDetailsHeader(
                 title = conversationTitle,
@@ -1392,6 +1392,46 @@ internal fun GroupDetailsScreen(
                 onOpenCategory = { mediaLibraryCategory = it },
             )
 
+            // Custom folders containing this chat — manual membership or a
+            // live rule match — so the value tracks membership changes made
+            // anywhere (chat list, Settings, or a rule flipping).
+            val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
+            val chatIdLower = controller.group.groupIdHex.lowercase(Locale.ROOT)
+            val folderNames =
+                remember(
+                    folderStoreState,
+                    appState.chatListItems,
+                    appState.profileRevisionForCompose,
+                    folderAccountRef,
+                    chatIdLower,
+                    groupTitleCopy,
+                ) {
+                    val accountRef = folderAccountRef ?: return@remember emptyList()
+                    val thisChatRow = appState.chatListItems.filter { it.id.equals(chatIdLower, ignoreCase = true) }
+                    appState.chatFolderPreferences
+                        .foldersFor(accountRef)
+                        .mapNotNull { folder ->
+                            val manual =
+                                chatIdLower in appState.chatFolderPreferences.membershipFor(accountRef, folder.id)
+                            val effective =
+                                chatIdLower in
+                                    chatFolderChatIds(
+                                        items = thisChatRow,
+                                        manualChatIds =
+                                            appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
+                                        rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
+                                        activeAccountIdHex = appState.activeAccount?.accountIdHex,
+                                        isMuted = { groupIdHex ->
+                                            thisChatRow.any {
+                                                it.group.groupIdHex == groupIdHex && it.engineMuted()
+                                            }
+                                        },
+                                        displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
+                                    )
+                            if (effective) folder to manual else null
+                        }
+                }
+
             SettingsSection(stringResource(if (isDm) R.string.chat_actions else R.string.advanced))
             SettingsGroup(modifier = Modifier.testTag("chat_info.actions")) {
                 row("collapse_long_messages") { rowContext ->
@@ -1431,6 +1471,21 @@ internal fun GroupDetailsScreen(
                         onClick = { showBubbleColors = true },
                     )
                 }
+                row("folders") { rowContext ->
+                    SettingsLink(
+                        context = rowContext,
+                        title = stringResource(R.string.chat_folders_title),
+                        onClick = { showFolderPicker = true },
+                        modifier = Modifier.testTag("chat_info.folders"),
+                        value =
+                            folderNames
+                                .takeIf { it.isNotEmpty() }
+                                ?.map { (folder, _) -> chatFolderDisplayName(folder) }
+                                ?.joinToString(", ")
+                                ?: stringResource(R.string.chat_folders_none),
+                        leading = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
+                    )
+                }
             }
             if (isDm && dmPeerCandidate != null) {
                 DirectDetailsContactEditorRow(
@@ -1446,7 +1501,7 @@ internal fun GroupDetailsScreen(
             }
 
             if (showAutoReadPicker) {
-                TtsAutoReadPickerSheet(
+                TtsAutoReadPickerDialog(
                     globalDefaultEnabled = ttsAutoReadPrefs.globalDefaultEnabled,
                     selectedOverride = autoReadOverride,
                     onDismiss = { showAutoReadPicker = false },
@@ -1662,46 +1717,6 @@ internal fun GroupDetailsScreen(
                 }
             }
 
-            // Custom folders containing this chat — manual membership or a
-            // live rule match — so the value tracks membership changes made
-            // anywhere (chat list, Settings, or a rule flipping).
-            val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
-            val chatIdLower = controller.group.groupIdHex.lowercase(Locale.ROOT)
-            val folderNames =
-                remember(
-                    folderStoreState,
-                    appState.chatListItems,
-                    appState.profileRevisionForCompose,
-                    folderAccountRef,
-                    chatIdLower,
-                    groupTitleCopy,
-                ) {
-                    val accountRef = folderAccountRef ?: return@remember emptyList()
-                    val thisChatRow = appState.chatListItems.filter { it.id.equals(chatIdLower, ignoreCase = true) }
-                    appState.chatFolderPreferences
-                        .foldersFor(accountRef)
-                        .mapNotNull { folder ->
-                            val manual =
-                                chatIdLower in appState.chatFolderPreferences.membershipFor(accountRef, folder.id)
-                            val effective =
-                                chatIdLower in
-                                    chatFolderChatIds(
-                                        items = thisChatRow,
-                                        manualChatIds =
-                                            appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
-                                        rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
-                                        activeAccountIdHex = appState.activeAccount?.accountIdHex,
-                                        isMuted = { groupIdHex ->
-                                            thisChatRow.any {
-                                                it.group.groupIdHex == groupIdHex && it.engineMuted()
-                                            }
-                                        },
-                                        displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
-                                    )
-                            if (effective) folder to manual else null
-                        }
-                }
-
             // Danger zone (#416): leave routes through requestLeave so the
             // sole-admin and sole-member cases get their own confirm copy. On
             // failure the controller's lastMutationError surfaces inline here
@@ -1710,20 +1725,20 @@ internal fun GroupDetailsScreen(
                 val selfMember =
                     controller.members.firstOrNull { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
                 SettingsGroup(modifier = Modifier.testTag("chat_info.lifecycle")) {
-                    row("folders") { rowContext ->
-                        SettingsLink(
-                            context = rowContext,
-                            title = stringResource(R.string.chat_folders_title),
-                            onClick = { showFolderPicker = true },
-                            modifier = Modifier.testTag("chat_info.folders"),
-                            value =
-                                folderNames
-                                    .takeIf { it.isNotEmpty() }
-                                    ?.map { (folder, _) -> chatFolderDisplayName(folder) }
-                                    ?.joinToString(", ")
-                                    ?: stringResource(R.string.chat_folders_none),
-                            leading = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
-                        )
+                    if (!isDm && canEdit) {
+                        row("transfer_admin") { rowContext ->
+                            SettingsAction(
+                                context = rowContext,
+                                title = stringResource(R.string.transfer_admin),
+                                onClick = {
+                                    transferThenLeaveName = null
+                                    showTransferAdmin = true
+                                },
+                                modifier = Modifier.testTag("chat_info.transfer_admin"),
+                                enabled = !mutationsBlocked && controller.transferAdminCandidates().isNotEmpty(),
+                                leading = { Icon(painterResource(R.drawable.ic_swap_vert), contentDescription = null) },
+                            )
+                        }
                     }
                     if (!isDm && canEdit && selfMember != null) {
                         row("step_down") { rowContext ->
@@ -1739,11 +1754,11 @@ internal fun GroupDetailsScreen(
                                         }
                                 },
                                 enabled = !mutationsBlocked,
-                                destructive = true,
                                 leading = {
                                     DangerLeading(
                                         icon = R.drawable.ic_admin_panel_settings,
                                         inProgress = activeMutation?.action == GroupMutationAction.SelfDemoteAdmin,
+                                        destructive = false,
                                     )
                                 },
                             )
@@ -1782,6 +1797,36 @@ internal fun GroupDetailsScreen(
                                 },
                             )
                         }
+                    }
+                    if (!isDm && controller.isSelfMember) {
+                        groupDisbandRows(
+                            management = controller.managementState,
+                            enabled = !mutationsBlocked,
+                            enableInProgress = activeMutation?.action == GroupMutationAction.EnableDisbanding,
+                            disbandInProgress = activeMutation?.action == GroupMutationAction.Disband,
+                            onEnable = {
+                                runGroupMutation(
+                                    action = GroupMutationAction.EnableDisbanding,
+                                    mutation = { controller.enableGroupDisbanding() },
+                                )
+                            },
+                            onDisbandRequested = { disbandConfirmOpen = true },
+                        )
+                    }
+                    if (!isDm && controller.isSelfMember) {
+                        groupDisbandRows(
+                            management = controller.managementState,
+                            enabled = !mutationsBlocked,
+                            enableInProgress = activeMutation?.action == GroupMutationAction.EnableDisbanding,
+                            disbandInProgress = activeMutation?.action == GroupMutationAction.Disband,
+                            onEnable = {
+                                runGroupMutation(
+                                    action = GroupMutationAction.EnableDisbanding,
+                                    mutation = { controller.enableGroupDisbanding() },
+                                )
+                            },
+                            onDisbandRequested = { disbandConfirmOpen = true },
+                        )
                     }
                     if (controller.isSelfMember) {
                         row("leave") { rowContext ->
@@ -1822,33 +1867,28 @@ internal fun GroupDetailsScreen(
                         onDismiss = { showFolderPicker = false },
                     )
                 }
-                if (controller.isSelfMember) {
-                    if (!isDm) {
-                        GroupDetailsDisbandControls(
-                            management = controller.managementState,
-                            enabled = !mutationsBlocked,
-                            enableInProgress = activeMutation?.action == GroupMutationAction.EnableDisbanding,
-                            disbandInProgress = activeMutation?.action == GroupMutationAction.Disband,
-                            onEnable = {
-                                runGroupMutation(
-                                    action = GroupMutationAction.EnableDisbanding,
-                                    mutation = { controller.enableGroupDisbanding() },
-                                )
-                            },
-                            onDisbandConfirmed = {
-                                runGroupMutation(
-                                    action = GroupMutationAction.Disband,
-                                    mutation = { controller.disbandGroup() },
-                                )
-                            },
-                            onAcknowledgeFailure = {
-                                runGroupMutation(
-                                    action = GroupMutationAction.Disband,
-                                    mutation = { controller.acknowledgeDisbandFailure() },
-                                )
-                            },
-                        )
-                    }
+                if (!isDm && controller.isSelfMember) {
+                    GroupDisbandStatus(
+                        management = controller.managementState,
+                        onAcknowledgeFailure = {
+                            runGroupMutation(
+                                action = GroupMutationAction.Disband,
+                                mutation = { controller.acknowledgeDisbandFailure() },
+                            )
+                        },
+                    )
+                }
+                if (disbandConfirmOpen) {
+                    GroupDisbandConfirmDialog(
+                        onConfirm = {
+                            disbandConfirmOpen = false
+                            runGroupMutation(
+                                action = GroupMutationAction.Disband,
+                                mutation = { controller.disbandGroup() },
+                            )
+                        },
+                        onDismiss = { disbandConfirmOpen = false },
+                    )
                 }
                 GroupDetailsLocalDeleteControl(
                     isDm = isDm,

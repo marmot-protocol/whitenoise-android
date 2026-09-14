@@ -2,9 +2,11 @@ package dev.ipf.whitenoise.android.ui.group
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -78,6 +80,10 @@ internal fun ChatInfoMemberCard(
         shape = WhiteNoiseListItemDefaults.segmentedShapes(index, count).shape,
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         border = amoledOutlineBorder(),
-        content = content,
-    )
+    ) {
+        Box(Modifier.heightIn(min = MemberRowMinimumHeight)) { content() }
+    }
 }
+
+/** Material's two-line list item height, which the prototype's member rows use. */
+private val MemberRowMinimumHeight = 72.dp

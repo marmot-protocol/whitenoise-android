@@ -96,8 +96,6 @@
     <string name="scan_qr_code">扫码</string>
     <string name="show_my_qr_code">显示我的二维码</string>
     <string name="new_group">新建群组</string>
-    <string name="invitation">邀请函</string>
-    <string name="invited">已受邀</string>
     <string name="invite">邀请</string>
     <string name="new_chat">新聊天</string>
     <string name="error_not_white_noise_profile_qr">该 QR 代码不是 White Noise 配置文件。</string>
@@ -132,7 +130,10 @@
     <string name="scroll_to_top">滚动到顶部</string>
     <string name="discard_failed_message">丢弃发送失败的消息</string>
     <string name="decline">拒绝</string>
-    <string name="join_group">加入群组</string>
+    <string name="accept">接受</string>
+    <string name="invited_to_chat_by">%1$s 邀请你加入聊天</string>
+    <string name="someone">某人</string>
+    <string name="invitation_pending">邀请待处理</string>
     <string name="invited_to_this_group">你已受邀加入此群组。</string>
     <string name="invite_preview_with_inviter">%1$s 邀请你加入此群组。</string>
     <string name="profile">个人资料</string>
@@ -168,7 +169,10 @@
     <string name="profile_contact_editor_private_hint">只有你会在此设备上看到昵称和备注。清除昵称后将恢复对方的个人资料名称。保存的昵称会被清理并限制为 80 个字符。</string>
     <string name="dismiss">关闭</string>
     <string name="edit">编辑</string>
-    <string name="edit_group_info_title">编辑群组信息</string>
+    <string name="edit_group_info_title">编辑群组</string>
+    <string name="group_private_image">群组私密照片</string>
+    <string name="group_private_image_detail">仅群组成员可见。</string>
+    <string name="group_description">描述（可选）</string>
     <string name="save_group">保存组</string>
     <string name="saving_group">正在保存群组...</string>
     <string name="info">信息</string>
@@ -428,7 +432,11 @@
     <string name="notification_scope_custom_chat">为此聊天自定义</string>
     <string name="notification_custom_for_chat_control">为此聊天自定义%1$s</string>
     <string name="open_notification_category_settings">打开%1$s的 Android 设置</string>
-    <string name="conversation_notification_categories_subtitle">打开类别以编辑当前生效的 Android 设置。只有此聊天需要不同的行为时，才启用“自定义”。</string>
+    <string name="notification_notify_restore">静音期间会保留你的“通知范围”选择，静音结束后恢复。</string>
+    <string name="notification_mute_detail">暂停通知，但不更改你的“通知范围”选择。</string>
+    <string name="notification_scope_switch_detail">关闭后重新使用全局默认设置。</string>
+    <string name="notification_chat_categories_detail">消息通知使用此聊天的设置。其他类别可以使用全局默认设置或此聊天的自定义设置。</string>
+    <string name="notify_nothing_while_muted">静音期间不通知。</string>
     <string name="notification_categories_loading">正在加载通知类别…</string>
     <string name="toast_notification_scope_update_failed">无法更新此通知设置</string>
     <string name="toast_notification_settings_unavailable">无法打开通知设置</string>
@@ -692,7 +700,7 @@
     <string name="toast_admin_added">管理员已添加</string>
     <string name="toast_admin_removed">管理员已删除</string>
     <string name="toast_couldnt_update_admin">无法更新管理员</string>
-    <string name="transfer_admin">转让管理员</string>
+    <string name="transfer_admin">转让管理权</string>
     <string name="toast_admin_transferred">管理员已转让</string>
     <string name="toast_cant_transfer_admin">无法将管理员转让给该成员。</string>
     <string name="toast_granted_but_couldnt_step_down">已授予管理员，但无法卸任。请重试。</string>
@@ -1272,7 +1280,7 @@
     <string name="vibration_pattern_custom_in_android_settings">已在 Android 设置中自定义</string>
     <string name="vibration_pattern_android_override">%1$s · Android 设置</string>
     <string name="chat_muted_badge">已静音</string>
-    <string name="collapse_long_messages_subtitle">在此聊天中为长消息显示“阅读更多”快捷入口</string>
+    <string name="collapse_long_messages_subtitle">在此聊天中显示长消息的预览。</string>
     <string name="toast_disappearing_not_applied">群组已创建，但无法开启阅后即焚消息</string>
     <string name="search_members">搜索成员</string>
     <string name="recent_chats">最近聊天</string>

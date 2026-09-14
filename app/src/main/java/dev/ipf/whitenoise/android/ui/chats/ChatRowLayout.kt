@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Badge
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ListItem
@@ -21,7 +20,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.role
@@ -36,8 +34,9 @@ import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
+import dev.ipf.whitenoise.android.ui.common.FailedDeliveryBadge
+import dev.ipf.whitenoise.android.ui.common.InvitationBadge
 import dev.ipf.whitenoise.android.ui.common.ManualUnreadDot
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
@@ -73,8 +72,11 @@ internal fun ChatRowLayout(
     val scheme = MaterialTheme.colorScheme
     val selectedColor = if (isAmoledSurfaceTheme()) Color.White.copy(alpha = 0.16f) else scheme.surfaceContainerHigh
     ListItem(
-        onClick = onClick,
-        enabled = interactionsEnabled,
+        // Stay visually enabled across list motion: a disabled ListItem paints the title in the disabled
+        // colour for a frame, which read as a grey flash when switching folders. Pointer gating lives on the
+        // list container.
+        onClick = { if (interactionsEnabled) onClick() },
+        enabled = true,
         // A selection-mode hold must not turn into a tap on release. The range gesture, when active,
         // is owned by AnchoredDragSelection on the modifier and must remain the sole long-press owner.
         onLongClick = if (consumeSelectionLongPress) ({}) else null,
@@ -203,9 +205,10 @@ internal fun ChatRowSupportingMetadata(
     actionColors: AccountActionColors?,
     pinned: Boolean,
     evicted: Boolean = false,
+    deliveryFailed: Boolean = false,
 ) {
     if (pendingConfirmation) {
-        Badge { Text(stringResource(R.string.invited)) }
+        InvitationBadge(actionColors = actionColors)
     } else {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -213,6 +216,7 @@ internal fun ChatRowSupportingMetadata(
         ) {
             if (pinned) PinnedBadge()
             if (evicted) EvictedLabel()
+            if (deliveryFailed) FailedDeliveryBadge()
             if (rowHasUnread) {
                 if (unreadMention) MentionBadge()
                 if (rowUnreadCount > 0uL) {

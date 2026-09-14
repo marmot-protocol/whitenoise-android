@@ -2,32 +2,22 @@ package dev.ipf.whitenoise.android.ui.group
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,13 +27,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -56,19 +43,17 @@ import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
-import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
+import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
-import dev.ipf.whitenoise.android.ui.settings.SettingsPanel
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
-import dev.ipf.whitenoise.android.ui.settings.SettingsSection
-import dev.ipf.whitenoise.android.ui.theme.Dimens
-import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
 
@@ -256,132 +241,90 @@ internal fun GroupEditScreen(
             },
         )
 
-    val listState = rememberLazyListState()
+    val saveLabel = stringResource(if (saving) R.string.saving_group else R.string.save_group)
     GroupEditScaffold(
         onBack = onBack,
         bottomBar = {
             if (canEdit) {
                 StickyFormActionBar {
-                    Button(
+                    WhiteNoiseButton(
                         onClick = { saveGroupProfile() },
                         enabled = saveEnabled,
                         modifier = Modifier.fillMaxWidth(),
+                        loading = saving,
+                        loadingLabel = saveLabel,
                     ) {
-                        if (saving) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Check, contentDescription = null)
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(if (saving) R.string.saving_group else R.string.save_group))
+                        Text(saveLabel)
                     }
                 }
             }
         },
     ) {
-        LazyColumn(
-            state = listState,
+        Column(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .trackWhiteNoiseHeader(listState),
-            contentPadding = PaddingValues(vertical = Dimens.spaceLg),
-            verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
+                    .whiteNoiseVerticalScroll(rememberScrollState())
+                    .padding(vertical = WhiteNoiseSpacing.Section),
+            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Section),
         ) {
-            item {
-                Column(
-                    Modifier.fillMaxWidth().padding(top = Dimens.spaceSm),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+            ) {
+                Text(stringResource(R.string.group_private_image), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.group_private_image_detail), style = MaterialTheme.typography.bodyMedium)
+                Box(
+                    modifier =
+                        Modifier
+                            .clip(CircleShape)
+                            .clickable(
+                                enabled = groupAvatarImageAvailable,
+                                onClickLabel = stringResource(R.string.profile_view_picture),
+                                role = Role.Button,
+                            ) { avatarViewerOpen = true },
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier =
-                                Modifier
-                                    .clip(CircleShape)
-                                    .clickable(
-                                        enabled = groupAvatarImageAvailable || canEdit,
-                                        onClickLabel =
-                                            stringResource(
-                                                if (groupAvatarImageAvailable) R.string.profile_view_picture else R.string.group_image_search_set,
-                                            ),
-                                        role = Role.Button,
-                                    ) {
-                                        if (groupAvatarImageAvailable) {
-                                            avatarViewerOpen = true
-                                        } else if (canEdit) {
-                                            showImageSearch = true
-                                        }
-                                    },
-                        ) {
-                            GroupAvatar(
-                                appState = appState,
-                                group = controller.group,
-                                title = controller.title(groupTitleCopy),
-                                seed = controller.group.groupIdHex,
-                                size = 96.dp,
-                            )
-                        }
-                        if (canEdit) {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .offset(x = 6.dp, y = 6.dp)
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.Black.copy(alpha = ScrimAlpha.HEAVY))
-                                        .clickable(
-                                            onClickLabel = editImageLabel,
-                                            role = Role.Button,
-                                        ) { showImageSearch = true },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    Icons.Default.PhotoCamera,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        }
-                    }
+                    GroupAvatar(
+                        appState = appState,
+                        group = controller.group,
+                        title = controller.title(groupTitleCopy),
+                        seed = controller.group.groupIdHex,
+                        size = GroupEditAvatarSize,
+                    )
+                }
+                if (imageSaving) LinearProgressIndicator(Modifier.fillMaxWidth())
+                WhiteNoiseFilledTonalButton(
+                    onClick = { showImageSearch = true },
+                    enabled = canEdit && !imageSaving,
+                ) {
+                    Text(editImageLabel)
                 }
             }
-            item {
-                SettingsSection(stringResource(R.string.edit_group_info_title))
-                SettingsPanel {
-                    Column(Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.Related)) {
-                        val profileFieldColors =
-                            TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                errorContainerColor = Color.Transparent,
-                            )
-                        GroupNameEmojiField(
-                            value = name,
-                            onValueChange = { name = it },
-                            label = stringResource(R.string.group_name),
-                            emojiPickerOpen = showEmojiPicker,
-                            onEmojiPickerClick = {
-                                if (nameEditable) showEmojiPicker = true
-                            },
-                            enabled = nameEditable,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        TextField(
-                            colors = profileFieldColors,
-                            value = description,
-                            onValueChange = { description = it },
-                            label = { Text(stringResource(R.string.description)) },
-                            minLines = 3,
-                            enabled = canEdit,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
+            ) {
+                GroupNameEmojiField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = stringResource(R.string.group_name),
+                    emojiPickerOpen = showEmojiPicker,
+                    onEmojiPickerClick = {
+                        if (nameEditable) showEmojiPicker = true
+                    },
+                    enabled = nameEditable,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text(stringResource(R.string.group_description)) },
+                    minLines = 3,
+                    maxLines = 6,
+                    enabled = canEdit,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }
@@ -451,6 +394,8 @@ internal fun GroupEditScreen(
         )
     }
 }
+
+private val GroupEditAvatarSize = 120.dp
 
 /** Settings frame shared by the native editor and its descriptive-title screenshot coverage. */
 @Composable

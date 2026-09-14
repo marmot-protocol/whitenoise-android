@@ -1,18 +1,13 @@
 package dev.ipf.whitenoise.android.ui.chats
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
@@ -40,7 +35,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
@@ -69,7 +63,6 @@ import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
-import dev.ipf.whitenoise.android.ui.conversation.messages.OutgoingIndicatorIcon
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
 
@@ -275,7 +268,8 @@ internal fun ChatRow(
             else -> Modifier
         }
     val pinned = item.pinned()
-    val hasSupportingMetadata = item.group.pendingConfirmation || rowHasUnread
+    val deliveryFailed = item.projectedDeliveryIndicator() == OutgoingMessageIndicator.Failed
+    val hasSupportingMetadata = item.group.pendingConfirmation || rowHasUnread || deliveryFailed
     val actionColors = accountActionColors(appState)
     ChatRowLayout(
         modifier = rowModifier.fillMaxWidth().padding(horizontal = 8.dp).testTag("chat.row.${item.id}"),
@@ -344,7 +338,6 @@ internal fun ChatRow(
             }
         },
         supportingContent = supportingContent@{
-            val deliveryIndicator = item.projectedDeliveryIndicator()
             val draft =
                 appState
                     .chatRowDraftFor(accountRef, item.group.groupIdHex)
@@ -369,7 +362,12 @@ internal fun ChatRow(
                 } else {
                     AnnotatedString(
                         when {
-                            item.group.pendingConfirmation -> stringResource(R.string.invitation)
+                            item.group.pendingConfirmation ->
+                                stringResource(
+                                    R.string.invited_to_chat_by,
+                                    avatarAccount?.let { appState.chatMemberTitle(it) }
+                                        ?: stringResource(R.string.someone),
+                                )
                             draft != null -> stringResource(R.string.chat_row_draft_prefix) + draft
                             else ->
                                 item.projectedPreviewText(
@@ -403,8 +401,6 @@ internal fun ChatRow(
                 ChatRowPreviewLine(
                     preview = preview,
                     fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
-                    deliveryIndicator =
-                        deliveryIndicator?.takeIf { draft == null && !item.group.pendingConfirmation },
                     attachmentKind =
                         item.projection
                             ?.lastMessage
@@ -432,6 +428,7 @@ internal fun ChatRow(
                         actionColors = actionColors,
                         pinned = false,
                         evicted = false,
+                        deliveryFailed = deliveryFailed,
                     )
                 }
             } else {
@@ -455,13 +452,12 @@ private fun ChatRowTitleStatus(
     )
 }
 
-/** Two-line production preview with native typed attachment decoration and the existing outgoing status. */
-@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
+/** Two-line production preview with native typed attachment decoration; status lives in the trailing badge. */
+@Suppress("FunctionNaming")
 @Composable
 internal fun ChatRowPreviewLine(
     preview: AnnotatedString,
     fontStyle: FontStyle,
-    deliveryIndicator: OutgoingMessageIndicator?,
     modifier: Modifier = Modifier,
     attachmentKind: ChatListAttachmentKindFfi? = null,
 ) {
@@ -494,50 +490,14 @@ internal fun ChatRowPreviewLine(
                     )
                 }.orEmpty()
         }
-    Row(
+    Text(
+        text = text,
+        inlineContent = inlineContent,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        fontStyle = fontStyle,
         modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = text,
-            inlineContent = inlineContent,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            fontStyle = fontStyle,
-            modifier = Modifier.weight(1f),
-        )
-        if (deliveryIndicator != null) {
-            val statusDescription =
-                stringResource(
-                    when (deliveryIndicator) {
-                        OutgoingMessageIndicator.Sending -> R.string.sending
-                        OutgoingMessageIndicator.Sent -> R.string.sent
-                        OutgoingMessageIndicator.Failed -> R.string.send_failed
-                    },
-                )
-            Spacer(Modifier.width(3.dp))
-            Box(
-                modifier =
-                    Modifier
-                        .size(14.dp)
-                        .semantics { contentDescription = statusDescription },
-                contentAlignment = Alignment.Center,
-            ) {
-                Crossfade(
-                    targetState = deliveryIndicator,
-                    animationSpec = tween(durationMillis = 150),
-                    label = "chat row delivery indicator",
-                ) { indicator ->
-                    Box(Modifier.clearAndSetSemantics {}) {
-                        OutgoingIndicatorIcon(
-                            indicator = indicator,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-        }
-    }
+    )
 }
 
 /** Decoration follows the engine's typed attachment kind; text remains the production projected preview. */

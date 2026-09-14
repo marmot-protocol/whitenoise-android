@@ -81,7 +81,7 @@ internal fun MessageInlineFooter(
     val retentionPresentation = rememberRetentionIndicatorPresentation(retention, retentionClockMillis)
     val showRetention =
         reserveRetentionSpace || retentionPresentation !is RetentionIndicatorPresentation.Hidden
-    val baselineIndex = footerBaselineIndex(showTime, editedLabel != null, showRetention)
+    val baselineIndex = footerBaselineIndex(showTime, editedLabel != null, showRetention, showStatus)
     Layout(
         modifier = modifier,
         content = {
@@ -148,21 +148,23 @@ private fun MessageInlineFooterItems(
     if (reserveRetentionSpace || retentionPresentation !is RetentionIndicatorPresentation.Hidden) {
         MessageRetentionIndicatorSlot(retentionPresentation, color, reserveRetentionSpace)
     }
-    if (showTime) {
-        Text(timeText, style = MaterialTheme.typography.labelSmall, color = color)
-    }
     if (showStatus) {
         OutgoingMessageStatusIcon(status, tint = color, containerColor = statusContainerColor)
     }
+    if (showTime) {
+        Text(timeText, style = MaterialTheme.typography.labelSmall, color = color)
+    }
 }
 
+/** The time carries the baseline; it follows the edited label, the retention slot and the delivery glyph. */
 private fun footerBaselineIndex(
     showTime: Boolean,
     hasEditedLabel: Boolean,
     showRetention: Boolean,
+    showStatus: Boolean,
 ): Int? =
     when {
-        showTime -> (if (hasEditedLabel) 1 else 0) + (if (showRetention) 1 else 0)
+        showTime -> (if (hasEditedLabel) 1 else 0) + (if (showRetention) 1 else 0) + (if (showStatus) 1 else 0)
         hasEditedLabel -> 0
         else -> null
     }

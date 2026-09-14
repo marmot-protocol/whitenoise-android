@@ -2,9 +2,11 @@
 <resources>
     <string name="shared_content_in_chat">聊天中的共享內容</string>
     <string name="shared_content_photos_videos">照片與影片</string>
-    <string name="shared_content_loaded_count">已載入 %1$d 項</string>
     <string name="shared_content_loaded_scope">僅顯示此聊天中已載入的訊息。</string>
     <string name="shared_content_loading">正在載入共享內容…</string>
     <string name="shared_content_empty">沒有共享內容</string>
     <string name="shared_content_go_to_message">前往訊息</string>
+    <plurals name="shared_item_count">
+        <item quantity="other">%1$d 項</item>
+    </plurals>
 </resources>

@@ -104,8 +104,6 @@
     <string name="scan_qr_code">QR kodu tara</string>
     <string name="show_my_qr_code">QR kodumu göster</string>
     <string name="new_group">Yeni grup</string>
-    <string name="invitation">Davet</string>
-    <string name="invited">Davet edildi</string>
     <string name="invite">Davet etmek</string>
     <string name="new_chat">Yeni sohbet</string>
     <string name="error_not_white_noise_profile_qr">Bu QR kodu bir White Noise profili değil.</string>
@@ -140,7 +138,10 @@
     <string name="scroll_to_top">Başa kaydır</string>
     <string name="discard_failed_message">Başarısız mesajı sil</string>
     <string name="decline">Reddet</string>
-    <string name="join_group">Gruba katıl</string>
+    <string name="accept">Kabul et</string>
+    <string name="invited_to_chat_by">%1$s sohbete davet etti</string>
+    <string name="someone">Birisi</string>
+    <string name="invitation_pending">Davet bekliyor</string>
     <string name="invited_to_this_group">Bu gruba davet edildiniz.</string>
     <string name="invite_preview_with_inviter">%1$s sizi bu gruba davet etti.</string>
     <string name="profile">Profil</string>
@@ -176,7 +177,10 @@
     <string name="profile_contact_editor_private_hint">Takma adı ve notları yalnızca siz bu cihazda görürsünüz. Takma adı temizlemek profil adını geri getirir. Kaydedilen takma adlar temizlenir ve 80 karakterle sınırlanır.</string>
     <string name="dismiss">Kapat</string>
     <string name="edit">Düzenle</string>
-    <string name="edit_group_info_title">Grup bilgisini düzenle</string>
+    <string name="edit_group_info_title">Grubu düzenle</string>
+    <string name="group_private_image">Özel grup fotoğrafı</string>
+    <string name="group_private_image_detail">Grup üyelerine görünür.</string>
+    <string name="group_description">Açıklama (isteğe bağlı)</string>
     <string name="save_group">Grubu Kaydet</string>
     <string name="saving_group">Grup kaydediliyor...</string>
     <string name="info">Bilgi</string>
@@ -439,7 +443,11 @@
     <string name="notification_scope_custom_chat">Bu sohbet için özel</string>
     <string name="notification_custom_for_chat_control">Bu sohbet için %1$s ayarını özelleştir</string>
     <string name="open_notification_category_settings">%1$s Android ayarlarını aç</string>
-    <string name="conversation_notification_categories_subtitle">Etkin Android ayarlarını düzenlemek için bir kategori açın. Özel seçeneğini yalnızca bu sohbet farklı davranmalıysa açın.</string>
+    <string name="notification_notify_restore">“Bildirim al” seçimin sessizdeyken korunur ve sessiz süresi bitince geri gelir.</string>
+    <string name="notification_mute_detail">“Bildirim al” seçimini değiştirmeden bildirimleri duraklat.</string>
+    <string name="notification_scope_switch_detail">Yeniden genel varsayılanı kullanmak için kapat.</string>
+    <string name="notification_chat_categories_detail">Mesaj bildirimleri bu sohbetin ayarlarını kullanır. Diğer kategoriler genel varsayılanları veya bu sohbete özel ayarları kullanabilir.</string>
+    <string name="notify_nothing_while_muted">Sessizdeyken hiçbir şey.</string>
     <string name="notification_categories_loading">Bildirim kategorileri yükleniyor…</string>
     <string name="toast_notification_scope_update_failed">Bu bildirim ayarı güncellenemedi</string>
     <string name="toast_notification_settings_unavailable">Bildirim ayarları açılamadı</string>
@@ -703,7 +711,7 @@
     <string name="toast_admin_added">Yönetici eklendi</string>
     <string name="toast_admin_removed">Yönetici kaldırıldı</string>
     <string name="toast_couldnt_update_admin">Yönetici güncellenemedi</string>
-    <string name="transfer_admin">Yöneticiliği devret</string>
+    <string name="transfer_admin">Yönetimi devret</string>
     <string name="toast_admin_transferred">Yöneticilik devredildi</string>
     <string name="toast_cant_transfer_admin">Bu üye yönetici olamaz.</string>
     <string name="toast_granted_but_couldnt_step_down">Yöneticilik verildi ama çekilme başarısız oldu. Tekrar deneyin.</string>
@@ -1293,7 +1301,7 @@
     <string name="vibration_pattern_custom_in_android_settings">Android ayarlarında özel</string>
     <string name="vibration_pattern_android_override">%1$s · Android ayarları</string>
     <string name="chat_muted_badge">Sessize alındı</string>
-    <string name="collapse_long_messages_subtitle">Bu sohbette uzun mesajlar için “Devamını oku” kısayolu göster</string>
+    <string name="collapse_long_messages_subtitle">Bu sohbetteki uzun mesajların önizlemesini gösterir.</string>
     <string name="toast_disappearing_not_applied">Grup oluşturuldu ancak kaybolan mesajlar açılamadı</string>
     <string name="search_members">Üye ara</string>
     <string name="recent_chats">Son sohbetler</string>

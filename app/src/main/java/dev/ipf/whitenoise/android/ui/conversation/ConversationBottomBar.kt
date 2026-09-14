@@ -180,9 +180,10 @@ internal fun ConversationBottomBar(
                     ComposerGate.DISBANDED ->
                         DisbandedGroupComposerNotice(disbanded = controller.group.disbanded)
                     ComposerGate.INVITE ->
-                        InvitePreviewActionBar(
+                        InvitationActions(
+                            inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
                             mutationInFlight = controller.mutationInFlight,
-                            onJoin = {
+                            onAccept = {
                                 appState.launchMutation {
                                     controller.acceptInvite(
                                         renderedGroupIdHex = renderedInviteGroupIdHex,

@@ -346,7 +346,7 @@ class GroupDetailsEditNavigationTest {
 
     private fun assertEditorIsOpen() {
         composeRule.onNodeWithText(context.getString(R.string.group_name)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.description)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.group_description)).assertIsDisplayed()
     }
 
     private fun controller(

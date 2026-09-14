@@ -2,9 +2,12 @@
 <resources>
     <string name="shared_content_in_chat">Shared in Chat</string>
     <string name="shared_content_photos_videos">Photos and videos</string>
-    <string name="shared_content_loaded_count">%1$d loaded</string>
     <string name="shared_content_loaded_scope">Only messages already loaded in this chat are shown.</string>
     <string name="shared_content_loading">Loading shared content…</string>
     <string name="shared_content_empty">No shared content</string>
     <string name="shared_content_go_to_message">Go to message</string>
+    <plurals name="shared_item_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
 </resources>

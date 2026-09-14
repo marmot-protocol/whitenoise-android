@@ -104,8 +104,6 @@
     <string name="scan_qr_code">Scanner le code QR</string>
     <string name="show_my_qr_code">Afficher mon code QR</string>
     <string name="new_group">Nouveau groupe</string>
-    <string name="invitation">Invitation</string>
-    <string name="invited">Invité</string>
     <string name="invite">Inviter</string>
     <string name="new_chat">Nouveau chat</string>
     <string name="error_not_white_noise_profile_qr">Ce code QR n’est pas un profil White Noise.</string>
@@ -140,7 +138,10 @@
     <string name="scroll_to_top">Faire défiler vers le haut</string>
     <string name="discard_failed_message">Supprimer le message échoué</string>
     <string name="decline">Refuser</string>
-    <string name="join_group">Rejoindre le groupe</string>
+    <string name="accept">Accepter</string>
+    <string name="invited_to_chat_by">Invité à discuter par %1$s</string>
+    <string name="someone">Quelqu’un</string>
+    <string name="invitation_pending">Invitation en attente</string>
     <string name="invited_to_this_group">Vous avez été invité à ce groupe.</string>
     <string name="invite_preview_with_inviter">%1$s vous a invité dans ce groupe.</string>
     <string name="profile">Profil</string>
@@ -176,7 +177,10 @@
     <string name="profile_contact_editor_private_hint">Vous seul voyez le surnom et les notes sur cet appareil. Effacer le surnom rétablit son nom de profil. Les surnoms enregistrés sont nettoyés et limités à 80 caractères.</string>
     <string name="dismiss">Fermer</string>
     <string name="edit">Modifier</string>
-    <string name="edit_group_info_title">Modifier les infos du groupe</string>
+    <string name="edit_group_info_title">Modifier le groupe</string>
+    <string name="group_private_image">Photo privée du groupe</string>
+    <string name="group_private_image_detail">Visible par les membres du groupe.</string>
+    <string name="group_description">Description (facultatif)</string>
     <string name="save_group">Enregistrer le groupe</string>
     <string name="saving_group">Enregistrement du groupe...</string>
     <string name="info">Informations</string>
@@ -439,7 +443,11 @@
     <string name="notification_scope_custom_chat">Personnalisé pour cette discussion</string>
     <string name="notification_custom_for_chat_control">Personnaliser %1$s pour cette discussion</string>
     <string name="open_notification_category_settings">Ouvrir les réglages Android de %1$s</string>
-    <string name="conversation_notification_categories_subtitle">Ouvrez une catégorie pour modifier ses réglages Android actifs. Activez Personnalisé uniquement si cette discussion doit se comporter différemment.</string>
+    <string name="notification_notify_restore">Votre choix « Notifier pour » est conservé pendant la mise en sourdine et rétabli à sa fin.</string>
+    <string name="notification_mute_detail">Suspendre les notifications sans modifier votre choix « Notifier pour ».</string>
+    <string name="notification_scope_switch_detail">Désactivez pour revenir au réglage global par défaut.</string>
+    <string name="notification_chat_categories_detail">Les notifications de messages utilisent les réglages de cette discussion. Les autres catégories peuvent suivre les réglages globaux ou des réglages propres à cette discussion.</string>
+    <string name="notify_nothing_while_muted">Rien pendant la mise en sourdine.</string>
     <string name="notification_categories_loading">Chargement des catégories de notifications…</string>
     <string name="toast_notification_scope_update_failed">Impossible de mettre à jour ce réglage de notification</string>
     <string name="toast_notification_settings_unavailable">Impossible d’ouvrir les réglages de notifications</string>
@@ -703,7 +711,7 @@
     <string name="toast_admin_added">Administrateur ajouté</string>
     <string name="toast_admin_removed">Administrateur supprimé</string>
     <string name="toast_couldnt_update_admin">Impossible de mettre à jour l’admin</string>
-    <string name="transfer_admin">Transférer l’admin</string>
+    <string name="transfer_admin">Transférer l’administration</string>
     <string name="toast_admin_transferred">Admin transféré</string>
     <string name="toast_cant_transfer_admin">Ce membre ne peut pas devenir admin.</string>
     <string name="toast_granted_but_couldnt_step_down">Admin accordé, mais impossible de vous retirer. Réessayez.</string>
@@ -1295,7 +1303,7 @@
     <string name="vibration_pattern_custom_in_android_settings">Personnalisée dans les paramètres Android</string>
     <string name="vibration_pattern_android_override">%1$s · Paramètres Android</string>
     <string name="chat_muted_badge">En sourdine</string>
-    <string name="collapse_long_messages_subtitle">Afficher un raccourci « Lire la suite » pour les longs messages de cette discussion</string>
+    <string name="collapse_long_messages_subtitle">Affiche un aperçu des messages longs dans cette discussion.</string>
     <string name="toast_disappearing_not_applied">Le groupe a été créé, mais les messages éphémères n’ont pas pu être activés</string>
     <string name="search_members">Rechercher des membres</string>
     <string name="recent_chats">Discussions récentes</string>

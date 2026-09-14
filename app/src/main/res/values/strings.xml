@@ -148,8 +148,6 @@
     <string name="scan_qr_code">Scan QR Code</string>
     <string name="show_my_qr_code">Show my QR code</string>
     <string name="new_group">New Group</string>
-    <string name="invitation">Invitation</string>
-    <string name="invited">Invited</string>
     <string name="invite">Invite</string>
     <string name="new_chat">New Chat</string>
     <string name="error_not_white_noise_profile_qr">That QR code doesn’t contain a White Noise profile.</string>
@@ -196,7 +194,10 @@
     <string name="scroll_to_top">Scroll to top</string>
     <string name="discard_failed_message">Discard failed message</string>
     <string name="decline">Decline</string>
-    <string name="join_group">Join group</string>
+    <string name="accept">Accept</string>
+    <string name="invited_to_chat_by">Invited to chat by %1$s</string>
+    <string name="someone">Someone</string>
+    <string name="invitation_pending">Invitation pending</string>
     <string name="invited_to_this_group">You were invited to this group.</string>
     <string name="invite_preview_with_inviter">%1$s invited you to this group.</string>
     <string name="profile">Profile</string>
@@ -232,7 +233,10 @@
     <string name="profile_contact_editor_private_hint">Only you see nickname and notes on this device. Clearing a nickname restores their profile name. Saved nicknames are cleaned and capped at 80 characters.</string>
     <string name="dismiss">Dismiss</string>
     <string name="edit">Edit</string>
-    <string name="edit_group_info_title">Edit group info</string>
+    <string name="edit_group_info_title">Edit Group</string>
+    <string name="group_private_image">Private group photo</string>
+    <string name="group_private_image_detail">Visible to group members.</string>
+    <string name="group_description">Description (optional)</string>
     <string name="save_group">Save Group</string>
     <string name="saving_group">Saving group...</string>
     <string name="info">Info</string>
@@ -617,7 +621,11 @@
     <string name="notification_scope_custom_chat">Custom for this chat</string>
     <string name="notification_custom_for_chat_control">Custom %1$s for this chat</string>
     <string name="open_notification_category_settings">Open %1$s Android settings</string>
-    <string name="conversation_notification_categories_subtitle">Open a category to edit its active Android settings. Turn on Custom only when this chat should behave differently.</string>
+    <string name="notification_notify_restore">Your Notify for choice is kept while muted and restored when mute ends.</string>
+    <string name="notification_mute_detail">Pause notifications without changing your Notify for choice.</string>
+    <string name="notification_scope_switch_detail">Turn off to use the global default again.</string>
+    <string name="notification_chat_categories_detail">Message notifications use this chat’s settings. Other categories can use global defaults or custom settings for this chat.</string>
+    <string name="notify_nothing_while_muted">Nothing while muted.</string>
     <string name="notification_categories_loading">Loading notification categories…</string>
     <string name="toast_notification_scope_update_failed">Couldn\'t update this notification setting</string>
     <string name="toast_notification_settings_unavailable">Couldn\'t open notification settings</string>
@@ -960,7 +968,7 @@
     <string name="toast_admin_added">Admin added</string>
     <string name="toast_admin_removed">Admin removed</string>
     <string name="toast_couldnt_update_admin">Couldn\'t update admin</string>
-    <string name="transfer_admin">Transfer admin</string>
+    <string name="transfer_admin">Transfer administration</string>
     <string name="toast_admin_transferred">Admin transferred</string>
     <string name="toast_cant_transfer_admin">This member can\'t receive admin.</string>
     <string name="toast_granted_but_couldnt_step_down">Granted admin, but couldn\'t step down. Try again.</string>
@@ -1464,7 +1472,7 @@
     <string name="add_group_description">Add group description</string>
     <string name="see_all_members">See all %1$d members</string>
     <string name="collapse_long_messages">Collapse long messages</string>
-    <string name="collapse_long_messages_subtitle">Show a Read More shortcut for long messages in this chat</string>
+    <string name="collapse_long_messages_subtitle">Show a preview of long messages in this chat.</string>
     <string name="sounds_and_notifications">Sounds &amp; notifications</string>
     <string name="notify_all_messages">All messages</string>
     <string name="notify_only_mentions">Only mentions</string>

@@ -22,13 +22,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
-import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
@@ -91,7 +91,7 @@ internal fun SharedContentCategories(
                         if (tiles.isLoading) {
                             stringResource(R.string.shared_content_loading)
                         } else {
-                            stringResource(R.string.shared_content_loaded_count, count)
+                            pluralStringResource(R.plurals.shared_item_count, count, count)
                         },
                     leading = { Icon(painterResource(icon), contentDescription = null) },
                     modifier = Modifier.testTag("shared.category.${category.name}"),
@@ -100,7 +100,6 @@ internal fun SharedContentCategories(
             }
         }
     }
-    SettingsExplainer(stringResource(R.string.shared_content_loaded_scope))
 }
 
 /** Shared settings frame with the prototype media-only filter chips; native content retains its scroll owner. */

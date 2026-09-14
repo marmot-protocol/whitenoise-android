@@ -120,8 +120,6 @@
     <string name="scan_qr_code">Сканировать QR-код</string>
     <string name="show_my_qr_code">Показать мой QR-код</string>
     <string name="new_group">Новая группа</string>
-    <string name="invitation">Приглашение</string>
-    <string name="invited">Приглашение</string>
     <string name="invite">Пригласить</string>
     <string name="new_chat">Новый чат</string>
     <string name="error_not_white_noise_profile_qr">Этот код QR не является профилем White Noise.</string>
@@ -156,7 +154,10 @@
     <string name="scroll_to_top">Прокрутить вверх</string>
     <string name="discard_failed_message">Удалить неотправленное сообщение</string>
     <string name="decline">Отклонить</string>
-    <string name="join_group">Вступить в группу</string>
+    <string name="accept">Принять</string>
+    <string name="invited_to_chat_by">Приглашение в чат от %1$s</string>
+    <string name="someone">Кто-то</string>
+    <string name="invitation_pending">Приглашение ожидает ответа</string>
     <string name="invited_to_this_group">Вас пригласили в эту группу.</string>
     <string name="invite_preview_with_inviter">%1$s пригласил(а) вас в эту группу.</string>
     <string name="profile">Профиль</string>
@@ -194,7 +195,10 @@
     <string name="profile_contact_editor_private_hint">Только вы видите псевдоним и заметки на этом устройстве. Очистка псевдонима восстанавливает имя из профиля. Сохранённые псевдонимы очищаются и ограничиваются 80 символами.</string>
     <string name="dismiss">Закрыть</string>
     <string name="edit">Изменить</string>
-    <string name="edit_group_info_title">Изменить информацию о группе</string>
+    <string name="edit_group_info_title">Изменить группу</string>
+    <string name="group_private_image">Приватное фото группы</string>
+    <string name="group_private_image_detail">Видно участникам группы.</string>
+    <string name="group_description">Описание (необязательно)</string>
     <string name="save_group">Сохранить группу</string>
     <string name="saving_group">Сохранение группы...</string>
     <string name="info">Информация</string>
@@ -471,7 +475,11 @@
     <string name="notification_scope_custom_chat">Особые настройки для этого чата</string>
     <string name="notification_custom_for_chat_control">Настроить %1$s для этого чата</string>
     <string name="open_notification_category_settings">Открыть настройки Android для %1$s</string>
-    <string name="conversation_notification_categories_subtitle">Откройте категорию, чтобы изменить её активные настройки Android. Включайте особые настройки, только если этот чат должен вести себя иначе.</string>
+    <string name="notification_notify_restore">Выбор «Уведомлять о» сохраняется на время отключения звука и восстанавливается после него.</string>
+    <string name="notification_mute_detail">Приостановить уведомления, не меняя выбор «Уведомлять о».</string>
+    <string name="notification_scope_switch_detail">Выключите, чтобы снова использовать глобальные настройки.</string>
+    <string name="notification_chat_categories_detail">Уведомления о сообщениях используют настройки этого чата. Остальные категории могут использовать глобальные или отдельные настройки для этого чата.</string>
+    <string name="notify_nothing_while_muted">Ничего, пока звук отключён.</string>
     <string name="notification_categories_loading">Загрузка категорий уведомлений…</string>
     <string name="toast_notification_scope_update_failed">Не удалось обновить эту настройку уведомлений</string>
     <string name="toast_notification_settings_unavailable">Не удалось открыть настройки уведомлений</string>
@@ -735,7 +743,7 @@
     <string name="toast_admin_added">Администратор добавил</string>
     <string name="toast_admin_removed">Администратор удален</string>
     <string name="toast_couldnt_update_admin">Не удалось обновить админа</string>
-    <string name="transfer_admin">Передать админа</string>
+    <string name="transfer_admin">Передать администрирование</string>
     <string name="toast_admin_transferred">Админ передан</string>
     <string name="toast_cant_transfer_admin">Этот участник не может стать админом.</string>
     <string name="toast_granted_but_couldnt_step_down">Админ назначен, но не удалось сложить полномочия. Повторите попытку.</string>
@@ -1347,7 +1355,7 @@
     <string name="vibration_pattern_custom_in_android_settings">Изменено в настройках Android</string>
     <string name="vibration_pattern_android_override">%1$s · Настройки Android</string>
     <string name="chat_muted_badge">Без звука</string>
-    <string name="collapse_long_messages_subtitle">Показывать кнопку «Читать дальше» для длинных сообщений в этом чате</string>
+    <string name="collapse_long_messages_subtitle">Показывать предварительный просмотр длинных сообщений в этом чате.</string>
     <string name="toast_disappearing_not_applied">Группа создана, но исчезающие сообщения включить не удалось</string>
     <string name="search_members">Поиск участников</string>
     <string name="recent_chats">Недавние чаты</string>

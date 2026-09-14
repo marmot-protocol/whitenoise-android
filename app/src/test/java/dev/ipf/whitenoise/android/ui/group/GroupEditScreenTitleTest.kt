@@ -106,17 +106,6 @@ class GroupEditScreenTitleTest {
         )
     }
 
-    @Test
-    fun editDetailsSectionUsesDedicatedTitle() {
-        val screenBody = functionBody("GroupEditScreen")
-
-        assertTrue(
-            "GroupEditScreen details panel must use edit_group_info_title",
-            Regex("""SettingsSection\s*\(\s*stringResource\s*\(\s*R\.string\.edit_group_info_title""")
-                .containsMatchIn(screenBody),
-        )
-    }
-
     private fun functionBody(functionName: String): String {
         val text = sourceFile.readText()
         // Strip comments so a commented-out reference cannot satisfy the check.

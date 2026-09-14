@@ -2,11 +2,9 @@ package dev.ipf.whitenoise.android.ui.group
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -41,7 +39,6 @@ internal fun TtsAutoReadGroupActionRow(
                 .testTag(TTS_AUTO_READ_GROUP_ROW_TAG)
                 .semantics(mergeDescendants = true) { contentDescription = "$title. $provenanceLabel" },
         value = provenanceLabel,
-        leading = { Icon(painterResource(R.drawable.ic_volume_up), contentDescription = null) },
     )
 }
 

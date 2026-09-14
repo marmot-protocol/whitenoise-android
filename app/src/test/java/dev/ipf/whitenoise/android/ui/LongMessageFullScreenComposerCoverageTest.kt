@@ -53,7 +53,7 @@ class LongMessageFullScreenComposerCoverageTest {
                 "ComposerGate.INVITE" in fullScreenCall &&
                 "ComposerGate.COMPOSER" in fullScreenCall &&
                 "RemovedMemberComposerNotice()" in fullScreenCall &&
-                "InvitePreviewActionBar(" in fullScreenCall,
+                "InvitationActions(" in fullScreenCall,
         )
         assertTrue(
             "expanded reader reply/react actions must require a live message and an active shared composer",
