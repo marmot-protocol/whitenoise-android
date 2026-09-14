@@ -877,6 +877,15 @@
         ]
       },
       {
+        "surface": "SelectedPersonCheck",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupCreationPeople.kt",
+        "anchor": "fun SelectedPersonCheck(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
         "surface": "AppText.resolveForCompose",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
         "anchor": "fun AppText.resolveForCompose(",
@@ -3842,14 +3851,6 @@
         ]
       },
       {
-        "surface": "DirectDetailsContactEditorRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DirectDetailsContactEditor.kt",
-        "anchor": "fun DirectDetailsContactEditorRow(",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "DisappearingCustomDialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
         "anchor": "fun DisappearingCustomDialog(",
@@ -3869,14 +3870,6 @@
         "surface": "DisappearingOptionRow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
         "anchor": "fun DisappearingOptionRow(",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "DmDetailsContactActionRows",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DmDetailsActionRows.kt",
-        "anchor": "fun DmDetailsContactActionRows(",
         "test_ids": [
           "GRP-001"
         ]
@@ -17414,22 +17407,6 @@
         ]
       },
       {
-        "surface": "string:chat_folders_none",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.chat_folders_none",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:chat_folders_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.chat_folders_title",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:chat_row_action_delete_chat",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.chat_row_action_delete_chat",
@@ -17561,30 +17538,6 @@
         "surface": "string:confirm_transfer_admin_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.confirm_transfer_admin_title",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:contact_add_to_group",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.contact_add_to_group",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:contact_create_group_with",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.contact_create_group_with",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:contact_groups_see_all",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.contact_groups_see_all",
         "test_ids": [
           "GRP-001"
         ]
@@ -17801,14 +17754,6 @@
         "surface": "string:members",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.members",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:members_count",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.members_count",
         "test_ids": [
           "GRP-001"
         ]
@@ -18233,6 +18178,14 @@
         "surface": "string:member",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.member",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:chat_add_folder",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.chat_add_folder",
         "test_ids": [
           "GRP-001"
         ]
@@ -19151,6 +19104,22 @@
         "surface": "string:group_disband_pending",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
         "anchor": "R.string.group_disband_pending",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadPickerDialog.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:tts_auto_read_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadPickerDialog.kt",
+        "anchor": "R.string.tts_auto_read_title",
         "test_ids": [
           "GRP-001"
         ]
@@ -22029,22 +21998,6 @@
         ]
       },
       {
-        "surface": "R.string.chat_folders_none",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.chat_folders_none",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "R.string.chat_folders_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.chat_folders_title",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "R.string.confirm_leave_message_named",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.confirm_leave_message_named",
@@ -22189,14 +22142,6 @@
         "surface": "R.string.loading_mls_state",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.loading_mls_state",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "R.string.members_count",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.members_count",
         "test_ids": [
           "GRP-001"
         ]

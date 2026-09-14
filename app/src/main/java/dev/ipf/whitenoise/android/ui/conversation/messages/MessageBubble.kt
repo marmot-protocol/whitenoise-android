@@ -150,6 +150,7 @@ import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
 import dev.ipf.whitenoise.android.ui.theme.LocalMessageBubbleBaseColorScheme
 import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
+import dev.ipf.whitenoise.android.ui.theme.messageFooterLabelColor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -1841,7 +1842,8 @@ internal fun MessageBubble(
                 // its paired WCAG-safe content color. Footer-only media rows are
                 // outside the bubble and retain the page's surface foreground.
                 val timestampColor =
-                    if (bodyOrWarningInsideBubble) bubbleContentColor else colorScheme.onSurfaceVariant
+                    amoledDirectionalAccentColor(mine)
+                        ?: messageFooterLabelColor(bubbleBackgroundColor, bubbleContentColor)
                 LaunchedEffect(textSelectionMode, bodyTextToRender) {
                     if (textSelectionMode && bodyTextToRender.isNullOrBlank()) {
                         onTextSelectionModeChange(false)
@@ -2225,6 +2227,7 @@ internal fun MessageBubble(
                             bubbleBackgroundColor = bubbleBackgroundColor,
                             bubbleContentColor = bubbleContentColor,
                             timestampColor = timestampColor,
+                            statusContainerColor = bubbleBackgroundColor,
                             showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
                             retentionOwnedByFileCard = false,
                             editedLabel = editedLabel,

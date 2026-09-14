@@ -149,13 +149,6 @@
     <string name="profile_unfollow">Takibi bırak</string>
     <string name="profile_follow_failed">Takip durumu güncellenemedi. Bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="profile_nip05_verified">Doğrulanmış Nostr adresi</string>
-    <string name="contact_create_group_with">%1$s ile grup oluştur</string>
-    <string name="contact_add_to_group">Gruba ekle</string>
-    <string name="contact_groups_see_all">Tümünü göster</string>
-    <plurals name="contact_groups_in_common">
-        <item quantity="one">%1$d ortak grup</item>
-        <item quantity="other">%1$d ortak grup</item>
-    </plurals>
     <string name="profile_add_to_another_group">Başka bir gruba ekle</string>
     <string name="profile_add_to_groups_title">%1$s kullanıcısını gruplara ekle</string>
     <string name="profile_add_to_groups_description">Admin olduğunuz ve %1$s kullanıcısının henüz üye olmadığı grupları seçin.</string>
@@ -1089,6 +1082,7 @@
     <string name="reaction_tap_to_remove">Kaldırmak için dokun</string>
     <string name="chat_list_filter_groups">Gruplar</string>
     <string name="chat_folders_title">Klasörler</string>
+    <string name="chat_add_folder">Klasöre ekle</string>
     <string name="chat_folder_new">Yeni klasör</string>
     <string name="chat_folder_name_label">Ad</string>
     <string name="chat_folder_description_label">Açıklama</string>
@@ -1122,7 +1116,6 @@
     <string name="done">Bitti</string>
     <string name="clear_search">Aramayı temizle</string>
     <string name="chat_list_action_add_to_folder">Klasöre ekle</string>
-    <string name="chat_folders_none">Yok</string>
     <string name="chat_folder_included_by_rule">Bu klasörün kuralları tarafından dahil edildi</string>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d sohbet</item>

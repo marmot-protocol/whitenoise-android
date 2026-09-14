@@ -8,14 +8,15 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -30,7 +31,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -103,19 +103,26 @@ internal fun GroupCreationPersonRow(
                 modifier = modifier.semantics { role = Role.Checkbox },
                 leadingContent = leading,
                 supportingContent = supporting,
-                trailingContent = {
-                    Checkbox(selected == true, null, enabled = enabled, modifier = Modifier.clearAndSetSemantics {})
-                },
+                trailingContent = if (selected == true) ({ SelectedPersonCheck() }) else null,
                 content = headline,
             )
         }
+        // The prototype separates the segmented rows with the list gap, not a drawn line.
         if (index < count - 1) {
-            HorizontalDivider(
-                Modifier.padding(horizontal = 16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-            )
+            Spacer(Modifier.height(WhiteNoiseListItemDefaults.segmentedGap))
         }
     }
+}
+
+/** The prototype marks a chosen person with the primary check glyph instead of a checkbox. */
+@Composable
+@Suppress("FunctionNaming") // Compose naming follows the framework convention.
+private fun SelectedPersonCheck() {
+    Icon(
+        painter = painterResource(R.drawable.ic_check),
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.primary,
+    )
 }
 
 /** Prototype 80dp selected-person chip; the complete chip is an accessible remove action. */

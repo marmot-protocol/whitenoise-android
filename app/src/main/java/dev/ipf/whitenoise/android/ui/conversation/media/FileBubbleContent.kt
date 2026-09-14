@@ -265,6 +265,7 @@ private fun FileTrailingMetadata(
                 reserveSpace = reserveRetentionSpace,
             )
         }
+        status?.let { OutgoingMessageStatusIcon(it, tint = color) }
         text?.let {
             Text(
                 text = it,
@@ -279,7 +280,6 @@ private fun FileTrailingMetadata(
                     ),
             )
         }
-        status?.let { OutgoingMessageStatusIcon(it, tint = color) }
     }
 }
 

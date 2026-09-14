@@ -783,7 +783,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             }
         }
     } else if (!footerOnVisualMedia && !footerOnPendingVisual && hasInlineFooter) {
-        Box(modifier = Modifier.align(if (mine) Alignment.End else Alignment.Start)) {
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
             inlineFooter()
         }
     }

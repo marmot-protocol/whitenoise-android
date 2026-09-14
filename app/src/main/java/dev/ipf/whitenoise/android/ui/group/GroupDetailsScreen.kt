@@ -97,11 +97,9 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.AppText
-import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
-import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
@@ -110,8 +108,6 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowQuickActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
-import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
-import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
@@ -127,7 +123,6 @@ import dev.ipf.whitenoise.android.ui.medialibrary.SharedContentCategory
 import dev.ipf.whitenoise.android.ui.medialibrary.SharedMediaSection
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
-import dev.ipf.whitenoise.android.ui.profile.ProfileAddToGroupsSheet
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.settings.ChatBubbleColorsScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
@@ -135,11 +130,11 @@ import dev.ipf.whitenoise.android.ui.settings.DiagnosticRow
 import dev.ipf.whitenoise.android.ui.settings.IdentifierCopyCapsule
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsGroupScope
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsPanel
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
-import dev.ipf.whitenoise.android.ui.settings.chatFolderDisplayName
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -212,22 +207,6 @@ internal fun GroupDetailsLocalDeleteControl(
 
 // Members shown in Group Details before the "See all" expander.
 private const val GROUP_MEMBERS_PREVIEW_COUNT = 5
-private const val SHARED_GROUPS_PREVIEW_COUNT = 3
-
-internal fun directDetailsSharedGroups(
-    groups: List<ChatListItem>,
-    currentGroupIdHex: String,
-): List<ChatListItem> =
-    groups.filter { item ->
-        !item.group.groupIdHex.equals(currentGroupIdHex, ignoreCase = true) &&
-            item.memberCount >= 2 &&
-            (item.memberCount != 2 || item.group.name.isNotBlank())
-    }
-
-internal fun visibleDirectDetailsSharedGroups(
-    groups: List<ChatListItem>,
-    expanded: Boolean,
-): List<ChatListItem> = if (expanded) groups else groups.take(SHARED_GROUPS_PREVIEW_COUNT)
 
 /** Chat overview that keeps native membership, moderation and notification owners behind its presentation. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -250,12 +229,6 @@ internal fun GroupDetailsScreen(
     onAutoOpenAddMemberConsumed: () -> Unit = {},
     // Close details and raise the conversation's message search.
     onOpenSearch: (() -> Unit)? = null,
-    // Shared-group rows and a newly-created group replace the currently open
-    // conversation in the shell without bouncing through the chat list.
-    onOpenConversation: (ChatListItem, Boolean) -> Unit = { _, _ -> },
-    onGroupCreateSubmitted: () -> Long = { 0L },
-    onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ -> onOpenConversation(item, false) },
-    onGroupCreateFlowSuperseded: () -> Unit = {},
 ) {
     val detailsScrollState = key(controller) { rememberScrollState() }
     val membersScrollState = key(controller) { rememberScrollState() }
@@ -273,10 +246,6 @@ internal fun GroupDetailsScreen(
     var membersExpanded by remember(controller) { mutableStateOf(false) }
     var memberSearchOpen by remember(controller) { mutableStateOf(false) }
     var memberQuery by remember(controller) { mutableStateOf("") }
-    var sharedGroupsExpanded by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    var showStartGroupWithContact by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    var showAddContactToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    var addingContactToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     // Sole-admin "Transfer admin first" picker. Surfaced from the blocked
     // leave path and the Admins prompt so a trapped sole admin can hand the
     // role to another member (issue #417).
@@ -375,35 +344,6 @@ internal fun GroupDetailsScreen(
     LaunchedEffect(canShowEditAction) {
         if (!canShowEditAction) showEditGroup = false
     }
-    val dmSharedGroups =
-        remember(dmPeerAccountIdHex, appState.chatListItems, controller.group.groupIdHex) {
-            dmPeerAccountIdHex
-                ?.let(appState::sharedGroupsWith)
-                ?.let { directDetailsSharedGroups(it, controller.group.groupIdHex) }
-                .orEmpty()
-        }
-    val groupPickerRevision = appState.profileGroupPickerRevision
-    val dmAddableGroupsState =
-        remember(dmPeerAccountIdHex, appState.chatListItems, groupPickerRevision) {
-            dmPeerAccountIdHex?.let(appState::profileAddableGroupsState) ?: ProfileGroupPickerState.empty()
-        }
-    LaunchedEffect(showAddContactToGroups, dmAddableGroupsState.pendingGroupIds) {
-        if (showAddContactToGroups && dmAddableGroupsState.pendingGroupIds.isNotEmpty()) {
-            appState.requestProfileGroupMembers(dmAddableGroupsState.pendingGroupIds)
-        }
-    }
-    val dmPeerCandidate =
-        remember(dmPeerAccountIdHex, dmPeerNpub, conversationTitle) {
-            if (dmPeerAccountIdHex != null && dmPeerNpub != null) {
-                RecipientSearch.Candidate(
-                    accountIdHex = dmPeerAccountIdHex,
-                    displayName = conversationTitle,
-                    npub = dmPeerNpub,
-                )
-            } else {
-                null
-            }
-        }
     val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
     val vibrationSelections by appState.conversationVibrationPreferences.state.collectAsState()
     val notificationModes = chatNotificationState.notificationModes
@@ -768,21 +708,6 @@ internal fun GroupDetailsScreen(
             autoSelectResolvedIdentifier = true,
             excludeAccountIdHexes =
                 (controller.presentedMembers.map { it.memberIdHex } + controller.pendingInviteMemberRefs).toSet(),
-        )
-        return
-    }
-
-    if (showStartGroupWithContact && dmPeerCandidate != null) {
-        NewGroupFlow(
-            appState = appState,
-            initialMembers = listOf(dmPeerCandidate),
-            onCreateCompletedOpen = onGroupCreateCompletedOpen,
-            onCreateSubmitted = onGroupCreateSubmitted,
-            onCreateFlowSuperseded = onGroupCreateFlowSuperseded,
-            onClose = {
-                showStartGroupWithContact = false
-                onGroupCreateFlowSuperseded()
-            },
         )
         return
     }
@@ -1471,33 +1396,6 @@ internal fun GroupDetailsScreen(
                         onClick = { showBubbleColors = true },
                     )
                 }
-                row("folders") { rowContext ->
-                    SettingsLink(
-                        context = rowContext,
-                        title = stringResource(R.string.chat_folders_title),
-                        onClick = { showFolderPicker = true },
-                        modifier = Modifier.testTag("chat_info.folders"),
-                        value =
-                            folderNames
-                                .takeIf { it.isNotEmpty() }
-                                ?.map { (folder, _) -> chatFolderDisplayName(folder) }
-                                ?.joinToString(", ")
-                                ?: stringResource(R.string.chat_folders_none),
-                        leading = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
-                    )
-                }
-            }
-            if (isDm && dmPeerCandidate != null) {
-                DirectDetailsContactEditorRow(
-                    appState = appState,
-                    groupIdHex = controller.group.groupIdHex,
-                    peerAccountIdHex = dmPeerAccountIdHex,
-                    isDm = isDm,
-                    readOnlyInvite = readOnlyInvite,
-                    dmPeerNpub = dmPeerNpub,
-                    activeAccountRef = appState.activeAccountRef,
-                    accounts = appState.accounts,
-                )
             }
 
             if (showAutoReadPicker) {
@@ -1554,52 +1452,74 @@ internal fun GroupDetailsScreen(
                 )
             }
 
-            if (isDm && dmPeerCandidate != null) {
-                // Give the contact actions a small section inset after the
-                // settings divider, then keep the actions and shared groups
-                // contiguous through their own row padding.
-                Column {
-                    AppDivider()
-                    Spacer(Modifier.height(Dimens.spaceSm))
-                    DmDetailsContactActionRows(
-                        createGroupTitle = stringResource(R.string.contact_create_group_with, conversationTitle),
-                        addToGroupTitle = stringResource(R.string.contact_add_to_group),
-                        addingContactToGroups = addingContactToGroups,
-                        onCreateGroup = { showStartGroupWithContact = true },
-                        onAddToGroup = { showAddContactToGroups = true },
+            // Rows shared by the DM technical group and the group lifecycle group.
+            fun SettingsGroupScope.folderRow() {
+                row("folders") { rowContext ->
+                    SettingsAction(
+                        context = rowContext,
+                        title = stringResource(R.string.chat_add_folder),
+                        onClick = { showFolderPicker = true },
+                        modifier = Modifier.testTag("chat_info.folders"),
+                        leading = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
                     )
-                    if (dmSharedGroups.isNotEmpty()) {
-                        SectionHeader(
-                            pluralStringResource(
-                                R.plurals.contact_groups_in_common,
-                                dmSharedGroups.size,
-                                dmSharedGroups.size,
-                            ),
-                        )
-                    }
-                    visibleDirectDetailsSharedGroups(dmSharedGroups, sharedGroupsExpanded).forEach { sharedGroup ->
-                        ContactRow(
-                            title = chatListItemDisplayTitle(sharedGroup, appState, groupTitleCopy),
-                            subtitle = stringResource(R.string.members_count, sharedGroup.memberCount),
-                            avatarSeed = sharedGroup.group.groupIdHex,
-                            avatarUrl = sharedGroup.group.avatarUrl,
-                            avatarImage = rememberEncryptedGroupAvatar(appState, sharedGroup.group),
-                            onClick = { onOpenConversation(sharedGroup, false) },
-                        )
-                    }
-                    if (!sharedGroupsExpanded && dmSharedGroups.size > SHARED_GROUPS_PREVIEW_COUNT) {
-                        SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Related)) {
-                            row("see_all_shared_groups") { rowContext ->
-                                SettingsAction(
-                                    context = rowContext,
-                                    title = stringResource(R.string.contact_groups_see_all),
-                                    onClick = { sharedGroupsExpanded = true },
-                                    leading = {
-                                        Icon(painterResource(R.drawable.ic_expand_more), contentDescription = null)
+                }
+            }
+
+            fun SettingsGroupScope.archiveRow() {
+                if (!readOnlyInvite) {
+                    row("archive") { rowContext ->
+                        SettingsAction(
+                            context = rowContext,
+                            title =
+                                stringResource(
+                                    if (controller.presentedArchived) {
+                                        R.string.unarchive_chat
+                                    } else {
+                                        R.string.archive_chat
                                     },
+                                ),
+                            onClick = {
+                                runGroupMutation(
+                                    action = GroupMutationAction.Archive,
+                                    mutation = { controller.setArchived(!controller.presentedArchived) },
                                 )
-                            }
-                        }
+                            },
+                            enabled = !mutationsBlocked,
+                            leading = {
+                                DangerLeading(
+                                    icon =
+                                        if (controller.presentedArchived) {
+                                            R.drawable.ic_unarchive
+                                        } else {
+                                            R.drawable.ic_archive
+                                        },
+                                    inProgress = activeMutation?.action == GroupMutationAction.Archive,
+                                    destructive = false,
+                                )
+                            },
+                        )
+                    }
+                }
+            }
+
+            fun SettingsGroupScope.leaveRow() {
+                if (controller.isSelfMember) {
+                    row("leave") { rowContext ->
+                        SettingsAction(
+                            context = rowContext,
+                            title = stringResource(if (isDm) R.string.leave_chat else R.string.leave_group),
+                            // The engine refuses Leave for disbanding/terminal groups; local delete below is the
+                            // exit for a dead group.
+                            onClick = { requestLeave(controller.title(groupTitleCopy)) },
+                            enabled = !mutationsBlocked && controller.membersLoaded && !groupTerminal,
+                            destructive = true,
+                            leading = {
+                                DangerLeading(
+                                    icon = R.drawable.ic_logout,
+                                    inProgress = activeMutation?.action == GroupMutationAction.Leave,
+                                )
+                            },
+                        )
                     }
                 }
             }
@@ -1628,6 +1548,11 @@ internal fun GroupDetailsScreen(
                         modifier = Modifier.testTag("chat_info.developer_tools"),
                         leading = { Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null) },
                     )
+                }
+                if (isDm) {
+                    folderRow()
+                    archiveRow()
+                    leaveRow()
                 }
             }
 
@@ -1724,128 +1649,67 @@ internal fun GroupDetailsScreen(
             Column(Modifier.padding(top = WhiteNoiseSpacing.Section)) {
                 val selfMember =
                     controller.members.firstOrNull { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-                SettingsGroup(modifier = Modifier.testTag("chat_info.lifecycle")) {
-                    if (!isDm && canEdit) {
-                        row("transfer_admin") { rowContext ->
-                            SettingsAction(
-                                context = rowContext,
-                                title = stringResource(R.string.transfer_admin),
-                                onClick = {
-                                    transferThenLeaveName = null
-                                    showTransferAdmin = true
-                                },
-                                modifier = Modifier.testTag("chat_info.transfer_admin"),
-                                enabled = !mutationsBlocked && controller.transferAdminCandidates().isNotEmpty(),
-                                leading = { Icon(painterResource(R.drawable.ic_swap_vert), contentDescription = null) },
-                            )
+                if (!isDm) {
+                    SettingsGroup(modifier = Modifier.testTag("chat_info.lifecycle")) {
+                        folderRow()
+                        if (canEdit) {
+                            row("transfer_admin") { rowContext ->
+                                SettingsAction(
+                                    context = rowContext,
+                                    title = stringResource(R.string.transfer_admin),
+                                    onClick = {
+                                        transferThenLeaveName = null
+                                        showTransferAdmin = true
+                                    },
+                                    modifier = Modifier.testTag("chat_info.transfer_admin"),
+                                    enabled = !mutationsBlocked && controller.transferAdminCandidates().isNotEmpty(),
+                                    leading = {
+                                        Icon(painterResource(R.drawable.ic_swap_vert), contentDescription = null)
+                                    },
+                                )
+                            }
                         }
-                    }
-                    if (!isDm && canEdit && selfMember != null) {
-                        row("step_down") { rowContext ->
-                            SettingsAction(
-                                context = rowContext,
-                                title = stringResource(R.string.step_down_as_admin),
-                                onClick = {
-                                    pendingConfirm =
-                                        if (controller.isSoleAdminWithOtherMembers) {
-                                            DetailsConfirm.StepDownSoleAdmin
-                                        } else {
-                                            DetailsConfirm.StepDownAdmin(selfMember)
-                                        }
-                                },
-                                enabled = !mutationsBlocked,
-                                leading = {
-                                    DangerLeading(
-                                        icon = R.drawable.ic_admin_panel_settings,
-                                        inProgress = activeMutation?.action == GroupMutationAction.SelfDemoteAdmin,
-                                        destructive = false,
-                                    )
-                                },
-                            )
-                        }
-                    }
-                    if (!readOnlyInvite) {
-                        row("archive") { rowContext ->
-                            SettingsAction(
-                                context = rowContext,
-                                title =
-                                    stringResource(
-                                        if (controller.presentedArchived) {
-                                            R.string.unarchive_chat
-                                        } else {
-                                            R.string.archive_chat
-                                        },
-                                    ),
-                                onClick = {
-                                    runGroupMutation(
-                                        action = GroupMutationAction.Archive,
-                                        mutation = { controller.setArchived(!controller.presentedArchived) },
-                                    )
-                                },
-                                enabled = !mutationsBlocked,
-                                leading = {
-                                    DangerLeading(
-                                        icon =
-                                            if (controller.presentedArchived) {
-                                                R.drawable.ic_unarchive
+                        if (canEdit && selfMember != null) {
+                            row("step_down") { rowContext ->
+                                SettingsAction(
+                                    context = rowContext,
+                                    title = stringResource(R.string.step_down_as_admin),
+                                    onClick = {
+                                        pendingConfirm =
+                                            if (controller.isSoleAdminWithOtherMembers) {
+                                                DetailsConfirm.StepDownSoleAdmin
                                             } else {
-                                                R.drawable.ic_archive
-                                            },
-                                        inProgress = activeMutation?.action == GroupMutationAction.Archive,
-                                        destructive = false,
+                                                DetailsConfirm.StepDownAdmin(selfMember)
+                                            }
+                                    },
+                                    enabled = !mutationsBlocked,
+                                    leading = {
+                                        DangerLeading(
+                                            icon = R.drawable.ic_admin_panel_settings,
+                                            inProgress = activeMutation?.action == GroupMutationAction.SelfDemoteAdmin,
+                                            destructive = false,
+                                        )
+                                    },
+                                )
+                            }
+                        }
+                        archiveRow()
+                        if (controller.isSelfMember) {
+                            groupDisbandRows(
+                                management = controller.managementState,
+                                enabled = !mutationsBlocked,
+                                enableInProgress = activeMutation?.action == GroupMutationAction.EnableDisbanding,
+                                disbandInProgress = activeMutation?.action == GroupMutationAction.Disband,
+                                onEnable = {
+                                    runGroupMutation(
+                                        action = GroupMutationAction.EnableDisbanding,
+                                        mutation = { controller.enableGroupDisbanding() },
                                     )
                                 },
+                                onDisbandRequested = { disbandConfirmOpen = true },
                             )
                         }
-                    }
-                    if (!isDm && controller.isSelfMember) {
-                        groupDisbandRows(
-                            management = controller.managementState,
-                            enabled = !mutationsBlocked,
-                            enableInProgress = activeMutation?.action == GroupMutationAction.EnableDisbanding,
-                            disbandInProgress = activeMutation?.action == GroupMutationAction.Disband,
-                            onEnable = {
-                                runGroupMutation(
-                                    action = GroupMutationAction.EnableDisbanding,
-                                    mutation = { controller.enableGroupDisbanding() },
-                                )
-                            },
-                            onDisbandRequested = { disbandConfirmOpen = true },
-                        )
-                    }
-                    if (!isDm && controller.isSelfMember) {
-                        groupDisbandRows(
-                            management = controller.managementState,
-                            enabled = !mutationsBlocked,
-                            enableInProgress = activeMutation?.action == GroupMutationAction.EnableDisbanding,
-                            disbandInProgress = activeMutation?.action == GroupMutationAction.Disband,
-                            onEnable = {
-                                runGroupMutation(
-                                    action = GroupMutationAction.EnableDisbanding,
-                                    mutation = { controller.enableGroupDisbanding() },
-                                )
-                            },
-                            onDisbandRequested = { disbandConfirmOpen = true },
-                        )
-                    }
-                    if (controller.isSelfMember) {
-                        row("leave") { rowContext ->
-                            SettingsAction(
-                                context = rowContext,
-                                title = stringResource(if (isDm) R.string.leave_chat else R.string.leave_group),
-                                // The engine refuses Leave for disbanding/terminal groups; local delete below is the
-                                // exit for a dead group.
-                                onClick = { requestLeave(controller.title(groupTitleCopy)) },
-                                enabled = !mutationsBlocked && controller.membersLoaded && !groupTerminal,
-                                destructive = true,
-                                leading = {
-                                    DangerLeading(
-                                        icon = R.drawable.ic_logout,
-                                        inProgress = activeMutation?.action == GroupMutationAction.Leave,
-                                    )
-                                },
-                            )
-                        }
+                        leaveRow()
                     }
                 }
                 if (showFolderPicker) {
@@ -1907,39 +1771,6 @@ internal fun GroupDetailsScreen(
                 )
             }
         }
-    }
-    if (showAddContactToGroups && dmPeerAccountIdHex != null) {
-        ProfileAddToGroupsSheet(
-            appState = appState,
-            targetName = conversationTitle,
-            state = dmAddableGroupsState,
-            busy = addingContactToGroups,
-            onDismiss = {
-                if (!addingContactToGroups) showAddContactToGroups = false
-            },
-            onRetry = {
-                appState.requestProfileGroupMembers(
-                    dmAddableGroupsState.pendingGroupIds,
-                    retry = true,
-                )
-            },
-            onAdd = { selected ->
-                if (addingContactToGroups) return@ProfileAddToGroupsSheet
-                addingContactToGroups = true
-                appState.launchMutation {
-                    try {
-                        val allAdded =
-                            appState.inviteProfileToGroups(
-                                targetRef = dmPeerAccountIdHex,
-                                targetGroupIds = selected.map { it.group.groupIdHex },
-                            )
-                        if (allAdded) showAddContactToGroups = false
-                    } finally {
-                        addingContactToGroups = false
-                    }
-                }
-            },
-        )
     }
 }
 

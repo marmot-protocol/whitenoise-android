@@ -4,10 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -16,11 +12,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -38,6 +34,7 @@ internal fun OutgoingMessageStatusIcon(
     OutgoingIndicatorIcon(status.outgoingIndicator() ?: return, tint, containerColor)
 }
 
+/** The prototype's delivery glyph; the check takes the bubble colour, or the page surface outside a bubble. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun OutgoingIndicatorIcon(
@@ -45,33 +42,7 @@ internal fun OutgoingIndicatorIcon(
     tint: Color,
     containerColor: Color? = null,
 ) {
-    if (containerColor != null) {
-        BubbleDeliveryGlyph(indicator, tint, containerColor)
-        return
-    }
-    when (indicator) {
-        OutgoingMessageIndicator.Sending ->
-            Icon(
-                imageVector = Icons.Default.Schedule,
-                contentDescription = stringResource(R.string.sending),
-                modifier = Modifier.size(14.dp),
-                tint = tint.copy(alpha = 0.76f),
-            )
-        OutgoingMessageIndicator.Sent ->
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = stringResource(R.string.sent),
-                modifier = Modifier.size(14.dp),
-                tint = tint,
-            )
-        OutgoingMessageIndicator.Failed ->
-            Icon(
-                imageVector = Icons.Default.ErrorOutline,
-                contentDescription = stringResource(R.string.send_failed),
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.error,
-            )
-    }
+    BubbleDeliveryGlyph(indicator, tint, containerColor ?: MaterialTheme.colorScheme.surface)
 }
 
 /**
@@ -88,8 +59,9 @@ private fun BubbleDeliveryGlyph(
     when (indicator) {
         OutgoingMessageIndicator.Sending -> {
             val sending = stringResource(R.string.sending)
+            // A status glyph, not a progress control: it must not read as the composer's progress indicator.
             CircularProgressIndicator(
-                modifier = Modifier.size(14.dp).semantics { contentDescription = sending },
+                modifier = Modifier.size(14.dp).clearAndSetSemantics { contentDescription = sending },
                 color = tint,
                 strokeWidth = 1.5.dp,
             )

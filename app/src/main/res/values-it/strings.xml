@@ -149,13 +149,6 @@
     <string name="profile_unfollow">Non seguire più</string>
     <string name="profile_follow_failed">Impossibile aggiornare lo stato. Controlla la connessione e riprova.</string>
     <string name="profile_nip05_verified">Indirizzo Nostr verificato</string>
-    <string name="contact_create_group_with">Crea gruppo con %1$s</string>
-    <string name="contact_add_to_group">Aggiungi a un gruppo</string>
-    <string name="contact_groups_see_all">Mostra tutti</string>
-    <plurals name="contact_groups_in_common">
-        <item quantity="one">%1$d gruppo in comune</item>
-        <item quantity="other">%1$d gruppi in comune</item>
-    </plurals>
     <string name="profile_add_to_another_group">Aggiungi a un altro gruppo</string>
     <string name="profile_add_to_groups_title">Aggiungi %1$s ai gruppi</string>
     <string name="profile_add_to_groups_description">Scegli i gruppi di cui sei admin e in cui %1$s non è già membro.</string>
@@ -1091,6 +1084,7 @@
     <string name="reaction_tap_to_remove">Tocca per rimuovere</string>
     <string name="chat_list_filter_groups">Gruppi</string>
     <string name="chat_folders_title">Cartelle</string>
+    <string name="chat_add_folder">Aggiungi a cartella</string>
     <string name="chat_folder_new">Nuova cartella</string>
     <string name="chat_folder_name_label">Nome</string>
     <string name="chat_folder_description_label">Descrizione</string>
@@ -1124,7 +1118,6 @@
     <string name="done">Fine</string>
     <string name="clear_search">Cancella ricerca</string>
     <string name="chat_list_action_add_to_folder">Aggiungi a una cartella</string>
-    <string name="chat_folders_none">Nessuna</string>
     <string name="chat_folder_included_by_rule">Incluso dalle regole di questa cartella</string>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d chat</item>

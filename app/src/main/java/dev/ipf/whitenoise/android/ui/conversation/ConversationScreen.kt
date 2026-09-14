@@ -571,10 +571,6 @@ internal fun ConversationScreen(
     // history (issue #1107). Null when none was saved or they left near-bottom.
     restoredScrollSnapshot: ConversationScrollSnapshot? = null,
     onSaveScrollSnapshot: (ConversationScrollSnapshot?) -> Unit = {},
-    onOpenConversation: (ChatListItem, Boolean) -> Unit = { _, _ -> },
-    onGroupCreateSubmitted: () -> Long = { 0L },
-    onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ -> onOpenConversation(item, false) },
-    onGroupCreateFlowSuperseded: () -> Unit = {},
     onTtsTransportBodyClick: (() -> Unit)? = null,
     surfaceState: ConversationSurfaceState? = null,
     dictationControlsVisible: Boolean = true,
@@ -3019,13 +3015,6 @@ internal fun ConversationScreen(
                 showDetails = false
                 navigationState.searchOpen = true
             },
-            onOpenConversation = { item, created ->
-                showDetails = false
-                onOpenConversation(item, created)
-            },
-            onGroupCreateSubmitted = onGroupCreateSubmitted,
-            onGroupCreateCompletedOpen = onGroupCreateCompletedOpen,
-            onGroupCreateFlowSuperseded = onGroupCreateFlowSuperseded,
         )
         return
     }

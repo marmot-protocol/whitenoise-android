@@ -149,13 +149,6 @@
     <string name="profile_unfollow">Deixar de seguir</string>
     <string name="profile_follow_failed">Não foi possível atualizar o seguimento. Verifique sua conexão e tente novamente.</string>
     <string name="profile_nip05_verified">Endereço Nostr verificado</string>
-    <string name="contact_create_group_with">Criar grupo com %1$s</string>
-    <string name="contact_add_to_group">Adicionar a um grupo</string>
-    <string name="contact_groups_see_all">Ver todos</string>
-    <plurals name="contact_groups_in_common">
-        <item quantity="one">%1$d grupo em comum</item>
-        <item quantity="other">%1$d grupos em comum</item>
-    </plurals>
     <string name="profile_add_to_another_group">Adicionar a outro grupo</string>
     <string name="profile_add_to_groups_title">Adicionar %1$s a grupos</string>
     <string name="profile_add_to_groups_description">Escolha grupos em que você é admin e %1$s ainda não é membro.</string>
@@ -1091,6 +1084,7 @@
     <string name="reaction_tap_to_remove">Toque para remover</string>
     <string name="chat_list_filter_groups">Grupos</string>
     <string name="chat_folders_title">Pastas</string>
+    <string name="chat_add_folder">Adicionar à pasta</string>
     <string name="chat_folder_new">Nova pasta</string>
     <string name="chat_folder_name_label">Nome</string>
     <string name="chat_folder_description_label">Descrição</string>
@@ -1124,7 +1118,6 @@
     <string name="done">Concluído</string>
     <string name="clear_search">Limpar pesquisa</string>
     <string name="chat_list_action_add_to_folder">Adicionar à pasta</string>
-    <string name="chat_folders_none">Nenhuma</string>
     <string name="chat_folder_included_by_rule">Incluído pelas regras desta pasta</string>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d conversa</item>

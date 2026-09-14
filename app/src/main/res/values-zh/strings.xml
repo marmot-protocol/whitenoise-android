@@ -141,13 +141,6 @@
     <string name="profile_unfollow">取消关注</string>
     <string name="profile_follow_failed">无法更新关注状态。请检查网络连接后重试。</string>
     <string name="profile_nip05_verified">已验证的 Nostr 地址</string>
-    <string name="contact_create_group_with">与 %1$s 创建群组</string>
-    <string name="contact_add_to_group">添加到群组</string>
-    <string name="contact_groups_see_all">查看全部</string>
-    <plurals name="contact_groups_in_common">
-        <item quantity="one">%1$d 个共同群组</item>
-        <item quantity="other">%1$d 个共同群组</item>
-    </plurals>
     <string name="profile_add_to_another_group">添加到另一个群组</string>
     <string name="profile_add_to_groups_title">将 %1$s 添加到群组</string>
     <string name="profile_add_to_groups_description">选择你是管理员且 %1$s 尚未加入的群组。</string>
@@ -1073,6 +1066,7 @@
     <string name="reaction_tap_to_remove">点按以移除</string>
     <string name="chat_list_filter_groups">群组</string>
     <string name="chat_folders_title">文件夹</string>
+    <string name="chat_add_folder">添加到文件夹</string>
     <string name="chat_folder_new">新建文件夹</string>
     <string name="chat_folder_name_label">名称</string>
     <string name="chat_folder_description_label">描述</string>
@@ -1106,7 +1100,6 @@
     <string name="done">完成</string>
     <string name="clear_search">清除搜索</string>
     <string name="chat_list_action_add_to_folder">添加到文件夹</string>
-    <string name="chat_folders_none">无</string>
     <string name="chat_folder_included_by_rule">由此文件夹的规则加入</string>
     <plurals name="chat_folder_chat_count">
         <item quantity="other">%1$d 个聊天</item>

@@ -149,13 +149,6 @@
     <string name="profile_unfollow">Nicht mehr folgen</string>
     <string name="profile_follow_failed">Der Folgestatus konnte nicht aktualisiert werden. Prüfe deine Verbindung und versuche es erneut.</string>
     <string name="profile_nip05_verified">Verifizierte Nostr-Adresse</string>
-    <string name="contact_create_group_with">Gruppe mit %1$s erstellen</string>
-    <string name="contact_add_to_group">Zu Gruppe hinzufügen</string>
-    <string name="contact_groups_see_all">Alle anzeigen</string>
-    <plurals name="contact_groups_in_common">
-        <item quantity="one">%1$d gemeinsame Gruppe</item>
-        <item quantity="other">%1$d gemeinsame Gruppen</item>
-    </plurals>
     <string name="profile_add_to_another_group">Zu einer anderen Gruppe hinzufügen</string>
     <string name="profile_add_to_groups_title">%1$s zu Gruppen hinzufügen</string>
     <string name="profile_add_to_groups_description">Wähle Gruppen aus, in denen du Admin bist und %1$s noch kein Mitglied ist.</string>
@@ -1089,6 +1082,7 @@
     <string name="reaction_tap_to_remove">Zum Entfernen tippen</string>
     <string name="chat_list_filter_groups">Gruppen</string>
     <string name="chat_folders_title">Ordner</string>
+    <string name="chat_add_folder">Zu Ordner hinzufügen</string>
     <string name="chat_folder_new">Neuer Ordner</string>
     <string name="chat_folder_name_label">Name</string>
     <string name="chat_folder_description_label">Beschreibung</string>
@@ -1122,7 +1116,6 @@
     <string name="done">Fertig</string>
     <string name="clear_search">Suche löschen</string>
     <string name="chat_list_action_add_to_folder">Zu Ordner hinzufügen</string>
-    <string name="chat_folders_none">Keine</string>
     <string name="chat_folder_included_by_rule">Durch die Regeln dieses Ordners enthalten</string>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d Chat</item>

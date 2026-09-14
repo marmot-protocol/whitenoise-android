@@ -141,13 +141,6 @@
     <string name="profile_unfollow">取消追蹤</string>
     <string name="profile_follow_failed">無法更新追蹤狀態。請檢查網路連線後再試一次。</string>
     <string name="profile_nip05_verified">已驗證的 Nostr 位址</string>
-    <string name="contact_create_group_with">與 %1$s 建立群組</string>
-    <string name="contact_add_to_group">新增至群組</string>
-    <string name="contact_groups_see_all">查看全部</string>
-    <plurals name="contact_groups_in_common">
-        <item quantity="one">%1$d 個共同群組</item>
-        <item quantity="other">%1$d 個共同群組</item>
-    </plurals>
     <string name="profile_add_to_another_group">新增到另一個群組</string>
     <string name="profile_add_to_groups_title">將 %1$s 新增到群組</string>
     <string name="profile_add_to_groups_description">選擇你是管理員且 %1$s 尚未加入的群組。</string>
@@ -1073,6 +1066,7 @@
     <string name="reaction_tap_to_remove">輕觸以移除</string>
     <string name="chat_list_filter_groups">群組</string>
     <string name="chat_folders_title">資料夾</string>
+    <string name="chat_add_folder">加入資料夾</string>
     <string name="chat_folder_new">新增資料夾</string>
     <string name="chat_folder_name_label">名稱</string>
     <string name="chat_folder_description_label">描述</string>
@@ -1106,7 +1100,6 @@
     <string name="done">完成</string>
     <string name="clear_search">清除搜尋</string>
     <string name="chat_list_action_add_to_folder">加入資料夾</string>
-    <string name="chat_folders_none">無</string>
     <string name="chat_folder_included_by_rule">由此資料夾的規則加入</string>
     <plurals name="chat_folder_chat_count">
         <item quantity="other">%1$d 個聊天</item>

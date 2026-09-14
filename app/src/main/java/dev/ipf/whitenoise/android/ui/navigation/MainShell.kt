@@ -2262,10 +2262,6 @@ internal fun MainShell(
                                     transitionRunning = routeTransition.isRunning,
                                 ),
                             restoredScrollSnapshot = conversationScrollSnapshots[scrollKey],
-                            onOpenConversation = openGroupFromProfile,
-                            onGroupCreateSubmitted = onGroupCreateSubmitted,
-                            onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
-                            onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
                             onTtsTransportBodyClick = requestTtsDestinationOpen,
                             onSaveScrollSnapshot = { snapshot ->
                                 if (snapshot == null) {
