@@ -43,9 +43,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -1079,10 +1077,9 @@ internal fun ComposerPill(
                                         .alpha(if (inputContentVisible) 1f else 0f)
                                         .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
                             ) {
-                                // A waveform keeps text dictation visually distinct from
-                                // the plain microphone used by hold-to-record voice notes.
+                                // The prototype's microphone is dictation; voice notes use the waveform glyph.
                                 Icon(
-                                    Icons.Default.GraphicEq,
+                                    painter = painterResource(R.drawable.ic_mic),
                                     contentDescription = stringResource(R.string.dictate_text),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(24.dp),

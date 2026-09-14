@@ -236,7 +236,6 @@
     <string name="save_group">Save Group</string>
     <string name="saving_group">Saving group...</string>
     <string name="info">Info</string>
-    <string name="group_info">Group info</string>
     <string name="group_identifiers">Group identifiers</string>
     <string name="mls_group_id">MLS group ID</string>
     <string name="nostr_group_id">Nostr group ID</string>
@@ -245,6 +244,7 @@
     <string name="relay_number">Relay %1$d</string>
     <string name="group_id">Group ID</string>
     <string name="relays">Relays</string>
+    <string name="developer_tools">Developer Tools</string>
     <string name="members">Members</string>
     <string name="add_member">Add Members</string>
     <string name="add_member_already_in_group">%1$s is already in this group</string>
@@ -298,6 +298,7 @@
     <string name="push_debug_updated_at">Updated at</string>
     <string name="error_qr_not_valid_npub_or_public_key">That QR code is not a valid npub or public key.</string>
     <string name="admin">Admin</string>
+    <string name="member">Member</string>
     <string name="you">You</string>
     <string name="reaction_filter_all">All</string>
     <string name="view_reactors">View who reacted</string>
@@ -380,19 +381,18 @@
     <string name="open_emoji_picker">Open emoji picker</string>
     <string name="show_keyboard">Show keyboard</string>
     <string name="emoji_backspace">Delete emoji</string>
-    <string name="customize_reactions">Customize reactions</string>
-    <string name="customize_reactions_hint">Tap to replace an emoji</string>
-    <string name="reset_reactions">Reset</string>
+    <string name="configure_reactions">Configure Reactions</string>
+    <string name="configure_reactions_guidance">Tap an emoji to replace it.</string>
+    <string name="reset">Reset</string>
+    <string name="reaction_slot_description">Reaction %1$d, %2$s. Double tap to replace.</string>
     <string name="emoji_search_hint">Search emoji</string>
     <string name="emoji_search_clear">Clear emoji search</string>
     <string name="emoji_search_no_results">No emoji found</string>
-    <string name="emoji_category_this_message" translatable="false">This Message</string>
     <string name="emoji_category_recent" translatable="false">Recently Used</string>
-    <string name="emoji_category_smileys" translatable="false">Smileys &amp; People</string>
-    <string name="emoji_category_people" translatable="false">People &amp; body</string>
-    <string name="emoji_category_animals" translatable="false">Animals &amp; nature</string>
-    <string name="emoji_category_food" translatable="false">Food &amp; drink</string>
-    <string name="emoji_category_travel" translatable="false">Travel &amp; places</string>
+    <string name="emoji_category_smileys_people" translatable="false">Smileys &amp; People</string>
+    <string name="emoji_category_animals_nature" translatable="false">Animals &amp; Nature</string>
+    <string name="emoji_category_food_drink" translatable="false">Food &amp; Drink</string>
+    <string name="emoji_category_travel_places" translatable="false">Travel &amp; Places</string>
     <string name="emoji_category_activities" translatable="false">Activities</string>
     <string name="emoji_category_objects" translatable="false">Objects</string>
     <string name="emoji_category_symbols" translatable="false">Symbols</string>
@@ -1416,8 +1416,6 @@
         <item quantity="one">%d year</item>
         <item quantity="other">%d years</item>
     </plurals>
-    <string name="disappearing_row_hint_admin">Tap to set how long new messages last</string>
-    <string name="disappearing_row_hint_readonly">Only admins can change this</string>
     <string name="toast_disappearing_messages_updated">Disappearing messages updated</string>
     <string name="toast_couldnt_update_disappearing">Couldn\'t update disappearing messages</string>
     <string name="save">Save</string>
@@ -1933,9 +1931,6 @@
     <string name="folder_included_chats">Included Chats</string>
     <string name="chats">Chats</string>
     <string name="manage_folders">Manage folders</string>
-    <string name="left_chats">Left</string>
-    <string name="no_left_chats">No Left Chats</string>
-    <string name="no_left_chats_detail">Chats you leave or are removed from will appear here.</string>
     <string name="new_message_name_or_npub">Name or npub</string>
     <string name="new_message_connect_qr">Connect with QR</string>
     <string name="new_message_invite_friend">Invite a friend</string>
@@ -1978,6 +1973,20 @@
 
     <string name="chat_selection_title">Select chats</string>
     <string name="chats_check_relays">Check relays</string>
+    <string name="selection_state_selected">Selected</string>
+    <string name="selection_state_not_selected">Not selected</string>
+    <plurals name="reaction_count">
+        <item quantity="one">%1$s, %2$d reaction</item>
+        <item quantity="other">%1$s, %2$d reactions</item>
+    </plurals>
+    <plurals name="more_reaction_types">
+        <item quantity="one">%2$d more reaction type</item>
+        <item quantity="other">%2$d more reaction types</item>
+    </plurals>
+    <plurals name="chat_relay_count">
+        <item quantity="one">%1$d chat relay</item>
+        <item quantity="other">%1$d chat relays</item>
+    </plurals>
     <string name="audit_upload_title">Share technical logs</string>
     <string name="audit_upload_subtitle">Automatically send diagnostic audit logs to White Noise, separately from usage sharing.</string>
     <string name="audit_upload_confirm_title">Share technical logs with White Noise?</string>

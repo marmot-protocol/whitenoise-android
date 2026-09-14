@@ -159,10 +159,10 @@ class DeletedMessageLocalRemovalTest {
         val surface = renderLive(reactions = reactedSummary())
         val viewReactorsAction =
             SemanticsMatcher("has view reactors action") {
-                it.config.contains(SemanticsActions.OnClick) &&
-                    it.config[SemanticsActions.OnClick].label == string(R.string.view_reactors)
+                it.config.contains(SemanticsActions.OnLongClick) &&
+                    it.config[SemanticsActions.OnLongClick].label == string(R.string.view_reactors)
             }
-        composeRule.onNode(viewReactorsAction, useUnmergedTree = true).performClick()
+        composeRule.onNode(viewReactorsAction, useUnmergedTree = true).performTouchInput { longClick() }
         val reactionFilterAll = "${string(R.string.reaction_filter_all)} · 1"
         composeRule.onNodeWithText(reactionFilterAll, substring = false).assertIsDisplayed()
 
@@ -328,7 +328,6 @@ class DeletedMessageLocalRemovalTest {
                             isActionMenuOpen = actionMenuOpen,
                             onActionMenuOpenChange = { actionMenuOpen = it },
                             onQuickReactionsSave = {},
-                            onQuickReactionsReset = {},
                             onReplyPreviewClick = {},
                             composerGate = ComposerGate.COMPOSER,
                             onBack = {},
@@ -408,7 +407,6 @@ class DeletedMessageLocalRemovalTest {
                         isActionMenuOpen = actionMenuOpen,
                         onActionMenuOpenChange = { actionMenuOpen = it },
                         onQuickReactionsSave = {},
-                        onQuickReactionsReset = {},
                         onReplyPreviewClick = {},
                         composerGate = ComposerGate.COMPOSER,
                         onBack = {},

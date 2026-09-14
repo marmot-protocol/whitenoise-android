@@ -3,7 +3,11 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,13 +21,15 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material3.DropdownMenuGroup
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,12 +37,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
@@ -50,8 +59,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupPositionProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
+import dev.ipf.whitenoise.android.ui.theme.outlineSelectionColor
 import kotlin.math.roundToInt
 
 /** One visible native capability; dispatch remains in the owning message. */
@@ -85,7 +96,23 @@ internal class FocusedMessageActionsPositionProvider(
     }
 }
 
-/** Prototype reaction rail, inert real-message preview and labeled command rows; preserves the host IME. */
+private const val FOCUSED_BACKDROP_ALPHA = 0.88f
+private const val FOCUSED_PRESSED_STATE_ALPHA = 0.12f
+private const val FOCUSED_MORE_DISC_ALPHA = 0.08f
+private val FocusedStackMaximumWidth = 560.dp
+private val FocusedOverlayShadowSafeInset = 8.dp
+private val FocusedReactionRailMaximumWidth = 392.dp
+private val FocusedReactionRailInset = 4.dp
+private val FocusedReactionItemSpacing = 4.dp
+private val FocusedReactionTargetSize = 48.dp
+private val FocusedReactionStateLayerSize = 40.dp
+private val FocusedReactionSelectedFillSize = 36.dp
+private val FocusedReactionEmojiSize = 28.dp
+private val FocusedMoreIconSize = 24.dp
+private val FocusedMenuMinimumWidth = 248.dp
+private val FocusedMenuMaximumWidth = 300.dp
+
+/** Prototype reaction rail, inert real-message preview and grouped command menu; preserves the host IME. */
 @Composable
 @Suppress("LongMethod", "LongParameterList")
 internal fun FocusedMessageActions(
@@ -111,19 +138,22 @@ internal fun FocusedMessageActions(
         expanded = true,
         onDismissRequest = onDismiss,
         popupPositionProvider = position,
-        scrimModifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.88f)),
+        scrimModifier =
+            Modifier.background(
+                MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = FOCUSED_BACKDROP_ALPHA),
+            ),
     ) {
         BoxWithConstraints {
             Column(
                 modifier =
                     Modifier
-                        .widthIn(max = 560.dp)
+                        .widthIn(max = FocusedStackMaximumWidth)
                         .fillMaxWidth()
                         .heightIn(max = maxHeight)
                         .onSizeChanged { measured = it.width > 0 && it.height > 0 }
                         .graphicsLayer { alpha = if (measured && previewReady) 1f else 0f }
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 24.dp)
+                        .padding(horizontal = 16.dp, vertical = FocusedOverlayShadowSafeInset)
                         .semantics {
                             paneTitle = title
                             customActions =
@@ -138,75 +168,12 @@ internal fun FocusedMessageActions(
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
             ) {
                 if (canReact) {
-                    Surface(
-                        modifier = Modifier.widthIn(max = 392.dp),
-                        shape = MaterialTheme.shapes.extraLarge,
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        border = amoledSurfaceBorderStroke(),
-                        shadowElevation = 3.dp,
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Row(
-                                modifier = Modifier.weight(1f, fill = false).horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                quickReactions.forEach { emoji ->
-                                    IconButton(
-                                        onClick = { onReact(emoji) },
-                                        modifier =
-                                            Modifier
-                                                .size(48.dp)
-                                                .semantics {
-                                                    selected = emoji in selectedReactions
-                                                    contentDescription = emoji
-                                                }.testTag("$MESSAGE_ACTION_REACTION_TEST_TAG:$emoji"),
-                                    ) {
-                                        Surface(
-                                            shape = CircleShape,
-                                            color =
-                                                if (emoji in selectedReactions) {
-                                                    MaterialTheme.colorScheme.primaryContainer
-                                                } else {
-                                                    androidx.compose.ui.graphics.Color.Transparent
-                                                },
-                                            modifier = Modifier.size(36.dp),
-                                            border =
-                                                if (emoji in selectedReactions) {
-                                                    amoledSurfaceBorderStroke()
-                                                } else {
-                                                    null
-                                                },
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Text(
-                                                    emoji,
-                                                    fontSize = with(LocalDensity.current) { 28.dp.toSp() },
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            IconButton(onClick = onMoreReactions, modifier = Modifier.size(48.dp)) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                                    modifier = Modifier.size(40.dp),
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            Icons.Default.MoreHoriz,
-                                            contentDescription = stringResource(R.string.open_emoji_picker),
-                                            modifier = Modifier.size(24.dp),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    FocusedReactionRail(
+                        quickReactions = quickReactions,
+                        selectedReactions = selectedReactions,
+                        onReact = onReact,
+                        onMoreReactions = onMoreReactions,
+                    )
                 }
                 if (preview != null) {
                     Box(
@@ -216,26 +183,186 @@ internal fun FocusedMessageActions(
                                 .testTag("message-actions-preview"),
                     ) { preview() }
                 }
-                Surface(
-                    modifier = Modifier.widthIn(max = 300.dp).fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    border = amoledSurfaceBorderStroke(),
-                    shadowElevation = 3.dp,
-                ) {
-                    Column {
-                        actions.forEach { action ->
-                            MessageActionButton(
-                                label = action.label,
-                                supportingLabel = action.supportingLabel,
-                                icon = action.icon,
-                                onClick = action.onClick,
-                                enabled = action.enabled,
-                                isDestructive = action.destructive,
-                            )
-                        }
-                    }
+                FocusedActionMenu(actions)
+            }
+        }
+    }
+}
+
+/** Quick reactions on the menu-group surface: 48dp targets, 40dp state layer, 36dp selected disc, 28dp emoji. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FocusedReactionRail(
+    quickReactions: List<String>,
+    selectedReactions: Set<String>,
+    onReact: (String) -> Unit,
+    onMoreReactions: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.widthIn(max = FocusedReactionRailMaximumWidth),
+        border = amoledOutlineBorder(),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MenuDefaults.groupStandardContainerColor,
+        tonalElevation = MenuDefaults.TonalElevation,
+        shadowElevation = MenuDefaults.ShadowElevation,
+    ) {
+        Row(
+            modifier = Modifier.padding(FocusedReactionRailInset),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                modifier = Modifier.weight(1f, fill = false).horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(FocusedReactionItemSpacing),
+            ) {
+                quickReactions.forEach { emoji ->
+                    FocusedReactionTarget(
+                        emoji = emoji,
+                        selected = emoji in selectedReactions,
+                        onClick = { onReact(emoji) },
+                    )
                 }
+            }
+            FocusedMoreReactionsTarget(onClick = onMoreReactions)
+        }
+    }
+}
+
+@Composable
+private fun FocusedReactionTarget(
+    emoji: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    Box(
+        modifier =
+            Modifier
+                .size(FocusedReactionTargetSize)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    role = Role.Button,
+                    onClick = onClick,
+                ).semantics {
+                    this.selected = selected
+                    contentDescription = emoji
+                }.testTag("$MESSAGE_ACTION_REACTION_TEST_TAG:$emoji"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(FocusedReactionStateLayerSize)
+                    .clip(CircleShape)
+                    .background(
+                        if (pressed) {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = FOCUSED_PRESSED_STATE_ALPHA)
+                        } else {
+                            Color.Transparent
+                        },
+                    ).indication(interactionSource, ripple()),
+            contentAlignment = Alignment.Center,
+        ) {
+            Surface(
+                modifier = Modifier.size(FocusedReactionSelectedFillSize),
+                shape = CircleShape,
+                color =
+                    if (selected) {
+                        outlineSelectionColor(MaterialTheme.colorScheme.primaryContainer)
+                    } else {
+                        Color.Transparent
+                    },
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    EmojiGlyph(emoji, size = FocusedReactionEmojiSize)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FocusedMoreReactionsTarget(onClick: () -> Unit) {
+    val moreReactions = stringResource(R.string.open_emoji_picker)
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    Box(
+        modifier =
+            Modifier
+                .size(FocusedReactionTargetSize)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    role = Role.Button,
+                    onClick = onClick,
+                ).semantics { contentDescription = moreReactions },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(FocusedReactionStateLayerSize)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = FOCUSED_MORE_DISC_ALPHA))
+                    .background(
+                        if (pressed) {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = FOCUSED_PRESSED_STATE_ALPHA)
+                        } else {
+                            Color.Transparent
+                        },
+                    ).indication(interactionSource, ripple()),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_more_horiz),
+                contentDescription = null,
+                modifier = Modifier.size(FocusedMoreIconSize),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** Material's grouped menu: leading icon, label with an optional second line, error colours for destructive rows. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FocusedActionMenu(actions: List<FocusedMessageAction>) {
+    DropdownMenuGroup(
+        shapes = MenuDefaults.groupShapes(),
+        border = amoledOutlineBorder(),
+        modifier = Modifier.widthIn(min = FocusedMenuMinimumWidth, max = FocusedMenuMaximumWidth),
+        shadowElevation = MenuDefaults.ShadowElevation,
+    ) {
+        Column {
+            actions.forEachIndexed { index, action ->
+                val contentColor =
+                    if (action.destructive) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    }
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(action.label, style = MaterialTheme.typography.bodyLarge)
+                            if (action.supportingLabel != null) {
+                                Text(action.supportingLabel, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    },
+                    onClick = action.onClick,
+                    shape = MenuDefaults.itemShape(index, actions.size).shape,
+                    leadingIcon = action.icon,
+                    enabled = action.enabled,
+                    colors =
+                        MenuDefaults.itemColors(
+                            textColor = contentColor,
+                            leadingIconColor = contentColor,
+                            disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                )
             }
         }
     }

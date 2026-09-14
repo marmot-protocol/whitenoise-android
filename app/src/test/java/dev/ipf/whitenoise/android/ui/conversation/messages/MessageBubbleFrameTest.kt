@@ -370,7 +370,11 @@ class MessageBubbleFrameTest {
             val footerBounds = composeRule.onNodeWithTag(MEDIA_REPLY_FOOTER_TAG).fetchSemanticsNode().boundsInRoot
             assertEquals(mediaBounds.width, captionBounds.width, 1f)
             assertEquals(mediaBounds.bottom, captionBounds.top, 0.1f)
-            assertEquals(captionBounds.right - 12f, footerBounds.right, 1f)
+            assertEquals(
+                captionBounds.right - ConversationMessageMetrics.RichTextHorizontalAdjustment.value,
+                footerBounds.right,
+                1f,
+            )
         }
     }
 

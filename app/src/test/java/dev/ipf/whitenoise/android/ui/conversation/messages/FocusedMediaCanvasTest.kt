@@ -53,54 +53,55 @@ class FocusedMediaCanvasTest {
     @Test
     fun landscapeCanvasShrinksWhileTimeStatusAndOwnerStayNative() {
         render(ratio = 1.6f)
-        assertNativeCanvasTransition(320f, 200f, "focused_media_canvas_landscape")
+        assertNativeCanvasTransition(256f, 256f, "focused_media_canvas_landscape")
     }
 
     @Test
     fun portraitLargeFontRtlKeepsFullSizeFooterAndUnscaledFileSibling() {
         render(ratio = 0.5f, dark = true, fontScale = 2f, rtl = true)
-        assertNativeCanvasTransition(280f, 340f, "focused_media_canvas_portrait_large_rtl")
+        assertNativeCanvasTransition(128f, 256f, "focused_media_canvas_portrait_large_rtl")
     }
 
     @Test
     fun focusedWindowResizeUsesTheNewNormalImageCanvasAndTimelineFootprint() {
         render(ratio = 1.6f)
-        assertOpenResizeAndClose(expectedWideHeight = 200f, expectedNarrowHeight = 100f)
+        // A lone photo keeps the prototype's 256dp frame until the row is narrower than that.
+        assertOpenResizeAndClose(wideWidth = 256f, wideHeight = 256f, narrowWidth = 160f, narrowHeight = 256f)
     }
 
     @Test
     fun focusedWindowResizeUsesTheActualNativeAlbumLayout() {
         render(album = true)
-        assertOpenResizeAndClose(expectedWideHeight = 320f, expectedNarrowHeight = 160f)
+        assertOpenResizeAndClose(wideWidth = 320f, wideHeight = 256f, narrowWidth = 160f, narrowHeight = 256f)
     }
 
     private fun assertOpenResizeAndClose(
-        expectedWideHeight: Float,
-        expectedNarrowHeight: Float,
+        wideWidth: Float,
+        wideHeight: Float,
+        narrowWidth: Float,
+        narrowHeight: Float,
     ) {
         val normalFootprint = bounds("timeline-footprint")
         val originalTime = composeRule.onNodeWithText("12:34").fetchSemanticsNode().boundsInRoot
         composeRule.runOnIdle { focused = true }
         composeRule.waitForIdle()
-        assertEquals(240f, bounds("canvas").width, 1f)
-        assertEquals(expectedWideHeight * 0.75f, bounds("canvas").height, 1f)
+        assertEquals(wideWidth * 0.75f, bounds("canvas").width, 1f)
+        assertEquals(wideHeight * 0.75f, bounds("canvas").height, 1f)
         assertEquals(normalFootprint.width, bounds("timeline-footprint").width, 1f)
         assertEquals(normalFootprint.height, bounds("timeline-footprint").height, 1f)
-
         composeRule.runOnIdle { parentWidth = 160.dp }
         composeRule.waitForIdle()
-        assertEquals("75% of the new160dp canvas, not100% of its available width", 120f, bounds("canvas").width, 1f)
-        assertEquals(expectedNarrowHeight * 0.75f, bounds("canvas").height, 1f)
+        assertEquals("75% of the canvas the narrow row offers", narrowWidth * 0.75f, bounds("canvas").width, 1f)
+        assertEquals(narrowHeight * 0.75f, bounds("canvas").height, 1f)
         val focusedNarrowFootprint = bounds("timeline-footprint")
         assertEquals(160f, focusedNarrowFootprint.width, 1f)
         val narrowTime = composeRule.onNodeWithText("12:34").fetchSemanticsNode().boundsInRoot
         assertEquals(originalTime.width, narrowTime.width, 1f)
         assertEquals(originalTime.height, narrowTime.height, 1f)
-
         composeRule.runOnIdle { focused = false }
         composeRule.waitForIdle()
-        assertEquals(160f, bounds("canvas").width, 1f)
-        assertEquals(expectedNarrowHeight, bounds("canvas").height, 1f)
+        assertEquals(narrowWidth, bounds("canvas").width, 1f)
+        assertEquals(narrowHeight, bounds("canvas").height, 1f)
         assertEquals(focusedNarrowFootprint.height, bounds("timeline-footprint").height, 1f)
         assertEquals(1, ownerStarts)
         assertEquals(0, ownerDisposals)

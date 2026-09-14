@@ -68,6 +68,7 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -134,7 +135,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOut
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.shareMessageExternally
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
-import dev.ipf.whitenoise.android.ui.conversation.reactions.CustomizeReactionsDialog
+import dev.ipf.whitenoise.android.ui.conversation.reactions.ConfigureReactionsSheet
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionDetailsSheet
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.replies.isOwnReplySender
@@ -321,7 +322,6 @@ internal fun MessageBubble(
     isActionMenuOpen: Boolean,
     onActionMenuOpenChange: (Boolean) -> Unit,
     onQuickReactionsSave: (List<String>) -> Unit,
-    onQuickReactionsReset: () -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
     composerGate: ComposerGate,
     groupDisbanded: Boolean = false,
@@ -848,7 +848,8 @@ internal fun MessageBubble(
     var editHistoryOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var reactionSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var customizeReactionsOpen by remember(record.messageIdHex) { mutableStateOf(false) }
-    var restoreReactionPickerExpanded by remember(record.messageIdHex) { mutableStateOf(false) }
+    var configureReactionsDraft by remember(record.messageIdHex) { mutableStateOf<List<String>>(emptyList()) }
+    var configureReactionSlot by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
     var deleteDialogOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var deleteInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     var attachmentSaveInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
@@ -906,7 +907,7 @@ internal fun MessageBubble(
             editHistoryOpen = false
             reactionSheetOpen = false
             customizeReactionsOpen = false
-            restoreReactionPickerExpanded = false
+            configureReactionSlot = null
             deleteDialogOpen = false
             messageShareInFlight = false
         }
@@ -1694,14 +1695,8 @@ internal fun MessageBubble(
                 // An uncaptioned visual-only message carries the footer over the
                 // bottom-right media tile. For an album that is the last visible
                 // image/video; a file card or caption owns the footer instead.
-                val footerOnVisualMedia =
-                    visualMediaOwnsFooter(
-                        deleted = deleted,
-                        hasInvalidationWarning = invalidationWarning != null,
-                        visualCount = visualAttachments.size,
-                        fileCount = fileAttachments.size,
-                        hasCaption = mediaCaption != null,
-                    )
+                // The prototype keeps time and status below the media, inside the bubble, never overlaid on it.
+                val footerOnVisualMedia = false
                 val confirmedFileFooterInCard =
                     fileCardOwnsFooter(
                         deleted = deleted,
@@ -1750,15 +1745,7 @@ internal fun MessageBubble(
                             null
                         }
                     }
-                val footerOnPendingVisual =
-                    !anyConfirmedMedia &&
-                        visualMediaOwnsFooter(
-                            deleted = deleted,
-                            hasInvalidationWarning = invalidationWarning != null,
-                            visualCount = pendingVisualRefs.size,
-                            fileCount = 0,
-                            hasCaption = mediaCaption != null,
-                        )
+                val footerOnPendingVisual = false
                 val pendingFileFooterInCard =
                     fileCardOwnsFooter(
                         deleted = deleted,
@@ -1886,11 +1873,12 @@ internal fun MessageBubble(
                         Text(
                             appState.displayName(record.sender),
                             style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
                             color =
                                 if (insideBubble) {
                                     bubbleContentColor
                                 } else {
-                                    colorScheme.onSurfaceVariant
+                                    groupAuthorColor(record.sender)
                                 },
                             modifier =
                                 Modifier.combinedClickable(
@@ -2047,7 +2035,6 @@ internal fun MessageBubble(
                                                 showPendingPlaceholder = showPendingPlaceholder,
                                                 fileFooterWarning = fileFooterWarning,
                                                 onMediaLongPress = onMediaLongPress,
-                                                attachedToCaption = true,
                                                 focusedPreview = isActionMenuOpen,
                                             )
                                         }
@@ -2083,6 +2070,7 @@ internal fun MessageBubble(
                                     bubbleBackgroundColor = bubbleBackgroundColor,
                                     bubbleContentColor = bubbleContentColor,
                                     timestampColor = timestampColor,
+                                    statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
                                     showStatus = showOutgoingStatus && !fileFooterInCard,
                                     retentionOwnedByFileCard = fileFooterInCard,
                                     editedLabel = editedLabel,
@@ -2096,8 +2084,13 @@ internal fun MessageBubble(
                                 )
                             }
                         } else {
-                            MediaSupplementEnvelope(
+                            MediaCaptionFrame(
                                 modifier = actionAnchorBoundsModifier,
+                                presentation = bubblePresentation,
+                                highlighted = highlighted,
+                                mine = mine,
+                                mentionedSelf = mentionedSelf,
+                                mentionedYouLabel = mentionedYouLabel,
                                 alignEnd = mine,
                                 media = {
                                     LookaheadScope {
@@ -2124,7 +2117,6 @@ internal fun MessageBubble(
                                                 showPendingPlaceholder = showPendingPlaceholder,
                                                 fileFooterWarning = fileFooterWarning,
                                                 onMediaLongPress = onMediaLongPress,
-                                                attachedToCaption = false,
                                                 focusedPreview = isActionMenuOpen,
                                             )
                                         }
@@ -2163,6 +2155,7 @@ internal fun MessageBubble(
                                     bubbleBackgroundColor = bubbleBackgroundColor,
                                     bubbleContentColor = bubbleContentColor,
                                     timestampColor = timestampColor,
+                                    statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
                                     showStatus = showOutgoingStatus && !fileFooterInCard,
                                     retentionOwnedByFileCard = fileFooterInCard,
                                     editedLabel = editedLabel,
@@ -2394,6 +2387,7 @@ internal fun MessageBubble(
                                 retention = previewRetention,
                                 reserveRetentionSpace = previewReserveRetention,
                                 showTime = !fileFooterInCard,
+                                statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
                             )
                         }
                         val mediaPreview: (@Composable () -> Unit)? =
@@ -2655,45 +2649,59 @@ internal fun MessageBubble(
                     )
                 }
                 if (emojiPickerOpen && !deleted && !readOnly) {
+                    val pickingSlot = configureReactionSlot
                     EmojiPickerSheet(
-                        restoreExpanded = restoreReactionPickerExpanded,
-                        purpose = EmojiPickerPurpose.USE,
+                        purpose =
+                            if (pickingSlot == null) {
+                                EmojiPickerPurpose.USE
+                            } else {
+                                EmojiPickerPurpose.CONFIGURE_QUICK_REACTION
+                            },
                         recentEmojis = recentEmojis,
                         onEmojiUsed = onEmojiUsed,
-                        messageReactionEmojis =
-                            item.projected
-                                ?.reactions
-                                ?.byEmoji
-                                .orEmpty()
-                                .map { it.emoji },
                         onDismissRequest = {
-                            restoreReactionPickerExpanded = false
                             emojiPickerOpen = false
+                            configureReactionSlot = null
                         },
                         onEmojiPicked = { emoji ->
-                            restoreReactionPickerExpanded = false
                             emojiPickerOpen = false
-                            reactWithEmoji(emoji)
+                            if (pickingSlot == null) {
+                                reactWithEmoji(emoji)
+                            } else {
+                                configureReactionsDraft =
+                                    configureReactionsDraft.mapIndexed { index, current ->
+                                        if (index == pickingSlot) emoji else current
+                                    }
+                                configureReactionSlot = null
+                                customizeReactionsOpen = true
+                            }
                         },
-                        onCustomizeReactions = { wasExpanded ->
-                            restoreReactionPickerExpanded = wasExpanded
-                            customizeReactionsOpen = true
-                        },
+                        onConfigure =
+                            if (pickingSlot != null) {
+                                null
+                            } else {
+                                {
+                                    configureReactionsDraft = quickReactionEmojis
+                                    emojiPickerOpen = false
+                                    customizeReactionsOpen = true
+                                }
+                            },
                     )
                 }
                 if (customizeReactionsOpen && !deleted) {
-                    fun closeCustomizeToReactionSheet() {
-                        customizeReactionsOpen = false
-                    }
-                    CustomizeReactionsDialog(
-                        quickReactionEmojis = quickReactionEmojis,
-                        recentEmojis = recentEmojis,
-                        onDismiss = ::closeCustomizeToReactionSheet,
-                        onSave = { choices ->
+                    ConfigureReactionsSheet(
+                        current = configureReactionsDraft,
+                        onDismiss = { customizeReactionsOpen = false },
+                        onApply = { choices ->
                             onQuickReactionsSave(choices)
-                            closeCustomizeToReactionSheet()
+                            customizeReactionsOpen = false
                         },
-                        onReset = onQuickReactionsReset,
+                        onPickSlot = { index, draft ->
+                            configureReactionsDraft = draft
+                            configureReactionSlot = index
+                            customizeReactionsOpen = false
+                            emojiPickerOpen = true
+                        },
                     )
                 }
                 if (editHistoryOpen && !deleted && editState != null) {
@@ -2742,9 +2750,11 @@ internal fun MessageBubble(
                 MessageReactionSummary(
                     tallies = reactionTallies,
                     mine = mine,
-                    bubbleBorderOverrideArgb = bubblePresentation.borderOverrideArgb,
                     visibilityState = reactionVisibilityState,
                     enabled = !deleted,
+                    onToggle = { emoji ->
+                        if (!deleted) appState.launchMutation { controller.toggleReaction(emoji, record) }
+                    },
                     onClick = { if (!deleted) reactionSheetOpen = true },
                 )
                 if (reactionSheetOpen && !deleted) {

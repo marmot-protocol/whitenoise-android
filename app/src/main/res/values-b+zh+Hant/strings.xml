@@ -172,7 +172,6 @@
     <string name="save_group">保存群組</string>
     <string name="saving_group">正在儲存群組...</string>
     <string name="info">資訊</string>
-    <string name="group_info">群組資訊</string>
     <string name="group_identifiers">群組識別碼</string>
     <string name="mls_group_id">MLS 群組 ID</string>
     <string name="nostr_group_id">Nostr 群組 ID</string>
@@ -181,6 +180,7 @@
     <string name="relay_number">中繼站 %1$d</string>
     <string name="group_id">群組 ID</string>
     <string name="relays">網路中繼站</string>
+    <string name="developer_tools">開發者工具</string>
     <string name="members">成員：</string>
     <string name="add_member">新增成員</string>
     <string name="add_member_already_in_group">%1$s 已在此群組中</string>
@@ -230,6 +230,7 @@
     <string name="push_debug_updated_at">更新時間</string>
     <string name="error_qr_not_valid_npub_or_public_key">該 QR 程式碼不是有效的 npub 或公鑰。</string>
     <string name="admin">管理員</string>
+    <string name="member">成員</string>
     <string name="you">你</string>
     <string name="reaction_filter_all">全部</string>
     <string name="view_reactors">查看誰做出了回應</string>
@@ -267,9 +268,10 @@
     <string name="open_emoji_picker">開啟表情符號選擇器</string>
     <string name="show_keyboard">顯示鍵盤</string>
     <string name="emoji_backspace">刪除表情符號</string>
-    <string name="customize_reactions">自訂回應</string>
-    <string name="customize_reactions_hint">點按即可替換表情符號</string>
-    <string name="reset_reactions">重設</string>
+    <string name="configure_reactions">設定回應</string>
+    <string name="configure_reactions_guidance">點按表情符號即可替換。</string>
+    <string name="reset">重設</string>
+    <string name="reaction_slot_description">回應 %1$d，%2$s。點兩下即可替換。</string>
     <string name="emoji_search_hint">搜尋表情符號</string>
     <string name="emoji_search_clear">清除表情符號搜尋</string>
     <string name="emoji_search_no_results">找不到表情符號</string>
@@ -1206,8 +1208,6 @@
     <plurals name="disappearing_years_count">
         <item quantity="other">%d 年</item>
     </plurals>
-    <string name="disappearing_row_hint_admin">點按設定新訊息的保留時間</string>
-    <string name="disappearing_row_hint_readonly">只有管理員可以變更</string>
     <string name="toast_disappearing_messages_updated">已更新閱後即焚訊息</string>
     <string name="toast_couldnt_update_disappearing">無法更新閱後即焚訊息</string>
     <string name="save">儲存</string>
@@ -1805,9 +1805,6 @@
     <string name="folder_included_chats">已包含的聊天</string>
     <string name="chats">聊天</string>
     <string name="manage_folders">管理資料夾</string>
-    <string name="left_chats">已退出</string>
-    <string name="no_left_chats">沒有已退出的聊天</string>
-    <string name="no_left_chats_detail">你退出或被移除的聊天會顯示在這裡。</string>
     <string name="new_message_name_or_npub">名稱或 npub</string>
     <string name="new_message_connect_qr">透過 QR 碼連線</string>
     <string name="new_message_invite_friend">邀請好友</string>
@@ -1853,6 +1850,17 @@
     <string name="app_update_row_unknown">檢查更新</string>
     <string name="app_update_row_current">已是最新版本</string>
     <string name="app_update_row_available">Zapstore 上有可用版本 %1$s。</string>
+    <string name="selection_state_selected">已選取</string>
+    <string name="selection_state_not_selected">未選取</string>
+    <plurals name="reaction_count">
+        <item quantity="other">%1$s，%2$d 個回應</item>
+    </plurals>
+    <plurals name="more_reaction_types">
+        <item quantity="other">另有 %2$d 種回應</item>
+    </plurals>
+    <plurals name="chat_relay_count">
+        <item quantity="other">%1$d 個聊天中繼</item>
+    </plurals>
     <string name="audit_upload_title">分享技術記錄</string>
     <string name="audit_upload_subtitle">自動向 White Noise 傳送診斷稽核記錄，與使用情況分享分開控制。</string>
     <string name="audit_upload_confirm_title">與 White Noise 分享技術記錄？</string>

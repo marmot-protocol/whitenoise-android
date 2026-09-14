@@ -738,15 +738,6 @@
         ]
       },
       {
-        "surface": "EmptyLeftChats",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/EmptyLeftChats.kt",
-        "anchor": "fun EmptyLeftChats(",
-        "test_ids": [
-          "CHL-001",
-          "FLD-001"
-        ]
-      },
-      {
         "surface": "GlobalSearchFilterControlsRow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
         "anchor": "fun GlobalSearchFilterControlsRow(",
@@ -2346,23 +2337,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
         "anchor": "fun ComposerEmojiPickerPane(",
         "test_ids": [
-          "CON-001"
-        ]
-      },
-      {
-        "surface": "EmojiCategoryRail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
-        "anchor": "fun EmojiCategoryRail(",
-        "test_ids": [
-          "CON-001"
-        ]
-      },
-      {
-        "surface": "EmojiPickerContent",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
-        "anchor": "fun EmojiPickerContent(",
-        "test_ids": [
-          "CON-001"
+          "CON-010",
+          "MSG-005"
         ]
       },
       {
@@ -2370,47 +2346,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
         "anchor": "fun EmojiPickerSheet(",
         "test_ids": [
-          "CON-001"
-        ]
-      },
-      {
-        "surface": "EmojiRailIconButton",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
-        "anchor": "fun EmojiRailIconButton(",
-        "test_ids": [
-          "CON-001"
-        ]
-      },
-      {
-        "surface": "EmojiSearchField",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
-        "anchor": "fun EmojiSearchField(",
-        "test_ids": [
-          "CON-001"
-        ]
-      },
-      {
-        "surface": "EmojiSearchResultCell",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
-        "anchor": "fun EmojiSearchResultCell(",
-        "test_ids": [
-          "CON-001"
-        ]
-      },
-      {
-        "surface": "EmojiSearchResultsGrid",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
-        "anchor": "fun EmojiSearchResultsGrid(",
-        "test_ids": [
-          "CON-001"
-        ]
-      },
-      {
-        "surface": "EmojiSectionHeader",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
-        "anchor": "fun EmojiSectionHeader(",
-        "test_ids": [
-          "CON-001"
+          "CON-010",
+          "MSG-005"
         ]
       },
       {
@@ -2449,6 +2386,14 @@
         "surface": "RecordingStripLeading",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecorder.kt",
         "anchor": "fun RecordingStripLeading(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "MiniWaveformGlyph",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecorder.kt",
+        "anchor": "fun MiniWaveformGlyph(",
         "test_ids": [
           "CON-001"
         ]
@@ -2778,19 +2723,19 @@
         ]
       },
       {
-        "surface": "VoiceSpeedPill",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
-        "anchor": "fun VoiceSpeedPill(",
-        "test_ids": [
-          "MED-001"
-        ]
-      },
-      {
         "surface": "VoiceWaveform",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
         "anchor": "fun VoiceWaveform(",
         "test_ids": [
           "MED-001"
+        ]
+      },
+      {
+        "surface": "VoiceActionGlyph",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "fun VoiceActionGlyph(",
+        "test_ids": [
+          "MED-008"
         ]
       },
       {
@@ -3203,14 +3148,6 @@
         ]
       },
       {
-        "surface": "MessageActionButton",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
-        "anchor": "fun MessageActionButton(",
-        "test_ids": [
-          "MSG-001"
-        ]
-      },
-      {
         "surface": "MessageActionIcon",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
         "anchor": "fun MessageActionIcon(",
@@ -3343,6 +3280,14 @@
         "surface": "OutgoingMessageStatusIcon",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleStatus.kt",
         "anchor": "fun OutgoingMessageStatusIcon(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "BubbleDeliveryGlyph",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleStatus.kt",
+        "anchor": "fun BubbleDeliveryGlyph(",
         "test_ids": [
           "MSG-001"
         ]
@@ -3696,14 +3641,6 @@
         ]
       },
       {
-        "surface": "CustomizeReactionsDialog",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
-        "anchor": "fun CustomizeReactionsDialog(",
-        "test_ids": [
-          "MSG-001"
-        ]
-      },
-      {
         "surface": "ReactionDetailsSheet",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
         "anchor": "fun ReactionDetailsSheet(",
@@ -3715,14 +3652,6 @@
         "surface": "ReactionParticipantRow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
         "anchor": "fun ReactionParticipantRow(",
-        "test_ids": [
-          "MSG-001"
-        ]
-      },
-      {
-        "surface": "ReactionSummaryChip",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
-        "anchor": "fun ReactionSummaryChip(",
         "test_ids": [
           "MSG-001"
         ]
@@ -4394,15 +4323,6 @@
         "anchor": "fun ProfileGroupForegroundCoordinator(",
         "test_ids": [
           "NAV-001"
-        ]
-      },
-      {
-        "surface": "rememberMainShellChatScope",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellChatScopeState.kt",
-        "anchor": "fun rememberMainShellChatScope(",
-        "test_ids": [
-          "CHL-005",
-          "FLD-001"
         ]
       },
       {
@@ -6877,6 +6797,42 @@
         ]
       },
       {
+        "surface": "FocusedActionMenu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "fun FocusedActionMenu(",
+        "test_ids": [
+          "MSG-004",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "FocusedMoreReactionsTarget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "fun FocusedMoreReactionsTarget(",
+        "test_ids": [
+          "MSG-004",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "FocusedReactionRail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "fun FocusedReactionRail(",
+        "test_ids": [
+          "MSG-004",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "FocusedReactionTarget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "fun FocusedReactionTarget(",
+        "test_ids": [
+          "MSG-004",
+          "MSG-005"
+        ]
+      },
+      {
         "surface": "FocusedRenderedMessagePreview",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
         "anchor": "fun FocusedRenderedMessagePreview(",
@@ -7110,6 +7066,135 @@
         "anchor": "fun Modifier.timelineReadingExposure(",
         "test_ids": [
           "CON-001"
+        ]
+      },
+      {
+        "surface": "ComposerActionDisc",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerActionDisc.kt",
+        "anchor": "fun ComposerActionDisc(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "ReactionPillItem",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+        "anchor": "fun ReactionPillItem(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "ReactionPillRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+        "anchor": "fun ReactionPillRow(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "ReactionPillSurface",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+        "anchor": "fun ReactionPillSurface(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "EmojiCategoryBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiCategoryBar.kt",
+        "anchor": "fun EmojiCategoryBar(",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "EmojiCategoryToggle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiCategoryBar.kt",
+        "anchor": "fun EmojiCategoryToggle(",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "EmojiCell",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
+        "anchor": "fun EmojiCell(",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "EmojiGlyph",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
+        "anchor": "fun EmojiGlyph(",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "EmojiPickerContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
+        "anchor": "fun EmojiPickerContent(",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "EmojiPickerScrollSync",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
+        "anchor": "fun EmojiPickerScrollSync(",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "EmojiSearchField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
+        "anchor": "fun EmojiSearchField(",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "EmojiSectionGrid",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
+        "anchor": "fun EmojiSectionGrid(",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "EmojiSectionHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
+        "anchor": "fun EmojiSectionHeader(",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "ConfigureReactionsSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+        "anchor": "fun ConfigureReactionsSheet(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "ReactionSlot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+        "anchor": "fun ReactionSlot(",
+        "test_ids": [
+          "MSG-001"
         ]
       },
       {
@@ -15808,32 +15893,6 @@
         ]
       },
       {
-        "surface": "R.string.left_chats",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
-        "anchor": "R.string.left_chats",
-        "test_ids": [
-          "FLD-001"
-        ]
-      },
-      {
-        "surface": "R.string.no_left_chats",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/EmptyLeftChats.kt",
-        "anchor": "R.string.no_left_chats",
-        "test_ids": [
-          "CHL-001",
-          "FLD-001"
-        ]
-      },
-      {
-        "surface": "R.string.no_left_chats_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/EmptyLeftChats.kt",
-        "anchor": "R.string.no_left_chats_detail",
-        "test_ids": [
-          "CHL-001",
-          "FLD-001"
-        ]
-      },
-      {
         "surface": "setting:copy",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
         "anchor": "R.string.copy",
@@ -17324,14 +17383,6 @@
         ]
       },
       {
-        "surface": "string:actions",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.actions",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:add_group_description",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.add_group_description",
@@ -17668,30 +17719,6 @@
         ]
       },
       {
-        "surface": "string:disappearing_messages",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.disappearing_messages",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:disappearing_row_hint_admin",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.disappearing_row_hint_admin",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:disappearing_row_hint_readonly",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.disappearing_row_hint_readonly",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:dismiss",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.dismiss",
@@ -17748,14 +17775,6 @@
         ]
       },
       {
-        "surface": "string:group_info",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.group_info",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:invite_pending",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.invite_pending",
@@ -17791,14 +17810,6 @@
         "surface": "string:leave_group",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.leave_group",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:leaving_chat",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.leaving_chat",
         "test_ids": [
           "GRP-001"
         ]
@@ -18236,6 +18247,30 @@
         ]
       },
       {
+        "surface": "string:admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.admin",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:developer_tools",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.developer_tools",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.member",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
         "surface": "string:description",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.description",
@@ -18348,14 +18383,6 @@
         ]
       },
       {
-        "surface": "string:group_info",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
-        "anchor": "R.string.group_info",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:group_relays",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
         "anchor": "R.string.group_relays",
@@ -18407,6 +18434,14 @@
         "surface": "string:relays",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
         "anchor": "R.string.relays",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:developer_tools",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
+        "anchor": "R.string.developer_tools",
         "test_ids": [
           "GRP-001"
         ]
@@ -18697,6 +18732,55 @@
         "test_ids": [
           "SEC-008",
           "SEC-012"
+        ]
+      },
+      {
+        "surface": "string:send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "anchor": "R.string.send",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:voice_message_record",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecorder.kt",
+        "anchor": "R.string.voice_message_record",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "string:voice_recording_stop",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecorder.kt",
+        "anchor": "R.string.voice_recording_stop",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "string:send_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleStatus.kt",
+        "anchor": "R.string.send_failed",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:sending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleStatus.kt",
+        "anchor": "R.string.sending",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleStatus.kt",
+        "anchor": "R.string.sent",
+        "test_ids": [
+          "MSG-001"
         ]
       }
     ],
@@ -21311,14 +21395,6 @@
         ]
       },
       {
-        "surface": "R.string.actions",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.actions",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "R.string.add_member",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.add_member",
@@ -21397,14 +21473,6 @@
         "surface": "R.string.you",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.you",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "R.string.group_info",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
-        "anchor": "R.string.group_info",
         "test_ids": [
           "GRP-001"
         ]
@@ -21716,32 +21784,6 @@
         "test_ids": [
           "GRP-001",
           "GRP-008"
-        ]
-      },
-      {
-        "surface": "R.string.disappearing_messages",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.disappearing_messages",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "R.string.disappearing_row_hint_admin",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.disappearing_row_hint_admin",
-        "test_ids": [
-          "GRP-001",
-          "GRP-004",
-          "GRP-007"
-        ]
-      },
-      {
-        "surface": "R.string.disappearing_row_hint_readonly",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.disappearing_row_hint_readonly",
-        "test_ids": [
-          "GRP-001"
         ]
       },
       {

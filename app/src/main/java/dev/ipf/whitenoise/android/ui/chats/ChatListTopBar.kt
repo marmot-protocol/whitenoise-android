@@ -378,16 +378,6 @@ internal fun ChatListFilterChips(
     onSelect: (String?) -> Unit,
     onEditFolder: (String) -> Unit = {},
     onManageFolders: (() -> Unit)? = null,
-    chatScope: ChatScope = ChatScope.Chats,
-    onSelectScope: ((ChatScope) -> Unit)? = null,
 ) {
-    ChatFolderPills(
-        chips,
-        selectedFolderId,
-        onSelect,
-        onEditFolder,
-        onManageFolders,
-        chatScope = chatScope,
-        onSelectScope = onSelectScope,
-    )
+    ChatFolderPills(chips, selectedFolderId, onSelect, onEditFolder, onManageFolders)
 }

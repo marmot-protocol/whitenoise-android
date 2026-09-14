@@ -34,7 +34,7 @@ internal fun GroupInfoScreen(
     onBack: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
-    SettingsScaffold(title = stringResource(R.string.group_info), onBack = onBack) {
+    SettingsScaffold(title = stringResource(R.string.developer_tools), onBack = onBack) {
         Column(
             modifier =
                 Modifier

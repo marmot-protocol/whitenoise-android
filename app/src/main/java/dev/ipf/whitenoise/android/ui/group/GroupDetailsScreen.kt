@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -45,7 +44,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -81,13 +79,10 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
@@ -127,8 +122,6 @@ import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTransientNotice
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
-import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
-import dev.ipf.whitenoise.android.ui.design.conversationMenuItemPadding
 import dev.ipf.whitenoise.android.ui.medialibrary.MediaLibraryRoute
 import dev.ipf.whitenoise.android.ui.medialibrary.SharedContentCategory
 import dev.ipf.whitenoise.android.ui.medialibrary.SharedMediaSection
@@ -267,7 +260,6 @@ internal fun GroupDetailsScreen(
     val detailsScrollState = key(controller) { rememberScrollState() }
     val membersScrollState = key(controller) { rememberScrollState() }
     var showChatRelays by remember(controller) { mutableStateOf(false) }
-    var menuOpen by remember { mutableStateOf(false) }
     var showEditGroup by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showGroupInfo by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showNotificationSettings by remember(controller.group.groupIdHex) { mutableStateOf(false) }
@@ -320,7 +312,6 @@ internal fun GroupDetailsScreen(
     // Tap-time archive direction, recorded before the mutation coroutine is
     // dispatched so the menu's progress label can never read the pre-intent
     // presented state and show the opposite direction.
-    var pendingArchiveTarget by remember(controller.group.groupIdHex) { mutableStateOf<Boolean?>(null) }
     var pendingConfirm by remember { mutableStateOf<DetailsConfirm?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -500,7 +491,6 @@ internal fun GroupDetailsScreen(
                 // onSuccess() may have already dismissed this sheet; clearing
                 // detached Compose state is harmless in that case.
                 activeMutation = null
-                pendingArchiveTarget = null
             }
         }
     }
@@ -1018,7 +1008,6 @@ internal fun GroupDetailsScreen(
             // info in one contiguous list section. ContactRow/FlowQuickActionRow
             // already provide Material touch heights and internal padding.
             Column {
-                AppDivider()
                 if (!rosterReady) {
                     GroupRosterLoadStatus(
                         state = controller.memberRosterState,
@@ -1034,12 +1023,9 @@ internal fun GroupDetailsScreen(
                                 .heightIn(min = 56.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            stringResource(R.string.members_count, controller.presentedMemberCount),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.weight(1f).padding(start = Dimens.spaceLg, end = Dimens.spaceSm),
-                        )
+                        Box(Modifier.weight(1f)) {
+                            SettingsSection(stringResource(R.string.members))
+                        }
                         IconButton(
                             onClick = {
                                 memberSearchOpen = !memberSearchOpen
@@ -1140,20 +1126,20 @@ internal fun GroupDetailsScreen(
                         val rowMutationPending =
                             controller.isMemberMutationPending(member.memberIdHex) ||
                                 activeMutation?.target == member.memberIdHex
-                        val memberNpub = appState.npubForDisplay(member.memberIdHex)
                         ChatInfoMemberCard(
                             index = index,
                             count = visibleMembers.size,
                             modifier = Modifier.testTag("chat_info.member.${member.memberIdHex}"),
                         ) {
                             ContactRow(
-                                title = controller.memberDisplayName(member),
-                                subtitle =
+                                title =
                                     if (isSelfRow) {
                                         stringResource(R.string.you)
                                     } else {
-                                        IdentityFormatter.short(memberNpub)
+                                        controller.memberDisplayName(member)
                                     },
+                                subtitle =
+                                    stringResource(if (controller.isAdmin(member)) R.string.admin else R.string.member),
                                 avatarSeed = member.memberIdHex,
                                 avatarUrl = controller.memberAvatarUrl(member),
                                 modifier =
@@ -1162,19 +1148,13 @@ internal fun GroupDetailsScreen(
                                     } else {
                                         Modifier
                                     },
-                                onSubtitleClick =
-                                    if (isSelfRow || memberNpub.isBlank()) {
-                                        null
-                                    } else {
-                                        { clipboard.setText(AnnotatedString(memberNpub)) }
-                                    },
                                 onClick = { appState.presentProfile(appState.npub(member.memberIdHex)) },
-                                trailing = {
-                                    GroupMemberMutationStatus(
-                                        isAdmin = controller.isAdmin(member),
-                                        inProgress = rowMutationPending,
-                                    )
-                                },
+                                trailing =
+                                    if (rowMutationPending) {
+                                        { GroupMemberMutationStatus(isAdmin = false, inProgress = true) }
+                                    } else {
+                                        null
+                                    },
                             )
                         }
                     }
@@ -1286,110 +1266,6 @@ internal fun GroupDetailsScreen(
                         Icon(
                             painterResource(R.drawable.ic_arrow_back),
                             contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                },
-                actions = {
-                    if (!readOnlyInvite) {
-                        IconButton(onClick = { menuOpen = true }) {
-                            Icon(
-                                painterResource(R.drawable.ic_more_vert),
-                                contentDescription = stringResource(R.string.actions),
-                            )
-                        }
-                    }
-                    KeyboardPreservingDropdownMenu(
-                        expanded = menuOpen && !readOnlyInvite,
-                        onDismissRequest = { menuOpen = false },
-                        shape = RoundedCornerShape(20.dp),
-                        // Match the conversation top-bar menu exactly: inset from
-                        // the right edge, roomy iconless body-large rows.
-                        offset = DpOffset(x = (-8).dp, y = 0.dp),
-                        modifier = Modifier.widthIn(min = 232.dp),
-                    ) {
-                        if (canShowEditAction) {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        stringResource(R.string.edit),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                    )
-                                },
-                                contentPadding = conversationMenuItemPadding,
-                                enabled = activeMutation == null && !controller.mutationInFlight,
-                                onClick = {
-                                    menuOpen = false
-                                    showEditGroup = true
-                                },
-                            )
-                        }
-                        if (!readOnlyInvite) {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        stringResource(
-                                            archiveMenuLabelForTarget(
-                                                pendingArchiveTarget = pendingArchiveTarget,
-                                                presentedArchived = controller.presentedArchived,
-                                            ),
-                                        ),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                    )
-                                },
-                                contentPadding = conversationMenuItemPadding,
-                                enabled = activeMutation == null && !controller.mutationInFlight,
-                                onClick = {
-                                    menuOpen = false
-                                    val target = !controller.presentedArchived
-                                    pendingArchiveTarget = target
-                                    runGroupMutation(
-                                        action = GroupMutationAction.Archive,
-                                        mutation = { controller.setArchived(target) },
-                                    )
-                                },
-                            )
-                        }
-                        if (!readOnlyInvite && controller.isSelfMember) {
-                            val leaveLabel =
-                                when {
-                                    activeMutation?.action == GroupMutationAction.Leave -> R.string.leaving_chat
-                                    isDm -> R.string.leave_chat
-                                    else -> R.string.leave_group
-                                }
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        stringResource(leaveLabel),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                    )
-                                },
-                                contentPadding = conversationMenuItemPadding,
-                                // Tappable for members (greyed while a mutation is
-                                // in flight). The sole-admin gate is surfaced as an
-                                // explanatory dialog by requestLeave rather than a
-                                // silently-disabled item — but only once the roster
-                                // is loaded, since requestLeave classifies the leave
-                                // from member count and an empty roster reads as
-                                // "sole member" (delete group).
-                                enabled = activeMutation == null && !controller.mutationInFlight && controller.membersLoaded,
-                                onClick = {
-                                    menuOpen = false
-                                    requestLeave(controller.title(groupTitleCopy))
-                                },
-                            )
-                        }
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    stringResource(R.string.group_info),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            },
-                            contentPadding = conversationMenuItemPadding,
-                            onClick = {
-                                menuOpen = false
-                                showGroupInfo = true
-                            },
                         )
                     }
                 },
@@ -1555,28 +1431,6 @@ internal fun GroupDetailsScreen(
                         onClick = { showBubbleColors = true },
                     )
                 }
-                row("disappearing") { rowContext ->
-                    val readOnlyHint = stringResource(R.string.disappearing_row_hint_readonly)
-                    SettingsLink(
-                        context = rowContext,
-                        title = stringResource(R.string.disappearing_messages),
-                        // Keep a disabled button semantic for role-gated rows. A missing click action looked
-                        // enabled but silently ignored touch and accessibility activation (#2201).
-                        onClick = { showDisappearingPicker = true },
-                        modifier = Modifier.semantics { if (!canEdit) stateDescription = readOnlyHint },
-                        subtitle =
-                            stringResource(
-                                if (canEdit) {
-                                    R.string.disappearing_row_hint_admin
-                                } else {
-                                    R.string.disappearing_row_hint_readonly
-                                },
-                            ),
-                        value = disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
-                        enabled = canEdit && !mutationsBlocked,
-                        busy = activeMutation?.action == GroupMutationAction.DisappearingMessages,
-                    )
-                }
             }
             if (isDm && dmPeerCandidate != null) {
                 DirectDetailsContactEditorRow(
@@ -1702,10 +1556,22 @@ internal fun GroupDetailsScreen(
                         title = stringResource(R.string.relays),
                         onClick = { showChatRelays = true },
                         modifier = Modifier.testTag("chat_info.relays"),
-                        value =
-                            controller.group.relays.size
-                                .toString(),
+                        subtitle =
+                            pluralStringResource(
+                                R.plurals.chat_relay_count,
+                                controller.group.relays.size,
+                                controller.group.relays.size,
+                            ),
                         leading = { Icon(painterResource(R.drawable.ic_tune), contentDescription = null) },
+                    )
+                }
+                row("developer_tools") { rowContext ->
+                    SettingsLink(
+                        context = rowContext,
+                        title = stringResource(R.string.developer_tools),
+                        onClick = { showGroupInfo = true },
+                        modifier = Modifier.testTag("chat_info.developer_tools"),
+                        leading = { Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null) },
                     )
                 }
             }
@@ -1796,84 +1662,45 @@ internal fun GroupDetailsScreen(
                 }
             }
 
-            Column {
-                // Custom folders containing this chat — manual membership or a
-                // live rule match — so the value tracks membership changes made
-                // anywhere (chat list, Settings, or a rule flipping).
-                val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
-                val chatIdLower = controller.group.groupIdHex.lowercase(Locale.ROOT)
-                val folderNames =
-                    remember(
-                        folderStoreState,
-                        appState.chatListItems,
-                        appState.profileRevisionForCompose,
-                        folderAccountRef,
-                        chatIdLower,
-                        groupTitleCopy,
-                    ) {
-                        val accountRef = folderAccountRef ?: return@remember emptyList()
-                        val thisChatRow = appState.chatListItems.filter { it.id.equals(chatIdLower, ignoreCase = true) }
-                        appState.chatFolderPreferences
-                            .foldersFor(accountRef)
-                            .mapNotNull { folder ->
-                                val manual =
-                                    chatIdLower in appState.chatFolderPreferences.membershipFor(accountRef, folder.id)
-                                val effective =
-                                    chatIdLower in
-                                        chatFolderChatIds(
-                                            items = thisChatRow,
-                                            manualChatIds =
-                                                appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
-                                            rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
-                                            activeAccountIdHex = appState.activeAccount?.accountIdHex,
-                                            isMuted = { groupIdHex ->
-                                                thisChatRow.any {
-                                                    it.group.groupIdHex == groupIdHex && it.engineMuted()
-                                                }
-                                            },
-                                            displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
-                                        )
-                                if (effective) folder to manual else null
-                            }
-                    }
-                SettingsGroup(
-                    modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.folders"),
+            // Custom folders containing this chat — manual membership or a
+            // live rule match — so the value tracks membership changes made
+            // anywhere (chat list, Settings, or a rule flipping).
+            val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
+            val chatIdLower = controller.group.groupIdHex.lowercase(Locale.ROOT)
+            val folderNames =
+                remember(
+                    folderStoreState,
+                    appState.chatListItems,
+                    appState.profileRevisionForCompose,
+                    folderAccountRef,
+                    chatIdLower,
+                    groupTitleCopy,
                 ) {
-                    row("folders") { rowContext ->
-                        SettingsLink(
-                            context = rowContext,
-                            title = stringResource(R.string.chat_folders_title),
-                            onClick = { showFolderPicker = true },
-                            value =
-                                folderNames
-                                    .takeIf { it.isNotEmpty() }
-                                    ?.map { (folder, _) -> chatFolderDisplayName(folder) }
-                                    ?.joinToString(", ")
-                                    ?: stringResource(R.string.chat_folders_none),
-                            leading = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
-                        )
-                    }
+                    val accountRef = folderAccountRef ?: return@remember emptyList()
+                    val thisChatRow = appState.chatListItems.filter { it.id.equals(chatIdLower, ignoreCase = true) }
+                    appState.chatFolderPreferences
+                        .foldersFor(accountRef)
+                        .mapNotNull { folder ->
+                            val manual =
+                                chatIdLower in appState.chatFolderPreferences.membershipFor(accountRef, folder.id)
+                            val effective =
+                                chatIdLower in
+                                    chatFolderChatIds(
+                                        items = thisChatRow,
+                                        manualChatIds =
+                                            appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
+                                        rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
+                                        activeAccountIdHex = appState.activeAccount?.accountIdHex,
+                                        isMuted = { groupIdHex ->
+                                            thisChatRow.any {
+                                                it.group.groupIdHex == groupIdHex && it.engineMuted()
+                                            }
+                                        },
+                                        displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
+                                    )
+                            if (effective) folder to manual else null
+                        }
                 }
-                if (showFolderPicker) {
-                    ChatFolderPickerSheet(
-                        appState = appState,
-                        targetChatIds = listOf(chatIdLower),
-                        // Rule-matched membership is visible in the row above but
-                        // not toggleable here — the sheet edits manual membership
-                        // only, so it must say why a checked-looking folder shows
-                        // an unchecked box.
-                        ruleMatchedFolderIds =
-                            folderNames
-                                .filterNot { (_, manual) -> manual }
-                                .mapTo(HashSet()) { (folder, _) -> folder.id },
-                        onCreateFolder = {
-                            showFolderPicker = false
-                            showFolderCreate = true
-                        },
-                        onDismiss = { showFolderPicker = false },
-                    )
-                }
-            }
 
             // Danger zone (#416): leave routes through requestLeave so the
             // sole-admin and sole-member cases get their own confirm copy. On
@@ -1883,6 +1710,21 @@ internal fun GroupDetailsScreen(
                 val selfMember =
                     controller.members.firstOrNull { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
                 SettingsGroup(modifier = Modifier.testTag("chat_info.lifecycle")) {
+                    row("folders") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.chat_folders_title),
+                            onClick = { showFolderPicker = true },
+                            modifier = Modifier.testTag("chat_info.folders"),
+                            value =
+                                folderNames
+                                    .takeIf { it.isNotEmpty() }
+                                    ?.map { (folder, _) -> chatFolderDisplayName(folder) }
+                                    ?.joinToString(", ")
+                                    ?: stringResource(R.string.chat_folders_none),
+                            leading = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
+                        )
+                    }
                     if (!isDm && canEdit && selfMember != null) {
                         row("step_down") { rowContext ->
                             SettingsAction(
@@ -1960,6 +1802,25 @@ internal fun GroupDetailsScreen(
                             )
                         }
                     }
+                }
+                if (showFolderPicker) {
+                    ChatFolderPickerSheet(
+                        appState = appState,
+                        targetChatIds = listOf(chatIdLower),
+                        // Rule-matched membership is visible in the row above but
+                        // not toggleable here — the sheet edits manual membership
+                        // only, so it must say why a checked-looking folder shows
+                        // an unchecked box.
+                        ruleMatchedFolderIds =
+                            folderNames
+                                .filterNot { (_, manual) -> manual }
+                                .mapTo(HashSet()) { (folder, _) -> folder.id },
+                        onCreateFolder = {
+                            showFolderPicker = false
+                            showFolderCreate = true
+                        },
+                        onDismiss = { showFolderPicker = false },
+                    )
                 }
                 if (controller.isSelfMember) {
                     if (!isDm) {

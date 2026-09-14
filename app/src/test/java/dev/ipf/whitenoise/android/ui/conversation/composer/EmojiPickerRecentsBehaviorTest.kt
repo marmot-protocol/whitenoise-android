@@ -4,9 +4,8 @@ import android.content.Context
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -94,11 +93,9 @@ class EmojiPickerRecentsBehaviorTest {
             }
         }
         waitForBrowseGrid()
-        composeRule
-            .onNodeWithContentDescription(string(R.string.emoji_search_hint))
-            .performClick()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performClick()
         composeRule.waitForIdle()
-        composeRule.onNode(hasSetTextAction()).performTextInput("happy")
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performTextInput("happy")
         composeRule.waitForIdle()
         var found = false
         repeat(100) {
@@ -142,7 +139,7 @@ class EmojiPickerRecentsBehaviorTest {
         repeat(100) {
             composeRule.waitForIdle()
             runCatching {
-                composeRule.onNodeWithText(string(R.string.emoji_category_smileys)).assertIsDisplayed()
+                composeRule.onNodeWithText(string(R.string.emoji_category_smileys_people)).assertIsDisplayed()
                 composeRule.onNodeWithText("😀").assertIsDisplayed()
             }.onSuccess { return }
             Thread.sleep(20)

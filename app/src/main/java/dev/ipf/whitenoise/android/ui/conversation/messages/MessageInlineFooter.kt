@@ -57,6 +57,7 @@ internal fun BoxScope.MediaFooterOverlay(
             onEditedClick = null,
             retention = retention,
             reserveRetentionSpace = reserveRetentionSpace,
+            statusContainerColor = Color.Black,
         )
     }
 }
@@ -75,6 +76,7 @@ internal fun MessageInlineFooter(
     reserveRetentionSpace: Boolean = false,
     showTime: Boolean = true,
     modifier: Modifier = Modifier,
+    statusContainerColor: Color? = null,
 ) {
     val retentionPresentation = rememberRetentionIndicatorPresentation(retention, retentionClockMillis)
     val showRetention =
@@ -93,6 +95,7 @@ internal fun MessageInlineFooter(
                 retentionPresentation = retentionPresentation,
                 reserveRetentionSpace = reserveRetentionSpace,
                 showTime = showTime,
+                statusContainerColor = statusContainerColor,
             )
         },
     ) { measurables, constraints ->
@@ -132,6 +135,7 @@ private fun MessageInlineFooterItems(
     retentionPresentation: RetentionIndicatorPresentation,
     reserveRetentionSpace: Boolean,
     showTime: Boolean,
+    statusContainerColor: Color?,
 ) {
     editedLabel?.let {
         Text(
@@ -148,7 +152,7 @@ private fun MessageInlineFooterItems(
         Text(timeText, style = MaterialTheme.typography.labelSmall, color = color)
     }
     if (showStatus) {
-        OutgoingMessageStatusIcon(status, tint = color)
+        OutgoingMessageStatusIcon(status, tint = color, containerColor = statusContainerColor)
     }
 }
 

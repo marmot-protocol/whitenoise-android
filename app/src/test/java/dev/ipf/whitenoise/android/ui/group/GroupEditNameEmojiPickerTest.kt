@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_TEST_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -118,7 +119,7 @@ class GroupEditNameEmojiPickerTest {
             .onNodeWithContentDescription(string(R.string.open_emoji_picker))
             .assertIsNotEnabled()
             .performClick()
-        composeRule.onNodeWithContentDescription(string(R.string.emoji_search_hint)).assertDoesNotExist()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
     }
 
     @Test

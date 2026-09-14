@@ -192,7 +192,7 @@ class MessageReactionTransitionScreenshotTest {
         composeRule.runOnIdle { }
 
         composeRule.onNodeWithText("👍", substring = false, useUnmergedTree = true).assertExists()
-        composeRule.onNodeWithText("👍❤️", substring = false, useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("❤️", substring = false, useUnmergedTree = true).assertExists()
         composeRule
             .onNodeWithTag(GALLERY_TAG)
             .captureRoboImage("src/test/snapshots/${name}_mid.png")

@@ -180,7 +180,6 @@
     <string name="save_group">Gruppe speichern</string>
     <string name="saving_group">Gruppe wird gespeichert...</string>
     <string name="info">Infos</string>
-    <string name="group_info">Gruppeninfo</string>
     <string name="group_identifiers">Gruppenkennungen</string>
     <string name="mls_group_id">MLS-Gruppen-ID</string>
     <string name="nostr_group_id">Nostr-Gruppen-ID</string>
@@ -189,6 +188,7 @@
     <string name="relay_number">Relay-Server %1$d</string>
     <string name="group_id">Gruppen-ID</string>
     <string name="relays">Netzwerk-Relays</string>
+    <string name="developer_tools">Entwicklerwerkzeuge</string>
     <string name="members">Mitglieder:</string>
     <string name="add_member">Mitglieder hinzufügen</string>
     <string name="add_member_already_in_group">%1$s ist bereits in dieser Gruppe</string>
@@ -238,6 +238,7 @@
     <string name="push_debug_updated_at">Aktualisiert am</string>
     <string name="error_qr_not_valid_npub_or_public_key">Dieser QR-Code ist kein gültiger npub oder öffentlicher Schlüssel.</string>
     <string name="admin">Admin</string>
+    <string name="member">Mitglied</string>
     <string name="you">Du</string>
     <string name="reaction_filter_all">Alle</string>
     <string name="view_reactors">Anzeigen, wer reagiert hat</string>
@@ -275,9 +276,10 @@
     <string name="open_emoji_picker">Emoji-Auswahl öffnen</string>
     <string name="show_keyboard">Tastatur anzeigen</string>
     <string name="emoji_backspace">Emoji löschen</string>
-    <string name="customize_reactions">Reaktionen anpassen</string>
-    <string name="customize_reactions_hint">Tippe, um ein Emoji zu ersetzen</string>
-    <string name="reset_reactions">Zurücksetzen</string>
+    <string name="configure_reactions">Reaktionen konfigurieren</string>
+    <string name="configure_reactions_guidance">Tippe auf ein Emoji, um es zu ersetzen.</string>
+    <string name="reset">Zurücksetzen</string>
+    <string name="reaction_slot_description">Reaktion %1$d, %2$s. Zum Ersetzen doppelt tippen.</string>
     <string name="emoji_search_hint">Emoji suchen</string>
     <string name="emoji_search_clear">Emoji-Suche löschen</string>
     <string name="emoji_search_no_results">Kein Emoji gefunden</string>
@@ -1227,8 +1229,6 @@
         <item quantity="one">%d Jahr</item>
         <item quantity="other">%d Jahre</item>
     </plurals>
-    <string name="disappearing_row_hint_admin">Tippen, um die Lebensdauer neuer Nachrichten festzulegen</string>
-    <string name="disappearing_row_hint_readonly">Nur Admins können das ändern</string>
     <string name="toast_disappearing_messages_updated">Verschwindende Nachrichten aktualisiert</string>
     <string name="toast_couldnt_update_disappearing">Verschwindende Nachrichten konnten nicht aktualisiert werden</string>
     <string name="save">Speichern</string>
@@ -1842,9 +1842,6 @@
     <string name="folder_included_chats">Enthaltene Chats</string>
     <string name="chats">Unterhaltungen</string>
     <string name="manage_folders">Ordner verwalten</string>
-    <string name="left_chats">Verlassen</string>
-    <string name="no_left_chats">Keine verlassenen Unterhaltungen</string>
-    <string name="no_left_chats_detail">Unterhaltungen, die du verlässt oder aus denen du entfernt wirst, erscheinen hier.</string>
     <string name="new_message_name_or_npub">Name oder npub</string>
     <string name="new_message_connect_qr">Mit QR verbinden</string>
     <string name="new_message_invite_friend">Freund einladen</string>
@@ -1890,6 +1887,20 @@
     <string name="app_update_row_unknown">Nach Updates suchen</string>
     <string name="app_update_row_current">Auf dem neuesten Stand</string>
     <string name="app_update_row_available">Version %1$s ist auf Zapstore verfügbar.</string>
+    <string name="selection_state_selected">Ausgewählt</string>
+    <string name="selection_state_not_selected">Nicht ausgewählt</string>
+    <plurals name="reaction_count">
+        <item quantity="one">%1$s, %2$d Reaktion</item>
+        <item quantity="other">%1$s, %2$d Reaktionen</item>
+    </plurals>
+    <plurals name="more_reaction_types">
+        <item quantity="one">%2$d weiterer Reaktionstyp</item>
+        <item quantity="other">%2$d weitere Reaktionstypen</item>
+    </plurals>
+    <plurals name="chat_relay_count">
+        <item quantity="one">%1$d Chat-Relay</item>
+        <item quantity="other">%1$d Chat-Relays</item>
+    </plurals>
     <string name="audit_upload_title">Technische Protokolle teilen</string>
     <string name="audit_upload_subtitle">Diagnostische Audit-Protokolle automatisch an White Noise senden, getrennt von der Nutzungsfreigabe.</string>
     <string name="audit_upload_confirm_title">Technische Protokolle mit White Noise teilen?</string>

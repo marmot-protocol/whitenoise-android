@@ -43,24 +43,23 @@ class ComposeHotPathCoverageTest {
 
     @Test
     fun emojiSearchRunsOutsideCompositionAndOffTheMainThread() {
-        val source = source("conversation/composer/EmojiPicker.kt").readText()
+        val source = source("conversation/composer/EmojiPickerContent.kt").readText()
 
         assertTrue(
             "emoji search must be produced asynchronously",
-            "initialValue = EmojiSearchSnapshot(query = \"\", results = emptyList())" in source,
+            "LaunchedEffect(query, entries)" in source,
         )
         assertTrue(
             "emoji filtering must run on the Default dispatcher",
-            "withContext(Dispatchers.Default) { EmojiData.search(browseEmoji, query) }" in source,
+            "withContext(Dispatchers.Default) { emojiSearchSections(EmojiData.search(entries, query)) }" in source,
         )
         assertFalse(
             "emoji filtering must not run synchronously from remember during composition",
-            Regex("""remember\(searchQuery,\s*browseEmoji\)\s*\{\s*EmojiData\.search""")
-                .containsMatchIn(source),
+            Regex("""remember\([^)]*\)\s*\{\s*(emojiSearchSections\()?EmojiData\.search""").containsMatchIn(source),
         )
         assertTrue(
-            "results from a superseded query must not remain selectable",
-            "searchSnapshot.results.takeIf { searchSnapshot.query == searchQuery }.orEmpty()" in source,
+            "results from a superseded query must not present an empty state",
+            "model.searchedQuery == query" in source,
         )
     }
 

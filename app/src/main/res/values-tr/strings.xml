@@ -180,7 +180,6 @@
     <string name="save_group">Grubu Kaydet</string>
     <string name="saving_group">Grup kaydediliyor...</string>
     <string name="info">Bilgi</string>
-    <string name="group_info">Grup bilgileri</string>
     <string name="group_identifiers">Grup tanımlayıcıları</string>
     <string name="mls_group_id">MLS grup kimliği</string>
     <string name="nostr_group_id">Nostr grup kimliği</string>
@@ -189,6 +188,7 @@
     <string name="relay_number">Aktarıcı %1$d</string>
     <string name="group_id">Grup Kimliği</string>
     <string name="relays">Ağ röleleri</string>
+    <string name="developer_tools">Geliştirici araçları</string>
     <string name="members">Üyeler:</string>
     <string name="add_member">Üyeler ekle</string>
     <string name="add_member_already_in_group">%1$s zaten bu grupta</string>
@@ -238,6 +238,7 @@
     <string name="push_debug_updated_at">Güncellenme zamanı</string>
     <string name="error_qr_not_valid_npub_or_public_key">Bu QR kodu geçerli bir npub veya genel anahtar değil.</string>
     <string name="admin">Yönetici</string>
+    <string name="member">Üye</string>
     <string name="you">Sen</string>
     <string name="reaction_filter_all">Tümü</string>
     <string name="view_reactors">Kimlerin tepki verdiğini gör</string>
@@ -275,9 +276,10 @@
     <string name="open_emoji_picker">Emoji seçiciyi aç</string>
     <string name="show_keyboard">Klavyeyi göster</string>
     <string name="emoji_backspace">Emojiyi sil</string>
-    <string name="customize_reactions">Tepkileri özelleştir</string>
-    <string name="customize_reactions_hint">Bir emojiyi değiştirmek için dokun</string>
-    <string name="reset_reactions">Sıfırla</string>
+    <string name="configure_reactions">Tepkileri yapılandır</string>
+    <string name="configure_reactions_guidance">Değiştirmek için bir emojiye dokun.</string>
+    <string name="reset">Sıfırla</string>
+    <string name="reaction_slot_description">Tepki %1$d, %2$s. Değiştirmek için iki kez dokun.</string>
     <string name="emoji_search_hint">Emoji ara</string>
     <string name="emoji_search_clear">Emoji aramasını temizle</string>
     <string name="emoji_search_no_results">Emoji bulunamadı</string>
@@ -1227,8 +1229,6 @@
         <item quantity="one">%d yıl</item>
         <item quantity="other">%d yıl</item>
     </plurals>
-    <string name="disappearing_row_hint_admin">Yeni mesajların ne kadar kalacağını ayarlamak için dokunun</string>
-    <string name="disappearing_row_hint_readonly">Bunu yalnızca yöneticiler değiştirebilir</string>
     <string name="toast_disappearing_messages_updated">Kaybolan mesajlar güncellendi</string>
     <string name="toast_couldnt_update_disappearing">Kaybolan mesajlar güncellenemedi</string>
     <string name="save">Kaydet</string>
@@ -1826,9 +1826,6 @@
     <string name="folder_included_chats">Dahil Edilen Sohbetler</string>
     <string name="chats">Sohbetler</string>
     <string name="manage_folders">Klasörleri yönet</string>
-    <string name="left_chats">Ayrıldığınız sohbetler</string>
-    <string name="no_left_chats">Ayrıldığınız sohbet yok</string>
-    <string name="no_left_chats_detail">Ayrıldığınız veya kaldırıldığınız sohbetler burada görünecektir.</string>
     <string name="new_message_name_or_npub">Ad veya npub</string>
     <string name="new_message_connect_qr">QR koduyla bağlan</string>
     <string name="new_message_invite_friend">Bir arkadaşını davet et</string>
@@ -1874,6 +1871,20 @@
     <string name="app_update_row_unknown">Güncellemeleri kontrol et</string>
     <string name="app_update_row_current">Güncel</string>
     <string name="app_update_row_available">%1$s sürümü Zapstore’da mevcut.</string>
+    <string name="selection_state_selected">Seçili</string>
+    <string name="selection_state_not_selected">Seçili değil</string>
+    <plurals name="reaction_count">
+        <item quantity="one">%1$s, %2$d tepki</item>
+        <item quantity="other">%1$s, %2$d tepki</item>
+    </plurals>
+    <plurals name="more_reaction_types">
+        <item quantity="one">%2$d tepki türü daha</item>
+        <item quantity="other">%2$d tepki türü daha</item>
+    </plurals>
+    <plurals name="chat_relay_count">
+        <item quantity="one">%1$d sohbet aktarıcısı</item>
+        <item quantity="other">%1$d sohbet aktarıcısı</item>
+    </plurals>
     <string name="audit_upload_title">Teknik günlükleri paylaş</string>
     <string name="audit_upload_subtitle">Tanılama denetim günlüklerini kullanım paylaşımından ayrı olarak White Noise’a otomatik gönder.</string>
     <string name="audit_upload_confirm_title">Teknik günlükler White Noise ile paylaşılsın mı?</string>

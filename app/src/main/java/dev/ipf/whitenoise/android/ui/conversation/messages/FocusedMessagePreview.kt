@@ -128,6 +128,7 @@ internal fun FocusedTextMessagePreview(
                 onEditedClick = null,
                 retention = retention,
                 reserveRetentionSpace = reserveRetentionSpace,
+                statusContainerColor = colorFromArgb(presentation.backgroundArgb),
             )
         }
     val content: @Composable () -> Unit = {

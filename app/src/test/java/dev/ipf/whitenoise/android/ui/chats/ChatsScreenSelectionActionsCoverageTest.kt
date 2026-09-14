@@ -211,7 +211,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         listOf(
             "globalSearchState:",
             "onGlobalSearchStateChange:",
-            "val chatListState = key(showArchived, effectiveChatScope) { rememberLazyListState() }",
+            "val chatListState = key(showArchived) { rememberLazyListState() }",
         ).forEach { declaration ->
             assertTrue(
                 "$declaration must remain outside the editor swap so closing it preserves list state",

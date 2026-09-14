@@ -13,18 +13,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,12 +35,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -60,7 +65,8 @@ internal fun MicHoldButton(controller: dev.ipf.whitenoise.android.audio.VoiceRec
     val cancelThresholdPx = with(density) { cancelThresholdDp.toPx() }
     val lockThresholdPx = with(density) { lockThresholdDp.toPx() }
     val recording = controller.isRecording
-    FloatingActionButton(
+    val label = stringResource(if (recording) R.string.voice_recording_stop else R.string.voice_message_record)
+    IconButton(
         // Accessibility fallback: a tap (TalkBack double-tap, keyboard
         // Enter, switch access) toggles record-and-lock so users who can't
         // perform the press-and-hold gesture can still send voice notes.
@@ -73,7 +79,9 @@ internal fun MicHoldButton(controller: dev.ipf.whitenoise.android.audio.VoiceRec
         },
         modifier =
             Modifier
-                .size(44.dp)
+                .width(40.dp)
+                .height(48.dp)
+                .semantics { contentDescription = label }
                 .pointerInput(controller) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
@@ -135,18 +143,41 @@ internal fun MicHoldButton(controller: dev.ipf.whitenoise.android.audio.VoiceRec
                         }
                     }
                 },
-        containerColor =
-            if (recording) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.primary
-            },
-        contentColor = MaterialTheme.colorScheme.onPrimary,
     ) {
-        Icon(
-            Icons.Default.Mic,
-            contentDescription = stringResource(R.string.voice_message_record),
-        )
+        if (recording) {
+            Icon(
+                painter = painterResource(R.drawable.ic_stop),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp),
+            )
+        } else {
+            MiniWaveformGlyph(MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** The prototype's five-bar voice glyph: 2dp bars of 6/12/18/12/6dp, 2dp apart, inside a 24dp box. */
+@Composable
+@Suppress("FunctionNaming")
+internal fun MiniWaveformGlyph(
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    val heights = listOf(6.dp, 12.dp, 18.dp, 12.dp, 6.dp)
+    Row(
+        modifier = modifier.size(24.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        heights.forEach { height ->
+            Box(
+                Modifier
+                    .width(2.dp)
+                    .height(height)
+                    .background(color, CircleShape),
+            )
+        }
     }
 }
 

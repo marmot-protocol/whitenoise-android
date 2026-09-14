@@ -1971,13 +1971,6 @@ internal fun ConversationScreen(
         }
     }
 
-    fun resetQuickReactionEmojis() {
-        quickReactionEmojisTouched = true
-        scope.launch {
-            quickReactionEmojis = withContext(Dispatchers.IO) { RecentEmojiPreferences.resetQuickReactions(context) }
-        }
-    }
-
     fun navigateToReplyTarget(item: TimelineMessage) {
         navigationState.searchJob?.cancel()
         navigationState.targetHighlight.clear()
@@ -3837,7 +3830,6 @@ internal fun ConversationScreen(
                                         }
                                     },
                                     onQuickReactionsSave = { saveQuickReactionEmojis(it) },
-                                    onQuickReactionsReset = { resetQuickReactionEmojis() },
                                     onReplyPreviewClick = { navigateToReplyTarget(it) },
                                     composerGate = composerGate,
                                     onBack = exitConversation,

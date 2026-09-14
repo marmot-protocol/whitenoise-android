@@ -345,7 +345,8 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         awaitResizeHandleAfterReentry()
         composeRule.onNodeWithText(restoredDraft).assertExists()
         val restoredPillHeight = productionComposerPillContentHeight()
-        val expectedPillHeight = 240f - (2f * 8f)
+        // The composer bar keeps a 6dp vertical inset above and below the pill.
+        val expectedPillHeight = 240f - (2f * 6f)
         assertTrue(
             "the restored 240dp owner must leave exact content below its outer insets",
             kotlin.math.abs(restoredPillHeight - expectedPillHeight) <= 2f,

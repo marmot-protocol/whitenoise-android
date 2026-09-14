@@ -198,7 +198,6 @@
     <string name="save_group">Сохранить группу</string>
     <string name="saving_group">Сохранение группы...</string>
     <string name="info">Информация</string>
-    <string name="group_info">Информация о группе</string>
     <string name="group_identifiers">Идентификаторы группы</string>
     <string name="mls_group_id">ID группы MLS</string>
     <string name="nostr_group_id">ID группы Nostr</string>
@@ -207,6 +206,7 @@
     <string name="relay_number">Ретранслятор %1$d</string>
     <string name="group_id">ID группы</string>
     <string name="relays">Сетевые реле</string>
+    <string name="developer_tools">Инструменты разработчика</string>
     <string name="members">Участники:</string>
     <string name="add_member">Добавить участников</string>
     <string name="add_member_already_in_group">%1$s уже в этой группе</string>
@@ -256,6 +256,7 @@
     <string name="push_debug_updated_at">Обновлено</string>
     <string name="error_qr_not_valid_npub_or_public_key">Этот код QR не является действительным npub или открытым ключом.</string>
     <string name="admin">Админ</string>
+    <string name="member">Участник</string>
     <string name="you">Вы</string>
     <string name="reaction_filter_all">Все</string>
     <string name="view_reactors">Показать, кто отреагировал</string>
@@ -293,9 +294,10 @@
     <string name="open_emoji_picker">Открыть выбор эмодзи</string>
     <string name="show_keyboard">Показать клавиатуру</string>
     <string name="emoji_backspace">Удалить эмодзи</string>
-    <string name="customize_reactions">Настроить реакции</string>
-    <string name="customize_reactions_hint">Нажмите, чтобы заменить эмодзи</string>
-    <string name="reset_reactions">Сбросить</string>
+    <string name="configure_reactions">Настроить реакции</string>
+    <string name="configure_reactions_guidance">Нажмите на эмодзи, чтобы заменить его.</string>
+    <string name="reset">Сбросить</string>
+    <string name="reaction_slot_description">Реакция %1$d, %2$s. Нажмите дважды, чтобы заменить.</string>
     <string name="emoji_search_hint">Поиск эмодзи</string>
     <string name="emoji_search_clear">Очистить поиск эмодзи</string>
     <string name="emoji_search_no_results">Эмодзи не найдены</string>
@@ -1281,8 +1283,6 @@
         <item quantity="many">%d лет</item>
         <item quantity="other">%d года</item>
     </plurals>
-    <string name="disappearing_row_hint_admin">Нажмите, чтобы задать срок жизни новых сообщений</string>
-    <string name="disappearing_row_hint_readonly">Изменить это могут только администраторы</string>
     <string name="toast_disappearing_messages_updated">Исчезающие сообщения обновлены</string>
     <string name="toast_couldnt_update_disappearing">Не удалось обновить исчезающие сообщения</string>
     <string name="save">Сохранить</string>
@@ -1880,9 +1880,6 @@
     <string name="folder_included_chats">Включенные чаты</string>
     <string name="chats">Чаты</string>
     <string name="manage_folders">Управление папками</string>
-    <string name="left_chats">Покинутые чаты</string>
-    <string name="no_left_chats">Нет покинутых чатов</string>
-    <string name="no_left_chats_detail">Здесь появятся чаты, из которых вы вышли или были удалены.</string>
     <string name="new_message_name_or_npub">Имя или npub</string>
     <string name="new_message_connect_qr">Подключиться по QR-коду</string>
     <string name="new_message_invite_friend">Пригласить друга</string>
@@ -1928,6 +1925,26 @@
     <string name="app_update_row_unknown">Проверить обновления</string>
     <string name="app_update_row_current">Установлена последняя версия</string>
     <string name="app_update_row_available">Версия %1$s доступна в Zapstore.</string>
+    <string name="selection_state_selected">Выбрано</string>
+    <string name="selection_state_not_selected">Не выбрано</string>
+    <plurals name="reaction_count">
+        <item quantity="one">%1$s, %2$d реакция</item>
+        <item quantity="few">%1$s, %2$d реакции</item>
+        <item quantity="many">%1$s, %2$d реакций</item>
+        <item quantity="other">%1$s, %2$d реакции</item>
+    </plurals>
+    <plurals name="more_reaction_types">
+        <item quantity="one">ещё %2$d тип реакции</item>
+        <item quantity="few">ещё %2$d типа реакций</item>
+        <item quantity="many">ещё %2$d типов реакций</item>
+        <item quantity="other">ещё %2$d типа реакций</item>
+    </plurals>
+    <plurals name="chat_relay_count">
+        <item quantity="one">%1$d релей чата</item>
+        <item quantity="few">%1$d релея чата</item>
+        <item quantity="many">%1$d релеев чата</item>
+        <item quantity="other">%1$d релея чата</item>
+    </plurals>
     <string name="audit_upload_title">Отправлять технические журналы</string>
     <string name="audit_upload_subtitle">Автоматически отправлять диагностические журналы в White Noise отдельно от данных об использовании.</string>
     <string name="audit_upload_confirm_title">Отправлять технические журналы в White Noise?</string>

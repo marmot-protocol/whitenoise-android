@@ -4,13 +4,11 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerFallbackHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerSearchExtraHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPaneRestoreStep
-import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheetMaxHeightFraction
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerAttachmentPaneMinimumHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneRestoreStep
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneTargetHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerKeyboardRestoreTimeoutClearsFocus
-import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerSheetVisibleContentFraction
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldStartComposerKeyboardRestore
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldSwapComposerEmojiPaneToIme
 import dev.ipf.whitenoise.android.ui.conversation.composer.updatedComposerRememberedImeHeight
@@ -371,18 +369,5 @@ class ComposerEmojiPaneLayoutTest {
     @Test
     fun searchModeAddsRoomForTheSearchFieldAndResults() {
         assertEquals(432.dp, ComposerEmojiPickerFallbackHeight + ComposerEmojiPickerSearchExtraHeight)
-    }
-
-    @Test
-    fun emojiPickerSheetUsesOnlyTheVisiblePartialViewportBeforeExpansion() {
-        val partialFraction = emojiPickerSheetVisibleContentFraction(expanded = false)
-
-        assertEquals(0.48f / EmojiPickerSheetMaxHeightFraction, partialFraction, 0.0001f)
-        assertTrue(partialFraction < 1f)
-    }
-
-    @Test
-    fun emojiPickerSheetUsesTheFullSheetViewportWhenExpanded() {
-        assertEquals(1f, emojiPickerSheetVisibleContentFraction(expanded = true), 0.0001f)
     }
 }

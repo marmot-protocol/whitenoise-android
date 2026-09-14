@@ -182,21 +182,15 @@ object IdentityFormatter {
         }.getOrDefault("")
     }
 
+    /** Bubble footers carry the clock time only, the prototype's rule; day changes belong to the date headers. */
     fun messageBubbleTime(
         epochSeconds: ULong,
-        copy: RelativeTimeCopy = RelativeTimeCopy.Default,
         locale: Locale = Locale.getDefault(),
-        now: Instant = Instant.now(),
         zone: ZoneId = ZoneId.systemDefault(),
         force24Hour: Boolean? = null,
     ): String {
         if (epochSeconds == 0uL) return ""
-        val seconds = epochSeconds.toLong().coerceIn(0L, MAX_DISPLAYABLE_EPOCH_SECONDS)
-        return if (now.epochSecond - seconds < 3_600) {
-            relativeTime(epochSeconds, copy, locale, now, zone)
-        } else {
-            clockTime(epochSeconds, locale, zone, force24Hour)
-        }
+        return clockTime(epochSeconds, locale, zone, force24Hour)
     }
 
     private fun localizedDateWithoutYearFormatter(locale: Locale): DateTimeFormatter =

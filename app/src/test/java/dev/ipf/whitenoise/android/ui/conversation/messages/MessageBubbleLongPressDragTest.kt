@@ -126,7 +126,6 @@ class MessageBubbleLongPressDragTest {
                                 actionMenuOpen = open
                             },
                             onQuickReactionsSave = {},
-                            onQuickReactionsReset = {},
                             onReplyPreviewClick = {},
                             composerGate = ComposerGate.COMPOSER,
                             inviteMutationInFlight = false,
@@ -221,7 +220,6 @@ class MessageBubbleLongPressDragTest {
                             actionMenuOpen = open
                         },
                         onQuickReactionsSave = {},
-                        onQuickReactionsReset = {},
                         onReplyPreviewClick = {},
                         composerGate = ComposerGate.COMPOSER,
                         inviteMutationInFlight = false,
@@ -325,7 +323,6 @@ class MessageBubbleLongPressDragTest {
                                 isActionMenuOpen = false,
                                 onActionMenuOpenChange = {},
                                 onQuickReactionsSave = {},
-                                onQuickReactionsReset = {},
                                 onReplyPreviewClick = {},
                                 composerGate = ComposerGate.COMPOSER,
                                 inviteMutationInFlight = false,
@@ -427,7 +424,6 @@ class MessageBubbleLongPressDragTest {
                     isActionMenuOpen = false,
                     onActionMenuOpenChange = {},
                     onQuickReactionsSave = {},
-                    onQuickReactionsReset = {},
                     onReplyPreviewClick = {},
                     composerGate = ComposerGate.COMPOSER,
                     inviteMutationInFlight = false,

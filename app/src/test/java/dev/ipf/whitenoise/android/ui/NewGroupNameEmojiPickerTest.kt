@@ -39,6 +39,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupSetupScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.newGroupDetailsEditable
 import dev.ipf.whitenoise.android.ui.chats.newchat.submittedNewGroupName
+import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
 import dev.ipf.whitenoise.android.ui.group.GROUP_EMOJI_IMAGE_PICKER_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -80,7 +81,7 @@ class NewGroupNameEmojiPickerTest {
 
         action.performClick()
 
-        composeRule.onNodeWithContentDescription(string(R.string.emoji_search_hint)).assertIsDisplayed()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsDisplayed()
     }
 
     @Test
@@ -122,7 +123,7 @@ class NewGroupNameEmojiPickerTest {
 
         val firstUpdate = composeRule.onNode(hasSetTextAction() and hasText("hello 😀"))
         assertSelection(firstUpdate, TextRange("hello 😀".length))
-        composeRule.onNodeWithContentDescription(string(R.string.emoji_search_hint)).assertIsDisplayed()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsDisplayed()
 
         composeRule.onAllNodesWithText("😀")[0].performClick()
         val secondUpdate = composeRule.onNode(hasSetTextAction() and hasText("hello 😀😀"))
@@ -205,18 +206,18 @@ class NewGroupNameEmojiPickerTest {
         field.performTextReplacement("Team 😀 name")
         field.performTextInputSelection(TextRange(5, 7))
         composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker)).performClick()
-        composeRule.onNodeWithContentDescription(string(R.string.emoji_search_hint)).assertIsDisplayed()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsDisplayed()
 
         restorationTester.emulateSavedInstanceStateRestore()
 
         val restored = composeRule.onNode(hasSetTextAction() and hasText("Team 😀 name"))
         assertSelection(restored, TextRange(5, 7))
-        composeRule.onNodeWithContentDescription(string(R.string.emoji_search_hint)).assertIsDisplayed()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsDisplayed()
 
         composeRule
             .onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Dismiss))
             .performSemanticsAction(SemanticsActions.Dismiss)
-        composeRule.onNodeWithContentDescription(string(R.string.emoji_search_hint)).assertDoesNotExist()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
         composeRule.onNode(hasSetTextAction() and hasText("Team 😀 name")).assertExists()
     }
 
@@ -227,7 +228,7 @@ class NewGroupNameEmojiPickerTest {
         val action = composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker))
         action.assertIsNotEnabled().performClick()
 
-        composeRule.onNodeWithContentDescription(string(R.string.emoji_search_hint)).assertDoesNotExist()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
     }
 
     @Test

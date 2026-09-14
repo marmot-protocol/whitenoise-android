@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="shared_content_in_chat">Shared in chat</string>
-    <string name="shared_content_photos_videos">Photos &amp; videos</string>
+    <string name="shared_content_in_chat">Shared in Chat</string>
+    <string name="shared_content_photos_videos">Photos and videos</string>
     <string name="shared_content_loaded_count">%1$d loaded</string>
     <string name="shared_content_loaded_scope">Only messages already loaded in this chat are shown.</string>
     <string name="shared_content_loading">Loading shared content…</string>

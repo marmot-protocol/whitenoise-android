@@ -49,12 +49,11 @@ private const val FOLDER_PILL_MAX_VISIBLE_COUNT = 99
 internal fun selectedChatFolderPillIndex(
     chips: List<ChatFolderChipModel>,
     selectedFolderId: String?,
-    chatScope: ChatScope = ChatScope.Chats,
 ): Int =
-    when {
-        selectedFolderId != null -> (chips.indexOfFirst { it.folderId == selectedFolderId } + 1).coerceAtLeast(0)
-        chatScope == ChatScope.Left -> chips.size + 1
-        else -> 0
+    if (selectedFolderId != null) {
+        (chips.indexOfFirst { it.folderId == selectedFolderId } + 1).coerceAtLeast(0)
+    } else {
+        0
     }
 
 /** Native folder order/rules/counts remain input facts; this row only presents and reveals the selected destination. */
@@ -68,8 +67,6 @@ internal fun ChatFolderPills(
     onEditFolder: (String) -> Unit,
     onFolders: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    chatScope: ChatScope = ChatScope.Chats,
-    onSelectScope: ((ChatScope) -> Unit)? = null,
 ) {
     val scrolled =
         (LocalWhiteNoiseHeaderScroll.current?.state?.overlappedFraction ?: 0f) > FOLDER_HEADER_SCROLLED_THRESHOLD
@@ -87,7 +84,7 @@ internal fun ChatFolderPills(
             },
             label = "Selected folder background",
         ).value
-    val selectedIndex = selectedChatFolderPillIndex(chips, selectedFolderId, chatScope)
+    val selectedIndex = selectedChatFolderPillIndex(chips, selectedFolderId)
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex)
     LaunchedEffect(selectedIndex, chips.map { it.folderId }) {
         val layout = listState.layoutInfo
@@ -109,7 +106,7 @@ internal fun ChatFolderPills(
         item(key = "scope:chats") {
             ChatFolderPill(
                 stringResource(R.string.chats),
-                selectedFolderId == null && chatScope == ChatScope.Chats,
+                selectedFolderId == null,
                 CHAT_LIST_FILTER_CHIP_ALL_TAG,
                 selectedColor,
                 { onSelect(null) },
@@ -133,17 +130,6 @@ internal fun ChatFolderPills(
                 onLongClick = { onEditFolder(chip.folderId) },
                 trailingCount = chip.trailingCount,
             )
-        }
-        if (onSelectScope != null) {
-            item(key = "scope:left") {
-                ChatFolderPill(
-                    stringResource(R.string.left_chats),
-                    selectedFolderId == null && chatScope == ChatScope.Left,
-                    "chats.scope.left",
-                    selectedColor,
-                    { onSelectScope(ChatScope.Left) },
-                )
-            }
         }
         if (onFolders != null) {
             item(key = "manage") {

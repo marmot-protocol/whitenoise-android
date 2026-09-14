@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -65,7 +64,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.SoftwareKeyboardController
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.TextRange
@@ -1005,11 +1003,11 @@ internal fun ComposerBar(
                 maxHeight
             }
         val customInputPaneHeight = with(density) { customInputPaneHeightPx.toDp() }
-        // The existing 8dp outer padding completes the prototype surface top gap of 24dp. A compact remainder
-        // (landscape with the IME open) keeps that 16dp for the editor, mirroring the ceiling's compact allowance.
+        // The 6dp outer padding completes the prototype surface top gap of 24dp. A compact remainder
+        // (landscape with the IME open) keeps that 18dp for the editor, mirroring the ceiling's compact allowance.
         val composerRemainder =
             boundedHeight - statusBarTop - topInteractionClearance - bottomInset - customInputPaneHeight
-        val prototypeTopGap = if (composerRemainder - 16.dp >= CompactViableComposerHeight) 16.dp else 0.dp
+        val prototypeTopGap = if (composerRemainder - 18.dp >= CompactViableComposerHeight) 18.dp else 0.dp
         val maximumComposerHeight = (composerRemainder - prototypeTopGap).coerceAtLeast(44.dp)
         val automaticComposerCeiling = resolveAutomaticComposerCeiling(maximumComposerHeight)
         val maximumComposerHeightPx = with(density) { maximumComposerHeight.toPx() }
@@ -1111,7 +1109,7 @@ internal fun ComposerBar(
                             automaticComposerHeightPx = size.height.toFloat()
                         }
                         onTimelineComposerMeasured(size.height, automaticComposerHeightPx.toInt().coerceAtLeast(0))
-                    }.padding(horizontal = 16.dp, vertical = 8.dp),
+                    }.padding(horizontal = 16.dp, vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 val voiceReviewClip = voiceReview?.clip?.takeUnless { voiceRecordingController?.isRecording == true }
@@ -1497,38 +1495,26 @@ internal fun ComposerBar(
                                     tint = MaterialTheme.colorScheme.error,
                                 )
                             }
-                            FloatingActionButton(
+                            ComposerActionDisc(
                                 onClick = { voiceRecordingController.stop() },
-                                modifier = Modifier.composerActionSize(),
-                                shape = androidx.compose.foundation.shape.CircleShape,
                                 containerColor = actionColors.container,
                                 contentColor = actionColors.content,
-                            ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_stop),
-                                    contentDescription = stringResource(R.string.voice_recording_stop),
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
+                                description = stringResource(R.string.voice_recording_stop),
+                                icon = R.drawable.ic_stop,
+                            )
                         } else if (showPrimaryTrailingAction && showMicButton) {
                             Box(contentAlignment = Alignment.BottomCenter) {
                                 LockHintAbove(controller = voiceRecordingController)
                                 MicHoldButton(controller = voiceRecordingController)
                             }
                         } else if (showPrimaryTrailingAction) {
-                            FloatingActionButton(
+                            ComposerActionDisc(
                                 onClick = { submitMessage() },
-                                modifier = Modifier.composerActionSize(),
-                                shape = androidx.compose.foundation.shape.CircleShape,
                                 containerColor = actionColors.container,
                                 contentColor = actionColors.content,
-                            ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_arrow_upward),
-                                    contentDescription = stringResource(R.string.send),
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
+                                description = stringResource(R.string.send),
+                                icon = R.drawable.ic_arrow_upward,
+                            )
                         }
                     }
                     if (activeRecordingController != null) {

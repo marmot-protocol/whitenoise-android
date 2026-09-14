@@ -69,6 +69,17 @@ internal fun amoledOutlineBorder(enabled: Boolean = true): BorderStroke? =
         null
     }
 
+private const val AMOLED_SELECTION_ALPHA = 0.16f
+
+/** Selected-state fill: a faint white wash on AMOLED, where every tonal container is black, else [default]. */
+@Composable
+internal fun outlineSelectionColor(default: Color): Color =
+    if (isAmoledSurfaceTheme()) {
+        Color.White.copy(alpha = AMOLED_SELECTION_ALPHA)
+    } else {
+        default
+    }
+
 /** Filled buttons on AMOLED turn black with white content behind the outline instead of a tonal fill. */
 @Composable
 internal fun outlineButtonColors(): ButtonColors =

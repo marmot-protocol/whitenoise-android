@@ -262,7 +262,6 @@ internal fun GroupEmojiImagePickerSheet(
                 },
                 purpose = EmojiPickerPurpose.USE,
                 recentEmojis = recentEmojis,
-                searchFieldAlwaysVisible = true,
                 selectionEnabled = !applyInFlight,
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )

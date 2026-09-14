@@ -257,7 +257,6 @@ class ConversationInviteAcceptanceResolutionScreenshotTest {
                         isActionMenuOpen = false,
                         onActionMenuOpenChange = {},
                         onQuickReactionsSave = {},
-                        onQuickReactionsReset = {},
                         onReplyPreviewClick = {},
                         composerGate = ComposerGate.PENDING,
                         inviteMutationInFlight = false,

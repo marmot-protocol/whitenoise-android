@@ -107,10 +107,10 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithTag("chat_info.header_identity").assertDoesNotExist()
         composeRule.onNodeWithTag("chat_info.list").performTouchInput { swipeUp(durationMillis = 1_000) }
         composeRule.onNodeWithTag("chat_info.header_name").assertIsDisplayed()
+        composeRule.onNodeWithTag("chat_info.developer_tools").performScrollTo()
         val offset = overviewScrollOffset()
         assertTrue(offset > 0f)
-        composeRule.onNodeWithContentDescription(context.getString(R.string.actions)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.group_info)).performClick()
+        composeRule.onNodeWithTag("chat_info.developer_tools").performClick()
         composeRule.onNodeWithText(context.getString(R.string.mls_group_id)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         composeRule.onNodeWithTag("chat_info.header_name").assertIsDisplayed()
@@ -260,11 +260,13 @@ class GroupDetailsEditNavigationTest {
             .value()
 
     @Test
-    fun overflowEditAndAddDescriptionOpenTheSameEditor() {
+    fun managementEditRowAndAddDescriptionOpenTheSameEditor() {
         render(controller(group()))
 
-        composeRule.onNodeWithContentDescription(context.getString(R.string.actions)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.edit)).performClick()
+        composeRule
+            .onNodeWithText(context.getString(R.string.edit_group_info_title))
+            .performScrollTo()
+            .performClick()
         assertEditorIsOpen()
 
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()

@@ -80,7 +80,6 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.ui.account.rememberQuickProfileCycleNotice
-import dev.ipf.whitenoise.android.ui.chats.ChatScope
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
@@ -495,15 +494,6 @@ internal fun MainShell(
     // conversation does not dispose the selection when ChatsScreen leaves
     // composition (issue #1897).
     var selectedChatListFolderId by remember { mutableStateOf<String?>(null) }
-    val chatScopeAccount = appState.activeAccountRef
-    val chatScopeRuntime = appState.runtimeGeneration
-    val chatScopeState = rememberMainShellChatScope(chatScopeAccount, chatScopeRuntime)
-
-    fun chatScopeActionsAllowed(): Boolean =
-        appState.activeAccountRef == chatScopeAccount &&
-            appState.runtimeGeneration == chatScopeRuntime &&
-            !appState.signOutInProgress &&
-            !appState.wipeInProgress
     // Global chat-list search survives conversation navigation and rotation
     // (issue #1941). Saveable codec only — no protocol or preference storage.
     val globalSearch =
@@ -2354,17 +2344,7 @@ internal fun MainShell(
                                     globalSearchState = scopedGlobalSearchState,
                                     onGlobalSearchStateChange = globalSearch.update,
                                     selectedFolderId = selectedChatListFolderId,
-                                    onSelectFolder = {
-                                        if (chatScopeActionsAllowed() && chatScopeState.select(ChatScope.Chats)) {
-                                            selectedChatListFolderId = it
-                                        }
-                                    },
-                                    chatScope = chatScopeState.scope,
-                                    onSelectScope = {
-                                        if (chatScopeActionsAllowed() && chatScopeState.select(it)) {
-                                            selectedChatListFolderId = null
-                                        }
-                                    },
+                                    onSelectFolder = { selectedChatListFolderId = it },
                                     onTtsTransportBodyClick = requestTtsDestinationOpen,
                                     onQuickSwitchAccount = { requestQuickAccountSwitch(it) },
                                     onQuickCycleAccount = {

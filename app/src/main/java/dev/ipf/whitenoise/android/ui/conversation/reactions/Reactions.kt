@@ -1,43 +1,24 @@
 package dev.ipf.whitenoise.android.ui.conversation.reactions
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -47,31 +28,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.ReactionTally
-import dev.ipf.whitenoise.android.core.RecentEmojiList
 import dev.ipf.whitenoise.android.state.ReactionParticipant
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
-import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.design.BottomAnchoredPopupPositionProvider
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
-import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 
@@ -90,144 +59,6 @@ internal fun Modifier.reactionSummaryAttachment(outgoing: Boolean): Modifier =
             placeable.place(0, -overlap)
         }
     }
-
-@Composable
-internal fun reactionSummaryChipBorder(
-    outgoing: Boolean,
-    selected: Boolean,
-    customAmoledBorderColor: Color? = null,
-): BorderStroke {
-    val colorScheme = MaterialTheme.colorScheme
-    val amoledAccent =
-        if (isAmoledSurfaceTheme()) {
-            // AMOLED outlines are fixed: sent chips white, received chips a quieter white.
-            customAmoledBorderColor
-                ?: if (outgoing) colorScheme.primary else colorScheme.onSurface.copy(alpha = 0.7f)
-        } else {
-            null
-        }
-    val outlineWidth = if (selected) 2.dp else 1.dp
-    return BorderStroke(outlineWidth, amoledAccent ?: colorScheme.surface)
-}
-
-@Composable
-internal fun reactionSummaryChipContainerColor(selected: Boolean): Color {
-    val colorScheme = MaterialTheme.colorScheme
-    return when {
-        isAmoledSurfaceTheme() && selected -> colorScheme.onSurface.copy(alpha = 0.1f).compositeOver(Color.Black)
-        isAmoledSurfaceTheme() -> Color.Black
-        selected -> colorScheme.secondaryContainer
-        else -> colorScheme.surfaceContainerHigh
-    }
-}
-
-@Composable
-internal fun reactionSummaryChipContentColor(selected: Boolean): Color {
-    val colorScheme = MaterialTheme.colorScheme
-    return when {
-        isAmoledSurfaceTheme() -> colorScheme.onSurface
-        selected -> colorScheme.onSecondaryContainer
-        else -> colorScheme.onSurface
-    }
-}
-
-/**
- * One consolidated reaction pill: the distinct emojis clustered together with a
- * total count, mirroring the familiar messenger style — a single compact target
- * rather than a spread of separate chips. Tapping opens the reactor list, where
- * a reaction can be removed.
- */
-@Composable
-internal fun ReactionSummaryChip(
-    tallies: List<ReactionTally>,
-    outgoing: Boolean,
-    customAmoledBorderColor: Color? = null,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val selected = tallies.any { it.mine }
-    val total = tallies.sumOf { it.count.toLong() }
-    val emojis = tallies.take(MAX_VISIBLE_REACTIONS).joinToString(separator = "") { it.emoji }
-    val contentKey = ReactionSummaryContent(emojis = emojis, total = total)
-    val viewReactorsLabel = stringResource(R.string.view_reactors)
-    Surface(
-        modifier =
-            modifier
-                // Keep the current-user state available to accessibility services;
-                // the thicker selected outline provides the non-color visual cue.
-                .semantics { this.selected = selected }
-                .clip(RoundedCornerShape(percent = 50))
-                .then(reactionSummaryChipInteractionModifier(enabled, onClick, viewReactorsLabel)),
-        shape = RoundedCornerShape(percent = 50),
-        color = reactionSummaryChipContainerColor(selected),
-        contentColor = reactionSummaryChipContentColor(selected),
-        border =
-            reactionSummaryChipBorder(
-                outgoing = outgoing,
-                selected = selected,
-                customAmoledBorderColor = customAmoledBorderColor,
-            ),
-        tonalElevation = if (isAmoledSurfaceTheme()) 0.dp else 1.dp,
-    ) {
-        AnimatedContent(
-            targetState = contentKey,
-            transitionSpec = {
-                fadeIn(tween(durationMillis = REACTION_CONTENT_FADE_DURATION_MILLIS)) togetherWith
-                    fadeOut(tween(durationMillis = REACTION_CONTENT_FADE_DURATION_MILLIS))
-            },
-            label = "reactionSummaryChipContent",
-        ) { content ->
-            Row(
-                modifier =
-                    Modifier
-                        .heightIn(min = 28.dp)
-                        .widthIn(min = 40.dp)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    text = content.emojis,
-                    modifier = Modifier.weight(1f, fill = false),
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    softWrap = false,
-                )
-                if (content.total > 1) {
-                    Text(
-                        text = content.total.toString(),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        softWrap = false,
-                    )
-                }
-            }
-        }
-    }
-}
-
-private data class ReactionSummaryContent(
-    val emojis: String,
-    val total: Long,
-)
-
-private fun reactionSummaryChipInteractionModifier(
-    enabled: Boolean,
-    onClick: () -> Unit,
-    onClickLabel: String,
-): Modifier =
-    if (enabled) {
-        Modifier.clickable(
-            role = Role.Button,
-            onClick = onClick,
-            onClickLabel = onClickLabel,
-        )
-    } else {
-        Modifier
-    }
-
-private const val REACTION_CONTENT_FADE_DURATION_MILLIS = 120
 
 @Composable
 internal fun ReactionDetailsSheet(
@@ -354,121 +185,5 @@ private fun ReactionParticipantRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun CustomizeReactionsDialog(
-    quickReactionEmojis: List<String>,
-    recentEmojis: List<String>,
-    onDismiss: () -> Unit,
-    onSave: (List<String>) -> Unit,
-    onReset: () -> Unit,
-) {
-    var draft by remember(quickReactionEmojis) { mutableStateOf(RecentEmojiList.normalizeQuickChoices(quickReactionEmojis)) }
-    var editingIndex by remember { mutableStateOf<Int?>(null) }
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties =
-            DialogProperties(
-                usePlatformDefaultWidth = false,
-                dismissOnBackPress = true,
-            ),
-    ) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.customize_reactions)) },
-                    navigationIcon = {
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.back),
-                            )
-                        }
-                    },
-                )
-            },
-        ) { padding ->
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .navigationBarsPadding()
-                        .padding(horizontal = 24.dp, vertical = 18.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(28.dp),
-                ) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(32.dp),
-                        border = amoledSurfaceBorderStroke(),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            draft.forEachIndexed { index, emoji ->
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .size(44.dp)
-                                            .clip(CircleShape)
-                                            .clickable { editingIndex = index },
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(emoji, style = MaterialTheme.typography.headlineSmall)
-                                }
-                            }
-                        }
-                    }
-                    Text(
-                        stringResource(R.string.customize_reactions_hint),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextButton(
-                        onClick = {
-                            draft = RecentEmojiList.DefaultQuickChoices
-                            onReset()
-                        },
-                    ) {
-                        Text(stringResource(R.string.reset_reactions))
-                    }
-                    Button(onClick = { onSave(draft) }) {
-                        Text(stringResource(R.string.save))
-                    }
-                }
-            }
-        }
-        if (editingIndex != null) {
-            EmojiPickerSheet(
-                onDismissRequest = { editingIndex = null },
-                recentEmojis = recentEmojis,
-                onEmojiPicked = { emoji ->
-                    val index = editingIndex ?: return@EmojiPickerSheet
-                    draft = draft.toMutableList().also { it[index] = emoji }
-                    editingIndex = null
-                },
-                purpose = EmojiPickerPurpose.CONFIGURE_QUICK_REACTION,
-            )
-        }
-    }
-}
-
-// Distinct emojis shown in the consolidated reaction pill; the total count
-// still reflects every reaction beyond them.
-private const val MAX_VISIBLE_REACTIONS = 4
-private val REACTION_BUBBLE_EDGE_INSET = 6.dp
-private val REACTION_BUBBLE_OVERLAP = 6.dp
+private val REACTION_BUBBLE_EDGE_INSET = 12.dp
+private val REACTION_BUBBLE_OVERLAP = 21.dp

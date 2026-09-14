@@ -156,11 +156,18 @@ internal fun MediaCaptionFrame(
     ) {
         MediaSupplementEnvelope(
             alignEnd = alignEnd,
+            modifier = Modifier.padding(ConversationMessageMetrics.RichOuterInset),
             media = media,
         ) {
             Column(modifier = contentModifier.fillMaxWidth()) {
                 Column(
-                    modifier = bubbleContentModifier(Modifier),
+                    modifier =
+                        Modifier.padding(
+                            start = ConversationMessageMetrics.RichTextHorizontalAdjustment,
+                            end = ConversationMessageMetrics.RichTextHorizontalAdjustment,
+                            top = ConversationMessageMetrics.RichContentSpacing,
+                            bottom = ConversationMessageMetrics.RichTextBottomAdjustment,
+                        ),
                     verticalArrangement = bubbleContentArrangement,
                     content = caption,
                 )

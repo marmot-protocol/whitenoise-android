@@ -1,10 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
-import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
 import org.junit.Test
 
 class MediaBubbleAspectRatioTest {
@@ -25,9 +25,26 @@ class MediaBubbleAspectRatioTest {
         assertNull(initialMediaBubbleAspectRatio(dim = "invalid"))
     }
 
+    /** Media inside a bubble keeps the prototype's own 10 dp corners whether or not a caption follows. */
     @Test
-    fun captionedMediaDefersItsVisibleCornersToTheSharedFrame() {
-        assertSame(RectangleShape, visualMediaBubbleShape(attachedToCaption = true))
-        assertNotSame(RectangleShape, visualMediaBubbleShape(attachedToCaption = false))
+    fun mediaInsideABubbleKeepsItsOwnRoundedCorners() {
+        assertEquals(RoundedCornerShape(10.dp), ConversationRichContentShape)
+    }
+
+    /** A landscape photo fills the 256 dp frame width and derives its height; a portrait keeps the frame height. */
+    @Test
+    fun singleMediaFrameFollowsThePrototypeExtents() {
+        assertEquals(256f to 256f, singleMediaSizeDp(ratio = 1.5f))
+        assertEquals(192f to 256f, singleMediaSizeDp(ratio = 0.75f))
+        assertEquals(256f to 256f, singleMediaSizeDp(ratio = null))
+    }
+
+    /** Sources smaller than the frame render at 192 dp instead of being blown up to it. */
+    @Test
+    fun smallSourcesDisplayAtTheReducedExtent() {
+        assertEquals(192f to 192f, singleMediaSizeDp(ratio = 1f, sourceShortSidePx = 120))
+        assertEquals(256f to 256f, singleMediaSizeDp(ratio = 1f, sourceShortSidePx = 1200))
+        assertEquals(minOf(320, 180), sourceShortSideFromDim("320x180"))
+        assertNull(sourceShortSideFromDim("0x180"))
     }
 }

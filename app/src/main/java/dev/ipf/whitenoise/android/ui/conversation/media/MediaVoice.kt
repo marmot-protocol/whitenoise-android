@@ -4,29 +4,24 @@ import android.content.Context
 import android.util.Log
 import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -47,12 +42,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
@@ -61,7 +56,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.audio.AudioWaveformExtractor
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController.PlaybackStartResult
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
@@ -75,7 +69,9 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.evictCachedAttachment
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -181,9 +177,6 @@ internal interface VoiceAttachmentPresentationRuntime {
     /** Resolves or publishes the stable local file for one attachment. */
     suspend fun materialize(request: VoiceAttachmentMaterializationRequest): java.io.File
 
-    /** Decodes normalized waveform bars from [file], if supported. */
-    suspend fun waveform(file: java.io.File): FloatArray?
-
     /** Probes the playable duration of [file] in milliseconds. */
     suspend fun durationMs(file: java.io.File): Int
 
@@ -222,8 +215,6 @@ private object DefaultVoiceAttachmentPresentationRuntime : VoiceAttachmentPresen
             priority = request.priority,
             materializationOwner = request.presentationOwner,
         )
-
-    override suspend fun waveform(file: java.io.File): FloatArray? = AudioWaveformExtractor.decode(file)
 
     override suspend fun durationMs(file: java.io.File): Int = VoicePlaybackController.probeDuration(file)
 
@@ -273,7 +264,6 @@ internal fun MediaVoiceBubble(
     presentationOwner: Any,
     mine: Boolean,
     onLongPress: () -> Unit = {},
-    attachedToCaption: Boolean = false,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -328,7 +318,6 @@ internal fun MediaVoiceBubble(
             .map { state -> state.takeIf { it.key == pillKey } }
             .distinctUntilChanged()
     }.collectAsState(null)
-    val isThis = playback != null
     val isPlayingThis = playback?.isPlaying == true
     val isPausedThis = playback?.let { !it.isPlaying && it.positionMs > 0 } == true
     val activeDurationMs =
@@ -341,25 +330,6 @@ internal fun MediaVoiceBubble(
             0f
         }
 
-    val pseudoWaveform: FloatArray =
-        remember(pillKey) {
-            val bytes =
-                java.security.MessageDigest
-                    .getInstance("SHA-256")
-                    .digest(pillKey.toByteArray())
-            FloatArray(dev.ipf.whitenoise.android.audio.AudioWaveformExtractor.BARS) { i ->
-                val byte = bytes[i % bytes.size].toInt() and 0xFF
-                0.3f + (byte / 255f) * 0.7f
-            }
-        }
-    var realWaveform by remember(pillKey, epoch) { mutableStateOf<FloatArray?>(null) }
-    LaunchedEffect(localFile, pillKey, epoch, presentationRuntime) {
-        val file = localFile ?: return@LaunchedEffect
-        if (realWaveform != null) return@LaunchedEffect
-        realWaveform = presentationRuntime.waveform(file)
-    }
-    val waveform: FloatArray = realWaveform ?: pseudoWaveform
-
     suspend fun clearBadVoiceCache(reason: String) {
         Log.w("MediaVoiceBubble", "voice_cache_cleared reason=${reason.replace(' ', '_')}")
         clearVoiceAttachmentCacheAfterPlaybackFailure(
@@ -370,7 +340,6 @@ internal fun MediaVoiceBubble(
             reference = reference,
         )
         localFile = null
-        realWaveform = null
         totalDurationMs = 0
         failed = true
         val retryAllowedByPolicy =
@@ -393,7 +362,6 @@ internal fun MediaVoiceBubble(
             }
         if (playableFile == null) {
             localFile = null
-            realWaveform = null
             totalDurationMs = 0
             controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
             return
@@ -499,10 +467,8 @@ internal fun MediaVoiceBubble(
         activePositionMs = activePositionMs,
         activeDurationMs = activeDurationMs,
         totalDurationMs = totalDurationMs,
-        waveform = waveform,
         progressFraction = progressFraction,
-        playbackSpeed = playback?.speed,
-        attachedToCaption = attachedToCaption,
+        outgoing = mine,
         onLongPress = onLongPress,
         onActionClick = {
             when {
@@ -521,15 +487,6 @@ internal fun MediaVoiceBubble(
                 }
             }
         },
-        onSeek =
-            if (isThis && activeDurationMs > 0) {
-                { fraction ->
-                    presentationRuntime.seekTo(pillKey, (fraction * activeDurationMs).toInt())
-                }
-            } else {
-                null
-            },
-        onCycleSpeed = presentationRuntime::cycleSpeed,
     )
 }
 
@@ -554,119 +511,104 @@ internal fun VoiceAttachmentContent(
     activePositionMs: Int,
     activeDurationMs: Int,
     totalDurationMs: Int,
-    waveform: FloatArray,
     progressFraction: Float,
-    playbackSpeed: Float?,
-    attachedToCaption: Boolean,
+    outgoing: Boolean,
     onLongPress: () -> Unit,
     onActionClick: () -> Unit,
-    onSeek: ((Float) -> Unit)?,
-    onCycleSpeed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val onSurfaceMuted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
-    val accent = MaterialTheme.colorScheme.primary
-    val onAccent = MaterialTheme.colorScheme.onPrimary
+    val bubbleContent = LocalContentColor.current
+    val tinted = outgoing && !isAmoledSurfaceTheme()
+    val container =
+        if (tinted) bubbleContent.copy(alpha = VOICE_CARD_TINT_ALPHA) else MaterialTheme.colorScheme.surfaceContainer
+    val content = if (tinted) bubbleContent else MaterialTheme.colorScheme.onSurface
+    val secondaryContent =
+        if (tinted) {
+            bubbleContent.copy(alpha = VOICE_CARD_SECONDARY_ALPHA)
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
     val actionVisual = voiceActionVisual(loading, failed, startDownload, localFileAvailable, isPlaying)
     val actionDescription = stringResource(actionVisual.descriptionResource)
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = if (attachedToCaption) RectangleShape else RoundedCornerShape(18.dp),
-        border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
-        modifier = modifier.fillMaxWidth(),
+        color = container,
+        contentColor = content,
+        shape = ConversationRichContentShape,
+        modifier = modifier.width(ConversationMessageMetrics.RichContentCanvasWidth),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(ConversationMessageMetrics.RichComponentInset),
         ) {
-            Surface(
-                color = accent,
-                shape = CircleShape,
+            Box(
                 modifier =
                     Modifier
                         .size(48.dp)
-                        .semantics(mergeDescendants = true) {
-                            contentDescription = actionDescription
-                        }.combinedClickable(
-                            onLongClick = onLongPress,
-                            onClick = onActionClick,
-                        ),
+                        .semantics(mergeDescendants = true) { contentDescription = actionDescription }
+                        .combinedClickable(onLongClick = onLongPress, onClick = onActionClick),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    when (actionVisual) {
-                        VoiceActionVisual.LOADING ->
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                strokeWidth = 2.dp,
-                                color = onAccent,
-                            )
-                        VoiceActionVisual.FAILED ->
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = null,
-                                tint = onAccent,
-                                modifier = Modifier.size(26.dp),
-                            )
-                        VoiceActionVisual.DOWNLOAD ->
-                            Icon(
-                                imageVector = Icons.Default.ArrowDownward,
-                                contentDescription = null,
-                                tint = onAccent,
-                                modifier = Modifier.size(26.dp),
-                            )
-                        VoiceActionVisual.PAUSE ->
-                            Icon(
-                                imageVector = Icons.Default.Pause,
-                                contentDescription = null,
-                                tint = onAccent,
-                                modifier = Modifier.size(28.dp),
-                            )
-                        VoiceActionVisual.PLAY ->
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                tint = onAccent,
-                                modifier = Modifier.size(28.dp),
-                            )
-                    }
-                }
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                VoiceWaveform(
-                    bars = waveform,
-                    progress = progressFraction,
-                    playedColor = accent,
-                    remainingColor = onSurfaceMuted,
-                    modifier = Modifier.fillMaxWidth().height(28.dp),
-                    onSeek = onSeek,
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = CircleShape,
+                    modifier = Modifier.size(40.dp),
                 ) {
-                    Text(
-                        text = voiceTimeText(isPlaying, isPaused, activePositionMs, activeDurationMs, totalDurationMs),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f).padding(vertical = 2.dp),
-                    )
-                    playbackSpeed?.let { speed ->
-                        VoiceSpeedPill(
-                            currentSpeed = speed,
-                            onCycleSpeed = onCycleSpeed,
-                        )
-                    }
+                    Box(contentAlignment = Alignment.Center) { VoiceActionGlyph(actionVisual) }
                 }
             }
+            LinearProgressIndicator(
+                progress = { progressFraction },
+                modifier = Modifier.weight(1f),
+                color = if (tinted) bubbleContent else MaterialTheme.colorScheme.primary,
+                trackColor = content.copy(alpha = VOICE_TRACK_ALPHA),
+                drawStopIndicator = {},
+            )
+            Text(
+                text = voiceTimeText(isPlaying, isPaused, activePositionMs, activeDurationMs, totalDurationMs),
+                style = MaterialTheme.typography.labelMedium,
+                color = secondaryContent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
+
+/** The 24dp glyph inside the play button for each action variant. */
+@Suppress("FunctionNaming")
+@Composable
+private fun VoiceActionGlyph(actionVisual: VoiceActionVisual) {
+    when (actionVisual) {
+        VoiceActionVisual.LOADING ->
+            CircularProgressIndicator(
+                modifier = Modifier.size(22.dp),
+                strokeWidth = 2.dp,
+                color = LocalContentColor.current,
+            )
+        VoiceActionVisual.FAILED ->
+            Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(24.dp))
+        VoiceActionVisual.DOWNLOAD ->
+            Icon(imageVector = Icons.Default.ArrowDownward, contentDescription = null, modifier = Modifier.size(24.dp))
+        VoiceActionVisual.PAUSE ->
+            Icon(
+                painter = painterResource(R.drawable.ic_pause),
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+        VoiceActionVisual.PLAY ->
+            Icon(
+                painter = painterResource(R.drawable.ic_play_arrow),
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+    }
+}
+
+private const val VOICE_CARD_TINT_ALPHA = 0.12f
+private const val VOICE_CARD_SECONDARY_ALPHA = 0.78f
+private const val VOICE_TRACK_ALPHA = 0.24f
 
 /** Stable action variants keep accessibility copy and glyph selection in lockstep. */
 private enum class VoiceActionVisual(
@@ -708,31 +650,6 @@ private fun voiceTimeText(
         totalDurationMs > 0 -> formatVoiceTime(totalDurationMs)
         else -> "0:00"
     }
-
-@Composable
-private fun VoiceSpeedPill(
-    currentSpeed: Float,
-    onCycleSpeed: () -> Unit,
-) {
-    val label =
-        when {
-            currentSpeed >= 1.95f -> "2×"
-            currentSpeed >= 1.45f -> "1.5×"
-            else -> "1×"
-        }
-    Surface(
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-        shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.clickable(onClick = onCycleSpeed),
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-        )
-    }
-}
 
 /**
  * Voice attachments need a file on disk for MediaPlayer; reuse the

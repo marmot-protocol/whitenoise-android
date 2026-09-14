@@ -168,8 +168,6 @@ internal fun ChatsScreen(
     onGlobalSearchStateChange: ((GlobalSearchState) -> GlobalSearchState) -> Unit = {},
     // Shell-owned so the filter survives conversation navigation (issue #1897).
     selectedFolderId: String? = null,
-    chatScope: ChatScope = ChatScope.Chats,
-    onSelectScope: ((ChatScope) -> Unit)? = null,
     onSelectFolder: (String?) -> Unit = {},
     onTtsTransportBodyClick: (() -> Unit)? = null,
     onGroupCreateSubmitted: () -> Long = { 0L },
@@ -284,7 +282,6 @@ internal fun ChatsScreen(
     // An archived-only folder is a view switch as well as a filter: it swaps
     // the source list to archived chats (replacing the old Archived chip).
     val showArchived = selectedFolderRule?.archivedOnly == true
-    val effectiveChatScope = if (selectedFolderId == null) chatScope else ChatScope.Chats
     val searchFocusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
 
@@ -379,21 +376,10 @@ internal fun ChatsScreen(
             }
         }
 
+    // Archived-only folder rules swap the source list; every other view reads the active native rows.
     val sourceList =
-        remember(
-            controller.items,
-            controller.archivedItems,
-            showArchived,
-            effectiveChatScope,
-            appState.activeAccount?.accountIdHex,
-        ) {
-            chatScopeSource(
-                effectiveChatScope,
-                controller.items,
-                controller.archivedItems,
-                showArchived,
-                appState.activeAccount?.accountIdHex,
-            )
+        remember(controller.items, controller.archivedItems, showArchived) {
+            if (showArchived) controller.archivedItems else controller.items
         }
     LaunchedEffect(controller, controller.recoveryProjectionGeneration, sourceList) {
         val generation = controller.recoveryProjectionGeneration
@@ -492,7 +478,7 @@ internal fun ChatsScreen(
             }
         }
     }
-    val chatListState = key(showArchived, effectiveChatScope) { rememberLazyListState() }
+    val chatListState = key(showArchived) { rememberLazyListState() }
     val userGestureGeneration = rememberChatListUserGestureGeneration(chatListState)
     LaunchedEffect(chatListState, actionSheetChatId, actionMenuOwner.token, actionMenuOwner.pointerHeld) {
         val anchorId = actionSheetChatId ?: return@LaunchedEffect
@@ -560,14 +546,13 @@ internal fun ChatsScreen(
                 )
             }
         }
-    val ordinaryActiveList = !showArchived && effectiveChatScope == ChatScope.Chats && !searchActive
+    val ordinaryActiveList = !showArchived && !searchActive
     var nextHeadDemotionTransactionId by remember { mutableLongStateOf(0L) }
     var pendingHeadDemotion by
         remember(
             appState.activeAccountRef,
             appState.runtimeGeneration,
             showArchived,
-            effectiveChatScope,
             selectedFolderId,
             trimmedQuery,
         ) {
@@ -597,13 +582,13 @@ internal fun ChatsScreen(
         justCreated: Boolean,
     ) {
         val visibleHeadId =
-            if (showArchived || effectiveChatScope == ChatScope.Left) null else visibleItems.firstOrNull()?.id
+            if (showArchived) null else visibleItems.firstOrNull()?.id
         onOpenGroup(item, focusMessageId, justCreated, visibleHeadId)
     }
 
     fun presentProfileFromVisibleList(npub: String) {
         val visibleHeadId =
-            if (showArchived || effectiveChatScope == ChatScope.Left) null else visibleItems.firstOrNull()?.id
+            if (showArchived) null else visibleItems.firstOrNull()?.id
         onPresentProfile(npub, visibleHeadId)
     }
     LaunchedEffect(visibleChatIds, selectionMode) {
@@ -754,7 +739,6 @@ internal fun ChatsScreen(
     val chatListDatasetKey =
         ChatListDatasetKey(
             showArchived = showArchived,
-            chatScope = effectiveChatScope,
             folderId = selectedFolderId,
             query = normalizedSearchQuery,
             accountRef = appState.activeAccountRef,
@@ -860,7 +844,7 @@ internal fun ChatsScreen(
     // deep, hide only after they climb back to ≤ 2. The 3–4 dead band keeps a
     // quick scroll wiggle near the threshold from toggling the button (issue
     // #413). The previous decision keeps the band sticky.
-    var jumpToTopVisible by remember(showArchived, effectiveChatScope) { mutableStateOf(false) }
+    var jumpToTopVisible by remember(showArchived) { mutableStateOf(false) }
     // Observe scroll-index changes in an effect so the whole screen does not
     // subscribe to every LazyColumn index update during a fling.
     LaunchedEffect(chatListState) {
@@ -1373,8 +1357,6 @@ internal fun ChatsScreen(
                     ChatListFilterChips(
                         chips = folderChipModels,
                         selectedFolderId = selectedFolderId,
-                        chatScope = effectiveChatScope,
-                        onSelectScope = onSelectScope,
                         onSelect = onSelectFolder,
                         onEditFolder = { folderHandoff.editingFolderId = it },
                         onManageFolders = {
@@ -1451,13 +1433,6 @@ internal fun ChatsScreen(
                             requireNotNull(controller.error),
                             onRetry = controller::retryLoad,
                         )
-                    sourceList.isEmpty() && effectiveChatScope == ChatScope.Left && !showArchived -> {
-                        if (searchActive) {
-                            ChatListNoResults(query = trimmedQuery, unreadFolderSelected = false)
-                        } else {
-                            EmptyLeftChats()
-                        }
-                    }
                     sourceList.isEmpty() && showArchived -> EmptyArchivedChats()
                     sourceList.isEmpty() ->
                         EmptyChats(onCreate = openNewMessageFlow)

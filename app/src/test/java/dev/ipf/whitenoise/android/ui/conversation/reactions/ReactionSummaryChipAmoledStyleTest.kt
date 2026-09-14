@@ -1,278 +1,134 @@
 package dev.ipf.whitenoise.android.ui.conversation.reactions
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+/** The prototype's reaction pills: one per emoji, primary container/outline when the reaction is mine. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ReactionSummaryChipAmoledStyleTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Selection is the only colour cue, on AMOLED as elsewhere. */
     @Test
-    fun amoledReactionChipSeparatesMessageDirectionFromSelection() {
-        var outgoingSelectedBorder: BorderStroke? = null
-        var outgoingUnselectedBorder: BorderStroke? = null
-        var incomingSelectedBorder: BorderStroke? = null
-        var incomingUnselectedBorder: BorderStroke? = null
+    fun amoledPillsUseThePrimaryRolesForSelectionOnly() {
+        assertPillRoles(amoled = true)
+    }
+
+    /** The standard dark palette keeps the same roles. */
+    @Test
+    fun standardDarkPillsUseThePrimaryRolesForSelectionOnly() {
+        assertPillRoles(amoled = false)
+    }
+
+    private fun assertPillRoles(amoled: Boolean) {
         var selectedContainer = Color.Unspecified
         var unselectedContainer = Color.Unspecified
-        var selectedContent = Color.Unspecified
-        var unselectedContent = Color.Unspecified
-        var expectedSentAccent = Color.Unspecified
-        var expectedReceivedAccent = Color.Unspecified
-        var expectedContent = Color.Unspecified
+        var selectedBorder = Color.Unspecified
+        var unselectedBorder = Color.Unspecified
         var expectedSelectedContainer = Color.Unspecified
-
+        var expectedUnselectedContainer = Color.Unspecified
+        var expectedSelectedBorder = Color.Unspecified
+        var expectedUnselectedBorder = Color.Unspecified
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true, amoled = true) {
-                val sentAccent = MaterialTheme.colorScheme.primary
-                val receivedAccent = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                val onSurface = MaterialTheme.colorScheme.onSurface
-                val selectedContainerValue = reactionSummaryChipContainerColor(selected = true)
-                val unselectedContainerValue = reactionSummaryChipContainerColor(selected = false)
-                val selectedContentValue = reactionSummaryChipContentColor(selected = true)
-                val unselectedContentValue = reactionSummaryChipContentColor(selected = false)
-                val outgoingSelectedBorderValue = reactionSummaryChipBorder(outgoing = true, selected = true)
-                val outgoingUnselectedBorderValue = reactionSummaryChipBorder(outgoing = true, selected = false)
-                val incomingSelectedBorderValue = reactionSummaryChipBorder(outgoing = false, selected = true)
-                val incomingUnselectedBorderValue = reactionSummaryChipBorder(outgoing = false, selected = false)
-
+            WhiteNoiseTheme(darkTheme = true, amoled = amoled) {
+                val scheme = MaterialTheme.colorScheme
+                val selectedContainerValue = reactionPillContainerColor(selected = true)
+                val unselectedContainerValue = reactionPillContainerColor(selected = false)
+                val selectedBorderValue = reactionPillBorderColor(selected = true)
+                val unselectedBorderValue = reactionPillBorderColor(selected = false)
                 SideEffect {
-                    outgoingSelectedBorder = outgoingSelectedBorderValue
-                    outgoingUnselectedBorder = outgoingUnselectedBorderValue
-                    incomingSelectedBorder = incomingSelectedBorderValue
-                    incomingUnselectedBorder = incomingUnselectedBorderValue
                     selectedContainer = selectedContainerValue
                     unselectedContainer = unselectedContainerValue
-                    selectedContent = selectedContentValue
-                    unselectedContent = unselectedContentValue
-                    expectedSentAccent = sentAccent
-                    expectedReceivedAccent = receivedAccent
-                    expectedContent = onSurface
-                    expectedSelectedContainer = onSurface.copy(alpha = 0.1f).compositeOver(Color.Black)
+                    selectedBorder = selectedBorderValue
+                    unselectedBorder = unselectedBorderValue
+                    expectedSelectedContainer = scheme.primaryContainer
+                    expectedUnselectedContainer = scheme.surfaceContainerHigh
+                    expectedSelectedBorder = scheme.primary
+                    expectedUnselectedBorder = scheme.outlineVariant
                 }
             }
         }
-
         composeRule.runOnIdle {
             assertEquals(expectedSelectedContainer, selectedContainer)
-            assertEquals(Color.Black, unselectedContainer)
-            assertEquals(expectedContent, selectedContent)
-            assertEquals(expectedContent, unselectedContent)
-            assertEquals(2.dp, requireNotNull(outgoingSelectedBorder).width)
-            assertEquals(1.dp, requireNotNull(outgoingUnselectedBorder).width)
-            assertEquals(2.dp, requireNotNull(incomingSelectedBorder).width)
-            assertEquals(1.dp, requireNotNull(incomingUnselectedBorder).width)
-            assertEquals(expectedSentAccent, borderColor(outgoingSelectedBorder))
-            assertEquals(expectedSentAccent, borderColor(outgoingUnselectedBorder))
-            assertEquals(expectedReceivedAccent, borderColor(incomingSelectedBorder))
-            assertEquals(expectedReceivedAccent, borderColor(incomingUnselectedBorder))
-            assertNotEquals(borderColor(outgoingSelectedBorder), borderColor(incomingSelectedBorder))
+            assertEquals(expectedUnselectedContainer, unselectedContainer)
+            assertEquals(expectedSelectedBorder, selectedBorder)
+            assertEquals(expectedUnselectedBorder, unselectedBorder)
         }
     }
 
+    /** My reaction reads as selected and a tap toggles exactly that emoji. */
     @Test
-    fun customAmoledBubbleBorderOverridesDirectionalFallbackForBothSides() {
-        val customBorder = Color(0xFFFFC107)
-        var outgoingSelected: BorderStroke? = null
-        var outgoingUnselected: BorderStroke? = null
-        var incomingSelected: BorderStroke? = null
-        var incomingUnselected: BorderStroke? = null
-
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true, amoled = true) {
-                val outgoingSelectedValue =
-                    reactionSummaryChipBorder(true, true, customBorder)
-                val outgoingUnselectedValue =
-                    reactionSummaryChipBorder(true, false, customBorder)
-                val incomingSelectedValue =
-                    reactionSummaryChipBorder(false, true, customBorder)
-                val incomingUnselectedValue =
-                    reactionSummaryChipBorder(false, false, customBorder)
-                SideEffect {
-                    outgoingSelected = outgoingSelectedValue
-                    outgoingUnselected = outgoingUnselectedValue
-                    incomingSelected = incomingSelectedValue
-                    incomingUnselected = incomingUnselectedValue
-                }
-            }
-        }
-
-        composeRule.runOnIdle {
-            assertEquals(customBorder, borderColor(outgoingSelected))
-            assertEquals(customBorder, borderColor(outgoingUnselected))
-            assertEquals(customBorder, borderColor(incomingSelected))
-            assertEquals(customBorder, borderColor(incomingUnselected))
-            assertEquals(2.dp, requireNotNull(outgoingSelected).width)
-            assertEquals(1.dp, requireNotNull(outgoingUnselected).width)
-            assertEquals(2.dp, requireNotNull(incomingSelected).width)
-            assertEquals(1.dp, requireNotNull(incomingUnselected).width)
-        }
-    }
-
-    @Test
-    fun standardDarkReactionChipDistinguishesSelectionWithoutChangingPalette() {
-        var mineContainer = Color.Unspecified
-        var notMineContainer = Color.Unspecified
-        var mineContent = Color.Unspecified
-        var notMineContent = Color.Unspecified
-        var mineBorder: BorderStroke? = null
-        var notMineBorder: BorderStroke? = null
-        var expectedMineContainer = Color.Unspecified
-        var expectedNotMineContainer = Color.Unspecified
-        var expectedMineContent = Color.Unspecified
-        var expectedNotMineContent = Color.Unspecified
-        var expectedBorderColor = Color.Unspecified
-
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true, amoled = false) {
-                val colorScheme = MaterialTheme.colorScheme
-                val mineContainerValue = reactionSummaryChipContainerColor(selected = true)
-                val notMineContainerValue = reactionSummaryChipContainerColor(selected = false)
-                val mineContentValue = reactionSummaryChipContentColor(selected = true)
-                val notMineContentValue = reactionSummaryChipContentColor(selected = false)
-                val ignoredCustomBorder = Color.Magenta
-                val mineBorderValue =
-                    reactionSummaryChipBorder(
-                        outgoing = true,
-                        selected = true,
-                        customAmoledBorderColor = ignoredCustomBorder,
-                    )
-                val notMineBorderValue =
-                    reactionSummaryChipBorder(
-                        outgoing = true,
-                        selected = false,
-                        customAmoledBorderColor = ignoredCustomBorder,
-                    )
-
-                SideEffect {
-                    mineContainer = mineContainerValue
-                    notMineContainer = notMineContainerValue
-                    mineContent = mineContentValue
-                    notMineContent = notMineContentValue
-                    mineBorder = mineBorderValue
-                    notMineBorder = notMineBorderValue
-                    expectedMineContainer = colorScheme.secondaryContainer
-                    expectedNotMineContainer = colorScheme.surfaceContainerHigh
-                    expectedMineContent = colorScheme.onSecondaryContainer
-                    expectedNotMineContent = colorScheme.onSurface
-                    expectedBorderColor = colorScheme.surface
-                }
-            }
-        }
-
-        composeRule.runOnIdle {
-            assertEquals(expectedMineContainer, mineContainer)
-            assertEquals(expectedNotMineContainer, notMineContainer)
-            assertEquals(expectedMineContent, mineContent)
-            assertEquals(expectedNotMineContent, notMineContent)
-            assertEquals(2.dp, requireNotNull(mineBorder).width)
-            assertEquals(1.dp, requireNotNull(notMineBorder).width)
-            assertEquals(expectedBorderColor, borderColor(mineBorder))
-            assertEquals(expectedBorderColor, borderColor(notMineBorder))
-        }
-    }
-
-    @Test
-    fun currentUserReactionIsExposedAsSelectedSemantics() {
-        var clickCount = 0
+    fun currentUserReactionIsExposedAsSelectedSemanticsAndTapToggles() {
+        val toggled = mutableListOf<String>()
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
                 Column {
-                    ReactionSummaryChip(
-                        tallies = listOf(ReactionTally(emoji = "👍", count = 1, mine = true)),
-                        outgoing = false,
-                        onClick = { clickCount += 1 },
-                    )
-                    ReactionSummaryChip(
-                        tallies = listOf(ReactionTally(emoji = "❤️", count = 1, mine = false)),
-                        outgoing = true,
-                        onClick = {},
+                    ReactionPillRow(
+                        tallies =
+                            listOf(
+                                ReactionTally(emoji = "👍", count = 1, mine = true),
+                                ReactionTally(emoji = "❤️", count = 1, mine = false),
+                            ),
+                        enabled = true,
+                        onToggle = { toggled += it },
+                        onOverflow = {},
+                        onLongPress = null,
                     )
                 }
             }
         }
-
-        val chips = composeRule.onAllNodes(hasClickAction())
-        chips[0].assertIsSelected()
-        chips[1].assertIsNotSelected()
-        chips[0].performClick()
-        composeRule.runOnIdle { assertEquals(1, clickCount) }
+        val pills = composeRule.onAllNodes(hasClickAction())
+        pills[0].assertIsSelected()
+        pills[1].assertIsNotSelected()
+        pills[1].performClick()
+        composeRule.runOnIdle { assertEquals(listOf("❤️"), toggled) }
     }
 
-    /** AMOLED ignores a saved dark accent: the sent chip keeps the fixed white outline. */
+    /** A fifth emoji collapses into the "+N" pill, which opens the details instead of toggling. */
     @Test
-    fun darkAccountAccentIsIgnoredAndOutgoingOutlineStaysWhiteOnAmoled() {
-        var outgoingBorder: BorderStroke? = null
-        var themePrimary = Color.Unspecified
-
-        composeRule.setContent {
-            WhiteNoiseTheme(
-                darkTheme = true,
-                amoled = true,
-                accentColorArgb = 0xFF000000,
-            ) {
-                val border = reactionSummaryChipBorder(outgoing = true, selected = false)
-                val primary = MaterialTheme.colorScheme.primary
-                SideEffect {
-                    outgoingBorder = border
-                    themePrimary = primary
-                }
-            }
-        }
-
-        composeRule.runOnIdle {
-            assertEquals(Color.White, themePrimary)
-            assertEquals(Color.White, borderColor(outgoingBorder))
-            assertNotEquals(Color.Black, borderColor(outgoingBorder))
-        }
-    }
-
-    @Test
-    fun totalDoesNotOverflowAndOnlyFourEmojiRemainVisible() {
+    fun fifthEmojiCollapsesIntoTheOverflowPill() {
+        var overflowOpened = 0
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
-                ReactionSummaryChip(
+                ReactionPillRow(
                     tallies =
                         listOf(
-                            ReactionTally("👍", Int.MAX_VALUE, mine = false),
-                            ReactionTally("❤️", Int.MAX_VALUE, mine = false),
+                            ReactionTally("👍", 2, mine = false),
+                            ReactionTally("❤️", 1, mine = false),
                             ReactionTally("😂", 1, mine = false),
                             ReactionTally("🎉", 1, mine = false),
                             ReactionTally("😮", 1, mine = false),
                         ),
-                    outgoing = false,
-                    onClick = {},
+                    enabled = true,
+                    onToggle = {},
+                    onOverflow = { overflowOpened += 1 },
+                    onLongPress = null,
                 )
             }
         }
-
-        composeRule.onNodeWithText("👍❤️😂🎉", useUnmergedTree = true).assertExists()
-        composeRule.onNodeWithText("4294967297", useUnmergedTree = true).assertExists()
+        listOf("👍", "❤️", "😂", "🎉", "2", "+1").forEach {
+            composeRule.onNodeWithText(it, useUnmergedTree = true).assertExists()
+        }
         composeRule.onNodeWithText("😮", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onAllNodes(hasClickAction())[4].performClick()
+        composeRule.runOnIdle { assertEquals(1, overflowOpened) }
     }
-
-    private fun borderColor(border: BorderStroke?): Color = (requireNotNull(border).brush as SolidColor).value
 }

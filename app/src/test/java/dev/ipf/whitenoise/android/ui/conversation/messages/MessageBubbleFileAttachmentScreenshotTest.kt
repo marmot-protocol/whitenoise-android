@@ -588,7 +588,9 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
             composeRule
                 .onNodeWithTag(messageBubbleColumnTestTag(messageIdHex), useUnmergedTree = true)
                 .getUnclippedBoundsInRoot()
-        assertEquals(expectedWidth, (cardBounds.right - cardBounds.left).value, 1f)
+        // File cards sit inside the bubble's rich inset, so they are 2 × 6dp narrower than the bubble column.
+        val richInset = ConversationMessageMetrics.RichOuterInset.value
+        assertEquals(expectedWidth - 2 * richInset, (cardBounds.right - cardBounds.left).value, 1f)
         assertEquals(expectedWidth, (bubbleBounds.right - bubbleBounds.left).value, 1f)
     }
 
@@ -718,7 +720,6 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
             isActionMenuOpen = false,
             onActionMenuOpenChange = {},
             onQuickReactionsSave = {},
-            onQuickReactionsReset = {},
             onReplyPreviewClick = {},
             composerGate = ComposerGate.COMPOSER,
             inviteMutationInFlight = false,

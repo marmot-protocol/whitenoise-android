@@ -163,7 +163,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
     showPendingPlaceholder: Boolean,
     fileFooterWarning: String?,
     onMediaLongPress: () -> Unit,
-    attachedToCaption: Boolean,
     focusedPreview: Boolean = false,
 ) {
     val retentionInput =
@@ -233,7 +232,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         appState = appState,
                         onOpenConversationMedia = onOpenConversationMedia,
                         onLongPress = onMediaLongPress,
-                        attachedToCaption = attachedToCaption,
                     )
                 } else {
                     MediaImageBubble(
@@ -245,7 +243,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         onOpenConversationMedia = onOpenConversationMedia,
                         mine = mine,
                         onLongPress = onMediaLongPress,
-                        attachedToCaption = attachedToCaption,
                     )
                 }
             }
@@ -267,7 +264,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                     onOpenConversationMedia = onOpenConversationMedia,
                     mine = mine,
                     onLongPress = onMediaLongPress,
-                    attachedToCaption = attachedToCaption,
                 )
             }
         }
@@ -287,7 +283,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                     appState = appState,
                     presentationOwner = presentationOwner,
                     onLongPress = onMediaLongPress,
-                    attachedToCaption = attachedToCaption,
                 )
             }
         }
@@ -312,7 +307,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 senderKey = record.sender,
                 senderDisplayName = appState.displayName(record.sender),
                 onLongPress = onMediaLongPress,
-                attachedToCaption = attachedToCaption,
                 timestampText = fileTimestamp.takeIf { isFooterOwner },
                 showStatus = isFooterOwner && showStatus,
                 status = item.status,
@@ -350,7 +344,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                     appState = appState,
                     presentationOwner = presentationOwner,
                     onLongPress = onMediaLongPress,
-                    attachedToCaption = attachedToCaption,
                 )
             }
         }
@@ -384,7 +377,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         uploading = !uploadFailed,
                         uploadFailed = uploadFailed,
                         onRetryUpload = if (uploadFailed) retryUpload else null,
-                        attachedToCaption = attachedToCaption,
                     )
                 } else {
                     MediaImageBubble(
@@ -397,7 +389,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         mine = true,
                         onLongPress = onMediaLongPress,
                         uploading = !uploadFailed,
-                        attachedToCaption = attachedToCaption,
                     )
                 }
             }
@@ -420,7 +411,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                     mine = true,
                     onLongPress = onMediaLongPress,
                     uploading = !uploadFailed,
-                    attachedToCaption = attachedToCaption,
                 )
             }
         }
@@ -435,7 +425,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
         MediaPendingPlaceholder(
             pendingAttachments = controller.pendingAttachmentsList(record.messageIdHex),
             failed = item.status == MessageStatus.Failed,
-            attachedToCaption = attachedToCaption,
             timestampText = rememberedMessageBubbleTime(record.recordedAt).takeIf { pendingFileOwnsFooter },
             showStatus = pendingFileOwnsFooter && showStatus,
             status = item.status,
@@ -492,6 +481,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     invalidationWarning: String?,
     mine: Boolean,
     onExpand: () -> Unit,
+    statusContainerColor: Color? = null,
 ) {
     val retentionInput =
         record
@@ -522,6 +512,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             editedLabel = editedLabel,
             onEditedClick = onEditedClick,
             showTime = showTimestamp,
+            statusContainerColor = statusContainerColor,
         )
     }
     val hasInlineFooter =

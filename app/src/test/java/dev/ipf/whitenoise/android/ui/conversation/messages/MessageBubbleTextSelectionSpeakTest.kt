@@ -690,7 +690,6 @@ class MessageBubbleTextSelectionSpeakTest {
                 isActionMenuOpen = isActionMenuOpen,
                 onActionMenuOpenChange = onActionMenuOpenChange,
                 onQuickReactionsSave = {},
-                onQuickReactionsReset = {},
                 onReplyPreviewClick = {},
                 composerGate = ComposerGate.COMPOSER,
                 inviteMutationInFlight = false,

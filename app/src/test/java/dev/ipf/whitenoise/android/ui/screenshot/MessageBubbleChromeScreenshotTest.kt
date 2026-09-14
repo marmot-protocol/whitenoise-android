@@ -39,7 +39,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleFillColo
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleTimestampColor
 import dev.ipf.whitenoise.android.ui.conversation.messages.replyPreviewAccentArgb
-import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionSummaryChip
+import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillRow
 import dev.ipf.whitenoise.android.ui.conversation.reactions.reactionSummaryAttachment
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -588,11 +588,12 @@ private fun AmoledReactionBubble(
             }
         }
         Box(modifier = Modifier.reactionSummaryAttachment(outgoing = outgoing)) {
-            ReactionSummaryChip(
+            ReactionPillRow(
                 tallies = tallies,
-                outgoing = outgoing,
-                customAmoledBorderColor = presentation.borderOverrideArgb?.let(::colorFromArgb),
-                onClick = {},
+                enabled = true,
+                onToggle = {},
+                onOverflow = {},
+                onLongPress = null,
             )
         }
     }
