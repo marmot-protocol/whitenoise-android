@@ -92,6 +92,17 @@ are independent systems. Production builds enforce the Firebase/push guards.
 Telemetry credentials are ingest-only and compiled into the app; never put a
 privileged service credential in a BuildConfig field.
 
+Aptabase product analytics is a separate destination from OTLP and Goggles.
+For a release intended to include it, provision the environment-specific
+`PRODUCT_EVENTS_ENDPOINT`, `PRODUCT_APP_KEY`, `PRODUCT_OPERATOR`, and
+`PRODUCT_RETENTION` fields documented in
+[`product-analytics.md`](product-analytics.md). Run
+`./gradlew :app:verifyProductionProductAnalyticsConfig` against the resolved
+configuration, and check those values in the resulting candidate without
+printing keys. The general runtime-completeness flag does not require these
+optional product fields. Changing them requires a new build and may require
+renewed consent; configured artifacts alone do not prove Aptabase ingestion.
+
 `google-play-internal` contains `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`. Give that
 account testing-track permissions only. The workflow hardcodes `internal`;
 there is no input for production, open testing, or a rollout percentage.
@@ -138,6 +149,68 @@ not load the app-signing keystore into the publication job.
    Retain the artifact for qualification. An expired artifact cannot be promoted;
    a new build is a new candidate requiring another review.
 
+### Operator commands: build to Play internal
+
+Run these from the repository with authenticated `gh`, Python 3, and Git.
+First inspect `git status --short` and preserve any existing work. Complete the
+version changes above and their required CI before dispatching. Full PR CI may
+run automatically for a version change; distribution itself does not repeat
+compilation or the Android test suite.
+
+```bash
+gh auth status
+git fetch origin master
+release_version='REPLACE_WITH_VERSION'
+gh workflow run android-production-release.yml --ref master \
+  -f expected_version="$release_version"
+```
+
+Use the run URL returned by `gh` to record its numeric ID. Review its source SHA
+against the intended `origin/master`, approve `android-release-signing` through
+the authorized reviewer, and wait for success. Do not pick a candidate solely
+because it is the latest run; another operator may also be building.
+
+```bash
+build_run_id='REPLACE_WITH_BUILD_RUN_ID'
+gh run view "$build_run_id" --json headSha,status,conclusion,url
+gh run watch "$build_run_id" --exit-status
+```
+
+Read the manifest digest from that successful run's summary. Fetch into a fresh
+directory; this command verifies the workflow/run/attempt, source, policy,
+payload hashes, and archived metadata against the exact source commit.
+
+```bash
+manifest_sha256='REPLACE_WITH_REVIEWED_MANIFEST_SHA256'
+candidate_dir="build/releases/$release_version/pipeline-$build_run_id"
+python3 scripts/release_bundle.py fetch \
+  --run-id "$build_run_id" --version "$release_version" \
+  --manifest-sha256 "$manifest_sha256" --directory "$candidate_dir"
+```
+
+Review the files and complete the authorized device qualification in
+[`manual-release-testing.md`](manual-release-testing.md). For a manual download
+release, hand off `whitenoise-android-<version>-arm64-v8a.apk` from this directory
+with its SHA-256 and source commit. The AAB is a separate Play artifact from the
+same candidate run. Do not substitute a local rebuild under the same filename.
+
+Only when internal distribution is requested, dispatch with an explicit
+destination (the workflow's default is a GitHub draft):
+
+```bash
+gh workflow run android-release-distribute.yml --ref master \
+  -f build_run_id="$build_run_id" -f expected_version="$release_version" \
+  -f manifest_sha256="$manifest_sha256" -f destination=play-internal
+```
+
+Record this separate distribution run ID, approve `google-play-internal` through
+the authorized reviewer, and wait for success. In Play Console, confirm the
+internal release's version code/name, **Available to internal testers** status,
+and attached mapping file; confirm the production track is unchanged. Retain
+the build/distribution URLs, run attempts, manifest digest, artifact hashes, and
+Console readback with the release evidence. Keep receipts outside the candidate
+directory: its verified file inventory must remain exact.
+
 The production workflow checks both keystore certificates against the pinned
 fingerprints before compiling. A mismatch reports only public certificate
 fingerprints; passwords remain environment inputs. The finished APK and AAB
@@ -145,6 +218,28 @@ still undergo their separate signature checks before artifact upload. APK verifi
 recognizes numbered, scheme-prefixed, and SDK-range signer labels;
 every reported APK signing certificate must match the pinned identity. Source
 stamp certificates do not count as APK signing certificates.
+
+For an independent APK check, use Android SDK tools, not a raw ZIP-entry or
+binary-manifest string scan. With `apksigner` and `aapt` on PATH:
+
+```bash
+python3 scripts/verify_apk_signature.py "$(command -v apksigner)" \
+  "$candidate_dir/whitenoise-android-$release_version-arm64-v8a.apk" \
+  "$(python3 scripts/release_bundle.py property APP_SIGNING_SHA256)"
+aapt dump badging "$candidate_dir/whitenoise-android-$release_version-arm64-v8a.apk"
+aapt dump xmltree "$candidate_dir/whitenoise-android-$release_version-arm64-v8a.apk" AndroidManifest.xml
+bash scripts/verify-play-bundle-signature.sh \
+  "$candidate_dir/whitenoise-android-$release_version-play.aab" \
+  "$(python3 scripts/release_bundle.py property PLAY_UPLOAD_SHA256)"
+```
+
+Check the decoded APK package, version, ARM64-only native code, and that
+`debuggable` and `testOnly` are false (absent attributes default to false).
+APK v2 signatures and certificates reside in the APK Signing Block, outside
+ordinary ZIP entries; absence of `.RSA`, `.EC`, or `.DSA` entries is not evidence
+of an unsigned APK. `META-INF/AL2.0` is Apache license text, not a signature marker.
+See the [Android v2 format documentation](https://source.android.com/docs/security/features/apksigning/v2).
+After transferring an APK, compare its SHA-256 at both ends before publication.
 
 `release-manifest.json` binds the source, version, signing fingerprints, build
 run/attempt, runtime completeness, and file hashes. This is a verified inventory,
@@ -183,10 +278,38 @@ Verify the actual Play track/version and delivered signing lineage in Console.
 If upload fails or a version code was already used, inspect Play before retrying;
 this workflow does not automatically allocate a new code or promote any track.
 
+If the log says the AAB uploaded but committing the edit failed (for example,
+`The service is currently unavailable`), the final state is uncertain. Check both
+the internal track and **Latest releases and bundles** in Console first. If the
+expected candidate is already active, record the readback rather than uploading
+again. If no new release or bundle is present and the error was transient, retry
+the failed distribution job with `gh run rerun <distribution-run-id> --failed`
+and review its environment approval again. Reuse the same candidate; do not
+rebuild or bump the code to work around an uncertain commit. If a bundle or
+draft remains, or another upload reports a used code, reconcile that state before
+another attempt. Repeated service failures require investigation, not a retry loop.
+
 Complete the Play Console setup tracked in #2127 separately: store listing,
 privacy-policy URL, Data Safety declaration, content rating, and tester access.
 An internal upload does not complete that qualification or authorize production
 promotion.
+
+### Verified execution: 2026.9.10 / code 13
+
+The first exercised build-to-internal flow used source
+`d2417ce5c7c6a3cb1512d3a1037487e931be83e7`:
+
+- [Production build 34458015735, attempt 1](https://github.com/marmot-protocol/whitenoise-android/actions/runs/34458015735)
+  succeeded; APK and AAB signatures and the candidate inventory were independently verified.
+- Manifest SHA-256: `d7735f7a7f2dd3ccb79b52d3187794dddfb4ac12206e7b4f5f4ef9d274611f5f`.
+- [Play distribution 34460426318, attempt 2](https://github.com/marmot-protocol/whitenoise-android/actions/runs/34460426318)
+  succeeded after a transient Google commit failure. Console confirmed code 13
+  available to internal testers with its mapping file; production stayed inactive.
+- No GitHub release or Zapstore publication was performed. This receipt proves
+  build and internal distribution, not device behavior or public-store qualification.
+
+These are historical receipts, not candidate IDs to reuse for a future version.
+CI artifacts expire after 30 days; retain approved release evidence separately.
 
 ## Public Zapstore publication
 

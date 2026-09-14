@@ -35,6 +35,16 @@ If Android seems to need a cache for protocol data, stop and ask whether the dat
 - Prefer `rg` for searching.
 - Before editing files, check the dirty worktree and preserve changes you did not make.
 
+## Release operations
+
+Read [`docs/android-release-pipeline.md`](docs/android-release-pipeline.md) before
+preparing or distributing a release. It is the canonical operator runbook for
+versioning, signed builds, candidate verification, Play internal uploads, GitHub
+drafts, and the separate public Zapstore gate. Distribute the reviewed candidate
+without rebuilding it. A build or internal-testing request does not authorize
+public Zapstore publication. Record the source commit, build run/attempt,
+manifest digest, artifact hashes, and destination readback for each release.
+
 ## Manual release testing guide
 
 [`docs/manual-release-testing.md`](docs/manual-release-testing.md) is the canonical novice-facing release checklist. Every change to a user-visible route, label, action, state, permission, notification, Android entry point, supported configuration, or failure/recovery path must update the corresponding permanent test IDs in the same pull request. Add a new ID for new behavior; never renumber or reuse an ID. When behavior is removed, move its ID to the Retired IDs table and record the pull request or commit that removed it.
