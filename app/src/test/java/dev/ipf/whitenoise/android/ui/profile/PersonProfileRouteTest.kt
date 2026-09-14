@@ -213,8 +213,10 @@ class PersonProfileRouteTest {
                 context,
                 DraftStore(
                     object : DraftPersistence {
+                        /** In-memory draft persistence: returns the stored values. */
                         override fun read(): Map<String, String> = emptyMap()
 
+                        /** In-memory draft persistence: stores or clears one value. */
                         override fun write(
                             key: String,
                             value: String?,

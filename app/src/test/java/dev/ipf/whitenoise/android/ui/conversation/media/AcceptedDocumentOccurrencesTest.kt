@@ -11,6 +11,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class AcceptedDocumentOccurrencesTest {
+    /** Accepted original does not remove copies appended during send. */
     @Test
     fun acceptedOriginalDoesNotRemoveCopiesAppendedDuringSend() {
         val a = Uri.parse("content://documents/A")

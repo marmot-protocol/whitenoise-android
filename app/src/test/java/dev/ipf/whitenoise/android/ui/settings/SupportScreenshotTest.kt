@@ -69,6 +69,7 @@ class SupportScreenshotTest {
             amoled = true,
         )
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         name: String,
         state: SupportRelayState = SupportRelayState.Configured,

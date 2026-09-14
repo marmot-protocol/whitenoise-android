@@ -85,8 +85,10 @@ internal fun ChatListSelectionControls(
     var active by remember { mutableStateOf(true) }
     DisposableEffect(Unit) { onDispose { active = false } }
 
+    /** An action runs only while the bar is active, enabled and still current. */
     fun canPerform(): Boolean = active && actionsEnabled && isCurrent()
 
+    /** Runs [action] when [canPerform] holds and clears the opening token. */
     fun perform(action: () -> Unit) {
         if (canPerform()) {
             opening = null

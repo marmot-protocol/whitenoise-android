@@ -219,6 +219,7 @@ internal fun MessageActionMenu(
     )
 }
 
+/** Label explaining why forwarding is blocked. */
 @Composable
 internal fun forwardBlockedReasonLabel(reason: ForwardBlockedReason): String =
     when (reason) {
@@ -231,6 +232,7 @@ internal fun forwardBlockedReasonLabel(reason: ForwardBlockedReason): String =
         ForwardBlockedReason.Unsupported -> stringResource(R.string.forward_blocked_unsupported)
     }
 
+/** Glyph for a message action kind. */
 @Composable
 @Suppress("FunctionNaming")
 private fun MessageActionIcon(kind: MessageActionKind) {

@@ -21,6 +21,7 @@ class ChatFolderAssignmentTest {
     private var current = true
     private val targets = listOf("G1", "g2")
 
+    /** Prepares the shared fixture before each test. */
     @Before fun setup() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context
@@ -31,9 +32,11 @@ class ChatFolderAssignmentTest {
         store = ChatFolderPreferences(context)
     }
 
+    /** Session. */
     private fun session(draft: ChatFolderAssignmentDraft = ChatFolderAssignmentDraft("alice", 7, targets)) =
         ChatFolderAssignmentSession("alice", targets, store, draft, 7) { current }
 
+    /** Edits are local and cancel revokes captured save. */
     @Test fun editsAreLocalAndCancelRevokesCapturedSave() {
         val folder = store.createFolder("alice", "Work")!!
         val session = session()
@@ -49,6 +52,7 @@ class ChatFolderAssignmentTest {
         )
     }
 
+    /** Save touches only selected manual membership and preserves rules. */
     @Test fun saveTouchesOnlySelectedManualMembershipAndPreservesRules() {
         val first = store.createFolder("alice", "First")!!
         val second = store.createFolder("alice", "Second")!!
@@ -66,6 +70,7 @@ class ChatFolderAssignmentTest {
         assertFalse(session.save())
     }
 
+    /** Current folder deletion rejects all intents before writing. */
     @Test fun currentFolderDeletionRejectsAllIntentsBeforeWriting() {
         val first = store.createFolder("alice", "First")!!
         val deleted = store.createFolder("alice", "Deleted")!!
@@ -78,6 +83,7 @@ class ChatFolderAssignmentTest {
         assertEquals(2, session.intents.size)
     }
 
+    /** Already applied intent is successful without rewriting other members. */
     @Test fun alreadyAppliedIntentIsSuccessfulWithoutRewritingOtherMembers() {
         val folder = store.createFolder("alice", "Work")!!
         val session = session()
@@ -88,6 +94,7 @@ class ChatFolderAssignmentTest {
         assertEquals(setOf("g1", "g2"), store.membershipFor("alice", folder.id))
     }
 
+    /** Owner replacement and disposal never write. */
     @Test fun ownerReplacementAndDisposalNeverWrite() {
         val folder = store.createFolder("alice", "Work")!!
         val first = session()
@@ -102,6 +109,7 @@ class ChatFolderAssignmentTest {
         assertTrue(store.membershipFor("alice", folder.id).isEmpty())
     }
 
+    /** Restored draft cannot borrow different account runtime or target set. */
     @Test fun restoredDraftCannotBorrowDifferentAccountRuntimeOrTargetSet() {
         for (draft in listOf(
             ChatFolderAssignmentDraft("bob", 7, targets),

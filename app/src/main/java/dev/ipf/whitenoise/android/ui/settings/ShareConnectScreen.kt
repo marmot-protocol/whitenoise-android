@@ -90,6 +90,7 @@ internal fun ShareConnectScreen(
     var routeActive by remember(accountIdHex, runtime) { mutableStateOf(true) }
     DisposableEffect(accountIdHex, runtime) { onDispose { routeActive = false } }
 
+    /** True while the screen still shows the active account and no teardown runs. */
     fun ownsScreen(): Boolean {
         val sameOwner = appState.activeAccountRef == account.label && appState.runtimeGeneration == runtime
         val blocked = appState.signOutInProgress || appState.wipeInProgress

@@ -123,6 +123,7 @@ internal fun MessageInlineFooter(
     }
 }
 
+/** Footer items in prototype order: status, time, edited label, retention. */
 @Suppress("FunctionNaming")
 @Composable
 private fun MessageInlineFooterItems(

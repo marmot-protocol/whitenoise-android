@@ -30,11 +30,13 @@ import java.util.concurrent.CopyOnWriteArrayList
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ProfileSwitcherQueuedStartTest {
+    /** Close before mutation dispatch never enters native recovery. */
     @Test fun closeBeforeMutationDispatchNeverEntersNativeRecovery() = queuedStart(close = true)
 
+    /** Teardown before mutation dispatch never enters native recovery. */
     @Test fun teardownBeforeMutationDispatchNeverEntersNativeRecovery() = queuedStart(close = false)
 
-    /** Await real process-scope mutation jobs through IO so late native calls cannot evade assertions. */
+    /** Awaits real process-scope mutation jobs through IO so late native calls cannot evade assertions. */
     @Suppress("LongMethod")
     private fun queuedStart(close: Boolean) {
         val dispatcher = StandardTestDispatcher()

@@ -45,12 +45,14 @@ private fun WhiteNoiseAppState.abandonGroupCreateTiming(stage: String) {
 
 internal fun submittedNewGroupName(value: TextFieldValue): String = value.text.trim()
 
+/** Details stay editable until creation is busy or a canonical retry pins the group. */
 internal fun newGroupDetailsEditable(
     retryGroupIdHex: String?,
     busy: Boolean,
     imagePreparing: Boolean,
 ): Boolean = retryGroupIdHex == null && !busy && !imagePreparing
 
+/** Applies the staged disappearing-message timer to the new group when one was chosen. */
 private suspend fun applyNewGroupRetentionIfNeeded(
     appState: WhiteNoiseAppState,
     account: String,
@@ -148,6 +150,7 @@ private fun captureNewGroupSubmission(
     )
 }
 
+/** Runs the canonical group creation with its staged image and members, reporting each stage. */
 private suspend fun runNewGroupCreateMutation(
     appState: WhiteNoiseAppState,
     account: String,
@@ -217,6 +220,7 @@ private suspend fun runNewGroupCreateMutation(
     }
 }
 
+/** Opens the created group once the canonical create confirms, or reports the recovery state. */
 private suspend fun openCreatedGroupAfterCanonicalCreate(
     appState: WhiteNoiseAppState,
     accountRef: String,
@@ -344,7 +348,11 @@ private fun NewGroupSetupAccountScreen(
     val recentEmojiRecentsOwner = rememberRecentEmojiRecentsOwner(context)
     val imagePreview = rememberImageUploadPreview(imageDraft)
 
-    fun createGroupErrorMessage(throwable: Throwable): String = groupCreateFailureDetail(throwable, appState::chatMemberTitle).resolve(context)
+    /** Localized failure detail for a group creation error. */
+    fun createGroupErrorMessage(throwable: Throwable): String {
+        val detail = groupCreateFailureDetail(throwable, appState::chatMemberTitle)
+        return detail.resolve(context)
+    }
 
     val canCreate =
         owner.isCurrent() &&
@@ -357,6 +365,7 @@ private fun NewGroupSetupAccountScreen(
             )
     val setupUi = newGroupSetupUiState(retryGroupIdHex, canCreate, busy)
 
+    /** Whether the details still accept edits right now. */
     fun detailsEditableNow(): Boolean =
         owner.isCurrent() &&
             newGroupDetailsEditable(
@@ -370,6 +379,7 @@ private fun NewGroupSetupAccountScreen(
         if (!detailsEditable) showEmojiPicker = false
     }
 
+    /** Starts (or retries) the group creation mutation. */
     @Suppress("ReturnCount") // Early exits preserve route ownership and reject invalid or superseded actions.
     fun create(retryLoadGroupIdHex: String? = null) {
         // canCreate is a composition-time snapshot; the direct `busy` state
@@ -421,6 +431,7 @@ private fun NewGroupSetupAccountScreen(
         }
     }
 
+    /** Prepares a picked image into the staged draft, dropping stale generations. */
     @Suppress("TooGenericExceptionCaught") // The callback can surface any non-cancellation preparation failure.
     fun prepareImage(load: suspend () -> ImageUploadDraft) {
         if (!detailsEditableNow()) return

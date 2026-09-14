@@ -28,6 +28,7 @@ class SettingsSignOutScreenshotTest {
     @Test
     fun signOutProgressAmoled() = capture(amoled = true, name = "settings_sign_out_progress_amoled")
 
+    /** Renders the fixture and records its screenshot baseline. */
     private fun capture(
         amoled: Boolean,
         name: String,

@@ -143,6 +143,7 @@ internal fun conversationUnderlayScaffoldPadding(
     overlap: Dp,
 ): PaddingValues =
     object : PaddingValues by padding {
+        /** Bottom padding minus the overlap the foreground chrome covers, never negative. */
         override fun calculateBottomPadding() = (padding.calculateBottomPadding() - overlap).coerceAtLeast(0.dp)
     }
 

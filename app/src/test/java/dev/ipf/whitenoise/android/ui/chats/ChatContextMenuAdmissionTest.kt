@@ -25,10 +25,13 @@ class ChatContextMenuAdmissionTest {
     private var actions = 0
     private var dismissals = 0
 
+    /** Stale delete dismisses without dispatching. */
     @Test fun staleDeleteDismissesWithoutDispatching() = rejectStaleCommand("Delete")
 
+    /** Stale pin dismisses without dispatching. */
     @Test fun stalePinDismissesWithoutDispatching() = rejectStaleCommand("Pin")
 
+    /** Back dismisses without dispatching. */
     @Test fun backDismissesWithoutDispatching() {
         render()
         composeRule.onNode(isPopup()).dispatchNativePopupBack()
@@ -37,6 +40,7 @@ class ChatContextMenuAdmissionTest {
         assertEquals(1, dismissals)
     }
 
+    /** Fake transport: rejects a command from a stale session. */
     private fun rejectStaleCommand(tag: String) {
         render()
         // AtomicBoolean deliberately does not recompose away the popup before the queued click runs.
@@ -47,6 +51,7 @@ class ChatContextMenuAdmissionTest {
         assertEquals(1, dismissals)
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render() {
         composeRule.setContent {
             WhiteNoiseTheme {

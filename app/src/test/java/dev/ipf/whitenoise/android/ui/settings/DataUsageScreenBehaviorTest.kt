@@ -38,7 +38,7 @@ class DataUsageScreenBehaviorTest {
     private val preferences by lazy { context.getSharedPreferences("data-usage-behaviour-test", Context.MODE_PRIVATE) }
     private lateinit var appState: WhiteNoiseAppState
 
-    /** Start from cleared preferences so the matrix is the shipped default and nothing is paused. */
+    /** Starts from cleared preferences so the matrix is the shipped default and nothing is paused. */
     @Before
     fun setUp() {
         preferences.edit().clear().commit()
@@ -126,8 +126,10 @@ class DataUsageScreenBehaviorTest {
 
 /** Draft storage that never persists, so the fixture starts clean. */
 private object EmptyDataUsageDraftPersistence : DraftPersistence {
+    /** In-memory draft persistence: returns the stored values. */
     override fun read(): Map<String, String> = emptyMap()
 
+    /** In-memory draft persistence: stores or clears one value. */
     override fun write(
         key: String,
         value: String?,

@@ -93,6 +93,7 @@ internal fun dragSelectionAutoScrollDelta(
  * gestures such as swipe-to-reply. After the hold wins, this detector owns the
  * pointer through release.
  */
+
 @Composable
 @Suppress(
     "CyclomaticComplexMethod",

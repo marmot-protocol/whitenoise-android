@@ -58,6 +58,7 @@ class IdentityFormatterTest {
         assertEquals("now", IdentityFormatter.relativeTime(skewedAhead))
     }
 
+    /** Initials take the leading letter only. */
     @Test
     fun initialsTakeTheLeadingLetterOnly() {
         // The prototype's monogram is a single glyph, whatever the word count.
@@ -88,6 +89,7 @@ class IdentityFormatterTest {
         assertEquals(grinningFace, IdentityFormatter.initials("$grinningFace$fire"))
     }
 
+    /** Initials single word with trailing emoji uses letters. */
     @Test
     fun initialsSingleWordWithTrailingEmojiUsesLetters() {
         // A single word yields its first letter; the trailing emoji is never
@@ -130,6 +132,7 @@ class IdentityFormatterTest {
         assertTrue(farFuture.isNotBlank())
     }
 
+    /** Initials take two non bmp code points from one word. */
     @Test
     fun initialsTakeTwoNonBmpCodePointsFromOneWord() {
         // Single-word name made entirely of non-BMP code points: the initial
@@ -330,6 +333,7 @@ class IdentityFormatterTest {
         assertTrue("expected the 12-hour US default, got $localeDefault", localeDefault.contains("3:28"))
     }
 
+    /** Message bubble clock portion honors the forced clock system. */
     @Test
     fun messageBubbleClockPortionHonorsTheForcedClockSystem() {
         // Older than an hour, so the footer shows a clock time — the portion the
@@ -350,6 +354,7 @@ class IdentityFormatterTest {
         assertTrue("expected a 12-hour rendering, got $us12", us12.startsWith("3:28"))
     }
 
+    /** Epoch seconds for a UTC civil time. */
     private fun utcEpoch(
         hour: Int,
         minute: Int,
@@ -364,11 +369,13 @@ class IdentityFormatterTest {
     // ---- messageBubbleTime (bubble footer timestamps) -----------------------
     // The prototype's bubble footer is the clock time; the date headers carry day changes.
 
+    /** Message bubble time empty for unset sentinel. */
     @Test
     fun messageBubbleTimeEmptyForUnsetSentinel() {
         assertEquals("", IdentityFormatter.messageBubbleTime(0uL))
     }
 
+    /** Message bubble time shows clock time for recent messages. */
     @Test
     fun messageBubbleTimeShowsClockTimeForRecentMessages() {
         val zone = ZoneId.of("UTC")
@@ -379,6 +386,7 @@ class IdentityFormatterTest {
         )
     }
 
+    /** Message bubble time shows clock time at one hour boundary. */
     @Test
     fun messageBubbleTimeShowsClockTimeAtOneHourBoundary() {
         val zone = ZoneId.of("UTC")
@@ -389,6 +397,7 @@ class IdentityFormatterTest {
         )
     }
 
+    /** Message bubble time shows clock time for future skew. */
     @Test
     fun messageBubbleTimeShowsClockTimeForFutureSkew() {
         val zone = ZoneId.of("UTC")
@@ -399,6 +408,7 @@ class IdentityFormatterTest {
         )
     }
 
+    /** Formats a short clock label for the test locale. */
     private fun shortClock(
         instant: Instant,
         zone: ZoneId,

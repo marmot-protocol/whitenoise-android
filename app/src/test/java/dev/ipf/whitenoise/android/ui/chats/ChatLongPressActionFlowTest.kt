@@ -50,6 +50,7 @@ class ChatLongPressActionFlowTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
+    /** Long press opens actions and select dismisses into existing selection mode. */
     @Test
     fun longPressOpensActionsAndSelectDismissesIntoExistingSelectionMode() {
         var sheetOpen by mutableStateOf(false)
@@ -113,6 +114,7 @@ class ChatLongPressActionFlowTest {
         }
     }
 
+    /** Action sheet opens at long press threshold before pointer up. */
     @Test
     @Suppress("LongMethod") // Full pointer lifecycle and visible sheet belong in one regression test.
     fun actionSheetOpensAtLongPressThresholdBeforePointerUp() {
@@ -308,6 +310,7 @@ class ChatLongPressActionFlowTest {
         assertEquals(1, dragEnds)
     }
 
+    /** Delete dismisses the sheet and requires destructive confirmation. */
     @Test
     fun deleteDismissesTheSheetAndRequiresDestructiveConfirmation() {
         var sheetOpen by mutableStateOf(true)

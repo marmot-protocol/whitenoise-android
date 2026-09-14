@@ -37,27 +37,36 @@ import org.robolectric.annotation.GraphicsMode
 class QuickProfileCycleScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Screenshot: light theme. */
     @Test fun light() = capture("profile_cycle_light")
 
+    /** Screenshot: dark theme. */
     @Test fun dark() = capture("profile_cycle_dark", dark = true)
 
+    /** Screenshot: AMOLED. */
     @Test fun amoled() = capture("profile_cycle_amoled", dark = true, amoled = true)
 
+    /** Density fixture for a high-density render. */
     @Test
     @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-xxhdpi")
     fun highDensity() = capture("profile_cycle_amoled_xxhdpi", dark = true, amoled = true)
 
+    /** Large rtl. */
     @Test fun largeRtl() = capture("profile_cycle_rtl_200", dark = true, rtl = true)
 
+    /** Off. */
     @Test fun off() = capture("profile_cycle_off", enabled = false)
 
+    /** Appearance. */
     @Test fun appearance() = capture("profile_cycle_appearance_light", settings = true, enabled = false)
 
+    /** Appearance amoled rtl. */
     @Test
     fun appearanceAmoledRtl() {
         capture("profile_cycle_appearance_amoled_rtl", dark = true, amoled = true, rtl = true, settings = true)
     }
 
+    /** Renders the fixture and records its screenshot baseline. */
     @Suppress("LongParameterList")
     private fun capture(
         name: String,

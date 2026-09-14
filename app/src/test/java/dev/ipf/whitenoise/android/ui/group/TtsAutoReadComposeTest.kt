@@ -54,6 +54,7 @@ class TtsAutoReadComposeTest {
 
     private val app: Application = ApplicationProvider.getApplicationContext()
 
+    /** Resolves a string resource in the test context. */
     private fun string(resId: Int): String = app.getString(resId)
 
     /** Every provenance label the row can show renders beside the title. */
@@ -289,6 +290,7 @@ class TtsAutoReadComposeTest {
         composeRule.runOnIdle { assertEquals(null, selected) }
     }
 
+    /** Renders group row. */
     private fun renderGroupRow(
         provenanceLabel: String,
         onClick: () -> Unit = {},

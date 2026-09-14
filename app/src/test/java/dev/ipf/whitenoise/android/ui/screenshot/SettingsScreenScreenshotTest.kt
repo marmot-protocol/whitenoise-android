@@ -93,6 +93,7 @@ class SettingsScreenScreenshotTest {
         capture("settings_screen_available_update_light")
     }
 
+    /** Settings screen with global confirmation dark. */
     @Test
     fun settingsScreenWithGlobalConfirmationDark() {
         composeRule.setContent {

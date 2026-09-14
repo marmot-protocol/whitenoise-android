@@ -227,12 +227,14 @@ internal fun AccountKeysScreen(
     val runtimeGeneration = appState.runtimeGeneration
     val ui = remember(accountIdHex, accountRef, runtimeGeneration) { ProfileKeysUiState() }
 
+    /** True while the screen still shows the active account. */
     fun ownsAccount(): Boolean =
         accountIdHex != null &&
             appState.activeAccount?.accountIdHex == accountIdHex &&
             appState.activeAccountRef == accountRef &&
             appState.runtimeGeneration == runtimeGeneration
 
+    /** Secrets are delivered only to the owning account while started and signing locally. */
     fun canDeliverSecret(): Boolean =
         ownsAccount() &&
             lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&
@@ -251,6 +253,7 @@ internal fun AccountKeysScreen(
             }
         }
 
+    /** Launches the export share with the prepared content. */
     fun launchExport(
         encrypted: Boolean,
         content: String,
@@ -266,6 +269,7 @@ internal fun AccountKeysScreen(
         }
     }
 
+    /** Begins an export to the chosen destination. */
     fun beginExport(
         encrypted: Boolean,
         destination: KeyExportDestination,
@@ -1076,6 +1080,7 @@ internal fun EncryptedBackupPassphraseStrength.labelRes(): Int =
         EncryptedBackupPassphraseStrength.Strong -> R.string.encrypted_backup_strength_strong
     }
 
+/** Progress fraction for a passphrase strength level. */
 internal fun EncryptedBackupPassphraseStrength.progress(): Float =
     when (this) {
         EncryptedBackupPassphraseStrength.TooShort -> 0.15f
@@ -1084,6 +1089,7 @@ internal fun EncryptedBackupPassphraseStrength.progress(): Float =
         EncryptedBackupPassphraseStrength.Strong -> 1f
     }
 
+/** Colour for a passphrase strength level. */
 @Composable
 internal fun EncryptedBackupPassphraseStrength.color(): Color =
     when (this) {

@@ -61,6 +61,7 @@ class ShareConnectScreenScreenshotTest {
         capture("copied_invalid_scan")
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         darkTheme: Boolean,
         amoled: Boolean = false,
@@ -91,6 +92,7 @@ class ShareConnectScreenScreenshotTest {
         }
     }
 
+    /** Renders the fixture and records its screenshot baseline. */
     private fun capture(variant: String) {
         composeRule
             .onNodeWithTag("share_connect.screen")

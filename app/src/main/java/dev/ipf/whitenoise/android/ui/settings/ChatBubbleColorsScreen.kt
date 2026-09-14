@@ -90,6 +90,7 @@ internal fun ChatBubbleColorsScreen(
     }
 }
 
+/** Editor for bubble colours of one theme and source. */
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
 @Composable
 private fun ChatBubbleColorEditor(
@@ -252,6 +253,7 @@ private fun BubblePreview(
     }
 }
 
+/** Preview bubble in the editor. */
 @Suppress("FunctionNaming")
 @Composable
 private fun PreviewBubble(

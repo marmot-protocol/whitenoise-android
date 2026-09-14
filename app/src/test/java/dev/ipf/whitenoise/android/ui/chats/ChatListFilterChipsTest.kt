@@ -330,6 +330,7 @@ class ChatListFilterChipsTest {
         return count
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         chips: List<ChatFolderChipModel>,
         selectedFolderId: String? = null,

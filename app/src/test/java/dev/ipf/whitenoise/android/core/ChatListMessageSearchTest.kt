@@ -279,6 +279,7 @@ class ChatListMessageSearchTest {
 
     // ---- prototype filters (senders / date / content) ------------------------
 
+    /** Constraints match sender date and content across categories. */
     @Test
     fun constraintsMatchSenderDateAndContentAcrossCategories() {
         val constraints =
@@ -295,6 +296,7 @@ class ChatListMessageSearchTest {
         assertTrue(constraints.matches(photo.copy(mediaTypes = emptyList(), plaintext = "see https://x.y/z")))
     }
 
+    /** Content kinds follow the prototype classification. */
     @Test
     fun contentKindsFollowThePrototypeClassification() {
         assertEquals(
@@ -311,6 +313,7 @@ class ChatListMessageSearchTest {
         )
     }
 
+    /** Filter only search accepts attachment rows and builds a label snippet. */
     @Test
     fun filterOnlySearchAcceptsAttachmentRowsAndBuildsALabelSnippet() {
         val records =

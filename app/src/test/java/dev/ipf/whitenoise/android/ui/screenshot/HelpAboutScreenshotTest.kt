@@ -97,6 +97,7 @@ class HelpAboutScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/about_developer_enabled_light.png")
     }
 
+    /** Composes the bug report screen with the given callbacks. */
     private fun renderBugReport(
         dark: Boolean,
         accepted: Boolean,
@@ -108,6 +109,7 @@ class HelpAboutScreenshotTest {
         }
     }
 
+    /** Composes the About screen with the given callbacks. */
     private fun renderAbout(
         dark: Boolean,
         amoled: Boolean,

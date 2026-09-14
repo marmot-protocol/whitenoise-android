@@ -41,6 +41,7 @@ class ComposeHotPathCoverageTest {
         )
     }
 
+    /** Emoji search runs outside composition and off the main thread. */
     @Test
     fun emojiSearchRunsOutsideCompositionAndOffTheMainThread() {
         val source = source("conversation/composer/EmojiPickerContent.kt").readText()
@@ -93,6 +94,7 @@ class ComposeHotPathCoverageTest {
         )
     }
 
+    /** Chat list scroll and row search work are isolated from screen composition. */
     @Test
     fun chatListScrollAndRowSearchWorkAreIsolatedFromScreenComposition() {
         val source = source("chats/ChatsScreen.kt").readText()

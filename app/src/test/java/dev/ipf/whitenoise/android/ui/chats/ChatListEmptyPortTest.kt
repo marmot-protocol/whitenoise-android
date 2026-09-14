@@ -21,6 +21,7 @@ class ChatListEmptyPortTest {
     @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    /** New account retains the actual create callback. */
     @Test fun newAccountRetainsTheActualCreateCallback() {
         var creates = 0
         composeRule.setContent { WhiteNoiseTheme { EmptyChats(onCreate = { creates++ }) } }
@@ -29,18 +30,21 @@ class ChatListEmptyPortTest {
         assertEquals(1, creates)
     }
 
+    /** Search empty takes precedence over unread folder. */
     @Test fun searchEmptyTakesPrecedenceOverUnreadFolder() {
         composeRule.setContent { WhiteNoiseTheme { ChatListNoResults("not found", true) } }
         composeRule.onNodeWithText(context.getString(R.string.no_results)).assertExists()
         composeRule.onNodeWithText(context.getString(R.string.chat_rows_no_unread_title)).assertDoesNotExist()
     }
 
+    /** Unread empty does not claim the account has no chats. */
     @Test fun unreadEmptyDoesNotClaimTheAccountHasNoChats() {
         composeRule.setContent { WhiteNoiseTheme { ChatListNoResults("", true) } }
         composeRule.onNodeWithText(context.getString(R.string.chat_rows_no_unread_detail)).assertExists()
         composeRule.onNodeWithText(context.getString(R.string.chat_rows_no_chats_title)).assertDoesNotExist()
     }
 
+    /** Archived empty keeps its own scope. */
     @Test fun archivedEmptyKeepsItsOwnScope() {
         composeRule.setContent { WhiteNoiseTheme { EmptyArchivedChats() } }
         composeRule.onNodeWithText(context.getString(R.string.chat_rows_no_archived_title)).assertExists()

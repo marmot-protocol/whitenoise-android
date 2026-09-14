@@ -114,6 +114,7 @@ class GroupRecoveryCardScreenshotTest {
     @Config(qualifiers = "en-w600dp-h900dp-mdpi")
     fun recoveryRetryAmoledLargeRtl() = captureRetry(dark = true, amoled = true, largeRtl = true)
 
+    /** Renders the retry state and records its screenshot baseline. */
     private fun captureRetry(
         dark: Boolean,
         amoled: Boolean,

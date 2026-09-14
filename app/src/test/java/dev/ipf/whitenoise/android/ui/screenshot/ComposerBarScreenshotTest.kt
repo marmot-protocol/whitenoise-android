@@ -111,6 +111,7 @@ class ComposerBarScreenshotTest {
         composeRule.onNodeWithTag(LONG_TAG).captureRoboImage("src/test/snapshots/composer_bar_long_draft_rtl.png")
     }
 
+    /** Composer resize border pressed light. */
     @Test
     fun composerResizeBorderPressedLight() {
         renderLongComposer(darkTheme = false)
@@ -361,6 +362,7 @@ class ComposerBarScreenshotTest {
         }
     }
 
+    /** Composer reply shows convergence warning. */
     @Test
     fun composerReplyShowsConvergenceWarning() {
         val warning = "May not be visible to everyone"
@@ -423,6 +425,7 @@ class ComposerBarScreenshotTest {
         assertTrue(editor.width > 0f && editor.height > 0f)
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         darkTheme: Boolean,
         amoled: Boolean = false,

@@ -31,27 +31,36 @@ class ChatRowsPortScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    /** Rows light. */
     @Test fun rowsLight() = capture("chat_rows_port_light")
 
+    /** Rows dark. */
     @Test fun rowsDark() = capture("chat_rows_port_dark", dark = true)
 
+    /** Rows amoled. */
     @Test fun rowsAmoled() = capture("chat_rows_port_amoled", dark = true, amoled = true)
 
+    /** Rows large rtl. */
     @Test fun rowsLargeRtl() = capture("chat_rows_port_large_rtl", dark = true, largeRtl = true)
 
+    /** Rows amoled high density. */
     @Test
     @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-xxhdpi")
     fun rowsAmoledHighDensity() = capture("chat_rows_port_amoled_xxhdpi", dark = true, amoled = true)
 
+    /** Empty new chats light. */
     @Test fun emptyNewChatsLight() = capture("chat_rows_empty_light", empty = Empty.New)
 
+    /** Empty unread dark. */
     @Test fun emptyUnreadDark() = capture("chat_rows_empty_unread_dark", dark = true, empty = Empty.Unread)
 
+    /** The empty archived AMOLED fixture. */
     @Test
     fun emptyArchivedAmoled() {
         capture("chat_rows_empty_archived_amoled", dark = true, amoled = true, empty = Empty.Archived)
     }
 
+    /** Empty search large rtl. */
     @Test
     fun emptySearchLargeRtl() {
         capture("chat_rows_empty_search_large_rtl", dark = true, largeRtl = true, empty = Empty.Search)

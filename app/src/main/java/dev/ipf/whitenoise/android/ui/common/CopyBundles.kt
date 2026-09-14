@@ -191,8 +191,13 @@ private fun rememberRelativeTimeNow(): Instant {
     return currentTime
 }
 
-internal fun relativeTimeRefreshDelayMillis(now: Instant): Long = (60_000L - (now.toEpochMilli() % 60_000L)).coerceAtLeast(1L)
+/** Delay until the next minute boundary, when relative time labels must refresh. */
+internal fun relativeTimeRefreshDelayMillis(now: Instant): Long {
+    val intoMinute = now.toEpochMilli() % 60_000L
+    return (60_000L - intoMinute).coerceAtLeast(1L)
+}
 
+/** Remembered bubble time label for an epoch-second stamp in the current locale and zone. */
 @Composable
 internal fun rememberedMessageBubbleTime(epochSeconds: ULong): String {
     val locale = LocalConfiguration.current.locales[0]

@@ -135,6 +135,7 @@ private fun DisappearingPickerChoices(
 internal const val DISAPPEARING_PICKER_TAG = "disappearing.picker"
 internal const val DISAPPEARING_CUSTOM_ACTION_TAG = "disappearing.custom"
 
+/** Human label for a disappearing timer in seconds. */
 @Composable
 internal fun disappearingMessagesLabel(secs: Long): String =
     when (val spec = disappearingLabelSpec(secs)) {

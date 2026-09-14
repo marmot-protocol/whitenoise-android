@@ -555,6 +555,7 @@ internal fun ProfileEditScreen(
         }
     }
 
+    /** Restores the draft to the baseline profile. */
     fun resetDraft() {
         saveFailed = false
         fields.restore(baselineDraft)
@@ -562,6 +563,7 @@ internal fun ProfileEditScreen(
         lud16ResolveError = null
     }
 
+    /** Enters edit mode with a fresh draft. */
     fun beginEditing() {
         if (busy || activeAccountId == null || !profileContentReady) return
         editRevision++
@@ -569,6 +571,7 @@ internal fun ProfileEditScreen(
         isEditing = true
     }
 
+    /** Back leaves edit mode (confirming unsaved changes) or the screen. */
     fun handleBack() {
         if (!isEditing) {
             onBack()
@@ -586,6 +589,7 @@ internal fun ProfileEditScreen(
     val imageOverlayOpen = fullPictureOpen || fullBannerOpen || showPictureSheet || showBannerSheet
     BackHandler(enabled = isEditing && !imageOverlayOpen) { handleBack() }
 
+    /** Saves the draft profile. */
     fun saveProfile() {
         if (!saveEnabled) return
         val accountId = activeAccountId ?: return
@@ -649,6 +653,7 @@ internal fun ProfileEditScreen(
         }
     }
 
+    /** Prepares and uploads a picture or banner draft. */
     @Suppress("LongMethod", "TooGenericExceptionCaught") // Preparation and upload have different failure types.
     fun uploadProfileDraft(
         target: ProfileImageTarget,

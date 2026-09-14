@@ -82,6 +82,7 @@ class MessageReactionTransitionScreenshotTest {
             layoutDirection = LayoutDirection.Ltr,
         )
 
+    /** Reaction content change dark large rtl. */
     @Test
     fun reactionContentChangeDarkLargeRtl() =
         captureReactionContentChange(
@@ -91,6 +92,7 @@ class MessageReactionTransitionScreenshotTest {
             layoutDirection = LayoutDirection.Rtl,
         )
 
+    /** Captures reaction enter. */
     private fun captureReactionEnter(
         name: String,
         dark: Boolean,
@@ -159,6 +161,7 @@ class MessageReactionTransitionScreenshotTest {
         assertAnchoring(avatarTop = avatarTop, bubbleTextTop = bubbleTextTop)
     }
 
+    /** Captures reaction content change. */
     private fun captureReactionContentChange(
         name: String,
         dark: Boolean,
@@ -205,6 +208,7 @@ class MessageReactionTransitionScreenshotTest {
             .boundsInRoot
             .height
 
+    /** Node top. */
     private fun nodeTop(text: String): Float =
         composeRule
             .onNodeWithText(text, useUnmergedTree = true)
@@ -212,6 +216,7 @@ class MessageReactionTransitionScreenshotTest {
             .boundsInRoot
             .top
 
+    /** Asserts anchoring. */
     private fun assertAnchoring(
         avatarTop: Float,
         bubbleTextTop: Float,

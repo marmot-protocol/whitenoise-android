@@ -86,6 +86,7 @@ internal fun OnboardingScreen(
     val amberSignerAvailable = remember { appState.isAmberSignerInstalled() }
     val savedAccounts = onboardingSavedAccounts(appState)
 
+    /** Applies a sign-in step: clears the clipboard on completion and updates the stage. */
     fun applyStep(step: SignInStep) {
         when (step) {
             SignInStep.SignedIn, SignInStep.SetupStarted -> {
@@ -116,6 +117,7 @@ internal fun OnboardingScreen(
         }
     }
 
+    /** Starts a network setup action unless a retained reactivation is pending. */
     fun startNetworkSetupAction(action: OnboardingAction) {
         if (appState.retainedAccountReactivationRef != null) return
         dispatchOnboardingAction(

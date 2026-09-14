@@ -57,6 +57,7 @@ internal sealed interface GlobalSearchDateCustomStage {
     ) : GlobalSearchDateCustomStage
 }
 
+/** Stable test tag for a date preset row. */
 internal fun globalSearchDatePresetTag(selection: GlobalSearchDateFilterSelection): String {
     val presetKey = selection.codecKey()
     return "global-search-date-preset-$presetKey"
@@ -146,6 +147,7 @@ private fun GlobalSearchDateCustomStageDialog(
     }
 }
 
+/** Preset choice dialog: Any time, Today, Last 7 / 30 days, Custom range. */
 @Suppress("FunctionNaming")
 @Composable
 private fun GlobalSearchDatePresetDialog(
@@ -203,6 +205,7 @@ private fun GlobalSearchDatePresetDialog(
     )
 }
 
+/** Review step of a custom range with the reversed-range error. */
 @Suppress("FunctionNaming")
 @Composable
 private fun GlobalSearchCustomRangeReviewDialog(
@@ -251,6 +254,7 @@ private fun GlobalSearchCustomRangeReviewDialog(
     )
 }
 
+/** One preset radio row. */
 @Suppress("FunctionNaming")
 @Composable
 private fun GlobalSearchDatePresetRow(

@@ -509,6 +509,7 @@ private val GALLERY_FOUR_HEIGHT = 256.dp
 private val GALLERY_FIVE_HEIGHT = 213.dp
 private val GALLERY_FIVE_SECOND_ROW_HEIGHT = 84.dp
 
+/** Gallery grid of up to five frames with the +N overflow tile. */
 @Composable
 internal fun MediaVisualGridBubble(
     item: TimelineMessage,

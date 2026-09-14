@@ -83,6 +83,7 @@ internal const val GROUP_EMOJI_IMAGE_PICKER_TAG = "group_emoji_image_picker"
 // while leaving the underlying screen context visible at the top.
 private const val PICKER_SHEET_HEIGHT_FRACTION = 0.92f
 
+/** Sheet that builds a group image from an emoji. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun GroupEmojiImagePickerSheet(

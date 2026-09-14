@@ -23,6 +23,7 @@ internal fun personTestGroup(
     memberSnapshot = members?.let { GroupMemberSnapshot(it.map(::member)) },
 )
 
+/** Builds a group record fixture. */
 private fun group(
     groupId: String,
     name: String,
@@ -57,6 +58,7 @@ private fun group(
     disbandRequest = null,
 )
 
+/** Member. */
 private fun member(memberId: String) =
     AppGroupMemberRecordFfi(
         memberIdHex = memberId,
@@ -64,6 +66,7 @@ private fun member(memberId: String) =
         local = false,
     )
 
+/** Builds an encrypted media reference fixture. */
 private fun encryptedMedia() =
     AppGroupEncryptedMediaComponentFfi(
         componentId = 0x8008u,

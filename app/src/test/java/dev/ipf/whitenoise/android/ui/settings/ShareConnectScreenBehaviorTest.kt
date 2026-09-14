@@ -76,6 +76,7 @@ class ShareConnectScreenBehaviorTest {
         composeRule.onNodeWithText("Scan to connect.").assertIsDisplayed()
     }
 
+    /** Mounts the composable under test. */
     private fun mount(
         copied: Boolean = false,
         scanInvalid: Boolean = false,

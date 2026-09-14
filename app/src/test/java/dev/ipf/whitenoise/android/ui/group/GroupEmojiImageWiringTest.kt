@@ -5,6 +5,7 @@ import org.junit.Test
 import java.io.File
 
 class GroupEmojiImageWiringTest {
+    /** New group uses generated draft for preview and initial encrypted image. */
     @Test
     fun newGroupUsesGeneratedDraftForPreviewAndInitialEncryptedImage() {
         val source = source("ui/chats/newchat/NewGroupSetupScreen.kt").readText()

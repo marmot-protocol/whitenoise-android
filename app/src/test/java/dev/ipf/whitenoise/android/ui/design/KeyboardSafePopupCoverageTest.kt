@@ -135,6 +135,7 @@ class KeyboardSafePopupCoverageTest {
         assertEquals(600, offset.y)
     }
 
+    /** Bottom anchored position. */
     private fun bottomAnchoredPosition(
         windowSize: IntSize,
         popupContentSize: IntSize,
@@ -145,6 +146,7 @@ class KeyboardSafePopupCoverageTest {
         popupContentSize = popupContentSize,
     )
 
+    /** Message action menu uses keyboard safe popup. */
     @Test
     fun messageActionMenuUsesKeyboardSafePopup() {
         val body = messageActionsSource().readText().functionBody("MessageActionMenu")
@@ -220,10 +222,13 @@ class KeyboardSafePopupCoverageTest {
 
     private fun keyboardSafePopupSource(): File = sourceFile("ui/design/KeyboardSafePopup.kt")
 
+    /** Message actions source. */
     private fun messageActionsSource(): File = sourceFile("ui/conversation/messages/MessageActions.kt")
 
+    /** Forward picker source. */
     private fun forwardPickerSource(): File = sourceFile("ui/conversation/messages/ForwardMessagePicker.kt")
 
+    /** Focused message actions source. */
     private fun focusedMessageActionsSource(): File = sourceFile("ui/conversation/messages/FocusedMessageActions.kt")
 
     private fun reactionsSource(): File = sourceFile("ui/conversation/reactions/Reactions.kt")

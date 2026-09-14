@@ -87,6 +87,7 @@ private fun ChatFolderEditSession(
         if (appState.activeAccountRef != accountRef) onClose()
     }
 
+    /** True while edits still apply to the account and folder store that opened the editor. */
     fun canMutate() =
         active &&
             appState.activeAccountRef == accountRef &&
@@ -146,12 +147,14 @@ private fun ChatFolderEditSession(
             rule != initialRule ||
             manualChatIds != initialManual
 
+    /** Back confirms discarding a dirty draft. */
     fun back() {
         if (dirty) discard = true else onClose()
     }
 
     BackHandler(onBack = ::back)
 
+    /** Saves the folder, failing if it vanished meanwhile. */
     @Suppress("ReturnCount") // Early exits preserve route ownership and reject invalid or superseded actions.
     fun save() {
         if (!canMutate() || submitted) return

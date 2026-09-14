@@ -941,10 +941,12 @@ internal fun ComposerBar(
         restoreKeyboardFromEmojiPane()
     }
 
+    /** Opens the attachment sheet. */
     fun openComposerAttachmentSheet() {
         attachmentSheetState.open()
     }
 
+    /** Opens the recent-media pane, dismissing the emoji picker and any pending keyboard restore. */
     fun openRecentMediaPane() {
         composerKeyboardRestorePending = false
         composerEmojiPickerRequested = false

@@ -41,6 +41,7 @@ internal enum class ChatListBackDismissal {
     CloseSearch,
 }
 
+/** Back dismisses selection first, then an open filter picker, then search. */
 internal fun chatListBackDismissal(
     selectionMode: Boolean,
     searchState: GlobalSearchState,
@@ -64,6 +65,7 @@ internal fun shouldPresentGlobalSearchFilterSheet(
     selectionMode: Boolean,
 ): Boolean = searchState.isOpen && searchState.filterSheetOpen && !selectionMode
 
+/** Selection mode revokes an open filter picker; otherwise the state passes through. */
 internal fun reconcileGlobalSearchFilterSheet(
     searchState: GlobalSearchState,
     selectionMode: Boolean,

@@ -52,6 +52,7 @@ internal enum class SharedVisualFilter(
     Videos(R.string.shared_media_tab_videos),
 }
 
+/** Visual tiles matching the filter. */
 internal fun SharedMediaTiles.visualsFor(filter: SharedVisualFilter): List<SharedMediaTile> =
     when (filter) {
         SharedVisualFilter.All -> visuals
@@ -158,6 +159,7 @@ internal class SharedMediaViewerSelection {
     var source by mutableStateOf<Pair<String, Int>?>(null)
         private set
 
+    /** Selects the viewer source page. */
     fun select(
         messageId: String,
         attachmentIndex: Int,
@@ -165,10 +167,12 @@ internal class SharedMediaViewerSelection {
         source = messageId to attachmentIndex
     }
 
+    /** Clears the viewer source. */
     fun clear() {
         source = null
     }
 
+    /** Drops a selection whose page vanished once loading settled. */
     fun reconcile(
         loading: Boolean,
         pages: List<MediaViewerPage>,

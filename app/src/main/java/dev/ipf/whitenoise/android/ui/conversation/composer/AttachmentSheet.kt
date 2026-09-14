@@ -79,6 +79,7 @@ internal class ComposerAttachmentSheetState {
         isOpen = true
     }
 
+    /** Closes the sheet and its recent-media pane. */
     fun dismiss() {
         recentMediaOpen = false
         isOpen = false
@@ -144,6 +145,7 @@ private fun readBottomRoundedCornerRadii(view: View): Pair<Int, Int> {
     return bottomLeft to bottomRight
 }
 
+/** Attachment pane content: sources grid and the optional recent-media strip. */
 @Composable
 internal fun ComposerAttachmentSheetPane(
     alpha: Float,

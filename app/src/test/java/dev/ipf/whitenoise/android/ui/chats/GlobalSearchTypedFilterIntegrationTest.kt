@@ -99,6 +99,7 @@ class GlobalSearchTypedFilterIntegrationTest {
         assertEquals(setOf(GlobalSearchContentKind.TEXT, GlobalSearchContentKind.LINKS), projection.contentKinds)
     }
 
+    /** Content picker and date dialog update shell owned state. */
     @Test
     fun contentPickerAndDateDialogUpdateShellOwnedState() {
         val stateHolder =
@@ -157,6 +158,7 @@ class GlobalSearchTypedFilterIntegrationTest {
         assertFalse(restored.filterSheetOpen)
     }
 
+    /** Date dialog does not survive search or picker dismissal. */
     @Test
     fun dateDialogDoesNotSurviveSearchOrPickerDismissal() {
         val stateHolder =
@@ -196,6 +198,7 @@ class GlobalSearchTypedFilterIntegrationTest {
         assertNull(restored.openFilterCategory)
     }
 
+    /** Custom date filter round trips through saver. */
     @Test
     fun customDateFilterRoundTripsThroughSaver() {
         val custom =

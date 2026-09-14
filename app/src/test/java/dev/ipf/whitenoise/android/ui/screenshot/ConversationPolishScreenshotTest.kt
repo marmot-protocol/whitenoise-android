@@ -122,6 +122,7 @@ class ConversationPolishScreenshotTest {
         captureAttachmentTransferStates("attachment_transfer_states_amoled", dark = true, amoled = true)
     }
 
+    /** Captures action menu. */
     private fun captureActionMenu(
         name: String,
         dark: Boolean,
@@ -136,6 +137,7 @@ class ConversationPolishScreenshotTest {
         composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).captureRoboImage("src/test/snapshots/$name.png")
     }
 
+    /** Captures deleted message action menu. */
     private fun captureDeletedMessageActionMenu(
         name: String,
         dark: Boolean,

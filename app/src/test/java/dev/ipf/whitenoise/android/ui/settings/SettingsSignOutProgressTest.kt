@@ -71,6 +71,7 @@ class SettingsSignOutProgressTest {
         composeRule.runOnIdle { assertEquals(listOf(SettingsDetail.ShareConnect), details) }
     }
 
+    /** Builds an account fixture. */
     private fun account(
         label: String,
         hexDigit: String,

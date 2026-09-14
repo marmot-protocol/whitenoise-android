@@ -89,6 +89,7 @@ internal fun SignInKeyField(
     val clipboard = remember(context) { ContextCompat.getSystemService(context, ClipboardManager::class.java) }
     val canPaste = rememberClipboardCanOfferPaste(clipboard)
 
+    /** Replaces the key text and reports the change while the field is active. */
     fun replaceKey(value: String) {
         if (currentBusy || !active) return
         key.setTextAndPlaceCursorAtEnd(value)

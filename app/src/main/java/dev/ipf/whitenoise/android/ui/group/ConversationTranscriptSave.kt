@@ -21,8 +21,10 @@ internal class TranscriptSaveOwner(
 ) {
     private val valid = AtomicBoolean(true)
 
+    /** True while the owner is valid and its screen is current. */
     fun isCurrent(): Boolean = valid.get() && current()
 
+    /** Marks the owner invalid. */
     fun invalidate() {
         valid.set(false)
     }
@@ -35,6 +37,7 @@ internal class TranscriptSaveRequest(
     var claimed = false
         private set
 
+    /** Claims the request once; later claims return false. */
     fun claim(): Boolean {
         if (claimed) return false
         claimed = true
@@ -47,11 +50,13 @@ internal class TranscriptSaveRequests {
     private var pending by mutableStateOf<TranscriptSaveRequest?>(null)
     val busy: Boolean get() = pending != null
 
+    /** Starts a save request for a current owner when none is pending. */
     fun begin(owner: TranscriptSaveOwner): TranscriptSaveRequest? {
         if (busy || !owner.isCurrent()) return null
         return TranscriptSaveRequest(owner).also { pending = it }
     }
 
+    /** Claims the pending request for an accepted result of a still-current owner. */
     fun claimResult(accepted: Boolean): TranscriptSaveRequest? {
         val request = pending?.takeIf { it.claim() } ?: return null
         if (!accepted || !request.owner.isCurrent()) {
@@ -60,6 +65,7 @@ internal class TranscriptSaveRequests {
         return request.takeIf { pending === it }
     }
 
+    /** Clears the pending request once it finished. */
     fun finish(request: TranscriptSaveRequest) {
         if (pending === request) pending = null
     }

@@ -111,6 +111,7 @@ internal fun visualMediaOwnsFooter(
     hasCaption: Boolean,
 ): Boolean = !deleted && !hasInvalidationWarning && visualCount > 0 && fileCount == 0 && !hasCaption
 
+/** Footer frame for visual media: time and status at the trailing edge. */
 @Composable
 @Suppress("FunctionNaming") // Compose UI entry point.
 internal fun VisualMediaFooterFrame(
@@ -440,6 +441,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
     }
 }
 
+/** Body, inline footer and the retry affordance of a bubble. */
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 internal fun ColumnScope.BubbleBodyFooterAndRetry(

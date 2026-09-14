@@ -331,6 +331,7 @@ class ChatListTopBarScreenshotTest {
         }
     }
 
+    /** Screenshot search state. */
     private fun screenshotSearchState(
         withActiveFilters: Boolean,
         filterActionWithCount: Boolean,
@@ -372,6 +373,7 @@ class ChatListTopBarScreenshotTest {
                 },
         )
 
+    /** Renders search. */
     private fun renderSearch(
         dark: Boolean,
         amoled: Boolean,

@@ -37,6 +37,7 @@ internal sealed interface TextAttachmentReaderState {
     ) : TextAttachmentReaderState
 }
 
+/** Decodes bytes into a preview, parsing Markdown when the type calls for it. */
 internal suspend fun loadTextAttachmentPreview(
     candidate: TextAttachmentCandidate,
     bytes: ByteArray,

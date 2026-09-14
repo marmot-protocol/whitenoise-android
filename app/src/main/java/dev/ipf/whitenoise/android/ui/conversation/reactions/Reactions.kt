@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 
+/** Attaches the reaction summary to the bubble's outer edge. */
 internal fun Modifier.reactionSummaryAttachment(outgoing: Boolean): Modifier =
     padding(
         if (outgoing) {

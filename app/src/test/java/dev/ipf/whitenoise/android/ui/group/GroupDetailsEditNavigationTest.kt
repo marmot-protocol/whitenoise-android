@@ -72,6 +72,7 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNode(hasText(GROUP_NAME) and hasClickAction()).assertIsDisplayed()
     }
 
+    /** Unavailable call actions do not occupy the primary action row. */
     @Test
     fun unavailableCallActionsDoNotOccupyThePrimaryActionRow() {
         render(controller(group()), onOpenSearch = {})
@@ -259,6 +260,7 @@ class GroupDetailsEditNavigationTest {
             .config[SemanticsProperties.VerticalScrollAxisRange]
             .value()
 
+    /** Management edit row and add description open the same editor. */
     @Test
     fun managementEditRowAndAddDescriptionOpenTheSameEditor() {
         render(controller(group()))
@@ -344,11 +346,13 @@ class GroupDetailsEditNavigationTest {
         composeRule.waitForIdle()
     }
 
+    /** Asserts editor is open. */
     private fun assertEditorIsOpen() {
         composeRule.onNodeWithText(context.getString(R.string.group_name)).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.group_description)).assertIsDisplayed()
     }
 
+    /** Controller. */
     private fun controller(
         group: AppGroupRecordFfi,
         extraMembers: Int = 0,

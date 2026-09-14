@@ -232,6 +232,7 @@ private enum class MediaEnvelopeSlot {
 
 private val bubbleContentArrangement = Arrangement.spacedBy(6.dp)
 
+/** Content insets inside the bubble frame. */
 private fun bubbleContentModifier(contentModifier: Modifier): Modifier =
     contentModifier
         .padding(horizontal = 12.dp, vertical = 8.dp)
@@ -256,11 +257,13 @@ internal fun shouldFrameMessageBubbleSupplement(
     invalidationWarning: String?,
 ): Boolean = bodyText != null || invalidationWarning != null
 
+/** Highlight border colour: the custom bubble colour when set, else the fallback. */
 internal fun messageTargetHighlightColor(
     customBorderArgb: Long?,
     fallback: Color,
 ): Color = customBorderArgb?.let(::colorFromArgb) ?: fallback
 
+/** Animated highlight border for a jump-to-message target. */
 private fun messageTargetHighlightModifier(
     progress: State<Float>,
     customBorderArgb: Long?,

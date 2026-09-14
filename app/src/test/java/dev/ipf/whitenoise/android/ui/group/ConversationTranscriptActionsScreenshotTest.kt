@@ -33,6 +33,7 @@ class ConversationTranscriptActionsScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Available actions light deliver each native callback once. */
     @Test
     fun availableActionsLightDeliverEachNativeCallbackOnce() {
         var shares = 0
@@ -53,6 +54,7 @@ class ConversationTranscriptActionsScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_transcript_actions_available_light.png")
     }
 
+    /** Saving dark shows progress and disables both actions. */
     @Test
     fun savingDarkShowsProgressAndDisablesBothActions() {
         showActions(dark = true, saveInFlight = true)
@@ -61,6 +63,7 @@ class ConversationTranscriptActionsScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_transcript_actions_saving_dark.png")
     }
 
+    /** Pending share disables save until the native share result returns. */
     @Test
     fun pendingShareDisablesSaveUntilTheNativeShareResultReturns() {
         showActions(sharePending = true)
@@ -68,6 +71,7 @@ class ConversationTranscriptActionsScreenshotTest {
         composeRule.onNodeWithTag("chat_info.save_transcript").assertIsNotEnabled()
     }
 
+    /** Missing account disables both destinations. */
     @Test
     fun missingAccountDisablesBothDestinations() {
         showActions(accountAvailable = false)
@@ -75,6 +79,7 @@ class ConversationTranscriptActionsScreenshotTest {
         composeRule.onNodeWithTag("chat_info.save_transcript").assertIsNotEnabled()
     }
 
+    /** Shows actions. */
     private fun showActions(
         dark: Boolean = false,
         saveInFlight: Boolean = false,

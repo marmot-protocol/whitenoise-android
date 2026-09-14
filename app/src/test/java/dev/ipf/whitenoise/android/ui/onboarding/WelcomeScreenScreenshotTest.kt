@@ -143,5 +143,6 @@ class WelcomeScreenScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 
+    /** Builds a saved-account fixture. */
     private fun saved(name: String) = OnboardingSavedAccountUi(name, name, name, "npub1…$name", null)
 }

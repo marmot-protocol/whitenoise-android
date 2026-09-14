@@ -40,6 +40,7 @@ class ChatListSelectionActionsTest {
         assertTrue(chatListBackHandlerEnabled(selectionMode = false, searchOpen = false, filterSheetOpen = true))
     }
 
+    /** Back dismissal prioritizes selection then filter sheet then search. */
     @Test
     fun backDismissalPrioritizesSelectionThenFilterSheetThenSearch() {
         val searchOpen = GlobalSearchState(isOpen = true, openFilterCategory = GlobalSearchFilterCategory.Date)
@@ -55,6 +56,7 @@ class ChatListSelectionActionsTest {
         assertEquals(null, chatListBackDismissal(selectionMode = false, GlobalSearchState()))
     }
 
+    /** Filter picker cannot cover selection and needs an open category. */
     @Test
     fun filterPickerCannotCoverSelectionAndNeedsAnOpenCategory() {
         val requested = GlobalSearchState(isOpen = true, openFilterCategory = GlobalSearchFilterCategory.Date)
@@ -72,6 +74,7 @@ class ChatListSelectionActionsTest {
         )
     }
 
+    /** Filter chips show only with active filters outside selection. */
     @Test
     fun filterChipsShowOnlyWithActiveFiltersOutsideSelection() {
         val emptySearch = GlobalSearchState(isOpen = true)
@@ -89,6 +92,7 @@ class ChatListSelectionActionsTest {
         )
     }
 
+    /** Selection revokes an open filter picker before back dispatch. */
     @Test
     fun selectionRevokesAnOpenFilterPickerBeforeBackDispatch() {
         val requested = GlobalSearchState(isOpen = true, openFilterCategory = GlobalSearchFilterCategory.Date)

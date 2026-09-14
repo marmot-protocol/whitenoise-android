@@ -33,6 +33,7 @@ internal data class AccountSelectorState(
     val refreshing: Boolean,
 )
 
+/** Presentation state for the account selector: ordered accounts, the active one and the refresh flag. */
 internal fun accountSelectorState(
     accounts: List<AccountSummaryFfi>,
     activeAccountRef: String?,
@@ -98,6 +99,7 @@ internal fun AccountSelectorSheet(
     val settings by rememberUpdatedState(onSettings)
     var refreshing by remember(appState, runtime) { mutableStateOf(true) }
 
+    /** Closes the selection and dismisses the sheet in one step. */
     fun close() {
         selection.close()
         dismiss()

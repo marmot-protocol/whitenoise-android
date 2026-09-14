@@ -39,6 +39,7 @@ class TtsAutoReadScreenshotTest {
 
     private val app: Application = ApplicationProvider.getApplicationContext()
 
+    /** Resolves a string resource in the test context. */
     private fun string(resId: Int): String = app.getString(resId)
 
     /** Three picker states side by side: default, explicit on, explicit off. */

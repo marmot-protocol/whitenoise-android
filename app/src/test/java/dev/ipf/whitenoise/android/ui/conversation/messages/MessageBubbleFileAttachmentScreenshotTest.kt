@@ -574,6 +574,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         val rtl: TimelineMessage,
     )
 
+    /** Asserts file card and bubble width. */
     private fun assertFileCardAndBubbleWidth(
         item: TimelineMessage,
         attachmentIndex: Int = 0,
@@ -688,6 +689,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         assertTrue(inner.bottom <= outer.bottom)
     }
 
+    /** Composes a file message bubble fixture. */
     @Composable
     @Suppress("LongMethod") // Exercises the real MessageBubble interaction and layout contract.
     private fun FileMessage(

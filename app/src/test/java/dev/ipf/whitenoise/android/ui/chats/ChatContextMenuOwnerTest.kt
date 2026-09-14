@@ -8,6 +8,7 @@ import org.junit.Test
 
 /** Opening identity and pointer ownership are independent from recycled row IDs and account labels. */
 class ChatContextMenuOwnerTest {
+    /** Older held pointer cannot release or dismiss new opening. */
     @Test fun olderHeldPointerCannotReleaseOrDismissNewOpening() {
         val owner = ChatContextMenuOwner()
         val first = owner.open(held = true)
@@ -26,6 +27,7 @@ class ChatContextMenuOwnerTest {
         assertFalse(owner.isLatest(first))
     }
 
+    /** Disposed owner cannot revive after another owner is created. */
     @Test fun disposedOwnerCannotReviveAfterAnotherOwnerIsCreated() {
         val previous = ChatContextMenuOwner()
         val stale = previous.open(held = true)

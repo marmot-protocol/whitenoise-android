@@ -72,6 +72,7 @@ internal fun OnboardingSavedAccountActions(
     var recoveryAccountLabel by remember { mutableStateOf<String?>(null) }
     val continuing = accounts.firstOrNull { it.label == reactivatingAccountLabel } ?: accounts.firstOrNull()
 
+    /** Selects a saved account, routing recovery-required accounts to their prompt. */
     fun select(account: OnboardingSavedAccountUi) {
         if (!enabled || reactivatingAccountLabel != null) return
         pickerVisible = false

@@ -52,6 +52,10 @@ object IdentityFormatter {
             (normalized.length == NOSTR_HEX_ID_LENGTH && normalized.all { it.isDigit() || it in 'a'..'f' })
     }
 
+    /**
+     * Single-glyph monogram for a display name: the first letter, else the first emoji grapheme, else the DM
+     * fallback.
+     */
     fun initials(name: String): String {
         val words =
             name
@@ -161,6 +165,7 @@ object IdentityFormatter {
         }
     }
 
+    /** Locale-aware clock time for an epoch-second stamp. */
     fun clockTime(
         epochSeconds: ULong,
         locale: Locale = Locale.getDefault(),

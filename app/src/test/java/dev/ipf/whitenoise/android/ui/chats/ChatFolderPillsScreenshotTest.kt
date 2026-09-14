@@ -30,24 +30,33 @@ import org.robolectric.annotation.GraphicsMode
 class ChatFolderPillsScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Screenshot: light theme. */
     @Test fun light() = capture("folder_pills_light")
 
+    /** Screenshot: dark theme. */
     @Test fun dark() = capture("folder_pills_dark", dark = true)
 
+    /** Screenshot: AMOLED. */
     @Test fun amoled() = capture("folder_pills_amoled", dark = true, amoled = true)
 
+    /** Scrolled. */
     @Test fun scrolled() = capture("folder_pills_scrolled", scrolled = true)
 
+    /** Large rtl. */
     @Test fun largeRtl() = capture("folder_pills_rtl_200", dark = true, rtl = true)
 
+    /** Empty. */
     @Test fun empty() = capture("folder_pills_empty", empty = true)
 
+    /** Renamed default. */
     @Test fun renamedDefault() = capture("folder_pills_renamed_default", selected = "unread")
 
+    /** Density fixture for a high-density render. */
     @Test
     @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-xxhdpi")
     fun highDensity() = capture("folder_pills_amoled_xxhdpi", dark = true, amoled = true)
 
+    /** Renders the fixture and records its screenshot baseline. */
     @OptIn(ExperimentalMaterial3Api::class)
     @Suppress("LongParameterList")
     private fun capture(

@@ -26,7 +26,7 @@ class ChatFolderDraftCommitTest {
     private lateinit var preferences: FolderCommitRecordingPreferences
     private lateinit var store: ChatFolderPreferences
 
-    /** Seed with the unchanged legacy owner before observing an explicit editor save. */
+    /** Seeds with the unchanged legacy owner before observing an explicit editor save. */
     @Before fun setUp() {
         val delegate = context.getSharedPreferences("folder-atomic-test", Context.MODE_PRIVATE)
         delegate.edit().clear().commit()
@@ -186,16 +186,18 @@ class ChatFolderDraftCommitTest {
     }
 }
 
-/** Record actual preference transactions, with a deterministic failure before the delegate applies any data. */
+/** Records actual preference transactions, with a deterministic failure before the delegate applies any data. */
 internal class FolderCommitRecordingPreferences(
     private val delegate: SharedPreferences,
 ) : SharedPreferences by delegate {
     var writes = 0
     var failNext = false
 
+    /** Fake preferences: opens an editor. */
     override fun edit(): SharedPreferences.Editor {
         val editor = delegate.edit()
         return object : SharedPreferences.Editor by editor {
+            /** Fake preferences editor: stores a string. */
             override fun putString(
                 key: String?,
                 value: String?,
@@ -204,6 +206,7 @@ internal class FolderCommitRecordingPreferences(
                     editor.putString(key, value)
                 }
 
+            /** Fake preferences editor: stores a string set. */
             override fun putStringSet(
                 key: String?,
                 values: MutableSet<String>?,
@@ -212,6 +215,7 @@ internal class FolderCommitRecordingPreferences(
                     editor.putStringSet(key, values)
                 }
 
+            /** Fake preferences editor: stores an int. */
             override fun putInt(
                 key: String?,
                 value: Int,
@@ -220,8 +224,10 @@ internal class FolderCommitRecordingPreferences(
                     editor.putInt(key, value)
                 }
 
+            /** Fake preferences editor: removes a key. */
             override fun remove(key: String?): SharedPreferences.Editor = apply { editor.remove(key) }
 
+            /** Fake preferences editor: commits the pending writes. */
             override fun apply() {
                 if (failNext) {
                     failNext = false

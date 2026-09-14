@@ -57,6 +57,7 @@ internal fun NewGroupRecipientSearchField(
     val receiver =
         remember(state) {
             object : ReceiveContentListener {
+                /** Routes pasted clipboard text through the recipient paste policy; other sources pass through. */
                 override fun onReceive(content: TransferableContent): TransferableContent? {
                     if (content.source != TransferableContent.Source.Clipboard) return content
                     val consumed =

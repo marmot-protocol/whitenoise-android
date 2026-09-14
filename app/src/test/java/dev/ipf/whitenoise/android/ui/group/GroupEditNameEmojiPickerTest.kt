@@ -111,6 +111,7 @@ class GroupEditNameEmojiPickerTest {
         )
     }
 
+    /** Disabled editor cannot open the picker. */
     @Test
     fun disabledEditorCannotOpenThePicker() {
         render(admin = false)
@@ -130,6 +131,7 @@ class GroupEditNameEmojiPickerTest {
         assertFalse(groupNameEmojiEditable(canEdit = true, saving = false, mutationInFlight = true))
     }
 
+    /** Actual group info image entry opens emoji builder and dismiss preserves name. */
     @Test
     fun actualGroupInfoImageEntryOpensEmojiBuilderAndDismissPreservesName() {
         render(admin = true)

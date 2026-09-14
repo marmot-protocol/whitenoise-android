@@ -228,6 +228,7 @@ internal fun GlobalNotificationCategories(onOpenChannel: (NotificationChannelSpe
     }
 }
 
+/** Title of a notification channel. */
 @Composable
 private fun notificationChannelTitle(channel: NotificationChannelSpec): String =
     stringResource(

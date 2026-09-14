@@ -69,6 +69,7 @@ class EmojiPickerRecentsBehaviorTest {
         composeRule.onNodeWithText(string(R.string.emoji_category_recent)).assertIsDisplayed()
     }
 
+    /** Search pick updates displayed recents immediately. */
     @Test
     fun searchPickUpdatesDisplayedRecentsImmediately() {
         val owner =
@@ -135,6 +136,7 @@ class EmojiPickerRecentsBehaviorTest {
         assertEquals(0, usedCount)
     }
 
+    /** Waits until the browse grid is composed. */
     private fun waitForBrowseGrid() {
         repeat(100) {
             composeRule.waitForIdle()

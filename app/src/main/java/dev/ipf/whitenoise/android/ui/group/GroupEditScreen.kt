@@ -72,12 +72,14 @@ import kotlinx.coroutines.CancellationException
 @Suppress("MaxLineLength")
 internal fun safeAvatarUploadUrl(url: String): String = ProfileSanitizer.androidOwnedHttpsImageUrl(url) ?: error("unsafe upload URL")
 
+/** The name field accepts emoji only for an admin while no save or mutation runs. */
 internal fun groupNameEmojiEditable(
     canEdit: Boolean,
     saving: Boolean,
     mutationInFlight: Boolean,
 ): Boolean = canEdit && !saving && !mutationInFlight
 
+/** Edit Group: photo with its sources, name and description, Save in the bottom bar. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun GroupEditScreen(

@@ -33,8 +33,10 @@ import org.robolectric.annotation.Config
 class ChatFolderManageRouteTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Manager works with no chats and return preserves selected native folder. */
     @Test fun managerWorksWithNoChatsAndReturnPreservesSelectedNativeFolder() = route(teardown = false)
 
+    /** Teardown dismisses manager and never changes folder membership. */
     @Test fun teardownDismissesManagerAndNeverChangesFolderMembership() = route(teardown = true)
 
     /** No fake folder route/model is supplied: actual native preference/controller/screen owners handle the click. */

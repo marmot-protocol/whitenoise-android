@@ -90,6 +90,7 @@ class ChatRowSelectionIndicatorCoverageTest {
         composeRule.onNodeWithContentDescription(mentionDescription).assertExists()
     }
 
+    /** Selection mode replaces invited timestamp and badge. */
     @Test
     fun selectionModeReplacesInvitedTimestampAndBadge() {
         val selectionMode = mutableStateOf(false)
@@ -130,6 +131,7 @@ class ChatRowSelectionIndicatorCoverageTest {
         composeRule.onAllNodesWithContentDescription(selectedDescription).assertCountEquals(0)
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         selectionMode: MutableState<Boolean>,
         selected: MutableState<Boolean>,

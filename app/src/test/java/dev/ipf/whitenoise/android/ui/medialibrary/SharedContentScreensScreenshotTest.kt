@@ -43,6 +43,7 @@ class SharedContentScreensScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Category rows light open their exact destination. */
     @Test
     fun categoryRowsLightOpenTheirExactDestination() {
         val opened = mutableListOf<SharedContentCategory>()
@@ -63,6 +64,7 @@ class SharedContentScreensScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/shared_content_categories_light.png")
     }
 
+    /** Media filters dark preserve selected category and dispatch changes. */
     @Test
     fun mediaFiltersDarkPreserveSelectedCategoryAndDispatchChanges() {
         val filters = mutableListOf<SharedVisualFilter>()
@@ -74,12 +76,14 @@ class SharedContentScreensScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/shared_content_media_empty_dark.png")
     }
 
+    /** Voice empty amoled keeps truthful loaded scope. */
     @Test
     fun voiceEmptyAmoledKeepsTruthfulLoadedScope() {
         renderDestination(SharedContentCategory.Voice, amoled = true)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/shared_content_voice_empty_amoled.png")
     }
 
+    /** Documents empty rtl large font stays readable. */
     @Test
     fun documentsEmptyRtlLargeFontStaysReadable() {
         renderDestination(SharedContentCategory.Documents, rtl = true, fontScale = 2f)
@@ -87,6 +91,7 @@ class SharedContentScreensScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/shared_content_documents_empty_rtl_200.png")
     }
 
+    /** Source actions in the real month list return each exact message. */
     @Test
     fun sourceActionsInTheRealMonthListReturnEachExactMessage() {
         val jumped = mutableListOf<String>()
@@ -121,6 +126,7 @@ class SharedContentScreensScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/shared_content_links_month_source_light.png")
     }
 
+    /** Renders destination. */
     private fun renderDestination(
         category: SharedContentCategory,
         amoled: Boolean = false,

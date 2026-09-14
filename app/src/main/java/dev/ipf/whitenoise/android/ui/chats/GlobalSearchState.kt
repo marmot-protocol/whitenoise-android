@@ -48,6 +48,7 @@ internal data class GlobalSearchState(
                 chatFilters.isNotEmpty() ||
                 messageFiltersActive
 
+    /** Whether the category holds at least one active filter. */
     fun isCategoryActive(category: GlobalSearchFilterCategory): Boolean =
         when (category) {
             GlobalSearchFilterCategory.Folder -> folderFilters.isNotEmpty()
@@ -120,6 +121,7 @@ internal data class GlobalSearchActiveChipList(
 
 /** Chips follow the prototype's category order, with a stable id order inside each category. */
 internal object GlobalSearchActiveChips {
+    /** Active chips in the prototype's category order. */
     fun from(state: GlobalSearchState): GlobalSearchActiveChipList {
         val chips =
             state.folderFilters.sorted().map {
@@ -143,6 +145,7 @@ internal object GlobalSearchActiveChips {
         return GlobalSearchActiveChipList(chips)
     }
 
+    /** The single date chip, or none when the selection is Any time. */
     private fun globalSearchDateChip(selection: GlobalSearchDateFilterSelection): List<GlobalSearchActiveChip> =
         when (selection) {
             GlobalSearchDateFilterSelection.AnyTime -> emptyList()
@@ -156,6 +159,7 @@ internal object GlobalSearchActiveChips {
                 )
         }
 
+    /** One chip per selected content kind, in a stable order. */
     private fun globalSearchContentChips(selection: GlobalSearchContentFilterSelection): List<GlobalSearchActiveChip> =
         GlobalSearchContentKind.entries
             .filter { it in selection.selectedKinds }
@@ -204,6 +208,7 @@ internal data class GlobalSearchQueryAlgebra(
     private val dateCodecKey: String?,
     private val contentKinds: Set<GlobalSearchContentKind>,
 ) {
+    /** Whether the encoded value belongs to the category's active set. */
     fun matchesCategory(
         category: GlobalSearchFilterCategory,
         value: String,
@@ -219,6 +224,7 @@ internal data class GlobalSearchQueryAlgebra(
                 runCatching { GlobalSearchContentKind.valueOf(value) }.getOrNull() in contentKinds
         }
 
+    /** Whether a candidate satisfies the query text and every active category. */
     fun matches(candidate: GlobalSearchCandidate): Boolean =
         (queryText.isBlank() || candidate.textMatches) &&
             (chatIds.isEmpty() || candidate.chatId in chatIds) &&
@@ -227,6 +233,7 @@ internal data class GlobalSearchQueryAlgebra(
             (contentKinds.isEmpty() || contentKinds.intersect(candidate.contentKinds).isNotEmpty())
 
     companion object {
+        /** Snapshots the state's filters into the algebra. */
         fun from(state: GlobalSearchState): GlobalSearchQueryAlgebra {
             val dateActive = state.dateFilterSelection !is GlobalSearchDateFilterSelection.AnyTime
             val categories = GlobalSearchFilterCategory.entries.count(state::isCategoryActive)
@@ -250,6 +257,7 @@ internal data class GlobalSearchQueryAlgebra(
     }
 }
 
+/** Projects the query, date and content filters into the MDK-facing request. */
 internal fun GlobalSearchState.projectSearchRequest(
     zoneId: ZoneId,
     nowMillis: Long,
@@ -271,23 +279,28 @@ internal fun GlobalSearchState.projectSearchRequest(
 internal object GlobalSearchTransitions {
     fun openSearch(state: GlobalSearchState): GlobalSearchState = state.copy(isOpen = true)
 
+    /** Closes search and resets the transient UI, keeping only the account scope token. */
     fun closeSearch(state: GlobalSearchState): GlobalSearchState =
         GlobalSearchState(
             accountScopeToken = state.accountScopeToken,
         )
 
+    /** Replaces the query text. */
     fun setQuery(
         state: GlobalSearchState,
         query: String,
     ): GlobalSearchState = state.copy(query = query)
 
+    /** Opens the picker for one filter category. */
     fun openFilterCategory(
         state: GlobalSearchState,
         category: GlobalSearchFilterCategory,
     ): GlobalSearchState = state.copy(openFilterCategory = category)
 
+    /** Closes the open picker. */
     fun dismissFilterSheet(state: GlobalSearchState): GlobalSearchState = state.copy(openFilterCategory = null)
 
+    /** Adds or removes one folder filter. */
     fun toggleFolderFilter(
         state: GlobalSearchState,
         folderId: String,
@@ -301,6 +314,7 @@ internal object GlobalSearchTransitions {
                 },
         )
 
+    /** Adds or removes one chat type filter. */
     fun toggleChatTypeFilter(
         state: GlobalSearchState,
         type: GlobalSearchChatType,
@@ -314,6 +328,7 @@ internal object GlobalSearchTransitions {
                 },
         )
 
+    /** Adds a chat filter, replacing an earlier label for the same id. */
     fun applyChatFilter(
         state: GlobalSearchState,
         filter: GlobalSearchChatFilter,
@@ -333,6 +348,7 @@ internal object GlobalSearchTransitions {
             applyChatFilter(state, filter)
         }
 
+    /** Adds a sender filter, replacing an earlier label for the same id. */
     fun applySenderFilter(
         state: GlobalSearchState,
         filter: GlobalSearchSenderFilter,
@@ -341,6 +357,7 @@ internal object GlobalSearchTransitions {
             senderFilters = state.senderFilters.filterNot { it.stableId == filter.stableId }.toSet() + filter,
         )
 
+    /** Picker rows toggle: a sender already chosen leaves the set, any other joins it. */
     fun toggleSenderFilter(
         state: GlobalSearchState,
         filter: GlobalSearchSenderFilter,
@@ -351,16 +368,19 @@ internal object GlobalSearchTransitions {
             applySenderFilter(state, filter)
         }
 
+    /** Replaces the date selection. */
     fun applyDateFilter(
         state: GlobalSearchState,
         selection: GlobalSearchDateFilterSelection,
     ): GlobalSearchState = state.copy(dateFilterSelection = selection)
 
+    /** Replaces the content kind selection. */
     fun setContentFilterSelection(
         state: GlobalSearchState,
         selection: GlobalSearchContentFilterSelection,
     ): GlobalSearchState = state.copy(contentFilterSelection = selection)
 
+    /** Removes the filter a chip stands for, by category prefix. */
     fun removeFilter(
         state: GlobalSearchState,
         chipId: String,
@@ -398,6 +418,7 @@ internal object GlobalSearchTransitions {
             else -> state
         }
 
+    /** Clears every filter while keeping search open and the query. */
     fun clearAllFilters(state: GlobalSearchState): GlobalSearchState =
         state.copy(
             folderFilters = emptySet(),
@@ -456,19 +477,23 @@ private const val GLOBAL_SEARCH_FIELD_SEPARATOR = ""
 private const val GLOBAL_SEARCH_LIST_SEPARATOR = ""
 private const val GLOBAL_SEARCH_SCOPE_SEPARATOR = ""
 
+/** Base64 encoding that keeps separators out of the payload. */
 private fun encodeGlobalSearchCodecString(value: String): String =
     Base64
         .getEncoder()
         .encodeToString(value.toByteArray(Charsets.UTF_8))
 
+/** Base64 decoding that yields null for malformed input. */
 private fun decodeGlobalSearchCodecString(encoded: String): String? =
     runCatching {
         String(Base64.getDecoder().decode(encoded), Charsets.UTF_8)
     }.getOrNull()
 
+/** Encodes a set of ids as a sorted, Base64-per-item list. */
 private fun encodeStringList(values: Collection<String>): String =
     values.sorted().joinToString(GLOBAL_SEARCH_LIST_SEPARATOR, transform = ::encodeGlobalSearchCodecString)
 
+/** Decodes an id list; null when any item is malformed. */
 private fun decodeStringList(encoded: String): Set<String>? =
     if (encoded.isEmpty()) {
         emptySet()
@@ -484,6 +509,7 @@ private fun encodeLabeledFilters(filters: Collection<Pair<String, String>>): Str
             "${encodeGlobalSearchCodecString(stableId)}:${encodeGlobalSearchCodecString(displayLabel)}"
         }
 
+/** Decodes id / label pairs; null when any token is malformed. */
 @Suppress("ReturnCount")
 private fun decodeLabeledFilters(encoded: String): Set<Pair<String, String>>? {
     if (encoded.isEmpty()) return emptySet()
@@ -498,6 +524,7 @@ private fun decodeLabeledFilters(encoded: String): Set<Pair<String, String>>? {
         }.toSet()
 }
 
+/** Encodes the state into the versioned saveable string. */
 internal fun encodeGlobalSearchState(state: GlobalSearchState): String {
     val chatTokens =
         encodeLabeledFilters(state.chatFilters.map { it.stableId to it.displayLabel })
@@ -520,6 +547,7 @@ internal fun encodeGlobalSearchState(state: GlobalSearchState): String {
     ).joinToString(GLOBAL_SEARCH_FIELD_SEPARATOR)
 }
 
+/** Decodes the saveable string, falling back to an empty state for any other version or shape. */
 internal fun decodeGlobalSearchState(encoded: String): GlobalSearchState {
     val fields = encoded.takeIf { it.isNotBlank() }?.split(GLOBAL_SEARCH_FIELD_SEPARATOR)
     return if (
@@ -533,6 +561,7 @@ internal fun decodeGlobalSearchState(encoded: String): GlobalSearchState {
     }
 }
 
+/** Decodes the versioned fields; null when any field is malformed. */
 @Suppress("ReturnCount")
 private fun decodeGlobalSearchStateFields(fields: List<String>): GlobalSearchState? {
     val query = decodeGlobalSearchCodecString(fields[2]) ?: return null

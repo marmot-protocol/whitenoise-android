@@ -25,6 +25,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.OutgoingMessageIndicator
 import dev.ipf.whitenoise.android.state.outgoingIndicator
 
+/** Delivery glyph for an outgoing status in the prototype's ring, disc and warning forms. */
 @Composable
 internal fun OutgoingMessageStatusIcon(
     status: MessageStatus,

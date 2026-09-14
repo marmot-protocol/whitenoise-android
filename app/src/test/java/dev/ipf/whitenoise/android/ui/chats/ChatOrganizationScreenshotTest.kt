@@ -41,30 +41,41 @@ class ChatOrganizationScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    /** Selection light. */
     @Test fun selectionLight() = selection("chat_selection_light")
 
+    /** Selection dark all selected. */
     @Test fun selectionDarkAllSelected() = selection("chat_selection_dark_all", dark = true, all = true)
 
+    /** Selection amoled. */
     @Test fun selectionAmoled() = selection("chat_selection_amoled", dark = true, amoled = true)
 
+    /** Selection menu. */
     @Test fun selectionMenu() = selection("chat_selection_menu", menu = true)
 
+    /** Selection short rtl large text. */
     @Test
     @Config(qualifiers = "en-w320dp-h480dp-mdpi")
     fun selectionShortRtlLargeText() = selection("chat_selection_short_rtl_large", scale = 2f, rtl = true)
 
+    /** Folder mixed and rule. */
     @Test fun folderMixedAndRule() = folder("chat_folder_picker_mixed_rule")
 
+    /** Folder amoled large text. */
     @Test fun folderAmoledLargeText() = folder("chat_folder_picker_amoled_large", amoled = true, scale = 2f)
 
+    /** Plain fab. */
     @Test fun plainFab() = fab("chats_fab_plain", missing = false)
 
+    /** Warning fab. */
     @Test fun warningFab() = fab("chats_fab_warning", missing = true)
 
+    /** The expanded AMOLED FAB fixture. */
     @Test
     @Config(qualifiers = "en-w840dp-h900dp-mdpi")
     fun expandedAmoledFab() = fab("chats_fab_expanded_amoled", missing = true, amoled = true)
 
+    /** Builds a selection fixture. */
     @Suppress("LongParameterList")
     private fun selection(
         name: String,
@@ -99,6 +110,7 @@ class ChatOrganizationScreenshotTest {
         }
     }
 
+    /** Builds a folder fixture. */
     private fun folder(
         name: String,
         amoled: Boolean = false,
@@ -120,6 +132,7 @@ class ChatOrganizationScreenshotTest {
         composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/$name.png")
     }
 
+    /** The FAB node under test. */
     private fun fab(
         name: String,
         missing: Boolean,

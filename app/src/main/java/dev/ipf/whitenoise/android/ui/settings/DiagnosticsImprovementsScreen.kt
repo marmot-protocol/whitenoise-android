@@ -44,6 +44,7 @@ internal fun DiagnosticsImprovementsScreen(
     var deleteConfirmOpen by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(appState.runtimeGeneration) { appState.refreshSecurityPrivacySettings() }
 
+    /** Runs an audit-log mutation with the busy flag. */
     fun runAuditMutation(block: suspend () -> Unit) {
         auditLogsBusy = true
         appState.launchMutation {

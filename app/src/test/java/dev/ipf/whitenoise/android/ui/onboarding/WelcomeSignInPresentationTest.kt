@@ -339,6 +339,7 @@ class WelcomeSignInPresentationTest {
         }
     }
 
+    /** Scanner result. */
     private fun scannerResult(
         payload: String,
         busyAtDelivery: Boolean,
@@ -376,6 +377,7 @@ class WelcomeSignInPresentationTest {
         assertEquals(0, imports)
     }
 
+    /** Builds a saved-account fixture. */
     private fun saved(
         label: String,
         recover: Boolean = false,

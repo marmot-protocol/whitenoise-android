@@ -39,13 +39,16 @@ internal const val CHAT_LIST_SEARCH_FILTER_MENU_TAG = "chat-list-search-filter-m
 internal const val CHAT_LIST_SEARCH_FILTER_MENU_CLEAR_TAG = "chat-list-search-filter-menu-clear"
 internal const val CHAT_LIST_SEARCH_FILTER_CONTROLS_TAG = "chat-list-search-filter-controls"
 
+/** Stable test tag for an active filter chip. */
 internal fun globalSearchFilterChipTag(chipId: String): String = "chat-list-search-filter-chip-$chipId"
 
+/** Stable test tag for a category item of the filter menu. */
 internal fun globalSearchFilterMenuItemTag(category: GlobalSearchFilterCategory): String {
     val name = category.name
     return "chat-list-search-filter-menu-$name"
 }
 
+/** Menu label of a filter category. */
 internal fun GlobalSearchFilterCategory.labelRes(): Int =
     when (this) {
         GlobalSearchFilterCategory.Folder -> R.string.chat_list_search_filter_folders
@@ -56,6 +59,7 @@ internal fun GlobalSearchFilterCategory.labelRes(): Int =
         GlobalSearchFilterCategory.Content -> R.string.chat_list_search_filter_content
     }
 
+/** Label of a chat type. */
 internal fun GlobalSearchChatType.labelRes(): Int =
     when (this) {
         GlobalSearchChatType.DIRECT -> R.string.chat_list_search_direct_chats
@@ -185,6 +189,7 @@ internal fun GlobalSearchFilterControlsRow(
     }
 }
 
+/** Chip label per category: folder and chat names, chat type, date and content labels. */
 @Composable
 internal fun globalSearchActiveChipLabel(
     chip: GlobalSearchActiveChip,

@@ -513,6 +513,7 @@ private fun formatFileSize(bytes: Long): String {
     return String.format(java.util.Locale.US, "%.1f GB", gb)
 }
 
+/** Pill for a file still being sent. */
 @Composable
 internal fun PendingFilePill(
     fileName: String,

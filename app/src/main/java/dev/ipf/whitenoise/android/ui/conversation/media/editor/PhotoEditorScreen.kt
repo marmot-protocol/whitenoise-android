@@ -106,6 +106,7 @@ internal fun PhotoEditorDialog(
     }
 }
 
+/** Photo editor: canvas, tools and the save flow for a staged photo. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("LongMethod") // Screen-level orchestration keeps save/back semantics alongside editor state.
@@ -359,6 +360,7 @@ private fun EditorChoiceChip(
     )
 }
 
+/** Error or limit status line of the editor. */
 @Composable
 private fun EditorStatus(state: PhotoEditorUiState) {
     val status = state.errorMessage ?: limitMessage(state.lastLimit)
@@ -391,6 +393,7 @@ private fun EditorStatus(state: PhotoEditorUiState) {
     }
 }
 
+/** Editing canvas with crop, rotation and drawing overlays. */
 @Composable
 @Suppress("LongMethod") // Pointer input, crop handles, and transformed preview share one coordinate space.
 private fun PhotoEditorCanvas(
@@ -698,6 +701,7 @@ private data class EditorColor(
     val selectedDescription: String,
 )
 
+/** The drawing colours the editor offers. */
 @Composable
 private fun editorColors(): List<EditorColor> {
     @Composable

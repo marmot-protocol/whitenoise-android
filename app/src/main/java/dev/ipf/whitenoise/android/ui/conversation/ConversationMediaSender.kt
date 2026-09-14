@@ -413,6 +413,7 @@ internal class ConversationMediaSender(
             get() = images.isEmpty() && documents.attachments.isEmpty()
     }
 
+    /** Sends the staged images and documents with the caption as one message. */
     fun sendStagedAttachments(
         imageSlots: List<PendingMediaSlot>,
         documentUris: List<android.net.Uri>,

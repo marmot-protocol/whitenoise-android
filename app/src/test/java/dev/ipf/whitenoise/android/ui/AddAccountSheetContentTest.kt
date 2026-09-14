@@ -63,6 +63,7 @@ class AddAccountSheetContentTest {
         assertEquals(0, imports)
     }
 
+    /** Amber row only offers when signer installed. */
     @Test
     fun amberRowOnlyOffersWhenSignerInstalled() {
         setContent(amberSignerAvailable = false)
@@ -70,6 +71,7 @@ class AddAccountSheetContentTest {
         composeRule.onNodeWithText(string(R.string.onboarding_login_with_amber)).assertDoesNotExist()
     }
 
+    /** Amber row fires login. */
     @Test
     fun amberRowFiresLogin() {
         var amberTaps = 0
@@ -79,6 +81,7 @@ class AddAccountSheetContentTest {
         assertEquals(1, amberTaps)
     }
 
+    /** Secret key form hidden until disclosed. */
     @Test
     fun secretKeyFormHiddenUntilDisclosed() {
         setContent(amberSignerAvailable = true)
@@ -87,6 +90,7 @@ class AddAccountSheetContentTest {
         composeRule.onNodeWithTag("onboarding.sign_in.private_key").assertExists()
     }
 
+    /** Import button gates on identity text. */
     @Test
     fun importButtonGatesOnIdentityText() {
         setContent(amberSignerAvailable = false, identity = "")
@@ -97,6 +101,7 @@ class AddAccountSheetContentTest {
             .assertIsNotEnabled()
     }
 
+    /** Import button enabled with identity and fires import. */
     @Test
     fun importButtonEnabledWithIdentityAndFiresImport() {
         var imports = 0
@@ -109,6 +114,7 @@ class AddAccountSheetContentTest {
         assertEquals(1, imports)
     }
 
+    /** All rows disabled while busy. */
     @Test
     fun allRowsDisabledWhileBusy() {
         setContent(amberSignerAvailable = true, inFlightAction = OnboardingAction.Creating)
@@ -116,6 +122,7 @@ class AddAccountSheetContentTest {
         composeRule.onNodeWithTag("onboarding.welcome.sign_up").assertIsNotEnabled()
     }
 
+    /** Public key import failure shows dedicated error. */
     @Test
     fun publicKeyImportFailureShowsDedicatedError() {
         val npub = "npub1" + "a".repeat(58)

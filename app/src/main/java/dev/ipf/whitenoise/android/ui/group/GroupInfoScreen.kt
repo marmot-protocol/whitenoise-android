@@ -73,6 +73,7 @@ internal fun ChatRelaysScreen(
     }
 }
 
+/** Group and Nostr group ids with copy actions. */
 @Composable
 private fun GroupIdentifierGroup(
     groupIdHex: String,
@@ -98,6 +99,7 @@ private fun GroupIdentifierGroup(
     }
 }
 
+/** Relay list of the group with copy actions. */
 @Composable
 private fun GroupRelayGroup(
     relays: List<String>,

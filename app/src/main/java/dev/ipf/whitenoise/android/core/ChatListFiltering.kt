@@ -127,6 +127,10 @@ private fun <T> ChatListSearchCandidate<T>.synchronousMatch(ciNeedle: String): C
     return ChatListSynchronousSearchMatch.NONE
 }
 
+/**
+ * Classifies candidates by title, metadata or body match (the strongest wins per canonical id) into groups and
+ * messages.
+ */
 internal fun <T> projectChatListSearchCandidates(
     candidates: List<ChatListSearchCandidate<T>>,
     rawQuery: String,
@@ -176,6 +180,7 @@ internal fun <T> projectChatListSearchCandidates(
     )
 }
 
+/** Projects the chat list into the search sections, applying the folder scope and the message-only rule. */
 internal fun projectChatListSearchSections(
     source: List<ChatListItem>,
     rawQuery: String,

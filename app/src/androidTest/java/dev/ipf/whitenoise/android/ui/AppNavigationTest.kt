@@ -107,6 +107,7 @@ class AppNavigationTest {
             .assertIsDisplayed()
     }
 
+    /** Settings top bar returns to chat list with back link. */
     @Test
     fun settingsTopBarReturnsToChatListWithBackLink() {
         var backClicks = 0
@@ -207,6 +208,7 @@ class AppNavigationTest {
         assertEquals(headerBefore, headerAfter)
     }
 
+    /** Global confirmation stays clear of settings account actions during navigation. */
     @Test
     fun globalConfirmationStaysClearOfSettingsAccountActionsDuringNavigation() {
         val appState = appState()

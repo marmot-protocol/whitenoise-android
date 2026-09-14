@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.state.otherAccountAvatars
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 
+/** Avatar that acts as the account button, with an optional unread dot in the account colour. */
 @Composable
 fun AccountAvatarButton(
     title: String,

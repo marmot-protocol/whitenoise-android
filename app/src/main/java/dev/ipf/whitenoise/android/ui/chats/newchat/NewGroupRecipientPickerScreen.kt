@@ -98,6 +98,7 @@ private fun NewGroupRecipientAccountScreen(
             )
         }
 
+    /** Maps a search candidate to a selectable group person with its resolved display name. */
     fun person(candidate: RecipientSearch.Candidate) =
         GroupCreationPerson(
             candidate.copy(displayName = selectedMemberDisplayName(candidate, appState)),
@@ -110,6 +111,7 @@ private fun NewGroupRecipientAccountScreen(
                 ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
         )
 
+    /** Adds or removes a candidate, never the active account itself. */
     fun toggle(candidate: RecipientSearch.Candidate) {
         if (!owner.isCurrent() || candidate.accountIdHex.equals(activeHex, true)) return
         if (selected.any { it.accountIdHex.equals(candidate.accountIdHex, true) }) {
@@ -121,6 +123,7 @@ private fun NewGroupRecipientAccountScreen(
         if (selected.isEmpty()) reviewing = false
     }
 
+    /** Leaves the picker through [callback] after disposing the owner and the scanner. */
     fun leave(callback: () -> Unit) {
         if (!owner.isCurrent()) return
         scannerSession = null

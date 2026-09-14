@@ -65,6 +65,7 @@ internal fun ActionColorScreen(
     }
 }
 
+/** Editor for the account action colour of one theme. */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
 private fun ActionColorEditor(

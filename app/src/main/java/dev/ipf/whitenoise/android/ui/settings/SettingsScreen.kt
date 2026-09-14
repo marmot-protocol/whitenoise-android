@@ -228,6 +228,8 @@ internal fun settingsHomeState(
 // Parent of a settings detail for back navigation; null means the Settings
 // home. Kept pure so the back-stack shape (Key Packages → Developer tools → home,
 // About → Help → home, ChatBubbleColors → Appearance) is unit-testable without Compose.
+
+/** Parent destination a nested settings detail returns to. */
 internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
     when (detail) {
         SettingsDetail.ActionColor,
@@ -243,6 +245,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         else -> null
     }
 
+/** Back handler: nested detail, then home, blocked during sign-out. */
 @Composable
 private fun settingsBackHandler(
     signOutInProgress: Boolean,
@@ -260,6 +263,7 @@ private fun settingsBackHandler(
     }
 }
 
+/** Settings root hosting the hub and every detail destination. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SettingsScreen(
@@ -388,6 +392,7 @@ internal data class SettingsHomeAccount(
     val pictureUrl: String?,
 )
 
+/** The Settings hub. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
 private fun SettingsHomeScreen(
@@ -405,6 +410,8 @@ private fun SettingsHomeScreen(
     val activeAccount = appState.activeAccount
 
     // Read the live flag on invocation as teardown can begin before the next recomposition.
+
+    /** Runs [action] unless sign-out is in progress. */
     fun whenIdle(action: () -> Unit) {
         if (!appState.signOutInProgress) action()
     }

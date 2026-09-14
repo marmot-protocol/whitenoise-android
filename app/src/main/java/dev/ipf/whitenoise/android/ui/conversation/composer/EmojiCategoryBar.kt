@@ -38,6 +38,7 @@ import dev.ipf.whitenoise.android.ui.theme.outlineSelectionColor
 internal const val EMOJI_PICKER_CATEGORIES_TEST_TAG = "emoji.picker.categories"
 internal const val EMOJI_PICKER_CONFIGURE_TEST_TAG = "emoji.picker.configure"
 
+/** Stable test tag for an emoji category toggle. */
 internal fun emojiPickerCategoryTestTag(category: EmojiCategory): String = "emoji.picker.category.${category.id}"
 
 private val EmojiCategoryBarMinimumHeight = 56.dp
@@ -117,6 +118,7 @@ internal fun EmojiCategoryBar(
     }
 }
 
+/** One category glyph toggle in the bar. */
 @Composable
 private fun EmojiCategoryToggle(
     category: EmojiCategory,

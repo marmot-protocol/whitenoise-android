@@ -72,6 +72,7 @@ class ComposerAttachmentSheetBehaviorTest {
         composeRule.waitForIdle()
     }
 
+    /** Tapping attach opens the sheet. */
     @Test
     fun tappingAttachOpensTheSheet() {
         renderComposer()
@@ -80,6 +81,7 @@ class ComposerAttachmentSheetBehaviorTest {
         composeRule.onNodeWithText(string(R.string.download_files)).assertIsDisplayed()
     }
 
+    /** Gallery tile fires callback and closes the sheet. */
     @Test
     fun galleryTileFiresCallbackAndClosesTheSheet() {
         var galleryClicks = 0
@@ -91,6 +93,7 @@ class ComposerAttachmentSheetBehaviorTest {
         composeRule.onNodeWithText(string(R.string.attachment_photos_videos)).assertDoesNotExist()
     }
 
+    /** Document tile fires callback. */
     @Test
     fun documentTileFiresCallback() {
         var documentClicks = 0
@@ -101,6 +104,7 @@ class ComposerAttachmentSheetBehaviorTest {
         assertEquals(1, documentClicks)
     }
 
+    /** Camera only composer uses the single attachment trigger. */
     @Test
     fun cameraOnlyComposerUsesTheSingleAttachmentTrigger() {
         var cameraClicks = 0
@@ -120,6 +124,7 @@ class ComposerAttachmentSheetBehaviorTest {
         composeRule.onNodeWithText(string(R.string.attachment_camera)).assertDoesNotExist()
     }
 
+    /** Opening emoji picker closes the sheet. */
     @Test
     fun openingEmojiPickerClosesTheSheet() {
         renderComposer()
@@ -129,6 +134,7 @@ class ComposerAttachmentSheetBehaviorTest {
         composeRule.onNodeWithText(string(R.string.attachment_photos_videos)).assertDoesNotExist()
     }
 
+    /** Contact tile fires callback and closes the sheet. */
     @Test
     fun contactTileFiresCallbackAndClosesTheSheet() {
         var contactClicks = 0
@@ -157,6 +163,7 @@ class ComposerAttachmentSheetBehaviorTest {
         assertEquals(1, locationClicks)
     }
 
+    /** User tile fires callback only after tap. */
     @Test
     fun userTileFiresCallbackOnlyAfterTap() {
         var userClicks = 0
@@ -170,6 +177,7 @@ class ComposerAttachmentSheetBehaviorTest {
         composeRule.onNodeWithText(string(R.string.attach_contact)).assertDoesNotExist()
     }
 
+    /** Unavailable sources are not offered as working commands. */
     @Test
     fun unavailableSourcesAreNotOfferedAsWorkingCommands() {
         renderComposer()

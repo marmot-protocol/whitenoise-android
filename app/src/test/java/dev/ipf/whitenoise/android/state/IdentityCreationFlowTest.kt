@@ -28,6 +28,7 @@ class IdentityCreationFlowTest {
         assertTrue("identity must become ready before best-effort warm-up starts", ready >= 0 && warmup > ready)
     }
 
+    /** Post create warmup is best effort and account scoped. */
     @Test
     fun postCreateWarmupIsBestEffortAndAccountScoped() {
         val body = appStateSource("AppProfileSignUp.kt").readText().functionBody("launchIdentityPostCreateWarmup")
@@ -71,6 +72,7 @@ class IdentityCreationFlowTest {
         )
     }
 
+    /** Builds an account fixture. */
     private fun account(
         label: String,
         accountIdHex: String,
@@ -84,6 +86,7 @@ class IdentityCreationFlowTest {
         running = running,
     )
 
+    /** The AppState source file under either working directory. */
     private fun appStateSource(name: String = "AppState.kt"): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/state/$name"),

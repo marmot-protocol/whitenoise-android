@@ -37,6 +37,7 @@ import kotlin.math.roundToInt
 
 internal val MessageBubbleBottomAlignmentLine = HorizontalAlignmentLine { old, new -> minOf(old, new) }
 
+/** Sender avatar slot beside incoming bubbles, shown at the end of a sender run. */
 @Composable
 internal fun RowScope.MessageSenderAvatarSlot(
     showSenderAvatar: Boolean,
@@ -78,6 +79,7 @@ internal fun RowScope.MessageSenderAvatarSlot(
     Spacer(Modifier.width(6.dp))
 }
 
+/** Reaction summary chips under a bubble. */
 @Composable
 internal fun ColumnScope.MessageReactionSummary(
     tallies: List<ReactionTally>,
@@ -147,6 +149,7 @@ internal fun ColumnScope.MessageReactionSummary(
     }
 }
 
+/** Edge inset of the reaction row for the bubble direction. */
 private fun reactionChipPadding(mine: Boolean): PaddingValues =
     if (mine) {
         PaddingValues(start = REACTION_ROW_EDGE_INSET)
@@ -156,6 +159,8 @@ private fun reactionChipPadding(mine: Boolean): PaddingValues =
 
 // Keep the chip tucked onto the bubble's lower outer edge while its
 // reported height expands or contracts with the visibility transition.
+
+/** Modifier hosting the reaction row under the bubble. */
 private fun ColumnScope.reactionHostModifier(
     mine: Boolean,
     padding: PaddingValues,

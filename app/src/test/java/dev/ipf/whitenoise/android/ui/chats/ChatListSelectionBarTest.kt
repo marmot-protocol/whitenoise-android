@@ -25,12 +25,14 @@ class ChatListSelectionBarTest {
 
     private fun string(res: Int): String = ApplicationProvider.getApplicationContext<android.content.Context>().getString(res)
 
+    /** Plural. */
     private fun plural(
         res: Int,
         quantity: Int,
         vararg args: Any,
     ): String = ApplicationProvider.getApplicationContext<android.content.Context>().resources.getQuantityString(res, quantity, *args)
 
+    /** Shows count and routes actions. */
     @Test
     fun showsCountAndRoutesActions() {
         var closes = 0
@@ -87,6 +89,7 @@ class ChatListSelectionBarTest {
         assertEquals(1, selectAll)
     }
 
+    /** Shows select all when not all visible selected. */
     @Test
     fun showsSelectAllWhenNotAllVisibleSelected() {
         var selectAll = 0
@@ -128,6 +131,7 @@ class ChatListSelectionBarTest {
         assertEquals(0, deselectAll)
     }
 
+    /** Shows deselect all when all visible selected. */
     @Test
     fun showsDeselectAllWhenAllVisibleSelected() {
         var selectAll = 0
@@ -169,6 +173,7 @@ class ChatListSelectionBarTest {
         assertEquals(1, deselectAll)
     }
 
+    /** Disables actions when nothing selected. */
     @Test
     fun disablesActionsWhenNothingSelected() {
         composeRule.setContent {
@@ -204,6 +209,7 @@ class ChatListSelectionBarTest {
         composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertIsNotEnabled()
     }
 
+    /** Single selection overflow routes mark read and mute. */
     @Test
     fun singleSelectionOverflowRoutesMarkReadAndMute() {
         var markRead = 0
@@ -249,6 +255,7 @@ class ChatListSelectionBarTest {
         assertEquals(1, muteToggle)
     }
 
+    /** Pinned selection offers unpin and manual moves. */
     @Test
     fun pinnedSelectionOffersUnpinAndManualMoves() {
         var pinToggles = 0
@@ -295,6 +302,7 @@ class ChatListSelectionBarTest {
         assertEquals(1, pinToggles)
     }
 
+    /** Multi selection overflow hides single chat actions. */
     @Test
     fun multiSelectionOverflowHidesSingleChatActions() {
         composeRule.setContent {
@@ -333,6 +341,7 @@ class ChatListSelectionBarTest {
         composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertIsDisplayed()
     }
 
+    /** Overflow routes add to folder for multi selection. */
     @Test
     fun overflowRoutesAddToFolderForMultiSelection() {
         var addToFolder = 0
@@ -371,6 +380,7 @@ class ChatListSelectionBarTest {
         assertEquals(1, addToFolder)
     }
 
+    /** Overflow shows add to folder for single selection. */
     @Test
     fun overflowShowsAddToFolderForSingleSelection() {
         var addToFolder = 0
@@ -410,6 +420,7 @@ class ChatListSelectionBarTest {
         assertEquals(1, addToFolder)
     }
 
+    /** Single selection shows unmute when muted. */
     @Test
     fun singleSelectionShowsUnmuteWhenMuted() {
         composeRule.setContent {

@@ -90,6 +90,7 @@ internal fun BugReportContent(
 ) {
     var openFailed by rememberSaveable { mutableStateOf(false) }
 
+    /** Opens the bug report, recording a failure to open. */
     fun openReport() {
         openFailed = !onOpenReport()
     }
@@ -196,10 +197,12 @@ internal fun AboutContent(
     var versionTaps by rememberSaveable(developerMode) { mutableIntStateOf(0) }
     var failure by rememberSaveable { mutableStateOf<AboutOpenFailure?>(null) }
 
+    /** Opens the licences, recording a failure to open. */
     fun showLicenses() {
         failure = if (onOpenLicenses()) null else AboutOpenFailure.Licenses
     }
 
+    /** Opens the privacy policy, recording a failure to open. */
     fun openPrivacy() {
         failure = if (onOpenPrivacy()) null else AboutOpenFailure.Privacy
     }

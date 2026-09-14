@@ -38,6 +38,7 @@ class ChatsNewMessageFabTest {
     private val app = chatOrganizationAppState(context)
     private var opens = 0
 
+    /** Configured keeps the existing new message callback and performance tag. */
     @Test fun configuredKeepsTheExistingNewMessageCallbackAndPerformanceTag() {
         show { chatOrganizationRelays(configured = true) }
         composeRule.onNodeWithContentDescription(context.getString(R.string.new_message)).assertIsDisplayed()
@@ -50,12 +51,14 @@ class ChatsNewMessageFabTest {
         }
     }
 
+    /** Failed read does not invent a missing relay gate. */
     @Test fun failedReadDoesNotInventAMissingRelayGate() {
         show { error("local native fixture failure") }
         fab().performClick()
         assertEquals(1, opens)
     }
 
+    /** Known missing opens actual relays only after explicit tap. */
     @Test fun knownMissingOpensActualRelaysOnlyAfterExplicitTap() {
         show { chatOrganizationRelays(configured = false) }
         composeRule.onNodeWithContentDescription(context.getString(R.string.chats_check_relays)).assertIsDisplayed()
@@ -66,6 +69,7 @@ class ChatsNewMessageFabTest {
         assertEquals(0, opens)
     }
 
+    /** Old account result cannot change the new accounts fab. */
     @Test fun oldAccountResultCannotChangeTheNewAccountsFab() {
         val held = CompletableDeferred<AccountRelayListsFfi?>()
         show { if (it == "alice") held.await() else awaitCancellation() }
@@ -76,6 +80,7 @@ class ChatsNewMessageFabTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.chats_check_relays)).assertDoesNotExist()
     }
 
+    /** Captured callback cannot open after same frame account replacement. */
     @Test fun capturedCallbackCannotOpenAfterSameFrameAccountReplacement() {
         show { null }
         val action =
@@ -90,6 +95,7 @@ class ChatsNewMessageFabTest {
         assertEquals(0, opens)
     }
 
+    /** Captured callback cannot open during wipe. */
     @Test fun capturedCallbackCannotOpenDuringWipe() {
         show { null }
         val action =
@@ -104,6 +110,7 @@ class ChatsNewMessageFabTest {
         assertEquals(0, opens)
     }
 
+    /** Unavailable unsafe and missing publication follow actual inbox evidence. */
     @Test fun unavailableUnsafeAndMissingPublicationFollowActualInboxEvidence() {
         assertFalse(chatsFabNeedsRelays(null))
         assertFalse(chatsFabNeedsRelays(chatOrganizationRelays(true)))
@@ -122,6 +129,7 @@ class ChatsNewMessageFabTest {
         )
     }
 
+    /** The FAB node under test. */
     private fun fab() =
         composeRule.onNode(
             hasClickAction() and (
@@ -130,6 +138,7 @@ class ChatsNewMessageFabTest {
             ),
         )
 
+    /** Shows the surface under test. */
     private fun show(load: suspend (String) -> AccountRelayListsFfi?) {
         composeRule.setContent { WhiteNoiseTheme { ChatsNewMessageFab(app, { opens++ }, load) } }
     }

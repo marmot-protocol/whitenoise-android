@@ -39,6 +39,7 @@ class ChatRowAdaptiveLayoutTest {
     private val nowText by lazy { context.getString(R.string.relative_time_now) }
     private val timestampAt = (System.currentTimeMillis() / 1_000L).toULong()
 
+    /** Normal density uses compact row height. */
     @Test
     fun normalDensityUsesCompactRowHeight() {
         render()

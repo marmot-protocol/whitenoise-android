@@ -25,6 +25,7 @@ import org.robolectric.annotation.Config
 class ProfileSwitcherContentBehaviorTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Inactive counts cap and manual unread remain independent. */
     @Test fun inactiveCountsCapAndManualUnreadRemainIndependent() {
         render()
         composeRule.onNodeWithTag("profile_switcher.profile.a").assertIsSelected()
@@ -38,6 +39,7 @@ class ProfileSwitcherContentBehaviorTest {
             ).assertExists()
     }
 
+    /** Each profile and pinned destination invokes its own callback. */
     @Test fun eachProfileAndPinnedDestinationInvokesItsOwnCallback() {
         val selected = mutableListOf<String>()
         var adds = 0
@@ -52,6 +54,7 @@ class ProfileSwitcherContentBehaviorTest {
         assertEquals(1, settings)
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         onSelect: (String) -> Unit = {},
         onAdd: () -> Unit = {},

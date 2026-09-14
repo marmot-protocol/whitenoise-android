@@ -69,6 +69,7 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
         AvatarImageLoader.resetProfileImageFetcherForTests()
     }
 
+    /** Locally seeded active and other account profiles own first frame. */
     @Test
     @Suppress("LongMethod") // Keep cached seed, first header and real selector checks in one ordered flow.
     fun locallySeededActiveAndOtherAccountProfilesOwnFirstFrame() =
@@ -130,16 +131,19 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
                 .captureRoboImage("src/test/snapshots/account_switch_seeded_profiles_selector_light.png")
         }
 
+    /** All account targets remain reachable in selector ltr. */
     @Test
     fun allAccountTargetsRemainReachableInSelectorLtr() {
         captureAllAccountTargets(LayoutDirection.Ltr, "account_switch_overlapping_targets_ltr.png")
     }
 
+    /** All account targets remain reachable in selector rtl. */
     @Test
     fun allAccountTargetsRemainReachableInSelectorRtl() {
         captureAllAccountTargets(LayoutDirection.Rtl, "account_switch_overlapping_targets_rtl.png")
     }
 
+    /** Records one baseline per account target. */
     @Suppress("LongMethod") // Keep both directions on the same real header-to-selector route.
     private fun captureAllAccountTargets(
         layoutDirection: LayoutDirection,
@@ -204,6 +208,7 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
             .captureRoboImage("src/test/snapshots/$snapshotName")
     }
 
+    /** Test tag of a profile row. */
     private fun profileRowTag(label: String): String = "profile_switcher.profile.$label"
 
     private fun appState(

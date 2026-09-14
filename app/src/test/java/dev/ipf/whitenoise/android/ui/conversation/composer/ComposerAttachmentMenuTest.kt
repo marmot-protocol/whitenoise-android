@@ -23,6 +23,7 @@ import org.robolectric.annotation.GraphicsMode
 class ComposerAttachmentMenuTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Native command surface matches prototype and retains additional sources. */
     @Test
     fun nativeCommandSurfaceMatchesPrototypeAndRetainsAdditionalSources() {
         composeRule.setContent {
@@ -46,6 +47,7 @@ class ComposerAttachmentMenuTest {
             .captureRoboImage("src/test/snapshots/composer_attachment_menu.png")
     }
 
+    /** Menu has ten pixel gap and uses below fallback when needed. */
     @Test
     fun menuHasTenPixelGapAndUsesBelowFallbackWhenNeeded() {
         val source = IntRect(16, 700, 56, 748)

@@ -93,6 +93,7 @@ class MediaViewerMessageActionsTest {
         assertEquals(listOf(page), delivered)
     }
 
+    /** Builds a list item fixture. */
     private fun item(): TimelineMessage {
         val record =
             AppMessageRecordFfi(
@@ -113,6 +114,7 @@ class MediaViewerMessageActionsTest {
         return TimelineMessage("album", record, MessageStatus.Received)
     }
 
+    /** Builds a media reference fixture. */
     private fun reference(name: String) =
         MediaAttachmentReferenceFfi(
             locators = listOf(MediaLocatorFfi("blossom-v1", "https://media.example/blob")),

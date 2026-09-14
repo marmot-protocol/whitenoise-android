@@ -7,6 +7,7 @@ import java.io.File
 
 /** Guards the shared recipient paste boundary across its intended surfaces. */
 class RecipientPasteConsumerWiringTest {
+    /** All recipient surfaces route through the shared paste policy. */
     @Test
     fun allRecipientSurfacesRouteThroughTheSharedPastePolicy() {
         val newChat = source("ui/chats/newchat/NewChatFlow.kt")

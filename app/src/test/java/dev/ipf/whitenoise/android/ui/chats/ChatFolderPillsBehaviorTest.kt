@@ -26,6 +26,7 @@ import org.robolectric.annotation.Config
 class ChatFolderPillsBehaviorTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Initially selected distant folder is revealed and explicit chats resets selection. */
     @Test fun initiallySelectedDistantFolderIsRevealedAndExplicitChatsResetsSelection() {
         var selected by mutableStateOf<String?>("folder-9")
         var selections = 0
@@ -51,10 +52,12 @@ class ChatFolderPillsBehaviorTest {
         assertEquals(1, selections)
     }
 
+    /** Selected folder is revealed in rtl. */
     @Test
     @Config(sdk = [36], qualifiers = "ar-ldrtl-w360dp-h780dp-mdpi")
     fun selectedFolderIsRevealedInRtl() = initiallySelectedDistantFolderIsRevealedAndExplicitChatsResetsSelection()
 
+    /** Reordered selected folder remains visible and retap does not toggle off. */
     @Test fun reorderedSelectedFolderRemainsVisibleAndRetapDoesNotToggleOff() {
         var chips by mutableStateOf(folders())
         var selected by mutableStateOf<String?>("folder-1")
@@ -70,6 +73,7 @@ class ChatFolderPillsBehaviorTest {
         assertEquals("folder-1", selected)
     }
 
+    /** Current edit and manage callbacks keep exact folder selection. */
     @Test fun currentEditAndManageCallbacksKeepExactFolderSelection() {
         var latest by mutableStateOf(false)
         var selected: String? = "folder-0"
@@ -99,5 +103,6 @@ class ChatFolderPillsBehaviorTest {
         assertEquals("folder-0", selected)
     }
 
+    /** Builds the folder fixtures. */
     private fun folders() = (0..9).map { ChatFolderChipModel("folder-$it", null, "Folder $it long label", it) }
 }

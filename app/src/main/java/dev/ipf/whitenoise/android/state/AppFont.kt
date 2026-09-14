@@ -18,6 +18,7 @@ enum class AppFont(
     ;
 
     companion object {
+        /** Resolves a stored preference value to its font, defaulting to the system face. */
         fun fromPreference(value: String?): AppFont = entries.firstOrNull { it.preferenceValue == value } ?: System
     }
 }

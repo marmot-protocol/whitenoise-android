@@ -25,6 +25,7 @@ import org.robolectric.annotation.Config
 class ChatsProfileSwitcherFlowTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Several profiles open the sheet and settings closes it without changing identity. */
     @Test fun severalProfilesOpenTheSheetAndSettingsClosesItWithoutChangingIdentity() {
         var settings = 0
         val app = render { settings++ }
@@ -38,6 +39,7 @@ class ChatsProfileSwitcherFlowTest {
         assertEquals("a", app.activeAccountRef)
     }
 
+    /** Add profile closes selector and opens existing native add identity sheet. */
     @Test fun addProfileClosesSelectorAndOpensExistingNativeAddIdentitySheet() {
         val app = render {}
         composeRule.onNodeWithTag("chats.switchProfile").performClick()
@@ -49,6 +51,7 @@ class ChatsProfileSwitcherFlowTest {
         assertEquals("a", app.activeAccountRef)
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(onSettings: () -> Unit): WhiteNoiseAppState {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val prefs = context.getSharedPreferences("profile-switcher-header-test", Context.MODE_PRIVATE)

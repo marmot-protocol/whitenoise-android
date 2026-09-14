@@ -138,6 +138,7 @@ class QrScannerTorchTest {
 
     /** Implement only the CameraX interfaces invoked by this owner; no app state is fabricated. */
     private companion object {
+        /** Proxy. */
         inline fun <reified T> proxy(crossinline result: (String, Array<out Any?>?) -> Any?): T =
             Proxy.newProxyInstance(T::class.java.classLoader, arrayOf(T::class.java)) { instance, method, args ->
                 when (method.name) {
@@ -154,6 +155,7 @@ class QrScannerTorchTest {
         private var done = false
         private var failure: Throwable? = null
 
+        /** Adds listener. */
         override fun addListener(
             listener: Runnable,
             executor: Executor,
@@ -161,7 +163,7 @@ class QrScannerTorchTest {
             if (done) executor.execute(listener) else listeners += listener to executor
         }
 
-        /** Deliver one real Future completion to the CameraX-facing owner. */
+        /** Delivers one real Future completion to the CameraX-facing owner. */
         fun complete(error: Throwable? = null) {
             failure = error
             done = true
@@ -169,18 +171,23 @@ class QrScannerTorchTest {
             listeners.clear()
         }
 
+        /** Fake operation: cancels. */
         override fun cancel(mayInterruptIfRunning: Boolean) = false
 
+        /** Is cancelled. */
         override fun isCancelled() = false
 
+        /** Is done. */
         override fun isDone() = done
 
+        /** Fake preferences: reads one key. */
         override fun get(): Void? {
             check(done)
             failure?.let { throw ExecutionException(it) }
             return null
         }
 
+        /** Fake preferences: reads one key. */
         override fun get(
             timeout: Long,
             unit: TimeUnit,

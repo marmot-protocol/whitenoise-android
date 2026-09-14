@@ -5,6 +5,7 @@ import org.junit.Test
 import java.io.File
 
 class ChatsScreenSelectionActionsCoverageTest {
+    /** Single selection overflow wires mark read. */
     @Test
     fun singleSelectionOverflowWiresMarkRead() {
         val source = chatsScreenSource().readText()
@@ -53,6 +54,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
     }
 
+    /** Single selection overflow wires mute. */
     @Test
     fun singleSelectionOverflowWiresMute() {
         val source = chatsScreenSource().readText()
@@ -84,6 +86,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         assertTrue("mute overflow must exit selection mode", "clearSelection()" in muteHelper)
     }
 
+    /** Single selection overflow wires pin and manual order. */
     @Test
     fun singleSelectionOverflowWiresPinAndManualOrder() {
         val source = chatsScreenSource().readText()
@@ -141,6 +144,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
     }
 
+    /** Long press sheet reuses pin and manual order mutations. */
     @Test
     fun longPressSheetReusesPinAndManualOrderMutations() {
         val source = chatsScreenSource().readText()
@@ -163,6 +167,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
     }
 
+    /** Selection bar wires add to folder picker and create handoff. */
     @Test
     fun selectionBarWiresAddToFolderPickerAndCreateHandoff() {
         val source = chatsScreenSource().readText()

@@ -106,6 +106,7 @@ internal fun ReactionPillRow(
     }
 }
 
+/** One reaction pill in the row. */
 @Suppress("LongParameterList", "FunctionNaming")
 @Composable
 private fun ReactionPillItem(

@@ -56,6 +56,7 @@ internal fun ChatsNewMessageFab(
     var active by remember(appState, account, runtime) { mutableStateOf(true) }
     DisposableEffect(appState, account, runtime) { onDispose { active = false } }
 
+    /** True while the FAB still belongs to the account and runtime that composed it. */
     fun current(): Boolean {
         val sameOwner = account != null && appState.activeAccountRef == account && appState.runtimeGeneration == runtime
         val available =

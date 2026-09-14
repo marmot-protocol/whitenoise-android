@@ -35,6 +35,7 @@ class ProfileSheetEntryPointTest {
 
     private val app: Application = ApplicationProvider.getApplicationContext()
 
+    /** Unknown follow state leaves the quick action disabled. */
     @Test
     fun unknownFollowStateLeavesTheQuickActionDisabled() {
         renderProfile { it.presentProfile(TARGET_NPROFILE) }

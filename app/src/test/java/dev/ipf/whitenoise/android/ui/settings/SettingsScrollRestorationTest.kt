@@ -83,6 +83,7 @@ class SettingsScrollRestorationTest {
         assertRestoredHelpBounds(originalBounds)
     }
 
+    /** Diagnostics and multi level details preserve the settings viewport. */
     @Test
     fun diagnosticsAndMultiLevelDetailsPreserveTheSettingsViewport() {
         var detail by mutableStateOf<SettingsDetail?>(null)
@@ -134,6 +135,7 @@ class SettingsScrollRestorationTest {
         assertRestoredBounds(context.getString(R.string.settings_developer_tools), developerBounds)
     }
 
+    /** About developer diagnostics preserves the settings viewport. */
     @Test
     fun aboutDeveloperDiagnosticsPreservesTheSettingsViewport() {
         var detail by mutableStateOf<SettingsDetail?>(null)
@@ -180,6 +182,7 @@ class SettingsScrollRestorationTest {
         assertRestoredHelpBounds(helpBounds)
     }
 
+    /** A new settings visit starts at the top. */
     @Test
     fun aNewSettingsVisitStartsAtTheTop() {
         var showSettings by mutableStateOf(true)
@@ -196,6 +199,7 @@ class SettingsScrollRestorationTest {
         composeRule.onNodeWithText(context.getString(R.string.profile)).fetchSemanticsNode()
     }
 
+    /** Keyed section wins when the section set changes. */
     @Test
     fun keyedSectionWinsWhenTheSectionSetChanges() {
         val viewport =
@@ -237,6 +241,7 @@ class SettingsScrollRestorationTest {
         }
     }
 
+    /** Mounts settings. */
     private fun mountSettings(
         restorationTester: StateRestorationTester? = null,
         showSettings: () -> Boolean = { true },
@@ -273,6 +278,7 @@ class SettingsScrollRestorationTest {
         }
     }
 
+    /** Scrolls to and open help. */
     private fun scrollToAndOpenHelp(): Rect = scrollToAndOpen(help)
 
     /** Scrolls the home list to [label], records where that row sits, and opens it. */
@@ -285,6 +291,7 @@ class SettingsScrollRestorationTest {
         return bounds
     }
 
+    /** Asserts restored help bounds. */
     private fun assertRestoredHelpBounds(expected: Rect) = assertRestoredBounds(help, expected)
 
     /** The home list is restored when [label] sits within a pixel of where it was left. */

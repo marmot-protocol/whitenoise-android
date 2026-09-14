@@ -7,6 +7,7 @@ import org.junit.Test
 import java.io.File
 
 class TtsAutoReadWiringCoverageTest {
+    /** Text to speech screen wires global default to app state. */
     @Test
     fun textToSpeechScreenWiresGlobalDefaultToAppState() {
         val body = source("ui/settings/TextToSpeechScreen.kt").functionBody("TextToSpeechScreen")

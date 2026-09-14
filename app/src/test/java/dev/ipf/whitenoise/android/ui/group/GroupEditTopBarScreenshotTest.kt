@@ -20,6 +20,7 @@ class GroupEditTopBarScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Descriptive title light. */
     @Test
     fun descriptiveTitleLight() {
         composeRule.setContent {

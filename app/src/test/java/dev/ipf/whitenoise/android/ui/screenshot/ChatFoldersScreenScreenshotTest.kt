@@ -104,6 +104,7 @@ class ChatFoldersScreenScreenshotTest {
         }
     }
 
+    /** Builds a preview state fixture. */
     private fun previewState() =
         chatFoldersState(
             folders =

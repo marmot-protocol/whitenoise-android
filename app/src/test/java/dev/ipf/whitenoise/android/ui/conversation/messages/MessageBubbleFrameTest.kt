@@ -123,6 +123,7 @@ class MessageBubbleFrameTest {
         composeRule.onNodeWithTag(HIGHLIGHTED_MEDIA_TAG).assertIsDisplayed()
     }
 
+    /** Saved custom color does not override neutral amoled reply accents. */
     @Test
     fun savedCustomColorDoesNotOverrideNeutralAmoledReplyAccents() {
         val presentation = customAmoledPresentation()
@@ -145,6 +146,7 @@ class MessageBubbleFrameTest {
         )
     }
 
+    /** Saved custom color keeps neutral black amoled caption plain and reply content. */
     @Test
     fun savedCustomColorKeepsNeutralBlackAmoledCaptionPlainAndReplyContent() {
         val captionContentArgb = AtomicInteger()
@@ -304,6 +306,7 @@ class MessageBubbleFrameTest {
         }
     }
 
+    /** Custom amoled presentation. */
     private fun customAmoledPresentation(
         mine: Boolean = false,
         customArgb: Long? = CUSTOM_BACKGROUND,
@@ -325,6 +328,7 @@ class MessageBubbleFrameTest {
                 ),
         )
 
+    /** Media caption shares the media envelope width. */
     @Test
     fun mediaCaptionSharesTheMediaEnvelopeWidth() {
         composeRule.setContent {
@@ -402,6 +406,7 @@ class MessageBubbleFrameTest {
         }
     }
 
+    /** Non reply footer keeps natural width. */
     @Test
     fun nonReplyFooterKeepsNaturalWidth() {
         composeRule.setContent {
@@ -427,6 +432,7 @@ class MessageBubbleFrameTest {
         }
     }
 
+    /** Plain text frame uses twelve by eight insets. */
     @Test
     fun plainTextFrameUsesTwelveByEightInsets() {
         composeRule.setContent {

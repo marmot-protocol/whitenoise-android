@@ -55,6 +55,7 @@ class KeyboardPreservingBottomSheetCoverageTest {
         assertFalse("the forward flow should not use a draggable sheet", "ModalBottomSheet(" in body)
     }
 
+    /** The AppSheets source file under either working directory. */
     private fun appSheetsSource(): File = source("ui/design/AppSheets.kt")
 
     private fun forwardPickerSource(): File = source("ui/conversation/messages/ForwardMessagePicker.kt")

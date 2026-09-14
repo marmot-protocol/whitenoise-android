@@ -81,6 +81,7 @@ class GroupEditScreenTitleTest {
         }
     }
 
+    /** Edit screen delegates to its settings frame. */
     @Test
     fun editScreenDelegatesToItsSettingsFrame() {
         val screenBody = functionBody("GroupEditScreen")
@@ -90,6 +91,7 @@ class GroupEditScreenTitleTest {
         )
     }
 
+    /** Group edit frame uses dedicated title. */
     @Test
     fun groupEditFrameUsesDedicatedTitle() {
         val topBarBody = functionBody("GroupEditScaffold")
@@ -106,6 +108,7 @@ class GroupEditScreenTitleTest {
         )
     }
 
+    /** Body of the named function in the source under test. */
     private fun functionBody(functionName: String): String {
         val text = sourceFile.readText()
         // Strip comments so a commented-out reference cannot satisfy the check.

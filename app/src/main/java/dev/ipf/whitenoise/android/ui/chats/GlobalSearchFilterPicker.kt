@@ -32,6 +32,7 @@ internal const val CHAT_LIST_SEARCH_FILTER_DIALOG_TAG = "chat-list-search-filter
 internal const val CHAT_LIST_SEARCH_FILTER_SEARCH_TAG = "global.filterSearch"
 internal const val CHAT_LIST_SEARCH_FILTER_CHOICE_PREFIX = "global.choice"
 
+/** Stable test tag for a check row in a filter picker. */
 internal fun globalSearchFilterOptionTag(id: String): String = "chat-list-search-filter-option-$id"
 
 internal data class GlobalSearchFolderOption(
@@ -102,6 +103,7 @@ internal fun GlobalSearchFilterPicker(
     }
 }
 
+/** Check dialog over the account's folders, or the no-folders note. */
 @Composable
 private fun GlobalSearchFolderPicker(
     state: GlobalSearchState,
@@ -124,6 +126,7 @@ private fun GlobalSearchFolderPicker(
     }
 }
 
+/** Check dialog over the two prototype chat types. */
 @Composable
 private fun GlobalSearchChatTypePicker(
     state: GlobalSearchState,
@@ -164,6 +167,7 @@ private fun GlobalSearchEntityPicker(
     )
 }
 
+/** The existing date dialog, applying the selection and closing the picker in one transition. */
 @Composable
 private fun GlobalSearchDatePicker(
     state: GlobalSearchState,
@@ -217,6 +221,7 @@ private fun GlobalSearchCheckDialog(
     )
 }
 
+/** One tagged check row inside a filter dialog. */
 @Composable
 private fun GlobalSearchCheckRow(
     label: String,

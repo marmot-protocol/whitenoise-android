@@ -45,6 +45,7 @@ class VoiceReviewComposerScreenshotTest {
     @get:Rule val rule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    /** Voice review light preserves all four actions. */
     @Test
     fun voiceReviewLightPreservesAllFourActions() {
         val actions = mutableListOf<String>()
@@ -59,6 +60,7 @@ class VoiceReviewComposerScreenshotTest {
         assertEquals(listOf("play", "discard", "recordAgain", "send"), actions)
     }
 
+    /** Voice review narrow large rtl amoled keeps playback and send readable. */
     @Test
     fun voiceReviewNarrowLargeRtlAmoledKeepsPlaybackAndSendReadable() {
         val actions = mutableListOf<String>()

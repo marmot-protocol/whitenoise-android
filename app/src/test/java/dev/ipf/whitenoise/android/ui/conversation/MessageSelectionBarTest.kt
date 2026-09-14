@@ -26,6 +26,7 @@ class MessageSelectionBarTest {
 
     private fun string(res: Int): String = ApplicationProvider.getApplicationContext<android.content.Context>().getString(res)
 
+    /** Plural. */
     private fun plural(
         res: Int,
         quantity: Int,
@@ -36,6 +37,7 @@ class MessageSelectionBarTest {
             .resources
             .getQuantityString(res, quantity, *args)
 
+    /** Shows prototype title and retains selected count state. */
     @Test
     fun showsPrototypeTitleAndRetainsSelectedCountState() {
         var closes = 0

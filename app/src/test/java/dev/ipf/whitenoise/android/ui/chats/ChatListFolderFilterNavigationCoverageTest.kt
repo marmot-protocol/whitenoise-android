@@ -125,6 +125,7 @@ class ChatListFolderFilterNavigationCoverageTest {
         )
     }
 
+    /** Chats screen source. */
     private fun chatsScreenSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt"),
@@ -132,6 +133,7 @@ class ChatListFolderFilterNavigationCoverageTest {
         ).firstOrNull { it.exists() }
             ?: error("Missing ChatsScreen.kt source file")
 
+    /** The MainShell source file under either working directory. */
     private fun mainShellSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),
@@ -139,6 +141,7 @@ class ChatListFolderFilterNavigationCoverageTest {
         ).firstOrNull { it.exists() }
             ?: error("Missing MainShell.kt source file")
 
+    /** The ChatFolderPills source file under either working directory. */
     private fun chatFolderPillsSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt"),

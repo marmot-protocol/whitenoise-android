@@ -104,6 +104,7 @@ internal fun GroupDisbandConfirmDialog(
     )
 }
 
+/** Leading glyph of a disband row: progress while in flight, else the delete glyph. */
 @Composable
 private fun DisbandLeading(
     inProgress: Boolean,

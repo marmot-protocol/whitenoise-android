@@ -60,6 +60,7 @@ class ProfileImageActionsDeliveryTest {
     @Test
     fun filesReturnAfterEditingCanceledIsIgnored() = exercise(Source.Files, Transition.CancelEdit)
 
+    /** Exercise. */
     private fun exercise(
         source: Source,
         transition: Transition,
@@ -134,6 +135,7 @@ class ProfileImageActionsDeliveryTest {
             private set
         private var requestCode: Int? = null
 
+        /** Records the launched request. */
         override fun <I, O> onLaunch(
             requestCode: Int,
             contract: ActivityResultContract<I, O>,
@@ -145,6 +147,7 @@ class ProfileImageActionsDeliveryTest {
             launchCount++
         }
 
+        /** Delivers a fake result to the subject. */
         fun deliver(uri: Uri) {
             assertTrue(dispatchResult(requireNotNull(requestCode), uri))
         }

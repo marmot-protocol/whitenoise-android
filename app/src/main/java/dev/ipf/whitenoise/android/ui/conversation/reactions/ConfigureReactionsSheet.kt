@@ -104,6 +104,7 @@ internal fun ConfigureReactionsSheet(
     }
 }
 
+/** One editable quick-reaction slot. */
 @Composable
 private fun ReactionSlot(
     index: Int,

@@ -5,6 +5,7 @@ import org.junit.Test
 import java.io.File
 
 class ChatListBodySearchKeyTest {
+    /** Body search effect keys on stable group ids not live source list identity. */
     @Test
     fun bodySearchEffectKeysOnStableGroupIdsNotLiveSourceListIdentity() {
         val source = chatsScreenSource().readText()
@@ -50,6 +51,7 @@ class ChatListBodySearchKeyTest {
         )
     }
 
+    /** Prototype filters run client side over the scoped list and constrained body search. */
     @Test
     fun prototypeFiltersRunClientSideOverTheScopedListAndConstrainedBodySearch() {
         val source = chatsScreenSource().readText()

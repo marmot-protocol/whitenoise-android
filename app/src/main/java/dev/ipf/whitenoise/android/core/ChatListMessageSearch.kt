@@ -202,6 +202,10 @@ object ChatListMessageSearch {
         constraints: MessageSearchConstraints? = null,
     ): SearchableRecord? = records.firstOrNull { record -> isEligibleMatch(record, ciNeedle, constraints) }
 
+    /**
+     * A row counts when it is a searchable body kind, satisfies the needle (or carries content without one) and
+     * the filters.
+     */
     private fun isEligibleMatch(
         record: SearchableRecord,
         ciNeedle: String,
@@ -285,6 +289,7 @@ data class MessageSearchConstraints(
     val isActive: Boolean
         get() = senderIds.isNotEmpty() || dateBounds != null || contentKinds.isNotEmpty()
 
+    /** AND across the sender, date and content categories; OR within each. */
     fun matches(record: ChatListMessageSearch.SearchableRecord): Boolean =
         (senderIds.isEmpty() || record.sender.lowercase(Locale.ROOT) in senderIds) &&
             (dateBounds == null || dateBounds.containsUnixSeconds(record.timelineAt)) &&
@@ -293,6 +298,7 @@ data class MessageSearchConstraints(
                     messageSearchContentKinds(record.plaintext, record.mediaTypes).any { it in contentKinds }
             )
 
+    /** Whether a unix-second timeline stamp falls inside these millisecond bounds. */
     private fun GlobalSearchEpochBounds.containsUnixSeconds(seconds: ULong): Boolean {
         val millis = seconds.toLong() * MILLIS_PER_SECOND
         return millis >= startEpochMillisInclusive && millis < endEpochMillisExclusive

@@ -109,6 +109,7 @@ class GlobalSearchFilterScreenshotTest {
             .captureRoboImage("src/test/snapshots/global_search_date_filter_reversed_error_rtl_large_font_light.png")
     }
 
+    /** Content filter dialog selected dark. */
     @Test
     fun contentFilterDialogSelectedDark() {
         renderFilterPicker(
@@ -131,6 +132,7 @@ class GlobalSearchFilterScreenshotTest {
             .captureRoboImage("src/test/snapshots/global_search_content_filter_dialog_selected_dark.png")
     }
 
+    /** Folder filter dialog light. */
     @Test
     fun folderFilterDialogLight() {
         renderFilterPicker(
@@ -173,6 +175,7 @@ class GlobalSearchFilterScreenshotTest {
             .captureRoboImage("src/test/snapshots/global_search_content_filter_selected_dark.png")
     }
 
+    /** Renders date dialog. */
     private fun renderDateDialog(
         selection: GlobalSearchDateFilterSelection = GlobalSearchDateFilterSelection.AnyTime,
         customStage: GlobalSearchDateCustomStage? = null,
@@ -209,6 +212,7 @@ class GlobalSearchFilterScreenshotTest {
         }
     }
 
+    /** Renders filter picker. */
     private fun renderFilterPicker(
         state: GlobalSearchState,
         options: GlobalSearchFilterOptions = GlobalSearchFilterOptions(),

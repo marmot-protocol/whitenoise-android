@@ -90,6 +90,7 @@ internal fun TtsTransportBar(
     )
 }
 
+/** Transport bar body: preview, rate, history edges and the playback controls. */
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 internal fun TtsTransportBarContent(
@@ -217,6 +218,8 @@ internal fun TtsTransportBarContent(
 
 // Compact status line for a pending or failed history edge load, announced
 // politely so TalkBack narrates the state change without stealing focus.
+
+/** Status line for the history edge being loaded or exhausted. */
 @Suppress("FunctionNaming")
 @Composable
 private fun HistoryEdgeStatus(historyEdge: TtsHistoryEdgeState?) {
@@ -243,6 +246,7 @@ private fun HistoryEdgeStatus(historyEdge: TtsHistoryEdgeState?) {
     )
 }
 
+/** Current passage preview with its preparing and error states. */
 @Suppress("FunctionNaming")
 @Composable
 private fun TtsTransportPreview(

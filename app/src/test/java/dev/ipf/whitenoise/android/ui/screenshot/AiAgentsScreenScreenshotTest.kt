@@ -48,6 +48,7 @@ class AiAgentsScreenScreenshotTest {
     @Test
     fun aiAgentsSetupSheetDark() = captureSheet("ai_agents_setup_sheet_dark", dark = true, amoled = false)
 
+    /** Renders the fixture and records its screenshot baseline. */
     private fun capture(
         name: String,
         dark: Boolean,
@@ -58,6 +59,7 @@ class AiAgentsScreenScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 
+    /** Captures sheet. */
     private fun captureSheet(
         name: String,
         dark: Boolean,
@@ -70,6 +72,7 @@ class AiAgentsScreenScreenshotTest {
         composeRule.onNodeWithTag("sheet.surface").captureRoboImage("src/test/snapshots/$name.png")
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         dark: Boolean,
         amoled: Boolean,

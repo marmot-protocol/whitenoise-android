@@ -84,6 +84,7 @@ class ComposerExpansionBehaviorTest {
 
     private val app = ApplicationProvider.getApplicationContext<android.app.Application>()
 
+    /** Expand and collapse keep the same editor draft. */
     @Test
     fun expandAndCollapseKeepTheSameEditorDraft() {
         val draft = longDraft()
@@ -120,6 +121,7 @@ class ComposerExpansionBehaviorTest {
         composeRule.onNodeWithText(draft).assertExists()
     }
 
+    /** Tap full screen and collapse animate height monotonically. */
     @Test
     fun tapFullScreenAndCollapseAnimateHeightMonotonically() {
         val draft = longDraft()
@@ -214,6 +216,7 @@ class ComposerExpansionBehaviorTest {
         }
     }
 
+    /** Multiline controls share the bottom edge in reading order. */
     @Test
     fun multilineControlsShareTheBottomEdgeInReadingOrder() {
         render(longDraft())
@@ -284,6 +287,7 @@ class ComposerExpansionBehaviorTest {
             .assertDoesNotExist()
     }
 
+    /** Line thresholds animate monotonically and preserve focus draft and selection. */
     @Test
     fun lineThresholdsAnimateMonotonicallyAndPreserveFocusDraftAndSelection() {
         val twoLines = "First line\nSecond line"
@@ -351,6 +355,7 @@ class ComposerExpansionBehaviorTest {
         )
     }
 
+    /** One to two line growth keeps text inside the composer on every frame. */
     @Test
     fun oneToTwoLineGrowthKeepsTextInsideTheComposerOnEveryFrame() {
         val oneLine = "First line"
@@ -547,6 +552,7 @@ class ComposerExpansionBehaviorTest {
         assertEditorState(editor, expanded, TextRange(expanded.length))
     }
 
+    /** Wide threshold keeps editor and pill anchored on every frame. */
     @Test
     fun wideThresholdKeepsEditorAndPillAnchoredOnEveryFrame() {
         val twoLines = "First line\nSecond line"
@@ -596,6 +602,7 @@ class ComposerExpansionBehaviorTest {
         assertEditorState(editor, "$twoLines\nThird line", TextRange("$twoLines\nThird line".length))
     }
 
+    /** Threshold draft with dictation and attachments settles without layout oscillation. */
     @Test
     fun thresholdDraftWithDictationAndAttachmentsSettlesWithoutLayoutOscillation() {
         val draft = "#938 close as done\nwin obtained\nthird line"
@@ -637,6 +644,7 @@ class ComposerExpansionBehaviorTest {
         resizeHandle().assertDoesNotExist()
     }
 
+    /** Automatic growth stops near half of the available viewport. */
     @Test
     fun automaticGrowthStopsNearHalfOfTheAvailableViewport() {
         render((1..40).joinToString("\n") { "Draft line $it" })
@@ -652,6 +660,7 @@ class ComposerExpansionBehaviorTest {
         assertTrue("automatic growth should preserve roughly half the viewport", height <= 360f)
     }
 
+    /** Upward fling settles at the full screen endpoint. */
     @Test
     fun upwardFlingSettlesAtTheFullScreenEndpoint() {
         render(longDraft())
@@ -677,6 +686,7 @@ class ComposerExpansionBehaviorTest {
         composeRule.onNodeWithText(longDraft()).assertExists()
     }
 
+    /** Downward drag keeps the current drafts compact endpoint. */
     @Test
     fun downwardDragKeepsTheCurrentDraftsCompactEndpoint() {
         val draft = (1..40).joinToString("\n") { "Draft line $it" }
@@ -699,6 +709,7 @@ class ComposerExpansionBehaviorTest {
         composeRule.onNodeWithText(draft).assertExists()
     }
 
+    /** Shrunk long draft can scroll back toward its first line. */
     @Test
     fun shrunkLongDraftCanScrollBackTowardItsFirstLine() {
         val draft = (1..40).joinToString("\n") { "Draft line $it" }
@@ -739,8 +750,10 @@ class ComposerExpansionBehaviorTest {
         assertEditorState(editor, draft, TextRange(draft.length))
     }
 
+    /** Pill surface. */
     private fun pillSurface() = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
 
+    /** Mouse wheel scrolls the shrunk editor without resizing it. */
     @Test
     fun mouseWheelScrollsTheShrunkEditorWithoutResizingIt() {
         val draft = (1..40).joinToString("\n") { "Draft line $it" }
@@ -804,6 +817,7 @@ class ComposerExpansionBehaviorTest {
         assertEquals("drag selection must not change the draft", draft, editorText(editor))
     }
 
+    /** Shrunk editor scrolls both ways without resizing or editing the draft. */
     @Test
     fun shrunkEditorScrollsBothWaysWithoutResizingOrEditingTheDraft() {
         val draft = (1..40).joinToString("\n") { "Draft line $it" }
@@ -833,6 +847,7 @@ class ComposerExpansionBehaviorTest {
         assertEquals("user scrolling must not change the draft", draft, editorText(editor))
     }
 
+    /** Accessibility scroll action moves the shrunk editor viewport. */
     @Test
     fun accessibilityScrollActionMovesTheShrunkEditorViewport() {
         val draft = (1..40).joinToString("\n") { "Draft line $it" }
@@ -894,6 +909,7 @@ class ComposerExpansionBehaviorTest {
         assertTrue(editorScrollValue() > 0f)
     }
 
+    /** Editing after a reading scroll restores caret following. */
     @Test
     fun editingAfterAReadingScrollRestoresCaretFollowing() {
         val draft = (1..40).joinToString("\n") { "Draft line $it" }
@@ -929,12 +945,14 @@ class ComposerExpansionBehaviorTest {
         assertTrue(editorText(editor).endsWith("!"))
     }
 
+    /** Editor text. */
     private fun editorText(editor: androidx.compose.ui.test.SemanticsNodeInteraction): String =
         editor
             .fetchSemanticsNode()
             .config[SemanticsProperties.EditableText]
             .text
 
+    /** Editor scroll value. */
     private fun editorScrollValue(): Float =
         composeRule
             .onNode(hasSetTextAction())
@@ -942,6 +960,7 @@ class ComposerExpansionBehaviorTest {
             .config[SemanticsProperties.VerticalScrollAxisRange]
             .value()
 
+    /** User selected expansion mode survives an orientation change. */
     @Test
     fun userSelectedExpansionModeSurvivesAnOrientationChange() {
         val draft = longDraft()
@@ -1020,6 +1039,7 @@ class ComposerExpansionBehaviorTest {
         }
     }
 
+    /** Full screen handle stays below and does not activate the top bar. */
     @Test
     fun fullScreenHandleStaysBelowAndDoesNotActivateTheTopBar() {
         var topBarClicks = 0
@@ -1042,6 +1062,7 @@ class ComposerExpansionBehaviorTest {
         assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
     }
 
+    /** First line center tap targets the editor without changing expansion. */
     @Test
     fun firstLineCenterTapTargetsTheEditorWithoutChangingExpansion() {
         val draft = longDraft()
@@ -1156,6 +1177,7 @@ class ComposerExpansionBehaviorTest {
         composeRule.waitForIdle()
     }
 
+    /** Builds an idle dictation controller fixture. */
     @Suppress("MaxLineLength")
     private fun idleDictationController(draft: TextFieldValue): ConversationDictationController =
         ConversationDictationController(
@@ -1163,12 +1185,16 @@ class ComposerExpansionBehaviorTest {
                 object : ConversationDictationPlatform {
                     override fun hasRecordAudioPermission() = true
 
+                    /** Recognition available. */
                     override fun recognitionAvailable() = true
 
+                    /** Fake recognizer: creates a session. */
                     override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession =
                         object : ConversationDictationRecognitionSession {
+                            /** Fake playback: starts. */
                             override fun start() = Unit
 
+                            /** Fake playback: stops. */
                             override fun stop() = Unit
 
                             override fun cancel() = Unit
@@ -1210,6 +1236,7 @@ class ComposerExpansionBehaviorTest {
             editor = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot,
         )
 
+    /** Asserts text fits inside pill. */
     private fun assertTextFitsInsidePill(geometry: ComposerGeometry) {
         assertTrue(
             "editor must stay inside the pill's leading edge",
@@ -1229,6 +1256,7 @@ class ComposerExpansionBehaviorTest {
         )
     }
 
+    /** Asserts expanded send inset. */
     private fun assertExpandedSendInset(layoutDirection: LayoutDirection) {
         val surface =
             composeRule

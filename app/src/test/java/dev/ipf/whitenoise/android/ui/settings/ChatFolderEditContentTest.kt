@@ -118,6 +118,7 @@ class ChatFolderEditContentTest {
         composeRule.onNodeWithText(app.getString(R.string.folder_save_failed)).assertExists()
     }
 
+    /** Edit state. */
     private fun editState(
         name: String,
         description: String = "",
@@ -147,6 +148,7 @@ class ChatFolderEditContentTest {
         error = error,
     )
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         state: ChatFolderEditFormState,
         onOpenManualChats: () -> Unit = {},

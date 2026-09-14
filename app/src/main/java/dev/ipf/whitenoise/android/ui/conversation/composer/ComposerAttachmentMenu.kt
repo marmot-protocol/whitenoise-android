@@ -38,6 +38,7 @@ internal class ComposerAttachmentMenuPositionProvider(
     private val gapPx: Int,
     private val edgePx: Int,
 ) : PopupPositionProvider {
+    /** Anchors the menu above the attachment button, clamped to the window. */
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,

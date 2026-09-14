@@ -65,6 +65,7 @@ class SignInRecoveryConsentTest {
         composeRule.onNodeWithText(string(R.string.onboarding_login)).performClick()
     }
 
+    /** Sign in. */
     private fun signIn(key: String) {
         composeRule.onNodeWithTag("onboarding.sign_in.private_key").performTextInput(key)
         composeRule.onNodeWithTag("onboarding.sign_in.action").performClick()
@@ -179,6 +180,7 @@ class SignInRecoveryConsentTest {
         composeRule.onNodeWithText(string(R.string.identity_entry_error_import_failed)).assertExists()
     }
 
+    /** A failed recovery reports itself without re arming the consent prompt. */
     @Test
     fun aFailedRecoveryReportsItselfWithoutReArmingTheConsentPrompt() {
         val engine = recoveryRequiredEngine { MarmotKitException.AccountSetupRecoveryRequired() }

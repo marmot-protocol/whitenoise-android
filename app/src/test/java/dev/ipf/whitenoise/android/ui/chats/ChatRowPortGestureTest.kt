@@ -166,6 +166,7 @@ class ChatRowPortGestureTest {
         }
     }
 
+    /** Builds a row fixture. */
     private fun row() = composeRule.onNodeWithTag("chat.row.g1")
 
     private class Events {

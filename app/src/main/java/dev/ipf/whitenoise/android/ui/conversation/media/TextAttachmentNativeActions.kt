@@ -22,6 +22,7 @@ internal class TextAttachmentNativeActions(
     private var attached = true
     private var saving = false
 
+    /** True while the actions are attached and their source message is still current. */
     fun isCurrent(): Boolean = attached && sourceIsCurrent()
 
     /** Serializes explicit saves and keeps cancellation separate from native export failures. */
@@ -74,6 +75,7 @@ internal fun rememberTextAttachmentNativeActions(
             val group = controller.group.groupIdHex
             lateinit var owned: TextAttachmentNativeActions
 
+            /** Whether the source message still exists and has not expired. */
             fun sourceIsCurrent(): Boolean {
                 val item = controller.timeline.firstOrNull { it.record.messageIdHex == messageIdHex }
                 val expiry = item?.record?.retentionExpiresAt?.takeIf { it > 0uL }

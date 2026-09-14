@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal const val CHAT_LIST_SEARCH_MODES_TAG = "global.library.modes"
 
+/** Stable test tag for a mode chip. */
 internal fun globalSearchModeTag(kind: GlobalSearchContentKind?): String {
     val name = kind?.name ?: "Messages"
     return "global.library.mode.$name"

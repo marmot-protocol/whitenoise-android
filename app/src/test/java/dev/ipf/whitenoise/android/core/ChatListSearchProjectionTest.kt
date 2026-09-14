@@ -111,6 +111,7 @@ class ChatListSearchProjectionTest {
         }
     }
 
+    /** Message only keeps body matches as messages and drops title matches. */
     @Test
     fun messageOnlyKeepsBodyMatchesAsMessagesAndDropsTitleMatches() {
         val sections =

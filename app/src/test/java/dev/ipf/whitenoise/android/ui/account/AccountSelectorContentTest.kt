@@ -40,6 +40,7 @@ class AccountSelectorContentTest {
         assertEquals("work", switchedTo)
     }
 
+    /** Add account row is visible and fires add action. */
     @Test
     fun addAccountRowIsVisibleAndFiresAddAction() {
         var addCount = 0

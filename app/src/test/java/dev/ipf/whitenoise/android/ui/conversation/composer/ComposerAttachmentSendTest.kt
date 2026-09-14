@@ -31,6 +31,7 @@ class ComposerAttachmentSendTest {
     @get:Rule val composeRule = createComposeRule()
     private val context: Context = ApplicationProvider.getApplicationContext()
 
+    /** Rejection allows retry and late acceptance preserves newer caption. */
     @Test
     fun rejectionAllowsRetryAndLateAcceptancePreservesNewerCaption() {
         var result: ((Boolean) -> Unit)? = null
@@ -67,6 +68,7 @@ class ComposerAttachmentSendTest {
         assertEquals(0, plainSends)
     }
 
+    /** Attachment without caption uses media send path. */
     @Test
     fun attachmentWithoutCaptionUsesMediaSendPath() {
         var mediaCaption: String? = null

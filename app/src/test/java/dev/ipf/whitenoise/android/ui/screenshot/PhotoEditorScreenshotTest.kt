@@ -82,6 +82,7 @@ class PhotoEditorScreenshotTest {
         }
     }
 
+    /** Narrow short window keeps canvas and scrollable commands reachable. */
     @Test
     @Config(qualifiers = "w240dp-h320dp-mdpi")
     fun narrowShortWindowKeepsCanvasAndScrollableCommandsReachable() {
@@ -128,6 +129,7 @@ class PhotoEditorScreenshotTest {
         }
     }
 
+    /** Light landscape retains labeled tools and native history. */
     @Test
     @Config(qualifiers = "w840dp-h400dp-mdpi")
     fun lightLandscapeRetainsLabeledToolsAndNativeHistory() {

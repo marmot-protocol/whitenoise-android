@@ -94,6 +94,7 @@ class MessageBubbleAmoledStyleTest {
         }
     }
 
+    /** Amoled custom color keeps monochrome directional bubble border. */
     @Test
     fun amoledCustomColorKeepsMonochromeDirectionalBubbleBorder() {
         val customArgb = 0xFF336699L
@@ -167,6 +168,7 @@ class MessageBubbleAmoledStyleTest {
         }
     }
 
+    /** Standard dark bubble chrome uses paired prototype foregrounds. */
     @Test
     fun standardDarkBubbleChromeUsesPairedPrototypeForegrounds() {
         var sentBorder: BorderStroke? = BorderStroke(2.dp, Color.Red)
@@ -204,6 +206,7 @@ class MessageBubbleAmoledStyleTest {
         }
     }
 
+    /** Message bubble fill color preserves theme and semantic precedence. */
     @Test
     fun messageBubbleFillColorPreservesThemeAndSemanticPrecedence() {
         val customArgb = 0xFF336699L
@@ -282,6 +285,7 @@ class MessageBubbleAmoledStyleTest {
         }
     }
 
+    /** Standard themes use readable selection tint behind content. */
     @Test
     fun standardThemesUseReadableSelectionTintBehindContent() {
         var lightTint = Color.Unspecified
@@ -308,6 +312,7 @@ class MessageBubbleAmoledStyleTest {
         }
     }
 
+    /** Action accent does not recolor default bubbles or override saved bubble colors. */
     @Test
     fun actionAccentDoesNotRecolorDefaultBubblesOrOverrideSavedBubbleColors() {
         val actionArgb = 0xFF217A44L

@@ -83,6 +83,7 @@ class KeyPackagesScreenScreenshotTest {
         capture(emptyList(), "src/test/snapshots/key_packages_empty_rtl_large_font.png", rtl = true, fontScale = 2f)
     }
 
+    /** Renders the fixture and records its screenshot baseline. */
     private fun capture(
         packages: List<AccountKeyPackageFfi>,
         path: String,

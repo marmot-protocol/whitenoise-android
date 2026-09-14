@@ -79,6 +79,7 @@ internal fun SignInContent(
     val changed by rememberUpdatedState(onIdentityChange)
     var lastReportedKey by remember(key) { mutableStateOf(key.text.toString()) }
 
+    /** Reports a key edit once per distinct value. */
     fun reportKeyEdit(value: String) {
         if (value != lastReportedKey) {
             lastReportedKey = value
@@ -95,6 +96,7 @@ internal fun SignInContent(
     }
     val canSignIn = key.text.isNotBlank() && !busy
 
+    /** Submits the key after flushing the last edit. */
     fun submit() {
         if (busy) return
         val value = key.text.toString()

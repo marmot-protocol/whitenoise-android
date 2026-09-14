@@ -218,6 +218,7 @@ class AiAgentsScreenTest {
         assertEquals(app.getString(R.string.agent_connector_codex_prompt, TEST_NPUB), clipboardText())
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(npub: String? = TEST_NPUB) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -234,6 +235,7 @@ class AiAgentsScreenTest {
         }
     }
 
+    /** Opens setup sheet. */
     private fun openSetupSheet(connectorId: String) {
         composeRule
             .onNodeWithTag("settings.list")

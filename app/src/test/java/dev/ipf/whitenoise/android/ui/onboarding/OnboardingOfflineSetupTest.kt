@@ -90,6 +90,7 @@ class OnboardingOfflineSetupTest {
         }
     }
 
+    /** Valid nsec reaches identity acceptance even while offline. */
     @Test
     fun validNsecReachesIdentityAcceptanceEvenWhileOffline() {
         val engine = RecordingIdentityLoginCalls(loginFails = { MarmotKitException.Runtime("expected") })
@@ -106,6 +107,7 @@ class OnboardingOfflineSetupTest {
         assertEquals(nsec, engine.logins.single().nsec)
     }
 
+    /** Locally invalid key keeps its specific error while offline. */
     @Test
     fun locallyInvalidKeyKeepsItsSpecificErrorWhileOffline() {
         val engine = RecordingIdentityLoginCalls(loginFails = { MarmotKitException.Runtime("unexpected") })

@@ -25,6 +25,7 @@ class ConversationTranscriptSaveTest {
     @get:Rule
     val temporary = TemporaryFolder()
 
+    /** Cancelled picker releases request without exporting. */
     @Test
     fun cancelledPickerReleasesRequestWithoutExporting() {
         var exports = 0
@@ -41,6 +42,7 @@ class ConversationTranscriptSaveTest {
         assertNotNull(requests.begin(owner))
     }
 
+    /** Stale picker cannot be rebound to a new owner or consumed twice. */
     @Test
     fun stalePickerCannotBeReboundToANewOwnerOrConsumedTwice() {
         val old = fileOwner()
@@ -60,6 +62,7 @@ class ConversationTranscriptSaveTest {
         assertFalse(requests.busy)
     }
 
+    /** Changed account runtime or controller rejects the pending result. */
     @Test
     fun changedAccountRuntimeOrControllerRejectsThePendingResult() {
         for (changedField in 0..2) {
@@ -74,6 +77,7 @@ class ConversationTranscriptSaveTest {
         }
     }
 
+    /** Saves exact native file off main and removes its temporary directory. */
     @Test
     fun savesExactNativeFileOffMainAndRemovesItsTemporaryDirectory() =
         runBlocking {
@@ -92,6 +96,7 @@ class ConversationTranscriptSaveTest {
             assertNoTemporaryFiles()
         }
 
+    /** Owner change during native export never opens the destination. */
     @Test
     fun ownerChangeDuringNativeExportNeverOpensTheDestination() =
         runBlocking {
@@ -111,6 +116,7 @@ class ConversationTranscriptSaveTest {
             assertNoTemporaryFiles()
         }
 
+    /** Cancellation during native preparation cleans even an unreturned file. */
     @Test
     fun cancellationDuringNativePreparationCleansEvenAnUnreturnedFile() =
         runBlocking {
@@ -130,6 +136,7 @@ class ConversationTranscriptSaveTest {
             assertNoTemporaryFiles()
         }
 
+    /** Null native export fails and cleans the destination without opening it. */
     @Test
     fun nullNativeExportFailsAndCleansTheDestinationWithoutOpeningIt() =
         runBlocking {
@@ -142,6 +149,7 @@ class ConversationTranscriptSaveTest {
             assertNoTemporaryFiles()
         }
 
+    /** Null output stream fails and deletes temporary plaintext. */
     @Test
     fun nullOutputStreamFailsAndDeletesTemporaryPlaintext() =
         runBlocking {
@@ -153,6 +161,7 @@ class ConversationTranscriptSaveTest {
             assertNoTemporaryFiles()
         }
 
+    /** Failed write closes and discards partial output and temporary plaintext. */
     @Test
     fun failedWriteClosesAndDiscardsPartialOutputAndTemporaryPlaintext() =
         runBlocking {
@@ -160,8 +169,10 @@ class ConversationTranscriptSaveTest {
             var discarded = false
             val output =
                 object : OutputStream() {
+                    /** In-memory draft persistence: stores or clears one value. */
                     override fun write(value: Int): Unit = throw IOException("Provider write failed")
 
+                    /** Close. */
                     override fun close() {
                         closed = true
                     }
@@ -174,6 +185,7 @@ class ConversationTranscriptSaveTest {
             assertNoTemporaryFiles()
         }
 
+    /** Owner change during write discards already written bytes and stops the next chunk. */
     @Test
     fun ownerChangeDuringWriteDiscardsAlreadyWrittenBytesAndStopsTheNextChunk() =
         runBlocking {
@@ -182,8 +194,10 @@ class ConversationTranscriptSaveTest {
             val owner = fileOwner(content = "x".repeat(DEFAULT_BUFFER_SIZE * 3))
             val output =
                 object : OutputStream() {
+                    /** In-memory draft persistence: stores or clears one value. */
                     override fun write(value: Int) = error("Bulk writes expected")
 
+                    /** In-memory draft persistence: stores or clears one value. */
                     override fun write(
                         bytes: ByteArray,
                         offset: Int,
@@ -201,6 +215,7 @@ class ConversationTranscriptSaveTest {
             assertNoTemporaryFiles()
         }
 
+    /** Temporary cleanup failure after success is observable. */
     @Test
     fun temporaryCleanupFailureAfterSuccessIsObservable() {
         try {
@@ -211,6 +226,7 @@ class ConversationTranscriptSaveTest {
         }
     }
 
+    /** Temporary cleanup failure preserves the original write or cancellation cause. */
     @Test
     fun temporaryCleanupFailurePreservesTheOriginalWriteOrCancellationCause() {
         val causes = listOf(IOException("Write failed"), CancellationException("Owner changed"))
@@ -221,11 +237,13 @@ class ConversationTranscriptSaveTest {
         }
     }
 
+    /** File owner. */
     private fun fileOwner(content: String = "native accepted transcript"): TranscriptSaveOwner =
         TranscriptSaveOwner(current = { true }, export = { directory ->
             File(directory, "native.json").apply { writeText(content) }
         })
 
+    /** Asserts no temporary files. */
     private fun assertNoTemporaryFiles() {
         assertTrue(
             temporary.root
@@ -235,6 +253,7 @@ class ConversationTranscriptSaveTest {
         )
     }
 
+    /** Expects io failure. */
     private suspend fun expectIoFailure(block: suspend () -> Unit) {
         try {
             block()
@@ -244,6 +263,7 @@ class ConversationTranscriptSaveTest {
         }
     }
 
+    /** Expects cancellation. */
     private suspend fun expectCancellation(block: suspend () -> Unit) {
         try {
             block()

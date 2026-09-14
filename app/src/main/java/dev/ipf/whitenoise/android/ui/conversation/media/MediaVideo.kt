@@ -1266,6 +1266,7 @@ internal fun VideoViewerPage(
     )
 }
 
+/** Placeholder when a video cannot play: invalidated cache, invalidated playback or load failure. */
 @Composable
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 private fun VideoViewerUnavailable(

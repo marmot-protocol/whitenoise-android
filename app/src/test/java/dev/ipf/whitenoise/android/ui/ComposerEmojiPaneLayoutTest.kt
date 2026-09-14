@@ -366,6 +366,7 @@ class ComposerEmojiPaneLayoutTest {
         assertFalse(composerKeyboardRestoreTimeoutClearsFocus(currentImeHeight = 264.dp))
     }
 
+    /** Search mode adds room for the search field and results. */
     @Test
     fun searchModeAddsRoomForTheSearchFieldAndResults() {
         assertEquals(432.dp, ComposerEmojiPickerFallbackHeight + ComposerEmojiPickerSearchExtraHeight)

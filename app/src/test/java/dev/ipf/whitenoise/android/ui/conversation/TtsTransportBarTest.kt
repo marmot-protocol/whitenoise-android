@@ -60,8 +60,10 @@ class TtsTransportBarTest {
 
     private val app: Application = ApplicationProvider.getApplicationContext()
 
+    /** Label. */
     private fun label(resId: Int): String = app.getString(resId)
 
+    /** Four distinct navigation actions invoke their own callbacks. */
     @Test
     fun fourDistinctNavigationActionsInvokeTheirOwnCallbacks() {
         val clicks = mutableListOf<String>()
@@ -138,6 +140,7 @@ class TtsTransportBarTest {
             .assertIsDisplayed()
     }
 
+    /** Paused state offers play without losing navigation. */
     @Test
     fun pausedStateOffersPlayWithoutLosingNavigation() {
         var resumed = false
@@ -154,6 +157,7 @@ class TtsTransportBarTest {
         assertEquals(true, resumed)
     }
 
+    /** Error state disables navigation but keeps stop. */
     @Test
     fun errorStateDisablesNavigationButKeepsStop() {
         var stopped = false
@@ -231,6 +235,7 @@ class TtsTransportBarTest {
         assertTrue(selections.isEmpty())
     }
 
+    /** Applied custom rate updates the visible control immediately. */
     @Test
     fun appliedCustomRateUpdatesTheVisibleControlImmediately() {
         composeRule.setContent {
@@ -261,6 +266,7 @@ class TtsTransportBarTest {
         composeRule.onNodeWithContentDescription(description).assertIsDisplayed()
     }
 
+    /** Narrow width and large font keep every action reachable. */
     @Test
     fun narrowWidthAndLargeFontKeepEveryActionReachable() {
         renderBar(
@@ -298,6 +304,7 @@ class TtsTransportBarTest {
         }
     }
 
+    /** Pending edge load disables navigation and announces the loading state. */
     @Test
     fun pendingEdgeLoadDisablesNavigationAndAnnouncesTheLoadingState() {
         renderBar(
@@ -320,6 +327,7 @@ class TtsTransportBarTest {
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_stop)).assertIsEnabled()
     }
 
+    /** One chunk no range completion animates progress before dismissal. */
     @Test
     fun oneChunkNoRangeCompletionAnimatesProgressBeforeDismissal() {
         composeRule.mainClock.autoAdvance = false
@@ -367,6 +375,7 @@ class TtsTransportBarTest {
         composeRule.onNodeWithTag(BAR_TAG).assertDoesNotExist()
     }
 
+    /** Short window caps transport and scrolls to every native action. */
     @Test
     @Config(sdk = [36], qualifiers = "w320dp-h240dp-mdpi")
     fun shortWindowCapsTransportAndScrollsToEveryNativeAction() {
@@ -418,6 +427,7 @@ class TtsTransportBarTest {
             messageProgressGeneration = 1L,
         )
 
+    /** Single sentence terminal state. */
     private fun singleSentenceTerminalState() =
         idleTts(
             chunkIndex = 1,
@@ -431,6 +441,7 @@ class TtsTransportBarTest {
             messageProgressGeneration = 1L,
         )
 
+    /** Failed edge load keeps navigation enabled for retry and shows the error. */
     @Test
     fun failedEdgeLoadKeepsNavigationEnabledForRetryAndShowsTheError() {
         var previousTaps = 0
@@ -446,6 +457,7 @@ class TtsTransportBarTest {
         assertEquals(1, previousTaps)
     }
 
+    /** Composes the bar under test with the given fixture. */
     @Suppress("LongParameterList")
     private fun renderBar(
         state: TtsState,
@@ -484,6 +496,7 @@ class TtsTransportBarTest {
         }
     }
 
+    /** Rate control description. */
     private fun rateControlDescription(): String {
         val rateLabel = ttsRateLabel(1.0f, Locale.US)
         return app.getString(R.string.tts_bar_rate_control, rateLabel)

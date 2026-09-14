@@ -39,28 +39,38 @@ import org.robolectric.annotation.GraphicsMode
 class ProfileSwitcherScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Screenshot: light theme. */
     @Test fun light() = capture("profile_switcher_light")
 
+    /** Screenshot: dark theme. */
     @Test fun dark() = capture("profile_switcher_dark", dark = true)
 
+    /** Screenshot: AMOLED. */
     @Test fun amoled() = capture("profile_switcher_amoled", dark = true, amoled = true)
 
+    /** Large rtl. */
     @Test fun largeRtl() = capture("profile_switcher_rtl_200", dark = true, rtl = true)
 
+    /** Loading. */
     @Test fun loading() = capture("profile_switcher_loading", empty = true)
 
+    /** Settings origin. */
     @Test fun settingsOrigin() = capture("profile_switcher_settings_origin", settings = false)
 
+    /** Header off. */
     @Test fun headerOff() = capture("profile_header_cycle_off", header = true)
 
+    /** Header on. */
     @Test fun headerOn() = capture("profile_header_cycle_on", header = true, cycle = true)
 
+    /** Density fixture for a high-density render. */
     @Test
     @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-xxhdpi")
     fun highDensity() {
         capture("profile_switcher_amoled_xxhdpi", dark = true, amoled = true)
     }
 
+    /** Renders the fixture and records its screenshot baseline. */
     @OptIn(ExperimentalMaterial3Api::class)
     @Suppress("LongParameterList", "LongMethod")
     private fun capture(

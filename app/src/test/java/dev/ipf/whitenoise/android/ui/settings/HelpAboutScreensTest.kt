@@ -169,6 +169,7 @@ class HelpAboutScreensTest {
         }
     }
 
+    /** Composes the bug report screen with the given callbacks. */
     private fun renderBugReport() {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -183,6 +184,7 @@ class HelpAboutScreensTest {
         }
     }
 
+    /** Composes the About screen with the given callbacks. */
     private fun renderAbout() {
         composeRule.setContent {
             WhiteNoiseTheme {

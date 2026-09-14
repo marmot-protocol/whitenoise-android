@@ -38,6 +38,7 @@ class VoiceRecordingReviewTest {
         runTest {
             val marker = VoiceReviewRecoveryMarker("owner")
 
+            /** Opens the review step under test. */
             fun review() =
                 VoiceRecordingReview(
                     this,
@@ -97,10 +98,13 @@ class VoiceRecordingReviewTest {
                     microphoneCaptures = coordinator,
                     recorderFactory = { _, _, _ ->
                         object : VoiceRecordingSession {
+                            /** Fake playback: starts. */
                             override fun start() = Unit
 
+                            /** Fake playback: stops. */
                             override fun stop() = VoiceRecordingResult(file, 1_500L)
 
+                            /** Fake operation: cancels. */
                             override fun cancel() = Unit
                         }
                     },
@@ -325,17 +329,21 @@ class VoiceRecordingReviewTest {
         val played = mutableListOf<String>()
         val stopped = mutableListOf<String>()
 
+        /** Fake playback: plays. */
         override suspend fun play(clip: VoiceReviewClip): Boolean {
             played += clip.key
             return pending?.await() ?: true
         }
 
+        /** Fake playback: pauses. */
         override fun pause(key: String) = Unit
 
+        /** Fake playback: stops. */
         override fun stop(key: String) {
             stopped += key
         }
 
+        /** Fake playback: whether it is playing. */
         override fun isPlaying(key: String) = false
     }
 }

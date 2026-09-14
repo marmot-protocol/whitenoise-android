@@ -411,6 +411,7 @@ internal fun GroupDetailsScreen(
         }
     }
 
+    /** Runs a group mutation under the shared lock, recording the action and target for the row status. */
     fun runGroupMutation(
         action: GroupMutationAction,
         mutation: suspend () -> Boolean,
@@ -464,6 +465,7 @@ internal fun GroupDetailsScreen(
         }
     }
 
+    /** Exports the transcript through the native save flow. */
     fun exportTranscript() {
         if (transcriptExportInFlight || transcriptSave.busy) return
         transcriptExportInFlight = true
@@ -1463,6 +1465,8 @@ internal fun GroupDetailsScreen(
             }
 
             // Rows shared by the DM technical group and the group lifecycle group.
+
+            /** Add to Folder row. */
             fun SettingsGroupScope.folderRow() {
                 row("folders") { rowContext ->
                     SettingsAction(
@@ -1475,6 +1479,7 @@ internal fun GroupDetailsScreen(
                 }
             }
 
+            /** Archive / Unarchive row. */
             fun SettingsGroupScope.archiveRow() {
                 if (!readOnlyInvite) {
                     row("archive") { rowContext ->
@@ -1512,6 +1517,7 @@ internal fun GroupDetailsScreen(
                 }
             }
 
+            /** Leave row. */
             fun SettingsGroupScope.leaveRow() {
                 if (controller.isSelfMember) {
                     row("leave") { rowContext ->
@@ -1952,6 +1958,7 @@ internal fun GroupDetailsHeader(
     }
 }
 
+/** Dismissible banner for the latest group mutation failure. */
 @Composable
 private fun GroupMutationErrorBanner(
     error: ErrorPresentation,
@@ -2075,6 +2082,7 @@ private sealed class DetailsConfirm {
     ) : DetailsConfirm()
 }
 
+/** Developer-mode push delivery diagnostics for the group. */
 @Composable
 private fun PushDeliveryDebugSection(
     info: GroupPushDebugInfoFfi?,

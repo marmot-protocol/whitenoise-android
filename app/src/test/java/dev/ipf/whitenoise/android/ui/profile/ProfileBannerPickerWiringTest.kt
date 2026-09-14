@@ -7,6 +7,7 @@ import org.junit.Test
 import java.io.File
 
 class ProfileBannerPickerWiringTest {
+    /** Profile banner uses dedicated picker upload and stale result state. */
     @Test
     fun profileBannerUsesDedicatedPickerUploadAndStaleResultState() {
         val source = profileEditSource().readText()

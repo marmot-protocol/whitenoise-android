@@ -353,6 +353,7 @@ private enum class ProfileSheetPage {
     MAKE_ADMIN,
 }
 
+/** User Profile page for an npub: identity, about, shared groups and the message action. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ProfileSheet(
@@ -572,6 +573,7 @@ internal fun ProfileSheet(
         )
     }
 
+    /** Opens the direct chat with this profile or creates it. */
     fun openOrCreateProfileChat(retryGroupIdHex: String? = null) {
         if (!owner.canAct() || creatingChat) return
         val progressHex = hex ?: return
@@ -613,6 +615,7 @@ internal fun ProfileSheet(
         }
     }
 
+    /** Adds the profile to the selected groups. */
     fun addProfileToGroups(selected: List<ChatListItem>) {
         val targetHex = hex ?: return
         if (!owner.canAct() || addingToGroups) return
@@ -636,6 +639,7 @@ internal fun ProfileSheet(
         }
     }
 
+    /** Grants the profile admin in the group. */
     fun makeProfileAdmin(group: ChatListItem) {
         val targetHex = hex ?: return
         if (!owner.canAct() || promotingAdmin) return
@@ -1470,6 +1474,7 @@ private fun ProfileSheetAdminActions(
     // elsewhere; it must not assign that work to a row in this sheet.
     val busy = !isCurrent() || pendingAction != null || controller.mutationInFlight
 
+    /** Runs a member menu mutation under the shared lock. */
     fun runMutation(
         action: GroupMemberMenuAction,
         mutation: suspend () -> Unit,

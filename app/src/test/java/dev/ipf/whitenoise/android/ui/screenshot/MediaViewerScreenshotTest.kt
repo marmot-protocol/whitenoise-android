@@ -111,6 +111,7 @@ class MediaViewerScreenshotTest {
         assertEquals(listOf("forward:first", "forward:second", "go:second"), delivered)
     }
 
+    /** Media viewer default frame. */
     @Test
     fun mediaViewerDefaultFrame() {
         composeRule.setContent {
@@ -134,6 +135,7 @@ class MediaViewerScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_default_frame.png")
     }
 
+    /** Directly opened video offers save and share. */
     @Test
     fun directlyOpenedVideoOffersSaveAndShare() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -269,6 +271,7 @@ class MediaViewerScreenshotTest {
         )
     }
 
+    /** Media viewer paged gallery shows the current pages metadata. */
     @Test
     fun mediaViewerPagedGalleryShowsTheCurrentPagesMetadata() {
         val gallery = loadedConversationGallery()
@@ -284,6 +287,7 @@ class MediaViewerScreenshotTest {
         )
     }
 
+    /** Page change dismisses the old save menu and new save uses current owner. */
     @Test
     fun pageChangeDismissesTheOldSaveMenuAndNewSaveUsesCurrentOwner() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -326,6 +330,7 @@ class MediaViewerScreenshotTest {
         )
     }
 
+    /** Captures gallery. */
     private fun captureGallery(
         gallery: MediaViewerGallery,
         currentPageIndex: Int,

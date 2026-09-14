@@ -62,6 +62,7 @@ class NewGroupNameEmojiPickerTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 
+    /** Emoji action is accessible and opens shared picker. */
     @Test
     fun emojiActionIsAccessibleAndOpensSharedPicker() {
         renderScreen()
@@ -84,6 +85,7 @@ class NewGroupNameEmojiPickerTest {
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsDisplayed()
     }
 
+    /** Compact viewport and large font keep the name field and emoji action visible. */
     @Test
     @Config(qualifiers = "w320dp-h640dp-mdpi")
     fun compactViewportAndLargeFontKeepTheNameFieldAndEmojiActionVisible() {
@@ -110,6 +112,7 @@ class NewGroupNameEmojiPickerTest {
         assertTrue("Emoji action height must be at least 48dp", actionBounds.bottom - actionBounds.top >= 48.dp)
     }
 
+    /** Picks replace the selection move the caret and keep the picker open. */
     @Test
     fun picksReplaceTheSelectionMoveTheCaretAndKeepThePickerOpen() {
         renderScreen()
@@ -188,6 +191,7 @@ class NewGroupNameEmojiPickerTest {
         assertEquals("😀", recents.firstOrNull())
     }
 
+    /** Dismiss and saved state restoration preserve the draft selection and picker. */
     @Test
     fun dismissAndSavedStateRestorationPreserveTheDraftSelectionAndPicker() {
         val restorationTester = StateRestorationTester(composeRule)
@@ -221,6 +225,7 @@ class NewGroupNameEmojiPickerTest {
         composeRule.onNode(hasSetTextAction() and hasText("Team 😀 name")).assertExists()
     }
 
+    /** Locked retry state disables the emoji action and cannot open the picker. */
     @Test
     fun lockedRetryStateDisablesTheEmojiActionAndCannotOpenThePicker() {
         renderScreen(initialRetryGroupIdHex = "created-group")
@@ -239,6 +244,7 @@ class NewGroupNameEmojiPickerTest {
         assertFalse(newGroupDetailsEditable(retryGroupIdHex = null, busy = false, imagePreparing = true))
     }
 
+    /** Actual new group image entry opens emoji builder and dismiss preserves name. */
     @Test
     fun actualNewGroupImageEntryOpensEmojiBuilderAndDismissPreservesName() {
         renderScreen()
@@ -272,6 +278,7 @@ class NewGroupNameEmojiPickerTest {
         assertEquals(expected, actual)
     }
 
+    /** Composes the screen under test with the given fixture. */
     private fun renderScreen(
         initialRetryGroupIdHex: String? = null,
         fontScale: Float = 1f,
@@ -290,6 +297,7 @@ class NewGroupNameEmojiPickerTest {
         }
     }
 
+    /** Resolves a string resource in the test context. */
     private fun string(res: Int): String = context.getString(res)
 
     private fun appState(): WhiteNoiseAppState =

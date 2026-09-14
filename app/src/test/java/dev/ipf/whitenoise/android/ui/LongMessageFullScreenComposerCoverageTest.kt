@@ -25,6 +25,7 @@ class LongMessageFullScreenComposerCoverageTest {
         )
     }
 
+    /** Expanded long message uses standard conversation composer. */
     @Test
     fun expandedLongMessageUsesStandardConversationComposer() {
         val body = messageBubbleSource().readText().functionBody("MessageBubble")

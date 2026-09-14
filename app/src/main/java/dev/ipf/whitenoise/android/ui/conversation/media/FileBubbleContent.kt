@@ -233,6 +233,7 @@ private fun FileMetadataRow(
     }
 }
 
+/** Trailing metadata of a file card: size or error, then the delivery status. */
 @Composable
 private fun FileTrailingMetadata(
     text: String?,

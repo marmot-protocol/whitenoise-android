@@ -186,6 +186,7 @@ private fun ColorScheme.withAmoledPalette(amoledActive: Boolean): ColorScheme {
     return AmoledColorScheme
 }
 
+/** Applies the account accent to the scheme outside AMOLED. */
 private fun ColorScheme.withAccountAccent(
     accentColorArgb: Long?,
     amoledActive: Boolean,
@@ -226,8 +227,10 @@ internal fun whiteNoiseBaseColorScheme(darkTheme: Boolean): ColorScheme {
 /** The scheme with a trial accent applied the way a saved account accent is; null keeps the monochrome roles. */
 internal fun ColorScheme.withActionColor(accentArgb: Long?): ColorScheme = withAccountAccent(accentArgb, false)
 
+/** Opaque ARGB value of a colour. */
 private fun Color.toOpaqueArgb(): Long = toArgb().toLong() and OPAQUE_ARGB_MASK
 
+/** App theme: monochrome scheme, optional AMOLED and account accent, font and shapes. */
 @Composable
 fun WhiteNoiseTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),

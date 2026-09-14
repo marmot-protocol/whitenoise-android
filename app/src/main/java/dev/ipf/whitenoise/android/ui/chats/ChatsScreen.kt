@@ -644,6 +644,7 @@ internal fun ChatsScreen(
                 )
             }
 
+    /** Opens a chat from the visible list, remembering the list head for the return scroll. */
     fun openGroupFromVisibleList(
         item: ChatListItem,
         focusMessageId: String?,
@@ -654,6 +655,7 @@ internal fun ChatsScreen(
         onOpenGroup(item, focusMessageId, justCreated, visibleHeadId)
     }
 
+    /** Presents a profile from the visible list, remembering the list head for the return scroll. */
     fun presentProfileFromVisibleList(npub: String) {
         val visibleHeadId =
             if (showArchived) null else visibleItems.firstOrNull()?.id
@@ -1144,6 +1146,7 @@ internal fun ChatsScreen(
                     }
                 }
 
+                /** True while the row menu still belongs to the account and runtime that opened it. */
                 fun menuActionsCurrent(): Boolean {
                     val ownsAccount =
                         menuAccount != null &&
@@ -1890,6 +1893,7 @@ private data class ChatListBodySearchResult(
 // debounce band so a fast typist doesn't trigger a query per keystroke.
 internal const val CHAT_LIST_SEARCH_DEBOUNCE_MS: Long = 275L
 
+/** Section header above the search result groups. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun ChatListSearchSectionHeader(

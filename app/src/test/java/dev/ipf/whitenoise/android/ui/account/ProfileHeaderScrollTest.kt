@@ -32,6 +32,7 @@ import org.robolectric.annotation.Config
 class ProfileHeaderScrollTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Restored list and empty refresh update actual header offset. */
     @Test fun restoredListAndEmptyRefreshUpdateActualHeaderOffset() {
         var count by mutableStateOf(20)
         lateinit var behavior: TopAppBarScrollBehavior
@@ -54,6 +55,7 @@ class ProfileHeaderScrollTest {
         composeRule.runOnIdle { assertEquals(0f, behavior.state.contentOffset, 0f) }
     }
 
+    /** Disposed list clears its header offset. */
     @Test fun disposedListClearsItsHeaderOffset() {
         var visible by mutableStateOf(true)
         lateinit var behavior: TopAppBarScrollBehavior

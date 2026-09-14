@@ -28,6 +28,7 @@ class ChatSelectionAdmissionTest {
     @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    /** Close then captured select all in same frame cannot restore selection. */
     @Test fun closeThenCapturedSelectAllInSameFrameCannotRestoreSelection() {
         var current = true
         var selections = 0
@@ -54,6 +55,7 @@ class ChatSelectionAdmissionTest {
         assertEquals(0, selections)
     }
 
+    /** Captured native archive action cannot run for replacement selection. */
     @Test fun capturedNativeArchiveActionCannotRunForReplacementSelection() {
         var current = true
         var archives = 0
@@ -72,6 +74,7 @@ class ChatSelectionAdmissionTest {
         assertEquals(0, archives)
     }
 
+    /** Dismissed popup rejects captured archive and delete after reopen. */
     @Test fun dismissedPopupRejectsCapturedArchiveAndDeleteAfterReopen() {
         var actions = 0
         composeRule.setContent {
@@ -102,6 +105,7 @@ class ChatSelectionAdmissionTest {
         assertEquals(1, actions)
     }
 
+    /** Disposed bottom bar revokes its captured action. */
     @Test fun disposedBottomBarRevokesItsCapturedAction() {
         val visible = mutableStateOf(true)
         var selections = 0

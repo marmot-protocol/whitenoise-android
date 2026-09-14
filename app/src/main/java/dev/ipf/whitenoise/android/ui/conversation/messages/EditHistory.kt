@@ -99,6 +99,7 @@ internal fun EditHistoryDialog(
     }
 }
 
+/** One revision: its label, exact time and selectable text. */
 @Suppress("FunctionNaming")
 @Composable
 private fun EditHistoryVersionRow(row: EditHistoryRow) {

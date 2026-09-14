@@ -27,6 +27,7 @@ class NewGroupSetupScreenTest {
     val composeRule = createComposeRule()
     private val context: Context = ApplicationProvider.getApplicationContext()
 
+    /** Canonical success read failure renders retry open surface with locked details. */
     @Test
     fun canonicalSuccessReadFailureRendersRetryOpenSurfaceWithLockedDetails() {
         composeRule.setContent {

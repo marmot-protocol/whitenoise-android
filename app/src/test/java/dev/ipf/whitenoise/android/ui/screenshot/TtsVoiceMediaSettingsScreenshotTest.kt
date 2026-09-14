@@ -130,11 +130,13 @@ class TtsVoiceMediaSettingsScreenshotTest {
         }
     }
 
+    /** Offline voice. */
     private fun offlineVoice(): TtsVoiceOption {
         val key = TtsVoiceKey("engine.a", "English US", "en-US")
         return TtsVoiceOption(key, "English US", "en-US", null)
     }
 
+    /** Network voice. */
     private fun networkVoice() =
         TtsVoiceOption(
             TtsVoiceKey("engine.a", "Cloud voice", "en-GB"),

@@ -53,6 +53,7 @@ class GroupDetailsHeaderScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Group details header light. */
     @Test
     fun groupDetailsHeaderLight() {
         render(darkTheme = false)
@@ -212,6 +213,7 @@ class GroupDetailsHeaderScreenshotTest {
         composeRule.onNodeWithContentDescription("Close").assertExists()
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         darkTheme: Boolean,
         editable: Boolean = false,

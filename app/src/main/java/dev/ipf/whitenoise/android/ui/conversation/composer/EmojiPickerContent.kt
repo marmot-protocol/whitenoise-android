@@ -66,8 +66,10 @@ import kotlinx.coroutines.withContext
 internal const val EMOJI_PICKER_SEARCH_TEST_TAG = "emoji.picker.search"
 internal const val EMOJI_PICKER_GRID_TEST_TAG = "emoji.picker.grid"
 
+/** Stable test tag for an emoji section header. */
 internal fun emojiPickerHeaderTestTag(category: EmojiCategory): String = "emoji.picker.header.${category.id}"
 
+/** Stable test tag for an emoji cell. */
 internal fun emojiPickerItemTestTag(
     category: EmojiCategory,
     index: Int,
@@ -98,6 +100,7 @@ private class EmojiPickerModel(
     val sectionRanges = emojiSectionRanges(sections)
 }
 
+/** Filtered sections for the query with the recents section first. */
 @Composable
 private fun rememberEmojiPickerModel(
     query: String,
@@ -160,6 +163,7 @@ internal fun EmojiPickerContent(
     }
     EmojiPickerScrollSync(model, activeCategory, gridState, categoryState)
 
+    /** Delivers a picked emoji and records it as used when the picker serves the composer. */
     fun pick(emoji: String) {
         if (!selectionEnabled) return
         if (purpose == EmojiPickerPurpose.USE) onEmojiUsed(emoji)
@@ -227,6 +231,7 @@ private fun EmojiPickerScrollSync(
     }
 }
 
+/** Search field of the emoji picker. */
 @Composable
 private fun EmojiSearchField(
     value: String,
@@ -273,6 +278,7 @@ private fun EmojiSearchField(
     )
 }
 
+/** Grid of emoji sections with sticky headers. */
 @Composable
 private fun EmojiSectionGrid(
     sections: List<EmojiSection>,
@@ -311,6 +317,7 @@ private fun EmojiSectionGrid(
     }
 }
 
+/** Header text of one emoji section. */
 @Composable
 private fun EmojiSectionHeader(category: EmojiCategory) {
     Text(
@@ -328,6 +335,7 @@ private fun EmojiSectionHeader(category: EmojiCategory) {
     )
 }
 
+/** One tappable emoji cell. */
 @Composable
 private fun EmojiCell(
     emoji: String,

@@ -50,18 +50,21 @@ class FocusedMediaCanvasTest {
     private var ownerStarts = 0
     private var ownerDisposals = 0
 
+    /** Landscape canvas shrinks while time status and owner stay native. */
     @Test
     fun landscapeCanvasShrinksWhileTimeStatusAndOwnerStayNative() {
         render(ratio = 1.6f)
         assertNativeCanvasTransition(256f, 256f, "focused_media_canvas_landscape")
     }
 
+    /** Portrait large font rtl keeps full size footer and unscaled file sibling. */
     @Test
     fun portraitLargeFontRtlKeepsFullSizeFooterAndUnscaledFileSibling() {
         render(ratio = 0.5f, dark = true, fontScale = 2f, rtl = true)
         assertNativeCanvasTransition(128f, 256f, "focused_media_canvas_portrait_large_rtl")
     }
 
+    /** Focused window resize uses the new normal image canvas and timeline footprint. */
     @Test
     fun focusedWindowResizeUsesTheNewNormalImageCanvasAndTimelineFootprint() {
         render(ratio = 1.6f)
@@ -69,12 +72,14 @@ class FocusedMediaCanvasTest {
         assertOpenResizeAndClose(wideWidth = 256f, wideHeight = 256f, narrowWidth = 160f, narrowHeight = 256f)
     }
 
+    /** Focused window resize uses the actual native album layout. */
     @Test
     fun focusedWindowResizeUsesTheActualNativeAlbumLayout() {
         render(album = true)
         assertOpenResizeAndClose(wideWidth = 320f, wideHeight = 256f, narrowWidth = 160f, narrowHeight = 256f)
     }
 
+    /** Asserts open resize and close. */
     private fun assertOpenResizeAndClose(
         wideWidth: Float,
         wideHeight: Float,
@@ -107,6 +112,7 @@ class FocusedMediaCanvasTest {
         assertEquals(0, ownerDisposals)
     }
 
+    /** Asserts native canvas transition. */
     private fun assertNativeCanvasTransition(
         width: Float,
         height: Float,
@@ -141,6 +147,7 @@ class FocusedMediaCanvasTest {
         assertEquals(0, ownerDisposals)
     }
 
+    /** Composes the surface under test with the given fixture. */
     @Suppress("LongMethod") // One native media tree supplies both sizing passes and its lifetime assertion.
     private fun render(
         ratio: Float = 1f,
@@ -206,5 +213,6 @@ class FocusedMediaCanvasTest {
         composeRule.waitForIdle()
     }
 
+    /** Bounds of the node with the given tag. */
     private fun bounds(tag: String) = composeRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
 }

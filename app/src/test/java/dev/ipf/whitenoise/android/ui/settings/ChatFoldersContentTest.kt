@@ -191,6 +191,7 @@ class ChatFoldersContentTest {
         composeRule.onNodeWithTag("folder.menu.work").assertDoesNotExist()
     }
 
+    /** Folder row. */
     private fun folderRow(
         id: String,
         name: String,
@@ -209,6 +210,7 @@ class ChatFoldersContentTest {
         description = description,
     )
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         folders: List<ChatFolderManageItem>,
         defaultsMissing: Boolean = true,

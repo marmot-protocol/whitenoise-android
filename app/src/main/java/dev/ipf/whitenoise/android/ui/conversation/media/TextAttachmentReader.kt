@@ -104,6 +104,7 @@ private suspend fun WhiteNoiseAppState.speakTextAttachment(
     }
 }
 
+/** Full-screen dialog reading a text attachment. */
 @Composable
 @Suppress("LongParameterList", "LongMethod")
 internal fun TextAttachmentReaderDialog(
@@ -196,6 +197,7 @@ internal fun TextAttachmentReaderDialog(
     }
 }
 
+/** Reader screen: metadata, body and native actions. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("LongParameterList", "LongMethod")
@@ -343,6 +345,7 @@ private fun TextAttachmentReaderBottomBar(
     }
 }
 
+/** File name, type and size with a copy action. */
 @Composable
 private fun TextAttachmentMetadata(
     candidate: TextAttachmentCandidate,
@@ -432,6 +435,7 @@ private fun TextAttachmentFilenameDialog(
     )
 }
 
+/** Loading, failed or ready body of the reader. */
 @Composable
 private fun TextAttachmentReaderContent(
     state: TextAttachmentReaderState,
@@ -472,6 +476,7 @@ private fun TextAttachmentLoading() {
     }
 }
 
+/** Selectable rendered text of a ready attachment. */
 @Composable
 private fun TextAttachmentReadyBody(
     preview: TextAttachmentPreview,

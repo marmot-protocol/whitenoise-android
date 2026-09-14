@@ -299,6 +299,7 @@ class TimelineRowTtsHighlightPaintTest {
             "renderedHighlightRange=$highlightRange"
     }
 
+    /** Builds a row fixture. */
     @Composable
     @Suppress("FunctionNaming", "LongMethod")
     private fun row(

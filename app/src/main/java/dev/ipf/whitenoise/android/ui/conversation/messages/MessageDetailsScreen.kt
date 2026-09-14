@@ -152,6 +152,7 @@ internal fun MessageDetailsScreen(
     }
 }
 
+/** The message on its own card: text and attachment names. */
 @Composable
 private fun MessageDetailsContentCard(
     text: String,
@@ -250,6 +251,7 @@ private fun MessageFactsSection(
     }
 }
 
+/** Localized labels for each delivery status. */
 @Composable
 private fun messageStatusLabels(): MessageStatusLabels =
     MessageStatusLabels(
@@ -260,6 +262,7 @@ private fun messageStatusLabels(): MessageStatusLabels =
         streaming = stringResource(R.string.message_status_streaming),
     )
 
+/** One label / value row of the facts table, with an optional copy action. */
 @Composable
 private fun FactRow(
     label: String,
@@ -290,6 +293,7 @@ private fun FactRow(
     )
 }
 
+/** Reactions with their counts. */
 @Composable
 private fun MessageReactionsSection(reactions: List<ReactionTally>) {
     Surface(

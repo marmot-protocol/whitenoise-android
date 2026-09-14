@@ -31,6 +31,7 @@ class ChatOrganizationOwnerTest {
     private lateinit var app: WhiteNoiseAppState
     private var dismissed = 0
 
+    /** Prepares the shared fixture before each test. */
     @Before fun setup() {
         context
             .getSharedPreferences("whitenoise.chat_folders", Context.MODE_PRIVATE)
@@ -40,6 +41,7 @@ class ChatOrganizationOwnerTest {
         app = chatOrganizationAppState(context)
     }
 
+    /** Selecting mixed folder does not write until save. */
     @Test fun selectingMixedFolderDoesNotWriteUntilSave() {
         val folder = app.chatFolderPreferences.createFolder("alice", "Work")!!
         app.chatFolderPreferences.setChatInFolder("alice", folder.id, "g1", true)
@@ -52,6 +54,7 @@ class ChatOrganizationOwnerTest {
         assertEquals(1, dismissed)
     }
 
+    /** Actual saved state restoration keeps pending intent without writing. */
     @Test fun actualSavedStateRestorationKeepsPendingIntentWithoutWriting() {
         val folder = app.chatFolderPreferences.createFolder("alice", "Work")!!
         val restoration = StateRestorationTester(composeRule)
@@ -66,6 +69,7 @@ class ChatOrganizationOwnerTest {
         assertEquals(setOf("g1", "g2"), app.chatFolderPreferences.membershipFor("alice", folder.id))
     }
 
+    /** Captured save after cancel in same frame does not write. */
     @Test fun capturedSaveAfterCancelInSameFrameDoesNotWrite() {
         val folder = app.chatFolderPreferences.createFolder("alice", "Work")!!
         show()
@@ -80,6 +84,7 @@ class ChatOrganizationOwnerTest {
         assertTrue(app.chatFolderPreferences.membershipFor("alice", folder.id).isEmpty())
     }
 
+    /** Captured save after account switch cannot write either account. */
     @Test fun capturedSaveAfterAccountSwitchCannotWriteEitherAccount() {
         val folder = app.chatFolderPreferences.createFolder("alice", "Work")!!
         show()
@@ -93,6 +98,7 @@ class ChatOrganizationOwnerTest {
         assertTrue(app.chatFolderPreferences.membershipFor("bob", folder.id).isEmpty())
     }
 
+    /** Native new folder handoff cancels uncommitted picker choices. */
     @Test fun nativeNewFolderHandoffCancelsUncommittedPickerChoices() {
         val folder = app.chatFolderPreferences.createFolder("alice", "Work")!!
         var creates = 0
@@ -107,12 +113,14 @@ class ChatOrganizationOwnerTest {
         assertTrue(app.chatFolderPreferences.membershipFor("alice", folder.id).isEmpty())
     }
 
+    /** Shows the surface under test. */
     private fun show() {
         composeRule.setContent {
             WhiteNoiseTheme { ChatFolderPickerSheet(app, listOf("g1", "g2"), {}, { dismissed++ }) }
         }
     }
 
+    /** Clicks the node with the given tag. */
     private fun click(tag: String) =
         composeRule
             .onNodeWithTag(tag)

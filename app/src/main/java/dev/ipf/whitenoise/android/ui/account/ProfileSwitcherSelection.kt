@@ -49,6 +49,7 @@ internal class ProfileSwitcherSelection {
         val request = ++generation
         pendingLabel = label
 
+        /** True while this request still owns the switch intent for the current account and runtime. */
         fun ownsIntent(): Boolean = this.ownsIntent(appState, label, target.accountIdHex, request, runtime)
         appState.launchMutation {
             try {

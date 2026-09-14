@@ -163,6 +163,7 @@ class ComposerDraftRestoreFocusTest {
         composeRule.runOnIdle { assertEquals(1, fixture.focusGainCount) }
     }
 
+    /** Restored draft focus survives composer remount with same draft key. */
     @Suppress("LongMethod") // Keeps the focus transition and remount assertions in one fixture.
     @Test
     fun restoredDraftFocusSurvivesComposerRemountWithSameDraftKey() {

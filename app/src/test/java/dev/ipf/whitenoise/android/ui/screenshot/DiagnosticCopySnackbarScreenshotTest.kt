@@ -50,9 +50,11 @@ class DiagnosticCopySnackbarScreenshotTest {
     @Test
     fun lightLargeText() = capture(darkTheme = false, fontScale = 1.5f, fileSuffix = "light_large")
 
+    /** Dark large text. */
     @Test
     fun darkLargeText() = capture(darkTheme = true, fontScale = 1.5f, fileSuffix = "dark_large")
 
+    /** Renders the fixture and records its screenshot baseline. */
     private fun capture(
         darkTheme: Boolean,
         fontScale: Float,

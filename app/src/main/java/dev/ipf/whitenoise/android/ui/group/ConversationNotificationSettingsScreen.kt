@@ -261,6 +261,7 @@ private fun ConversationNotificationCategorySetting.withPreparation(
     )
 }
 
+/** Busy placeholder row while the categories load. */
 @Composable
 private fun NotificationCategoriesLoadingRow() {
     SettingsGroup {
@@ -359,6 +360,7 @@ private fun openCategorySettings(
     return launch
 }
 
+/** Subtitle for the vibration row: the effective pattern, or the selection when it differs. */
 @Composable
 private fun effectiveVibrationLabel(
     effective: EffectiveConversationVibration,
@@ -375,6 +377,7 @@ private fun effectiveVibrationLabel(
         else -> vibrationPatternLabel(selected)
     }
 
+/** "Muted until" label for the expiry clock time. */
 @Composable
 private fun mutedUntilLabel(expiryMillis: Long): String =
     stringResource(

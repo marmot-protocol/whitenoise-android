@@ -154,6 +154,7 @@ class DeletedMessageLocalRemovalTest {
         placeholder().assertIsDisplayed()
     }
 
+    /** Remote deletion makes retained reaction summary inert and closes details sheet. */
     @Test
     fun remoteDeletionMakesRetainedReactionSummaryInertAndClosesDetailsSheet() {
         val surface = renderLive(reactions = reactedSummary())
@@ -279,8 +280,10 @@ class DeletedMessageLocalRemovalTest {
 
     private fun deleteAction() = composeRule.onNodeWithText(string(R.string.delete), substring = false)
 
+    /** Resolves a string resource in the test context. */
     private fun string(resource: Int): String = app.getString(resource)
 
+    /** Composes the surface under test with the given fixture. */
     @Suppress("LongMethod")
     private fun render(failCommits: Boolean): TestSurface {
         val preferences = CommitControllablePreferences(backingPreferences, failCommits)
@@ -348,6 +351,7 @@ class DeletedMessageLocalRemovalTest {
         }
     }
 
+    /** Composes the live surface bound to the fake controller. */
     @Suppress("LongMethod")
     private fun renderLive(
         body: String = LIVE_BODY,

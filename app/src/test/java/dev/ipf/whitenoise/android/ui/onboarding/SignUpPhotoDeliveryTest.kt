@@ -107,6 +107,7 @@ class SignUpPhotoDeliveryTest {
         var launches = 0
         private var request: Int? = null
 
+        /** Records the launched request. */
         override fun <I, O> onLaunch(
             requestCode: Int,
             contract: ActivityResultContract<I, O>,
@@ -117,6 +118,7 @@ class SignUpPhotoDeliveryTest {
             request = requestCode
         }
 
+        /** Delivers a fake result to the subject. */
         fun deliver(uri: Uri) {
             assertTrue(dispatchResult(checkNotNull(request), uri))
         }

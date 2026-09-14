@@ -39,6 +39,7 @@ internal fun applyGlobalSearchChatScope(
     }
 }
 
+/** The prototype chat type of a row: a direct chat or a group. */
 internal fun ChatListItem.globalSearchChatType(): GlobalSearchChatType =
     if (GroupProjector.isDm(projection?.conversationKind, presentationMemberCount, group.name)) {
         GlobalSearchChatType.DIRECT

@@ -51,6 +51,7 @@ class ProfileAddToGroupsFlowTest {
 
     private val app: Application = ApplicationProvider.getApplicationContext()
 
+    /** Add to groups and back reuse one modal host. */
     @Test
     fun addToGroupsAndBackReuseOneModalHost() {
         renderProfile()

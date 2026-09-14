@@ -47,6 +47,7 @@ class ChatRelayFeedbackTest {
     @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    /** Failed native restore shows persistent copyable feedback above relays. */
     @Test fun failedNativeRestoreShowsPersistentCopyableFeedbackAboveRelays() {
         val writes = AtomicInteger()
         val app = nativeFailureApp(writes)
@@ -96,6 +97,7 @@ class ChatRelayFeedbackTest {
         composeRule.onNodeWithTag("relays.restore").assertIsDisplayed()
     }
 
+    /** Non copyable native notice never exposes its report. */
     @Test fun nonCopyableNativeNoticeNeverExposesItsReport() {
         composeRule.setContent {
             WhiteNoiseTheme {

@@ -422,6 +422,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue("profile warming must stay outside the target first-frame path", profile > staleGuard)
     }
 
+    /** Interactive selectors load only authoritative rows before activation. */
     @Test
     fun interactiveSelectorsLoadOnlyAuthoritativeRowsBeforeActivation() {
         val setActiveAccount = setActiveAccountSection()
@@ -524,6 +525,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue(full.includePresentationSeeds)
     }
 
+    /** Selector dismisses at activation boundary instead of awaiting post switch work. */
     @Test
     fun selectorDismissesAtActivationBoundaryInsteadOfAwaitingPostSwitchWork() {
         val selection = source("ui/account/ProfileSwitcherSelection.kt").readText().kotlinFunctionBody("select")

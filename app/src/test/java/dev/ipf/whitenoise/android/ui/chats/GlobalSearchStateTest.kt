@@ -22,6 +22,7 @@ class GlobalSearchStateTest {
         assertTrue(opened.isOpen)
     }
 
+    /** Close search resets transient ui. */
     @Test
     fun closeSearchResetsTransientUi() {
         val scopeToken = accountScope("personal", 2).encodeToken()
@@ -54,6 +55,7 @@ class GlobalSearchStateTest {
         assertEquals("  hello  ", updated.query)
     }
 
+    /** Filter sheet open and dismiss. */
     @Test
     fun filterSheetOpenAndDismiss() {
         val open =
@@ -280,6 +282,7 @@ class GlobalSearchStateTest {
         assertEquals(state, reconciled)
     }
 
+    /** Reconcile account scope clears scoped filters when generation changes. */
     @Test
     fun reconcileAccountScopeClearsScopedFiltersWhenGenerationChanges() {
         val previousScope = accountScope("personal", 1)
@@ -305,6 +308,7 @@ class GlobalSearchStateTest {
         assertEquals(setOf(GlobalSearchContentKind.TEXT), reconciled.contentFilterSelection.selectedKinds)
     }
 
+    /** Folder and chat type filters toggle and chip in category order. */
     @Test
     fun folderAndChatTypeFiltersToggleAndChipInCategoryOrder() {
         var state = GlobalSearchState(isOpen = true)
@@ -327,6 +331,7 @@ class GlobalSearchStateTest {
         assertFalse(cleared.hasActiveFilters)
     }
 
+    /** Reconcile available drops vanished folders and out of scope chats. */
     @Test
     fun reconcileAvailableDropsVanishedFoldersAndOutOfScopeChats() {
         val state =
@@ -341,6 +346,7 @@ class GlobalSearchStateTest {
         assertEquals(state, GlobalSearchTransitions.reconcileAvailable(state, null, null))
     }
 
+    /** Encode decode round trip. */
     @Test
     fun encodeDecodeRoundTrip() {
         val scopeToken = accountScope("personal", 3).encodeToken()

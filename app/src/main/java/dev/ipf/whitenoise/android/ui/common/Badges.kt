@@ -38,6 +38,7 @@ internal fun chatRowBadgeDiameter(): Dp {
     }
 }
 
+/** Unread count disc with the shared chat-row badge diameter. */
 @Composable
 internal fun UnreadCountBadge(
     unreadCount: ULong,

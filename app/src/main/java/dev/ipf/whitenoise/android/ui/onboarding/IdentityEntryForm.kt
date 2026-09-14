@@ -193,6 +193,7 @@ internal fun IdentityEntryForm(
     }
 }
 
+/** Trailing paste / scan action of the public identifier field. */
 @Composable
 internal fun PublicIdentifierFieldTrailingAction(
     value: String,

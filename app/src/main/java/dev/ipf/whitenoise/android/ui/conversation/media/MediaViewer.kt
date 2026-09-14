@@ -406,6 +406,7 @@ internal fun FullScreenMediaViewer(
         }
     val actionGate = remember(actionOwner) { MediaViewerActionGate(actionOwner) }
 
+    /** Owner token binding viewer actions to the account and conversation that opened it. */
     fun currentActionOwner() =
         ConversationMediaViewerOwner(
             appState.activeAccountRef,
@@ -770,6 +771,7 @@ internal fun MediaViewerFrame(
     }
 }
 
+/** One page of the media viewer for a message attachment. */
 @Composable
 internal fun ViewerPage(
     controller: ConversationController,

@@ -55,6 +55,7 @@ class ComposerPrototypeGeometryTest {
     private var accepted: (() -> Unit)? = null
     private var sentText: String? = null
 
+    /** Reading row keeps add emoji and send inside one48dp surface. */
     @Test
     fun readingRowKeepsAddEmojiAndSendInsideOne48dpSurface() {
         render(ComposerTextState(TextFieldValue()))
@@ -74,6 +75,7 @@ class ComposerPrototypeGeometryTest {
         capture("composer_prototype_reading_light")
     }
 
+    /** Editing row uses full width above actions and only clears after acceptance. */
     @Test
     fun editingRowUsesFullWidthAboveActionsAndOnlyClearsAfterAcceptance() {
         val draft = TextFieldValue("Ready to send", TextRange(2, 7))
@@ -99,6 +101,7 @@ class ComposerPrototypeGeometryTest {
         composeRule.runOnIdle { assertEquals("", state.valueState.value.text) }
     }
 
+    /** Full width two line draft does not reserve the multiline resize header. */
     @Test
     fun fullWidthTwoLineDraftDoesNotReserveTheMultilineResizeHeader() {
         render(ComposerTextState(TextFieldValue("This full width draft should use two lines and no resize handle.")))
@@ -112,6 +115,7 @@ class ComposerPrototypeGeometryTest {
         assertEquals(104f, surface.height, 1f)
     }
 
+    /** Narrow large text rtl preserves draft and mirrors control order. */
     @Test
     fun narrowLargeTextRtlPreservesDraftAndMirrorsControlOrder() {
         val draft = TextFieldValue("Draft", TextRange(2))
@@ -168,6 +172,7 @@ class ComposerPrototypeGeometryTest {
         )
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         state: ComposerTextState,
         dark: Boolean = false,
@@ -203,12 +208,14 @@ class ComposerPrototypeGeometryTest {
         composeRule.waitForIdle()
     }
 
+    /** Bounds of the tagged action node. */
     private fun actionBounds(label: Int) =
         composeRule
             .onNodeWithContentDescription(app.getString(label))
             .fetchSemanticsNode()
             .boundsInRoot
 
+    /** Renders the fixture and records its screenshot baseline. */
     private fun capture(name: String) {
         composeRule.onNodeWithTag("composer-prototype").captureRoboImage("src/test/snapshots/$name.png")
     }

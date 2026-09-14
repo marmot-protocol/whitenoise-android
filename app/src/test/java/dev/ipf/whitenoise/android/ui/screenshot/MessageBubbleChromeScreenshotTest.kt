@@ -359,6 +359,7 @@ class MessageBubbleChromeScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_reply_attachments_large_rtl.png")
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(darkTheme: Boolean) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme) {
@@ -414,7 +415,7 @@ class MessageBubbleChromeScreenshotTest {
     }
 }
 
-/** Screenshot fixture for production reply-quote combinations. */
+/** Screenshots fixture for production reply-quote combinations. */
 @Composable
 private fun ReplyQuoteBubble(
     mine: Boolean,
@@ -522,6 +523,7 @@ private fun CustomAmoledReplyBubble(highlighted: Boolean) {
     }
 }
 
+/** Directional bubble. */
 @Composable
 private fun DirectionalBubble(
     text: String,
@@ -552,6 +554,7 @@ private fun DirectionalBubble(
     }
 }
 
+/** Amoled reaction bubble. */
 @Composable
 private fun AmoledReactionBubble(
     text: String,
@@ -599,6 +602,7 @@ private fun AmoledReactionBubble(
     }
 }
 
+/** Retention input. */
 private fun retentionInput(
     messageIdHex: String,
     expiresAtEpochSeconds: ULong?,

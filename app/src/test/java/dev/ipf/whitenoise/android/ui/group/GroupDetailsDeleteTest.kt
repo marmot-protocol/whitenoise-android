@@ -121,6 +121,7 @@ class GroupDetailsDeleteTest {
         )
     }
 
+    /** Danger button is the only leave affordance and splits on is dm. */
     @Test
     fun dangerButtonIsTheOnlyLeaveAffordanceAndSplitsOnIsDm() {
         val source = groupDetailsSource().readText()

@@ -23,6 +23,7 @@ internal fun accountRelays(lists: AccountRelayListsFfi): List<AccountRelay> {
     return roles.map { (url, set) -> AccountRelay(url, set) }
 }
 
+/** Relays of one list kind. */
 internal fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> =
     when (kind) {
         RelayListKind.Nip65 -> nip65.relays

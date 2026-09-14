@@ -162,6 +162,7 @@ class ChatListInlineConnectivityLayoutTest {
         composeRule.onNodeWithTag(CHAT_LIST_INLINE_CONNECTIVITY_TAG).assertIsNotDisplayed()
     }
 
+    /** Compact large text keeps account overflow and search usable. */
     @Test
     @Config(sdk = [36], qualifiers = "w320dp-h780dp-mdpi")
     fun compactLargeTextKeepsAccountOverflowAndSearchUsable() {
@@ -299,6 +300,7 @@ class ChatListInlineConnectivityLayoutTest {
         )
     }
 
+    /** Content anchor top. */
     private fun contentAnchorTop(): Float =
         composeRule
             .onNodeWithTag(CHAT_LIST_CONTENT_ANCHOR_TAG)
@@ -306,6 +308,7 @@ class ChatListInlineConnectivityLayoutTest {
             .boundsInRoot
             .top
 
+    /** Builds the app state fixture with the given number of accounts. */
     private fun testAppState(accountCount: Int = 1): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,

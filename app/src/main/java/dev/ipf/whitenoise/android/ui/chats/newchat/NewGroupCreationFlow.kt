@@ -55,6 +55,7 @@ private fun NewGroupAccountFlow(
     var active by remember { mutableStateOf(true) }
     DisposableEffect(Unit) { onDispose { active = false } }
 
+    /** True while the flow still belongs to the account and runtime that started it. */
     fun current() =
         active &&
             account != null &&

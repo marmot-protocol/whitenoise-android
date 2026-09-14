@@ -107,6 +107,7 @@ class MessageReactionSummaryAnimationTest {
         )
     }
 
+    /** Reaction pills follow the updated tallies. */
     @Test
     fun reactionPillsFollowTheUpdatedTallies() {
         var tallies by mutableStateOf(listOf(ReactionTally(emoji = "👍", count = 1, mine = true)))
@@ -128,6 +129,7 @@ class MessageReactionSummaryAnimationTest {
         composeRule.onNodeWithText("2", useUnmergedTree = true).assertExists()
     }
 
+    /** Reaction chip content update does not change host height. */
     @Test
     fun reactionChipContentUpdateDoesNotChangeHostHeight() {
         var tallies by mutableStateOf(listOf(ReactionTally(emoji = "👍", count = 1, mine = true)))

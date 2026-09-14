@@ -41,6 +41,7 @@ class SharedMediaVisibilityTest {
         )
     }
 
+    /** Visual media preserves combined newest first order. */
     @Test
     fun visualMediaPreservesCombinedNewestFirstOrder() {
         val messages =
@@ -79,6 +80,7 @@ class SharedMediaVisibilityTest {
         }
     }
 
+    /** Viewer keeps current page across loading and clears only confirmed removal. */
     @Test
     fun viewerKeepsCurrentPageAcrossLoadingAndClearsOnlyConfirmedRemoval() {
         val tiles =

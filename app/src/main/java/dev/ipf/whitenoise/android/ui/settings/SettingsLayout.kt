@@ -111,6 +111,7 @@ internal fun SettingsList(
                 val list = this
                 val scope =
                     object : LazyListScope by list {
+                        /** Adds one lazy item to the settings list. */
                         override fun item(
                             key: Any?,
                             contentType: Any?,

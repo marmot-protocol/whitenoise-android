@@ -22,6 +22,7 @@ internal object ChatRowPortFixtures {
     const val TITLE = "Review group"
     const val PREVIEW = "A local message preview long enough to span two lines at the narrow screen width."
 
+    /** Builds the state fixture for the test. */
     fun state(context: Context): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
@@ -31,6 +32,7 @@ internal object ChatRowPortFixtures {
             activeAccountRef = ACCOUNT_REF,
         )
 
+    /** Builds a list item fixture. */
     fun item(
         membership: SelfMembershipFfi = SelfMembershipFfi.MEMBER,
         pinned: Boolean = false,
@@ -79,6 +81,7 @@ internal object ChatRowPortFixtures {
         return ChatListItem(group, null, null, 3, null, projection = projected)
     }
 
+    /** Builds a projected chat-list row fixture. */
     private fun projectedRow(selfMembership: SelfMembershipFfi) =
         ChatListRowFfi(
             selfMembership = selfMembership,
@@ -113,6 +116,7 @@ internal object ChatRowPortFixtures {
             disbandRequest = null,
         )
 
+    /** Builds a group record fixture. */
     private fun groupRecord(selfMembership: SelfMembershipFfi) =
         AppGroupRecordFfi(
             selfMembership = selfMembership,
@@ -143,6 +147,7 @@ internal object ChatRowPortFixtures {
             disbandRequest = null,
         )
 
+    /** Builds an encrypted media reference fixture. */
     private fun encryptedMedia() =
         AppGroupEncryptedMediaComponentFfi(
             componentId = 0x8008u,

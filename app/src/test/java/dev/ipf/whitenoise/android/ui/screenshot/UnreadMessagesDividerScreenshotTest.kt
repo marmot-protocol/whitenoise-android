@@ -40,6 +40,7 @@ class UnreadMessagesDividerScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Unread divider has prototype gaps in light ltr. */
     @Test
     fun unreadDividerHasPrototypeGapsInLightLtr() {
         render(darkTheme = false, rtl = false, fontScale = 1f)
@@ -47,6 +48,7 @@ class UnreadMessagesDividerScreenshotTest {
         composeRule.onNodeWithTag(ROOT_TAG).captureRoboImage("src/test/snapshots/unread_divider_light_ltr.png")
     }
 
+    /** Unread divider has prototype gaps in dark large rtl. */
     @Test
     fun unreadDividerHasPrototypeGapsInDarkLargeRtl() {
         render(darkTheme = true, rtl = true, fontScale = 1.6f)

@@ -34,20 +34,28 @@ import java.util.concurrent.atomic.AtomicInteger
 class ProfileSwitcherNativeDeliveryTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Repeated target selects once and dismisses only after native activation. */
     @Test fun repeatedTargetSelectsOnceAndDismissesOnlyAfterNativeActivation() = heldSelection(Mode.Activate)
 
+    /** Close during native read rejects late activation and navigation. */
     @Test fun closeDuringNativeReadRejectsLateActivationAndNavigation() = heldSelection(Mode.Close)
 
+    /** Wipe during native read rejects late activation and navigation. */
     @Test fun wipeDuringNativeReadRejectsLateActivationAndNavigation() = heldSelection(Mode.Wipe)
 
+    /** Sign out during native read rejects late activation and navigation. */
     @Test fun signOutDuringNativeReadRejectsLateActivationAndNavigation() = heldSelection(Mode.SignOut)
 
+    /** Disposed sheet rejects late activation and navigation. */
     @Test fun disposedSheetRejectsLateActivationAndNavigation() = heldSelection(Mode.Dispose)
 
+    /** Removal during native read rejects late activation and navigation. */
     @Test fun removalDuringNativeReadRejectsLateActivationAndNavigation() = heldSelection(Mode.Remove)
 
+    /** Callback only recomposition uses current completion. */
     @Test fun callbackOnlyRecompositionUsesCurrentCompletion() = heldSelection(Mode.Callback)
 
+    /** Newer row selection supersedes held native target. */
     @Test fun newerRowSelectionSupersedesHeldNativeTarget() = heldSelection(Mode.Supersede)
 
     /** Holds the synchronous FFI read on native IO, then waits for the production request's terminal fence. */

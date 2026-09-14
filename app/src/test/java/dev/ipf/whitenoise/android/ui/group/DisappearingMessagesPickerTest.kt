@@ -188,6 +188,7 @@ class DisappearingMessagesPickerTest {
         }
     }
 
+    /** Opens custom dialog. */
     private fun openCustomDialog() {
         composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).performClick()
         composeRule.waitForIdle()

@@ -38,6 +38,7 @@ class ReactionSummaryChipAmoledStyleTest {
         assertPillRoles(amoled = false)
     }
 
+    /** Asserts pill roles. */
     private fun assertPillRoles(amoled: Boolean) {
         var selectedContainer = Color.Unspecified
         var unselectedContainer = Color.Unspecified

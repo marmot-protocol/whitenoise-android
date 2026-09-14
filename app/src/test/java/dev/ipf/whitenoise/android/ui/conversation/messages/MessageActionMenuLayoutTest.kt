@@ -313,6 +313,7 @@ class MessageActionMenuLayoutTest {
         assertEquals(163, position.y)
     }
 
+    /** Maximum menu uses prototype single column with delete last. */
     @Test
     fun maximumMenuUsesPrototypeSingleColumnWithDeleteLast() {
         renderMenu(fontScale = 1f)
@@ -343,6 +344,7 @@ class MessageActionMenuLayoutTest {
             .captureRoboImage("src/test/snapshots/message_action_menu_share_light.png")
     }
 
+    /** Large font falls back to one readable column. */
     @Test
     fun largeFontFallsBackToOneReadableColumn() {
         renderMenu(fontScale = 2f, literalCode = true)
@@ -367,6 +369,7 @@ class MessageActionMenuLayoutTest {
         )
     }
 
+    /** Rtl keeps single column command order. */
     @Test
     fun rtlKeepsSingleColumnCommandOrder() {
         renderMenu(fontScale = 1f, layoutDirection = LayoutDirection.Rtl)
@@ -375,6 +378,7 @@ class MessageActionMenuLayoutTest {
         assertEquals(bounds("Reply").right, bounds("Edit").right, 0.5f)
     }
 
+    /** Every maximum variant action invokes its original callback. */
     @Test
     fun everyMaximumVariantActionInvokesItsOriginalCallback() {
         val callbacks = mutableListOf<String>()
@@ -462,6 +466,7 @@ class MessageActionMenuLayoutTest {
         assertTrue(picker.right <= menu.right)
     }
 
+    /** Composes the menu under test with the given fixture. */
     private fun renderMenu(
         fontScale: Float,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,

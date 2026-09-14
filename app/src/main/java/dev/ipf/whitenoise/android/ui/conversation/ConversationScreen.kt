@@ -1121,6 +1121,7 @@ internal fun ConversationScreen(
         }.collect(sink::onViewport)
     }
 
+    /** Extends the drag selection to the row under the pointer; true when the endpoint changed. */
     @Suppress("ReturnCount") // Guard clauses keep invalid live-timeline gesture state explicit.
     fun updateMessageDragSelection(pointerWindowY: Float): Boolean {
         val anchorId = dragAnchorTimelineId ?: return false
@@ -1961,6 +1962,7 @@ internal fun ConversationScreen(
         ) { true }
     }
 
+    /** Persists the chosen quick-reaction emojis. */
     fun saveQuickReactionEmojis(choices: List<String>) {
         quickReactionEmojisTouched = true
         scope.launch {
@@ -2343,6 +2345,7 @@ internal fun ConversationScreen(
         scrollToSearchMatch(target)
     }
 
+    /** Closes in-conversation search and clears its query and pinned match. */
     fun closeSearch() {
         navigationState.searchOpen = false
         navigationState.searchQuery = ""

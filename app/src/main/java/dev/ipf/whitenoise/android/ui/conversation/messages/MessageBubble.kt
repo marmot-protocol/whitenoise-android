@@ -174,6 +174,7 @@ internal fun messageBubbleBorder(
     }
 }
 
+/** Accent for a reply preview, inside or beside the bubble, honouring custom bubble colours. */
 internal fun replyPreviewAccentArgb(
     insideBubble: Boolean,
     customBubbleColorActive: Boolean,
@@ -185,6 +186,7 @@ internal fun replyPreviewAccentArgb(
         null
     }
 
+/** Bubble colours and shape for the direction, deletion state and custom colour. */
 @Composable
 internal fun messageBubblePresentation(
     deleted: Boolean,
@@ -222,6 +224,7 @@ internal fun messageBubblePresentation(
     )
 }
 
+/** Fill colour of a bubble for the direction, deletion state and custom colour. */
 @Composable
 internal fun messageBubbleFillColor(
     deleted: Boolean,
@@ -229,6 +232,7 @@ internal fun messageBubbleFillColor(
     persistedFailure: Boolean = false,
 ): Color = colorFromArgb(messageBubblePresentation(deleted, mine, persistedFailure = persistedFailure).backgroundArgb)
 
+/** Footer time colour for the direction and state. */
 @Composable
 internal fun messageBubbleTimestampColor(
     mine: Boolean,

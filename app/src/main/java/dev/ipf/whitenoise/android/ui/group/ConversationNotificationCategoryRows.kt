@@ -45,6 +45,7 @@ internal fun ConversationNotificationCategoriesList(
     }
 }
 
+/** Settings group for one notification category: the Android settings link and the scope switch. */
 @Composable
 private fun ConversationNotificationCategoryGroup(
     setting: ConversationNotificationCategorySetting,

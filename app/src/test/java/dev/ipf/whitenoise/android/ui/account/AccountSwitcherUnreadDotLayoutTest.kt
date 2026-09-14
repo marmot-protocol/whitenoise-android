@@ -75,6 +75,7 @@ class AccountSwitcherUnreadDotLayoutTest {
         assertEquals(1, accountStackTargetIndex(78f, width * 2f, 3, LayoutDirection.Ltr))
     }
 
+    /** Selector rows receive rapid center taps without neighbor dispatch. */
     @Test
     fun selectorRowsReceiveRapidCenterTapsWithoutNeighborDispatch() {
         val switched = mutableListOf<String>()
@@ -118,6 +119,7 @@ class AccountSwitcherUnreadDotLayoutTest {
         assertEquals(listOf(1), opened)
     }
 
+    /** Selector exposes one named accessibility action per account and pinned destination. */
     @Test
     fun selectorExposesOneNamedAccessibilityActionPerAccountAndPinnedDestination() {
         val switched = mutableListOf<String>()
@@ -142,6 +144,7 @@ class AccountSwitcherUnreadDotLayoutTest {
         assertEquals(1, settings)
     }
 
+    /** Adjacent selector unread badges remain inside their own rows. */
     @Test
     fun adjacentSelectorUnreadBadgesRemainInsideTheirOwnRows() {
         renderSelector(
@@ -155,6 +158,7 @@ class AccountSwitcherUnreadDotLayoutTest {
         assertUnreadBadgeOwnedByRow("account-3", neighbor = "account-2")
     }
 
+    /** Rtl adjacent selector unread badges remain inside their own rows. */
     @Test
     fun rtlAdjacentSelectorUnreadBadgesRemainInsideTheirOwnRows() {
         renderSelector(
@@ -168,6 +172,7 @@ class AccountSwitcherUnreadDotLayoutTest {
         assertUnreadBadgeOwnedByRow("account-3", neighbor = "account-2")
     }
 
+    /** Active account unread announces unread on the profile selector action. */
     @Test
     fun activeAccountUnreadAnnouncesUnreadOnTheProfileSelectorAction() {
         renderTopBar(testAppState(accountCount = 2).also { it.updateAccountUnreadCount("personal", 2uL) })
@@ -181,6 +186,7 @@ class AccountSwitcherUnreadDotLayoutTest {
         composeRule.onNodeWithTag(OTHER_ACCOUNT_STACK_TAG).assertDoesNotExist()
     }
 
+    /** Other account unread announces its count on the actual selector row. */
     @Test
     fun otherAccountUnreadAnnouncesItsCountOnTheActualSelectorRow() {
         renderTopBar(testAppState(accountCount = 2).also { it.updateAccountUnreadCount("account-2", 1uL) })
@@ -195,6 +201,7 @@ class AccountSwitcherUnreadDotLayoutTest {
         assertUnreadBadgeOwnedByRow("account-2", neighbor = "personal")
     }
 
+    /** Read accounts render no unread dots. */
     @Test
     fun readAccounts_renderNoUnreadDots() {
         renderTopBar(appState = testAppState(accountCount = 3))
@@ -210,6 +217,7 @@ class AccountSwitcherUnreadDotLayoutTest {
             .assertDoesNotExist()
     }
 
+    /** Switching active account moves unread ownership from selector row to active avatar. */
     @Suppress("LongMethod")
     @Test
     fun switchingActiveAccountMovesUnreadOwnershipFromSelectorRowToActiveAvatar() {
@@ -262,6 +270,7 @@ class AccountSwitcherUnreadDotLayoutTest {
             .assertHasClickAction()
     }
 
+    /** Last selector unread badge is not covered by another row or pinned actions. */
     @Test
     fun lastSelectorUnreadBadgeIsNotCoveredByAnotherRowOrPinnedActions() {
         renderSelector(testAppState(accountCount = 5).also { it.updateAccountUnreadCount("account-5", 1uL) })
@@ -315,6 +324,7 @@ class AccountSwitcherUnreadDotLayoutTest {
         assertEquals(0, marmotAccesses)
     }
 
+    /** Renders top bar. */
     private fun renderTopBar(
         appState: WhiteNoiseAppState,
         rtl: Boolean = false,
@@ -347,14 +357,17 @@ class AccountSwitcherUnreadDotLayoutTest {
         composeRule.waitForIdle()
     }
 
+    /** Bounds of the node with the given tag. */
     private fun boundsForTag(tag: String): Rect =
         composeRule
             .onNodeWithTag(tag, useUnmergedTree = true)
             .fetchSemanticsNode()
             .boundsInRoot
 
+    /** Test tag of a profile row. */
     private fun profileRowTag(label: String): String = "profile_switcher.profile.$label"
 
+    /** Bounds of the unread badge node. */
     private fun unreadBadgeBounds(label: String): Rect =
         composeRule
             .onNode(
@@ -365,6 +378,7 @@ class AccountSwitcherUnreadDotLayoutTest {
             .fetchSemanticsNode()
             .boundsInRoot
 
+    /** Asserts unread badge owned by row. */
     private fun assertUnreadBadgeOwnedByRow(
         label: String,
         neighbor: String,

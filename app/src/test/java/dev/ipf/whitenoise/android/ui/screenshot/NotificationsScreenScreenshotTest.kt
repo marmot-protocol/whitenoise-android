@@ -54,6 +54,7 @@ class NotificationsScreenScreenshotTest {
         )
     }
 
+    /** Renders the fixture and records its screenshot baseline. */
     private fun capture(
         name: String,
         darkTheme: Boolean,

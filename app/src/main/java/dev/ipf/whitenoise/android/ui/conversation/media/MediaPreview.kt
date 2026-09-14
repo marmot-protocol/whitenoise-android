@@ -238,6 +238,7 @@ internal fun previewIndexAfterRemoval(
         else -> currentIndex.coerceIn(0, remainingCount - 1)
     }
 
+/** Full-screen preview of staged media before sending. */
 @Composable
 internal fun MediaPreviewScreen(
     mediaSlots: List<PendingMediaSlot>,
@@ -537,6 +538,7 @@ private fun previewCaptionFieldColors() =
         unfocusedPlaceholderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
     )
 
+/** Large preview of the selected staged item. */
 @Composable
 private fun HeroMediaPreview(
     uri: android.net.Uri,
@@ -607,6 +609,7 @@ private fun HeroDocumentPreview(
     }
 }
 
+/** Thumbnail in the staged-items strip. */
 @Composable
 private fun PreviewStripThumb(
     item: StagedPreviewItem,

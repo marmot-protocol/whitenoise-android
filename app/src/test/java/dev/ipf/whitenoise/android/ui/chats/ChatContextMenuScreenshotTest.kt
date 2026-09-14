@@ -29,24 +29,32 @@ import org.robolectric.annotation.GraphicsMode
 class ChatContextMenuScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Screenshot: light theme. */
     @Test fun light() = capture("chat_context_menu_light")
 
+    /** Screenshot: dark theme. */
     @Test fun dark() = capture("chat_context_menu_dark", dark = true)
 
+    /** Screenshot: AMOLED. */
     @Test fun amoled() = capture("chat_context_menu_amoled", dark = true, amoled = true)
 
+    /** Large rtl. */
     @Test fun largeRtl() = capture("chat_context_menu_rtl_200", rtl = true)
 
+    /** Ended membership. */
     @Test fun endedMembership() = capture("chat_context_menu_left", left = true)
 
+    /** Density fixture for a high-density render. */
     @Test
     @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-xxhdpi")
     fun highDensity() = capture("chat_context_menu_amoled_xxhdpi", dark = true, amoled = true)
 
+    /** Short landscape large rtl. */
     @Test
     @Config(sdk = [36], qualifiers = "en-w640dp-h300dp-land-mdpi")
     fun shortLandscapeLargeRtl() = capture("chat_context_menu_landscape_rtl_200", rtl = true)
 
+    /** Renders the fixture and records its screenshot baseline. */
     @Suppress("LongParameterList")
     private fun capture(
         name: String,

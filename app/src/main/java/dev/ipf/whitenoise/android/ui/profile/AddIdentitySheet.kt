@@ -59,6 +59,7 @@ internal fun AddIdentitySheet(
         if (!session.ownsEntry()) session.dismiss()
     }
 
+    /** Runs an onboarding action as the sheet's single in-flight work item. */
     fun start(
         action: OnboardingAction,
         work: suspend () -> Unit,
@@ -84,6 +85,7 @@ internal fun AddIdentitySheet(
         }
     }
 
+    /** Imports the entered key. */
     fun startImport() {
         val submitted = session.key.text.toString()
         if (submitted.isBlank()) return

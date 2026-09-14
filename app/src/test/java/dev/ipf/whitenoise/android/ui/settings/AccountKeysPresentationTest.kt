@@ -119,6 +119,7 @@ class AccountKeysPresentationTest {
         )
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         fontScale: Float = 1f,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
@@ -139,6 +140,7 @@ class AccountKeysPresentationTest {
         }
     }
 
+    /** App state with npub. */
     private fun appStateWithNpub(
         npub: String,
         localSigning: Boolean,
@@ -155,6 +157,7 @@ class AccountKeysPresentationTest {
         return appState
     }
 
+    /** Active account. */
     private fun activeAccount(localSigning: Boolean) =
         AccountSummaryFfi(
             label = ACCOUNT_REF,

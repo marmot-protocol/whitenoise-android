@@ -110,6 +110,7 @@ class QrScannerContentTest {
         composeRule.onNodeWithTag("qr_scanner.target").assertDoesNotExist()
     }
 
+    /** Shows the surface under test. */
     private fun show(
         granted: Boolean,
         permanent: Boolean = false,

@@ -147,6 +147,7 @@ class ProfileStartGroupNavigationTest {
             .assertDoesNotExist()
     }
 
+    /** Profile arm dismisses profile new group overlay. */
     @Test
     fun profileArmDismissesProfileNewGroupOverlay() {
         val foregroundState = ProfileGroupForegroundState().apply { open(viewedCandidate()) }
@@ -185,6 +186,7 @@ class ProfileStartGroupNavigationTest {
             .assertDoesNotExist()
     }
 
+    /** Profile replacement while new group active shows replacement profile. */
     @Test
     fun profileReplacementWhileNewGroupActive_showsReplacementProfile() {
         val foregroundState = ProfileGroupForegroundState().apply { open(viewedCandidate()) }
@@ -229,6 +231,7 @@ class ProfileStartGroupNavigationTest {
         assertOwnerSurfaceVisible(fixture)
     }
 
+    /** Shell profile handoff shows selected member and back clears overlays. */
     @Test
     fun shellProfileHandoffShowsSelectedMemberAndBackClearsOverlays() {
         val fixture = renderProfileHandoff(conversationController = null, ownerSurface = SHELL_SURFACE)
@@ -246,6 +249,7 @@ class ProfileStartGroupNavigationTest {
         assertNoProfileOrPickerOverlay(fixture)
     }
 
+    /** Conversation profile handoff removes admin sheet and back clears overlays. */
     @Test
     fun conversationProfileHandoffRemovesAdminSheetAndBackClearsOverlays() {
         val fixture = profileFixture(CONVERSATION_SURFACE)
@@ -355,6 +359,7 @@ class ProfileStartGroupNavigationTest {
         )
     }
 
+    /** Conversation controller. */
     private fun conversationController(appState: WhiteNoiseAppState): ConversationController =
         ConversationController(
             appState = appState,
@@ -368,6 +373,7 @@ class ProfileStartGroupNavigationTest {
                 ),
         )
 
+    /** Asserts profile action visible. */
     private fun assertProfileActionVisible(scrollToAction: Boolean) {
         val action =
             composeRule.onNodeWithText(
@@ -377,6 +383,7 @@ class ProfileStartGroupNavigationTest {
         action.assertIsDisplayed().assertIsEnabled()
     }
 
+    /** Starts group from profile. */
     private fun startGroupFromProfile() {
         composeRule
             .onNodeWithText(app.getString(R.string.person_start_group))
@@ -385,6 +392,7 @@ class ProfileStartGroupNavigationTest {
         composeRule.waitForIdle()
     }
 
+    /** Asserts selected member picker. */
     private fun assertSelectedMemberPicker(fixture: HandoffFixture) {
         composeRule.onNodeWithText(app.getString(R.string.new_group)).assertIsDisplayed()
         composeRule
@@ -395,12 +403,14 @@ class ProfileStartGroupNavigationTest {
         composeRule.onNodeWithContentDescription(app.getString(R.string.back)).assertIsEnabled()
     }
 
+    /** Asserts profile overlay absent. */
     private fun assertProfileOverlayAbsent() {
         composeRule
             .onNodeWithText(app.getString(R.string.person_start_group))
             .assertDoesNotExist()
     }
 
+    /** Asserts owner surface visible. */
     private fun assertOwnerSurfaceVisible(fixture: HandoffFixture) {
         composeRule.onNodeWithText(fixture.ownerSurface).assertIsDisplayed()
     }
@@ -409,6 +419,7 @@ class ProfileStartGroupNavigationTest {
         composeRule.onNodeWithText(fixture.ownerSurface).assertDoesNotExist()
     }
 
+    /** Asserts no profile or picker overlay. */
     private fun assertNoProfileOrPickerOverlay(fixture: HandoffFixture) {
         assertProfileOverlayAbsent()
         composeRule

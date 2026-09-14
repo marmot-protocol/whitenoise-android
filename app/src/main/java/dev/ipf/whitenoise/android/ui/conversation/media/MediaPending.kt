@@ -48,6 +48,7 @@ import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** Placeholder for attachments still uploading, with retry on failure. */
 @Composable
 internal fun MediaPendingPlaceholder(
     pendingAttachments: List<PendingAttachment>,

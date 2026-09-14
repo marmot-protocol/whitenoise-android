@@ -92,6 +92,7 @@ internal fun SignUpScreen(
             }
     }
 
+    /** Submits sign-up after the connectivity check. */
     fun submit() {
         if (preparingPhoto || stage.busy) return
         if (!hasValidatedInternet()) {
@@ -106,6 +107,7 @@ internal fun SignUpScreen(
         }
     }
 
+    /** Back asks to confirm leaving once an identity was accepted. */
     fun back() {
         if (stage.busy) return
         if (controller.acceptedIdentity != null && stage != SignUpStage.OwnerChanged) {

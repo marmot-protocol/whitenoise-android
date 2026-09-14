@@ -63,8 +63,10 @@ import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 internal const val CHAT_LIST_FILTER_CHIP_ALL_TAG = "chats.scope.chats"
 internal const val CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG = "chat-list-other-account-avatars"
 
+/** Stable test tag for a folder pill. */
 internal fun chatListFilterChipTag(folderId: String): String = "chats.folder.$folderId"
 
+/** Chat list header: account avatar and quick switch, or the search field with its filter action. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod", "UnusedParameter", "FunctionNaming")
 @Composable
@@ -97,10 +99,12 @@ internal fun ChatListTopBar(
         }
     }
 
+    /** Opens the account selector unless sign-out or a wipe is in progress. */
     fun openSelector() {
         if (!appState.signOutInProgress && !appState.wipeInProgress) showSelector = true
     }
 
+    /** Switches to the next quick-cycle account through the caller's handler or the app state. */
     fun cycle() {
         if (appState.quickProfileCycleTarget() == null) return
         if (onCycleAccount != null) {

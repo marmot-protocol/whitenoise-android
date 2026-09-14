@@ -165,6 +165,7 @@ class DetailsSurfacePolishScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshot")
     }
 
+    /** Captures profile. */
     private fun captureProfile(
         snapshot: String,
         targetHex: String?,

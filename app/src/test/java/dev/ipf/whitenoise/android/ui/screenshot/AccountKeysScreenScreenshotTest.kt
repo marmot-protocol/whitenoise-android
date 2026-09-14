@@ -64,6 +64,7 @@ class AccountKeysScreenScreenshotTest {
     @Test
     fun profileKeysAmberLight() = capture("profile_keys_amber_light", darkTheme = false, localSigning = false)
 
+    /** Renders the fixture and records its screenshot baseline. */
     private fun capture(
         snapshotName: String,
         darkTheme: Boolean,
@@ -89,6 +90,7 @@ class AccountKeysScreenScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshotName.png")
     }
 
+    /** Account state. */
     private fun accountState(localSigning: Boolean): WhiteNoiseAppState {
         val appState =
             WhiteNoiseAppState(

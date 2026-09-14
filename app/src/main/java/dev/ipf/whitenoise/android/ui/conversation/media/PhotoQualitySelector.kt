@@ -98,6 +98,7 @@ private enum class PhotoSendQualityTier(
     ),
 }
 
+/** Maps the selectable quality to the send tier. */
 private fun MediaQuality.sendQualityTier(): PhotoSendQualityTier =
     if (selectablePhotoQuality() == MediaQuality.Standard) {
         PhotoSendQualityTier.Standard

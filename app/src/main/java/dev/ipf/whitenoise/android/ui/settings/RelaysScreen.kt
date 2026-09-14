@@ -65,6 +65,7 @@ internal fun RelaysScreen(
     val account = appState.activeAccountRef
     val feedbackRuntime = appState.runtimeGeneration
 
+    /** Shows publication feedback once the owning account is still active. */
     fun deliverFeedback(previous: dev.ipf.whitenoise.android.state.ToastMessage?) {
         val sameOwner = appState.activeAccountRef == account && appState.runtimeGeneration == feedbackRuntime
         val fresh = appState.toast?.takeIf { it !== previous }
@@ -79,6 +80,7 @@ internal fun RelaysScreen(
     var rejectedUrl by rememberSaveable(account) { mutableStateOf<String?>(null) }
     var restoreDialog by rememberSaveable(account) { mutableStateOf(false) }
 
+    /** Runs a relay list publication with progress and feedback. */
     fun runPublication(
         operation: RelayPublicationOperation,
         block: suspend () -> AccountRelayListsFfi?,
@@ -98,6 +100,7 @@ internal fun RelaysScreen(
         }
     }
 
+    /** Runs a relay list edit under the shared mutation launcher. */
     fun runEdit(block: suspend () -> AccountRelayListsFfi?) {
         operations.launch(launcher = appState::launchMutation) {
             val previousToast = appState.toast

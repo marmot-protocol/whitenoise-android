@@ -71,6 +71,7 @@ class SettingsAppUpdateActionTest {
             assertEquals(1, updates)
         }
 
+    /** Available. */
     private fun available() =
         AppUpdateInfo(
             installedVersion = "2026.9.11",

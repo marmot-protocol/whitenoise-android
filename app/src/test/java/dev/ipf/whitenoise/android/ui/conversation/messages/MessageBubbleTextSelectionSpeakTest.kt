@@ -89,6 +89,7 @@ class MessageBubbleTextSelectionSpeakTest {
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val app = ApplicationProvider.getApplicationContext<Application>()
 
+    /** Long press action menu speak queues through app state at message top. */
     @Test
     fun longPressActionMenuSpeakQueuesThroughAppStateAtMessageTop() {
         val engine = FakeSessionEngine()
@@ -195,6 +196,7 @@ class MessageBubbleTextSelectionSpeakTest {
         assertEquals("Second sentence.", engine.spoken.last().text)
     }
 
+    /** Double tap seeks inside active truncated message projection. */
     @Test
     fun doubleTapSeeksInsideActiveTruncatedMessageProjection() {
         val engine = FakeSessionEngine()
@@ -349,6 +351,7 @@ class MessageBubbleTextSelectionSpeakTest {
         assertEquals(sessionId, appState.ttsController.state.value.sessionId)
     }
 
+    /** Select text from action menu speak clears mode and starts at pressed sentence. */
     @Test
     @Suppress("LongMethod")
     fun selectTextFromActionMenuSpeakClearsModeAndStartsAtPressedSentence() {
@@ -411,6 +414,7 @@ class MessageBubbleTextSelectionSpeakTest {
         }
     }
 
+    /** Native selection menu speak uses same speak path. */
     @Test
     @Suppress("LongMethod")
     fun nativeSelectionMenuSpeakUsesSameSpeakPath() {
@@ -459,6 +463,7 @@ class MessageBubbleTextSelectionSpeakTest {
         )
     }
 
+    /** Native selection menu replaces system read aloud and keeps other process text actions. */
     @Test
     @Suppress("LongMethod")
     fun nativeSelectionMenuReplacesSystemReadAloudAndKeepsOtherProcessTextActions() {
@@ -652,6 +657,7 @@ class MessageBubbleTextSelectionSpeakTest {
         }
     }
 
+    /** Message bubble host. */
     @Composable
     @Suppress("LongParameterList")
     private fun messageBubbleHost(

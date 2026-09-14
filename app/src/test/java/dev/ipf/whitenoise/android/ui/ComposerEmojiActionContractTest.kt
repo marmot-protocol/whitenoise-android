@@ -39,6 +39,7 @@ class ComposerEmojiActionContractTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    /** Composer uses the shared action and exposes its keyboard toggle state. */
     @Test
     fun composerUsesTheSharedActionAndExposesItsKeyboardToggleState() {
         var pickerOpen by mutableStateOf(false)

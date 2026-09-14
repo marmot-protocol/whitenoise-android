@@ -63,6 +63,7 @@ class AddIdentitySheetRecoveryTest {
         composeRule.onNodeWithText(app.getString(R.string.identity_entry_error_import_failed)).assertExists()
     }
 
+    /** Adding an account never recovers an incomplete setup. */
     @Test
     fun addingAnAccountNeverRecoversAnIncompleteSetup() {
         val engine =

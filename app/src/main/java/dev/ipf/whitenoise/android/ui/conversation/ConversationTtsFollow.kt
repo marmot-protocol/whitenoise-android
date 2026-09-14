@@ -513,6 +513,7 @@ private data class CompleteTtsSentenceLayout(
     val viewportBoundsInWindow: Rect,
 )
 
+/** Suspends until the target sentence has a complete layout in the registry. */
 private suspend fun awaitCompleteTtsSentenceLayout(
     target: ConversationTtsFollowTarget,
     registry: ConversationTtsSentenceLayoutRegistry,
@@ -531,6 +532,7 @@ private suspend fun awaitCompleteTtsSentenceLayout(
         }.filterNotNull().first()
     }
 
+/** Scrolls the viewport so the Read Aloud target is visible, honouring the follow direction. */
 @Suppress("CyclomaticComplexMethod", "LongMethod")
 internal suspend fun followTtsTargetInViewport(
     target: ConversationTtsFollowTarget,

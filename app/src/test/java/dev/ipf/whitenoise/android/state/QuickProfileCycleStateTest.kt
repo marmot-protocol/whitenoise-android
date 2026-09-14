@@ -51,6 +51,7 @@ class QuickProfileCycleStateTest {
         val preferences = context.getSharedPreferences("cycle-preference-test", Context.MODE_PRIVATE)
         preferences.edit().clear().commit()
 
+        /** Builds the state fixture for the test. */
         fun state(
             accounts: List<AccountSummaryFfi>,
             active: String,

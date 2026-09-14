@@ -60,6 +60,7 @@ class ComposerDictationControlTest {
         assertEquals(REPLY_MESSAGE_ID, controller.state.target?.replyToMessageIdHex)
     }
 
+    /** Focusing unfolds the editor without displacing emoji from its action row. */
     @Test
     fun focusingUnfoldsTheEditorWithoutDisplacingEmojiFromItsActionRow() {
         render()
@@ -172,6 +173,7 @@ class ComposerDictationControlTest {
         assertFalse(controller.ownsMicrophone)
     }
 
+    /** Compact large font rtl layout keeps the emoji action reachable without clipping. */
     @Test
     fun compactLargeFontRtlLayoutKeepsTheEmojiActionReachableWithoutClipping() {
         render(fontScale = 2f, rtl = true)
@@ -211,6 +213,7 @@ class ComposerDictationControlTest {
         val controller = render(fontScale = 2f, rtl = true, withAttachments = true)
         composeRule.onNodeWithContentDescription("Dictate text").performClick()
 
+        /** Records the dispatched action. */
         fun action(label: String) {
             val node = composeRule.onNodeWithContentDescription(label).performScrollTo().assertIsDisplayed()
             val bounds = node.fetchSemanticsNode().boundsInRoot
@@ -283,6 +286,7 @@ class ComposerDictationControlTest {
         )
     }
 
+    /** Builds an idle dictation controller fixture. */
     private fun idleDictationController(draft: TextFieldValue): ConversationDictationController =
         ConversationDictationController(
             platform = FakeDictationPlatform,
@@ -296,18 +300,23 @@ class ComposerDictationControlTest {
     private data object FakeDictationPlatform : ConversationDictationPlatform {
         lateinit var listener: ConversationDictationRecognitionListener
 
+        /** Has record audio permission. */
         override fun hasRecordAudioPermission() = true
 
+        /** Recognition available. */
         override fun recognitionAvailable() = true
 
+        /** Fake recognizer: creates a session. */
         @Suppress("MaxLineLength")
         override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
             this.listener = listener
             return object : ConversationDictationRecognitionSession {
                 override fun start() = Unit
 
+                /** Fake playback: stops. */
                 override fun stop() = Unit
 
+                /** Fake operation: cancels. */
                 override fun cancel() = Unit
 
                 override fun destroy() = Unit

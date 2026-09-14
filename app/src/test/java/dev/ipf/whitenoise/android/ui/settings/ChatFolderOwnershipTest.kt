@@ -259,12 +259,12 @@ class ChatFolderOwnershipTest {
         assertEquals(setOf("g1"), state.chatFolderPreferences.membershipFor(A, folder.id))
     }
 
-    /** Render the real account-scoped list owner. */
+    /** Renders the real account-scoped list owner. */
     private fun showList(state: WhiteNoiseAppState) {
         composeRule.setContent { WhiteNoiseTheme { ChatFoldersScreen(state, {}) } }
     }
 
-    /** Render the real editor owner without removing it on a synthetic completion. */
+    /** Renders the real editor owner without removing it on a synthetic completion. */
     private fun showEditor(
         state: WhiteNoiseAppState,
         folder: String? = null,
@@ -387,7 +387,7 @@ class ChatFolderOwnershipTest {
         }
     }
 
-    /** Capture the installed semantic callback to test before recomposition disables/removes it. */
+    /** Captures the installed semantic callback to test before recomposition disables/removes it. */
     private fun saveAction(): () -> Boolean =
         composeRule
             .onNodeWithTag("folder.save")
@@ -405,6 +405,7 @@ class ChatFolderOwnershipTest {
             activeAccountRef = A,
         )
 
+    /** Builds an account fixture. */
     private fun account(
         ref: String,
         hex: String,
@@ -417,6 +418,7 @@ class ChatFolderOwnershipTest {
         running = true,
     )
 
+    /** Chat item. */
     private fun chatItem(groupIdHex: String): ChatListItem =
         ChatListItem(
             group = group(groupIdHex),
@@ -459,6 +461,7 @@ class ChatFolderOwnershipTest {
                 ),
         )
 
+    /** Builds a group record fixture. */
     private fun group(id: String) =
         AppGroupRecordFfi(
             selfMembership = SelfMembershipFfi.MEMBER,
@@ -489,6 +492,7 @@ class ChatFolderOwnershipTest {
             disbandRequest = null,
         )
 
+    /** Builds an encrypted media reference fixture. */
     private fun encryptedMedia() =
         AppGroupEncryptedMediaComponentFfi(
             componentId = 0x8008u,
@@ -504,8 +508,10 @@ class ChatFolderOwnershipTest {
         )
 
     private class InMemoryDraftPersistence : DraftPersistence {
+        /** In-memory draft persistence: returns the stored values. */
         override fun read(): Map<String, String> = emptyMap()
 
+        /** In-memory draft persistence: stores or clears one value. */
         override fun write(
             key: String,
             value: String?,

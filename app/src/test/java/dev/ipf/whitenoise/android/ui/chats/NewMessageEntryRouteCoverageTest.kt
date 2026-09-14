@@ -6,6 +6,7 @@ import org.junit.Test
 import java.io.File
 
 class NewMessageEntryRouteCoverageTest {
+    /** Empty and non empty chat entry points use the same new message host transition. */
     @Test
     fun emptyAndNonEmptyChatEntryPointsUseTheSameNewMessageHostTransition() {
         val source = sourceFile().readText()

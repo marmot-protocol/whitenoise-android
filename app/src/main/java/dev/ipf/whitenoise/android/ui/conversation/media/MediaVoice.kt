@@ -204,6 +204,7 @@ private object DefaultVoiceAttachmentPresentationRuntime : VoiceAttachmentPresen
     override val playbackState = VoicePlaybackController.state
     override val playbackFailures = VoicePlaybackController.failures
 
+    /** Materializes the voice attachment through the shared attachment cache. */
     override suspend fun materialize(request: VoiceAttachmentMaterializationRequest): java.io.File =
         materializeVoiceAttachment(
             context = request.context,
@@ -330,6 +331,7 @@ internal fun MediaVoiceBubble(
             0f
         }
 
+    /** Drops a corrupt cached voice file so the next play re-downloads it. */
     suspend fun clearBadVoiceCache(reason: String) {
         Log.w("MediaVoiceBubble", "voice_cache_cleared reason=${reason.replace(' ', '_')}")
         clearVoiceAttachmentCacheAfterPlaybackFailure(
@@ -355,6 +357,7 @@ internal fun MediaVoiceBubble(
             AttachmentMaterializationIntent.Idle.withPolicyAllowed(retryAllowedByPolicy)
     }
 
+    /** Plays a materialized voice file after validating the cache entry. */
     suspend fun playReadyVoice(file: java.io.File) {
         val playableFile =
             withContext(Dispatchers.IO) {
@@ -501,6 +504,7 @@ internal fun MediaVoiceBubble(
     "LongMethod",
     "LongParameterList",
 )
+/** Voice bubble content: waveform, play control and download states. */
 internal fun VoiceAttachmentContent(
     loading: Boolean,
     failed: Boolean,

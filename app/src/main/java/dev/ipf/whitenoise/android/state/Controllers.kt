@@ -4689,6 +4689,10 @@ class ChatsController private constructor(
         }
     }
 
+    /**
+     * Pages one chat's timeline backwards until the first eligible body match for the needle and filter
+     * constraints.
+     */
     private suspend fun searchOneChat(
         account: String,
         groupIdHex: String,
@@ -8287,6 +8291,7 @@ class ConversationController(
         return QueuedAttachmentSend(account, key, tempId, optimisticOrder, optimistic)
     }
 
+    /** Builds the optimistic pending record that carries staged attachments until the send confirms. */
     private suspend fun pendingAttachmentRecord(
         tempId: String,
         body: String,

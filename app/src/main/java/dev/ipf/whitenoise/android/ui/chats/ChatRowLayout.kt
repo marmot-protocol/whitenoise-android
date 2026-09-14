@@ -195,6 +195,7 @@ private fun ChatRowTextLayout(
     }
 }
 
+/** Trailing metadata of a row: time, unread or marked-unread badge, invitation or failed-delivery badge. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ChatRowSupportingMetadata(

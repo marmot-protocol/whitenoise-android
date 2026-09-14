@@ -164,11 +164,13 @@ class ChatContextMenuFlowTest {
             assertEquals(0, opens())
         }
 
+    /** Opens the row menu under test. */
     private fun openMenu() {
         composeRule.onNodeWithTag("chat.row.a").performSemanticsAction(SemanticsActions.OnLongClick) { it() }
         composeRule.onNodeWithTag("chat.menu.a").assertIsDisplayed()
     }
 
+    /** Runs the block with the screen composed. */
     private fun withScreen(assertions: (() -> Int, (Boolean) -> Unit, WhiteNoiseAppState) -> Unit) {
         context
             .getSharedPreferences("whitenoise.chat_folders", Context.MODE_PRIVATE)

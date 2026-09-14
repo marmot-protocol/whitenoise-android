@@ -66,6 +66,7 @@ internal fun SignUpPhotoControls(
     val currentPhoto by rememberUpdatedState(onPhoto)
     val currentPreparing by rememberUpdatedState(onPreparing)
 
+    /** Invalidates in-flight photo work and picker sessions. */
     fun invalidate() {
         generation++
         pickerGeneration = null
@@ -83,6 +84,7 @@ internal fun SignUpPhotoControls(
     }
     LaunchedEffect(enabled) { if (!enabled) invalidate() }
 
+    /** Prepares a photo draft, dropping stale generations. */
     fun prepare(action: suspend () -> ImageUploadDraft) {
         if (!currentEnabled || !active) return
         val token = ++generation
@@ -111,6 +113,7 @@ internal fun SignUpPhotoControls(
             }
     }
 
+    /** Handles the picker result when it still belongs to this generation. */
     fun selected(uri: Uri?) {
         val token = pickerGeneration
         pickerGeneration = null

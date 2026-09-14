@@ -99,6 +99,7 @@ class ChatRowPortPresentationTest {
         )
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         item: ChatListItem,
         bodyMatch: MessageBodyMatch? = null,

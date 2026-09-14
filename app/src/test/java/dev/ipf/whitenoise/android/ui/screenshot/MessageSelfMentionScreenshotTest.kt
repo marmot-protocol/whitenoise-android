@@ -204,6 +204,7 @@ private fun MentionMediaBubble(
     }
 }
 
+/** Rich mention bubble. */
 @Composable
 private fun RichMentionBubble() {
     val presentation =

@@ -64,6 +64,7 @@ internal fun FullSpectrumColorPicker(
     val parsedHex = parseOpaqueColorHex(hex)
     val sliderArgb = HsvColor(hue, saturation, brightness).toOpaqueArgb()
 
+    /** Seeds the sliders from an ARGB colour. */
     fun applyHsv(color: Long) {
         val hsv = opaqueArgbToHsv(color)
         hue = hsv.hue
@@ -71,6 +72,7 @@ internal fun FullSpectrumColorPicker(
         brightness = hsv.value
     }
 
+    /** Recomputes the colour from the slider values. */
     fun updateFromSliders(
         h: Float = hue,
         s: Float = saturation,

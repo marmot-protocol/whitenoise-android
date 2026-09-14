@@ -28,6 +28,7 @@ class ProfileEditCachedFirstFrameScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Cached profile owns the first rendered frame. */
     @Test
     fun cachedProfileOwnsTheFirstRenderedFrame() {
         val context = ApplicationProvider.getApplicationContext<Context>()

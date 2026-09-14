@@ -16,6 +16,7 @@ object QrCodeEncoder {
     /** One module of quiet zone by default; Share & Connect draws its modules edge to edge like the prototype. */
     const val DEFAULT_MARGIN_MODULES = 1
 
+    /** Encodes [content] as a QR bit matrix of [size] pixels with the given quiet zone. */
     fun matrix(
         content: String,
         size: Int,
@@ -32,6 +33,7 @@ object QrCodeEncoder {
         return QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size, hints)
     }
 
+    /** Encodes [content] into ARGB pixels of [size] x [size]. */
     fun pixels(
         content: String,
         size: Int,

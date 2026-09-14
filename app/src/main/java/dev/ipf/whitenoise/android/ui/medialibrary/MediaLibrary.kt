@@ -176,6 +176,8 @@ internal data class SharedMediaTiles(
 // Projected rows provide typed media carrying the real source epoch; only
 // optimistic/compatibility records fall back to MarmotKit tag parsing. Keyed
 // on timeline identity so it rebuilds on projection changes, not per frame.
+
+/** Remembers the shared media tiles derived from the loaded timeline. */
 @Composable
 internal fun rememberSharedMediaTiles(
     controller: ConversationController,
@@ -242,6 +244,7 @@ private fun emptySharedMediaTiles() =
         hasOther = false,
     )
 
+/** Tiles for the visible shared media of the loaded messages. */
 internal fun buildVisibleSharedMediaTiles(
     messages: List<TimelineMessage>,
     myAccountId: String?,
@@ -267,6 +270,8 @@ internal fun buildVisibleSharedMediaTiles(
 // Pure tile projection extracted from the composable so it can run on a
 // background dispatcher. Projected rows carry authoritative typed media;
 // optimistic/compatibility records alone fall back to MarmotKit tag parsing.
+
+/** Builds the visual, voice, file and link tiles from the messages. */
 private fun buildTiles(
     messages: List<TimelineMessage>,
     myAccountId: String?,
@@ -359,6 +364,8 @@ internal fun monthKeyForMedia(recordedAtSeconds: ULong): Int {
 // Group already-newest-first items by calendar month, preserving order so
 // section headers read newest → oldest. Runs during tile projection on a
 // background dispatcher — composition only renders the pre-built sections.
+
+/** Groups items into month sections by their recorded time, newest first. */
 internal fun <T> groupIntoMonthSections(
     items: List<T>,
     recordedAtOf: (T) -> ULong,
@@ -386,6 +393,7 @@ internal data class SharedMediaFallback(
     val count: Int = 0,
 )
 
+/** Counts fallback for media the grid cannot show. */
 internal fun sharedMediaFallbackContent(
     videoCount: Int,
     voiceCount: Int,
@@ -414,6 +422,8 @@ internal fun SharedMediaSection(
 // Project resolved image/video tiles onto the per-page descriptors the
 // full-screen viewer pages over. Order is preserved (the tiles are already
 // newest-first), so the gallery swipes newest → oldest matching the grid.
+
+/** Viewer pages for the tiles. */
 internal fun List<SharedMediaTile>.toViewerPages(): List<MediaViewerPage> =
     map { MediaViewerPage(it.messageIdHex, it.attachmentIndex, it.reference, it.mine, it.sender, it.recordedAt) }
 
@@ -533,6 +543,7 @@ private fun MediaLibraryContent(
     }
 }
 
+/** Month-sectioned grid of visual tiles. */
 @Composable
 private fun MediaTileGrid(
     sections: List<MediaMonthSection<SharedMediaTile>>,
@@ -596,6 +607,7 @@ private fun MediaTileGrid(
     }
 }
 
+/** Empty state of a library tab. */
 @Composable
 private fun EmptyPlaceholder(label: String) {
     SharedContentEmptyState(label)
@@ -604,6 +616,8 @@ private fun EmptyPlaceholder(label: String) {
 // Shared LazyColumn skeleton for the Voice/Files/URLs tabs: groups already
 // newest-first items by calendar month and emits a sticky-style month header
 // per section, matching the grids' separators. [keyOf] keys each row stably.
+
+/** Month-sectioned list shared by the voice, file and link tabs. */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun <T> MonthSectionedColumn(
@@ -648,6 +662,7 @@ internal fun <T> MonthSectionedColumn(
     }
 }
 
+/** Voice tab of the library. */
 @Composable
 private fun VoiceLibraryTab(
     tiles: SharedMediaTiles,
@@ -673,6 +688,7 @@ private fun VoiceLibraryTab(
     }
 }
 
+/** One voice row with playback. */
 @Composable
 private fun VoiceLibraryRow(
     row: SharedMediaRow,
@@ -793,6 +809,7 @@ private fun VoiceLibraryRow(
     }
 }
 
+/** Files tab of the library. */
 @Composable
 private fun FileLibraryTab(
     tiles: SharedMediaTiles,
@@ -819,6 +836,7 @@ private fun FileLibraryTab(
     }
 }
 
+/** One file row with open and save actions. */
 @Composable
 private fun FileLibraryRow(
     row: SharedMediaRow,
@@ -847,6 +865,8 @@ private fun FileLibraryRow(
     // The tap is the user-initiated download trigger — files never auto-fetch
     // in the library. Prefer retained bytes for own in-flight sends, mirroring
     // the conversation file bubble.
+
+    /** Loads the row's file bytes from the retained or downloaded attachment. */
     suspend fun fetchBytes(): ByteArray {
         val retained =
             if (row.mine) {
@@ -866,6 +886,7 @@ private fun FileLibraryRow(
             ).await()
     }
 
+    /** Materializes the row's document for opening or saving. */
     suspend fun fetchFile() =
         materializeDocumentAttachment(
             context = context,
@@ -1038,6 +1059,7 @@ private fun FileLibraryRow(
     }
 }
 
+/** Links tab of the library. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun UrlLibraryTab(
@@ -1082,6 +1104,7 @@ private fun UrlLibraryTab(
     }
 }
 
+/** One link row. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun UrlLibraryRow(

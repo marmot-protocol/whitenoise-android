@@ -76,6 +76,7 @@ class ChatListTtsTransportLayoutTest {
             .captureRoboImage("src/test/snapshots/chat_list_tts_transport_dark.png")
     }
 
+    /** Active transport and newest row remain usable at large text in rtl. */
     @Test
     fun activeTransportAndNewestRowRemainUsableAtLargeTextInRtl() {
         var opened = 0
@@ -118,6 +119,7 @@ class ChatListTtsTransportLayoutTest {
         capture("chat_list_tts_transport_error_dark.png")
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         state: ChatListFixtureState = ChatListFixtureState.Loaded,
         darkTheme: Boolean = false,

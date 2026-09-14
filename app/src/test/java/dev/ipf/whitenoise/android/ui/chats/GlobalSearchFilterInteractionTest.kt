@@ -41,6 +41,7 @@ class GlobalSearchFilterInteractionTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
+    /** Filter icon describes the inactive state without selection. */
     @Test
     fun filterIconDescribesTheInactiveStateWithoutSelection() {
         composeRule.setContent {
@@ -54,6 +55,7 @@ class GlobalSearchFilterInteractionTest {
             .assertIsNotSelected()
     }
 
+    /** Active filter icon is selected with the active count. */
     @Test
     fun activeFilterIconIsSelectedWithTheActiveCount() {
         composeRule.setContent {
@@ -75,6 +77,7 @@ class GlobalSearchFilterInteractionTest {
             ).assertIsSelected()
     }
 
+    /** Menu category opens the picker state. */
     @Test
     fun menuCategoryOpensThePickerState() {
         val stateHolder = mutableStateOf(GlobalSearchState(isOpen = true))
@@ -96,6 +99,7 @@ class GlobalSearchFilterInteractionTest {
         composeRule.runOnIdle { assertEquals(GlobalSearchFilterCategory.Folder, stateHolder.value.openFilterCategory) }
     }
 
+    /** Menu offers clear all only while filters are active. */
     @Test
     fun menuOffersClearAllOnlyWhileFiltersAreActive() {
         val stateHolder =
@@ -117,6 +121,7 @@ class GlobalSearchFilterInteractionTest {
         composeRule.runOnIdle { assertFalse(stateHolder.value.hasActiveFilters) }
     }
 
+    /** Folder picker toggles the folder and done dismisses. */
     @Test
     fun folderPickerTogglesTheFolderAndDoneDismisses() {
         val stateHolder =
@@ -135,6 +140,7 @@ class GlobalSearchFilterInteractionTest {
         composeRule.runOnIdle { assertFalse(stateHolder.value.filterSheetOpen) }
     }
 
+    /** Empty folder picker explains that no folder exists. */
     @Test
     fun emptyFolderPickerExplainsThatNoFolderExists() {
         composeRule.setContent {
@@ -147,6 +153,7 @@ class GlobalSearchFilterInteractionTest {
         composeRule.onNodeWithText(context.getString(R.string.chat_list_search_no_folders)).assertExists()
     }
 
+    /** Chat type picker toggles direct chats. */
     @Test
     fun chatTypePickerTogglesDirectChats() {
         val stateHolder =
@@ -162,6 +169,7 @@ class GlobalSearchFilterInteractionTest {
         composeRule.runOnIdle { assertEquals(setOf(GlobalSearchChatType.DIRECT), stateHolder.value.chatTypeFilters) }
     }
 
+    /** Folder chip names the folder and type chip uses the prototype label. */
     @Test
     fun folderChipNamesTheFolderAndTypeChipUsesThePrototypeLabel() {
         composeRule.setContent {
@@ -187,6 +195,7 @@ class GlobalSearchFilterInteractionTest {
             .assertTextEquals(context.getString(R.string.chat_list_search_groups))
     }
 
+    /** Removing active chip clears only that filter. */
     @Test
     fun removingActiveChipClearsOnlyThatFilter() {
         val chat = GlobalSearchChatFilter("g1", "Alice")
@@ -222,6 +231,7 @@ class GlobalSearchFilterInteractionTest {
         }
     }
 
+    /** Active chip has one localized removal description. */
     @Test
     fun activeChipHasOneLocalizedRemovalDescription() {
         val chat = GlobalSearchChatFilter("g1", "Alice")
@@ -245,6 +255,7 @@ class GlobalSearchFilterInteractionTest {
             )
     }
 
+    /** Clear all removes every active filter. */
     @Test
     fun clearAllRemovesEveryActiveFilter() {
         val stateHolder =
@@ -275,6 +286,7 @@ class GlobalSearchFilterInteractionTest {
         }
     }
 
+    /** Custom date active chip shows inclusive range label. */
     @Test
     fun customDateActiveChipShowsInclusiveRangeLabel() {
         val from = LocalDate.of(2026, 7, 1)
@@ -312,6 +324,7 @@ class GlobalSearchFilterInteractionTest {
             .assertTextEquals(expectedLabel)
     }
 
+    /** Clear all button has accessibility description. */
     @Test
     fun clearAllButtonHasAccessibilityDescription() {
         composeRule.setContent {

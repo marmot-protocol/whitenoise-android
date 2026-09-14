@@ -35,6 +35,7 @@ import org.robolectric.annotation.GraphicsMode
 class FocusedMessagePreviewTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Excerpt preserves native styles without any interactive links. */
     @Test fun excerptPreservesNativeStylesWithoutAnyInteractiveLinks() {
         val document =
             MarkdownDocumentFfi(
@@ -62,6 +63,7 @@ class FocusedMessagePreviewTest {
         assertTrue(excerpt.getLinkAnnotations(0, excerpt.length).isEmpty())
     }
 
+    /** Visual canvas shrinks before layout and preserves aspect when constrained. */
     @Test fun visualCanvasShrinksBeforeLayoutAndPreservesAspectWhenConstrained() {
         assertEquals(IntSize(225, 150), focusedVisualCanvasSize(IntSize(300, 200), 400, 600))
         assertEquals(IntSize(200, 100), focusedVisualCanvasSize(IntSize(400, 200), 200, 600))
@@ -69,6 +71,7 @@ class FocusedMessagePreviewTest {
         assertEquals(IntSize.Zero, focusedVisualCanvasSize(IntSize.Zero, 400, 600))
     }
 
+    /** Media only description retains author attachment time and delivery. */
     @Test fun mediaOnlyDescriptionRetainsAuthorAttachmentTimeAndDelivery() {
         assertEquals(
             "Alice, Media attachment, 12:34, Sent",
@@ -76,6 +79,7 @@ class FocusedMessagePreviewTest {
         )
     }
 
+    /** Text preview ellipsizes at five lines without changing source. */
     @Test fun textPreviewEllipsizesAtFiveLinesWithoutChangingSource() {
         val source = "This full original message remains available to native copy and forward. ".repeat(30)
         composeRule.setContent {
@@ -103,6 +107,7 @@ class FocusedMessagePreviewTest {
         assertEquals(source, layout.layoutInput.text.text)
     }
 
+    /** Focused stack centers on its source and clamps to the visible ime frame. */
     @Test fun focusedStackCentersOnItsSourceAndClampsToTheVisibleImeFrame() {
         val provider = FocusedMessageActionsPositionProvider(IntRect(20, 200, 220, 260), null)
         val regular =

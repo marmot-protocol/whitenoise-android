@@ -31,6 +31,7 @@ class KeyPackagesContentTest {
 
     private val app = ApplicationProvider.getApplicationContext<android.content.Context>()
 
+    /** Retained local material is not presented as published or deletable. */
     @Test
     fun retainedLocalMaterialIsNotPresentedAsPublishedOrDeletable() {
         val published =
@@ -65,6 +66,7 @@ class KeyPackagesContentTest {
         composeRule.runOnIdle { assertSame(published, deleteTarget) }
     }
 
+    /** Retained only inventory is distinguished from an empty inventory. */
     @Test
     fun retainedOnlyInventoryIsDistinguishedFromAnEmptyInventory() {
         val retained =
@@ -107,6 +109,7 @@ class KeyPackagesContentTest {
         assertMalformedEventIdIsPresentedButNotDeletable("ab".repeat(33))
     }
 
+    /** Asserts malformed event id is presented but not deletable. */
     private fun assertMalformedEventIdIsPresentedButNotDeletable(eventIdHex: String) {
         val valid = keyPackage(keyPackageId = "valid-relay-package", eventIdHex = "ef".repeat(32), relay = true)
         val malformed = keyPackage(keyPackageId = "malformed-relay-package", eventIdHex = eventIdHex, relay = true)
@@ -138,6 +141,7 @@ class KeyPackagesContentTest {
             .assertIsNotEnabled()
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         packages: List<AccountKeyPackageFfi>,
         onDelete: (AccountKeyPackageFfi) -> Unit = {},

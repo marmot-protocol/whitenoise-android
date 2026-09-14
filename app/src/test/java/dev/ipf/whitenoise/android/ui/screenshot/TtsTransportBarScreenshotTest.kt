@@ -178,6 +178,7 @@ class TtsTransportBarScreenshotTest {
         capture("tts_resume_follow_amoled")
     }
 
+    /** Tts transport bar large font rtl keeps labeled message actions. */
     @Test
     fun ttsTransportBarLargeFontRtlKeepsLabeledMessageActions() {
         render(
@@ -190,6 +191,7 @@ class TtsTransportBarScreenshotTest {
         capture("tts_transport_bar_large_font_rtl_light")
     }
 
+    /** Tts transport bar short window shows the capped native transport. */
     @Test
     @Config(sdk = [36], qualifiers = "w360dp-h240dp-mdpi")
     fun ttsTransportBarShortWindowShowsTheCappedNativeTransport() {
@@ -263,10 +265,13 @@ class TtsTransportBarScreenshotTest {
         return ttsTerminalCompletionDisplayState(lastActive, terminalIdle)
     }
 
+    /** Loading edge. */
     private fun loadingEdge(): TtsHistoryEdgeState = TtsHistoryEdgeState.Loading(TtsHistoryDirection.Older)
 
+    /** Failed edge. */
     private fun failedEdge(): TtsHistoryEdgeState = TtsHistoryEdgeState.Failed(TtsHistoryDirection.Older)
 
+    /** Composes the surface under test with the given fixture. */
     @Suppress("LongParameterList")
     private fun render(
         state: TtsState,

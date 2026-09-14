@@ -181,6 +181,7 @@ internal fun MiniWaveformGlyph(
     }
 }
 
+/** Leading part of the recording strip: the pulsing microphone glyph. */
 @Composable
 internal fun RecordingStripLeading(
     controller: dev.ipf.whitenoise.android.audio.VoiceRecordingController,

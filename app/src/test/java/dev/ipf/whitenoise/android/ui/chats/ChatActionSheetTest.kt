@@ -32,8 +32,10 @@ class ChatActionSheetTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
+    /** Resolves a string resource in the test context. */
     private fun string(res: Int): String = context.getString(res)
 
+    /** Renders inverse actions and routes selection after dismissing. */
     @Test
     fun rendersInverseActionsAndRoutesSelectionAfterDismissing() {
         var dismisses = 0
@@ -77,6 +79,7 @@ class ChatActionSheetTest {
         assertEquals(1, selects)
     }
 
+    /** Omits unread action when membership cannot persist it. */
     @Test
     fun omitsUnreadActionWhenMembershipCannotPersistIt() {
         composeRule.setContent {
@@ -111,6 +114,7 @@ class ChatActionSheetTest {
         composeRule.onNodeWithText(string(R.string.chat_row_action_pin)).assertIsDisplayed()
     }
 
+    /** Renders pinned actions and routes move after dismissing. */
     @Test
     fun rendersPinnedActionsAndRoutesMoveAfterDismissing() {
         var dismisses = 0
@@ -148,6 +152,7 @@ class ChatActionSheetTest {
         assertEquals(1, moveDelta)
     }
 
+    /** Routes pin after dismissing. */
     @Test
     fun routesPinAfterDismissing() {
         var dismisses = 0
@@ -183,6 +188,7 @@ class ChatActionSheetTest {
         assertEquals(1, pins)
     }
 
+    /** Compact large text sheet can scroll to the destructive action. */
     @Test
     @Config(sdk = [36], qualifiers = "w360dp-h320dp-mdpi")
     fun compactLargeTextSheetCanScrollToTheDestructiveAction() {
@@ -221,6 +227,7 @@ class ChatActionSheetTest {
             .assertIsDisplayed()
     }
 
+    /** Action sheet light screenshot. */
     @Test
     fun actionSheetLightScreenshot() {
         renderScreenshotSheet(darkTheme = false)
@@ -229,6 +236,7 @@ class ChatActionSheetTest {
             .captureRoboImage("src/test/snapshots/chat_action_sheet_light.png")
     }
 
+    /** Action sheet dark screenshot. */
     @Test
     fun actionSheetDarkScreenshot() {
         renderScreenshotSheet(darkTheme = true)
@@ -237,6 +245,7 @@ class ChatActionSheetTest {
             .captureRoboImage("src/test/snapshots/chat_action_sheet_dark.png")
     }
 
+    /** Composes the sheet for a screenshot capture. */
     private fun renderScreenshotSheet(darkTheme: Boolean) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme) {

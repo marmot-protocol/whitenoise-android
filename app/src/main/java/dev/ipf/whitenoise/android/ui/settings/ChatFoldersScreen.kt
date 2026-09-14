@@ -69,6 +69,7 @@ internal data class ChatFoldersState(
     val defaultsMissing: Boolean,
 )
 
+/** Presentation state of the folders list. */
 internal fun chatFoldersState(
     folders: List<ChatFolderManageItem>,
     defaultsMissing: Boolean = true,
@@ -106,6 +107,7 @@ private fun ChatFoldersAccountScreen(
     var active by remember { mutableStateOf(true) }
     DisposableEffect(Unit) { onDispose { active = false } }
 
+    /** True while the list still belongs to the active account and runtime. */
     fun canMutate() =
         active &&
             accountRef != null &&
@@ -132,6 +134,7 @@ private fun ChatFoldersAccountScreen(
         return
     }
 
+    /** Moves a folder by [delta] positions. */
     fun move(
         folder: ChatFolder,
         delta: Int,
@@ -359,9 +362,11 @@ private data class ChatFolderEditorTarget(
 @Composable
 internal fun chatFolderDisplayName(folder: ChatFolder): String = chatFolderDisplayName(folder.systemKind, folder.name)
 
+/** Display name of a manage row: its own name or the system kind label. */
 @Composable
 private fun ChatFolderManageItem.displayName(): String = chatFolderDisplayName(systemKind, name)
 
+/** Display name of a folder: its own name or the system kind label. */
 @Composable
 private fun chatFolderDisplayName(
     systemKind: SystemFolderKind?,
@@ -381,6 +386,8 @@ private fun chatFolderDisplayName(
 // Counts what selecting the folder's chip would show, so this stays in
 // lockstep with the chip row's hide-when-empty and filtering decisions:
 // every folder's count derives from its rule, defaults included.
+
+/** Number of chats the folder currently holds. */
 private fun folderChatCount(
     folder: ChatFolder,
     appState: WhiteNoiseAppState,

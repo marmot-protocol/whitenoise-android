@@ -147,6 +147,7 @@ class SettingsHomeBehaviorTest {
         composeRule.onNodeWithTag("settings.app_updates").assertDoesNotExist()
     }
 
+    /** Mounts the composable under test. */
     private fun mount(
         profileCount: Int,
         hasActiveAccount: Boolean = true,
@@ -183,6 +184,7 @@ class SettingsHomeBehaviorTest {
         }
     }
 
+    /** Updates info. */
     private fun updateInfo() =
         AppUpdateInfo(
             installedVersion = "2026.9.11",
@@ -192,6 +194,7 @@ class SettingsHomeBehaviorTest {
             releasesBehind = null,
         )
 
+    /** Scrolls to and click. */
     private fun scrollToAndClick(title: String) {
         composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(title))
         composeRule.onNodeWithText(title).performClick()

@@ -6,6 +6,7 @@ import org.junit.Test
 
 /** Presentation order never mutates the source ordering used for native quick cycling. */
 class ProfileSwitcherPresentationTest {
+    /** Active first retains native order and recovery states. */
     @Test fun activeFirstRetainsNativeOrderAndRecoveryStates() {
         val accounts =
             listOf(
@@ -22,6 +23,7 @@ class ProfileSwitcherPresentationTest {
         assertEquals(true, presented[3].isReadOnly)
     }
 
+    /** Removed active does not create a phantom profile. */
     @Test fun removedActiveDoesNotCreateAPhantomProfile() {
         val state = accountSelectorState(emptyList(), "removed", false)
         assertEquals(emptyList<AccountSelectorAccountState>(), profileSwitcherPresentation(state))

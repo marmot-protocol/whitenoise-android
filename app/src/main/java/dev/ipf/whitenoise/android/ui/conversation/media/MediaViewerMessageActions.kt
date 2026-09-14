@@ -29,10 +29,12 @@ internal class MediaViewerActionGate(
     var currentPage: MediaViewerPage? = null
     private var attached = true
 
+    /** Detaches the actions from the viewer. */
     fun close() {
         attached = false
     }
 
+    /** Runs [action] for the page when the owner is still current. */
     fun dispatch(
         page: MediaViewerPage,
         currentOwner: ConversationMediaViewerOwner,
@@ -113,6 +115,7 @@ internal fun rememberMediaViewerForwardActions(
     val mediaCacheRevision by appState.mediaCacheRevision.collectAsState()
     val hasCachedAttachment = remember(controller, mediaCacheRevision) { controller::hasCachedAttachment }
 
+    /** True while the viewer's account and conversation are still the active ones. */
     fun ownerIsCurrent(): Boolean =
         attached &&
             owner.accountRef != null &&
@@ -121,6 +124,7 @@ internal fun rememberMediaViewerForwardActions(
             controller.boundAccountRef == owner.accountRef &&
             controller.group.groupIdHex == owner.conversationId
 
+    /** Forward payload for the page, or null when its message is gone or expired. */
     fun payloadFor(
         page: MediaViewerPage,
         atSeconds: ULong,

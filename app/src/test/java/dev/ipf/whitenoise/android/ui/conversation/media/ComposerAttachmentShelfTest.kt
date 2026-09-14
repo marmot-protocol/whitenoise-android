@@ -41,6 +41,7 @@ class ComposerAttachmentShelfTest {
     @get:Rule val composeRule = createComposeRule()
     private val context: Context = ApplicationProvider.getApplicationContext()
 
+    /** Visual shelf uses prototype card geometry and independent actions. */
     @Test
     fun visualShelfUsesPrototypeCardGeometryAndIndependentActions() {
         val image = File(context.cacheDir, "shelf-landscape.png")
@@ -89,6 +90,7 @@ class ComposerAttachmentShelfTest {
         assertEquals(0, preview)
     }
 
+    /** Utility shelf keeps filename and removal at large text in rtl. */
     @Test
     fun utilityShelfKeepsFilenameAndRemovalAtLargeTextInRtl() {
         val name = "quarterly-report-final.pdf"
@@ -126,6 +128,7 @@ class ComposerAttachmentShelfTest {
         assertEquals(0, removed)
     }
 
+    /** Sizing and filename suffix remain bounded. */
     @Test
     fun sizingAndFilenameSuffixRemainBounded() {
         assertEquals(68, composerVisualAttachmentWidth(0.1f))

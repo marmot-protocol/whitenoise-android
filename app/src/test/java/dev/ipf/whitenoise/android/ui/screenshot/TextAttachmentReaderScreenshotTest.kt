@@ -160,6 +160,7 @@ class TextAttachmentReaderScreenshotTest {
         assertEquals(longFilenameCandidate.displayName, copied)
     }
 
+    /** Ready actions are accessible and do not offer editing. */
     @Test
     fun readyActionsAreAccessibleAndDoNotOfferEditing() {
         var dismissed = 0
@@ -197,6 +198,7 @@ class TextAttachmentReaderScreenshotTest {
         composeRule.onNodeWithText(string(R.string.edit)).assertDoesNotExist()
     }
 
+    /** Top back clears a real selection before closing the reader. */
     @Test
     fun topBackClearsARealSelectionBeforeClosingTheReader() {
         val source = "select a few words from this attachment"
@@ -248,6 +250,7 @@ class TextAttachmentReaderScreenshotTest {
         composeRule.onNodeWithText(string(R.string.media_open)).assertIsEnabled()
     }
 
+    /** Ordinary markdown long press copies only the selection. */
     @Test
     fun ordinaryMarkdownLongPressCopiesOnlyTheSelection() {
         val fullSource = "ordinary markdown selection words"
@@ -331,6 +334,7 @@ class TextAttachmentReaderScreenshotTest {
         assertFalse(copied == source)
     }
 
+    /** Link tap still uses the existing confirmation flow. */
     @Test
     fun linkTapStillUsesTheExistingConfirmationFlow() {
         val label = "your-bank.example"
@@ -374,6 +378,7 @@ class TextAttachmentReaderScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/text_reader_native_actions_dark_large.png")
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         candidate: TextAttachmentCandidate,
         state: TextAttachmentReaderState,

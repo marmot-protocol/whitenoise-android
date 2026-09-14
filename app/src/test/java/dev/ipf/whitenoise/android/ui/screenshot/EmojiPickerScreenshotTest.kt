@@ -63,6 +63,7 @@ class EmojiPickerScreenshotTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 
+    /** Resolves a string resource in the test context. */
     private fun string(resId: Int): String = context.getString(resId)
 
     /** Seeds three recents so the browse grid opens with the Recent section. */
@@ -209,6 +210,7 @@ class EmojiPickerScreenshotTest {
             .captureRoboImage("src/test/snapshots/emoji_picker_search_amoled.png")
     }
 
+    /** Renders reaction sheet browse pane. */
     private fun renderReactionSheetBrowsePane() {
         renderBrowsePane(
             darkTheme = false,
@@ -219,6 +221,7 @@ class EmojiPickerScreenshotTest {
         )
     }
 
+    /** Renders browse pane. */
     private fun renderBrowsePane(
         darkTheme: Boolean,
         amoled: Boolean,
@@ -248,6 +251,7 @@ class EmojiPickerScreenshotTest {
         }
     }
 
+    /** Waits until the browse grid is composed. */
     private fun waitForBrowseGrid() {
         repeat(100) {
             composeRule.waitForIdle()
@@ -260,6 +264,7 @@ class EmojiPickerScreenshotTest {
         error("Emoji browse grid did not load")
     }
 
+    /** Opens search and type. */
     private fun openSearchAndType(query: String) {
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performClick()
         composeRule.waitForIdle()
@@ -277,6 +282,7 @@ class EmojiPickerScreenshotTest {
         error("Emoji search results did not load for query=$query")
     }
 
+    /** Asserts browse grid layout. */
     private fun assertBrowseGridLayout() {
         composeRule.onNodeWithText(string(R.string.emoji_category_recent)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.emoji_category_smileys_people)).assertIsDisplayed()
@@ -299,6 +305,7 @@ class EmojiPickerScreenshotTest {
         assertStartsNextRow(FIRST_SMILEYS_ROW.last(), SECOND_SMILEYS_ROW.first())
     }
 
+    /** Asserts search grid layout. */
     private fun assertSearchGridLayout() {
         composeRule
             .onNodeWithTag(emojiPickerHeaderTestTag(EmojiCategory.Recent), useUnmergedTree = true)
@@ -390,6 +397,7 @@ class EmojiPickerScreenshotTest {
         )
     }
 
+    /** Bounds of text. */
     private fun boundsOfText(text: String): Rect {
         val bounds =
             composeRule
@@ -399,6 +407,7 @@ class EmojiPickerScreenshotTest {
         return Rect(bounds.left.value, bounds.top.value, bounds.right.value, bounds.bottom.value)
     }
 
+    /** Bounds of tag. */
     private fun boundsOfTag(tag: String): Rect {
         val bounds =
             composeRule
@@ -407,6 +416,7 @@ class EmojiPickerScreenshotTest {
         return Rect(bounds.left.value, bounds.top.value, bounds.right.value, bounds.bottom.value)
     }
 
+    /** Text layout result. */
     private fun textLayoutResult(text: String): TextLayoutResult {
         val results = mutableListOf<TextLayoutResult>()
         composeRule

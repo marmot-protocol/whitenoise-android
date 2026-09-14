@@ -386,12 +386,14 @@ private fun NewMessageAccountScreen(
     val inviteTitle = stringResource(R.string.invite_to_white_noise)
     val inviteMessage = stringResource(R.string.invite_message)
 
+    /** Shares the invite text unless the flow is busy or superseded. */
     fun shareInvite() {
         if (!session.isCurrent() || creatingHex != null || scannerSession != null) return
         launchInviteShare(context, inviteMessage, inviteTitle)
             .onFailure { appState.presentOutboundShareFailure("INVITE_SHARE", it) }
     }
 
+    /** Leaves the screen through [action] after closing the scanner, unless the flow is busy. */
     fun leaveScreen(action: () -> Unit) {
         if (!session.isCurrent() || creatingHex != null || scannerSession != null) return
         scannerSession = null
@@ -436,6 +438,7 @@ private fun NewMessageAccountScreen(
             }
         }
 
+    /** Opens the existing direct chat with the recipient or creates it, tracking progress by hex. */
     @Suppress("LongMethod") // Native attempt callbacks share the same captured recipient and lifetime.
     fun openOrCreateChat(
         npub: String,
@@ -504,6 +507,7 @@ private fun NewMessageAccountScreen(
         }
     }
 
+    /** Starts or opens the direct chat with a search candidate. */
     fun startOrOpenConversation(candidate: RecipientSearch.Candidate) {
         openOrCreateChat(
             npub = candidate.npub,
@@ -534,12 +538,14 @@ private fun NewMessageAccountScreen(
             )
         }
 
+    /** True while the flow is current and no creation or scan is in progress. */
     fun canInteract() =
         session.isCurrent() &&
             creatingHex == null &&
             scannerSession == null &&
             queryState.text.toString() == query
 
+    /** Opens the candidate's profile, discovered or known. */
     fun presentPerson(candidate: RecipientSearch.Candidate) {
         if (!canInteract()) return
         if (candidate.searchProfile != null) {
@@ -615,6 +621,7 @@ private fun NewMessageAccountScreen(
     }
 }
 
+/** Resolves plain or resource text for display. */
 @Composable
 private fun AppText.resolveForCompose(): String =
     when (this) {

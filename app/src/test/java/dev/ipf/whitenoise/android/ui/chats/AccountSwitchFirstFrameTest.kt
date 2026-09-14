@@ -397,6 +397,7 @@ class AccountSwitchFirstFrameTest {
         )
     }
 
+    /** Builds the app state fixture with the given number of accounts. */
     private fun testAppState(): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
@@ -406,6 +407,7 @@ class AccountSwitchFirstFrameTest {
             activeAccountRef = TARGET_ACCOUNT,
         )
 
+    /** Builds an app state with one signed-in identity. */
     private fun identityAppState() =
         WhiteNoiseAppState(
             context = context,

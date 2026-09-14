@@ -80,6 +80,7 @@ internal class FocusedMessageActionsPositionProvider(
     private val sourceBounds: IntRect?,
     private val touchY: Float?,
 ) : PopupPositionProvider {
+    /** Positions the actions above or below the focused bubble within the window. */
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,
@@ -227,6 +228,7 @@ private fun FocusedReactionRail(
     }
 }
 
+/** One quick-reaction emoji target. */
 @Composable
 private fun FocusedReactionTarget(
     emoji: String,
@@ -282,6 +284,7 @@ private fun FocusedReactionTarget(
     }
 }
 
+/** The target that opens the full emoji picker. */
 @Composable
 private fun FocusedMoreReactionsTarget(onClick: () -> Unit) {
     val moreReactions = stringResource(R.string.open_emoji_picker)

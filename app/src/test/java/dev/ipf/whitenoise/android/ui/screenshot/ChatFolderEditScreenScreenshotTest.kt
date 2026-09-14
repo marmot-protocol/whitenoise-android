@@ -118,6 +118,7 @@ class ChatFolderEditScreenScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 
+    /** Builds a preview state fixture. */
     private fun previewState() =
         ChatFolderEditFormState(
             isNew = false,

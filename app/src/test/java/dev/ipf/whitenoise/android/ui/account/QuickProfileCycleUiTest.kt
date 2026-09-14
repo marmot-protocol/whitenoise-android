@@ -99,6 +99,7 @@ class QuickProfileCycleUiTest {
         composeRule.onNodeWithTag(OTHER_ACCOUNT_STACK_TAG).assertDoesNotExist()
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         app: WhiteNoiseAppState,
         search: Boolean = false,
@@ -125,6 +126,7 @@ class QuickProfileCycleUiTest {
         }
     }
 
+    /** Builds the state fixture for the test. */
     private fun state(accounts: List<AccountSummaryFfi>): WhiteNoiseAppState {
         val preferences = context.getSharedPreferences("cycle-ui-test", Context.MODE_PRIVATE)
         preferences.edit().clear().commit()

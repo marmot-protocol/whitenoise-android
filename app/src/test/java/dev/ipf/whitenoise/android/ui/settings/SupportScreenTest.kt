@@ -172,6 +172,7 @@ class SupportScreenTest {
         assertEquals(emptyList<String>(), presented)
     }
 
+    /** Shows the surface under test. */
     private fun show(
         load: suspend (String) -> AccountRelayListsFfi?,
         existing: (String) -> ChatListItem? = { null },
