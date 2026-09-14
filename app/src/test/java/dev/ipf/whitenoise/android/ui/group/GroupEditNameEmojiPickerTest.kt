@@ -138,11 +138,10 @@ class GroupEditNameEmojiPickerTest {
             .onNode(hasSetTextAction() and hasText("Marmot team"))
             .performTextReplacement(draftName)
 
-        composeRule.onNodeWithText(string(R.string.group_image_search_set)).performClick()
-        composeRule.onNodeWithText(string(R.string.group_image_source_emoji)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(string(R.string.group_image_choose_emoji)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.add_photo)).performClick()
+        composeRule.onNodeWithText(string(R.string.group_emoji_create)).assertIsDisplayed()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/group_info_emoji_image_entry_light.png")
-        composeRule.onNodeWithText(string(R.string.group_image_source_emoji)).performClick()
+        composeRule.onNodeWithText(string(R.string.group_emoji_create)).performClick()
         composeRule.onNodeWithTag(GROUP_EMOJI_IMAGE_PICKER_TAG).assertIsDisplayed()
 
         composeRule

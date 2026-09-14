@@ -2,6 +2,9 @@ package dev.ipf.whitenoise.android.ui.group
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.TextFieldValue
@@ -42,9 +46,12 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
+import dev.ipf.whitenoise.android.ui.common.IMAGE_DOCUMENT_MIME_TYPES
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
@@ -232,14 +239,15 @@ internal fun GroupEditScreen(
     // wins the back event while the editor is open.
     BackHandler { onBack() }
 
-    val editImageLabel =
-        stringResource(
-            if (!hasGroupImage) {
-                R.string.group_image_search_set
-            } else {
-                R.string.group_image_search_edit
-            },
-        )
+    var photoMenuOpen by remember { mutableStateOf(false) }
+    val photoPicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri != null) uploadPublicAvatar(uri)
+        }
+    val filePicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) uploadPublicAvatar(uri)
+        }
 
     val saveLabel = stringResource(if (saving) R.string.saving_group else R.string.save_group)
     GroupEditScaffold(
@@ -294,11 +302,28 @@ internal fun GroupEditScreen(
                     )
                 }
                 if (imageSaving) LinearProgressIndicator(Modifier.fillMaxWidth())
-                WhiteNoiseFilledTonalButton(
-                    onClick = { showImageSearch = true },
-                    enabled = canEdit && !imageSaving,
-                ) {
-                    Text(editImageLabel)
+                Box {
+                    WhiteNoiseFilledTonalButton(
+                        onClick = { photoMenuOpen = true },
+                        enabled = canEdit && !imageSaving,
+                        modifier = Modifier.testTag("group_edit.photoAction"),
+                    ) {
+                        Text(stringResource(if (hasGroupImage) R.string.change_photo else R.string.add_photo))
+                    }
+                    GroupEditPhotoMenu(
+                        expanded = photoMenuOpen,
+                        hasImage = hasGroupImage,
+                        onDismiss = { photoMenuOpen = false },
+                        onChoosePhoto = {
+                            photoPicker.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                            )
+                        },
+                        onChooseFile = { filePicker.launch(IMAGE_DOCUMENT_MIME_TYPES) },
+                        onFindWebImage = { showImageSearch = true },
+                        onCreateEmoji = { showGroupEmojiImagePicker = true },
+                        onRemove = { updateImage { null } },
+                    )
                 }
             }
             Column(
@@ -396,6 +421,42 @@ internal fun GroupEditScreen(
 }
 
 private val GroupEditAvatarSize = 120.dp
+
+/** The prototype's photo sources behind the Add / Change photo button; Remove joins once the group has an image. */
+@Composable
+@Suppress("FunctionNaming", "LongParameterList")
+private fun GroupEditPhotoMenu(
+    expanded: Boolean,
+    hasImage: Boolean,
+    onDismiss: () -> Unit,
+    onChoosePhoto: () -> Unit,
+    onChooseFile: () -> Unit,
+    onFindWebImage: () -> Unit,
+    onCreateEmoji: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    WhiteNoiseDropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        items =
+            buildList {
+                add(WhiteNoiseMenuItem(stringResource(R.string.choose_photos), onChoosePhoto, R.drawable.ic_image))
+                add(WhiteNoiseMenuItem(stringResource(R.string.choose_files), onChooseFile, R.drawable.ic_description))
+                add(WhiteNoiseMenuItem(stringResource(R.string.find_web_image), onFindWebImage, R.drawable.ic_search))
+                add(WhiteNoiseMenuItem(stringResource(R.string.group_emoji_create), onCreateEmoji, R.drawable.ic_add))
+                if (hasImage) {
+                    add(
+                        WhiteNoiseMenuItem(
+                            stringResource(R.string.remove_photo),
+                            onRemove,
+                            icon = R.drawable.ic_delete,
+                            destructive = true,
+                        ),
+                    )
+                }
+            },
+    )
+}
 
 /** Settings frame shared by the native editor and its descriptive-title screenshot coverage. */
 @Composable

@@ -18,19 +18,17 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Group
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -42,6 +40,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
@@ -189,28 +188,15 @@ private fun GroupSetupPhoto(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (draft.name.text.isBlank() && state.imagePreview == null) {
-            Surface(
-                shape = androidx.compose.foundation.shape.CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
-            ) {
-                Box(
-                    Modifier
-                        .size(120.dp)
-                        .testTag("group_setup.avatar")
-                        .semantics { contentDescription = photoDescription },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Default.Group, null, Modifier.size(48.dp))
-                }
-            }
+            GroupSetupEmptyAvatar(photoDescription)
         } else {
             Box(Modifier.testTag("group_setup.avatar").semantics { contentDescription = photoDescription }) {
                 Avatar(draft.name.text.toString(), draft.name.text.toString(), 120.dp, picture = state.imagePreview)
             }
         }
         Box {
-            TextButton(
-                onPhoto,
+            WhiteNoiseFilledTonalButton(
+                onClick = onPhoto,
                 enabled = state.detailsEditable,
                 modifier = Modifier.testTag("group_setup.photoAction"),
             ) {
@@ -235,6 +221,31 @@ private fun GroupSetupPhoto(
                 ),
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+    }
+}
+
+/** The prototype's empty group avatar: the group glyph on the variant surface, in the 120 dp circle. */
+@Composable
+@Suppress("FunctionNaming")
+private fun GroupSetupEmptyAvatar(photoDescription: String) {
+    Surface(
+        shape = androidx.compose.foundation.shape.CircleShape,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+    ) {
+        Box(
+            Modifier
+                .size(120.dp)
+                .testTag("group_setup.avatar")
+                .semantics { contentDescription = photoDescription },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painterResource(R.drawable.ic_group),
+                null,
+                Modifier.size(40.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
