@@ -97,6 +97,7 @@ private fun qrImage(content: String): ImageBitmap {
             size = size,
             onColor = android.graphics.Color.BLACK,
             offColor = android.graphics.Color.WHITE,
+            marginModules = 0,
         )
     return Bitmap
         .createBitmap(size, size, Bitmap.Config.ARGB_8888)
