@@ -3019,19 +3019,20 @@
         ]
       },
       {
-        "surface": "EditHistorySheet",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
-        "anchor": "fun EditHistorySheet(",
-        "test_ids": [
-          "MSG-001"
-        ]
-      },
-      {
         "surface": "EditHistoryVersionRow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
         "anchor": "fun EditHistoryVersionRow(",
         "test_ids": [
           "MSG-001"
+        ]
+      },
+      {
+        "surface": "EditHistoryDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
+        "anchor": "fun EditHistoryDialog(",
+        "test_ids": [
+          "MSG-007",
+          "MSG-015"
         ]
       },
       {
@@ -3381,22 +3382,6 @@
         "anchor": "fun MessageFullScreenView(",
         "test_ids": [
           "MSG-013"
-        ]
-      },
-      {
-        "surface": "MessageInfoRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
-        "anchor": "fun MessageInfoRow(",
-        "test_ids": [
-          "MSG-001"
-        ]
-      },
-      {
-        "surface": "MessageInfoSheet",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
-        "anchor": "fun MessageInfoSheet(",
-        "test_ids": [
-          "MSG-001"
         ]
       },
       {
@@ -7268,6 +7253,54 @@
         "test_ids": [
           "NCH-002",
           "ACC-017"
+        ]
+      },
+      {
+        "surface": "FactRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun FactRow(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "MessageDeliverySection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun MessageDeliverySection(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "MessageDetailsContentCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun MessageDetailsContentCard(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "MessageDetailsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun MessageDetailsScreen(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "MessageFactsSection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun MessageFactsSection(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "MessageReactionsSection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun MessageReactionsSection(",
+        "test_ids": [
+          "MSG-001"
         ]
       },
       {
@@ -16913,15 +16946,6 @@
         ]
       },
       {
-        "surface": "R.string.person_profile_with_role",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
-        "anchor": "R.string.person_profile_with_role",
-        "test_ids": [
-          "ACC-001",
-          "GRP-007"
-        ]
-      },
-      {
         "surface": "R.string.person_promote_groups",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
         "anchor": "R.string.person_promote_groups",
@@ -21827,15 +21851,6 @@
         ]
       },
       {
-        "surface": "R.string.admin",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
-        "anchor": "R.string.admin",
-        "test_ids": [
-          "ACC-001",
-          "GRP-007"
-        ]
-      },
-      {
         "surface": "R.string.cancel",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
         "anchor": "R.string.cancel",
@@ -21849,15 +21864,6 @@
         "anchor": "R.string.person_add_to_group",
         "test_ids": [
           "ACC-008"
-        ]
-      },
-      {
-        "surface": "R.string.person_profile_member",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
-        "anchor": "R.string.person_profile_member",
-        "test_ids": [
-          "ACC-001",
-          "GRP-007"
         ]
       },
       {

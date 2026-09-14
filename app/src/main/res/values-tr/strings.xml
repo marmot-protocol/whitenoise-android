@@ -863,6 +863,17 @@
     <string name="conversation_disbanding_notice">Bu grup dağıtılıyor</string>
     <string name="conversation_disbanded_notice">Bu grup dağıtıldı</string>
     <string name="message_info_created_at">Oluşturuldu</string>
+    <string name="message_details">Mesaj ayrıntıları</string>
+    <string name="sent_from">Gönderen kişi</string>
+    <string name="reactions">Tepkiler</string>
+    <string name="message_sender_time">Gönderenin gönderme zamanı</string>
+    <string name="message_sender_public_key">Gönderenin açık anahtarı</string>
+    <string name="message_copy_id">Mesaj kimliğini kopyala</string>
+    <string name="message_copy_sender_key">Gönderenin açık anahtarını kopyala</string>
+    <plurals name="people_reacted">
+        <item quantity="one">%1$d kişi tepki verdi</item>
+        <item quantity="other">%1$d kişi tepki verdi</item>
+    </plurals>
     <string name="message_status_pending">Gönderiliyor…</string>
     <string name="message_status_sent">Gönderildi</string>
     <string name="message_status_received">Alındı</string>
@@ -1863,13 +1874,11 @@
     <string name="group_review_people">Seçili kişileri incele</string>
 
     <string name="person_profile_title">Kullanıcı Profili</string>
-    <string name="person_profile_with_role">Kullanıcı Profili (%1$s)</string>
     <string name="person_groups_in_common">Ortak Gruplar</string>
     <string name="person_no_groups_in_common">Ortak grup yok.</string>
     <string name="person_start_group">Grubu başlat</string>
     <string name="person_promote_groups">Gruplarda yönetici yap</string>
     <string name="person_add_to_group">Bir gruba ekle</string>
-    <string name="person_profile_member">Üye</string>
     <string name="person_group_memberships_unavailable">Bazı grup üyeliklerine ulaşılamıyor. Ortak grupları doğrulamak için yeniden deneyin.</string>
     <string name="person_lightning_display">Lightning adresi: %1$s</string>
 

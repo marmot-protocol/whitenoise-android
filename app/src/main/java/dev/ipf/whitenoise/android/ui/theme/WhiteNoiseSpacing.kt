@@ -9,5 +9,8 @@ object WhiteNoiseSpacing {
     val Related = 8.dp
     val FormField = 16.dp
     val Section = 24.dp
+
+    /** Gap the prototype opens before the first bubble of a sender cluster. */
+    val ConversationCluster = 12.dp
     val PinnedActionInset = 16.dp
 }

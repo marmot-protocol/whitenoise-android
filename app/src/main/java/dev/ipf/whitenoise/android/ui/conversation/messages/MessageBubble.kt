@@ -2709,7 +2709,7 @@ internal fun MessageBubble(
                     )
                 }
                 if (editHistoryOpen && !deleted && editState != null) {
-                    EditHistorySheet(
+                    EditHistoryDialog(
                         original = record.plaintext,
                         originalTimestamp = record.recordedAt,
                         editState = editState,
@@ -2717,12 +2717,16 @@ internal fun MessageBubble(
                     )
                 }
                 if (infoSheetOpen && !deleted) {
-                    MessageInfoSheet(
+                    MessageDetailsScreen(
                         record = record,
                         status = item.status,
                         mine = mine,
                         senderDisplayName = appState.displayName(record.sender),
                         senderNpub = appState.npubForDisplay(record.sender),
+                        senderAvatarUrl = appState.avatarUrl(record.sender),
+                        reactions = controller.reactions[record.messageIdHex].orEmpty(),
+                        recipients = messageDetailsRecipients(controller, appState, mine),
+                        attachmentLabels = mediaReferences.map { it.fileName.ifBlank { it.mediaType } },
                         onDismissRequest = { infoSheetOpen = false },
                         onCopy = { value ->
                             clipboard.setText(AnnotatedString(value))

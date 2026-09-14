@@ -8,9 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,7 +35,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
@@ -48,8 +45,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
-import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
-import dev.ipf.whitenoise.android.ui.design.conversationMenuItemPadding
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -80,15 +75,10 @@ internal fun ConversationTopBar(
     openDetailsDescription: String,
     onOpenDetails: () -> Unit,
     onBack: () -> Unit,
-    menuOpen: Boolean,
-    onMenuOpenChange: (Boolean) -> Unit,
-    onOpenSearch: () -> Unit,
-    onToggleArchived: () -> Unit,
-    onRequestLeave: () -> Unit,
     onTtsTransportBodyClick: (() -> Unit)? = null,
     // Compact-height windows (landscape with the IME open) trade top-bar
     // height back to the transcript and composer while keeping Back, the
-    // conversation identity, and the details/menu actions reachable.
+    // conversation identity and the details action reachable.
     compactHeight: Boolean = false,
     performanceSelectorsEnabled: Boolean = BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS,
 ) {
@@ -249,60 +239,6 @@ internal fun ConversationTopBar(
                             painterResource(R.drawable.ic_arrow_back),
                             contentDescription = stringResource(R.string.back),
                         )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { onMenuOpenChange(true) }) {
-                        Icon(
-                            painterResource(R.drawable.ic_more_vert),
-                            contentDescription = stringResource(R.string.chat_actions),
-                        )
-                    }
-                    KeyboardPreservingDropdownMenu(
-                        expanded = menuOpen,
-                        onDismissRequest = { onMenuOpenChange(false) },
-                        shape = RoundedCornerShape(20.dp),
-                        offset = DpOffset(x = (-8).dp, y = 0.dp),
-                        modifier = Modifier.widthIn(min = 232.dp),
-                    ) {
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    stringResource(R.string.conversation_search_open),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            },
-                            contentPadding = conversationMenuItemPadding,
-                            onClick = onOpenSearch,
-                        )
-                        if (!controller.group.pendingConfirmation) {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        stringResource(
-                                            if (controller.presentedArchived) R.string.unarchive else R.string.archive,
-                                        ),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                    )
-                                },
-                                contentPadding = conversationMenuItemPadding,
-                                enabled = !controller.mutationInFlight,
-                                onClick = onToggleArchived,
-                            )
-                            if (controller.isSelfMember) {
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            stringResource(R.string.leave),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                        )
-                                    },
-                                    contentPadding = conversationMenuItemPadding,
-                                    enabled = !controller.mutationInFlight && controller.membersLoaded,
-                                    onClick = onRequestLeave,
-                                )
-                            }
-                        }
                     }
                 },
                 scrollBehavior = LocalWhiteNoiseHeaderScroll.current,

@@ -1,13 +1,16 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.GroupProjector
@@ -27,6 +30,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerO
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.util.Locale
 
 /** Renders one projected timeline item and delegates bubble gestures to the conversation owner. */
@@ -215,48 +219,55 @@ internal fun TimelineRow(
             ) {
                 onActionMenuOpenChange(false)
             }
-            key(item.record.messageIdHex) {
-                TimelineRowMessageBubble(
-                    messageIdHex = item.record.messageIdHex,
-                    item = item,
-                    controller = controller,
-                    appState = appState,
-                    onOpenConversationMedia = onOpenConversationMedia,
-                    eventCardResolver = eventCardResolver,
-                    documentSaveFallback = documentSaveFallback,
-                    composerTextState = composerTextState,
-                    highlighted = highlighted,
-                    selectionMode = selectionMode,
-                    textSelectionMode = textSelectionMode,
-                    onTextSelectionModeChange = onTextSelectionModeChange,
-                    onTextSelectionBoundsChange = onTextSelectionBoundsChange,
-                    batchSelectable = batchSelectable,
-                    selected = selected,
-                    onToggleSelection = onToggleSelection,
-                    rangeDragActive = rangeDragActive,
-                    onDragSelectionStart = onDragSelectionStart,
-                    onDragSelection = onDragSelection,
-                    onDragSelectionEnd = onDragSelectionEnd,
-                    onDragSelectionCancel = onDragSelectionCancel,
-                    quickReactionEmojis = quickReactionEmojis,
-                    recentEmojis = recentEmojis,
-                    onEmojiUsed = onEmojiUsed,
-                    isActionMenuOpen = isActionMenuOpen,
-                    onActionMenuOpenChange = onActionMenuOpenChange,
-                    onQuickReactionsSave = onQuickReactionsSave,
-                    onReplyPreviewClick = onReplyPreviewClick,
-                    composerGate = composerGate,
-                    onBack = onBack,
-                    mentionCandidates = mentionCandidates,
-                    mentionPickerEnabled = mentionPickerEnabled,
-                    showSenderName = senderDecoration.showName,
-                    showSenderAvatar = senderDecoration.showAvatar,
-                    collapseLongMessages = collapseLongMessages,
-                    readOnly = controller.group.pendingConfirmation,
-                    ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
-                    ttsSentenceLayoutSink = ttsSentenceLayoutSink,
-                    onTtsSentenceSeek = onTtsSentenceSeek,
-                )
+            // The prototype opens each sender cluster with a 12 dp gap; rows inside a run keep the list spacing.
+            Box(
+                Modifier.padding(
+                    top = if (sameSenderAsOlderBubble) 0.dp else WhiteNoiseSpacing.ConversationCluster,
+                ),
+            ) {
+                key(item.record.messageIdHex) {
+                    TimelineRowMessageBubble(
+                        messageIdHex = item.record.messageIdHex,
+                        item = item,
+                        controller = controller,
+                        appState = appState,
+                        onOpenConversationMedia = onOpenConversationMedia,
+                        eventCardResolver = eventCardResolver,
+                        documentSaveFallback = documentSaveFallback,
+                        composerTextState = composerTextState,
+                        highlighted = highlighted,
+                        selectionMode = selectionMode,
+                        textSelectionMode = textSelectionMode,
+                        onTextSelectionModeChange = onTextSelectionModeChange,
+                        onTextSelectionBoundsChange = onTextSelectionBoundsChange,
+                        batchSelectable = batchSelectable,
+                        selected = selected,
+                        onToggleSelection = onToggleSelection,
+                        rangeDragActive = rangeDragActive,
+                        onDragSelectionStart = onDragSelectionStart,
+                        onDragSelection = onDragSelection,
+                        onDragSelectionEnd = onDragSelectionEnd,
+                        onDragSelectionCancel = onDragSelectionCancel,
+                        quickReactionEmojis = quickReactionEmojis,
+                        recentEmojis = recentEmojis,
+                        onEmojiUsed = onEmojiUsed,
+                        isActionMenuOpen = isActionMenuOpen,
+                        onActionMenuOpenChange = onActionMenuOpenChange,
+                        onQuickReactionsSave = onQuickReactionsSave,
+                        onReplyPreviewClick = onReplyPreviewClick,
+                        composerGate = composerGate,
+                        onBack = onBack,
+                        mentionCandidates = mentionCandidates,
+                        mentionPickerEnabled = mentionPickerEnabled,
+                        showSenderName = senderDecoration.showName,
+                        showSenderAvatar = senderDecoration.showAvatar,
+                        collapseLongMessages = collapseLongMessages,
+                        readOnly = controller.group.pendingConfirmation,
+                        ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
+                        ttsSentenceLayoutSink = ttsSentenceLayoutSink,
+                        onTtsSentenceSeek = onTtsSentenceSeek,
+                    )
+                }
             }
         }
     }

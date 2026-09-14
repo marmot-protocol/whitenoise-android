@@ -80,7 +80,6 @@ internal data class PersonProfilePresentation(
     val lightningAddress: String?,
     val hasTarget: Boolean,
     val self: Boolean,
-    val roleLabel: String? = null,
 )
 
 /** Reuses the existing live archived-inclusive projection, never the frozen foreground chat-list snapshot. */

@@ -849,6 +849,16 @@
     <string name="conversation_disbanding_notice">此群組正在解散</string>
     <string name="conversation_disbanded_notice">此群組已解散</string>
     <string name="message_info_created_at">已建立</string>
+    <string name="message_details">訊息詳細資料</string>
+    <string name="sent_from">傳送自</string>
+    <string name="reactions">回應</string>
+    <string name="message_sender_time">傳送者的傳送時間</string>
+    <string name="message_sender_public_key">傳送者公鑰</string>
+    <string name="message_copy_id">複製訊息 ID</string>
+    <string name="message_copy_sender_key">複製傳送者公鑰</string>
+    <plurals name="people_reacted">
+        <item quantity="other">%1$d 人已回應</item>
+    </plurals>
     <string name="message_status_pending">傳送中…</string>
     <string name="message_status_sent">已傳送</string>
     <string name="message_status_received">已接收</string>
@@ -1842,13 +1852,11 @@
     <string name="group_review_people">檢視已選人員</string>
 
     <string name="person_profile_title">使用者配置</string>
-    <string name="person_profile_with_role">使用者簡介( E)%1$s)</string>
     <string name="person_groups_in_common">共同群體</string>
     <string name="person_no_groups_in_common">沒有共同點</string>
     <string name="person_start_group">啟動組</string>
     <string name="person_promote_groups">組合管理員</string>
     <string name="person_add_to_group">新增至群組</string>
-    <string name="person_profile_member">成員</string>
     <string name="person_group_memberships_unavailable">部分群組成員資訊無法取得。請重試以確認共同群組。</string>
     <string name="person_lightning_display">閃電網路地址：%1$s</string>
 

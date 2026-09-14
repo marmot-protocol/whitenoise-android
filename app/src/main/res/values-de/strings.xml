@@ -863,6 +863,17 @@
     <string name="conversation_disbanding_notice">Diese Gruppe wird aufgelöst</string>
     <string name="conversation_disbanded_notice">Diese Gruppe wurde aufgelöst</string>
     <string name="message_info_created_at">Erstellt</string>
+    <string name="message_details">Nachrichtendetails</string>
+    <string name="sent_from">Gesendet von</string>
+    <string name="reactions">Reaktionen</string>
+    <string name="message_sender_time">Sendezeit des Absenders</string>
+    <string name="message_sender_public_key">Öffentlicher Schlüssel des Absenders</string>
+    <string name="message_copy_id">Nachrichten-ID kopieren</string>
+    <string name="message_copy_sender_key">Öffentlichen Schlüssel des Absenders kopieren</string>
+    <plurals name="people_reacted">
+        <item quantity="one">%1$d Person hat reagiert</item>
+        <item quantity="other">%1$d Personen haben reagiert</item>
+    </plurals>
     <string name="message_status_pending">Wird gesendet …</string>
     <string name="message_status_sent">Gesendet</string>
     <string name="message_status_received">Empfangen</string>
@@ -1879,13 +1890,11 @@
     <string name="group_review_people">Ausgewählte Personen prüfen</string>
 
     <string name="person_profile_title">Nutzerprofil</string>
-    <string name="person_profile_with_role">Nutzerprofil (%1$s)</string>
     <string name="person_groups_in_common">Gemeinsame Gruppen</string>
     <string name="person_no_groups_in_common">Keine gemeinsamen Gruppen.</string>
     <string name="person_start_group">Gruppe erstellen</string>
     <string name="person_promote_groups">In Gruppen zum Admin machen</string>
     <string name="person_add_to_group">Zu einer Gruppe hinzufügen</string>
-    <string name="person_profile_member">Mitglied</string>
     <string name="person_group_memberships_unavailable">Einige Gruppenmitgliedschaften sind nicht verfügbar. Erneut versuchen, um gemeinsame Gruppen zu bestätigen.</string>
     <string name="person_lightning_display">Lightning-Adresse: %1$s</string>
 

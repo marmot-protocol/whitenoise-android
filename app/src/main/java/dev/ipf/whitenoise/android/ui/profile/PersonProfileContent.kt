@@ -79,9 +79,7 @@ internal fun PersonProfileContent(
     adminActions: @Composable () -> Unit = {},
 ) {
     SettingsScaffold(
-        title =
-            person.roleLabel?.let { stringResource(R.string.person_profile_with_role, it) }
-                ?: stringResource(R.string.person_profile_title),
+        title = stringResource(R.string.person_profile_title),
         onBack = onBack,
         bottomBar = {
             if (person.hasTarget && !person.self) {

@@ -901,6 +901,19 @@
     <string name="conversation_disbanding_notice">Эта группа распускается</string>
     <string name="conversation_disbanded_notice">Эта группа была распущена</string>
     <string name="message_info_created_at">Создано</string>
+    <string name="message_details">Сведения о сообщении</string>
+    <string name="sent_from">Отправлено от</string>
+    <string name="reactions">Реакции</string>
+    <string name="message_sender_time">Время отправки у отправителя</string>
+    <string name="message_sender_public_key">Открытый ключ отправителя</string>
+    <string name="message_copy_id">Скопировать ID сообщения</string>
+    <string name="message_copy_sender_key">Скопировать открытый ключ отправителя</string>
+    <plurals name="people_reacted">
+        <item quantity="one">%1$d человек отреагировал</item>
+        <item quantity="few">%1$d человека отреагировали</item>
+        <item quantity="many">%1$d человек отреагировали</item>
+        <item quantity="other">%1$d человека отреагировали</item>
+    </plurals>
     <string name="message_status_pending">Отправка…</string>
     <string name="message_status_sent">Отправлено</string>
     <string name="message_status_received">Получено</string>
@@ -1915,13 +1928,11 @@
     <string name="group_review_people">Просмотреть выбранных людей</string>
 
     <string name="person_profile_title">Профиль пользователя</string>
-    <string name="person_profile_with_role">Профиль пользователя (%1$s)</string>
     <string name="person_groups_in_common">Общие группы</string>
     <string name="person_no_groups_in_common">Никаких общих групп.</string>
     <string name="person_start_group">Стартовая группа</string>
     <string name="person_promote_groups">Сделать администратором в группах</string>
     <string name="person_add_to_group">Добавить в группу</string>
-    <string name="person_profile_member">Участник</string>
     <string name="person_group_memberships_unavailable">Некоторые данные об участии в группах недоступны. Повторите попытку, чтобы проверить общие группы.</string>
     <string name="person_lightning_display">Lightning-адрес: %1$s</string>
 

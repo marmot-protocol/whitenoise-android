@@ -1157,6 +1157,17 @@
     <string name="conversation_disbanding_notice">This group is being disbanded</string>
     <string name="conversation_disbanded_notice">This group was disbanded</string>
     <string name="message_info_created_at">Created</string>
+    <string name="message_details">Message Details</string>
+    <string name="sent_from">Sent from</string>
+    <string name="reactions">Reactions</string>
+    <string name="message_sender_time">Sender’s sent time</string>
+    <string name="message_sender_public_key">Sender Public Key</string>
+    <string name="message_copy_id">Copy Message ID</string>
+    <string name="message_copy_sender_key">Copy Sender Public Key</string>
+    <plurals name="people_reacted">
+        <item quantity="one">%1$d person reacted</item>
+        <item quantity="other">%1$d people reacted</item>
+    </plurals>
     <string name="message_status_pending">Sending…</string>
     <string name="message_status_sent">Sent</string>
     <string name="message_status_received">Received</string>
@@ -1968,13 +1979,11 @@
     <string name="group_review_people">Review selected people</string>
 
     <string name="person_profile_title">User Profile</string>
-    <string name="person_profile_with_role">User Profile (%1$s)</string>
     <string name="person_groups_in_common">Groups in Common</string>
     <string name="person_no_groups_in_common">No groups in common.</string>
     <string name="person_start_group">Start group</string>
     <string name="person_promote_groups">Make admin in groups</string>
     <string name="person_add_to_group">Add to a group</string>
-    <string name="person_profile_member">Member</string>
     <string name="person_group_memberships_unavailable">Some group memberships are not available. Retry to confirm shared groups.</string>
     <string name="person_lightning_display">Lightning: %1$s</string>
 

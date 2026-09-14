@@ -1,25 +1,18 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,33 +27,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.os.ConfigurationCompat
-import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MessageStatus
-import dev.ipf.whitenoise.android.state.MessageStatusLabels
-import dev.ipf.whitenoise.android.state.formatExactTimestamp
-import dev.ipf.whitenoise.android.state.labelFor
-import dev.ipf.whitenoise.android.state.shortHex
-import dev.ipf.whitenoise.android.state.shouldShowOriginalTimestamp
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
-import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingBottomSheet
-import java.time.ZoneId
-import java.util.Locale
 
 internal const val MESSAGE_FULL_SCREEN_TAG = "message-full-screen"
 internal const val MESSAGE_FULL_SCREEN_BODY_TAG = "message-full-screen-body"
@@ -273,168 +254,6 @@ internal fun MessageFullScreenBody(
             }
         } else {
             content()
-        }
-    }
-}
-
-@Composable
-internal fun MessageInfoSheet(
-    record: AppMessageRecordFfi,
-    status: MessageStatus,
-    mine: Boolean,
-    senderDisplayName: String,
-    senderNpub: String,
-    onDismissRequest: () -> Unit,
-    onCopy: (String) -> Unit,
-) {
-    val configuration = LocalConfiguration.current
-    val locale =
-        remember(configuration) {
-            ConfigurationCompat.getLocales(configuration).get(0) ?: Locale.getDefault()
-        }
-    val zone = remember { ZoneId.systemDefault() }
-    val statusLabels =
-        MessageStatusLabels(
-            pending = stringResource(R.string.message_status_pending),
-            sent = stringResource(R.string.message_status_sent),
-            received = stringResource(R.string.message_status_received),
-            failed = stringResource(R.string.message_status_failed),
-            streaming = stringResource(R.string.message_status_streaming),
-        )
-    val statusText = labelFor(status, statusLabels)
-    // Label derives from status, not `mine`, so an outgoing Failed bubble
-    // doesn't read "Sent" while the Status row says "Failed". For outgoing
-    // pending/failed the row reflects local composition time.
-    val timestampLabel =
-        when (status) {
-            MessageStatus.Sent -> stringResource(R.string.message_info_sent_at)
-            MessageStatus.Received, MessageStatus.Streaming -> stringResource(R.string.message_info_received_at)
-            MessageStatus.Pending, MessageStatus.Failed -> stringResource(R.string.message_info_created_at)
-        }
-    // For incoming, prefer the *local* arrival time — sender's claimed
-    // `recordedAt` can be spoofed. Surface `recordedAt` as a second row only
-    // when it diverges from receivedAt by more than a few seconds (anything
-    // less is clock-skew noise).
-    val primarySeconds = if (!mine && record.receivedAt > 0uL) record.receivedAt else record.recordedAt
-    val formattedTimestamp = formatExactTimestamp(primarySeconds, zone, locale)
-    val showOriginal = !mine && shouldShowOriginalTimestamp(record.recordedAt, record.receivedAt)
-    val formattedOriginalTimestamp =
-        if (showOriginal) {
-            formatExactTimestamp(record.recordedAt, zone, locale)
-        } else {
-            ""
-        }
-    val npubShort = shortHex(senderNpub, head = 12, tail = 6)
-    val messageIdShort = shortHex(record.messageIdHex)
-    val copyActionLabel = stringResource(R.string.copy_text)
-
-    KeyboardPreservingBottomSheet(
-        paneTitle = stringResource(R.string.message_info),
-        onDismissRequest = onDismissRequest,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                stringResource(R.string.message_info),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            if (formattedTimestamp.isNotBlank()) {
-                MessageInfoRow(
-                    label = timestampLabel,
-                    value = formattedTimestamp,
-                )
-            }
-            if (formattedOriginalTimestamp.isNotBlank()) {
-                // Sender's claimed send time. Suppressed when it matches the
-                // local Received time within the skew tolerance — see
-                // shouldShowOriginalTimestamp — so the row only appears when
-                // it adds information.
-                MessageInfoRow(
-                    label = stringResource(R.string.message_info_sent_at),
-                    value = formattedOriginalTimestamp,
-                )
-            }
-            // "From" is meaningful only for incoming messages; hide for own
-            // messages where it would read tautologically "From: <my name>".
-            if (!mine && senderNpub.isNotBlank()) {
-                MessageInfoRow(
-                    label = stringResource(R.string.message_info_sender),
-                    value = if (senderDisplayName.isNotBlank()) "$senderDisplayName · $npubShort" else npubShort,
-                    onCopy = { onCopy(senderNpub) },
-                    copyActionLabel = copyActionLabel,
-                )
-            }
-            if (record.messageIdHex.isNotBlank()) {
-                MessageInfoRow(
-                    label = stringResource(R.string.message_info_message_id),
-                    value = messageIdShort,
-                    onCopy = { onCopy(record.messageIdHex) },
-                    copyActionLabel = copyActionLabel,
-                )
-            }
-            MessageInfoRow(
-                label = stringResource(R.string.message_info_status),
-                value = statusText,
-            )
-            // The engine's authoritative per-message expiry; absent for
-            // messages outside a retention window.
-            record.retentionExpiresAt?.takeIf { it > 0uL }?.let { expiresAt ->
-                MessageInfoRow(
-                    label = stringResource(R.string.message_info_disappears_at),
-                    value = formatExactTimestamp(expiresAt, zone, locale),
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-        }
-    }
-}
-
-@Composable
-private fun MessageInfoRow(
-    label: String,
-    value: String,
-    onCopy: (() -> Unit)? = null,
-    copyActionLabel: String? = null,
-) {
-    val rowModifier =
-        if (onCopy != null) {
-            Modifier
-                .fillMaxWidth()
-                .clickable(
-                    onClickLabel = copyActionLabel,
-                    role = Role.Button,
-                    onClick = onCopy,
-                )
-        } else {
-            Modifier.fillMaxWidth()
-        }
-    Row(
-        modifier = rowModifier.padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                value,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-        if (onCopy != null) {
-            Icon(
-                Icons.Default.ContentCopy,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }

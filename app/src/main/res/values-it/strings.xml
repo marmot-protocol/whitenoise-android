@@ -863,6 +863,17 @@
     <string name="conversation_disbanding_notice">Questo gruppo è in fase di scioglimento</string>
     <string name="conversation_disbanded_notice">Questo gruppo è stato sciolto</string>
     <string name="message_info_created_at">Creato</string>
+    <string name="message_details">Dettagli del messaggio</string>
+    <string name="sent_from">Inviato da</string>
+    <string name="reactions">Reazioni</string>
+    <string name="message_sender_time">Ora di invio del mittente</string>
+    <string name="message_sender_public_key">Chiave pubblica del mittente</string>
+    <string name="message_copy_id">Copia ID messaggio</string>
+    <string name="message_copy_sender_key">Copia chiave pubblica del mittente</string>
+    <plurals name="people_reacted">
+        <item quantity="one">%1$d persona ha reagito</item>
+        <item quantity="other">%1$d persone hanno reagito</item>
+    </plurals>
     <string name="message_status_pending">Invio…</string>
     <string name="message_status_sent">Inviato</string>
     <string name="message_status_received">Ricevuto</string>
@@ -1865,13 +1876,11 @@
     <string name="group_review_people">Rivedi le persone selezionate</string>
 
     <string name="person_profile_title">Profilo utente</string>
-    <string name="person_profile_with_role">Profilo utente (%1$s)</string>
     <string name="person_groups_in_common">Gruppi in comune</string>
     <string name="person_no_groups_in_common">Nessun gruppo in comune.</string>
     <string name="person_start_group">Crea gruppo</string>
     <string name="person_promote_groups">Rendi amministratore nei gruppi</string>
     <string name="person_add_to_group">Aggiungi a un gruppo</string>
-    <string name="person_profile_member">Membro</string>
     <string name="person_group_memberships_unavailable">Alcune appartenenze ai gruppi non sono disponibili. Riprova per confermare i gruppi in comune.</string>
     <string name="person_lightning_display">Indirizzo Lightning: %1$s</string>
 

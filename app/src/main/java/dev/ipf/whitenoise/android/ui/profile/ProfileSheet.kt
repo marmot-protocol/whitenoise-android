@@ -672,20 +672,6 @@ internal fun ProfileSheet(
                     lightningAddress,
                     hasTarget = hex != null,
                     self = targetIsSelf,
-                    roleLabel =
-                        adminController
-                            ?.presentedMembers
-                            ?.firstOrNull {
-                                it.memberIdHex.equals(hex, ignoreCase = true)
-                            }?.let { member ->
-                                stringResource(
-                                    if (adminController?.isAuthoritativeAdmin(member) == true) {
-                                        R.string.admin
-                                    } else {
-                                        R.string.person_profile_member
-                                    },
-                                )
-                            },
                 ),
             scroll = contentScrollState,
             follow = followRow,

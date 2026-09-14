@@ -144,11 +144,6 @@ class ConversationTopBarSemanticsTest {
                         openDetailsDescription = OPEN_DETAILS_DESCRIPTION,
                         onOpenDetails = onOpenDetails,
                         onBack = {},
-                        menuOpen = false,
-                        onMenuOpenChange = {},
-                        onOpenSearch = {},
-                        onToggleArchived = {},
-                        onRequestLeave = {},
                         compactHeight = compactHeight,
                         performanceSelectorsEnabled = true,
                     )

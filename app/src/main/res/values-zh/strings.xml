@@ -849,6 +849,16 @@
     <string name="conversation_disbanding_notice">此群组正在解散</string>
     <string name="conversation_disbanded_notice">此群组已解散</string>
     <string name="message_info_created_at">已创建</string>
+    <string name="message_details">消息详情</string>
+    <string name="sent_from">发送自</string>
+    <string name="reactions">回应</string>
+    <string name="message_sender_time">发送者的发送时间</string>
+    <string name="message_sender_public_key">发送者公钥</string>
+    <string name="message_copy_id">复制消息 ID</string>
+    <string name="message_copy_sender_key">复制发送者公钥</string>
+    <plurals name="people_reacted">
+        <item quantity="other">%1$d 人已回应</item>
+    </plurals>
     <string name="message_status_pending">发送中…</string>
     <string name="message_status_sent">已发送</string>
     <string name="message_status_received">已接收</string>
@@ -1842,13 +1852,11 @@
     <string name="group_review_people">查看已选人员</string>
 
     <string name="person_profile_title">用户配置</string>
-    <string name="person_profile_with_role">用户简介( E)%1$s)</string>
     <string name="person_groups_in_common">共同群体</string>
     <string name="person_no_groups_in_common">没有共同点</string>
     <string name="person_start_group">启动组</string>
     <string name="person_promote_groups">组合管理员</string>
     <string name="person_add_to_group">添加到群组</string>
-    <string name="person_profile_member">成员</string>
     <string name="person_group_memberships_unavailable">部分群组成员信息不可用。请重试以确认共同群组。</string>
     <string name="person_lightning_display">闪电网络地址：%1$s</string>
 

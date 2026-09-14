@@ -27,7 +27,7 @@ import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.EditVersion
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
 import dev.ipf.whitenoise.android.ui.conversation.MessageSelectionBar
-import dev.ipf.whitenoise.android.ui.conversation.messages.EditHistorySheet
+import dev.ipf.whitenoise.android.ui.conversation.messages.EditHistoryDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -100,7 +100,7 @@ class ConversationReaderChromeScreenshotTest {
                 LocalLayoutDirection provides if (dark) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, fontScale = if (dark) 2f else 1f) {
-                    EditHistorySheet(
+                    EditHistoryDialog(
                         original = "Original message",
                         originalTimestamp = 1_800_000_000uL,
                         editState =

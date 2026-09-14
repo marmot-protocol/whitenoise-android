@@ -105,6 +105,7 @@ import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
+import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingEvent
 import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingState
@@ -179,9 +180,10 @@ import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachme
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
-import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInfoSheet
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDetailsScreen
 import dev.ipf.whitenoise.android.ui.conversation.messages.RestoredForwardRequestHost
 import dev.ipf.whitenoise.android.ui.conversation.messages.dismissTextSelectionOnOutsideTap
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageDetailsRecipients
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import dev.ipf.whitenoise.android.ui.conversation.nostr.publicEventCardRelays
@@ -649,7 +651,6 @@ internal fun ConversationScreen(
         controller = controller,
         streamingDebugEnabled = appState.streamingDebugEnabled,
     )
-    var menuOpen by remember { mutableStateOf(false) }
     // Keyed on the controller as well as chat.id so the same shared group under
     // another account cannot inherit this account's details route.
     var showDetails by presentationState.showDetails
@@ -3240,43 +3241,6 @@ internal fun ConversationScreen(
                 openDetailsDescription = openDetailsDescription,
                 onOpenDetails = { showDetails = true },
                 onBack = exitConversation,
-                menuOpen = menuOpen,
-                onMenuOpenChange = { menuOpen = it },
-                onOpenSearch = {
-                    menuOpen = false
-                    val bookmark = scrollCoordinator.bookmark(currentScrollAnchor())
-                    val anchorMessage =
-                        bookmark.anchor.messageId?.let { messageId ->
-                            renderedTimeline.firstOrNull { it.record.messageIdHex == messageId }
-                        }
-                    navigationState.preSearchScrollAnchor =
-                        ConversationSearchScrollAnchor(
-                            bookmark = bookmark,
-                            match =
-                                anchorMessage?.let {
-                                    ConversationSearchMatch(
-                                        messageIdHex = it.record.messageIdHex,
-                                        timelineAt = it.projected?.timelineAt ?: it.record.recordedAt,
-                                    )
-                                },
-                        )
-                    navigationState.searchOpen = true
-                },
-                onToggleArchived = {
-                    menuOpen = false
-                    appState.launchMutation { controller.setArchived(!controller.presentedArchived) }
-                },
-                onRequestLeave = {
-                    menuOpen = false
-                    appState.launchMutation {
-                        when (val leaveAction = controller.leaveAction()) {
-                            LeaveAction.SoleAdminMustTransfer -> showTransferAdminFirst = true
-                            LeaveAction.SoleMemberDeletesGroup,
-                            LeaveAction.Standard,
-                            -> pendingTopBarLeaveAction = leaveAction
-                        }
-                    }
-                },
                 onTtsTransportBodyClick = onTtsTransportBodyClick,
                 compactHeight = compactHeightConversation,
             )
@@ -4001,12 +3965,23 @@ internal fun ConversationScreen(
 
     batchInfoSelection?.let { infoSelection ->
         val infoRecord = infoSelection.record
-        MessageInfoSheet(
+        val infoMine = controller.isMessageMine(infoRecord)
+        val infoAttachmentLabels =
+            remember(infoRecord) {
+                MediaReferenceSupport
+                    .parseAllImetaTags(infoRecord.tags, infoRecord.sourceEpoch ?: 0uL)
+                    .map { it.fileName.ifBlank { it.mediaType } }
+            }
+        MessageDetailsScreen(
             record = infoRecord,
             status = infoSelection.status,
-            mine = controller.isMessageMine(infoRecord),
+            mine = infoMine,
             senderDisplayName = appState.displayName(infoRecord.sender),
             senderNpub = appState.npubForDisplay(infoRecord.sender),
+            senderAvatarUrl = appState.avatarUrl(infoRecord.sender),
+            reactions = controller.reactions[infoRecord.messageIdHex].orEmpty(),
+            recipients = messageDetailsRecipients(controller, appState, infoMine),
+            attachmentLabels = infoAttachmentLabels,
             onDismissRequest = { batchInfoSelection = null },
             onCopy = { value -> clipboard.setText(AnnotatedString(value)) },
         )
