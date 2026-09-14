@@ -121,7 +121,7 @@ class AppNavigationTest {
         composeRule.onNodeWithText("Chats").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Open navigation").assertDoesNotExist()
 
-        composeRule.onNodeWithContentDescription("Back").performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         composeRule.runOnIdle { assertEquals(1, backClicks) }
     }
 

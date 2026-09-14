@@ -3,12 +3,13 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.content.Context
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.WHITE_NOISE_TOP_BAR_BACK_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -52,7 +53,7 @@ class LanguageScreenBehaviorTest {
         composeRule.onNodeWithText("Deutsch").performClick()
         composeRule.runOnIdle { assertEquals("de", appState.languageTag) }
         composeRule.onNodeWithText("Deutsch").assertIsSelected()
-        composeRule.onNodeWithContentDescription("Back").performClick()
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
         composeRule.runOnIdle { assertEquals(1, backCount) }
     }
 }

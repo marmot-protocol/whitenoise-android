@@ -10,7 +10,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
 import dev.ipf.whitenoise.android.ui.theme.connectedRowBorder
@@ -57,7 +56,7 @@ internal fun SettingsRowTrailing(
 ) {
     if (busy) {
         LoadingIndicator(
-            modifier = Modifier.size(SettingsRowDefaults.BusyIndicatorSize).clearAndSetSemantics {},
+            modifier = Modifier.size(SettingsRowDefaults.BusyIndicatorSize),
         )
     } else {
         control()

@@ -12,10 +12,14 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import dev.ipf.whitenoise.android.R
+
+/** Locale-independent handle for the shared top bar's Back action. */
+internal const val WHITE_NOISE_TOP_BAR_BACK_TAG = "whitenoise.topbar.back"
 
 /** Destination top bar: start-aligned title, one back action, and the scaffold's shared scroll tint. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,7 +40,7 @@ fun WhiteNoiseTopBar(
         modifier = modifier,
         title = titleContent ?: { Text(title, style = titleStyle) },
         navigationIcon = {
-            IconButton(onClick = onBack) {
+            IconButton(onClick = onBack, modifier = Modifier.testTag(WHITE_NOISE_TOP_BAR_BACK_TAG)) {
                 Icon(
                     painter = painterResource(R.drawable.ic_arrow_back),
                     contentDescription = stringResource(R.string.back),
