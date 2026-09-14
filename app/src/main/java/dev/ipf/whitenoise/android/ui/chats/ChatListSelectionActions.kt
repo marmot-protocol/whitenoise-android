@@ -52,27 +52,23 @@ internal fun chatListBackDismissal(
         else -> null
     }
 
+/** The chips row shows only while a filter is active; selection mode owns the header instead. */
 internal fun shouldShowGlobalSearchFilterControls(
     searchState: GlobalSearchState,
-    interactiveSectionsAvailable: Boolean,
     selectionMode: Boolean,
-): Boolean =
-    searchState.isOpen &&
-        !selectionMode &&
-        (interactiveSectionsAvailable || GlobalSearchActiveChips.from(searchState).count > 0)
+): Boolean = searchState.isOpen && !selectionMode && GlobalSearchActiveChips.from(searchState).count > 0
 
+/** A category picker shows for the open category unless selection mode took over. */
 internal fun shouldPresentGlobalSearchFilterSheet(
     searchState: GlobalSearchState,
-    interactiveSectionsAvailable: Boolean,
     selectionMode: Boolean,
-): Boolean = searchState.filterSheetOpen && interactiveSectionsAvailable && !selectionMode
+): Boolean = searchState.isOpen && searchState.filterSheetOpen && !selectionMode
 
 internal fun reconcileGlobalSearchFilterSheet(
     searchState: GlobalSearchState,
-    interactiveSectionsAvailable: Boolean,
     selectionMode: Boolean,
 ): GlobalSearchState =
-    if (searchState.filterSheetOpen && (!interactiveSectionsAvailable || selectionMode)) {
+    if (searchState.filterSheetOpen && selectionMode) {
         GlobalSearchTransitions.dismissFilterSheet(searchState)
     } else {
         searchState

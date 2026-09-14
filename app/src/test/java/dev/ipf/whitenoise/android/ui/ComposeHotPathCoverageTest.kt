@@ -97,8 +97,8 @@ class ComposeHotPathCoverageTest {
     fun chatListScrollAndRowSearchWorkAreIsolatedFromScreenComposition() {
         val source = source("chats/ChatsScreen.kt").readText()
         val searchProjectionRemember =
-            "remember\\(sourceList, normalizedSearchQuery, selectedFolderChatIds, " +
-                "groupTitleCopy, profileRev, bodyMatches\\)"
+            "remember\\(\\s*scopedSourceList,\\s*normalizedSearchQuery,\\s*effectiveFolderChatIds,\\s*" +
+                "groupTitleCopy,\\s*profileRev,\\s*bodyMatches,\\s*messageSearchConstraints,?\\s*\\)"
 
         assertTrue(
             "scroll index must be observed from snapshotFlow",

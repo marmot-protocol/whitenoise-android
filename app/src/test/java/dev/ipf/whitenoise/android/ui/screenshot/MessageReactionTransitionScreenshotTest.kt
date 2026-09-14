@@ -111,7 +111,7 @@ class MessageReactionTransitionScreenshotTest {
             }
         }
         composeRule.waitForIdle()
-        val avatarTop = nodeTop("AL")
+        val avatarTop = nodeTop("A")
         val bubbleTextTop = nodeTop("Can you review the file?")
         composeRule
             .onNodeWithTag(GALLERY_TAG)
@@ -216,7 +216,7 @@ class MessageReactionTransitionScreenshotTest {
         avatarTop: Float,
         bubbleTextTop: Float,
     ) {
-        assertEquals(avatarTop, nodeTop("AL"), POSITION_TOLERANCE)
+        assertEquals(avatarTop, nodeTop("A"), POSITION_TOLERANCE)
         assertEquals(bubbleTextTop, nodeTop("Can you review the file?"), POSITION_TOLERANCE)
     }
 

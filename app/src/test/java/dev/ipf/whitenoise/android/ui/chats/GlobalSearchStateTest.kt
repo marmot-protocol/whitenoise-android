@@ -29,7 +29,7 @@ class GlobalSearchStateTest {
             GlobalSearchState(
                 isOpen = true,
                 query = "hello",
-                filterSheetOpen = true,
+                openFilterCategory = GlobalSearchFilterCategory.Date,
                 accountScopeToken = scopeToken,
                 chatFilters = setOf(GlobalSearchChatFilter("abc", "Chat A")),
                 senderFilters = setOf(GlobalSearchSenderFilter("npub1", "Sender B")),
@@ -56,8 +56,13 @@ class GlobalSearchStateTest {
 
     @Test
     fun filterSheetOpenAndDismiss() {
-        val open = GlobalSearchTransitions.openFilterSheet(GlobalSearchState(isOpen = true))
+        val open =
+            GlobalSearchTransitions.openFilterCategory(
+                GlobalSearchState(isOpen = true),
+                GlobalSearchFilterCategory.Date,
+            )
         assertTrue(open.filterSheetOpen)
+        assertEquals(GlobalSearchFilterCategory.Date, open.openFilterCategory)
         val dismissed = GlobalSearchTransitions.dismissFilterSheet(open)
         assertFalse(dismissed.filterSheetOpen)
     }
@@ -301,6 +306,42 @@ class GlobalSearchStateTest {
     }
 
     @Test
+    fun folderAndChatTypeFiltersToggleAndChipInCategoryOrder() {
+        var state = GlobalSearchState(isOpen = true)
+        state = GlobalSearchTransitions.toggleFolderFilter(state, "f1")
+        state = GlobalSearchTransitions.toggleChatTypeFilter(state, GlobalSearchChatType.DIRECT)
+        state = GlobalSearchTransitions.applyChatFilter(state, GlobalSearchChatFilter("g1", "Alice"))
+        state = GlobalSearchTransitions.applyDateFilter(state, GlobalSearchDateFilterSelection.Today)
+        assertEquals(
+            listOf("folder:f1", "type:DIRECT", "chat:g1", "date:today"),
+            GlobalSearchActiveChips.from(state).items.map { it.chipId },
+        )
+        assertTrue(state.hasActiveFilters)
+        assertTrue(state.messageFiltersActive)
+
+        state = GlobalSearchTransitions.removeFilter(state, "type:DIRECT")
+        assertTrue(state.chatTypeFilters.isEmpty())
+        state = GlobalSearchTransitions.toggleFolderFilter(state, "f1")
+        assertTrue(state.folderFilters.isEmpty())
+        val cleared = GlobalSearchTransitions.clearAllFilters(state)
+        assertFalse(cleared.hasActiveFilters)
+    }
+
+    @Test
+    fun reconcileAvailableDropsVanishedFoldersAndOutOfScopeChats() {
+        val state =
+            GlobalSearchState(
+                isOpen = true,
+                folderFilters = setOf("keep", "gone"),
+                chatFilters = setOf(GlobalSearchChatFilter("in", "In"), GlobalSearchChatFilter("out", "Out")),
+            )
+        val reconciled = GlobalSearchTransitions.reconcileAvailable(state, setOf("keep"), setOf("in"))
+        assertEquals(setOf("keep"), reconciled.folderFilters)
+        assertEquals(setOf(GlobalSearchChatFilter("in", "In")), reconciled.chatFilters)
+        assertEquals(state, GlobalSearchTransitions.reconcileAvailable(state, null, null))
+    }
+
+    @Test
     fun encodeDecodeRoundTrip() {
         val scopeToken = accountScope("personal", 3).encodeToken()
         val customDate =
@@ -313,8 +354,10 @@ class GlobalSearchStateTest {
             GlobalSearchState(
                 isOpen = true,
                 query = "hello\u001fworld \uD83D\uDE00 \u0627\u0644\u0639\u0631\u0628\u064A\u0629",
-                filterSheetOpen = true,
+                openFilterCategory = GlobalSearchFilterCategory.Date,
                 accountScopeToken = scopeToken,
+                folderFilters = setOf("folder\u001e1", "folder-2"),
+                chatTypeFilters = setOf(GlobalSearchChatType.GROUPS),
                 chatFilters = setOf(GlobalSearchChatFilter("group\u001e1\u001dpart", "Alice\u001f\u001dlabel")),
                 senderFilters = setOf(GlobalSearchSenderFilter("npub1", "Bob")),
                 dateFilterSelection = customDate,

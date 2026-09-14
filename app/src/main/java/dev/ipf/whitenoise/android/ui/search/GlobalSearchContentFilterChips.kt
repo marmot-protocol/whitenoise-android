@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.search
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -26,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.search.labelRes
-import dev.ipf.whitenoise.android.ui.common.whiteNoiseDialogSelection
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal const val GLOBAL_SEARCH_CONTENT_FILTER_TAG = "global-search-content-filter"
 
@@ -63,7 +65,7 @@ internal fun GlobalSearchContentFilterChips(
     }
 }
 
-/** One checkable target with native selected semantics and at least 48 dp for every content kind. */
+/** The prototype's dialog check row (label, trailing checkbox) with one native selected target per kind. */
 @Suppress("FunctionNaming")
 @Composable
 private fun GlobalSearchContentChip(
@@ -76,17 +78,23 @@ private fun GlobalSearchContentChip(
     Row(
         modifier
             .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .whiteNoiseDialogSelection(selected)
+            .heightIn(min = 56.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
             .toggleable(value = selected, role = Role.Checkbox, onValueChange = { onClick() })
             .semantics {
                 contentDescription = label
                 this.selected = selected
-            }.padding(horizontal = 8.dp, vertical = 4.dp),
+            }.padding(WhiteNoiseSpacing.Related),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
     ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
         Checkbox(selected, onCheckedChange = null, modifier = Modifier.clearAndSetSemantics {})
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
     }
 }

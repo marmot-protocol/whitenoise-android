@@ -27,18 +27,24 @@
     <string name="toast_demoted_but_couldnt_leave">Du bist kein Admin mehr, aber konntest die Gruppe nicht verlassen</string>
     <string name="chat_list_search_hint">Chats suchen</string>
     <string name="chat_list_search_filters">Filter</string>
-    <string name="chat_list_search_filters_button">Filter (%1$d)</string>
     <plurals name="chat_list_search_filters_active">
         <item quantity="one">%1$d Filter aktiv</item>
         <item quantity="other">%1$d Filter aktiv</item>
     </plurals>
     <string name="chat_list_search_clear_all_filters">Alle löschen</string>
-    <string name="chat_list_search_filter_sheet_title">Filter</string>
-    <string name="chat_list_search_filter_chat">Gespräch</string>
+    <string name="chat_list_search_filter_chat">Unterhaltungen</string>
     <string name="chat_list_search_filter_sender">Absender</string>
     <string name="chat_list_search_filter_date">Datum</string>
     <string name="chat_list_search_filter_content">Inhalt</string>
-    <string name="chat_list_search_filter_remove">%1$s entfernen</string>
+    <string name="chat_list_search_filter_folders">Ordner</string>
+    <string name="chat_list_search_filter_chat_type">Chat-Typ</string>
+    <string name="chat_list_search_direct_chats">Direktchats</string>
+    <string name="chat_list_search_groups">Gruppen</string>
+    <string name="chat_list_search_folder_chip">Ordner: %1$s</string>
+    <string name="chat_list_search_chat_chip">Unterhaltung: %1$s</string>
+    <string name="chat_list_search_sender_chip">Absender: %1$s</string>
+    <string name="chat_list_search_no_folders">Keine Ordner</string>
+    <string name="chat_list_search_filter_remove">Filter entfernen: %1$s</string>
     <string name="chat_list_filter_all">Alle</string>
     <string name="chat_list_filter_unread">Ungelesen</string>
     <string name="chat_list_search_resolving">Profil wird gesucht…</string>
@@ -1276,7 +1282,7 @@
     <string name="quick_action_search">Suchen</string>
     <string name="group_details_subtitle">Gruppe · %1$d Mitglieder</string>
     <string name="add_group_description">Gruppenbeschreibung hinzufügen</string>
-    <string name="see_all_members">Alle %1$d Mitglieder anzeigen</string>
+    <string name="see_all_members">Alle anzeigen</string>
     <string name="collapse_long_messages">Lange Nachrichten einklappen</string>
     <string name="sounds_and_notifications">Töne &amp; Benachrichtigungen</string>
     <string name="notify_all_messages">Alle Nachrichten</string>

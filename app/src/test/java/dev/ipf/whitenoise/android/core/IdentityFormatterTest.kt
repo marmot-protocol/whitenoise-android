@@ -59,9 +59,10 @@ class IdentityFormatterTest {
     }
 
     @Test
-    fun initialsTakeLeadingCodePointFromEachWord() {
-        // Latin smoke test: the existing two-word path still works.
-        assertEquals("AB", IdentityFormatter.initials("alice bobson"))
+    fun initialsTakeTheLeadingLetterOnly() {
+        // The prototype's monogram is a single glyph, whatever the word count.
+        assertEquals("A", IdentityFormatter.initials("alice bobson"))
+        assertEquals("X", IdentityFormatter.initials("Xavier"))
     }
 
     @Test
@@ -89,13 +90,11 @@ class IdentityFormatterTest {
 
     @Test
     fun initialsSingleWordWithTrailingEmojiUsesLetters() {
-        // A single word keeps the two-letter monogram from its letters; the
-        // trailing emoji is simply never reached (#427). Deliberately "BO", not
-        // "B" — single-word names always yield up to two letters, matching the
-        // existing "Xavier"-style behavior.
+        // A single word yields its first letter; the trailing emoji is never
+        // reached (#427).
         val fire = String(Character.toChars(0x1F525))
 
-        assertEquals("BO", IdentityFormatter.initials("Bob$fire"))
+        assertEquals("B", IdentityFormatter.initials("Bob$fire"))
     }
 
     @Test
@@ -133,12 +132,12 @@ class IdentityFormatterTest {
 
     @Test
     fun initialsTakeTwoNonBmpCodePointsFromOneWord() {
-        // Single-word name made entirely of non-BMP code points: both initials
+        // Single-word name made entirely of non-BMP code points: the initial
         // must arrive whole. Pre-fix this would split a surrogate pair.
         val mathBoldX = String(Character.toChars(0x1D54F))
         val mathBoldA = String(Character.toChars(0x1D400))
         val word = mathBoldX + mathBoldA + "vier"
-        val expected = (mathBoldX + mathBoldA).uppercase()
+        val expected = mathBoldX.uppercase()
 
         assertEquals(expected, IdentityFormatter.initials(word))
     }

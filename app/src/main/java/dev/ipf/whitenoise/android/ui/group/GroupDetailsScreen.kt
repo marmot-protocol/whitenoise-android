@@ -37,7 +37,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -1089,12 +1088,23 @@ internal fun GroupDetailsScreen(
                             !membersExpanded &&
                             displayedMembers.size > GROUP_MEMBERS_PREVIEW_COUNT
                     if (canExpandMembers) {
-                        FlowQuickActionRow(
-                            icon = Icons.Default.ExpandMore,
-                            title = stringResource(R.string.see_all_members, displayedMembers.size),
-                            modifier = Modifier.testTag("chat_info.all_members"),
-                            onClick = { membersExpanded = true },
-                        )
+                        SettingsGroup(
+                            modifier =
+                                Modifier
+                                    .padding(top = WhiteNoiseSpacing.Related)
+                                    .testTag("chat_info.all_members"),
+                        ) {
+                            row("all_members") { rowContext ->
+                                SettingsAction(
+                                    context = rowContext,
+                                    title = stringResource(R.string.see_all_members),
+                                    onClick = { membersExpanded = true },
+                                    leading = {
+                                        Icon(painterResource(R.drawable.ic_group), contentDescription = null)
+                                    },
+                                )
+                            }
+                        }
                     }
                     controller.pendingInviteMemberRefs.forEach { invite ->
                         val inviteNpub = appState.npubForDisplay(invite)

@@ -1,111 +1,167 @@
-@file:Suppress("FunctionNaming", "LongMethod")
+@file:Suppress("FunctionNaming")
 
 package dev.ipf.whitenoise.android.ui.chats
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.search.labelRes
-import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.search.globalSearchDateFilterLabel
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal const val CHAT_LIST_SEARCH_FILTERS_ACTION_TAG = "chat-list-search-filters-action"
 internal const val CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG = "chat-list-search-clear-all-filters"
-internal const val CHAT_LIST_SEARCH_FILTER_SHEET_TAG = "chat-list-search-filter-sheet"
+internal const val CHAT_LIST_SEARCH_FILTER_MENU_TAG = "chat-list-search-filter-menu"
+internal const val CHAT_LIST_SEARCH_FILTER_MENU_CLEAR_TAG = "chat-list-search-filter-menu-clear"
 internal const val CHAT_LIST_SEARCH_FILTER_CONTROLS_TAG = "chat-list-search-filter-controls"
 
 internal fun globalSearchFilterChipTag(chipId: String): String = "chat-list-search-filter-chip-$chipId"
 
-/** Clear-first removable chips retain the shell filter identities and the caller\'s native availability gate. */
+internal fun globalSearchFilterMenuItemTag(category: GlobalSearchFilterCategory): String {
+    val name = category.name
+    return "chat-list-search-filter-menu-$name"
+}
+
+internal fun GlobalSearchFilterCategory.labelRes(): Int =
+    when (this) {
+        GlobalSearchFilterCategory.Folder -> R.string.chat_list_search_filter_folders
+        GlobalSearchFilterCategory.ChatType -> R.string.chat_list_search_filter_chat_type
+        GlobalSearchFilterCategory.Chat -> R.string.chat_list_search_filter_chat
+        GlobalSearchFilterCategory.Sender -> R.string.chat_list_search_filter_sender
+        GlobalSearchFilterCategory.Date -> R.string.chat_list_search_filter_date
+        GlobalSearchFilterCategory.Content -> R.string.chat_list_search_filter_content
+    }
+
+internal fun GlobalSearchChatType.labelRes(): Int =
+    when (this) {
+        GlobalSearchChatType.DIRECT -> R.string.chat_list_search_direct_chats
+        GlobalSearchChatType.GROUPS -> R.string.chat_list_search_groups
+    }
+
+/** The prototype's filter entry beside the search field: a plain icon that fills once any filter is active. */
+@Composable
+internal fun GlobalSearchFilterIconButton(
+    state: GlobalSearchState,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val activeCount = GlobalSearchActiveChips.from(state).count
+    val description = globalSearchFiltersActionDescription(activeCount)
+    val semantics =
+        modifier
+            .testTag(CHAT_LIST_SEARCH_FILTERS_ACTION_TAG)
+            .semantics {
+                contentDescription = description
+                selected = activeCount > 0
+            }
+    val icon: @Composable () -> Unit = {
+        Icon(painterResource(R.drawable.ic_filter_list), contentDescription = null)
+    }
+    if (activeCount > 0) {
+        FilledIconButton(onClick = onClick, modifier = semantics, content = icon)
+    } else {
+        IconButton(onClick = onClick, modifier = semantics, content = icon)
+    }
+}
+
+/** The prototype's category menu anchored on the filter button; Clear All joins once a filter is active. */
+@Composable
+internal fun GlobalSearchFilterMenu(
+    expanded: Boolean,
+    state: GlobalSearchState,
+    onDismiss: () -> Unit,
+    onCategory: (GlobalSearchFilterCategory) -> Unit,
+    onClearAll: () -> Unit,
+) {
+    val categories =
+        GlobalSearchFilterCategory.entries.map { category ->
+            WhiteNoiseMenuItem(
+                label = stringResource(category.labelRes()),
+                selected = state.isCategoryActive(category),
+                onClick = { onCategory(category) },
+                modifier = Modifier.testTag(globalSearchFilterMenuItemTag(category)),
+            )
+        }
+    val clearAll =
+        if (state.hasActiveFilters) {
+            listOf(
+                WhiteNoiseMenuItem(
+                    label = stringResource(R.string.chat_list_search_clear_all_filters),
+                    onClick = onClearAll,
+                    modifier = Modifier.testTag(CHAT_LIST_SEARCH_FILTER_MENU_CLEAR_TAG),
+                ),
+            )
+        } else {
+            emptyList()
+        }
+    WhiteNoiseDropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        items = categories + clearAll,
+        modifier = Modifier.testTag(CHAT_LIST_SEARCH_FILTER_MENU_TAG),
+    )
+}
+
+/** The prototype's active-filter bar: Clear All first, then one removable chip per filter. */
 @Composable
 internal fun GlobalSearchFilterControlsRow(
     state: GlobalSearchState,
-    onOpenFilters: (() -> Unit)?,
     onRemoveFilter: (String) -> Unit,
     onClearAll: () -> Unit,
     modifier: Modifier = Modifier,
+    folderNames: Map<String, String> = emptyMap(),
 ) {
     val chips = GlobalSearchActiveChips.from(state)
-    val activeFilterCount = chips.count
-    val filtersButtonLabel = globalSearchFiltersButtonLabel(activeFilterCount)
-    val filtersContentDescription = globalSearchFiltersActionDescription(activeFilterCount)
     val clearAllDescription = stringResource(R.string.chat_list_search_clear_all_filters)
-    Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .testTag(CHAT_LIST_SEARCH_FILTER_CONTROLS_TAG)
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 4.dp),
+    LazyRow(
+        modifier = modifier.fillMaxWidth().testTag(CHAT_LIST_SEARCH_FILTER_CONTROLS_TAG),
+        contentPadding = PaddingValues(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (onOpenFilters != null) {
-            TextButton(
-                onClick = onOpenFilters,
-                modifier =
-                    Modifier
-                        .testTag(CHAT_LIST_SEARCH_FILTERS_ACTION_TAG)
-                        .semantics {
-                            contentDescription = filtersContentDescription
-                        },
-            ) {
-                Text(filtersButtonLabel)
+        if (chips.count > 0) {
+            item(key = "clear-all") {
+                TextButton(
+                    onClick = onClearAll,
+                    modifier =
+                        Modifier
+                            .testTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG)
+                            .semantics { contentDescription = clearAllDescription },
+                ) {
+                    Text(stringResource(R.string.chat_list_search_clear_all_filters))
+                }
             }
         }
-        if (activeFilterCount > 0) {
-            TextButton(
-                onClick = onClearAll,
-                modifier =
-                    Modifier
-                        .testTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG)
-                        .semantics {
-                            contentDescription = clearAllDescription
-                        },
-            ) {
-                Text(stringResource(R.string.chat_list_search_clear_all_filters))
-            }
-        }
-        chips.items.forEach { chip ->
-            val chipLabel = globalSearchActiveChipLabel(chip, state)
+        items(chips.items, key = { it.chipId }) { chip ->
+            val chipLabel = globalSearchActiveChipLabel(chip, state, folderNames)
             val removeDescription = stringResource(R.string.chat_list_search_filter_remove, chipLabel)
             InputChip(
                 selected = true,
                 onClick = { onRemoveFilter(chip.chipId) },
                 label = { Text(chipLabel) },
-                trailingIcon = {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = null,
-                        modifier = Modifier.padding(2.dp),
-                    )
-                },
+                trailingIcon = { Icon(painterResource(R.drawable.ic_close), contentDescription = null) },
                 modifier =
                     Modifier
                         .testTag(globalSearchFilterChipTag(chip.chipId))
@@ -115,81 +171,33 @@ internal fun GlobalSearchFilterControlsRow(
     }
 }
 
-/** Hosts only supplied native filter sections; an empty capability set cannot open a misleading filter sheet. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun GlobalSearchFilterSheet(
-    visible: Boolean,
-    onDismiss: () -> Unit,
-    chatSection: (@Composable () -> Unit)? = null,
-    senderSection: (@Composable () -> Unit)? = null,
-    dateSection: (@Composable () -> Unit)? = null,
-    contentSection: (@Composable () -> Unit)? = null,
-) {
-    val hasInteractiveSections =
-        chatSection != null || senderSection != null || dateSection != null || contentSection != null
-    if (!visible || !hasInteractiveSections) return
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .testTag(CHAT_LIST_SEARCH_FILTER_SHEET_TAG)
-                    .navigationBarsPadding()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.chat_list_search_filter_sheet_title),
-                style = MaterialTheme.typography.titleLarge,
-            )
-            if (chatSection != null) {
-                SectionHeader(stringResource(R.string.chat_list_search_filter_chat))
-                chatSection()
-            }
-            if (senderSection != null) {
-                SectionHeader(stringResource(R.string.chat_list_search_filter_sender))
-                senderSection()
-            }
-            if (dateSection != null) {
-                SectionHeader(stringResource(R.string.chat_list_search_filter_date))
-                dateSection()
-            }
-            if (contentSection != null) {
-                SectionHeader(stringResource(R.string.chat_list_search_filter_content))
-                contentSection()
-            }
-        }
-    }
-}
-
 @Composable
 internal fun globalSearchActiveChipLabel(
     chip: GlobalSearchActiveChip,
     state: GlobalSearchState,
+    folderNames: Map<String, String> = emptyMap(),
 ): String =
     when (chip.category) {
-        GlobalSearchFilterCategory.Chat,
-        GlobalSearchFilterCategory.Sender,
-        -> chip.displayLabel
+        GlobalSearchFilterCategory.Folder -> {
+            val folderName = folderNames[chip.chipId.removePrefix("folder:")]
+            if (folderName == null) {
+                stringResource(R.string.chat_list_search_filter_folders)
+            } else {
+                stringResource(R.string.chat_list_search_folder_chip, folderName)
+            }
+        }
+        GlobalSearchFilterCategory.ChatType -> {
+            val type = runCatching { GlobalSearchChatType.valueOf(chip.chipId.removePrefix("type:")) }.getOrNull()
+            if (type == null) "" else stringResource(type.labelRes())
+        }
+        GlobalSearchFilterCategory.Chat -> stringResource(R.string.chat_list_search_chat_chip, chip.displayLabel)
+        GlobalSearchFilterCategory.Sender -> stringResource(R.string.chat_list_search_sender_chip, chip.displayLabel)
         GlobalSearchFilterCategory.Date -> globalSearchDateFilterLabel(state.dateFilterSelection)
         GlobalSearchFilterCategory.Content -> {
             val kindName = chip.chipId.removePrefix("content:")
             val kind = runCatching { GlobalSearchContentKind.valueOf(kindName) }.getOrNull()
             if (kind == null) "" else stringResource(kind.labelRes())
         }
-    }
-
-@Composable
-internal fun globalSearchFiltersButtonLabel(activeFilterCount: Int): String =
-    if (activeFilterCount > 0) {
-        stringResource(R.string.chat_list_search_filters_button, activeFilterCount)
-    } else {
-        stringResource(R.string.chat_list_search_filters)
     }
 
 @Composable

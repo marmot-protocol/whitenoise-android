@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.core
 
+import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
+import dev.ipf.whitenoise.android.search.GlobalSearchEpochBounds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -270,7 +272,61 @@ class ChatListMessageSearchTest {
         override val plaintext: String,
         override val messageIdHex: String,
         override val timelineAt: ULong = 0uL,
+        override val sender: String = "",
+        override val mediaTypes: List<String> = emptyList(),
+        override val mediaLabels: List<String> = emptyList(),
     ) : ChatListMessageSearch.SearchableRecord
+
+    // ---- prototype filters (senders / date / content) ------------------------
+
+    @Test
+    fun constraintsMatchSenderDateAndContentAcrossCategories() {
+        val constraints =
+            MessageSearchConstraints(
+                senderIds = setOf("abc"),
+                dateBounds = GlobalSearchEpochBounds(1_000_000L, 2_000_000L),
+                contentKinds = setOf(GlobalSearchContentKind.IMAGES_VIDEO, GlobalSearchContentKind.LINKS),
+            )
+        val photo = Rec(9uL, false, "", "m1", timelineAt = 1_500uL, sender = "ABC", mediaTypes = listOf("image/png"))
+        assertTrue(constraints.matches(photo))
+        assertFalse(constraints.matches(photo.copy(sender = "zzz")))
+        assertFalse(constraints.matches(photo.copy(timelineAt = 2_000uL)))
+        assertFalse(constraints.matches(photo.copy(mediaTypes = listOf("application/pdf"))))
+        assertTrue(constraints.matches(photo.copy(mediaTypes = emptyList(), plaintext = "see https://x.y/z")))
+    }
+
+    @Test
+    fun contentKindsFollowThePrototypeClassification() {
+        assertEquals(
+            setOf(GlobalSearchContentKind.TEXT, GlobalSearchContentKind.LINKS),
+            messageSearchContentKinds("read www.example.org now", emptyList()),
+        )
+        assertEquals(
+            setOf(
+                GlobalSearchContentKind.ANY_ATTACHMENT,
+                GlobalSearchContentKind.VOICE_AUDIO,
+                GlobalSearchContentKind.FILES_DOCUMENTS,
+            ),
+            messageSearchContentKinds("", listOf("audio/ogg", "application/pdf")),
+        )
+    }
+
+    @Test
+    fun filterOnlySearchAcceptsAttachmentRowsAndBuildsALabelSnippet() {
+        val records =
+            listOf(
+                Rec(7uL, false, "reaction", "r1", mediaTypes = listOf("image/png")),
+                Rec(9uL, true, "", "d1", mediaTypes = listOf("image/png")),
+                Rec(9uL, false, "", "p1", mediaTypes = listOf("image/png"), mediaLabels = listOf("beach.png")),
+            )
+        val match = ChatListMessageSearch.firstEligibleBodyMatch(records, "", MessageSearchConstraints())
+        assertEquals("p1", match?.messageIdHex)
+        val snippet = ChatListMessageSearch.buildFilteredSnippet("", listOf("beach.png"))
+        assertEquals("beach.png", snippet?.text)
+        assertEquals(0, snippet?.highlightEnd)
+        assertNull(ChatListMessageSearch.buildFilteredSnippet("  ", emptyList()))
+        assertEquals("hello world", ChatListMessageSearch.buildFilteredSnippet("hello  world", emptyList())?.text)
+    }
 
     @Test
     fun excludedNewerRowsDoNotHideAnOlderEligibleBodyMatch() {

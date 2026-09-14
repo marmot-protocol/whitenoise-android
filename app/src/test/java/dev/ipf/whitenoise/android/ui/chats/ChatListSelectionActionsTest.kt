@@ -42,7 +42,7 @@ class ChatListSelectionActionsTest {
 
     @Test
     fun backDismissalPrioritizesSelectionThenFilterSheetThenSearch() {
-        val searchOpen = GlobalSearchState(isOpen = true, filterSheetOpen = true)
+        val searchOpen = GlobalSearchState(isOpen = true, openFilterCategory = GlobalSearchFilterCategory.Date)
         assertEquals(ChatListBackDismissal.ClearSelection, chatListBackDismissal(selectionMode = true, searchOpen))
         assertEquals(
             ChatListBackDismissal.DismissFilterSheet,
@@ -56,89 +56,49 @@ class ChatListSelectionActionsTest {
     }
 
     @Test
-    fun filterSheetCannotCoverSelectionOrOpenWithoutInteractiveSections() {
-        val requested = GlobalSearchState(isOpen = true, filterSheetOpen = true)
+    fun filterPickerCannotCoverSelectionAndNeedsAnOpenCategory() {
+        val requested = GlobalSearchState(isOpen = true, openFilterCategory = GlobalSearchFilterCategory.Date)
 
+        assertFalse(shouldPresentGlobalSearchFilterSheet(searchState = requested, selectionMode = true))
+        assertTrue(shouldPresentGlobalSearchFilterSheet(searchState = requested, selectionMode = false))
         assertFalse(
-            shouldPresentGlobalSearchFilterSheet(
-                searchState = requested,
-                interactiveSectionsAvailable = true,
-                selectionMode = true,
-            ),
+            shouldPresentGlobalSearchFilterSheet(searchState = GlobalSearchState(isOpen = true), selectionMode = false),
         )
         assertFalse(
             shouldPresentGlobalSearchFilterSheet(
-                searchState = requested,
-                interactiveSectionsAvailable = false,
-                selectionMode = false,
-            ),
-        )
-        assertTrue(
-            shouldPresentGlobalSearchFilterSheet(
-                searchState = requested,
-                interactiveSectionsAvailable = true,
+                searchState = requested.copy(isOpen = false),
                 selectionMode = false,
             ),
         )
     }
 
     @Test
-    fun filterControlsStayHiddenUntilSectionsExistButCanStillExposeRestoredChips() {
+    fun filterChipsShowOnlyWithActiveFiltersOutsideSelection() {
         val emptySearch = GlobalSearchState(isOpen = true)
         val filteredSearch =
             emptySearch.copy(chatFilters = setOf(GlobalSearchChatFilter("chat-id", "Alice")))
 
+        assertFalse(shouldShowGlobalSearchFilterControls(searchState = emptySearch, selectionMode = false))
+        assertTrue(shouldShowGlobalSearchFilterControls(searchState = filteredSearch, selectionMode = false))
+        assertFalse(shouldShowGlobalSearchFilterControls(searchState = filteredSearch, selectionMode = true))
         assertFalse(
             shouldShowGlobalSearchFilterControls(
-                searchState = emptySearch,
-                interactiveSectionsAvailable = false,
+                searchState = filteredSearch.copy(isOpen = false),
                 selectionMode = false,
-            ),
-        )
-        assertTrue(
-            shouldShowGlobalSearchFilterControls(
-                searchState = emptySearch,
-                interactiveSectionsAvailable = true,
-                selectionMode = false,
-            ),
-        )
-        assertTrue(
-            shouldShowGlobalSearchFilterControls(
-                searchState = filteredSearch,
-                interactiveSectionsAvailable = false,
-                selectionMode = false,
-            ),
-        )
-        assertFalse(
-            shouldShowGlobalSearchFilterControls(
-                searchState = filteredSearch,
-                interactiveSectionsAvailable = true,
-                selectionMode = true,
             ),
         )
     }
 
     @Test
-    fun selectionRevokesAnOpenFilterSheetBeforeBackDispatch() {
-        val requested = GlobalSearchState(isOpen = true, filterSheetOpen = true)
+    fun selectionRevokesAnOpenFilterPickerBeforeBackDispatch() {
+        val requested = GlobalSearchState(isOpen = true, openFilterCategory = GlobalSearchFilterCategory.Date)
 
-        val reconciled =
-            reconcileGlobalSearchFilterSheet(
-                searchState = requested,
-                interactiveSectionsAvailable = true,
-                selectionMode = true,
-            )
-
+        val reconciled = reconcileGlobalSearchFilterSheet(searchState = requested, selectionMode = true)
         assertFalse(reconciled.filterSheetOpen)
         assertEquals(ChatListBackDismissal.ClearSelection, chatListBackDismissal(selectionMode = true, reconciled))
 
-        val unavailable =
-            reconcileGlobalSearchFilterSheet(
-                searchState = requested,
-                interactiveSectionsAvailable = false,
-                selectionMode = false,
-            )
-        assertFalse(unavailable.filterSheetOpen)
-        assertEquals(ChatListBackDismissal.CloseSearch, chatListBackDismissal(selectionMode = false, unavailable))
+        val untouched = reconcileGlobalSearchFilterSheet(searchState = requested, selectionMode = false)
+        assertEquals(requested, untouched)
+        assertEquals(ChatListBackDismissal.DismissFilterSheet, chatListBackDismissal(selectionMode = false, untouched))
     }
 }

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,8 +14,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -34,6 +37,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
@@ -286,3 +290,37 @@ internal fun SpeechChoiceDialog(
 }
 
 private val SpeechChoiceDialogMaxHeight = 400.dp
+
+/** Prototype check row for dialogs: dialog-owned insets, one toggle target, the checkbox itself silent. */
+@Suppress("FunctionNaming")
+@Composable
+fun WhiteNoiseDialogCheckRow(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    leadingIcon: (@Composable () -> Unit)? = null,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = DialogCheckRowMinHeight)
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .toggleable(checked, role = Role.Checkbox, onValueChange = onCheckedChange)
+            .padding(WhiteNoiseSpacing.Related),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
+    ) {
+        leadingIcon?.invoke()
+        Text(
+            title,
+            Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Checkbox(checked, onCheckedChange = null, modifier = Modifier.clearAndSetSemantics { })
+    }
+}
+
+private val DialogCheckRowMinHeight = 56.dp

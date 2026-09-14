@@ -1,14 +1,15 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.activity.ComponentActivity
-import androidx.activity.ComponentDialog
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
@@ -25,7 +26,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import org.robolectric.shadows.ShadowDialog
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -42,35 +42,29 @@ class GlobalSearchFilterInteractionTest {
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
     @Test
-    fun filtersActionDescriptionWithZeroCount() {
+    fun filterIconDescribesTheInactiveStateWithoutSelection() {
         composeRule.setContent {
             Surface {
-                GlobalSearchFilterControlsRow(
-                    state = GlobalSearchState(isOpen = true),
-                    onOpenFilters = {},
-                    onRemoveFilter = {},
-                    onClearAll = {},
-                )
+                GlobalSearchFilterIconButton(state = GlobalSearchState(isOpen = true), onClick = {})
             }
         }
         composeRule
             .onNodeWithTag(CHAT_LIST_SEARCH_FILTERS_ACTION_TAG)
             .assertContentDescriptionEquals(context.getString(R.string.chat_list_search_filters))
+            .assertIsNotSelected()
     }
 
     @Test
-    fun filtersActionDescriptionAndVisibleLabelHaveNonzeroCount() {
+    fun activeFilterIconIsSelectedWithTheActiveCount() {
         composeRule.setContent {
             Surface {
-                GlobalSearchFilterControlsRow(
+                GlobalSearchFilterIconButton(
                     state =
                         GlobalSearchState(
                             isOpen = true,
                             dateFilterSelection = GlobalSearchDateFilterSelection.Today,
                         ),
-                    onOpenFilters = {},
-                    onRemoveFilter = {},
-                    onClearAll = {},
+                    onClick = {},
                 )
             }
         }
@@ -78,86 +72,119 @@ class GlobalSearchFilterInteractionTest {
             .onNodeWithTag(CHAT_LIST_SEARCH_FILTERS_ACTION_TAG)
             .assertContentDescriptionEquals(
                 context.resources.getQuantityString(R.plurals.chat_list_search_filters_active, 1, 1),
-            ).assertTextEquals(
-                context.getString(R.string.chat_list_search_filters_button, 1),
-            )
+            ).assertIsSelected()
     }
 
     @Test
-    fun filtersActionOpensTheSheetState() {
+    fun menuCategoryOpensThePickerState() {
         val stateHolder = mutableStateOf(GlobalSearchState(isOpen = true))
         composeRule.setContent {
             Surface {
-                GlobalSearchFilterControlsRow(
+                GlobalSearchFilterMenu(
+                    expanded = true,
                     state = stateHolder.value,
-                    onOpenFilters = {
-                        stateHolder.value = GlobalSearchTransitions.openFilterSheet(stateHolder.value)
+                    onDismiss = {},
+                    onCategory = {
+                        stateHolder.value = GlobalSearchTransitions.openFilterCategory(stateHolder.value, it)
                     },
-                    onRemoveFilter = {},
                     onClearAll = {},
                 )
             }
         }
-
-        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTERS_ACTION_TAG).performClick()
-        composeRule.runOnIdle { assertTrue(stateHolder.value.filterSheetOpen) }
+        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTER_MENU_CLEAR_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(globalSearchFilterMenuItemTag(GlobalSearchFilterCategory.Folder)).performClick()
+        composeRule.runOnIdle { assertEquals(GlobalSearchFilterCategory.Folder, stateHolder.value.openFilterCategory) }
     }
 
     @Test
-    fun unavailableFiltersActionIsHiddenWhileActiveFiltersRemainClearable() {
-        val chat = GlobalSearchChatFilter("g1", "Alice")
+    fun menuOffersClearAllOnlyWhileFiltersAreActive() {
+        val stateHolder =
+            mutableStateOf(
+                GlobalSearchState(isOpen = true, chatTypeFilters = setOf(GlobalSearchChatType.GROUPS)),
+            )
+        composeRule.setContent {
+            Surface {
+                GlobalSearchFilterMenu(
+                    expanded = true,
+                    state = stateHolder.value,
+                    onDismiss = {},
+                    onCategory = {},
+                    onClearAll = { stateHolder.value = GlobalSearchTransitions.clearAllFilters(stateHolder.value) },
+                )
+            }
+        }
+        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTER_MENU_CLEAR_TAG).performClick()
+        composeRule.runOnIdle { assertFalse(stateHolder.value.hasActiveFilters) }
+    }
+
+    @Test
+    fun folderPickerTogglesTheFolderAndDoneDismisses() {
+        val stateHolder =
+            mutableStateOf(GlobalSearchState(isOpen = true, openFilterCategory = GlobalSearchFilterCategory.Folder))
+        composeRule.setContent {
+            GlobalSearchFilterPicker(
+                state = stateHolder.value,
+                options = GlobalSearchFilterOptions(folders = listOf(GlobalSearchFolderOption("f1", "Family"))),
+                onStateChange = { transform -> stateHolder.value = transform(stateHolder.value) },
+            )
+        }
+        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTER_DIALOG_TAG).assertExists()
+        composeRule.onNodeWithTag(globalSearchFilterOptionTag("f1")).performClick()
+        composeRule.runOnIdle { assertEquals(setOf("f1"), stateHolder.value.folderFilters) }
+        composeRule.onNodeWithText(context.getString(R.string.done)).performClick()
+        composeRule.runOnIdle { assertFalse(stateHolder.value.filterSheetOpen) }
+    }
+
+    @Test
+    fun emptyFolderPickerExplainsThatNoFolderExists() {
+        composeRule.setContent {
+            GlobalSearchFilterPicker(
+                state = GlobalSearchState(isOpen = true, openFilterCategory = GlobalSearchFilterCategory.Folder),
+                options = GlobalSearchFilterOptions(),
+                onStateChange = {},
+            )
+        }
+        composeRule.onNodeWithText(context.getString(R.string.chat_list_search_no_folders)).assertExists()
+    }
+
+    @Test
+    fun chatTypePickerTogglesDirectChats() {
+        val stateHolder =
+            mutableStateOf(GlobalSearchState(isOpen = true, openFilterCategory = GlobalSearchFilterCategory.ChatType))
+        composeRule.setContent {
+            GlobalSearchFilterPicker(
+                state = stateHolder.value,
+                options = GlobalSearchFilterOptions(),
+                onStateChange = { transform -> stateHolder.value = transform(stateHolder.value) },
+            )
+        }
+        composeRule.onNodeWithTag(globalSearchFilterOptionTag(GlobalSearchChatType.DIRECT.name)).performClick()
+        composeRule.runOnIdle { assertEquals(setOf(GlobalSearchChatType.DIRECT), stateHolder.value.chatTypeFilters) }
+    }
+
+    @Test
+    fun folderChipNamesTheFolderAndTypeChipUsesThePrototypeLabel() {
         composeRule.setContent {
             Surface {
                 GlobalSearchFilterControlsRow(
-                    state = GlobalSearchState(isOpen = true, chatFilters = setOf(chat)),
-                    onOpenFilters = null,
+                    state =
+                        GlobalSearchState(
+                            isOpen = true,
+                            folderFilters = setOf("f1"),
+                            chatTypeFilters = setOf(GlobalSearchChatType.GROUPS),
+                        ),
+                    folderNames = mapOf("f1" to "Family"),
                     onRemoveFilter = {},
                     onClearAll = {},
                 )
             }
         }
-
-        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTERS_ACTION_TAG).assertDoesNotExist()
-        composeRule.onNodeWithTag(globalSearchFilterChipTag(chat.chipId)).assertExists()
-        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG).assertExists()
-    }
-
-    @Test
-    fun emptyFilterSheetIsNotPresented() {
-        composeRule.setContent {
-            Surface {
-                GlobalSearchFilterSheet(
-                    visible = true,
-                    onDismiss = {},
-                )
-            }
-        }
-
-        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTER_SHEET_TAG).assertDoesNotExist()
-    }
-
-    @Test
-    fun backDismissesFilterSheet() {
-        val visible = mutableStateOf(true)
-        composeRule.setContent {
-            Surface {
-                GlobalSearchFilterSheet(
-                    visible = visible.value,
-                    onDismiss = { visible.value = false },
-                    chatSection = { Text("Chat controls") },
-                )
-            }
-        }
-        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTER_SHEET_TAG).assertExists()
-
-        val dialog = ShadowDialog.getLatestDialog()
-        assertTrue("Filter sheet must own a ComponentDialog", dialog is ComponentDialog)
-        composeRule.runOnUiThread {
-            (dialog as ComponentDialog).onBackPressedDispatcher.onBackPressed()
-        }
-        composeRule.waitForIdle()
-
-        composeRule.runOnIdle { assertFalse(visible.value) }
+        composeRule
+            .onNodeWithTag(globalSearchFilterChipTag("folder:f1"))
+            .assertTextEquals(context.getString(R.string.chat_list_search_folder_chip, "Family"))
+        composeRule
+            .onNodeWithTag(globalSearchFilterChipTag("type:GROUPS"))
+            .assertTextEquals(context.getString(R.string.chat_list_search_groups))
     }
 
     @Test
@@ -176,7 +203,6 @@ class GlobalSearchFilterInteractionTest {
             Surface {
                 GlobalSearchFilterControlsRow(
                     state = stateHolder.value,
-                    onOpenFilters = {},
                     onRemoveFilter = { chipId ->
                         stateHolder.value = GlobalSearchTransitions.removeFilter(stateHolder.value, chipId)
                     },
@@ -203,7 +229,6 @@ class GlobalSearchFilterInteractionTest {
             Surface {
                 GlobalSearchFilterControlsRow(
                     state = GlobalSearchState(isOpen = true, chatFilters = setOf(chat)),
-                    onOpenFilters = {},
                     onRemoveFilter = {},
                     onClearAll = {},
                 )
@@ -213,7 +238,10 @@ class GlobalSearchFilterInteractionTest {
         composeRule
             .onNodeWithTag(globalSearchFilterChipTag(chat.chipId))
             .assertContentDescriptionEquals(
-                context.getString(R.string.chat_list_search_filter_remove, chat.displayLabel),
+                context.getString(
+                    R.string.chat_list_search_filter_remove,
+                    context.getString(R.string.chat_list_search_chat_chip, chat.displayLabel),
+                ),
             )
     }
 
@@ -231,7 +259,6 @@ class GlobalSearchFilterInteractionTest {
             Surface {
                 GlobalSearchFilterControlsRow(
                     state = stateHolder.value,
-                    onOpenFilters = {},
                     onRemoveFilter = { chipId ->
                         stateHolder.value = GlobalSearchTransitions.removeFilter(stateHolder.value, chipId)
                     },
@@ -263,7 +290,6 @@ class GlobalSearchFilterInteractionTest {
                 Surface {
                     GlobalSearchFilterControlsRow(
                         state = GlobalSearchState(isOpen = true, dateFilterSelection = custom),
-                        onOpenFilters = {},
                         onRemoveFilter = {},
                         onClearAll = {},
                     )
@@ -298,7 +324,6 @@ class GlobalSearchFilterInteractionTest {
                             contentFilterSelection =
                                 GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.TEXT)),
                         ),
-                    onOpenFilters = {},
                     onRemoveFilter = {},
                     onClearAll = {},
                 )

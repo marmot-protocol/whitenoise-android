@@ -27,17 +27,23 @@
     <string name="toast_demoted_but_couldnt_leave">您不再是管理員,但無法離開群組</string>
     <string name="chat_list_search_hint">搜尋聊天</string>
     <string name="chat_list_search_filters">篩選</string>
-    <string name="chat_list_search_filters_button">篩選（%1$d）</string>
     <plurals name="chat_list_search_filters_active">
         <item quantity="other">%1$d 個篩選條件已啟用</item>
     </plurals>
     <string name="chat_list_search_clear_all_filters">全部清除</string>
-    <string name="chat_list_search_filter_sheet_title">篩選</string>
     <string name="chat_list_search_filter_chat">聊天</string>
     <string name="chat_list_search_filter_sender">傳送者</string>
     <string name="chat_list_search_filter_date">日期</string>
     <string name="chat_list_search_filter_content">內容</string>
-    <string name="chat_list_search_filter_remove">移除%1$s</string>
+    <string name="chat_list_search_filter_folders">資料夾</string>
+    <string name="chat_list_search_filter_chat_type">聊天類型</string>
+    <string name="chat_list_search_direct_chats">私聊</string>
+    <string name="chat_list_search_groups">群組</string>
+    <string name="chat_list_search_folder_chip">資料夾：%1$s</string>
+    <string name="chat_list_search_chat_chip">聊天：%1$s</string>
+    <string name="chat_list_search_sender_chip">傳送者：%1$s</string>
+    <string name="chat_list_search_no_folders">沒有資料夾</string>
+    <string name="chat_list_search_filter_remove">移除篩選：%1$s</string>
     <string name="chat_list_filter_all">全部</string>
     <string name="chat_list_filter_unread">未讀</string>
     <string name="chat_list_search_resolving">正在查找個人檔案…</string>
@@ -1255,7 +1261,7 @@
     <string name="quick_action_search">搜尋</string>
     <string name="group_details_subtitle">群組 · %1$d 位成員</string>
     <string name="add_group_description">新增群組描述</string>
-    <string name="see_all_members">查看全部 %1$d 位成員</string>
+    <string name="see_all_members">查看全部</string>
     <string name="collapse_long_messages">摺疊長訊息</string>
     <string name="sounds_and_notifications">音效與通知</string>
     <string name="notify_all_messages">所有訊息</string>

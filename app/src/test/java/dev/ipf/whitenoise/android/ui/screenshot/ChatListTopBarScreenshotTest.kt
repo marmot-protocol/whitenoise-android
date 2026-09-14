@@ -408,10 +408,11 @@ class ChatListTopBarScreenshotTest {
                                 onOpenSettings = {},
                                 onSwitchAccount = {},
                                 connectivityState = ConnectivityBannerState.Hidden,
+                                searchFilterState = searchState,
+                                onSearchFilterCategory = {},
                             )
                             GlobalSearchFilterControlsRow(
                                 state = searchState,
-                                onOpenFilters = {},
                                 onRemoveFilter = {},
                                 onClearAll = {},
                             )

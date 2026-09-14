@@ -21,16 +21,18 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 internal fun ChatListNoResults(
     query: String,
     unreadFolderSelected: Boolean,
+    filtersActive: Boolean = false,
 ) {
+    val searching = query.isNotEmpty() || filtersActive
     val title =
         when {
-            query.isNotEmpty() -> stringResource(R.string.no_results)
+            searching -> stringResource(R.string.no_results)
             unreadFolderSelected -> stringResource(R.string.chat_rows_no_unread_title)
             else -> stringResource(R.string.chat_rows_no_chats_title)
         }
     val detail =
         when {
-            query.isNotEmpty() -> stringResource(R.string.chat_rows_no_results_detail)
+            searching -> stringResource(R.string.chat_rows_no_results_detail)
             unreadFolderSelected -> stringResource(R.string.chat_rows_no_unread_detail)
             else -> stringResource(R.string.chat_rows_empty_folder_detail)
         }

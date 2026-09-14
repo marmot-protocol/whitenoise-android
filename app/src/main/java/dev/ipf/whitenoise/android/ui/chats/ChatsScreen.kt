@@ -79,6 +79,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
+import dev.ipf.whitenoise.android.core.MessageSearchConstraints
 import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.canonicalChatListBodyMatches
 import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
@@ -201,16 +202,11 @@ internal fun ChatsScreen(
     }
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     val selectionMode = selectedChatIds.isNotEmpty()
-    // Typed Date and Content filters cannot be exposed until the MDK search
-    // contract executes them. Keeping this false prevents the UI from claiming
-    // that results are filtered when only the ordinary text query is applied.
-    val interactiveGlobalSearchFilterSectionsAvailable = false
     val searchOpen = globalSearchState.isOpen
     val searchQuery = globalSearchState.query
     val globalSearchPresentationState =
         reconcileGlobalSearchFilterSheet(
             searchState = globalSearchState,
-            interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
             selectionMode = selectionMode,
         )
     // Async message-body results retain their exact query/account/list key.
@@ -317,16 +313,11 @@ internal fun ChatsScreen(
             searchFocusRequester.requestFocus()
         }
     }
-    LaunchedEffect(
-        selectionMode,
-        globalSearchState.filterSheetOpen,
-        interactiveGlobalSearchFilterSectionsAvailable,
-    ) {
+    LaunchedEffect(selectionMode, globalSearchState.filterSheetOpen) {
         if (globalSearchPresentationState != globalSearchState) {
             onGlobalSearchStateChange { currentState ->
                 reconcileGlobalSearchFilterSheet(
                     searchState = currentState,
-                    interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
                     selectionMode = selectionMode,
                 )
             }
@@ -389,6 +380,59 @@ internal fun ChatsScreen(
         }
     }
     val loadFailurePlacement = loadFailurePlacement(controller.error != null, sourceList.isNotEmpty())
+    // Prototype search filters. Folders and chat types scope the chat list before
+    // the query runs, named chats narrow it further, and senders / date / content
+    // constrain the per-chat message search while hiding plain chat rows.
+    val searchFolderChatIds =
+        remember(globalSearchState.folderFilters, resolveFolderChatIds) {
+            globalSearchState.folderFilters
+                .takeIf { it.isNotEmpty() }
+                ?.flatMapTo(mutableSetOf()) { resolveFolderChatIds(it) }
+        }
+    val effectiveFolderChatIds =
+        remember(selectedFolderChatIds, searchFolderChatIds) {
+            intersectChatScopes(selectedFolderChatIds, searchFolderChatIds)
+        }
+    val folderTypeScopedList =
+        remember(sourceList, globalSearchState.chatTypeFilters, effectiveFolderChatIds) {
+            restrictToChatIds(
+                applyGlobalSearchChatScope(sourceList, globalSearchState.chatTypeFilters, emptySet()),
+                effectiveFolderChatIds,
+            )
+        }
+    val scopedSourceList =
+        remember(sourceList, globalSearchState.chatTypeFilters, globalSearchState.chatFilters) {
+            applyGlobalSearchChatScope(
+                sourceList,
+                globalSearchState.chatTypeFilters,
+                globalSearchState.chatFilters.mapTo(mutableSetOf()) { it.stableId },
+            )
+        }
+    val messageSearchConstraints =
+        remember(
+            globalSearchState.senderFilters,
+            globalSearchState.dateFilterSelection,
+            globalSearchState.contentFilterSelection,
+        ) {
+            messageSearchConstraintsFor(globalSearchState)
+        }
+    val globalSearchFolderNames = remember(accountFolders) { accountFolders.associate { it.id to it.name } }
+    val globalSearchFilterOptions =
+        remember(accountFolders, folderTypeScopedList, groupTitleCopy, appState.profileRevisionForCompose) {
+            globalSearchFilterOptions(appState, accountFolders, folderTypeScopedList, groupTitleCopy)
+        }
+    // Deleted folders and chats outside the folder / type scope leave the filters (prototype `reconcile`).
+    LaunchedEffect(globalSearchState.isOpen, accountFolders, folderTypeScopedList) {
+        if (!globalSearchState.isOpen) return@LaunchedEffect
+        val folderIds = if (appState.activeAccountRef == null) null else accountFolders.mapTo(mutableSetOf()) { it.id }
+        val chatIds =
+            if (sourceList.isEmpty()) {
+                null
+            } else {
+                folderTypeScopedList.mapTo(mutableSetOf()) { canonicalChatListGroupId(it.group.groupIdHex) }
+            }
+        onGlobalSearchStateChange { GlobalSearchTransitions.reconcileAvailable(it, folderIds, chatIds) }
+    }
     // Subscribing read of the profile-cache revision so the filter
     // re-runs when a DM peer's display name resolves — the title
     // projection inside `projectChatListSearchSections` reads
@@ -403,18 +447,26 @@ internal fun ChatsScreen(
     // full-corpus body search while the user is typing (#1201).
     val trimmedQuery = searchQuery.trim()
     val normalizedSearchQuery = remember(trimmedQuery) { localeInvariantFold(trimmedQuery) }
-    val searchActive = trimmedQuery.isNotEmpty()
+    val filtersActive = searchOpen && globalSearchState.hasActiveFilters
+    val searchActive = trimmedQuery.isNotEmpty() || filtersActive
     val bodySearchGroupIds =
-        remember(sourceList) {
-            sourceList.map { canonicalChatListGroupId(it.id) }.distinct().sorted()
+        remember(scopedSourceList) {
+            scopedSourceList.map { canonicalChatListGroupId(it.id) }.distinct().sorted()
         }
     val bodySearchKey =
-        remember(normalizedSearchQuery, controller.boundAccountRef, showArchived, bodySearchGroupIds) {
+        remember(
+            normalizedSearchQuery,
+            controller.boundAccountRef,
+            showArchived,
+            bodySearchGroupIds,
+            messageSearchConstraints,
+        ) {
             ChatListBodySearchKey(
                 query = normalizedSearchQuery,
                 accountRef = controller.boundAccountRef,
                 showArchived = showArchived,
                 canonicalGroupIds = bodySearchGroupIds,
+                constraints = messageSearchConstraints,
             )
         }
     // Use a request identity as well as the structural cache key. If a user
@@ -427,14 +479,19 @@ internal fun ChatsScreen(
             ?.matches
             .orEmpty()
     LaunchedEffect(bodySearchRequest) {
-        if (!searchActive) {
+        // Folder / type / chat scopes alone need no body search; a needle or a
+        // message-level filter does.
+        if (!searchActive || (trimmedQuery.isEmpty() && messageSearchConstraints == null)) {
             return@LaunchedEffect
         }
         delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
         bodySearchResult =
             ChatListBodySearchResult(
                 request = bodySearchRequest,
-                matches = canonicalChatListBodyMatches(controller.searchMessageBodies(sourceList, trimmedQuery)),
+                matches =
+                    canonicalChatListBodyMatches(
+                        controller.searchMessageBodies(scopedSourceList, trimmedQuery, messageSearchConstraints),
+                    ),
             )
     }
     // Resolve a pasted Nostr identifier in the search field (#344). An npub is
@@ -502,14 +559,23 @@ internal fun ChatsScreen(
     val searchSections =
         // Keyed on the normalized query: whitespace and case-only edits change
         // nothing the filter can see, so they must not re-run the O(n) pass.
-        remember(sourceList, normalizedSearchQuery, selectedFolderChatIds, groupTitleCopy, profileRev, bodyMatches) {
+        remember(
+            scopedSourceList,
+            normalizedSearchQuery,
+            effectiveFolderChatIds,
+            groupTitleCopy,
+            profileRev,
+            bodyMatches,
+            messageSearchConstraints,
+        ) {
             projectChatListSearchSections(
-                source = sourceList,
+                source = scopedSourceList,
                 rawQuery = trimmedQuery,
                 appState = appState,
                 titleCopy = groupTitleCopy,
                 bodyMatchGroupIds = bodyMatches.keys,
-                folderChatIds = selectedFolderChatIds,
+                folderChatIds = effectiveFolderChatIds,
+                messageOnly = messageSearchConstraints != null,
             )
         }
     val visibleItems = remember(searchSections) { searchSections.orderedItems() }
@@ -1249,6 +1315,15 @@ internal fun ChatsScreen(
                         },
                         onOpenSettings = onOpenSettings,
                         connectivityState = connectivityState,
+                        searchFilterState = globalSearchState,
+                        onSearchFilterCategory = { category ->
+                            onGlobalSearchStateChange { state ->
+                                GlobalSearchTransitions.openFilterCategory(state, category)
+                            }
+                        },
+                        onClearSearchFilters = {
+                            onGlobalSearchStateChange(GlobalSearchTransitions::clearAllFilters)
+                        },
                     )
                 }
             }
@@ -1338,17 +1413,13 @@ internal fun ChatsScreen(
             }
         },
     ) { padding ->
-        GlobalSearchFilterSheet(
-            visible =
-                shouldPresentGlobalSearchFilterSheet(
-                    searchState = globalSearchState,
-                    interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
-                    selectionMode = selectionMode,
-                ),
-            onDismiss = {
-                onGlobalSearchStateChange(GlobalSearchTransitions::dismissFilterSheet)
-            },
-        )
+        if (shouldPresentGlobalSearchFilterSheet(searchState = globalSearchState, selectionMode = selectionMode)) {
+            GlobalSearchFilterPicker(
+                state = globalSearchState,
+                options = globalSearchFilterOptions,
+                onStateChange = onGlobalSearchStateChange,
+            )
+        }
         Column(Modifier.fillMaxSize().padding(padding)) {
             // Chats reset and folder management remain available with an empty list.
             // Native folder models still own visibility/counts; this row stays above list/empty-state swaps.
@@ -1371,23 +1442,10 @@ internal fun ChatsScreen(
                     )
                 }
             }
-            if (
-                shouldShowGlobalSearchFilterControls(
-                    searchState = globalSearchState,
-                    interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
-                    selectionMode = selectionMode,
-                )
-            ) {
+            if (shouldShowGlobalSearchFilterControls(searchState = globalSearchState, selectionMode = selectionMode)) {
                 GlobalSearchFilterControlsRow(
                     state = globalSearchState,
-                    onOpenFilters =
-                        if (interactiveGlobalSearchFilterSectionsAvailable) {
-                            {
-                                onGlobalSearchStateChange(GlobalSearchTransitions::openFilterSheet)
-                            }
-                        } else {
-                            null
-                        },
+                    folderNames = globalSearchFolderNames,
                     onRemoveFilter = { chipId ->
                         onGlobalSearchStateChange { state -> GlobalSearchTransitions.removeFilter(state, chipId) }
                     },
@@ -1460,6 +1518,7 @@ internal fun ChatsScreen(
                                 ChatListNoResults(
                                     query = searchQuery.trim(),
                                     unreadFolderSelected = selectedFolderRule?.unreadOnly == true,
+                                    filtersActive = filtersActive,
                                 )
                             }
                         }
@@ -1804,6 +1863,7 @@ private data class ChatListBodySearchKey(
     val accountRef: String?,
     val showArchived: Boolean,
     val canonicalGroupIds: List<String>,
+    val constraints: MessageSearchConstraints? = null,
 )
 
 private class ChatListBodySearchRequest

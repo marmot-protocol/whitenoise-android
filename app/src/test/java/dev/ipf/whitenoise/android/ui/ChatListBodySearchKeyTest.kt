@@ -11,7 +11,7 @@ class ChatListBodySearchKeyTest {
 
         assertTrue(
             "body-search must derive a stable sorted id snapshot",
-            "sourceList.map { canonicalChatListGroupId(it.id) }.distinct().sorted()" in source,
+            "scopedSourceList.map { canonicalChatListGroupId(it.id) }.distinct().sorted()" in source,
         )
         assertTrue(
             "body-search effect must key by the stable account-aware search key, not sourceList identity",
@@ -21,7 +21,7 @@ class ChatListBodySearchKeyTest {
         assertTrue(
             "body-search and viewport datasets must use the locale-invariant normalized query",
             "query = normalizedSearchQuery" in source &&
-                "remember(normalizedSearchQuery, controller.boundAccountRef" in source,
+                Regex("remember\\(\\s*normalizedSearchQuery,\\s*controller\\.boundAccountRef").containsMatchIn(source),
         )
         assertTrue(
             "a repeated A-B-A query must hide the first A result before the replacement effect runs",
@@ -30,11 +30,14 @@ class ChatListBodySearchKeyTest {
         )
         assertTrue(
             "body-search results must share the projection's canonical group-id identity",
-            "canonicalChatListBodyMatches(controller.searchMessageBodies(sourceList, trimmedQuery))" in source,
+            Regex(
+                "canonicalChatListBodyMatches\\(\\s*controller\\.searchMessageBodies\\(" +
+                    "scopedSourceList, trimmedQuery, messageSearchConstraints\\)",
+            ).containsMatchIn(source),
         )
         assertTrue(
             "ordinary message-body search must keep using the trimmed text query",
-            "controller.searchMessageBodies(sourceList, trimmedQuery)" in source,
+            "controller.searchMessageBodies(scopedSourceList, trimmedQuery, messageSearchConstraints)" in source,
         )
         assertTrue(
             "search interactions and lazy rows must share canonical identity",
@@ -48,16 +51,24 @@ class ChatListBodySearchKeyTest {
     }
 
     @Test
-    fun typedFiltersStayOutOfProductionUntilMdkSearchSupportsThem() {
+    fun prototypeFiltersRunClientSideOverTheScopedListAndConstrainedBodySearch() {
         val source = chatsScreenSource().readText()
 
         assertTrue(
-            "typed filter controls must stay gated while the MDK contract is unavailable",
-            "val interactiveGlobalSearchFilterSectionsAvailable = false" in source,
+            "the category picker must be mounted from the shell-owned search state",
+            "GlobalSearchFilterPicker(" in source,
         )
         assertTrue(
-            "the typed filter sheet must not be wired into the production chat list yet",
-            "GlobalSearchTypedFilterSheet(" !in source,
+            "the body search must receive the sender / date / content constraints",
+            "controller.searchMessageBodies(scopedSourceList, trimmedQuery, messageSearchConstraints)" in source,
+        )
+        assertTrue(
+            "the body search key must include the constraints so a filter change restarts it",
+            "constraints = messageSearchConstraints," in source,
+        )
+        assertTrue(
+            "no legacy availability gate may remain",
+            "interactiveGlobalSearchFilterSectionsAvailable" !in source,
         )
     }
 

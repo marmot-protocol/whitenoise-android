@@ -58,10 +58,10 @@ object IdentityFormatter {
                 .trim()
                 .split(WHITESPACE)
                 .filter { it.isNotBlank() }
-        // Candidate initials, taken as whole grapheme clusters so emoji,
-        // surrogate pairs and ZWJ sequences (👨‍👩‍👧, 🏃‍♂️) are never split into a
-        // lone surrogate half (#112). Two words → the lead grapheme of each;
-        // one word → its first two graphemes.
+        // The prototype's monogram is one glyph. Candidates are whole grapheme
+        // clusters so emoji, surrogate pairs and ZWJ sequences (👨‍👩‍👧, 🏃‍♂️) are
+        // never split into a lone surrogate half (#112): the lead grapheme of
+        // the first two words, or the first two graphemes of a single word.
         val candidates =
             when {
                 words.size >= 2 -> listOfNotNull(firstGrapheme(words[0]), firstGrapheme(words[1]))
@@ -69,13 +69,13 @@ object IdentityFormatter {
                 else -> emptyList()
             }
         if (candidates.isEmpty()) return "DM"
-        // Prefer letters: an emoji or symbol rendered alone in the avatar circle
-        // clips or shows as tofu, so a letter always wins when the name has one
+        // Prefer a letter: an emoji or symbol rendered alone in the avatar circle
+        // clips or shows as tofu, so the first letter wins when the name has one
         // ("Alice 😀" → "A", "😀 Alice" → "A"). Only a name with no letters at
         // all falls back to its first emoji grapheme ("😀🔥" → "😀"). See #427.
         val letters = candidates.filter { isLetter(it) }
         return if (letters.isNotEmpty()) {
-            letters.take(2).joinToString("").uppercase()
+            letters.first().uppercase()
         } else {
             candidates.first()
         }

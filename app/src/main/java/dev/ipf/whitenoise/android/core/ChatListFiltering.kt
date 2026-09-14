@@ -132,6 +132,7 @@ internal fun <T> projectChatListSearchCandidates(
     rawQuery: String,
     bodyMatchGroupIds: Set<String> = emptySet(),
     folderChatIds: Set<String>? = null,
+    messageOnly: Boolean = false,
 ): ChatListSearchSections<T> {
     val ciNeedle = localeInvariantFold(rawQuery.trim())
     val canonicalFolderIds = folderChatIds?.mapTo(mutableSetOf(), ::canonicalChatListGroupId)
@@ -144,10 +145,16 @@ internal fun <T> projectChatListSearchCandidates(
         val synchronousMatch =
             if (ciNeedle.isEmpty()) ChatListSynchronousSearchMatch.METADATA else candidate.synchronousMatch(ciNeedle)
         val match =
-            if (synchronousMatch == ChatListSynchronousSearchMatch.NONE && canonicalId in canonicalBodyIds) {
-                ChatListSynchronousSearchMatch.MESSAGE
-            } else {
-                synchronousMatch
+            when {
+                messageOnly ->
+                    if (canonicalId in canonicalBodyIds) {
+                        ChatListSynchronousSearchMatch.MESSAGE
+                    } else {
+                        ChatListSynchronousSearchMatch.NONE
+                    }
+                synchronousMatch == ChatListSynchronousSearchMatch.NONE && canonicalId in canonicalBodyIds ->
+                    ChatListSynchronousSearchMatch.MESSAGE
+                else -> synchronousMatch
             }
         val previous = classifiedById[canonicalId]
         if (previous == null || match.priority > previous.second.priority) {
@@ -176,8 +183,11 @@ internal fun projectChatListSearchSections(
     titleCopy: GroupTitleCopy,
     bodyMatchGroupIds: Set<String> = emptySet(),
     folderChatIds: Set<String>? = null,
+    // The prototype hides plain chat rows while a sender / date / content
+    // filter is active: only chats with a matching message remain, as messages.
+    messageOnly: Boolean = false,
 ): ChatListSearchSections<ChatListItem> {
-    if (rawQuery.trim().isEmpty()) {
+    if (rawQuery.trim().isEmpty() && !messageOnly) {
         val canonicalFolderIds = folderChatIds?.mapTo(mutableSetOf(), ::canonicalChatListGroupId)
         val folderItems =
             if (canonicalFolderIds == null) {
@@ -203,6 +213,7 @@ internal fun projectChatListSearchSections(
         rawQuery = rawQuery,
         bodyMatchGroupIds = bodyMatchGroupIds,
         folderChatIds = folderChatIds,
+        messageOnly = messageOnly,
     )
 }
 

@@ -319,10 +319,12 @@ internal fun ChatRow(
                     title = title,
                     seed = item.selectedAvatarSeed ?: avatarAccount ?: item.group.groupIdHex,
                     size = 52.dp,
+                    // A group without its own image shows its monogram, never a
+                    // member's photo; only direct chats borrow the peer's picture.
                     fallbackPictureUrl =
-                        item.selectedAvatarUrl
+                        item.selectedAvatarUrl?.takeIf { item.isDm() }
                             ?: avatarAccount
-                                ?.takeIf { item.selectedPresentation == null }
+                                ?.takeIf { item.selectedPresentation == null || item.isDm() }
                                 ?.let { appState.avatarUrl(it) },
                     firstFrameAvatar = item.firstFrameAvatar,
                 )

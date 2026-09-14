@@ -74,8 +74,8 @@ class GlobalSearchPresentationTest {
         assertFalse(state.value.isOpen)
     }
 
-    /** Native filter unavailability removes the opening action but cannot prevent clearing restored filters. */
-    @Test fun unavailableFiltersRemainRemovableWithoutOpeningFakeControls() {
+    /** The chips row carries no opening action of its own; the header icon owns the menu, chips only clear. */
+    @Test fun chipsRowClearsRestoredFiltersWithoutAnOpeningAction() {
         val state =
             mutableStateOf(
                 GlobalSearchState(
@@ -87,7 +87,6 @@ class GlobalSearchPresentationTest {
             WhiteNoiseTheme {
                 GlobalSearchFilterControlsRow(
                     state.value,
-                    null,
                     { state.value = GlobalSearchTransitions.removeFilter(state.value, it) },
                     { state.value = GlobalSearchTransitions.clearAllFilters(state.value) },
                 )

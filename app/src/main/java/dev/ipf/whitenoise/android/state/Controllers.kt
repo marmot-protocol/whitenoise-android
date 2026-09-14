@@ -66,6 +66,7 @@ import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.MediaPreviewFallback
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.core.MessageSearchConstraints
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReactionTally
@@ -4666,10 +4667,11 @@ class ChatsController private constructor(
     suspend fun searchMessageBodies(
         chats: List<ChatListItem>,
         rawQuery: String,
+        constraints: MessageSearchConstraints? = null,
     ): Map<String, MessageBodyMatch> {
         val account = accountRef ?: return emptyMap()
         val needle = rawQuery.trim()
-        if (needle.isEmpty()) return emptyMap()
+        if (needle.isEmpty() && constraints == null) return emptyMap()
         val ciNeedle = needle.lowercase()
         return withContext(Dispatchers.IO) {
             val semaphore = Semaphore(SEARCH_FANOUT)
@@ -4678,7 +4680,7 @@ class ChatsController private constructor(
                     chats.map { item ->
                         async {
                             semaphore.withPermit {
-                                searchOneChat(account, item.group.groupIdHex, needle, ciNeedle)
+                                searchOneChat(account, item.group.groupIdHex, needle, ciNeedle, constraints)
                             }
                         }
                     }
@@ -4692,6 +4694,7 @@ class ChatsController private constructor(
         groupIdHex: String,
         needle: String,
         ciNeedle: String,
+        constraints: MessageSearchConstraints?,
     ): MessageBodyMatch? {
         // The FFI `search` field narrows to rows whose text matches the needle,
         // but it can't filter by kind/deleted — that gating happens client-side
@@ -4717,12 +4720,13 @@ class ChatsController private constructor(
                             account,
                             TimelineMessageQueryFfi(
                                 groupIdHex = groupIdHex,
-                                search = needle,
+                                // Filter-only searches (no needle) page the plain timeline instead.
+                                search = needle.takeIf { it.isNotEmpty() },
                                 before = cursorBefore,
                                 beforeMessageId = cursorMessageId,
                                 after = null,
                                 afterMessageId = null,
-                                limit = SEARCH_PER_CHAT_LIMIT,
+                                limit = if (needle.isEmpty()) SEARCH_FILTER_PAGE_LIMIT else SEARCH_PER_CHAT_LIMIT,
                             ),
                         )
                     }
@@ -4740,19 +4744,12 @@ class ChatsController private constructor(
             pagesScanned++
             val match =
                 ChatListMessageSearch.firstEligibleBodyMatch(
-                    page.messages.map { record ->
-                        object : ChatListMessageSearch.SearchableRecord {
-                            override val kind = record.kind
-                            override val deleted = record.deleted
-                            override val plaintext = record.plaintext
-                            override val messageIdHex = record.messageIdHex
-                            override val timelineAt = record.timelineAt
-                        }
-                    },
+                    page.messages.map(::searchableTimelineRecord),
                     ciNeedle,
+                    constraints,
                 )
             if (match != null) {
-                val snippet = ChatListMessageSearch.buildSnippet(match.plaintext, needle) ?: return null
+                val snippet = messageSearchSnippet(match, needle) ?: return null
                 return MessageBodyMatch(
                     groupIdHex = groupIdHex,
                     messageIdHex = match.messageIdHex,
@@ -6014,6 +6011,7 @@ private const val CHAT_LIST_AVATAR_WARM_ROWS = 24
 // match surfaces or the local timeline is exhausted, bounding worst-case work.
 private const val SEARCH_FANOUT = 6
 private val SEARCH_PER_CHAT_LIMIT = 5u
+private const val SEARCH_FILTER_PAGE_LIMIT = 25u
 private const val SEARCH_MAX_PAGES = 20
 
 // Maximum number of `groupMembers` FFI roster reads running at once from the

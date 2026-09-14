@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -30,6 +31,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -80,6 +83,9 @@ internal fun ChatListTopBar(
     onCycleAccount: (() -> Unit)? = null,
     updateInfo: AppUpdateInfo = appState.appUpdateInfo,
     selfUpdateEnabled: Boolean = BuildConfig.SELF_UPDATE_ENABLED,
+    searchFilterState: GlobalSearchState = GlobalSearchState(),
+    onSearchFilterCategory: ((GlobalSearchFilterCategory) -> Unit)? = null,
+    onClearSearchFilters: () -> Unit = {},
 ) {
     var showSelector by remember(appState.runtimeGeneration) { mutableStateOf(false) }
     var showAddIdentity by remember(appState.runtimeGeneration) { mutableStateOf(false) }
@@ -206,8 +212,15 @@ internal fun ChatListTopBar(
             }
         },
         actions = {
-            // Unsupported native filter categories remain absent; the empty field owns voice entry.
-            if (!searchOpen) {
+            if (searchOpen) {
+                if (onSearchFilterCategory != null) {
+                    ChatListSearchFilterAction(
+                        state = searchFilterState,
+                        onCategory = onSearchFilterCategory,
+                        onClearAll = onClearSearchFilters,
+                    )
+                }
+            } else {
                 AppUpdateIconButton(
                     info = updateInfo,
                     selfUpdateEnabled = selfUpdateEnabled,
@@ -245,6 +258,36 @@ internal fun ChatListTopBar(
     }
     if (showAddIdentity) {
         AddIdentitySheet(appState = appState, onDismiss = { showAddIdentity = false })
+    }
+}
+
+/** The prototype's filter entry beside the search field: the menu opens with the keyboard dismissed. */
+@Suppress("FunctionNaming")
+@Composable
+private fun ChatListSearchFilterAction(
+    state: GlobalSearchState,
+    onCategory: (GlobalSearchFilterCategory) -> Unit,
+    onClearAll: () -> Unit,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    Box {
+        GlobalSearchFilterIconButton(
+            state = state,
+            onClick = {
+                focusManager.clearFocus()
+                keyboardController?.hide()
+                menuOpen = true
+            },
+        )
+        GlobalSearchFilterMenu(
+            expanded = menuOpen,
+            state = state,
+            onDismiss = { menuOpen = false },
+            onCategory = onCategory,
+            onClearAll = onClearAll,
+        )
     }
 }
 
