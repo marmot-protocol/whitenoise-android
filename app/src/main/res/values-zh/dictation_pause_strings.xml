@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="dictation_pause">暂停听写</string>
-    <string name="dictation_resume">继续听写</string>
-    <string name="dictation_paused">听写已暂停</string>
-</resources>

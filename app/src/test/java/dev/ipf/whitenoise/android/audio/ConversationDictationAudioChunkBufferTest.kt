@@ -99,6 +99,28 @@ class ConversationDictationAudioChunkBufferTest {
         assertFalse(buffer.append(byteArrayOf(7, 6), 2))
     }
 
+    /** A speech-boundary seal shortens provider latency without gaps or overlapping sample ranges. */
+    @Test
+    fun sentenceBoundarySealsEligiblePartialChunkAndPreservesFollowingTail() {
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 8L, chunkBytes = 12, maxBufferedBytes = 24)
+        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6), 6))
+        assertFalse(buffer.sealCurrentIfAtLeast(8))
+        assertTrue(buffer.sealCurrentIfAtLeast(6))
+
+        val sentence = checkNotNull(buffer.poll())
+        assertArrayEquals(byteArrayOf(1, 2, 3, 4, 5, 6), sentence.pcm)
+        assertEquals(0L, sentence.firstSample)
+        assertEquals(3L, sentence.lastSampleExclusive)
+        assertTrue(buffer.acknowledge(sentence.chunkId))
+
+        assertTrue(buffer.append(byteArrayOf(7, 8, 9, 10), 4))
+        buffer.finish()
+        val tail = checkNotNull(buffer.poll())
+        assertArrayEquals(byteArrayOf(7, 8, 9, 10), tail.pcm)
+        assertEquals(sentence.lastSampleExclusive, tail.firstSample)
+        assertEquals(5L, tail.lastSampleExclusive)
+    }
+
     /** Rejects odd byte counts that would split a PCM16 sample in configuration or input. */
     @Test
     fun pcm16AlignmentIsRequiredForConfigurationAndAppends() {

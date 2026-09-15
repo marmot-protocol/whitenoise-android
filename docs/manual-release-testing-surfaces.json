@@ -2316,36 +2316,10 @@
         ]
       },
       {
-        "surface": "ConversationDictationProgressHairline",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
-        "anchor": "fun ConversationDictationProgressHairline(",
-        "test_ids": [
-          "DIC-001"
-        ]
-      },
-      {
         "surface": "ConversationDictationProviderAccessRejected",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
         "anchor": "R.string.dictation_provider_access_rejected",
         "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "ConversationDictationListeningIndicator",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
-        "anchor": "fun ConversationDictationListeningIndicator(",
-        "test_ids": [
-          "DIC-001",
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "ConversationDictationPhaseBadge",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
-        "anchor": "fun ConversationDictationPhaseBadge(",
-        "test_ids": [
-          "DIC-001",
           "DIC-002"
         ]
       },
@@ -17510,30 +17484,6 @@
         ]
       },
       {
-        "surface": "string:dictation_pause",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
-        "anchor": "R.string.dictation_pause",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "string:dictation_resume",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
-        "anchor": "R.string.dictation_resume",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "string:dictation_paused",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
-        "anchor": "R.string.dictation_paused",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
         "surface": "string:save",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "R.string.save",
@@ -21428,6 +21378,22 @@
         "surface": "Dictation global microphone privacy recovery",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "override fun microphoneAccess(): ConversationDictationMicrophoneAccess",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Completed dictation transcript retention when the origin target is lost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun retainTranscriptForReview(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Dictation completed-transcript target validation and retention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "internal enum class ConversationDictationTargetValidation",
         "test_ids": [
           "DIC-002"
         ]

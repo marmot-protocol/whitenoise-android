@@ -21,7 +21,7 @@ class AppStateSendLockCoverageTest {
         assertTrue(
             "Dictation must send through the ordinary controller path, whose text publisher " +
                 "records TEXT_SEND/TEXT_REPLY timing inside marmotIo",
-            "sendConversationText(controller, request.payload)" in body,
+            "sendConversationText(controller, request.payload, request.onPendingShown)" in body,
         )
         assertTrue(
             "The ordinary text publisher must record its marmotIo timing section",

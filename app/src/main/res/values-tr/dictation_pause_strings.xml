@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="dictation_pause">Dikteyi duraklat</string>
-    <string name="dictation_resume">Dikteye devam et</string>
-    <string name="dictation_paused">Dikte duraklatıldı</string>
-</resources>

@@ -51,19 +51,13 @@ class ConversationDictationPersistentControlTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /**
-     * Verifies listening and processing keep the three explicit session outcomes visible and accessible,
-     * and that starting, listening and transcribing each show a distinct phase indicator.
-     */
+    /** Verifies listening and processing keep the three explicit session outcomes visible and accessible. */
     @Test
     fun listeningAndProcessingExposeCancelPasteAndSendActions() {
         val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         render(fixture)
-        // Starting: the spinner alone, no hairline and no recording indicator.
-        composeRule.onNodeWithTag(DICTATION_SPINNER_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertDoesNotExist()
-        composeRule.onNodeWithTag(DICTATION_LISTENING_INDICATOR_TAG).assertDoesNotExist()
         fixture.platform.listener.onReady()
 
         composeRule
@@ -79,10 +73,8 @@ class ConversationDictationPersistentControlTest {
             assertTrue(bounds.bottom - bounds.top >= 48.dp)
         }
         composeRule.onNodeWithContentDescription("Record voice message").assertDoesNotExist()
-        // Listening: the live recording indicator, with neither spinner nor hairline.
+        composeRule.onNodeWithContentDescription("Pause").assertDoesNotExist()
         composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertDoesNotExist()
-        composeRule.onNodeWithTag(DICTATION_SPINNER_TAG).assertDoesNotExist()
-        composeRule.onNodeWithTag(DICTATION_LISTENING_INDICATOR_TAG).assertIsDisplayed()
 
         fixture.platform.listener.onEndOfSpeech()
 
@@ -92,7 +84,6 @@ class ConversationDictationPersistentControlTest {
         listOf("Cancel", "Paste", "Send").forEach { label ->
             composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
         }
-        // Transcribing: the indeterminate hairline plus the spinner, recording indicator gone.
         composeRule
             .onNodeWithTag(DICTATION_PROGRESS_TAG)
             .assertIsDisplayed()
@@ -102,28 +93,24 @@ class ConversationDictationPersistentControlTest {
                     ProgressBarRangeInfo.Indeterminate,
                 ),
             )
-        composeRule.onNodeWithTag(DICTATION_SPINNER_TAG).assertIsDisplayed()
-        composeRule.onNodeWithTag(DICTATION_LISTENING_INDICATOR_TAG).assertDoesNotExist()
     }
 
-    /** Real Pause and Resume preserve the draft while keeping Cancel/Paste/Send independently reachable. */
+    /** The selected completion action owns the only processing animation. */
     @Test
-    fun pauseAndResumeAreExplicitActionsWithoutTerminalDelivery() {
+    fun tappedSendReplacesItsOwnIconWithTheProcessingIndicator() {
         val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         render(fixture)
-        composeRule.onNodeWithContentDescription("Pause dictation").assertIsDisplayed().performClick()
-        fixture.platform.listener.onResult("first")
-        composeRule.onNodeWithContentDescription("Resume dictation").assertIsDisplayed()
-        assertEquals("Draft", fixture.draft.text)
-        listOf("Cancel", "Paste", "Send").forEach { label ->
-            composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
-        }
-        composeRule.onNodeWithContentDescription("Resume dictation").performClick()
-        fixture.platform.listener.onBeginningOfSpeech()
-        composeRule.onNodeWithContentDescription("Paste").performClick()
-        fixture.platform.listener.onResult("second")
-        assertEquals("Draft first second", fixture.draft.text)
+
+        composeRule.onNodeWithContentDescription("Send").performClick()
+
+        assertTrue(fixture.controller.state is ConversationDictationState.Processing)
+        val send = composeRule.onNodeWithContentDescription("Send").getUnclippedBoundsInRoot()
+        val progress = composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertTrue(progress.left >= send.left && progress.right <= send.right)
+        assertTrue(progress.top >= send.top && progress.bottom <= send.bottom)
+        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Pause").assertDoesNotExist()
     }
 
     /** Verifies an ambiguous merge retains explicit copy, insert, and discard choices. */

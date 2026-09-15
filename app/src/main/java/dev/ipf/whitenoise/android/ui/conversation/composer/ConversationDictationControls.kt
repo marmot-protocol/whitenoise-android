@@ -2,23 +2,15 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
@@ -29,7 +21,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,12 +31,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -56,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 
@@ -64,22 +52,9 @@ internal const val COMPOSER_DICTATION_REVIEW_DIALOG_TAG = "composer-dictation-re
 internal const val COMPOSER_DICTATION_COMPACT_ACTIONS_TAG = "composer-dictation-compact-actions"
 internal const val APP_DICTATION_CONTROL_TAG = "app-dictation-control"
 internal const val DICTATION_PROGRESS_TAG = "dictation-progress"
-internal const val DICTATION_SPINNER_TAG = "dictation-spinner"
-internal const val DICTATION_LISTENING_INDICATOR_TAG = "dictation-listening-indicator"
 
-/** Four native48dp commands; narrow hosts expose them through the same horizontal scroll owner. */
-internal val DICTATION_ACTIVE_ACTIONS_WIDTH = 192.dp
-
-private val DICTATION_PROGRESS_HEIGHT = 3.dp
-private const val DICTATION_PROGRESS_TRACK_ALPHA = 0.18f
-private val DICTATION_BADGE_INSET = 4.dp
-private val DICTATION_SPINNER_SIZE = 12.dp
-private val DICTATION_SPINNER_STROKE = 1.5.dp
-private val DICTATION_RECORDING_DOT_SIZE = 6.dp
-private val DICTATION_RECORDING_MIC_SIZE = 12.dp
-private val DICTATION_RECORDING_BADGE_SPACING = 2.dp
-private const val DICTATION_PULSE_MIN_ALPHA = 0.35f
-private const val DICTATION_PULSE_MILLIS = 700
+/** Three native 48dp commands; narrow hosts expose them through the same horizontal scroll owner. */
+internal val DICTATION_ACTIVE_ACTIONS_WIDTH = 144.dp
 
 /** App-root bottom control used while the immutable dictation origin is not visible. */
 @Composable
@@ -158,7 +133,7 @@ internal fun ConversationDictationCompactActions(
             horizontalArrangement = Arrangement.End,
         ) {
             if (state.hasActiveRecognitionActions) {
-                ConversationDictationActiveActions(state, controller, status)
+                ConversationDictationActiveActions(controller)
             } else {
                 ConversationDictationPrimaryAction(
                     state = state,
@@ -169,70 +144,23 @@ internal fun ConversationDictationCompactActions(
                 ConversationDictationDismissAction(state, controller)
             }
         }
-        // Only transcription sweeps the hairline: starting shows a spinner alone and
-        // listening shows the live recording indicator, so the three phases read apart.
-        if (state is ConversationDictationState.Processing) {
-            ConversationDictationProgressHairline(
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
-        }
     }
     ConversationDictationSessionDialogs(state, controller, reviewDialogOpen) { reviewDialogOpen = false }
-}
-
-/**
- * A rounded hairline reads as the bar's own activity rather than a stretched progress control:
- * it keeps a soft track so the sweep stays legible on both themes, inset from the bar's rounded
- * edge, with no indicator gap or stop dot to break the line.
- */
-@Composable
-private fun ConversationDictationProgressHairline(modifier: Modifier = Modifier) {
-    LinearProgressIndicator(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 6.dp)
-                .height(DICTATION_PROGRESS_HEIGHT)
-                .testTag(DICTATION_PROGRESS_TAG),
-        color = MaterialTheme.colorScheme.primary,
-        trackColor = MaterialTheme.colorScheme.primary.copy(alpha = DICTATION_PROGRESS_TRACK_ALPHA),
-        strokeCap = StrokeCap.Round,
-        gapSize = 0.dp,
-    )
 }
 
 private val ConversationDictationState.hasActiveRecognitionActions: Boolean
     get() =
         this is ConversationDictationState.Starting ||
             this is ConversationDictationState.Listening ||
-            this is ConversationDictationState.Processing ||
-            this is ConversationDictationState.Paused
+            this is ConversationDictationState.Processing
 
 /**
- * Keeps all three explicit outcomes visible for the lifetime of app-owned recognition. The first
- * slot also carries the phase badge, so starting, listening and transcribing look different.
+ * Keeps all three explicit outcomes visible for the lifetime of app-owned recognition.
  */
 @Composable
-private fun ConversationDictationActiveActions(
-    state: ConversationDictationState,
-    controller: ConversationDictationController,
-    status: String,
-) {
-    val paused = controller.state is ConversationDictationState.Paused
-    Box(modifier = Modifier.size(48.dp)) {
-        IconButton(
-            onClick = if (paused) controller::resume else controller::pause,
-            enabled = if (paused) controller.completionActionsEnabled else controller.pauseActionsEnabled,
-            modifier = Modifier.size(48.dp),
-        ) {
-            Icon(
-                painterResource(if (paused) R.drawable.ic_play_arrow else R.drawable.ic_pause),
-                contentDescription =
-                    stringResource(if (paused) R.string.dictation_resume else R.string.dictation_pause),
-            )
-        }
-        ConversationDictationPhaseBadge(state, status, Modifier.align(Alignment.TopEnd))
-    }
+private fun ConversationDictationActiveActions(controller: ConversationDictationController) {
+    val pasteLabel = stringResource(R.string.paste)
+    val sendLabel = stringResource(R.string.send)
     IconButton(
         onClick = controller::cancel,
         enabled = !controller.deliveryInProgress,
@@ -245,87 +173,36 @@ private fun ConversationDictationActiveActions(
         enabled = controller.completionActionsEnabled,
         modifier = Modifier.size(48.dp),
     ) {
-        Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.paste))
+        if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
+            CircularProgressIndicator(
+                modifier =
+                    Modifier
+                        .size(22.dp)
+                        .testTag(DICTATION_PROGRESS_TAG)
+                        .semantics { contentDescription = pasteLabel },
+                strokeWidth = 2.dp,
+            )
+        } else {
+            Icon(Icons.Default.ContentPaste, contentDescription = pasteLabel)
+        }
     }
     IconButton(
         onClick = controller::send,
         enabled = controller.completionActionsEnabled,
         modifier = Modifier.size(48.dp),
     ) {
-        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
-    }
-}
-
-/**
- * Tells the recognition phases apart at a glance: a live recording indicator while listening, a
- * small spinner while starting or transcribing (transcription adds the hairline sweep), and no
- * badge for the other phases. The status text names the phase for accessibility services.
- */
-@Composable
-private fun ConversationDictationPhaseBadge(
-    state: ConversationDictationState,
-    status: String,
-    modifier: Modifier = Modifier,
-) {
-    when (state) {
-        is ConversationDictationState.Listening -> ConversationDictationListeningIndicator(status, modifier)
-        is ConversationDictationState.Starting,
-        is ConversationDictationState.Processing,
-        ->
+        if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
             CircularProgressIndicator(
                 modifier =
-                    modifier
-                        .padding(DICTATION_BADGE_INSET)
-                        .size(DICTATION_SPINNER_SIZE)
-                        .testTag(DICTATION_SPINNER_TAG)
-                        .semantics { contentDescription = status },
-                strokeWidth = DICTATION_SPINNER_STROKE,
+                    Modifier
+                        .size(22.dp)
+                        .testTag(DICTATION_PROGRESS_TAG)
+                        .semantics { contentDescription = sendLabel },
+                strokeWidth = 2.dp,
             )
-        else -> Unit
-    }
-}
-
-/**
- * Live recording indicator: a filled dot in the recording colour that breathes on an infinite pulse
- * beside a small microphone glyph. No spinner and no hairline, so recording never reads as loading.
- */
-@Composable
-private fun ConversationDictationListeningIndicator(
-    status: String,
-    modifier: Modifier = Modifier,
-) {
-    val pulse = rememberInfiniteTransition(label = "dictation recording pulse")
-    val dotAlpha by
-        pulse.animateFloat(
-            initialValue = 1f,
-            targetValue = DICTATION_PULSE_MIN_ALPHA,
-            animationSpec = infiniteRepeatable(tween(DICTATION_PULSE_MILLIS), RepeatMode.Reverse),
-            label = "dictation recording dot alpha",
-        )
-    val recordingColor = MaterialTheme.colorScheme.error
-    Row(
-        modifier =
-            modifier
-                .padding(DICTATION_BADGE_INSET)
-                .testTag(DICTATION_LISTENING_INDICATOR_TAG)
-                .semantics { contentDescription = status },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DICTATION_RECORDING_BADGE_SPACING),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(DICTATION_RECORDING_DOT_SIZE)
-                    .graphicsLayer { alpha = dotAlpha }
-                    .clip(CircleShape)
-                    .background(recordingColor),
-        )
-        Icon(
-            painter = painterResource(R.drawable.ic_mic),
-            contentDescription = null,
-            tint = recordingColor,
-            modifier = Modifier.size(DICTATION_RECORDING_MIC_SIZE),
-        )
+        } else {
+            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = sendLabel)
+        }
     }
 }
 
@@ -439,7 +316,6 @@ private fun dictationStatusLabel(state: ConversationDictationState): String =
         is ConversationDictationState.Starting -> stringResource(R.string.dictation_starting)
         is ConversationDictationState.Listening -> stringResource(R.string.dictation_listening)
         is ConversationDictationState.Processing -> stringResource(R.string.dictation_processing)
-        is ConversationDictationState.Paused -> stringResource(R.string.dictation_paused)
         is ConversationDictationState.Failed -> dictationFailureLabel(state.reason)
         is ConversationDictationState.ReviewRequired -> stringResource(R.string.dictation_review_required)
         is ConversationDictationState.DeliveryUnknown -> stringResource(R.string.delivery_not_confirmed)

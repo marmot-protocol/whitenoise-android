@@ -60,7 +60,7 @@ class ConversationDictationReadinessScreenshotTest {
     }
 
     @Test
-    fun startingKeepsAllThreeActionsAndIndeterminateProgress() {
+    fun startingKeepsAllThreeActionsAndButtonProgress() {
         capture(fixture(appOwned = true), "dictation_bottom_bar_starting_light.png", fontScale = 1f, rtl = false)
     }
 
