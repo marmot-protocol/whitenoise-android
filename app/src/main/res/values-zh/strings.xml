@@ -1725,7 +1725,7 @@
     <string name="usage_diagnostics_disclosure">功能活动和遥测数据包括功能使用次数和应用性能指标。使用情况数据采用临时会话标识符，遥测数据采用可重置的安装标识符。两者均不包含账号或群组标识符。</string>
     <string name="usage_diagnostics_logs_separate">此设备上所有个人资料的已清理技术日志，单独分享。</string>
     <string name="usage_diagnostics_renew">分享范围现在包含功能使用情况。请查看此信息并重新选择。</string>
-    <string name="usage_diagnostics_status">使用情况：%1$s。诊断：%2$s。</string>
+    <string name="usage_diagnostics_status">使用情况：%1$s。遥测：%2$s。</string>
     <string name="usage_diagnostics_error">无法确认分享设置。请重试。尚未确认新的选择。</string>
     <string name="usage_diagnostics_off">已关闭</string>
     <string name="usage_diagnostics_permission_needed">需要同意</string>
@@ -1917,10 +1917,10 @@
     <string name="video_unmute">取消静音</string>
     <string name="audit_upload_title">分享群组诊断日志</string>
     <string name="audit_upload_subtitle">自动收集并上传此设备上所有个人资料的群组技术日志。</string>
-    <string name="audit_upload_confirm_title">与 White Noise 分享技术日志？</string>
+    <string name="audit_upload_confirm_title">与 White Noise 分享群组诊断日志？</string>
     <string name="audit_upload_disclosure">启用后，此设备上所有身份的诊断审计日志都会保存在本地，并自动上传到由 Internet Privacy Foundation 运营的 Goggles。以前记录的日志也可能上传。日志可能包含群组和消息标识符、中继地址、时间戳、假名化的账户引用、安装标识符、设备型号和应用版本，但不包含消息内容或私钥。这些日志属于敏感数据，会保留用于调查可靠性问题。此选项与使用情况和诊断分享相互独立。关闭分享会停止新的记录并阻止启动新的上传批次。已在进行的批次可能会继续完成其中所有文件的上传。这不会删除已保存在本地或已上传的日志。取消会使分享保持关闭。</string>
     <string name="audit_upload_confirm">启用自动分享</string>
-    <string name="audit_upload_renew">技术日志分享将保持关闭，直到你阅读自动上传说明并重新作出选择。</string>
+    <string name="audit_upload_renew">群组诊断日志分享将保持关闭，直到你阅读自动上传说明并重新作出选择。</string>
     <string name="diagnostics_group_disclosure">群组诊断日志有助于调查群组的可靠性和一致性。日志包含技术标识符、时间戳和成员变动，并使用哈希引用代替成员身份。日志绝不包含消息内容、个人资料名称、群组名称或私钥。</string>
     <string name="diagnostics_existing_logs">启用群组诊断日志分享后，可能会上传已存储在此设备上的日志。</string>
     <string name="diagnostics_retention">群组诊断日志将在 30 天后从我们的服务器删除，遥测数据在 90 天后删除，产品分析数据在 180 天后删除。</string>

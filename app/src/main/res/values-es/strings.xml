@@ -1749,7 +1749,7 @@
     <string name="usage_diagnostics_disclosure">Los datos de actividad de las funciones y telemetría incluyen recuentos de uso de funciones y métricas de rendimiento de la app. Los datos de uso utilizan identificadores de sesión temporales y la telemetría utiliza un identificador de instalación que se puede restablecer. Ninguno incluye identificadores de cuentas o grupos.</string>
     <string name="usage_diagnostics_logs_separate">Registros técnicos depurados de todos los perfiles de este dispositivo, compartidos por separado.</string>
     <string name="usage_diagnostics_renew">Ahora los datos compartidos incluyen el uso de funciones. Revisa esta información y elige de nuevo.</string>
-    <string name="usage_diagnostics_status">Uso: %1$s. Diagnósticos: %2$s.</string>
+    <string name="usage_diagnostics_status">Uso: %1$s. Telemetría: %2$s.</string>
     <string name="usage_diagnostics_error">No se pudo confirmar la configuración de uso compartido. Inténtalo de nuevo. No se ha confirmado ninguna nueva elección.</string>
     <string name="usage_diagnostics_off">Desactivado</string>
     <string name="usage_diagnostics_permission_needed">Se necesita consentimiento</string>
@@ -1944,10 +1944,10 @@
     <string name="video_unmute">Activar el sonido</string>
     <string name="audit_upload_title">Compartir registros de diagnóstico de grupos</string>
     <string name="audit_upload_subtitle">Recopila y sube automáticamente registros técnicos sobre grupos de todos los perfiles de este dispositivo.</string>
-    <string name="audit_upload_confirm_title">¿Compartir registros técnicos con White Noise?</string>
+    <string name="audit_upload_confirm_title">¿Compartir registros de diagnóstico de grupos con White Noise?</string>
     <string name="audit_upload_disclosure">Al activar esta opción, se registran localmente los registros de auditoría de diagnóstico de todos los perfiles de este dispositivo y se suben automáticamente a Goggles, operado por Internet Privacy Foundation. También pueden subirse registros anteriores. Los registros pueden incluir identificadores de grupos y mensajes, direcciones de relays, marcas de tiempo, referencias seudónimas de cuentas, identificadores de instalación y el modelo del dispositivo y la versión de la app. Se excluyen el contenido de los mensajes y las claves privadas. Estos registros son sensibles y se conservan para investigar problemas de fiabilidad. Esta opción es independiente del envío de datos de uso y diagnóstico. Desactivar el envío detiene las nuevas grabaciones e impide nuevos lotes de subida. Un lote ya en curso puede terminar de subir sus archivos. Esto no elimina los registros ya guardados localmente o subidos. Cancelar mantiene desactivado el envío.</string>
     <string name="audit_upload_confirm">Activar envío automático</string>
-    <string name="audit_upload_renew">El envío de registros técnicos está desactivado hasta que revises la información sobre la subida automática y vuelvas a elegir.</string>
+    <string name="audit_upload_renew">El envío de registros de diagnóstico de grupos está desactivado hasta que revises la información sobre la subida automática y vuelvas a elegir.</string>
     <string name="diagnostics_group_disclosure">Los registros de diagnóstico de grupos ayudan a investigar la fiabilidad y la coherencia de los grupos. Incluyen identificadores técnicos, marcas de tiempo y cambios de miembros, utilizando referencias hash en lugar de las identidades de los miembros. Nunca contienen el contenido de los mensajes, nombres de perfiles, nombres de grupos ni claves privadas.</string>
     <string name="diagnostics_existing_logs">Activar el uso compartido de registros de diagnóstico de grupos puede subir registros que ya están almacenados en este dispositivo.</string>
     <string name="diagnostics_retention">Los registros de diagnóstico de grupos se eliminan de nuestros servidores después de 30 días, la telemetría después de 90 días y los datos de análisis del producto después de 180 días.</string>

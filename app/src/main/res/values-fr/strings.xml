@@ -1749,7 +1749,7 @@
     <string name="usage_diagnostics_disclosure">Les données d’activité des fonctionnalités et de télémétrie comprennent le nombre d’utilisations des fonctionnalités et les mesures de performance de l’application. Les données d’utilisation emploient des identifiants de session temporaires, et la télémétrie un identifiant d’installation réinitialisable. Aucune de ces données ne contient d’identifiants de compte ou de groupe.</string>
     <string name="usage_diagnostics_logs_separate">Journaux techniques nettoyés de tous les profils sur cet appareil, partagés séparément.</string>
     <string name="usage_diagnostics_renew">Le partage inclut désormais l’utilisation des fonctionnalités. Consultez ces informations et faites un nouveau choix.</string>
-    <string name="usage_diagnostics_status">Utilisation : %1$s. Diagnostics : %2$s.</string>
+    <string name="usage_diagnostics_status">Utilisation : %1$s. Télémétrie : %2$s.</string>
     <string name="usage_diagnostics_error">Impossible de confirmer les paramètres de partage. Réessayez. Aucun nouveau choix n’a été confirmé.</string>
     <string name="usage_diagnostics_off">Désactivé</string>
     <string name="usage_diagnostics_permission_needed">Consentement requis</string>
@@ -1944,10 +1944,10 @@
     <string name="video_unmute">Réactiver le son</string>
     <string name="audit_upload_title">Partager les journaux de diagnostic des groupes</string>
     <string name="audit_upload_subtitle">Collecte et envoie automatiquement les journaux techniques concernant les groupes pour tous les profils sur cet appareil.</string>
-    <string name="audit_upload_confirm_title">Partager les journaux techniques avec White Noise ?</string>
+    <string name="audit_upload_confirm_title">Partager les journaux de diagnostic des groupes avec White Noise ?</string>
     <string name="audit_upload_disclosure">Lorsque cette option est activée, les journaux d’audit de diagnostic de tous les profils de cet appareil sont enregistrés localement et automatiquement envoyés à Goggles, exploité par Internet Privacy Foundation. Les journaux précédemment enregistrés peuvent également être envoyés. Ils peuvent contenir des identifiants de groupes et de messages, des adresses de relais, des horodatages, des références de comptes pseudonymes, des identifiants d’installation ainsi que le modèle de l’appareil et la version de l’application. Le contenu des messages et les clés privées sont exclus. Ces journaux sont sensibles et conservés pour analyser les problèmes de fiabilité. Ce choix est distinct du partage des données d’utilisation et de diagnostic. Désactiver le partage arrête les nouveaux enregistrements et empêche de nouveaux lots d’envoi. Un lot déjà en cours peut finir d’envoyer ses fichiers. Cela ne supprime pas les journaux déjà stockés localement ou envoyés. Annuler laisse le partage désactivé.</string>
     <string name="audit_upload_confirm">Activer le partage automatique</string>
-    <string name="audit_upload_renew">Le partage des journaux techniques reste désactivé jusqu’à ce que vous consultiez l’information sur l’envoi automatique et fassiez un nouveau choix.</string>
+    <string name="audit_upload_renew">Le partage des journaux de diagnostic des groupes reste désactivé jusqu’à ce que vous consultiez l’information sur l’envoi automatique et fassiez un nouveau choix.</string>
     <string name="diagnostics_group_disclosure">Les journaux de diagnostic des groupes aident à étudier la fiabilité et la cohérence des groupes. Ils comprennent des identifiants techniques, des horodatages et des changements de membres, en utilisant des références hachées plutôt que l’identité des membres. Ils ne contiennent jamais le contenu des messages, les noms de profil, les noms de groupe ou les clés privées.</string>
     <string name="diagnostics_existing_logs">Activer le partage des journaux de diagnostic des groupes peut entraîner l’envoi de journaux déjà stockés sur cet appareil.</string>
     <string name="diagnostics_retention">Les journaux de diagnostic des groupes sont supprimés de nos serveurs après 30 jours, les données de télémétrie après 90 jours et les données d’analyse du produit après 180 jours.</string>

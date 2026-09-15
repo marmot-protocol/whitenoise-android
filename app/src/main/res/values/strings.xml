@@ -1850,7 +1850,7 @@
     <string name="usage_diagnostics_disclosure">Feature activity and telemetry data include feature usage counts and app performance metrics. Usage data uses temporary session identifiers, and telemetry uses a resettable installation identifier. Neither includes account or group identifiers.</string>
     <string name="usage_diagnostics_logs_separate">Sanitized technical logs from every profile on this device, shared separately.</string>
     <string name="usage_diagnostics_renew">Sharing now includes feature usage. Please review this information and make a fresh choice.</string>
-    <string name="usage_diagnostics_status">Usage: %1$s. Diagnostics: %2$s.</string>
+    <string name="usage_diagnostics_status">Usage: %1$s. Telemetry: %2$s.</string>
     <string name="usage_diagnostics_error">Could not confirm sharing settings. Please retry. No new choice has been confirmed.</string>
     <string name="usage_diagnostics_off">Off</string>
     <string name="usage_diagnostics_permission_needed">Permission needed</string>
@@ -2064,10 +2064,10 @@
     <string name="photo_editor_original_edited">Edited photos use High quality. The original image is kept for further editing.</string>
     <string name="audit_upload_title">Share group diagnostic logs</string>
     <string name="audit_upload_subtitle">Automatically gathers and uploads technical logs about groups for every profile on this device.</string>
-    <string name="audit_upload_confirm_title">Share technical logs with White Noise?</string>
+    <string name="audit_upload_confirm_title">Share group diagnostic logs with White Noise?</string>
     <string name="audit_upload_disclosure">When enabled, diagnostic audit logs from every profile on this device are recorded locally and automatically uploaded to Goggles, operated by the Internet Privacy Foundation. Previously recorded logs may also be uploaded. Logs can include group and message identifiers, relay addresses, timestamps, pseudonymous account references, installation identifiers, and device model and app version. Message contents and private keys are excluded. These logs are sensitive and are retained for investigating reliability problems. This is separate from usage and diagnostics sharing. Turning sharing off stops new recording and prevents new upload batches. A batch already in progress may finish uploading its files. This does not delete logs already stored locally or uploaded. Cancel leaves sharing off.</string>
     <string name="audit_upload_confirm">Enable automatic sharing</string>
-    <string name="audit_upload_renew">Technical log sharing is off until you review the automatic-upload disclosure and make a fresh choice.</string>
+    <string name="audit_upload_renew">Group diagnostic log sharing is off until you review the automatic-upload disclosure and make a fresh choice.</string>
     <string name="diagnostics_group_disclosure">Group diagnostic logs help investigate group reliability and consistency. They include technical identifiers, timestamps, and membership changes, using hashed references instead of member identities. They never contain message contents, profile names, group names, or private keys.</string>
     <string name="diagnostics_existing_logs">Enabling group diagnostic log sharing may upload logs already stored on this device.</string>
     <string name="diagnostics_retention">Group diagnostic logs are deleted from our servers after 30 days, telemetry after 90 days, and product analytics after 180 days.</string>

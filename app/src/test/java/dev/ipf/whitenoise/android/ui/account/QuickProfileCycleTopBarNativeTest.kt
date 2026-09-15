@@ -113,7 +113,9 @@ class QuickProfileCycleTopBarNativeTest {
                 shadowOf(Looper.getMainLooper()).idle()
                 app.accountDisplayNameCached("bb".repeat(32)) == "Bea"
             }
-            // Later hydration must neither rewrite nor duplicate the completion notice.
+            // Known presentation limitation: this callback currently uses the account-ref fallback.
+            // This checks current timing and one-notice behavior, not a requirement to discard names;
+            // a future name-preserving activation should update these expectations together.
             assertEquals(1, ShadowToast.shownToastCount())
             assertEquals(context.getString(R.string.quick_account_switched, "b"), ShadowToast.getTextOfLatestToast())
         } finally {

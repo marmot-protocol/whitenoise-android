@@ -1747,7 +1747,7 @@
     <string name="usage_diagnostics_disclosure">Özellik etkinliği ve telemetri verileri, özellik kullanım sayılarını ve uygulama performans ölçümlerini içerir. Kullanım verileri geçici oturum tanımlayıcıları, telemetri ise sıfırlanabilir bir kurulum tanımlayıcısı kullanır. Hiçbiri hesap veya grup tanımlayıcılarını içermez.</string>
     <string name="usage_diagnostics_logs_separate">Bu cihazdaki tüm profillerin temizlenmiş teknik günlükleri, ayrı olarak paylaşılır.</string>
     <string name="usage_diagnostics_renew">Paylaşım artık özellik kullanımını da içeriyor. Lütfen bu bilgileri inceleyip yeniden seçim yapın.</string>
-    <string name="usage_diagnostics_status">Kullanım: %1$s. Tanılama: %2$s.</string>
+    <string name="usage_diagnostics_status">Kullanım: %1$s. Telemetri: %2$s.</string>
     <string name="usage_diagnostics_error">Paylaşım ayarları doğrulanamadı. Lütfen yeniden deneyin. Yeni bir seçim doğrulanmadı.</string>
     <string name="usage_diagnostics_off">Kapalı</string>
     <string name="usage_diagnostics_permission_needed">Onay gerekiyor</string>
@@ -1942,10 +1942,10 @@
     <string name="video_unmute">Sesi aç</string>
     <string name="audit_upload_title">Grup tanılama günlüklerini paylaş</string>
     <string name="audit_upload_subtitle">Bu cihazdaki tüm profiller için gruplarla ilgili teknik günlükleri otomatik olarak toplar ve yükler.</string>
-    <string name="audit_upload_confirm_title">Teknik günlükler White Noise ile paylaşılsın mı?</string>
+    <string name="audit_upload_confirm_title">Grup tanılama günlükleri White Noise ile paylaşılsın mı?</string>
     <string name="audit_upload_disclosure">Etkinleştirildiğinde, bu cihazdaki tüm profillerin tanılama denetim günlükleri yerel olarak kaydedilir ve Internet Privacy Foundation tarafından işletilen Goggles’a otomatik yüklenir. Daha önce kaydedilmiş günlükler de yüklenebilir. Günlükler grup ve mesaj tanımlayıcılarını, aktarıcı adreslerini, zaman damgalarını, takma adlı hesap referanslarını, kurulum tanımlayıcılarını, cihaz modelini ve uygulama sürümünü içerebilir. Mesaj içerikleri ve özel anahtarlar dahil değildir. Bu günlükler hassastır ve güvenilirlik sorunlarını araştırmak için saklanır. Bu seçim, kullanım ve tanılama paylaşımından ayrıdır. Paylaşımı kapatmak yeni kayıtları durdurur ve yeni toplu yüklemeleri engeller. Başlamış bir toplu yükleme, dosyalarını yüklemeyi tamamlayabilir. Bu işlem önceden yerel olarak saklanan veya yüklenen günlükleri silmez. İptal etmek paylaşımı kapalı bırakır.</string>
     <string name="audit_upload_confirm">Otomatik paylaşımı etkinleştir</string>
-    <string name="audit_upload_renew">Otomatik yükleme açıklamasını inceleyip yeni bir seçim yapana kadar teknik günlük paylaşımı kapalı kalır.</string>
+    <string name="audit_upload_renew">Otomatik yükleme açıklamasını inceleyip yeni bir seçim yapana kadar grup tanılama günlüğü paylaşımı kapalı kalır.</string>
     <string name="diagnostics_group_disclosure">Grup tanılama günlükleri, grupların güvenilirliğini ve tutarlılığını araştırmaya yardımcı olur. Üye kimlikleri yerine karma referanslar kullanarak teknik tanımlayıcıları, zaman damgalarını ve üyelik değişikliklerini içerir. Mesaj içeriklerini, profil adlarını, grup adlarını veya özel anahtarları asla içermez.</string>
     <string name="diagnostics_existing_logs">Grup tanılama günlüğü paylaşımını etkinleştirmek, bu cihazda zaten saklanan günlüklerin yüklenmesine neden olabilir.</string>
     <string name="diagnostics_retention">Grup tanılama günlükleri 30 gün, telemetri verileri 90 gün ve ürün analizi verileri 180 gün sonra sunucularımızdan silinir.</string>
