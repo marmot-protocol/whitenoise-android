@@ -1,9 +1,12 @@
 package dev.ipf.whitenoise.android.core
 
 /**
- * External destinations opened from Help / About.
+ * External destinations opened from settings.
  */
 internal object WhiteNoiseUrls {
+    const val DONATE =
+        "https://ipf.dev/donate/?utm_source=whitenoise_android&utm_medium=app&utm_campaign=donations"
+
     // GitHub's issue-template picker — opens a pre-filled bug report.
     const val BUG_REPORT = "https://github.com/marmot-protocol/whitenoise-android/issues/new/choose"
 

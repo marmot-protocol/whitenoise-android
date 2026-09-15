@@ -251,7 +251,7 @@ class DevicePrivacyScreenScreenshotTest {
                 .fetchSemanticsNodes()
                 .maxBy { it.boundsInRoot.height }
                 .boundsInRoot
-        val disclosure = composeRule.onNodeWithText("Share technical logs").fetchSemanticsNode().boundsInRoot
+        val disclosure = composeRule.onNodeWithText("Share group diagnostic logs").fetchSemanticsNode().boundsInRoot
         assertTrue("Choices $disclosure must fit inside $viewport", disclosure.bottom <= viewport.bottom)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
@@ -329,7 +329,7 @@ class DevicePrivacyScreenScreenshotTest {
             val release = CountDownLatch(1)
             writes.put(entered to release)
             try {
-                val title = if (index == 0) "Share usage and diagnostics" else "Share technical logs"
+                val title = if (index == 0) "Share usage and telemetry" else "Share group diagnostic logs"
                 composeRule.onNodeWithText(title).performClick()
                 if (index == 1 && enabled) composeRule.onNodeWithText("Enable automatic sharing").performClick()
                 waitForMutation { entered.count == 0L }
@@ -358,7 +358,7 @@ class DevicePrivacyScreenScreenshotTest {
 
     /** Samples the header and the choice rows instead of relying on screenshot timing alone. */
     private fun promptContentBounds() =
-        listOf("Help Improve White Noise", "Share usage and diagnostics", "Share technical logs").map {
+        listOf("Help Improve White Noise", "Share usage and telemetry", "Share group diagnostic logs").map {
             composeRule.onNodeWithText(it).fetchSemanticsNode().boundsInRoot
         }
 

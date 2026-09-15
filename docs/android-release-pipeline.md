@@ -94,8 +94,7 @@ privileged service credential in a BuildConfig field.
 
 Aptabase product analytics is a separate destination from OTLP and Goggles.
 For a release intended to include it, provision the environment-specific
-`PRODUCT_EVENTS_ENDPOINT`, `PRODUCT_APP_KEY`, `PRODUCT_OPERATOR`, and
-`PRODUCT_RETENTION` fields documented in
+`PRODUCT_EVENTS_ENDPOINT`, `PRODUCT_APP_KEY`, and `PRODUCT_OPERATOR` fields documented in
 [`product-analytics.md`](product-analytics.md). Run
 `./gradlew :app:verifyProductionProductAnalyticsConfig` against the resolved
 configuration, and check those values in the resulting candidate without

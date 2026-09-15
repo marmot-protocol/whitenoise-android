@@ -523,13 +523,13 @@
     <string name="allow_chat_screenshots_subtitle">Blocks screenshots and hides previews in Recents</string>
     <string name="audit_logs">Audit logs</string>
     <string name="audit_logs_settings_subtitle">Create and export local group forensic audit files</string>
-    <string name="export_audit_logs" translatable="false">Export audit logs</string>
-    <string name="export_audit_logs_subtitle" translatable="false">Share a copy of the local audit files you explicitly recorded</string>
-    <string name="export_audit_logs_confirm_title" translatable="false">Export sensitive audit data?</string>
-    <string name="export_audit_logs_confirm_body" translatable="false">Audit files may contain message content, identities, and device details. Share them only with someone you trust.</string>
-    <string name="export_audit_logs_confirm_action" translatable="false">Choose recipient</string>
-    <string name="delete_audit_logs">Delete audit logs</string>
-    <string name="delete_audit_logs_subtitle">Remove all local forensic audit files. Logging continues on a fresh file if it\'s still on.</string>
+    <string name="export_audit_logs">Export Diagnostic Logs</string>
+    <string name="export_audit_logs_subtitle">Share a copy of the diagnostic logs stored on this device</string>
+    <string name="export_audit_logs_confirm_title">Export diagnostic logs?</string>
+    <string name="export_audit_logs_confirm_body">Diagnostic logs contain technical identifiers and activity details. Share them only with someone you trust.</string>
+    <string name="export_audit_logs_confirm_action">Choose recipient</string>
+    <string name="delete_audit_logs">Clear Diagnostic Logs</string>
+    <string name="delete_audit_logs_subtitle">Clearing diagnostic logs deletes logs from this device only. It does not delete copies already uploaded to White Noise servers or turn off recording and automatic uploads.</string>
     <string name="device_protection">Device protection</string>
     <string name="incognito_keyboard_detail">Ask your keyboard not to learn from what you type in White Noise. Your keyboard may ignore this request.</string>
     <string name="require_device_authentication">Require device authentication</string>
@@ -539,7 +539,7 @@
     <string name="auto_lock">Auto-lock</string>
     <string name="diagnostics_improvements">Diagnostics &amp; Improvements</string>
     <string name="diagnostics_controls_detail">Control optional usage sharing and technical logs for this device.</string>
-    <string name="stored_audit_logs">Stored audit logs</string>
+    <string name="stored_audit_logs">Stored Diagnostic Logs</string>
     <string name="diagnostics_summary_on">On</string>
     <string name="diagnostics_summary_usage">Usage</string>
     <string name="diagnostics_summary_logs">Logs</string>
@@ -794,10 +794,6 @@
     <string name="name">Name</string>
     <string name="support_white_noise">Support White Noise</string>
     <string name="support_white_noise_detail">White Noise is free and open source. Donations help us improve it and keep it available to everyone.</string>
-    <string name="donation_address">%1$s donation address</string>
-    <string name="donation_qr_code">%1$s donation QR code</string>
-    <string name="donation_copy_address">Copy %1$s address</string>
-    <string name="donation_address_copied">%1$s address copied</string>
     <string name="url" translatable="false">URL</string>
     <string name="error_invalid_relay_url">Enter a valid secure relay URL beginning with wss://.</string>
     <string name="nip_65">Where I post</string>
@@ -990,11 +986,11 @@
     <string name="toast_couldnt_load_push_debug_info">Couldn\'t load push delivery info</string>
     <string name="toast_security_privacy_updated">Security &amp; Privacy updated</string>
     <string name="toast_couldnt_update_security_privacy">Couldn\'t update Security &amp; Privacy</string>
-    <string name="toast_audit_logs_deleted">Audit logs deleted</string>
-    <string name="toast_couldnt_delete_audit_logs">Couldn\'t delete audit logs</string>
-    <string name="toast_no_audit_logs_to_delete">No audit logs to delete</string>
-    <string name="toast_couldnt_export_audit_logs" translatable="false">Couldn\'t prepare audit logs for export</string>
-    <string name="toast_no_audit_logs_to_export" translatable="false">No audit logs to export</string>
+    <string name="toast_audit_logs_deleted">Diagnostic logs cleared</string>
+    <string name="toast_couldnt_delete_audit_logs">Couldn\'t clear diagnostic logs</string>
+    <string name="toast_no_audit_logs_to_delete">No diagnostic logs to clear</string>
+    <string name="toast_couldnt_export_audit_logs">Couldn\'t prepare diagnostic logs for export</string>
+    <string name="toast_no_audit_logs_to_export">No diagnostic logs to export</string>
     <string name="toast_chat_created">Chat created</string>
     <string name="group_create_stage_creating">Creating group…</string>
     <string name="group_create_stage_applying_retention">Applying disappearing messages…</string>
@@ -1088,12 +1084,6 @@
     <!-- Release-channel name shown on staging builds only; not a translatable word. -->
     <string name="settings_staging_badge" translatable="false">STAGING</string>
     <string name="chat_with_support">Chat with support</string>
-    <string name="donate_lightning_address">Lightning address</string>
-    <string name="donate_bitcoin_silent_payment">Bitcoin silent payment</string>
-    <string name="donate_method_lightning">Lightning</string>
-    <string name="donate_method_bitcoin">Bitcoin</string>
-    <string name="donate_lightning_value" translatable="false">whitenoise@donate.ipf.dev</string>
-    <string name="donate_bitcoin_silent_payment_value" translatable="false">sp1qqvp56mxcj9pz9xudvlch5g4ah5hrc8rj6neu25p34rc9gxhp38cwqqlmld28u57w2srgckr34dkyg3q02phu8tm05cyj483q026xedp0s5f5j40p</string>
     <string name="theme">Theme</string>
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
@@ -1854,15 +1844,13 @@
     <string name="tts_read_from_sentence">Read from this sentence</string>
     <string name="tts_choose_sentence">Choose sentence to read</string>
     <string name="tts_bar_preparing">Preparing speech…</string>
-    <string name="usage_diagnostics_title">Share usage and diagnostics</string>
-    <string name="usage_diagnostics_subtitle">Feature activity and reliability metrics.</string>
+    <string name="usage_diagnostics_title">Share usage and telemetry</string>
+    <string name="usage_diagnostics_subtitle">Automatically gathers and uploads feature activity and telemetry metrics for every profile on this device.</string>
     <string name="usage_diagnostics_prompt_title">Help Improve White Noise</string>
-    <string name="usage_diagnostics_disclosure">Usage includes approved, bucketed activity and temporary session IDs, without message contents or account and group identifiers. Diagnostics includes a random installation identifier that changes after you turn sharing off.</string>
-    <string name="usage_diagnostics_operator">Operated by %1$s.</string>
-    <string name="usage_diagnostics_retention_unknown">Retention policy has not yet been verified for this build.</string>
+    <string name="usage_diagnostics_disclosure">Feature activity and telemetry data include feature usage counts and app performance metrics. Usage data uses temporary session identifiers, and telemetry uses a resettable installation identifier. Neither includes account or group identifiers.</string>
     <string name="usage_diagnostics_logs_separate">Sanitized technical logs from every profile on this device, shared separately.</string>
     <string name="usage_diagnostics_renew">Sharing now includes feature usage. Please review this information and make a fresh choice.</string>
-    <string name="usage_diagnostics_status">Usage: %1$s. Diagnostics: %2$s.</string>
+    <string name="usage_diagnostics_status">Usage: %1$s. Telemetry: %2$s.</string>
     <string name="usage_diagnostics_error">Could not confirm sharing settings. Please retry. No new choice has been confirmed.</string>
     <string name="usage_diagnostics_off">Off</string>
     <string name="usage_diagnostics_permission_needed">Permission needed</string>
@@ -2074,10 +2062,20 @@
     <string name="photo_editor_quality_low">Low</string>
     <string name="photo_editor_quality_explanation">Photo location and identifying metadata are removed. Original keeps supported image data; other formats are safely re-encoded. Videos and files keep their original data.</string>
     <string name="photo_editor_original_edited">Edited photos use High quality. The original image is kept for further editing.</string>
-    <string name="audit_upload_title">Share technical logs</string>
-    <string name="audit_upload_subtitle">Automatically send diagnostic audit logs to White Noise, separately from usage sharing.</string>
-    <string name="audit_upload_confirm_title">Share technical logs with White Noise?</string>
-    <string name="audit_upload_disclosure">When enabled, diagnostic audit logs from every profile on this device are recorded locally and automatically uploaded to Goggles, operated by the Internet Privacy Foundation. Previously recorded logs may also be uploaded. Logs can include group and message identifiers, relay addresses, timestamps, pseudonymous account references, installation identifiers, and device model and app version. Message contents and private keys are excluded. These logs are sensitive and are retained for investigating reliability problems. This is separate from usage and diagnostics sharing. Turning sharing off stops new recording and prevents new upload batches. A batch already in progress may finish uploading its files. This does not delete logs already stored locally or uploaded. Cancel leaves sharing off.</string>
+    <string name="audit_upload_title">Share group diagnostic logs</string>
+    <string name="audit_upload_subtitle">Automatically gathers and uploads technical logs about groups for every profile on this device.</string>
+    <string name="audit_upload_confirm_title">Share group diagnostic logs with White Noise?</string>
+    <string name="audit_upload_disclosure">When enabled, group diagnostic logs from every profile on this device are recorded locally and automatically uploaded to Goggles, operated by the Internet Privacy Foundation. Previously recorded logs may also be uploaded. Logs can include group and message identifiers, relay addresses, timestamps, pseudonymous account references, installation identifiers, and device model and app version. Message contents and private keys are excluded. These logs are sensitive and are retained for investigating reliability problems. This is separate from usage and telemetry sharing. Turning sharing off stops new recording and prevents new upload batches. A batch already in progress may finish uploading its files. This does not delete logs already stored locally or uploaded. Cancel leaves sharing off.</string>
     <string name="audit_upload_confirm">Enable automatic sharing</string>
-    <string name="audit_upload_renew">Technical log sharing is off until you review the automatic-upload disclosure and make a fresh choice.</string>
+    <string name="audit_upload_renew">Group diagnostic log sharing is off until you review the automatic-upload disclosure and make a fresh choice.</string>
+    <string name="diagnostics_group_disclosure">Group diagnostic logs help investigate group reliability and consistency. They include technical identifiers, timestamps, and membership changes, using hashed references instead of member identities. They never contain message contents, profile names, group names, or private keys.</string>
+    <string name="diagnostics_existing_logs">Enabling group diagnostic log sharing may upload logs already stored on this device.</string>
+    <string name="diagnostics_retention">Group diagnostic logs are deleted from our servers after 30 days, telemetry after 90 days, and product analytics after 180 days.</string>
+    <string name="diagnostics_disable_disclosure">Turning these off stops new recording and prevents new automatic uploads. An automatic log upload batch already in progress may finish. Turning these off does not delete data already stored on this device or our servers.</string>
+    <string name="diagnostics_storage_device">On This Device</string>
+    <string name="diagnostics_clear_confirm_title">Clear diagnostic logs?</string>
+    <string name="diagnostics_clear_confirm_body">This permanently removes recorded diagnostic activity for all profiles from this device. Your logging preference won’t change.</string>
+    <string name="diagnostics_clear_confirm_action">Clear Logs</string>
+    <string name="usage_diagnostics_prompt_intro">Help us understand how White Noise is used and make messaging more reliable.</string>
+    <string name="donate_open_failed">Couldn’t open the donation page. Try again or return to Settings.</string>
 </resources>

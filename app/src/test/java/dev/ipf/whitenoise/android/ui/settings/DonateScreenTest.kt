@@ -1,15 +1,17 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
@@ -21,49 +23,49 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Behaviour contract of Donate: the method selector swaps the address and caption, copy fills the clipboard. */
+/** Donate opens the foundation website and preserves navigation. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h1200dp-mdpi")
 class DonateScreenTest {
-    @get:Rule
-    val composeRule = createComposeRule()
+    @get:Rule val composeRule = createComposeRule()
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private var backCount = 0
+    private var refuseUri = false
+    private val openedUris = mutableListOf<String>()
 
-    /** Lightning opens selected; choosing Bitcoin swaps the caption to the silent payment label. */
+    /** The single action opens the exact HTTPS donation page. */
     @Test
-    fun selectorSwapsMethodAndCaption() {
+    fun donateOpensFoundationPage() {
         show()
-        composeRule.onNodeWithTag("donate.method.0").assertIsSelected()
-        composeRule.onNodeWithText(context.getString(R.string.donate_lightning_address)).assertExists()
-        composeRule.onNodeWithTag("donate.method.1").performClick()
-        composeRule.onNodeWithTag("donate.method.1").assertIsSelected()
-        composeRule.onNodeWithText(context.getString(R.string.donate_bitcoin_silent_payment)).assertExists()
+        composeRule.onNodeWithTag("donate.method_selector").assertDoesNotExist()
+        composeRule.onNodeWithTag("donate.qr_surface").assertDoesNotExist()
+        composeRule.onNodeWithTag("donate.copy_address").assertDoesNotExist()
+        composeRule.onNodeWithTag("donate.open").performClick()
+        composeRule.runOnIdle {
+            assertEquals(
+                listOf("https://ipf.dev/donate/?utm_source=whitenoise_android&utm_medium=app&utm_campaign=donations"),
+                openedUris,
+            )
+        }
     }
 
-    /** The copy capsule puts the shipped address on the clipboard and reports it as copied. */
+    /** A missing browser reports failure, and retrying the same button can succeed. */
     @Test
-    fun copyCapsuleCopiesTheShippedAddress() {
+    fun refusedHandoffKeepsScreenAndCanRetry() {
+        refuseUri = true
         show()
-        composeRule.onNodeWithTag("donate.copy_address").performClick()
+        composeRule.onNodeWithTag("donate.open").performClick()
+        composeRule.onNodeWithTag("donate.open_failed").assertIsDisplayed().assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite),
+        )
         composeRule.runOnIdle {
-            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val copied =
-                clipboard.primaryClip
-                    ?.getItemAt(0)
-                    ?.text
-                    ?.toString()
-            assertEquals(context.getString(R.string.donate_lightning_value), copied)
+            assertEquals(emptyList<String>(), openedUris)
+            refuseUri = false
         }
-        composeRule
-            .onNodeWithTag("donate.copy_address")
-            .assert(
-                SemanticsMatcher.expectValue(
-                    SemanticsProperties.StateDescription,
-                    context.getString(R.string.copied),
-                ),
-            )
+        composeRule.onNodeWithTag("donate.open").performClick()
+        composeRule.onNodeWithTag("donate.open_failed").assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(1, openedUris.size) }
     }
 
     /** Back invokes the caller once. */
@@ -74,10 +76,20 @@ class DonateScreenTest {
         composeRule.runOnIdle { assertEquals(1, backCount) }
     }
 
-    /** Renders Donate in the light theme, counting Back calls. */
+    /** Uses an isolated URL handler so the test never launches a browser. */
     private fun show() {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false) { DonateScreen(onBack = { backCount++ }) }
+            CompositionLocalProvider(
+                LocalUriHandler provides
+                    object : UriHandler {
+                        override fun openUri(uri: String) {
+                            if (refuseUri) throw IllegalArgumentException("No browser")
+                            openedUris.add(uri)
+                        }
+                    },
+            ) {
+                WhiteNoiseTheme(darkTheme = false) { DonateScreen(onBack = { backCount++ }) }
+            }
         }
     }
 }
