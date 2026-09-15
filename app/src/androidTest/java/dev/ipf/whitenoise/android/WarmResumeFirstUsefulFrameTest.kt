@@ -24,6 +24,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/** A stop/start or recreate resumes onto the current useful surface with no full-screen loading frame. */
 @PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class WarmResumeFirstUsefulFrameTest {

@@ -13,6 +13,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.Random
 
+/** The packaged MarmotKit keeps valid media tags in order, drops malformed ones and survives bounded fuzzing. */
 @PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class MediaReferenceSupportFuzzIntegrationTest {

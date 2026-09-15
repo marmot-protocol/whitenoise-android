@@ -21,6 +21,7 @@ import java.io.File
 import java.net.ServerSocket
 import java.util.UUID
 
+/** The published JNI gates host timing export behind consent that scope expansion must renew, even after restart. */
 @PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class HostTimingConsentDeviceTest {

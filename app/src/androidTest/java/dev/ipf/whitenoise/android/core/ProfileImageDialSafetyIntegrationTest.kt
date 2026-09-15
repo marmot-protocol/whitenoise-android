@@ -16,6 +16,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.util.UUID
 
+/** The packaged MDK refuses loopback and other unsafe profile-image or media authorities before any dial. */
 @PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class ProfileImageDialSafetyIntegrationTest {

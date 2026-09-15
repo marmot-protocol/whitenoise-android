@@ -28,6 +28,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/** Repeated external shares reuse one task, keep only the newest request and draw the picker before returning. */
 @PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class InboundShareTaskReuseDeviceTest {
