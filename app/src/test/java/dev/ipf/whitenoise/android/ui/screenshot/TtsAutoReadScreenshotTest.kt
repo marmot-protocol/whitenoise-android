@@ -18,10 +18,9 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.TtsAutoReadOverride
-import dev.ipf.whitenoise.android.ui.group.TTS_AUTO_READ_GLOBAL_DEFAULT_ROW_TAG
-import dev.ipf.whitenoise.android.ui.group.TtsAutoReadGlobalDefaultRow
 import dev.ipf.whitenoise.android.ui.group.TtsAutoReadGroupActionRow
 import dev.ipf.whitenoise.android.ui.group.TtsAutoReadPickerContent
+import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -30,11 +29,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * Pixel baselines for TTS auto-read settings: global default switch, per-chat
- * picker selections (inherit / on / off), and group-details row layout under RTL
- * and large font.
- */
+/** The per-chat Read Aloud row inside its group and the override picker, including RTL at large type. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
@@ -44,20 +39,10 @@ class TtsAutoReadScreenshotTest {
 
     private val app: Application = ApplicationProvider.getApplicationContext()
 
+    /** Resolves a string resource in the test context. */
     private fun string(resId: Int): String = app.getString(resId)
 
-    @Test
-    fun globalDefaultOffLight() {
-        renderGlobalDefault(checked = false, darkTheme = false)
-        captureTag(TTS_AUTO_READ_GLOBAL_DEFAULT_ROW_TAG, "tts_auto_read_global_default_off_light")
-    }
-
-    @Test
-    fun globalDefaultOnLight() {
-        renderGlobalDefault(checked = true, darkTheme = false)
-        captureTag(TTS_AUTO_READ_GLOBAL_DEFAULT_ROW_TAG, "tts_auto_read_global_default_on_light")
-    }
-
+    /** Three picker states side by side: default, explicit on, explicit off. */
     @Test
     fun pickerSelectionGalleryLight() {
         composeRule.setContent {
@@ -86,6 +71,7 @@ class TtsAutoReadScreenshotTest {
         captureTag(PICKER_GALLERY_TAG, "tts_auto_read_picker_selection_gallery_light")
     }
 
+    /** The group row and the picker at 200 % type in RTL: title and provenance stay visible. */
     @Test
     @Config(sdk = [36], qualifiers = "w320dp-h780dp-mdpi")
     fun groupRowAndPickerRtlLargeFontLight() {
@@ -99,11 +85,16 @@ class TtsAutoReadScreenshotTest {
                 WhiteNoiseTheme(darkTheme = false) {
                     Surface {
                         Column(Modifier.width(320.dp).testTag(GROUP_ACCESSIBILITY_TAG)) {
-                            TtsAutoReadGroupActionRow(
-                                title = title,
-                                provenanceLabel = provenance,
-                                onClick = {},
-                            )
+                            SettingsGroup {
+                                row("auto_read") { rowContext ->
+                                    TtsAutoReadGroupActionRow(
+                                        context = rowContext,
+                                        title = title,
+                                        provenanceLabel = provenance,
+                                        onClick = {},
+                                    )
+                                }
+                            }
                             TtsAutoReadPickerContent(
                                 globalDefaultEnabled = false,
                                 selectedOverride = TtsAutoReadOverride.ON,
@@ -115,22 +106,6 @@ class TtsAutoReadScreenshotTest {
             }
         }
         captureTag(GROUP_ACCESSIBILITY_TAG, "tts_auto_read_group_row_picker_rtl_large_font_light")
-    }
-
-    private fun renderGlobalDefault(
-        checked: Boolean,
-        darkTheme: Boolean,
-    ) {
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme) {
-                Surface(Modifier.width(360.dp)) {
-                    TtsAutoReadGlobalDefaultRow(
-                        checked = checked,
-                        onCheckedChange = {},
-                    )
-                }
-            }
-        }
     }
 
     private fun captureTag(

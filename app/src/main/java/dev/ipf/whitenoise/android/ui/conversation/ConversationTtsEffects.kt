@@ -276,6 +276,7 @@ internal fun ConversationTtsFollowEffects(
     currentTimelineListIndex: (String) -> Int?,
     currentScrollAnchor: () -> ConversationScrollAnchor,
     explicitRevealRequestId: Long = 0L,
+    timelineViewport: ConversationTimelineViewport? = null,
 ) {
     @SuppressLint("StateFlowValueCalledInComposition")
     val followSignal by
@@ -356,7 +357,7 @@ internal fun ConversationTtsFollowEffects(
             }
 
             val targetIndex = currentTimelineListIndex(target.messageIdHex) ?: return@LaunchedEffect
-            val layoutInfo = listState.layoutInfo
+            val layoutInfo = (timelineViewport?.readingLayoutInfo() ?: listState.layoutInfo)
             val visibleTarget = layoutInfo.visibleItemsInfo.firstOrNull { it.key == row.id }
             val renderedForHeightSample = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
             val visibleTimelineHeights =
@@ -388,6 +389,7 @@ internal fun ConversationTtsFollowEffects(
                     targetIndex = targetIndex,
                     estimatedItemHeightPx = itemHeight,
                     listState = listState,
+                    timelineViewport = timelineViewport,
                     scrollCoordinator = scrollCoordinator,
                     sentenceLayouts = handle.sentenceLayouts,
                     claimPreposition = { handle.policy.claimPreposition(target) },

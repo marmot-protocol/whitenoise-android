@@ -27,7 +27,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.account.OTHER_ACCOUNT_STACK_TAG
+import dev.ipf.whitenoise.android.state.updateQuickProfileCycling
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -38,6 +38,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 private const val CHAT_LIST_TOP_BAR_TAG = "chat-list-top-bar"
+private const val QUICK_SWITCH_TAG = "chats.quickSwitch"
 
 private const val CHAT_LIST_CONTENT_ANCHOR_TAG = "chat-list-content-anchor"
 
@@ -117,30 +118,32 @@ class ChatListInlineConnectivityLayoutTest {
         assertMinimumAvatarConnectivityGap(activeAccountAvatar.right)
     }
 
+    /** With other accounts the cluster ends at the quick profile switch, which keeps the same clearance. */
     @Test
     fun connectingIndicatorKeepsMinimumGapWithOneOtherAccount() {
         renderConnectingTopBar(accountCount = 2)
 
-        val otherAccountAvatars =
+        val quickSwitch =
             composeRule
-                .onNodeWithTag(CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG)
+                .onNodeWithTag(QUICK_SWITCH_TAG)
                 .fetchSemanticsNode()
                 .boundsInRoot
 
-        assertMinimumAvatarConnectivityGap(otherAccountAvatars.right)
+        assertMinimumAvatarConnectivityGap(quickSwitch.right)
     }
 
+    /** Several other accounts still collapse to one quick switch; the clearance is measured from it. */
     @Test
     fun connectingIndicatorKeepsMinimumGapAfterEveryAccountAvatar() {
         renderConnectingTopBar(accountCount = 3)
 
-        val otherAccountAvatars =
+        val quickSwitch =
             composeRule
-                .onNodeWithTag(CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG)
+                .onNodeWithTag(QUICK_SWITCH_TAG)
                 .fetchSemanticsNode()
                 .boundsInRoot
 
-        assertMinimumAvatarConnectivityGap(otherAccountAvatars.right)
+        assertMinimumAvatarConnectivityGap(quickSwitch.right)
     }
 
     @Test
@@ -159,6 +162,7 @@ class ChatListInlineConnectivityLayoutTest {
         composeRule.onNodeWithTag(CHAT_LIST_INLINE_CONNECTIVITY_TAG).assertIsNotDisplayed()
     }
 
+    /** Compact large text keeps account overflow and search usable. */
     @Test
     @Config(sdk = [36], qualifiers = "w320dp-h780dp-mdpi")
     fun compactLargeTextKeepsAccountOverflowAndSearchUsable() {
@@ -182,7 +186,7 @@ class ChatListInlineConnectivityLayoutTest {
                 .boundsInRoot
         val overflowBounds =
             composeRule
-                .onNodeWithTag(OTHER_ACCOUNT_STACK_TAG)
+                .onNodeWithTag(QUICK_SWITCH_TAG)
                 .assertIsDisplayed()
                 .fetchSemanticsNode()
                 .boundsInRoot
@@ -296,6 +300,7 @@ class ChatListInlineConnectivityLayoutTest {
         )
     }
 
+    /** Content anchor top. */
     private fun contentAnchorTop(): Float =
         composeRule
             .onNodeWithTag(CHAT_LIST_CONTENT_ANCHOR_TAG)
@@ -303,6 +308,7 @@ class ChatListInlineConnectivityLayoutTest {
             .boundsInRoot
             .top
 
+    /** Builds the app state fixture with the given number of accounts. */
     private fun testAppState(accountCount: Int = 1): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
@@ -320,7 +326,7 @@ class ChatListInlineConnectivityLayoutTest {
                     )
                 },
             activeAccountRef = "personal",
-        )
+        ).also { it.updateQuickProfileCycling(true) }
 
     private class InMemoryDraftPersistence : DraftPersistence {
         override fun read(): Map<String, String> = emptyMap()

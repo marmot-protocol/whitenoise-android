@@ -9,6 +9,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +33,8 @@ import dev.ipf.whitenoise.android.state.KeyPackageDeletionResult
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentKeyPackageDeletionResult
+import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
+import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -104,6 +107,8 @@ class KeyPackageDeletionRecoveryScreenshotTest {
             CompositionLocalProvider(
                 LocalDensity provides Density(density.density, if (largeRtl) 2f else 1f),
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                LocalSnackbarBottomInset provides remember { mutableStateOf(0.dp) },
+                LocalSnackbarContentInset provides remember { mutableStateOf(0.dp) },
             ) {
                 WhiteNoiseTheme(darkTheme = darkTheme) {
                     Surface(modifier = Modifier.width(if (largeRtl) 320.dp else 360.dp)) {

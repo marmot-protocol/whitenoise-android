@@ -26,8 +26,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w240dp-h480dp-mdpi")
 class ChatRowAdaptiveLayoutTest {
     @get:Rule
@@ -37,6 +39,10 @@ class ChatRowAdaptiveLayoutTest {
     private val nowText by lazy { context.getString(R.string.relative_time_now) }
     private val timestampAt = (System.currentTimeMillis() / 1_000L).toULong()
 
+    /**
+     * Normal density uses the prototype's compact row height: Material's 72 dp one-line
+     * minimum less its own 20 dp list spacing, plus this row's 16 dp outer inset.
+     */
     @Test
     fun normalDensityUsesCompactRowHeight() {
         render()
@@ -47,7 +53,17 @@ class ChatRowAdaptiveLayoutTest {
                 .fetchSemanticsNode()
                 .boundsInRoot
 
-        assertEquals(72f, rowBounds.height, 0.5f)
+        val titleHeight =
+            composeRule
+                .onNodeWithText(TITLE, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        val previewHeight =
+            composeRule
+                .onNodeWithTag(PREVIEW_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        assertEquals("Compact row: title=$titleHeight preview=$previewHeight", 68f, rowBounds.height, 0.5f)
     }
 
     @Test

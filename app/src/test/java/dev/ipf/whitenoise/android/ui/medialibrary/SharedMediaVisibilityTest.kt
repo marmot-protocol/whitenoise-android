@@ -41,6 +41,7 @@ class SharedMediaVisibilityTest {
         )
     }
 
+    /** Visual media preserves combined newest first order. */
     @Test
     fun visualMediaPreservesCombinedNewestFirstOrder() {
         val messages =
@@ -65,6 +66,44 @@ class SharedMediaVisibilityTest {
         )
         assertFalse(tiles.visuals.first().isVideo)
         assertEquals(true, tiles.visuals[1].isVideo)
+        assertEquals(tiles.visuals, tiles.visualsFor(SharedVisualFilter.All))
+        assertEquals(tiles.images, tiles.visualsFor(SharedVisualFilter.Images))
+        assertEquals(tiles.videos, tiles.visualsFor(SharedVisualFilter.Videos))
+        assertEquals(tiles.visuals, tiles.visualSections.flatMap { it.items })
+        for (filter in SharedVisualFilter.entries) {
+            val source = tiles.visualsFor(filter)
+            val pages = source.toViewerPages()
+            assertEquals(source.map { it.messageIdHex }, pages.map { it.messageIdHex })
+            assertEquals(source.map { it.attachmentIndex }, pages.map { it.attachmentIndex })
+            assertEquals(source.map { it.reference }, pages.map { it.reference })
+            assertEquals(source.map { it.mine }, pages.map { it.mine })
+        }
+    }
+
+    /** Viewer keeps current page across loading and clears only confirmed removal. */
+    @Test
+    fun viewerKeepsCurrentPageAcrossLoadingAndClearsOnlyConfirmedRemoval() {
+        val tiles =
+            buildVisibleSharedMediaTiles(
+                listOf(imageMessage("first"), imageMessage("second")),
+                null,
+                emptySet(),
+                emptySet(),
+                100uL,
+            )
+        val pages = tiles.visuals.toViewerPages()
+        val selection = SharedMediaViewerSelection()
+        selection.select("first", 0)
+        // The real pager reports its new current source through this same owner method.
+        selection.select("second", 0)
+        selection.reconcile(loading = true, pages = emptyList())
+        assertEquals("second" to 0, selection.source)
+        selection.reconcile(loading = false, pages = pages)
+        assertEquals("second" to 0, selection.source)
+        selection.reconcile(loading = false, pages = pages.filter { it.messageIdHex == "second" })
+        assertEquals("second" to 0, selection.source)
+        selection.reconcile(loading = false, pages = pages.filter { it.messageIdHex == "first" })
+        assertEquals(null, selection.source)
     }
 
     private fun imageMessage(

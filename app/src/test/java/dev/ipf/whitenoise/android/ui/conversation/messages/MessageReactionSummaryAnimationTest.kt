@@ -107,17 +107,15 @@ class MessageReactionSummaryAnimationTest {
         )
     }
 
+    /** Reaction pills follow the updated tallies. */
     @Test
-    fun reactionChipContentCrossFadeShowsBothTalliesMidTransition() {
+    fun reactionPillsFollowTheUpdatedTallies() {
         var tallies by mutableStateOf(listOf(ReactionTally(emoji = "👍", count = 1, mine = true)))
-
-        composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
             ReactionHostHarness(tallies = tallies)
         }
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("3", useUnmergedTree = true).assertDoesNotExist()
-
+        composeRule.onNodeWithText("❤️", useUnmergedTree = true).assertDoesNotExist()
         composeRule.runOnUiThread {
             tallies =
                 listOf(
@@ -125,31 +123,13 @@ class MessageReactionSummaryAnimationTest {
                     ReactionTally(emoji = "❤️", count = 1, mine = false),
                 )
         }
-        composeRule.runOnIdle { }
-
-        var sawCrossFadeContent = false
-        repeat(REACTION_CONTENT_CROSSFADE_SAMPLE_FRAMES) {
-            composeRule.mainClock.advanceTimeBy(REACTION_CONTENT_CROSSFADE_STEP_MILLIS)
-            composeRule.runOnIdle { }
-            val hasOutgoingEmoji =
-                runCatching {
-                    composeRule.onNodeWithText("👍", useUnmergedTree = true, substring = false).assertExists()
-                }.isSuccess
-            val hasIncomingEmoji =
-                runCatching {
-                    composeRule.onNodeWithText("👍❤️", useUnmergedTree = true, substring = false).assertExists()
-                }.isSuccess
-            if (hasOutgoingEmoji && hasIncomingEmoji) {
-                sawCrossFadeContent = true
-            }
-        }
-
-        assertTrue(
-            "reaction chip content should briefly show outgoing and incoming tallies during cross-fade",
-            sawCrossFadeContent,
-        )
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("👍", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("❤️", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("2", useUnmergedTree = true).assertExists()
     }
 
+    /** Reaction chip content update does not change host height. */
     @Test
     fun reactionChipContentUpdateDoesNotChangeHostHeight() {
         var tallies by mutableStateOf(listOf(ReactionTally(emoji = "👍", count = 1, mine = true)))
@@ -170,8 +150,9 @@ class MessageReactionSummaryAnimationTest {
         composeRule.waitForIdle()
 
         assertEquals(heightBefore, columnHeight(), HEIGHT_TOLERANCE)
-        composeRule.onNodeWithText("👍❤️", useUnmergedTree = true).assertExists()
-        composeRule.onNodeWithText("3", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("👍", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("❤️", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("2", useUnmergedTree = true).assertExists()
     }
 
     @Test
@@ -325,8 +306,6 @@ private fun ReactionListHarness(tallies: List<ReactionTally>) {
 private const val COLUMN_TAG = "message-reaction-host-column"
 private const val BUBBLE_TEXT_TAG = "message-reaction-bubble-text"
 private const val FOLLOWING_MESSAGE_TAG = "message-reaction-following-message"
-private const val REACTION_CONTENT_CROSSFADE_SAMPLE_FRAMES = 8
-private const val REACTION_CONTENT_CROSSFADE_STEP_MILLIS = 20L
 private const val HEIGHT_TOLERANCE = 0.5f
 private const val POSITION_TOLERANCE = 0.5f
 private const val ANIMATION_SAMPLE_FRAMES = 8

@@ -39,6 +39,7 @@ class ComposerEmojiActionContractTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    /** Composer uses the shared action and exposes its keyboard toggle state. */
     @Test
     fun composerUsesTheSharedActionAndExposesItsKeyboardToggleState() {
         var pickerOpen by mutableStateOf(false)
@@ -70,8 +71,13 @@ class ComposerEmojiActionContractTest {
             "Composer emoji action must stay in the leading half of the field",
             bounds.left + bounds.right < fieldBounds.left + fieldBounds.right,
         )
-        assertTrue("Composer emoji action width must be at least 48dp", bounds.right - bounds.left >= 48.dp)
-        assertTrue("Composer emoji action height must be at least 48dp", bounds.bottom - bounds.top >= 48.dp)
+        val touchBounds = openAction.fetchSemanticsNode().touchBoundsInRoot
+        val minimumTouchTargetPx = with(composeRule.density) { 48.dp.toPx() }
+        assertTrue("Composer emoji action touch width must be at least 48dp", touchBounds.width >= minimumTouchTargetPx)
+        assertTrue(
+            "Composer emoji action touch height must be at least 48dp",
+            touchBounds.height >= minimumTouchTargetPx,
+        )
 
         openAction.performClick()
 

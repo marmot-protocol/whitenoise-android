@@ -80,14 +80,14 @@ class GroupAvatarRecoveryTest {
         try {
             composeRule.setContent { GroupAvatar(state, group(), "Group Avatar", "group", 64.dp) }
             composeRule.waitUntil(5_000) { attempted.isCompleted }
-            composeRule.onNodeWithText("GA").assertExists()
+            composeRule.onNodeWithText("G").assertExists()
             composeRule.runOnIdle {
                 online.set(true)
                 AvatarLoadRecovery.onNetworkRestored()
             }
             composeRule.waitUntil(5_000) { GroupAvatarImageLoader.peek(cacheKey(ACCOUNT_A)) != null }
             composeRule.waitForIdle()
-            composeRule.onNodeWithText("GA").assertDoesNotExist()
+            composeRule.onNodeWithText("G").assertDoesNotExist()
         } finally {
             state.ttsController.detachEngine()
         }
@@ -120,18 +120,18 @@ class GroupAvatarRecoveryTest {
             composeRule.waitUntil(5_000) { oldStarted.isCompleted }
             val oldFetchJob = currentDetachedFetch()
             activateAccountB(state, scope)
-            composeRule.onNodeWithText("GA").assertExists()
+            composeRule.onNodeWithText("G").assertExists()
             assertNull(GroupAvatarImageLoader.peek(cacheKey(ACCOUNT_B)))
             composeRule.runOnIdle { releaseOld.complete(Unit) }
             // Admission of the new owner proves the old detached fetch has released its permit.
             composeRule.waitUntil(5_000) { newStarted.isCompleted }
             composeRule.waitUntil(5_000) { oldFetchJob.isCompleted }
             assertNull(GroupAvatarImageLoader.peek(cacheKey(ACCOUNT_A)))
-            composeRule.onNodeWithText("GA").assertExists()
+            composeRule.onNodeWithText("G").assertExists()
             composeRule.runOnIdle { releaseNew.complete(Unit) }
             composeRule.waitUntil(5_000) { GroupAvatarImageLoader.peek(cacheKey(ACCOUNT_B)) != null }
             composeRule.waitForIdle()
-            composeRule.onNodeWithText("GA").assertDoesNotExist()
+            composeRule.onNodeWithText("G").assertDoesNotExist()
             assertNull(GroupAvatarImageLoader.peek(cacheKey(ACCOUNT_A)))
         } finally {
             releaseOld.complete(Unit)

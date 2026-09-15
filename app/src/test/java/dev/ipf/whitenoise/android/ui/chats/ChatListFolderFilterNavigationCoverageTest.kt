@@ -95,15 +95,15 @@ class ChatListFolderFilterNavigationCoverageTest {
     /** Proves the permanent All chip remains the sole explicit folder-filter reset action. */
     @Test
     fun explicitAllActionClearsRememberedFolderFilter() {
-        val filterChips =
-            chatListTopBarSource().readText().requiredSection(
-                start = "internal fun ChatListFilterChips(",
-                end = "\n}",
+        val pills =
+            chatFolderPillsSource().readText().requiredSection(
+                start = "item(key = \"scope:chats\")",
+                end = "\n        }",
             )
 
         assertTrue(
             "tapping All must explicitly clear the selected folder",
-            "onClick = { onSelect(null) }" in filterChips,
+            "{ onSelect(null) }" in pills,
         )
     }
 
@@ -125,6 +125,7 @@ class ChatListFolderFilterNavigationCoverageTest {
         )
     }
 
+    /** Chats screen source. */
     private fun chatsScreenSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt"),
@@ -132,6 +133,7 @@ class ChatListFolderFilterNavigationCoverageTest {
         ).firstOrNull { it.exists() }
             ?: error("Missing ChatsScreen.kt source file")
 
+    /** The MainShell source file under either working directory. */
     private fun mainShellSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),
@@ -139,12 +141,13 @@ class ChatListFolderFilterNavigationCoverageTest {
         ).firstOrNull { it.exists() }
             ?: error("Missing MainShell.kt source file")
 
-    private fun chatListTopBarSource(): File =
+    /** The ChatFolderPills source file under either working directory. */
+    private fun chatFolderPillsSource(): File =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt"),
+            File("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt"),
         ).firstOrNull { it.exists() }
-            ?: error("Missing ChatListTopBar.kt source file")
+            ?: error("Missing ChatFolderPills.kt source file")
 
     private fun String.requiredSection(
         start: String,

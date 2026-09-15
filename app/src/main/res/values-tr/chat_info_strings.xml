@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="disappearing">Kaybolan</string>
+    <string name="advanced">Gelişmiş</string>
+    <string name="save_conversation_transcript">Dökümü kaydet</string>
+</resources>

@@ -12,6 +12,7 @@ internal data class TextAttachmentPreview(
     val candidate: TextAttachmentCandidate,
     val text: String,
     val markdownDocument: MarkdownDocumentFfi? = null,
+    val byteCount: Long? = null,
 ) {
     val isTruncated: Boolean
         get() = markdownDocument?.truncated == true
@@ -36,6 +37,7 @@ internal sealed interface TextAttachmentReaderState {
     ) : TextAttachmentReaderState
 }
 
+/** Decodes bytes into a preview, parsing Markdown when the type calls for it. */
 internal suspend fun loadTextAttachmentPreview(
     candidate: TextAttachmentCandidate,
     bytes: ByteArray,
@@ -61,6 +63,7 @@ internal suspend fun loadTextAttachmentPreview(
                     candidate = candidate,
                     text = decoded.text,
                     markdownDocument = document,
+                    byteCount = bytes.size.toLong(),
                 ),
             )
         }

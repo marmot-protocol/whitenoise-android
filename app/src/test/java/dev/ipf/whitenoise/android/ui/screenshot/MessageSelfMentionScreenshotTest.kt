@@ -35,7 +35,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleTimestampColor
 import dev.ipf.whitenoise.android.ui.conversation.messages.replyPreviewAccentArgb
-import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionSummaryChip
+import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillRow
 import dev.ipf.whitenoise.android.ui.conversation.reactions.reactionSummaryAttachment
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -204,6 +204,7 @@ private fun MentionMediaBubble(
     }
 }
 
+/** Rich mention bubble. */
 @Composable
 private fun RichMentionBubble() {
     val presentation =
@@ -242,11 +243,12 @@ private fun RichMentionBubble() {
             MentionTimestamp(time = "١٢:٣٤")
         }
         Box(modifier = Modifier.reactionSummaryAttachment(outgoing = false)) {
-            ReactionSummaryChip(
+            ReactionPillRow(
                 tallies = listOf(ReactionTally("👍", 12, mine = true), ReactionTally("🎉", 3, mine = false)),
-                outgoing = false,
-                customAmoledBorderColor = presentation.borderOverrideArgb?.let(::colorFromArgb),
-                onClick = {},
+                enabled = true,
+                onToggle = {},
+                onOverflow = {},
+                onLongPress = null,
             )
         }
     }

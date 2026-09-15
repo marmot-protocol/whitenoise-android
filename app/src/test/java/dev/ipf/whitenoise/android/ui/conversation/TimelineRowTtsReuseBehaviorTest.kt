@@ -86,6 +86,7 @@ class TimelineRowTtsReuseBehaviorTest {
         appState.ttsController.attachEngine(engine)
     }
 
+    /** Keyed row reuse clears highlight and read aloud progress. */
     @Test
     @Suppress("LongMethod")
     fun keyedRowReuseClearsHighlightAndReadAloudProgress() {
@@ -148,7 +149,6 @@ class TimelineRowTtsReuseBehaviorTest {
                             isActionMenuOpen = false,
                             onActionMenuOpenChange = {},
                             onQuickReactionsSave = {},
-                            onQuickReactionsReset = {},
                             onReplyPreviewClick = {},
                             composerGate = ComposerGate.COMPOSER,
                             onBack = {},

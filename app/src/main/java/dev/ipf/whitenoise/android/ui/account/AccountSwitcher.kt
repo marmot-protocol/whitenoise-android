@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.state.otherAccountAvatars
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 
+/** Avatar that acts as the account button, with an optional unread dot in the account colour. */
 @Composable
 fun AccountAvatarButton(
     title: String,
@@ -56,8 +57,10 @@ fun AccountAvatarButton(
     // active account has no unread (the caller passes false).
     showUnreadDot: Boolean = false,
     unreadDotColor: Color? = null,
+    actionDescription: String? = null,
+    touchTargetSize: Dp = 56.dp,
 ) {
-    val openSettingsDescription = stringResource(R.string.open_settings)
+    val openSettingsDescription = actionDescription ?: stringResource(R.string.open_settings)
     val accountUnreadDescription =
         stringResource(R.string.account_unread_indicator)
     val safePictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
@@ -71,7 +74,7 @@ fun AccountAvatarButton(
         onClick = onClick,
         modifier =
             modifier
-                .size(56.dp)
+                .size(touchTargetSize)
                 .semantics { contentDescription = avatarContentDescription },
     ) {
         Box {

@@ -240,6 +240,13 @@ internal class PhotoEditorStateHolder(
         }
     }
 
+    /** Output quality now lives in the editor, so picking a level is an edit like any other. */
+    fun selectQuality(quality: MediaQuality) {
+        if (!state.isSaving) {
+            state = state.copy(quality = quality, errorMessage = null)
+        }
+    }
+
     fun beginSaving() {
         state = state.copy(isSaving = true, errorMessage = null, announcement = null)
     }

@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.net.Uri
-import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.StringRes
@@ -43,8 +42,6 @@ import dev.ipf.marmotkit.ProductAnalyticsActivityFfi
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.RelayEndpointClassificationFfi
 import dev.ipf.marmotkit.RelayEndpointPolicyFfi
-import dev.ipf.marmotkit.RelayTelemetryResourceFfi
-import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.RetentionSweepGroupOutcomeFfi
 import dev.ipf.marmotkit.RetentionSweepStatusFfi
@@ -151,6 +148,7 @@ import dev.ipf.whitenoise.android.share.shareResolveMime
 import dev.ipf.whitenoise.android.state.GroupInviteNotificationIdentityRefreshStore.RefreshCandidate
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
+import dev.ipf.whitenoise.android.ui.onboarding.SignUpController
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupCoordinator
 import dev.ipf.whitenoise.android.ui.onboarding.setup.setupOptions
 import dev.ipf.whitenoise.android.updates.AppSelfUpdateFlows
@@ -1371,6 +1369,8 @@ class WhiteNoiseAppState private constructor(
     private val nativePushFallback = NativePushFallbackCoordinator(nativePushFallbackPlatform)
     private val ttsRefreshMutex = Mutex()
     private val auditLogSettingsMutex = Mutex()
+    private val auditUploadConsent = AuditUploadConsent(preferences)
+    val auditUploadConsentRequired: Boolean get() = auditUploadConsent.requiresChoice
     private val conversationVibrationChannelMutex = Mutex()
 
     // Treat preference I/O plus observable-state publication as one transaction;
@@ -1862,6 +1862,9 @@ class WhiteNoiseAppState private constructor(
         EnterKeyBehavior.fromPreference(preferences.getString(ENTER_KEY_BEHAVIOR_KEY, null)),
     )
         private set
+
+    /** App-wide preference owner, retained across account changes and reset by erased app preferences. */
+    internal val quickProfileCyclePreference = QuickProfileCyclePreference(preferences)
 
     var languageTag by mutableStateOf(preferences.getString(APP_LANGUAGE_TAG_KEY, null).orEmpty())
         private set
@@ -4370,6 +4373,28 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    private val profileSignUp =
+        AppProfileSignUp(
+            this,
+            ::activateCreatedIdentity,
+            ::configurePrivacyRuntime,
+            ::warmProfile,
+        ) { phase = AppPhase.Ready }
+
+    /** Process-owned receipt survives recreation while native creation or profile publication runs. */
+    internal val pendingProfileSignUp: SignUpController?
+        get() = profileSignUp.pending
+
+    /** Presents the still-owned attempt above phase dispatch, including bootstrap re-entry. */
+    internal val profileSignUpForPresentation: SignUpController?
+        get() = profileSignUp.forPresentation
+
+    /** Opening the form performs no native creation or publication. */
+    internal fun beginProfileSignUp() = profileSignUp.begin()
+
+    /** Discards only an unsubmitted form or stale route; native accepted work remains intact. */
+    internal fun dismissProfileSignUp(): Boolean = profileSignUp.dismiss()
+
     suspend fun createIdentity() {
         val startedAt = SystemClock.elapsedRealtime()
         try {
@@ -4400,31 +4425,8 @@ class WhiteNoiseAppState private constructor(
         reloadMediaAutoDownloadMatrix()
     }
 
-    private fun launchIdentityPostCreateWarmup(summary: AccountSummaryFfi) {
-        mutationsScope.launch {
-            runBestEffortPostCommitSteps(
-                steps =
-                    listOf(
-                        "refresh-accounts" to { refreshAccounts() },
-                        "configure-privacy-runtime" to {
-                            if (activeAccountRef == summary.label) configurePrivacyRuntime()
-                        },
-                        "refresh-notification-settings" to {
-                            if (activeAccountRef == summary.label) refreshLocalNotificationSettings()
-                        },
-                        "warm-profile" to {
-                            if (activeAccountRef == summary.label) warmProfile(summary.accountIdHex)
-                        },
-                        "sync-push-registration" to {
-                            if (activeAccountRef == summary.label) syncNativePushRegistrationIfEnabled()
-                        },
-                    ),
-                onFailure = { step, error ->
-                    appStateDebug(error) { "post-create $step failed: ${error.readableMessage()}" }
-                },
-            )
-        }
-    }
+    /** Runs post-create enrichment without delaying the accepted identity or actionable route. */
+    private fun launchIdentityPostCreateWarmup(summary: AccountSummaryFfi) = profileSignUp.launchIdentityPostCreateWarmup(summary)
 
     /**
      * Reports how the import ended. Failures are reported to the caller (not
@@ -5787,7 +5789,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Validates and publishes one relay-list edit after app-level and MarmotKit policy checks. */
-    private suspend fun publishAccountRelays(
+    internal suspend fun publishAccountRelays(
         account: String,
         kind: RelayListKind,
         plan: RelayListEditPlan,
@@ -5828,7 +5830,7 @@ class WhiteNoiseAppState private constructor(
                 }.getOrNull()
         }
 
-    private suspend fun loadAccountRelayLists(account: String): AccountRelayListsFfi? =
+    internal suspend fun loadAccountRelayLists(account: String): AccountRelayListsFfi? =
         runCatchingCancellable { marmotIo { accountRelayLists(account) } }.getOrNull()
 
     /** Applies MarmotKit's shared relay policy and strips only unsafe pre-existing entries. */
@@ -6151,7 +6153,16 @@ class WhiteNoiseAppState private constructor(
                 storeCachedSettings = { auditLogSettings = it },
                 loadFromEngine = { marmotIo { auditLogSettings() } },
                 transform = { it.copy(enabled = enabled) },
-                persistToEngine = { settings -> marmotIo { setAuditLogSettings(settings) } },
+                persistToEngine = { settings ->
+                    withContext(Dispatchers.IO) {
+                        val runtime = marmot()
+                        auditUploadConsent.applyChoice(
+                            settings,
+                            configureUpload = { runtime.configureAuditRuntime(uploadConsentGranted = it) },
+                            persistSettings = { runtime.setAuditLogSettings(it) },
+                        )
+                    }
+                },
             )
             presentTransient(R.string.toast_security_privacy_updated)
             true
@@ -9265,24 +9276,10 @@ class WhiteNoiseAppState private constructor(
 
     /** Installs independent telemetry, audit and product destinations before native startup. */
     private suspend fun MarmotInterface.configurePrivacyRuntime() {
-        val installId = runCatchingCancellable { telemetryInstallId() }.getOrNull().orEmpty()
-        setRelayTelemetryRuntimeConfig(
-            RelayTelemetryRuntimeConfigFfi(
-                otlpEndpoint = BuildConfig.WHITENOISE_OTLP_ENDPOINT.nonBlankOrNull(),
-                authorizationBearerToken = BuildConfig.WHITENOISE_OTLP_AUTH_TOKEN.nonBlankOrNull(),
-                resource =
-                    RelayTelemetryResourceFfi(
-                        serviceVersion = telemetryServiceVersion(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
-                        serviceInstanceId = installId,
-                        deploymentEnvironment = telemetryDeploymentEnvironment(BuildConfig.WHITENOISE_DEPLOYMENT_ENVIRONMENT),
-                        tenant = BuildConfig.WHITENOISE_TELEMETRY_TENANT.ifBlank { "whitenoise-android" },
-                        osType = "linux",
-                        osVersion = Build.VERSION.RELEASE.ifBlank { Build.VERSION.SDK_INT.toString() },
-                        deviceModelIdentifier = telemetryDeviceModelIdentifier(Build.MODEL),
-                    ),
-            ),
-        )
-        configureAuditRuntime()
+        configureTelemetryRuntime()
+        auditLogSettingsMutex.withLock {
+            auditUploadConsent.prepare(this)
+        }
         setProductAnalyticsRuntimeConfig(androidProductAnalyticsRuntimeConfig())
     }
 

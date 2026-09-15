@@ -19,7 +19,6 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.Density
@@ -89,7 +88,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * Real-conversation evidence for voice download-to-playable transitions.
  *
  * The pinned baseline grew the voice row by four pixels exactly when playback
- * exposed its vertically padded speed pill; the stable row key remained and no
+ * exposed its pause action; the stable row key remained and no
  * scroll writer ran. Each regression below therefore records every intermediate
  * lazy viewport and rejects both logical-anchor movement and row-size drift.
  */
@@ -122,14 +121,10 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             val downloading = evidence.awaitAnchor(voiceId)
             assertVoiceActionTarget(voiceId, R.string.media_downloading)
             val transitionStart = evidence.checkpoint()
-            composeRule.onNodeWithText("1×").assertDoesNotExist()
             evidence.clearWrites()
 
             control.succeedMaterialization(0)
             control.awaitHydrationStarted()
-            composeRule.waitUntil(timeoutMillis = PHASE_TIMEOUT_MILLIS) {
-                composeRule.onAllNodesWithText("1×").fetchSemanticsNodes().isNotEmpty()
-            }
             awaitVoiceAction(voiceId, R.string.voice_message_pause)
             assertVoiceActionTarget(voiceId, R.string.voice_message_pause)
             assertViewportStayedFixed("materialization", downloading, evidence, transitionStart)
@@ -198,9 +193,6 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
 
             control.succeedMaterialization(0)
             control.awaitHydrationStarted()
-            composeRule.waitUntil(timeoutMillis = PHASE_TIMEOUT_MILLIS) {
-                composeRule.onAllNodesWithText("1×").fetchSemanticsNodes().isNotEmpty()
-            }
             awaitVoiceAction(voiceId, R.string.voice_message_pause)
             assertVoiceActionTarget(voiceId, R.string.voice_message_pause)
             assertVoiceBubbleFullyVisible(voiceId)
@@ -1099,9 +1091,6 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
     ) {
         private val attemptStarted = List(materializationAttemptCount) { CompletableDeferred<Unit>() }
         private val attemptResults = List(materializationAttemptCount) { CompletableDeferred<MaterializationResult>() }
-        val waveformStarted = CompletableDeferred<Unit>()
-        val waveformReleased = CompletableDeferred<Unit>()
-        val waveformCompleted = CompletableDeferred<Unit>()
         val durationStarted = CompletableDeferred<Unit>()
         val durationReleased = CompletableDeferred<Unit>()
         val durationCompleted = CompletableDeferred<Unit>()
@@ -1144,23 +1133,22 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
             attemptResults[index].complete(MaterializationResult.Failure(failure))
         }
 
-        /** Waits until both waveform and duration work have observed the published file. */
+        /** Waits until the duration probe has observed the published file. */
         fun awaitHydrationStarted() {
             composeRule.waitUntil(timeoutMillis = PHASE_TIMEOUT_MILLIS) {
-                waveformStarted.isCompleted && durationStarted.isCompleted
+                durationStarted.isCompleted
             }
         }
 
-        /** Lets waveform and duration complete together after their start has been recorded. */
+        /** Lets the duration probe complete after its start has been recorded. */
         fun releaseHydration() {
-            waveformReleased.complete(Unit)
             durationReleased.complete(Unit)
         }
 
-        /** Waits until both post-materialization state publications have completed. */
+        /** Waits until the post-materialization duration publication has completed. */
         fun awaitHydrationCompleted() {
             composeRule.waitUntil(timeoutMillis = PHASE_TIMEOUT_MILLIS) {
-                waveformCompleted.isCompleted && durationCompleted.isCompleted
+                durationCompleted.isCompleted
             }
             composeRule.waitForIdle()
         }
@@ -1170,7 +1158,6 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
             attemptResults.forEach { result ->
                 result.complete(MaterializationResult.Failure(CancellationException("voice test cleanup")))
             }
-            waveformReleased.complete(Unit)
             durationReleased.complete(Unit)
         }
     }
@@ -1346,14 +1333,6 @@ internal class ControlledVoicePresentationRuntime(
             publishedFiles += file
             control.successfulMaterializationReturned.complete(Unit)
         }
-    }
-
-    override suspend fun waveform(file: File): FloatArray {
-        val control = requireNotNull(fileOwners[file.absolutePath])
-        control.waveformStarted.complete(Unit)
-        control.waveformReleased.await()
-        control.waveformCompleted.complete(Unit)
-        return FloatArray(64) { index -> 0.2f + (index % 5) * 0.1f }
     }
 
     override suspend fun durationMs(file: File): Int {

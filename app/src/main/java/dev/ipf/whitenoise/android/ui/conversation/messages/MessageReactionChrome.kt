@@ -32,11 +32,12 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionSummaryChip
+import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillRow
 import kotlin.math.roundToInt
 
 internal val MessageBubbleBottomAlignmentLine = HorizontalAlignmentLine { old, new -> minOf(old, new) }
 
+/** Sender avatar slot beside incoming bubbles, shown at the end of a sender run. */
 @Composable
 internal fun RowScope.MessageSenderAvatarSlot(
     showSenderAvatar: Boolean,
@@ -56,7 +57,7 @@ internal fun RowScope.MessageSenderAvatarSlot(
     Box(
         modifier =
             Modifier
-                .size(32.dp)
+                .size(30.dp)
                 .then(avatarAlignment),
     ) {
         if (showSenderAvatar) {
@@ -69,22 +70,23 @@ internal fun RowScope.MessageSenderAvatarSlot(
                 Avatar(
                     title = title,
                     seed = seed,
-                    size = 32.dp,
+                    size = 30.dp,
                     pictureUrl = pictureUrl,
                 )
             }
         }
     }
-    Spacer(Modifier.width(8.dp))
+    Spacer(Modifier.width(6.dp))
 }
 
+/** Reaction summary chips under a bubble. */
 @Composable
 internal fun ColumnScope.MessageReactionSummary(
     tallies: List<ReactionTally>,
     mine: Boolean,
-    bubbleBorderOverrideArgb: Long? = null,
     visibilityState: MutableTransitionState<Boolean>? = null,
     enabled: Boolean = true,
+    onToggle: (String) -> Unit = {},
     onClick: () -> Unit,
 ) {
     val reactionChipPadding = reactionChipPadding(mine)
@@ -135,27 +137,30 @@ internal fun ColumnScope.MessageReactionSummary(
             ),
     ) {
         if (targetVisible || transition.currentState || transition.isRunning) {
-            ReactionSummaryChip(
+            ReactionPillRow(
                 tallies = displayTallies,
-                outgoing = mine,
-                customAmoledBorderColor = bubbleBorderOverrideArgb?.let(::colorFromArgb),
                 enabled = enabled,
-                onClick = onClick,
+                onToggle = onToggle,
+                onOverflow = onClick,
+                onLongPress = onClick,
                 modifier = hostGraphicsModifier,
             )
         }
     }
 }
 
+/** Edge inset of the reaction row for the bubble direction. */
 private fun reactionChipPadding(mine: Boolean): PaddingValues =
     if (mine) {
-        PaddingValues(start = 10.dp)
+        PaddingValues(start = REACTION_ROW_EDGE_INSET)
     } else {
-        PaddingValues(end = 10.dp)
+        PaddingValues(end = REACTION_ROW_EDGE_INSET)
     }
 
 // Keep the chip tucked onto the bubble's lower outer edge while its
 // reported height expands or contracts with the visibility transition.
+
+/** Modifier hosting the reaction row under the bubble. */
 private fun ColumnScope.reactionHostModifier(
     mine: Boolean,
     padding: PaddingValues,
@@ -168,7 +173,7 @@ private fun ColumnScope.reactionHostModifier(
         .then(clipModifier)
         .layout { measurable, constraints ->
             val placeable = measurable.measure(constraints)
-            val overlap = 6.dp.roundToPx()
+            val overlap = REACTION_ROW_OVERLAP.roundToPx()
             val expandedHeight = (placeable.height - overlap).coerceAtLeast(0)
             val height = (expandedHeight * sizeFraction).roundToInt()
             layout(
@@ -181,5 +186,10 @@ private fun ColumnScope.reactionHostModifier(
         }
 
 private const val REACTION_HOST_FADE_DURATION_MILLIS = 150
+
+// The prototype's metadata row: 12dp in from the bubble edge, and its 48dp touch row pulled up so the 23dp pills
+// overlap the bubble's bottom edge by 9dp ((48 - 23) / 2 + 9).
+private val REACTION_ROW_EDGE_INSET = 12.dp
+private val REACTION_ROW_OVERLAP = 21.dp
 private const val REACTION_HOST_SCALE_DURATION_MILLIS = 200
 private const val REACTION_HOST_SIZE_DURATION_MILLIS = 200

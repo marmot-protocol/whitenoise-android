@@ -358,26 +358,42 @@ internal class ConversationMediaSender(
         }
     }
 
+    /** Keeps the reviewed file until native optimistic acceptance; upload retries then retain the native bytes. */
     fun sendVoiceAttachment(
         file: java.io.File,
         durationMs: Long,
+        canSend: () -> Boolean,
+        onQueued: (Boolean) -> Unit,
     ) {
         appState.launchMutation {
-            val bytes =
-                withContext(Dispatchers.IO) {
-                    runCatching { file.readBytes() }.getOrNull()
-                }
-            withContext(Dispatchers.IO) { runCatching { file.delete() } }
-            if (bytes == null || bytes.isEmpty()) return@launchMutation
-            val attachment =
-                PendingAttachment(
-                    plaintextBytes = bytes,
-                    mediaType = dev.ipf.whitenoise.android.audio.VoiceRecorder.MIME_TYPE,
-                    fileName = "voice-${durationMs}ms.${dev.ipf.whitenoise.android.audio.VoiceRecorder.FILE_EXTENSION}",
-                )
-            val seeded = controller.queueAttachments(listOf(attachment), null) ?: return@launchMutation
-            onRevealSent()
-            controller.uploadQueued(seeded)
+            var accepted = false
+            try {
+                if (!canSend()) return@launchMutation
+                val bytes =
+                    withContext(Dispatchers.IO) {
+                        runCatching { file.readBytes() }.getOrNull()
+                    }
+                if (!canSend() || bytes == null || bytes.isEmpty()) return@launchMutation
+                val attachment =
+                    PendingAttachment(
+                        plaintextBytes = bytes,
+                        mediaType = dev.ipf.whitenoise.android.audio.VoiceRecorder.MIME_TYPE,
+                        fileName =
+                            "voice-${durationMs}ms.${dev.ipf.whitenoise.android.audio.VoiceRecorder.FILE_EXTENSION}",
+                    )
+                val seeded =
+                    controller.queueAttachments(
+                        listOf(attachment),
+                        null,
+                        canQueue = { canSend() && controller.canSendMessages },
+                    ) ?: return@launchMutation
+                accepted = true
+                onQueued(true)
+                onRevealSent()
+                controller.uploadQueued(seeded)
+            } finally {
+                if (!accepted) onQueued(false)
+            }
         }
     }
 
@@ -397,6 +413,7 @@ internal class ConversationMediaSender(
             get() = images.isEmpty() && documents.attachments.isEmpty()
     }
 
+    /** Sends the staged images and documents with the caption as one message. */
     fun sendStagedAttachments(
         imageSlots: List<PendingMediaSlot>,
         documentUris: List<android.net.Uri>,
@@ -414,35 +431,39 @@ internal class ConversationMediaSender(
             appState.captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
         appState.launchMutation {
-            val prepared = prepareStagedAttachments(imageSlots, documentUris, preparedImageAttachments)
-            if (!acceptPreparedAttachments(prepared, imageSlots.size)) {
-                onRejected()
-                return@launchMutation
-            }
-            val readyDocuments =
-                prepared.documents.copy(
-                    attachments = addMissingThumbhashes(prepared.documents.attachments),
-                )
-            val seeded =
-                seedPreparedAttachments(
-                    prepared.copy(documents = readyDocuments),
-                    trimmedCaption,
-                )
-            if (seeded.isEmpty()) {
-                onRejected()
-                return@launchMutation
-            }
-            onAccepted()
-            onAfterSend()
-            val clearDraftAfterDurableAcceptance: (() -> Unit)? =
-                pendingDraftClear?.let { pendingClear ->
-                    { appState.clearDraftAfterSuccessfulSend(pendingClear) }
+            var accepted = false
+            try {
+                val prepared = prepareStagedAttachments(imageSlots, documentUris, preparedImageAttachments)
+                if (!acceptPreparedAttachments(prepared, imageSlots.size)) {
+                    return@launchMutation
                 }
-            seeded.forEachIndexed { index, queued ->
-                controller.uploadQueued(
-                    seeded = queued,
-                    onDurablyAccepted = if (index == 0) clearDraftAfterDurableAcceptance else null,
-                )
+                val readyDocuments =
+                    prepared.documents.copy(
+                        attachments = addMissingThumbhashes(prepared.documents.attachments),
+                    )
+                val seeded =
+                    seedPreparedAttachments(
+                        prepared.copy(documents = readyDocuments),
+                        trimmedCaption,
+                    )
+                if (seeded.isEmpty()) {
+                    return@launchMutation
+                }
+                accepted = true
+                onAccepted()
+                onAfterSend()
+                val clearDraftAfterDurableAcceptance: (() -> Unit)? =
+                    pendingDraftClear?.let { pendingClear ->
+                        { appState.clearDraftAfterSuccessfulSend(pendingClear) }
+                    }
+                seeded.forEachIndexed { index, queued ->
+                    controller.uploadQueued(
+                        seeded = queued,
+                        onDurablyAccepted = if (index == 0) clearDraftAfterDurableAcceptance else null,
+                    )
+                }
+            } finally {
+                if (!accepted) onRejected()
             }
         }
     }

@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.ui.group
 
-import android.text.format.DateUtils
-import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
@@ -87,74 +85,91 @@ class MuteDurationDialogTest {
         assertTrue(isDateAllowed(tomorrowUtcMillis, today))
     }
 
+    /** Durations are listed shortest first, with Always ahead of the optional custom picker. */
     @Test
-    fun pickerShowsEveryRequestedChoiceAndExplicitAlwaysOption() {
+    fun durationsAreListedInTheDesignedOrderUnderTheMuteForTitle() {
         render()
 
-        listOf(
-            R.string.mute_duration_1_hour,
-            R.string.mute_duration_8_hours,
-            R.string.mute_duration_1_day,
-            R.string.mute_duration_7_days,
-            R.string.mute_duration_custom,
-            R.string.mute_duration_always,
-        ).forEach { label ->
-            composeRule.onNodeWithText(context.getString(label)).assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.mute_for)).assertExists()
+        val tops =
+            presetLabels().map { label ->
+                composeRule
+                    .onNodeWithText(label)
+                    .fetchSemanticsNode()
+                    .boundsInRoot.top
+            }
+        assertEquals(tops.sorted(), tops)
+    }
+
+    /** No confirm button: a duration commits itself, and Cancel is the only way out. */
+    @Test
+    fun durationDialogOffersCancelAsItsOnlyButton() {
+        render()
+
+        composeRule.onNodeWithTag(MUTE_DURATION_DIALOG_TAG).assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.ok)).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.mute)).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.cancel)).assertExists()
+    }
+
+    /** A surface without a date/time picker lists presets alone. */
+    @Test
+    fun customRowIsOmittedWhenNoCustomPickerIsAvailable() {
+        render(customTimeAvailable = false)
+
+        composeRule.onNodeWithText(context.getString(R.string.mute_duration_custom)).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.mute_duration_always)).assertExists()
+    }
+
+    @Test
+    fun oneHourPresetAppliesOnSelection() {
+        assertPreset(R.string.mute_duration_1_hour, MuteTarget.After(3_600_000L))
+    }
+
+    @Test
+    fun eightHourPresetAppliesOnSelection() {
+        assertPreset(R.string.mute_duration_8_hours, MuteTarget.After(28_800_000L))
+    }
+
+    @Test
+    fun oneDayPresetAppliesOnSelection() {
+        assertPreset(R.string.mute_duration_1_day, MuteTarget.After(86_400_000L))
+    }
+
+    @Test
+    fun oneWeekPresetAppliesOnSelection() {
+        assertPreset(R.string.mute_duration_1_week, MuteTarget.After(604_800_000L))
+    }
+
+    @Test
+    fun alwaysAppliesOnSelection() {
+        assertPreset(R.string.mute_duration_always, MuteTarget.Always)
+    }
+
+    @Test
+    fun cancellingDismissesWithoutSelectingADuration() {
+        var selected: MuteTarget? = null
+        var dismissed = false
+        render(onDismiss = { dismissed = true }, onSelect = { selected = it })
+
+        composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
+
+        composeRule.runOnIdle {
+            assertNull(selected)
+            assertTrue(dismissed)
         }
     }
 
     @Test
-    fun oneHourPresetUsesElapsedDuration() {
-        assertPreset(R.string.mute_duration_1_hour, 3_600_000L)
-    }
-
-    @Test
-    fun eightHourPresetUsesElapsedDuration() {
-        assertPreset(R.string.mute_duration_8_hours, 28_800_000L)
-    }
-
-    @Test
-    fun oneDayPresetIsStagedUntilConfirmation() {
-        assertPreset(R.string.mute_duration_1_day, 86_400_000L, assertStaged = true)
-    }
-
-    @Test
-    fun sevenDayPresetUsesElapsedDuration() {
-        assertPreset(R.string.mute_duration_7_days, 604_800_000L)
-    }
-
-    @Test
-    fun alwaysIsAnExplicitConfirmationTarget() {
-        var confirmed: MuteTarget? = null
-        render(onConfirm = { confirmed = it })
-
-        composeRule.onNodeWithText(context.getString(R.string.mute_duration_always)).performScrollTo().performClick()
-        composeRule.onNodeWithText(context.getString(R.string.ok)).performClick()
-
-        composeRule.runOnIdle { assertEquals(MuteTarget.Always, confirmed) }
-    }
-
-    @Test
-    fun cancellingDurationDialogDoesNotConfirmTheSelection() {
-        var confirmed: MuteTarget? = null
-        render(onConfirm = { confirmed = it })
-
-        composeRule.onNodeWithText(context.getString(R.string.mute_duration_1_hour)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
-
-        composeRule.runOnIdle { assertNull(confirmed) }
-    }
-
-    @Test
-    fun customDateAndTimeReturnToConfirmationWithTheResolvedInstant() {
-        var confirmed: MuteTarget? = null
+    fun customDateAndTimeApplyTheResolvedInstant() {
+        var selected: MuteTarget? = null
         val customDateTime = LocalDateTime.of(2026, 8, 11, 18, 30)
         val selectedDateTime = LocalDateTime.of(2026, 8, 12, 19, 30)
         render(
             nowMillis = { LocalDateTime.of(2026, 8, 10, 12, 0).toInstant(ZoneOffset.UTC).toEpochMilli() },
             zoneId = { ZoneOffset.UTC },
             initialCustomDateTime = customDateTime,
-            onConfirm = { confirmed = it },
+            onSelect = { selected = it },
         )
 
         composeRule.onNodeWithText(context.getString(R.string.mute_duration_custom)).performScrollTo().performClick()
@@ -166,105 +181,84 @@ class MuteDurationDialogTest {
         composeRule.onNodeWithTag(MUTE_CUSTOM_TIME_CONFIRM_TAG).performClick()
 
         val expectedExpiry = selectedDateTime.toInstant(ZoneOffset.UTC).toEpochMilli()
-        val expectedPreview =
-            context.getString(
-                R.string.mute_custom_selected,
-                DateUtils.formatDateTime(
-                    context,
-                    expectedExpiry,
-                    DateUtils.FORMAT_SHOW_WEEKDAY or DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME,
-                ),
-            )
-        composeRule.onNodeWithTag(MUTE_CUSTOM_PREVIEW_TAG).assertTextEquals(expectedPreview)
-        composeRule.onNodeWithText(context.getString(R.string.ok)).performClick()
-        composeRule.runOnIdle {
-            assertEquals(MuteTarget.At(expectedExpiry), confirmed)
-        }
+        composeRule.runOnIdle { assertEquals(MuteTarget.At(expectedExpiry), selected) }
     }
 
     @Test
-    fun elapsedCustomTimeIsRejectedAtFinalConfirmation() {
-        var confirmed: MuteTarget? = null
-        val customDateTime = LocalDateTime.of(2026, 8, 10, 12, 1)
-        var now = LocalDateTime.of(2026, 8, 10, 12, 0).toInstant(ZoneOffset.UTC).toEpochMilli()
-        render(
-            nowMillis = { now },
-            zoneId = { ZoneOffset.UTC },
-            initialCustomDateTime = customDateTime,
-            onConfirm = { confirmed = it },
-        )
+    fun cancellingTheCustomDateReturnsToThePresetsWithoutSelecting() {
+        var selected: MuteTarget? = null
+        render(onSelect = { selected = it })
 
-        composeRule.onNodeWithText(context.getString(R.string.mute_duration_custom)).performScrollTo().performClick()
-        composeRule.onNodeWithTag(MUTE_CUSTOM_DATE_CONFIRM_TAG).performClick()
-        composeRule.onNodeWithTag(MUTE_CUSTOM_TIME_CONFIRM_TAG).performClick()
-
-        now = customDateTime.toInstant(ZoneOffset.UTC).toEpochMilli()
-        composeRule.onNodeWithText(context.getString(R.string.ok)).performClick()
-
-        composeRule.runOnIdle { assertNull(confirmed) }
-        composeRule.onNodeWithText(context.getString(R.string.mute_custom_future_error)).assertExists()
-        composeRule.onNodeWithTag(MUTE_CUSTOM_TIME_PICKER_TAG).assertExists()
-    }
-
-    @Test
-    fun cancellingTheCustomDateReturnsWithoutChangingTheSelection() {
-        var confirmed: MuteTarget? = null
-        render(onConfirm = { confirmed = it })
-
-        composeRule.onNodeWithText(context.getString(R.string.mute_duration_1_day)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.mute_duration_custom)).performScrollTo().performClick()
         composeRule.onNodeWithTag(MUTE_CUSTOM_DATE_CANCEL_TAG).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.ok)).performClick()
 
-        composeRule.runOnIdle { assertEquals(MuteTarget.After(86_400_000L), confirmed) }
+        composeRule.runOnIdle { assertNull(selected) }
+        composeRule.onNodeWithText(context.getString(R.string.mute_for)).assertExists()
     }
 
     @Test
     fun currentCustomTimeShowsValidationAndKeepsTheTimePickerOpen() {
+        var selected: MuteTarget? = null
         val current = LocalDateTime.of(2026, 8, 10, 12, 0)
         render(
             nowMillis = { current.toInstant(ZoneOffset.UTC).toEpochMilli() },
             zoneId = { ZoneOffset.UTC },
             initialCustomDateTime = current,
+            onSelect = { selected = it },
         )
 
         composeRule.onNodeWithText(context.getString(R.string.mute_duration_custom)).performScrollTo().performClick()
         composeRule.onNodeWithTag(MUTE_CUSTOM_DATE_CONFIRM_TAG).performClick()
         composeRule.onNodeWithTag(MUTE_CUSTOM_TIME_CONFIRM_TAG).performClick()
 
+        composeRule.runOnIdle { assertNull(selected) }
         composeRule.onNodeWithText(context.getString(R.string.mute_custom_future_error)).assertExists()
         composeRule.onNodeWithTag(MUTE_CUSTOM_TIME_PICKER_TAG).assertExists()
     }
 
+    /** The prototype's preset order, top to bottom. */
+    private fun presetLabels(): List<String> =
+        listOf(
+            R.string.mute_duration_1_hour,
+            R.string.mute_duration_8_hours,
+            R.string.mute_duration_1_day,
+            R.string.mute_duration_1_week,
+            R.string.mute_duration_always,
+            R.string.mute_duration_custom,
+        ).map(context::getString)
+
+    /** Selecting a preset must both report the target and close the picker in one tap. */
     private fun assertPreset(
         labelId: Int,
-        expectedDurationMillis: Long,
-        assertStaged: Boolean = false,
+        expected: MuteTarget,
     ) {
-        var confirmed: MuteTarget? = null
-        render(onConfirm = { confirmed = it })
+        var selected: MuteTarget? = null
+        render(onSelect = { selected = it })
 
         composeRule.onNodeWithText(context.getString(labelId)).performScrollTo().performClick()
-        if (assertStaged) composeRule.runOnIdle { assertNull(confirmed) }
-        composeRule.onNodeWithText(context.getString(R.string.ok)).performClick()
 
-        composeRule.runOnIdle { assertEquals(MuteTarget.After(expectedDurationMillis), confirmed) }
+        composeRule.runOnIdle { assertEquals(expected, selected) }
     }
 
+    /** Renders the picker with fully injected clock and zone so no assertion depends on the host. */
+    @Suppress("LongParameterList")
     private fun render(
         nowMillis: () -> Long = System::currentTimeMillis,
         zoneId: () -> ZoneId = ZoneId::systemDefault,
         initialCustomDateTime: LocalDateTime? = null,
-        onConfirm: (MuteTarget) -> Unit = {},
+        customTimeAvailable: Boolean = true,
+        onDismiss: () -> Unit = {},
+        onSelect: (MuteTarget) -> Unit = {},
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
                 MuteDurationDialog(
-                    onDismiss = {},
-                    onConfirm = onConfirm,
+                    onDismiss = onDismiss,
+                    onSelect = onSelect,
                     nowMillis = nowMillis,
                     zoneId = zoneId,
                     initialCustomDateTime = initialCustomDateTime,
+                    customTimeAvailable = customTimeAvailable,
                 )
             }
         }

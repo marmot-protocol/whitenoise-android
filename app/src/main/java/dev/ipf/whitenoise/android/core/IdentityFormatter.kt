@@ -52,16 +52,20 @@ object IdentityFormatter {
             (normalized.length == NOSTR_HEX_ID_LENGTH && normalized.all { it.isDigit() || it in 'a'..'f' })
     }
 
+    /**
+     * Single-glyph monogram for a display name: the first letter, else the first emoji grapheme, else the DM
+     * fallback.
+     */
     fun initials(name: String): String {
         val words =
             name
                 .trim()
                 .split(WHITESPACE)
                 .filter { it.isNotBlank() }
-        // Candidate initials, taken as whole grapheme clusters so emoji,
-        // surrogate pairs and ZWJ sequences (👨‍👩‍👧, 🏃‍♂️) are never split into a
-        // lone surrogate half (#112). Two words → the lead grapheme of each;
-        // one word → its first two graphemes.
+        // The prototype's monogram is one glyph. Candidates are whole grapheme
+        // clusters so emoji, surrogate pairs and ZWJ sequences (👨‍👩‍👧, 🏃‍♂️) are
+        // never split into a lone surrogate half (#112): the lead grapheme of
+        // the first two words, or the first two graphemes of a single word.
         val candidates =
             when {
                 words.size >= 2 -> listOfNotNull(firstGrapheme(words[0]), firstGrapheme(words[1]))
@@ -69,13 +73,13 @@ object IdentityFormatter {
                 else -> emptyList()
             }
         if (candidates.isEmpty()) return "DM"
-        // Prefer letters: an emoji or symbol rendered alone in the avatar circle
-        // clips or shows as tofu, so a letter always wins when the name has one
+        // Prefer a letter: an emoji or symbol rendered alone in the avatar circle
+        // clips or shows as tofu, so the first letter wins when the name has one
         // ("Alice 😀" → "A", "😀 Alice" → "A"). Only a name with no letters at
         // all falls back to its first emoji grapheme ("😀🔥" → "😀"). See #427.
         val letters = candidates.filter { isLetter(it) }
         return if (letters.isNotEmpty()) {
-            letters.take(2).joinToString("").uppercase()
+            letters.first().uppercase()
         } else {
             candidates.first()
         }
@@ -161,6 +165,7 @@ object IdentityFormatter {
         }
     }
 
+    /** Locale-aware clock time for an epoch-second stamp. */
     fun clockTime(
         epochSeconds: ULong,
         locale: Locale = Locale.getDefault(),
@@ -182,21 +187,15 @@ object IdentityFormatter {
         }.getOrDefault("")
     }
 
+    /** Bubble footers carry the clock time only, the prototype's rule; day changes belong to the date headers. */
     fun messageBubbleTime(
         epochSeconds: ULong,
-        copy: RelativeTimeCopy = RelativeTimeCopy.Default,
         locale: Locale = Locale.getDefault(),
-        now: Instant = Instant.now(),
         zone: ZoneId = ZoneId.systemDefault(),
         force24Hour: Boolean? = null,
     ): String {
         if (epochSeconds == 0uL) return ""
-        val seconds = epochSeconds.toLong().coerceIn(0L, MAX_DISPLAYABLE_EPOCH_SECONDS)
-        return if (now.epochSecond - seconds < 3_600) {
-            relativeTime(epochSeconds, copy, locale, now, zone)
-        } else {
-            clockTime(epochSeconds, locale, zone, force24Hour)
-        }
+        return clockTime(epochSeconds, locale, zone, force24Hour)
     }
 
     private fun localizedDateWithoutYearFormatter(locale: Locale): DateTimeFormatter =

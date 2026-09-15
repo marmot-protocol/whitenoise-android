@@ -6,16 +6,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
-import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
-import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.BubbleSide
-import dev.ipf.whitenoise.android.state.BubbleTheme
-import dev.ipf.whitenoise.android.ui.settings.TonalSwatchPicker
+import dev.ipf.whitenoise.android.ui.settings.FullSpectrumColorPicker
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -24,6 +18,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
+/** The colour editor's controls with a custom violet selected: presets, three sliders and the hex field. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h640dp-mdpi")
@@ -31,49 +26,32 @@ class FullSpectrumColorPickerScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-
-    private fun string(resId: Int): String = context.getString(resId)
-
+    /** Light theme controls. */
     @Test
-    fun fullSpectrumPickerLight() = capture("full_spectrum_color_picker_light", dark = false, amoled = false)
+    fun fullSpectrumPickerLight() = capture("full_spectrum_color_picker_light", darkTheme = false)
 
+    /** Dark theme controls. */
     @Test
-    fun fullSpectrumPickerDark() = capture("full_spectrum_color_picker_dark", dark = true, amoled = false)
+    fun fullSpectrumPickerDark() = capture("full_spectrum_color_picker_dark", darkTheme = true)
 
-    @Test
-    fun fullSpectrumPickerAmoled() = capture("full_spectrum_color_picker_amoled", dark = true, amoled = true)
-
+    /** Renders the picker on a full-size surface and records the window. */
     private fun capture(
         name: String,
-        dark: Boolean,
-        amoled: Boolean,
+        darkTheme: Boolean,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
+            WhiteNoiseTheme(darkTheme = darkTheme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     Column(Modifier.fillMaxSize().padding(16.dp)) {
-                        TonalSwatchPicker(
+                        FullSpectrumColorPicker(
                             selectedArgb = 0xFF7C4DFFL,
+                            fallbackArgb = 0xFF000000L,
                             onColorSelected = {},
-                            scopeKey = name,
-                            theme =
-                                if (amoled) {
-                                    BubbleTheme.Amoled
-                                } else if (dark) {
-                                    BubbleTheme.Dark
-                                } else {
-                                    BubbleTheme.Light
-                                },
-                            slotKey = BubbleSide.Mine.name,
                         )
                     }
                 }
             }
         }
-        composeRule.onNodeWithContentDescription(string(R.string.more_colors)).performClick()
-        composeRule
-            .onRoot()
-            .captureRoboImage("src/test/snapshots/$name.png")
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 }

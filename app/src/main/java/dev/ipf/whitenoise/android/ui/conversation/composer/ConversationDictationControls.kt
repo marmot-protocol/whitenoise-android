@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
@@ -51,6 +53,8 @@ internal const val COMPOSER_DICTATION_COMPACT_ACTIONS_TAG = "composer-dictation-
 internal const val APP_DICTATION_CONTROL_TAG = "app-dictation-control"
 internal const val DICTATION_PROGRESS_TAG = "dictation-progress"
 
+/** Three native 48dp commands; narrow hosts expose them through the same horizontal scroll owner. */
+internal val DICTATION_ACTIVE_ACTIONS_WIDTH = 144.dp
 /** App-root bottom control used while the immutable dictation origin is not visible. */
 @Composable
 internal fun ConversationDictationPersistentControl(
@@ -115,7 +119,7 @@ internal fun ConversationDictationCompactActions(
     Box(
         modifier =
             modifier
-                .width(if (state.hasActiveRecognitionActions) 144.dp else 96.dp)
+                .width(if (state.hasActiveRecognitionActions) DICTATION_ACTIVE_ACTIONS_WIDTH else 96.dp)
                 .testTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)
                 .semantics {
                     liveRegion = LiveRegionMode.Polite
@@ -123,7 +127,7 @@ internal fun ConversationDictationCompactActions(
                 },
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.End,
         ) {
@@ -149,7 +153,9 @@ private val ConversationDictationState.hasActiveRecognitionActions: Boolean
             this is ConversationDictationState.Listening ||
             this is ConversationDictationState.Processing
 
-/** Keeps all three explicit outcomes visible for the lifetime of app-owned recognition. */
+/**
+ * Keeps all three explicit outcomes visible for the lifetime of app-owned recognition.
+ */
 @Composable
 private fun ConversationDictationActiveActions(controller: ConversationDictationController) {
     val pasteLabel = stringResource(R.string.paste)

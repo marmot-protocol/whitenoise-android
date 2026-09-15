@@ -14,14 +14,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -124,6 +122,7 @@ class ConversationPolishScreenshotTest {
         captureAttachmentTransferStates("attachment_transfer_states_amoled", dark = true, amoled = true)
     }
 
+    /** Captures action menu. */
     private fun captureActionMenu(
         name: String,
         dark: Boolean,
@@ -131,16 +130,14 @@ class ConversationPolishScreenshotTest {
         fontScale: Float = 1f,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
-                val density = LocalDensity.current
-                CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
-                    MaximumActionMenu()
-                }
+            WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = fontScale) {
+                MaximumActionMenu()
             }
         }
         composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).captureRoboImage("src/test/snapshots/$name.png")
     }
 
+    /** Captures deleted message action menu. */
     private fun captureDeletedMessageActionMenu(
         name: String,
         dark: Boolean,
@@ -149,10 +146,8 @@ class ConversationPolishScreenshotTest {
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
-                val density = LocalDensity.current
+            WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = fontScale) {
                 CompositionLocalProvider(
-                    LocalDensity provides Density(density.density, fontScale),
                     LocalLayoutDirection provides layoutDirection,
                 ) {
                     DeletedMessageActionMenu()

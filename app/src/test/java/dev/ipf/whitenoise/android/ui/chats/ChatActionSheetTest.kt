@@ -3,16 +3,13 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -35,15 +32,17 @@ class ChatActionSheetTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
+    /** Resolves a string resource in the test context. */
     private fun string(res: Int): String = context.getString(res)
 
+    /** Renders inverse actions and routes selection after dismissing. */
     @Test
     fun rendersInverseActionsAndRoutesSelectionAfterDismissing() {
         var dismisses = 0
         var selects = 0
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChatActionSheet(
+                ChatContextMenu(
                     hasUnread = true,
                     canMarkUnread = true,
                     archived = true,
@@ -80,11 +79,12 @@ class ChatActionSheetTest {
         assertEquals(1, selects)
     }
 
+    /** Omits unread action when membership cannot persist it. */
     @Test
     fun omitsUnreadActionWhenMembershipCannotPersistIt() {
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChatActionSheet(
+                ChatContextMenu(
                     hasUnread = false,
                     canMarkUnread = false,
                     archived = false,
@@ -114,13 +114,14 @@ class ChatActionSheetTest {
         composeRule.onNodeWithText(string(R.string.chat_row_action_pin)).assertIsDisplayed()
     }
 
+    /** Renders pinned actions and routes move after dismissing. */
     @Test
     fun rendersPinnedActionsAndRoutesMoveAfterDismissing() {
         var dismisses = 0
         var moveDelta = 0
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChatActionSheet(
+                ChatContextMenu(
                     hasUnread = false,
                     canMarkUnread = true,
                     archived = false,
@@ -144,20 +145,21 @@ class ChatActionSheetTest {
         }
 
         composeRule.onNodeWithText(string(R.string.chat_row_action_unpin)).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.chat_row_action_move_up)).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.chat_row_action_move_down)).performClick()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_move_up)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_move_down)).performScrollTo().performClick()
 
         assertEquals(1, dismisses)
         assertEquals(1, moveDelta)
     }
 
+    /** Routes pin after dismissing. */
     @Test
     fun routesPinAfterDismissing() {
         var dismisses = 0
         var pins = 0
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChatActionSheet(
+                ChatContextMenu(
                     hasUnread = false,
                     canMarkUnread = true,
                     archived = false,
@@ -186,13 +188,15 @@ class ChatActionSheetTest {
         assertEquals(1, pins)
     }
 
+    /** Compact large text sheet can scroll to the destructive action. */
     @Test
+    @Config(sdk = [36], qualifiers = "w360dp-h320dp-mdpi")
     fun compactLargeTextSheetCanScrollToTheDestructiveAction() {
         composeRule.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(density = 1f, fontScale = 2f)) {
+            WhiteNoiseTheme(fontScale = 2f) {
                 Box(Modifier.fillMaxWidth().height(240.dp)) {
-                    WhiteNoiseTheme {
-                        ChatActionSheet(
+                    Box {
+                        ChatContextMenu(
                             hasUnread = false,
                             canMarkUnread = true,
                             archived = false,
@@ -223,22 +227,29 @@ class ChatActionSheetTest {
             .assertIsDisplayed()
     }
 
+    /** Action sheet light screenshot. */
     @Test
     fun actionSheetLightScreenshot() {
         renderScreenshotSheet(darkTheme = false)
-        composeRule.onRoot(useUnmergedTree = true).captureRoboImage("src/test/snapshots/chat_action_sheet_light.png")
+        composeRule
+            .onNode(isPopup(), useUnmergedTree = true)
+            .captureRoboImage("src/test/snapshots/chat_action_sheet_light.png")
     }
 
+    /** Action sheet dark screenshot. */
     @Test
     fun actionSheetDarkScreenshot() {
         renderScreenshotSheet(darkTheme = true)
-        composeRule.onRoot(useUnmergedTree = true).captureRoboImage("src/test/snapshots/chat_action_sheet_dark.png")
+        composeRule
+            .onNode(isPopup(), useUnmergedTree = true)
+            .captureRoboImage("src/test/snapshots/chat_action_sheet_dark.png")
     }
 
+    /** Composes the sheet for a screenshot capture. */
     private fun renderScreenshotSheet(darkTheme: Boolean) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme) {
-                ChatActionSheet(
+                ChatContextMenu(
                     hasUnread = false,
                     canMarkUnread = true,
                     archived = false,

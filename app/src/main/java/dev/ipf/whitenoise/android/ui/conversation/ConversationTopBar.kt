@@ -2,17 +2,13 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,11 +29,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
@@ -47,8 +44,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
-import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
-import dev.ipf.whitenoise.android.ui.design.conversationMenuItemPadding
+import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -79,15 +75,10 @@ internal fun ConversationTopBar(
     openDetailsDescription: String,
     onOpenDetails: () -> Unit,
     onBack: () -> Unit,
-    menuOpen: Boolean,
-    onMenuOpenChange: (Boolean) -> Unit,
-    onOpenSearch: () -> Unit,
-    onToggleArchived: () -> Unit,
-    onRequestLeave: () -> Unit,
     onTtsTransportBodyClick: (() -> Unit)? = null,
     // Compact-height windows (landscape with the IME open) trade top-bar
     // height back to the transcript and composer while keeping Back, the
-    // conversation identity, and the details/menu actions reachable.
+    // conversation identity and the details action reachable.
     compactHeight: Boolean = false,
     performanceSelectorsEnabled: Boolean = BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS,
 ) {
@@ -135,29 +126,32 @@ internal fun ConversationTopBar(
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier =
                             Modifier
                                 .fillMaxWidth()
+                                .heightIn(min = 48.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .clickable(onClick = onOpenDetails)
+                                .clickable(role = Role.Button, onClick = onOpenDetails)
                                 .performanceTestTag(
                                     PerformanceTestTags.OPEN_GROUP_DETAILS,
                                     enabled = performanceSelectorsEnabled,
-                                ).semantics {
+                                ).semantics(mergeDescendants = true) {
                                     contentDescription = openDetailsDescription
                                 },
                     ) {
-                        GroupAvatar(
-                            appState = appState,
-                            group = presentedGroup,
-                            title = presentedTitle,
-                            seed = presentedAvatarAccount ?: presentedGroup.groupIdHex,
-                            size = if (compactHeight) 28.dp else 36.dp,
-                            fallbackPictureUrl = presentedAvatarAccount?.let(appState::avatarUrl),
-                            firstFrameAvatar = firstFrameAvatar,
-                        )
-                        Column {
+                        Box(Modifier.testTag("conversation.header.avatar")) {
+                            GroupAvatar(
+                                appState = appState,
+                                group = presentedGroup,
+                                title = presentedTitle,
+                                seed = presentedAvatarAccount ?: presentedGroup.groupIdHex,
+                                size = if (compactHeight) 28.dp else 40.dp,
+                                fallbackPictureUrl = presentedAvatarAccount?.let(appState::avatarUrl),
+                                firstFrameAvatar = firstFrameAvatar,
+                            )
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(CONVERSATION_TITLE_LINE_SPACING_DP.dp)) {
                             Text(
                                 presentedTitle,
                                 style = MaterialTheme.typography.titleMedium,
@@ -200,9 +194,9 @@ internal fun ConversationTopBar(
                                                 Text("·", style = labelStyle, color = labelColor)
                                             }
                                             Icon(
-                                                Icons.Default.Schedule,
+                                                painterResource(R.drawable.ic_timer),
                                                 contentDescription = null,
-                                                modifier = Modifier.size(13.dp),
+                                                modifier = Modifier.size(12.dp).testTag("conversation.header.timer"),
                                                 tint = labelColor,
                                             )
                                             Text(
@@ -242,65 +236,17 @@ internal fun ConversationTopBar(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
+                            painterResource(R.drawable.ic_arrow_back),
                             contentDescription = stringResource(R.string.back),
                         )
                     }
                 },
-                actions = {
-                    IconButton(onClick = { onMenuOpenChange(true) }) {
-                        Icon(
-                            Icons.Default.MoreVert,
-                            contentDescription = stringResource(R.string.chat_actions),
-                        )
-                    }
-                    KeyboardPreservingDropdownMenu(
-                        expanded = menuOpen,
-                        onDismissRequest = { onMenuOpenChange(false) },
-                        shape = RoundedCornerShape(20.dp),
-                        offset = DpOffset(x = (-8).dp, y = 0.dp),
-                        modifier = Modifier.widthIn(min = 232.dp),
-                    ) {
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    stringResource(R.string.conversation_search_open),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            },
-                            contentPadding = conversationMenuItemPadding,
-                            onClick = onOpenSearch,
-                        )
-                        if (!controller.group.pendingConfirmation) {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        stringResource(
-                                            if (controller.presentedArchived) R.string.unarchive else R.string.archive,
-                                        ),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                    )
-                                },
-                                contentPadding = conversationMenuItemPadding,
-                                enabled = !controller.mutationInFlight,
-                                onClick = onToggleArchived,
-                            )
-                            if (controller.isSelfMember) {
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            stringResource(R.string.leave),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                        )
-                                    },
-                                    contentPadding = conversationMenuItemPadding,
-                                    enabled = !controller.mutationInFlight && controller.membersLoaded,
-                                    onClick = onRequestLeave,
-                                )
-                            }
-                        }
-                    }
-                },
+                scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    ),
             )
         }
         TtsTransportBar(
@@ -309,3 +255,5 @@ internal fun ConversationTopBar(
         )
     }
 }
+
+private const val CONVERSATION_TITLE_LINE_SPACING_DP = -2

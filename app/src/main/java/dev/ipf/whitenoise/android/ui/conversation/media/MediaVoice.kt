@@ -4,14 +4,11 @@ import android.content.Context
 import android.util.Log
 import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,11 +19,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,6 +37,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -47,21 +45,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.audio.AudioWaveformExtractor
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController.PlaybackStartResult
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
@@ -75,7 +75,9 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.evictCachedAttachment
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -181,9 +183,6 @@ internal interface VoiceAttachmentPresentationRuntime {
     /** Resolves or publishes the stable local file for one attachment. */
     suspend fun materialize(request: VoiceAttachmentMaterializationRequest): java.io.File
 
-    /** Decodes normalized waveform bars from [file], if supported. */
-    suspend fun waveform(file: java.io.File): FloatArray?
-
     /** Probes the playable duration of [file] in milliseconds. */
     suspend fun durationMs(file: java.io.File): Int
 
@@ -211,6 +210,7 @@ private object DefaultVoiceAttachmentPresentationRuntime : VoiceAttachmentPresen
     override val playbackState = VoicePlaybackController.state
     override val playbackFailures = VoicePlaybackController.failures
 
+    /** Materializes the voice attachment through the shared attachment cache. */
     override suspend fun materialize(request: VoiceAttachmentMaterializationRequest): java.io.File =
         materializeVoiceAttachment(
             context = request.context,
@@ -222,8 +222,6 @@ private object DefaultVoiceAttachmentPresentationRuntime : VoiceAttachmentPresen
             priority = request.priority,
             materializationOwner = request.presentationOwner,
         )
-
-    override suspend fun waveform(file: java.io.File): FloatArray? = AudioWaveformExtractor.decode(file)
 
     override suspend fun durationMs(file: java.io.File): Int = VoicePlaybackController.probeDuration(file)
 
@@ -273,7 +271,6 @@ internal fun MediaVoiceBubble(
     presentationOwner: Any,
     mine: Boolean,
     onLongPress: () -> Unit = {},
-    attachedToCaption: Boolean = false,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -328,7 +325,6 @@ internal fun MediaVoiceBubble(
             .map { state -> state.takeIf { it.key == pillKey } }
             .distinctUntilChanged()
     }.collectAsState(null)
-    val isThis = playback != null
     val isPlayingThis = playback?.isPlaying == true
     val isPausedThis = playback?.let { !it.isPlaying && it.positionMs > 0 } == true
     val activeDurationMs =
@@ -341,25 +337,7 @@ internal fun MediaVoiceBubble(
             0f
         }
 
-    val pseudoWaveform: FloatArray =
-        remember(pillKey) {
-            val bytes =
-                java.security.MessageDigest
-                    .getInstance("SHA-256")
-                    .digest(pillKey.toByteArray())
-            FloatArray(dev.ipf.whitenoise.android.audio.AudioWaveformExtractor.BARS) { i ->
-                val byte = bytes[i % bytes.size].toInt() and 0xFF
-                0.3f + (byte / 255f) * 0.7f
-            }
-        }
-    var realWaveform by remember(pillKey, epoch) { mutableStateOf<FloatArray?>(null) }
-    LaunchedEffect(localFile, pillKey, epoch, presentationRuntime) {
-        val file = localFile ?: return@LaunchedEffect
-        if (realWaveform != null) return@LaunchedEffect
-        realWaveform = presentationRuntime.waveform(file)
-    }
-    val waveform: FloatArray = realWaveform ?: pseudoWaveform
-
+    /** Drops a corrupt cached voice file so the next play re-downloads it. */
     suspend fun clearBadVoiceCache(reason: String) {
         Log.w("MediaVoiceBubble", "voice_cache_cleared reason=${reason.replace(' ', '_')}")
         clearVoiceAttachmentCacheAfterPlaybackFailure(
@@ -370,7 +348,6 @@ internal fun MediaVoiceBubble(
             reference = reference,
         )
         localFile = null
-        realWaveform = null
         totalDurationMs = 0
         failed = true
         val retryAllowedByPolicy =
@@ -386,6 +363,7 @@ internal fun MediaVoiceBubble(
             AttachmentMaterializationIntent.Idle.withPolicyAllowed(retryAllowedByPolicy)
     }
 
+    /** Plays a materialized voice file after validating the cache entry. */
     suspend fun playReadyVoice(file: java.io.File) {
         val playableFile =
             withContext(Dispatchers.IO) {
@@ -393,7 +371,6 @@ internal fun MediaVoiceBubble(
             }
         if (playableFile == null) {
             localFile = null
-            realWaveform = null
             totalDurationMs = 0
             controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
             return
@@ -499,10 +476,18 @@ internal fun MediaVoiceBubble(
         activePositionMs = activePositionMs,
         activeDurationMs = activeDurationMs,
         totalDurationMs = totalDurationMs,
-        waveform = waveform,
         progressFraction = progressFraction,
-        playbackSpeed = playback?.speed,
-        attachedToCaption = attachedToCaption,
+        outgoing = mine,
+        // The speed pill only makes sense for the clip that owns playback; a
+        // seek needs a known duration to turn the track fraction into a position.
+        playbackSpeed = playback?.speed?.takeIf { isPlayingThis || isPausedThis },
+        onSeek =
+            if ((isPlayingThis || isPausedThis) && activeDurationMs > 0) {
+                { fraction -> presentationRuntime.seekTo(pillKey, (fraction * activeDurationMs).toInt()) }
+            } else {
+                null
+            },
+        onCycleSpeed = presentationRuntime::cycleSpeed,
         onLongPress = onLongPress,
         onActionClick = {
             when {
@@ -521,15 +506,6 @@ internal fun MediaVoiceBubble(
                 }
             }
         },
-        onSeek =
-            if (isThis && activeDurationMs > 0) {
-                { fraction ->
-                    presentationRuntime.seekTo(pillKey, (fraction * activeDurationMs).toInt())
-                }
-            } else {
-                null
-            },
-        onCycleSpeed = presentationRuntime::cycleSpeed,
     )
 }
 
@@ -544,6 +520,11 @@ internal fun MediaVoiceBubble(
     "LongMethod",
     "LongParameterList",
 )
+/**
+ * Voice bubble content: the 48dp play target, a progress track that doubles as the seek surface,
+ * the time label, and a compact speed pill that appears only while this clip is playing or paused.
+ * [onSeek] receives the tapped or dragged track fraction (0..1) and is null when seeking is unavailable.
+ */
 internal fun VoiceAttachmentContent(
     loading: Boolean,
     failed: Boolean,
@@ -554,119 +535,231 @@ internal fun VoiceAttachmentContent(
     activePositionMs: Int,
     activeDurationMs: Int,
     totalDurationMs: Int,
-    waveform: FloatArray,
     progressFraction: Float,
-    playbackSpeed: Float?,
-    attachedToCaption: Boolean,
+    outgoing: Boolean,
     onLongPress: () -> Unit,
     onActionClick: () -> Unit,
-    onSeek: ((Float) -> Unit)?,
-    onCycleSpeed: () -> Unit,
+    playbackSpeed: Float? = null,
+    onSeek: ((Float) -> Unit)? = null,
+    onCycleSpeed: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val onSurfaceMuted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
-    val accent = MaterialTheme.colorScheme.primary
-    val onAccent = MaterialTheme.colorScheme.onPrimary
+    val bubbleContent = LocalContentColor.current
+    val tinted = outgoing && !isAmoledSurfaceTheme()
+    val container =
+        if (tinted) bubbleContent.copy(alpha = VOICE_CARD_TINT_ALPHA) else MaterialTheme.colorScheme.surfaceContainer
+    val content = if (tinted) bubbleContent else MaterialTheme.colorScheme.onSurface
+    val secondaryContent =
+        if (tinted) {
+            bubbleContent.copy(alpha = VOICE_CARD_SECONDARY_ALPHA)
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
     val actionVisual = voiceActionVisual(loading, failed, startDownload, localFileAvailable, isPlaying)
     val actionDescription = stringResource(actionVisual.descriptionResource)
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = if (attachedToCaption) RectangleShape else RoundedCornerShape(18.dp),
-        border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
-        modifier = modifier.fillMaxWidth(),
+        color = container,
+        contentColor = content,
+        shape = ConversationRichContentShape,
+        modifier = modifier.width(ConversationMessageMetrics.RichContentCanvasWidth),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(ConversationMessageMetrics.RichComponentInset),
         ) {
-            Surface(
-                color = accent,
-                shape = CircleShape,
+            Box(
                 modifier =
                     Modifier
                         .size(48.dp)
-                        .semantics(mergeDescendants = true) {
-                            contentDescription = actionDescription
-                        }.combinedClickable(
-                            onLongClick = onLongPress,
-                            onClick = onActionClick,
-                        ),
+                        .semantics(mergeDescendants = true) { contentDescription = actionDescription }
+                        .combinedClickable(onLongClick = onLongPress, onClick = onActionClick),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    when (actionVisual) {
-                        VoiceActionVisual.LOADING ->
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                strokeWidth = 2.dp,
-                                color = onAccent,
-                            )
-                        VoiceActionVisual.FAILED ->
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = null,
-                                tint = onAccent,
-                                modifier = Modifier.size(26.dp),
-                            )
-                        VoiceActionVisual.DOWNLOAD ->
-                            Icon(
-                                imageVector = Icons.Default.ArrowDownward,
-                                contentDescription = null,
-                                tint = onAccent,
-                                modifier = Modifier.size(26.dp),
-                            )
-                        VoiceActionVisual.PAUSE ->
-                            Icon(
-                                imageVector = Icons.Default.Pause,
-                                contentDescription = null,
-                                tint = onAccent,
-                                modifier = Modifier.size(28.dp),
-                            )
-                        VoiceActionVisual.PLAY ->
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                tint = onAccent,
-                                modifier = Modifier.size(28.dp),
-                            )
-                    }
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = CircleShape,
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) { VoiceActionGlyph(actionVisual) }
                 }
             }
-            Column(
+            VoiceSeekTrack(
+                progressFraction = progressFraction,
+                color = if (tinted) bubbleContent else MaterialTheme.colorScheme.primary,
+                trackColor = content.copy(alpha = VOICE_TRACK_ALPHA),
+                onSeek = onSeek,
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                VoiceWaveform(
-                    bars = waveform,
-                    progress = progressFraction,
-                    playedColor = accent,
-                    remainingColor = onSurfaceMuted,
-                    modifier = Modifier.fillMaxWidth().height(28.dp),
-                    onSeek = onSeek,
+            )
+            Text(
+                text = voiceTimeText(isPlaying, isPaused, activePositionMs, activeDurationMs, totalDurationMs),
+                style = MaterialTheme.typography.labelMedium,
+                color = secondaryContent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (playbackSpeed != null) {
+                VoiceSpeedPill(
+                    currentSpeed = playbackSpeed,
+                    accent = if (tinted) bubbleContent else MaterialTheme.colorScheme.primary,
+                    onCycleSpeed = onCycleSpeed,
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = voiceTimeText(isPlaying, isPaused, activePositionMs, activeDurationMs, totalDurationMs),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f).padding(vertical = 2.dp),
-                    )
-                    playbackSpeed?.let { speed ->
-                        VoiceSpeedPill(
-                            currentSpeed = speed,
-                            onCycleSpeed = onCycleSpeed,
-                        )
-                    }
-                }
             }
         }
     }
 }
+
+internal const val VOICE_SEEK_TRACK_TAG = "voice-seek-track"
+
+/**
+ * The progress bar is the seek surface: the whole 48dp-tall strip accepts a tap or a horizontal drag
+ * and reports the pointer's position as a 0..1 fraction. Without [onSeek] it is a plain indicator.
+ */
+@Suppress("FunctionNaming")
+@Composable
+private fun VoiceSeekTrack(
+    progressFraction: Float,
+    color: Color,
+    trackColor: Color,
+    onSeek: ((Float) -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    var widthPx by remember { mutableFloatStateOf(0f) }
+    val currentOnSeek by rememberUpdatedState(onSeek)
+    Box(
+        modifier =
+            modifier
+                .height(VoiceSeekTargetHeight)
+                .onSizeChanged { widthPx = it.width.toFloat() }
+                .voiceSeekGesture(enabled = onSeek != null, widthPx = { widthPx }) { fraction ->
+                    currentOnSeek?.invoke(fraction)
+                }.testTag(VOICE_SEEK_TRACK_TAG),
+        contentAlignment = Alignment.Center,
+    ) {
+        LinearProgressIndicator(
+            progress = { progressFraction },
+            modifier = Modifier.fillMaxWidth(),
+            color = color,
+            trackColor = trackColor,
+            drawStopIndicator = {},
+        )
+    }
+}
+
+/** Compact speed action: reads the current multiplier and advances to the next preset on tap. */
+@Suppress("FunctionNaming")
+@Composable
+private fun VoiceSpeedPill(
+    currentSpeed: Float,
+    accent: Color,
+    onCycleSpeed: () -> Unit,
+) {
+    val label = voiceSpeedLabel(currentSpeed)
+    val description = stringResource(R.string.voice_message_speed, label)
+    Surface(
+        onClick = onCycleSpeed,
+        color = accent.copy(alpha = VOICE_SPEED_PILL_ALPHA),
+        contentColor = accent,
+        shape = RoundedCornerShape(VoiceSpeedPillCorner),
+        modifier =
+            Modifier.semantics {
+                contentDescription = description
+                role = Role.Button
+            },
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            modifier =
+                Modifier.padding(
+                    horizontal = VoiceSpeedPillHorizontalPadding,
+                    vertical = VoiceSpeedPillVerticalPadding,
+                ),
+        )
+    }
+}
+
+/** Formats a playback multiplier as the pill label, snapping to the three presets: 1×, 1.5× and 2×. */
+internal fun voiceSpeedLabel(speed: Float): String =
+    when {
+        speed >= VOICE_SPEED_DOUBLE_THRESHOLD -> "2×"
+        speed >= VOICE_SPEED_FAST_THRESHOLD -> "1.5×"
+        else -> "1×"
+    }
+
+/**
+ * Maps the pointer's horizontal position over this surface to a 0..1 fraction for as long as it is
+ * pressed. The down is consumed so the bubble's swipe-to-reply cannot snatch a rightward scrub, and
+ * the gesture is skipped until [widthPx] is known so x/0 never produces a stray seek to zero.
+ */
+private fun Modifier.voiceSeekGesture(
+    enabled: Boolean,
+    widthPx: () -> Float,
+    onSeek: (Float) -> Unit,
+): Modifier =
+    if (!enabled) {
+        this
+    } else {
+        pointerInput(Unit) {
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                down.consume()
+                val width = widthPx()
+                if (width <= 0f) return@awaitEachGesture
+                onSeek((down.position.x / width).coerceIn(0f, 1f))
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    change.consume()
+                    onSeek((change.position.x / width).coerceIn(0f, 1f))
+                    if (change.changedToUp() || !change.pressed) break
+                }
+            }
+        }
+    }
+
+/** The 24dp glyph inside the play button for each action variant. */
+@Suppress("FunctionNaming")
+@Composable
+private fun VoiceActionGlyph(actionVisual: VoiceActionVisual) {
+    when (actionVisual) {
+        VoiceActionVisual.LOADING ->
+            CircularProgressIndicator(
+                modifier = Modifier.size(22.dp),
+                strokeWidth = 2.dp,
+                color = LocalContentColor.current,
+            )
+        VoiceActionVisual.FAILED ->
+            Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(24.dp))
+        VoiceActionVisual.DOWNLOAD ->
+            Icon(imageVector = Icons.Default.ArrowDownward, contentDescription = null, modifier = Modifier.size(24.dp))
+        VoiceActionVisual.PAUSE ->
+            Icon(
+                painter = painterResource(R.drawable.ic_pause),
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+        VoiceActionVisual.PLAY ->
+            Icon(
+                painter = painterResource(R.drawable.ic_play_arrow),
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+    }
+}
+
+private const val VOICE_CARD_TINT_ALPHA = 0.12f
+private const val VOICE_CARD_SECONDARY_ALPHA = 0.78f
+private const val VOICE_TRACK_ALPHA = 0.24f
+private const val VOICE_SPEED_PILL_ALPHA = 0.15f
+private const val VOICE_SPEED_DOUBLE_THRESHOLD = 1.95f
+private const val VOICE_SPEED_FAST_THRESHOLD = 1.45f
+private val VoiceSeekTargetHeight = 48.dp
+private val VoiceSpeedPillCorner = 10.dp
+private val VoiceSpeedPillHorizontalPadding = 8.dp
+private val VoiceSpeedPillVerticalPadding = 4.dp
 
 /** Stable action variants keep accessibility copy and glyph selection in lockstep. */
 private enum class VoiceActionVisual(
@@ -708,31 +801,6 @@ private fun voiceTimeText(
         totalDurationMs > 0 -> formatVoiceTime(totalDurationMs)
         else -> "0:00"
     }
-
-@Composable
-private fun VoiceSpeedPill(
-    currentSpeed: Float,
-    onCycleSpeed: () -> Unit,
-) {
-    val label =
-        when {
-            currentSpeed >= 1.95f -> "2×"
-            currentSpeed >= 1.45f -> "1.5×"
-            else -> "1×"
-        }
-    Surface(
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-        shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.clickable(onClick = onCycleSpeed),
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-        )
-    }
-}
 
 /**
  * Voice attachments need a file on disk for MediaPlayer; reuse the
@@ -927,6 +995,8 @@ internal fun formatVoiceTime(ms: Int): String {
     return String.format(java.util.Locale.US, "%d:%02d", minutes, seconds)
 }
 
+/** Recording-review waveform whose bars double as a seek surface when [onSeek] is provided. */
+@Suppress("FunctionNaming")
 @Composable
 internal fun VoiceWaveform(
     bars: FloatArray,
@@ -937,29 +1007,10 @@ internal fun VoiceWaveform(
     onSeek: ((fraction: Float) -> Unit)? = null,
 ) {
     var widthPx by remember { mutableFloatStateOf(0f) }
+    val currentOnSeek by rememberUpdatedState(onSeek)
     val seekModifier =
-        if (onSeek != null) {
-            Modifier.pointerInput(Unit) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    // Consume so the bubble's parent swipe-to-reply gesture
-                    // doesn't snatch a rightward drag mid-scrub.
-                    down.consume()
-                    // Before the first onSizeChanged, widthPx is 0 → x/0 = NaN → a
-                    // stray seek-to-zero. Skip the gesture until the size is known.
-                    if (widthPx <= 0f) return@awaitEachGesture
-                    onSeek((down.position.x / widthPx).coerceIn(0f, 1f))
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        change.consume()
-                        onSeek((change.position.x / widthPx).coerceIn(0f, 1f))
-                        if (change.changedToUp() || !change.pressed) break
-                    }
-                }
-            }
-        } else {
-            Modifier
+        Modifier.voiceSeekGesture(enabled = onSeek != null, widthPx = { widthPx }) { fraction ->
+            currentOnSeek?.invoke(fraction)
         }
     Canvas(
         modifier =

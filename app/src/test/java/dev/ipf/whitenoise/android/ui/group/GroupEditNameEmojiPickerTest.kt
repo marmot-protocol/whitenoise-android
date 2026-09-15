@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_TEST_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -110,6 +111,7 @@ class GroupEditNameEmojiPickerTest {
         )
     }
 
+    /** Disabled editor cannot open the picker. */
     @Test
     fun disabledEditorCannotOpenThePicker() {
         render(admin = false)
@@ -118,7 +120,7 @@ class GroupEditNameEmojiPickerTest {
             .onNodeWithContentDescription(string(R.string.open_emoji_picker))
             .assertIsNotEnabled()
             .performClick()
-        composeRule.onNodeWithContentDescription(string(R.string.emoji_search_hint)).assertDoesNotExist()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
     }
 
     @Test
@@ -129,6 +131,7 @@ class GroupEditNameEmojiPickerTest {
         assertFalse(groupNameEmojiEditable(canEdit = true, saving = false, mutationInFlight = true))
     }
 
+    /** Actual group info image entry opens emoji builder and dismiss preserves name. */
     @Test
     fun actualGroupInfoImageEntryOpensEmojiBuilderAndDismissPreservesName() {
         render(admin = true)
@@ -137,15 +140,10 @@ class GroupEditNameEmojiPickerTest {
             .onNode(hasSetTextAction() and hasText("Marmot team"))
             .performTextReplacement(draftName)
 
-        composeRule
-            .onNode(
-                hasOnClickLabel(string(R.string.group_image_search_set)) and
-                    SemanticsMatcher.keyNotDefined(SemanticsProperties.Text),
-            ).performClick()
-        composeRule.onNodeWithText(string(R.string.group_image_source_emoji)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(string(R.string.group_image_choose_emoji)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.add_photo)).performClick()
+        composeRule.onNodeWithText(string(R.string.group_emoji_create)).assertIsDisplayed()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/group_info_emoji_image_entry_light.png")
-        composeRule.onNodeWithText(string(R.string.group_image_source_emoji)).performClick()
+        composeRule.onNodeWithText(string(R.string.group_emoji_create)).performClick()
         composeRule.onNodeWithTag(GROUP_EMOJI_IMAGE_PICKER_TAG).assertIsDisplayed()
 
         composeRule

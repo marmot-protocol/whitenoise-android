@@ -31,9 +31,6 @@ object EmojiData {
     const val GroupCount = 9
     private const val SearchResultLimit = 96
 
-    // One representative glyph per category, in dataset group order, for the tab row.
-    val groupTabIcons = listOf("😀", "🧑", "🐻", "🍎", "⚽", "🚗", "💡", "🔣", "🏁")
-
     @Volatile private var cache: List<EmojiEntry>? = null
 
     fun load(context: Context): List<EmojiEntry> =

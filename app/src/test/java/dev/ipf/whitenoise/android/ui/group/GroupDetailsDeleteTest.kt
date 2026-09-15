@@ -121,24 +121,21 @@ class GroupDetailsDeleteTest {
         )
     }
 
+    /** Danger button is the only leave affordance and splits on is dm. */
     @Test
-    fun overflowAndDangerButtonPickTheLeaveLabelTheSameWay() {
+    fun dangerButtonIsTheOnlyLeaveAffordanceAndSplitsOnIsDm() {
         val source = groupDetailsSource().readText()
 
         assertTrue(
-            "the overflow leave item must pick its label from isDm, not always say chat",
-            "isDm -> R.string.leave_chat" in source && "else -> R.string.leave_group" in source,
-        )
-        assertTrue(
-            "the danger leave button must keep the same isDm split",
+            "the danger leave button must pick its label from isDm, not always say chat",
             "stringResource(if (isDm) R.string.leave_chat else R.string.leave_group)" in source,
         )
         assertEquals(
-            "every leave affordance must resolve through the same two resources",
-            2,
+            "the leave row is the single leave affordance now that the overflow menu is gone",
+            1,
             Regex("R\\.string\\.leave_chat").findAll(source).count(),
         )
-        assertEquals(2, Regex("R\\.string\\.leave_group").findAll(source).count())
+        assertEquals(1, Regex("R\\.string\\.leave_group").findAll(source).count())
     }
 
     private fun groupDetailsSource(): File =

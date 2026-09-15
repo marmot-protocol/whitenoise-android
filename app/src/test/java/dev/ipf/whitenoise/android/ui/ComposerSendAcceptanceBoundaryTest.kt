@@ -17,6 +17,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
@@ -25,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
@@ -70,7 +72,7 @@ class ComposerSendAcceptanceBoundaryTest {
             }
         }
 
-        resizeHandle().performClick()
+        resizeGesture().performClick()
         composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
         composeRule.waitForIdle()
 
@@ -100,7 +102,7 @@ class ComposerSendAcceptanceBoundaryTest {
             }
         }
 
-        resizeHandle().performClick()
+        resizeGesture().performClick()
         composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
         composeRule.waitForIdle()
 
@@ -131,7 +133,7 @@ class ComposerSendAcceptanceBoundaryTest {
             }
         }
 
-        resizeHandle().performClick()
+        resizeGesture().performClick()
         composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
         composeRule.onNodeWithText(sentText).performTextReplacement(newerText)
         composeRule.runOnIdle { checkNotNull(accepted).invoke() }
@@ -253,6 +255,9 @@ class ComposerSendAcceptanceBoundaryTest {
 
         composeRule.onNodeWithText("Account B draft").assertExists()
     }
+
+    /** Pointer input targets the border so taps never reposition the editor caret. */
+    private fun resizeGesture() = composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true)
 
     /** Returns the accessible resize action shared by the acceptance scenarios. */
     private fun resizeHandle() =

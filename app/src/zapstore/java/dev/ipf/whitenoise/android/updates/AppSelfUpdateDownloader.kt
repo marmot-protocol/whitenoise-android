@@ -19,10 +19,12 @@ import kotlin.coroutines.coroutineContext
 class AppSelfUpdateDownloader(
     private val httpClient: OkHttpClient = defaultHttpClient(),
 ) {
+    /** Streams and hashes the bounded asset, then announces the real comparison before publishing the final file. */
     suspend fun downloadVerifiedApk(
         asset: ZapstoreApkAsset,
         destination: File,
-        onProgress: (bytesRead: Long, totalBytes: Long?) -> Unit,
+        onVerificationStarted: suspend () -> Unit = {},
+        onProgress: suspend (bytesRead: Long, totalBytes: Long?) -> Unit,
     ): Result<Unit> =
         withContext(Dispatchers.IO) {
             val partial = File(destination.parentFile, "${destination.name}.part")
@@ -65,15 +67,20 @@ class AppSelfUpdateDownloader(
                             }
                         }
                     }
+                    coroutineContext.ensureActive()
+                    onVerificationStarted()
+                    coroutineContext.ensureActive()
                     val computed = digest.digest()
                     if (!constantTimeEqualsHex(computed, asset.sha256Hex)) {
                         throw HashMismatchException()
                     }
+                    coroutineContext.ensureActive()
                     if (!partial.renameTo(destination)) {
                         partial.copyTo(destination, overwrite = true)
                         AppSelfUpdateStorage.deleteFile(partial)
                     }
                 }
+                coroutineContext.ensureActive()
                 Result.success(Unit)
             } catch (error: CancellationException) {
                 AppSelfUpdateStorage.deleteFile(partial)
@@ -102,6 +109,7 @@ class AppSelfUpdateDownloader(
         internal const val READ_TIMEOUT_SECONDS = 30L
         internal const val CALL_TIMEOUT_MINUTES = 30L
 
+        /** Reject nonpositive or oversized signed/server lengths before writing the response. */
         internal fun requireApkLengthWithinLimit(
             bytes: Long?,
             source: String,
@@ -111,6 +119,7 @@ class AppSelfUpdateDownloader(
             }
         }
 
+        /** Bound each byte-counter addition without overflow, including bodies with no declared length. */
         internal fun checkedDownloadedApkBytes(
             downloaded: Long,
             nextChunkBytes: Long,
@@ -145,6 +154,7 @@ class AppSelfUpdateDownloader(
                 }
             }
 
+        /** Require safe DNS, bounded waits and no HTTPS downgrade through redirects. */
         internal fun defaultHttpClient(): OkHttpClient =
             OkHttpClient
                 .Builder()

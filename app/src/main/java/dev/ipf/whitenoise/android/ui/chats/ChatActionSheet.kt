@@ -1,55 +1,24 @@
-@file:Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+@file:Suppress("FunctionNaming") // Composable names follow the framework convention.
 
 package dev.ipf.whitenoise.android.ui.chats
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.MarkChatRead
-import androidx.compose.material.icons.filled.MarkChatUnread
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Unarchive
-import androidx.compose.material.icons.outlined.PushPin
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAnchoredMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 
-/** Single-chat actions shown by a stationary long press outside selection mode. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** Row-anchored prototype commands retain the production action policy and existing confirmation callbacks. */
+@Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod") // Declarative native action availability.
 @Composable
-@Suppress("LongMethod") // Keep the complete, user-visible action order auditable in one block.
-internal fun ChatActionSheet(
+internal fun ChatContextMenu(
     hasUnread: Boolean,
     canMarkUnread: Boolean,
     archived: Boolean,
@@ -68,96 +37,98 @@ internal fun ChatActionSheet(
     onSelect: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
+    expanded: Boolean = true,
+    focusable: Boolean = true,
+    modifier: Modifier = Modifier,
+    canRunAction: () -> Boolean = { true },
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    fun runAction(action: () -> Unit) {
-        onDismiss()
-        action()
-    }
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = amoledSheetContainerColor(),
-    ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding(),
-        ) {
+    val items =
+        buildList {
             if (hasUnread) {
-                ChatActionButton(
-                    label = stringResource(R.string.chat_row_action_mark_read),
-                    icon = Icons.Default.MarkChatRead,
-                    onClick = { runAction(onMarkRead) },
+                add(
+                    chatMenuItem(R.string.chat_row_action_mark_read, R.drawable.ic_check, "Read") {
+                        onMarkRead()
+                    },
                 )
             } else if (canMarkUnread) {
-                ChatActionButton(
-                    label = stringResource(R.string.chat_row_action_mark_unread),
-                    icon = Icons.Default.MarkChatUnread,
-                    onClick = { runAction(onMarkUnread) },
+                add(
+                    chatMenuItem(R.string.chat_row_action_mark_unread, R.drawable.ic_mark_unread, "Unread") {
+                        onMarkUnread()
+                    },
                 )
             }
-            ChatActionButton(
-                label = stringResource(R.string.chat_list_action_add_to_folder),
-                icon = Icons.Default.Folder,
-                onClick = { runAction(onAddToFolder) },
-            )
             if (showPinToggle) {
-                ChatActionButton(
-                    label =
-                        stringResource(
-                            if (pinned) R.string.chat_row_action_unpin else R.string.chat_row_action_pin,
-                        ),
-                    icon = if (pinned) Icons.Outlined.PushPin else Icons.Filled.PushPin,
-                    onClick = { runAction(onPinToggle) },
+                add(
+                    chatMenuItem(
+                        if (pinned) R.string.chat_row_action_unpin else R.string.chat_row_action_pin,
+                        if (pinned) R.drawable.ic_unpin else R.drawable.ic_push_pin,
+                        if (pinned) "Unpin" else "Pin",
+                    ) { onPinToggle() },
                 )
             }
+            add(
+                chatMenuItem(
+                    if (muted) R.string.chat_row_action_unmute else R.string.chat_row_action_mute,
+                    if (muted) R.drawable.ic_settings_notifications else R.drawable.ic_notifications_off,
+                    if (muted) "Unmute" else "Mute",
+                ) { onMuteToggle() },
+            )
+            add(
+                chatMenuItem(
+                    if (archived) R.string.chat_row_action_unarchive else R.string.chat_row_action_archive,
+                    if (archived) R.drawable.ic_unarchive else R.drawable.ic_archive,
+                    if (archived) "Unarchive" else "Archive",
+                ) { onArchiveToggle() },
+            )
+            add(chatMenuItem(R.string.delete, R.drawable.ic_delete, "Delete", destructive = true) { onDelete() })
+            add(
+                chatMenuItem(R.string.chat_list_action_add_to_folder, R.drawable.ic_folder, "Folder") {
+                    onAddToFolder()
+                },
+            )
+            add(chatMenuItem(R.string.select, R.drawable.ic_check, "Select") { onSelect() })
             if (showMovePinnedUp) {
-                ChatActionButton(
-                    label = stringResource(R.string.chat_row_action_move_up),
-                    icon = Icons.Default.ArrowUpward,
-                    onClick = { runAction { onMovePinned(-1) } },
+                add(
+                    chatMenuItem(R.string.chat_row_action_move_up, R.drawable.ic_arrow_up, "MoveUp") {
+                        onMovePinned(-1)
+                    },
                 )
             }
             if (showMovePinnedDown) {
-                ChatActionButton(
-                    label = stringResource(R.string.chat_row_action_move_down),
-                    icon = Icons.Default.ArrowDownward,
-                    onClick = { runAction { onMovePinned(1) } },
+                add(
+                    chatMenuItem(R.string.chat_row_action_move_down, R.drawable.ic_arrow_down, "MoveDown") {
+                        onMovePinned(1)
+                    },
                 )
             }
-            ChatActionButton(
-                label =
-                    stringResource(
-                        if (archived) R.string.chat_row_action_unarchive else R.string.chat_row_action_archive,
-                    ),
-                icon = if (archived) Icons.Default.Unarchive else Icons.Default.Archive,
-                onClick = { runAction(onArchiveToggle) },
-            )
-            ChatActionButton(
-                label =
-                    stringResource(
-                        if (muted) R.string.chat_row_action_unmute else R.string.chat_row_action_mute,
-                    ),
-                icon = if (muted) Icons.Default.Notifications else Icons.Default.NotificationsOff,
-                onClick = { runAction(onMuteToggle) },
-            )
-            ChatActionButton(
-                label = stringResource(R.string.select),
-                icon = Icons.Default.CheckCircle,
-                onClick = { runAction(onSelect) },
-            )
-            ChatActionButton(
-                label = stringResource(R.string.delete),
-                icon = Icons.Default.Delete,
-                destructive = true,
-                onClick = { runAction(onDelete) },
-            )
         }
-    }
+    WhiteNoiseAnchoredMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        items = items,
+        modifier = modifier,
+        anchorSpacing = 8.dp,
+        focusable = focusable,
+        canRunAction = canRunAction,
+    )
 }
+
+/** Command labels stay localized and expose one stable action target to semantics and gesture tests. */
+@Composable
+private fun chatMenuItem(
+    @StringRes label: Int,
+    @DrawableRes icon: Int,
+    tag: String,
+    destructive: Boolean = false,
+    onClick: () -> Unit,
+): WhiteNoiseMenuItem =
+    WhiteNoiseMenuItem(
+        label = stringResource(label),
+        icon = icon,
+        onClick = onClick,
+        destructive = destructive,
+        modifier = Modifier.testTag("chat.action.$tag"),
+    )
 
 /** Shared confirmation reached by both single-chat and bulk delete actions. */
 @Composable
@@ -174,36 +145,4 @@ internal fun ChatDeleteConfirmationDialog(
         onConfirm = onConfirm,
         onDismiss = onDismiss,
     )
-}
-
-@Composable
-private fun ChatActionButton(
-    label: String,
-    icon: ImageVector,
-    destructive: Boolean = false,
-    onClick: () -> Unit,
-) {
-    TextButton(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-        colors =
-            ButtonDefaults.textButtonColors(
-                contentColor =
-                    if (destructive) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-            ),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(icon, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text(label, style = MaterialTheme.typography.titleMedium)
-        }
-    }
 }

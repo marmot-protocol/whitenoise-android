@@ -14,23 +14,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.TextSnippet
-import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Slideshow
-import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,11 +28,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,6 +58,12 @@ private val FileTrailingMetadataWithStatusMaxWidth = 112.dp
 private val FileTrailingMetadataWithRetentionMaxWidth = 113.dp
 private val FileTrailingMetadataWithRetentionAndStatusMaxWidth = 132.dp
 private val FileTimestampWithStatusMaxWidth = 92.dp
+
+/** The prototype's file card: 6dp padding, 8dp between slots, and a 20dp trailing glyph at 72% opacity. */
+private val FileCardPadding = 6.dp
+private val FileCardSlotSpacing = 8.dp
+private val FileCardTrailingGlyph = 20.dp
+private const val FILE_CARD_SECONDARY_ALPHA = 0.72f
 
 internal enum class FileTransferDirection {
     Download,
@@ -134,8 +131,8 @@ internal fun FileBubbleContent(
     val retentionPresentation = rememberRetentionIndicatorPresentation(retention, retentionClockMillis)
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(FileCardSlotSpacing),
+        modifier = Modifier.fillMaxWidth().padding(FileCardPadding),
     ) {
         FileTransferControl(
             presentation = presentation,
@@ -152,7 +149,8 @@ internal fun FileBubbleContent(
         ) {
             Text(
                 text = MediaPipeline.safeDisplayName(fileName),
-                style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.ContentOrLtr),
+                style = MaterialTheme.typography.titleSmall.copy(textDirection = TextDirection.ContentOrLtr),
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -168,7 +166,22 @@ internal fun FileBubbleContent(
                 footerWarningText = footerWarningText,
             )
         }
+        FileCardTrailingAffordance(transferState)
     }
+}
+
+/** The prototype's trailing glyph: a chevron into the file, or a warning when it cannot be opened. */
+@Composable
+private fun FileCardTrailingAffordance(transferState: AttachmentTransferState) {
+    val unavailable =
+        transferState == AttachmentTransferState.Failed || transferState == AttachmentTransferState.NotRetained
+    Icon(
+        painter =
+            painterResource(if (unavailable) R.drawable.ic_warning else R.drawable.ic_chevron_right),
+        contentDescription = null,
+        modifier = Modifier.size(FileCardTrailingGlyph),
+        tint = LocalContentColor.current.copy(alpha = FILE_CARD_SECONDARY_ALPHA),
+    )
 }
 
 /** Keeps an optional warning and the trailing timestamp/status block in one bounded file footer. */
@@ -205,12 +218,12 @@ private fun FileMetadataRow(
         ) {
             Text(
                 text = metadataText,
-                style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.ContentOrLtr),
+                style = MaterialTheme.typography.labelMedium.copy(textDirection = TextDirection.ContentOrLtr),
                 color =
                     if (metadataIsError) {
                         MaterialTheme.colorScheme.error
                     } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = FILE_CARD_SECONDARY_ALPHA)
                     },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -233,6 +246,7 @@ private fun FileMetadataRow(
     }
 }
 
+/** Trailing metadata of a file card: size or error, then the delivery status. */
 @Composable
 private fun FileTrailingMetadata(
     text: String?,
@@ -265,6 +279,7 @@ private fun FileTrailingMetadata(
                 reserveSpace = reserveRetentionSpace,
             )
         }
+        status?.let { OutgoingMessageStatusIcon(it, tint = color) }
         text?.let {
             Text(
                 text = it,
@@ -279,7 +294,6 @@ private fun FileTrailingMetadata(
                     ),
             )
         }
-        status?.let { OutgoingMessageStatusIcon(it, tint = color) }
     }
 }
 
@@ -450,55 +464,3 @@ private fun FileTransferIcon(
             Icon(fileIconFor(presentation.iconCategory), contentDescription = null, modifier = Modifier.size(24.dp))
     }
 }
-
-/** Localizes category fallbacks while stable format abbreviations stay concise. */
-@Composable
-internal fun attachmentTypeLabel(presentation: AttachmentPresentation): String =
-    presentation.formatLabel
-        ?: when (presentation.iconCategory) {
-            AttachmentIconCategory.AndroidPackage -> stringResource(R.string.attachment_type_android_package)
-            AttachmentIconCategory.Pdf -> stringResource(R.string.attachment_type_pdf)
-            AttachmentIconCategory.Archive -> stringResource(R.string.attachment_type_archive)
-            AttachmentIconCategory.Document -> stringResource(R.string.attachment_type_document)
-            AttachmentIconCategory.Spreadsheet -> stringResource(R.string.attachment_type_spreadsheet)
-            AttachmentIconCategory.Presentation -> stringResource(R.string.attachment_type_presentation)
-            AttachmentIconCategory.Text -> stringResource(R.string.attachment_type_text)
-            AttachmentIconCategory.Code -> stringResource(R.string.attachment_type_code)
-            AttachmentIconCategory.Audio -> stringResource(R.string.attachment_type_audio)
-            AttachmentIconCategory.Video -> stringResource(R.string.attachment_type_video)
-            AttachmentIconCategory.Image -> stringResource(R.string.attachment_type_image)
-            AttachmentIconCategory.Generic -> stringResource(R.string.attachment_type_file)
-        }
-
-@Composable
-internal fun attachmentTypeDescription(category: AttachmentIconCategory): String =
-    when (category) {
-        AttachmentIconCategory.AndroidPackage -> stringResource(R.string.attachment_type_android_package_description)
-        AttachmentIconCategory.Pdf -> stringResource(R.string.attachment_type_pdf_description)
-        AttachmentIconCategory.Archive -> stringResource(R.string.attachment_type_archive)
-        AttachmentIconCategory.Document -> stringResource(R.string.attachment_type_document)
-        AttachmentIconCategory.Spreadsheet -> stringResource(R.string.attachment_type_spreadsheet)
-        AttachmentIconCategory.Presentation -> stringResource(R.string.attachment_type_presentation)
-        AttachmentIconCategory.Text -> stringResource(R.string.attachment_type_text)
-        AttachmentIconCategory.Code -> stringResource(R.string.attachment_type_code_description)
-        AttachmentIconCategory.Audio -> stringResource(R.string.attachment_type_audio)
-        AttachmentIconCategory.Video -> stringResource(R.string.attachment_type_video)
-        AttachmentIconCategory.Image -> stringResource(R.string.attachment_type_image)
-        AttachmentIconCategory.Generic -> stringResource(R.string.attachment_type_file)
-    }
-
-internal fun fileIconFor(category: AttachmentIconCategory): ImageVector =
-    when (category) {
-        AttachmentIconCategory.AndroidPackage -> Icons.Default.Android
-        AttachmentIconCategory.Pdf -> Icons.Default.PictureAsPdf
-        AttachmentIconCategory.Archive -> Icons.Default.Archive
-        AttachmentIconCategory.Document -> Icons.Default.Description
-        AttachmentIconCategory.Spreadsheet -> Icons.Default.TableChart
-        AttachmentIconCategory.Presentation -> Icons.Default.Slideshow
-        AttachmentIconCategory.Text -> Icons.AutoMirrored.Filled.TextSnippet
-        AttachmentIconCategory.Code -> Icons.Default.Code
-        AttachmentIconCategory.Audio -> Icons.Default.Audiotrack
-        AttachmentIconCategory.Video -> Icons.Default.Movie
-        AttachmentIconCategory.Image -> Icons.Default.Image
-        AttachmentIconCategory.Generic -> Icons.Default.Description
-    }

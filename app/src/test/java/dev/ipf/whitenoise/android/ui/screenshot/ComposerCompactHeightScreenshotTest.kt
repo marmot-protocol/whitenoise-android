@@ -13,7 +13,6 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -22,10 +21,9 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -47,8 +45,6 @@ import org.robolectric.annotation.GraphicsMode
 class ComposerCompactHeightScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
-
-    private val app = ApplicationProvider.getApplicationContext<android.app.Application>()
 
     @Test
     fun compactHeightComposerLight() {
@@ -137,7 +133,7 @@ class ComposerCompactHeightScreenshotTest {
         composeRule.onNode(hasSetTextAction()).performClick()
         composeRule.waitForIdle()
         composeRule
-            .onNodeWithContentDescription(app.getString(R.string.composer_resize))
+            .onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true)
             .performTouchInput {
                 swipe(center, Offset(center.x, center.y + 120f), durationMillis = 320)
             }

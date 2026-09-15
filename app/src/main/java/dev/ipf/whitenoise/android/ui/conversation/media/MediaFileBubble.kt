@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -18,13 +17,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -44,8 +41,8 @@ import dev.ipf.whitenoise.android.state.hasAttachmentInstallerHandoff
 import dev.ipf.whitenoise.android.state.hasCachedAttachmentInMemory
 import dev.ipf.whitenoise.android.state.refreshAttachmentTransferState
 import dev.ipf.whitenoise.android.state.requestAttachmentInstallerHandoff
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
@@ -83,7 +80,6 @@ internal fun MediaFileBubble(
     senderDisplayName: String,
     mine: Boolean,
     onLongPress: () -> Unit = {},
-    attachedToCaption: Boolean = false,
     timestampText: String? = null,
     showStatus: Boolean = false,
     status: MessageStatus = MessageStatus.Received,
@@ -343,8 +339,7 @@ internal fun MediaFileBubble(
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = if (attachedToCaption) RectangleShape else RoundedCornerShape(12.dp),
-        border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
+        shape = ConversationRichContentShape,
         modifier =
             Modifier
                 .fileBubbleWidth()
@@ -391,7 +386,17 @@ internal fun MediaFileBubble(
         )
     }
     if (readerOpen && textCandidate != null) {
+        val readerActions =
+            rememberTextAttachmentNativeActions(
+                controller,
+                appState,
+                messageIdHex,
+                attachmentIndex,
+                reference,
+                mine,
+            )
         TextAttachmentReaderDialog(
+            actions = readerActions,
             candidate = textCandidate,
             appState = appState,
             senderKey = senderKey,
@@ -508,6 +513,7 @@ private fun formatFileSize(bytes: Long): String {
     return String.format(java.util.Locale.US, "%.1f GB", gb)
 }
 
+/** Pill for a file still being sent. */
 @Composable
 internal fun PendingFilePill(
     fileName: String,
@@ -516,7 +522,6 @@ internal fun PendingFilePill(
     failed: Boolean,
     statusLabel: String,
     onRetry: (() -> Unit)? = null,
-    attachedToCaption: Boolean = false,
     timestampText: String? = null,
     showStatus: Boolean = false,
     status: MessageStatus = MessageStatus.Pending,
@@ -526,8 +531,7 @@ internal fun PendingFilePill(
     val presentation = remember(mediaType, fileName) { resolveAttachmentPresentation(mediaType, fileName) }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = if (attachedToCaption) RectangleShape else RoundedCornerShape(12.dp),
-        border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
+        shape = ConversationRichContentShape,
         modifier =
             Modifier
                 .fileBubbleWidth()

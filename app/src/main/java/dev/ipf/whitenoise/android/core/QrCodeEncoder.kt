@@ -13,9 +13,14 @@ object QrCodeEncoder {
     // throw NegativeArraySizeException) and bounds the allocation. See #169.
     const val MAX_QR_DIMENSION = 2048
 
+    /** One module of quiet zone by default; Share & Connect draws its modules edge to edge like the prototype. */
+    const val DEFAULT_MARGIN_MODULES = 1
+
+    /** Encodes [content] as a QR bit matrix of [size] pixels with the given quiet zone. */
     fun matrix(
         content: String,
         size: Int,
+        marginModules: Int = DEFAULT_MARGIN_MODULES,
     ): BitMatrix {
         require(content.isNotBlank()) { "QR content cannot be blank" }
         require(size > 0) { "QR size must be positive" }
@@ -23,18 +28,38 @@ object QrCodeEncoder {
         val hints =
             mapOf(
                 EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
-                EncodeHintType.MARGIN to 1,
+                EncodeHintType.MARGIN to marginModules,
             )
         return QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size, hints)
     }
 
+    /**
+     * Encodes [content] as one bit per QR module and leaves scaling to the caller.
+     * Drawing modules directly keeps a code crisp at any size; a fixed-pixel bitmap
+     * has to be resampled and lays out at its own pixel count unless told otherwise.
+     */
+    fun moduleMatrix(
+        content: String,
+        marginModules: Int = DEFAULT_MARGIN_MODULES,
+    ): BitMatrix {
+        require(content.isNotBlank()) { "QR content cannot be blank" }
+        val hints =
+            mapOf(
+                EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
+                EncodeHintType.MARGIN to marginModules,
+            )
+        return QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, 0, 0, hints)
+    }
+
+    /** Encodes [content] into ARGB pixels of [size] x [size]. */
     fun pixels(
         content: String,
         size: Int,
         onColor: Int,
         offColor: Int,
+        marginModules: Int = DEFAULT_MARGIN_MODULES,
     ): IntArray {
-        val matrix = matrix(content, size)
+        val matrix = matrix(content, size, marginModules)
         require(matrix.width == size && matrix.height == size) {
             "Requested ${size}x$size QR, but encoder returned ${matrix.width}x${matrix.height}. Request a larger size."
         }

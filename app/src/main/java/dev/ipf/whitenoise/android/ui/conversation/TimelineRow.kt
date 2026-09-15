@@ -1,13 +1,16 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.GroupProjector
@@ -17,6 +20,7 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
@@ -26,6 +30,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerO
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.util.Locale
 
 /** Renders one projected timeline item and delegates bubble gestures to the conversation owner. */
@@ -65,7 +70,6 @@ internal fun TimelineRow(
     isActionMenuOpen: Boolean,
     onActionMenuOpenChange: (Boolean) -> Unit,
     onQuickReactionsSave: (List<String>) -> Unit,
-    onQuickReactionsReset: () -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
     composerGate: ComposerGate,
     onBack: () -> Unit,
@@ -75,8 +79,9 @@ internal fun TimelineRow(
     ttsQuickTransportViewportLock: TtsQuickTransportViewportLock? = null,
     ttsSentenceLayoutSink: ConversationTtsSentenceLayoutSink? = null,
     onTtsSentenceSeek: (TtsState) -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
-    Column(Modifier.fillMaxWidth()) {
+    Column(modifier.fillMaxWidth()) {
         val daySeparatorLabel =
             remember(older?.record?.recordedAt, item.record.recordedAt, transcriptLocale) {
                 if (older == null || differentDay(older.record.recordedAt, item.record.recordedAt)) {
@@ -85,18 +90,33 @@ internal fun TimelineRow(
                     null
                 }
             }
-        if (daySeparatorLabel != null) {
-            DaySeparator(daySeparatorLabel)
-        }
-        if (
+        val followsGroupEvent = older?.record?.let { MessageProjector.isGroupSystem(it) } == true
+        val showUnreadDivider =
             shouldShowConversationEntryUnreadDivider(
                 entryUnreadCount = entryUnreadCount,
                 dividerRetired = entryUnreadDividerRetired,
                 messageId = item.record.messageIdHex,
                 firstUnreadMessageId = entryFirstUnreadMessageId,
             )
-        ) {
-            UnreadMessagesDivider(count = entryUnreadCount)
+        if (daySeparatorLabel != null) {
+            val hasLeadingHeader =
+                controller.hasMoreBefore ||
+                    controller.isLoadingOlder ||
+                    (controller.error != null && controller.errorEdge == ConversationLoadFailureEdge.TOP) ||
+                    controller.groupRecoveryReadFailed ||
+                    controller.groupRecoveryStatus?.hasVisibleRecoveryState() == true
+            DaySeparator(
+                label = daySeparatorLabel,
+                atTranscriptStart = older == null && !hasLeadingHeader,
+                followsGroupEvent = followsGroupEvent,
+            )
+        }
+        if (showUnreadDivider) {
+            UnreadMessagesDivider(
+                count = entryUnreadCount,
+                followsDayHeader = daySeparatorLabel != null,
+                followsGroupEvent = followsGroupEvent,
+            )
         }
         Column(
             Modifier
@@ -198,49 +218,55 @@ internal fun TimelineRow(
             ) {
                 onActionMenuOpenChange(false)
             }
-            key(item.record.messageIdHex) {
-                TimelineRowMessageBubble(
-                    messageIdHex = item.record.messageIdHex,
-                    item = item,
-                    controller = controller,
-                    appState = appState,
-                    onOpenConversationMedia = onOpenConversationMedia,
-                    eventCardResolver = eventCardResolver,
-                    documentSaveFallback = documentSaveFallback,
-                    composerTextState = composerTextState,
-                    highlighted = highlighted,
-                    selectionMode = selectionMode,
-                    textSelectionMode = textSelectionMode,
-                    onTextSelectionModeChange = onTextSelectionModeChange,
-                    onTextSelectionBoundsChange = onTextSelectionBoundsChange,
-                    batchSelectable = batchSelectable,
-                    selected = selected,
-                    onToggleSelection = onToggleSelection,
-                    rangeDragActive = rangeDragActive,
-                    onDragSelectionStart = onDragSelectionStart,
-                    onDragSelection = onDragSelection,
-                    onDragSelectionEnd = onDragSelectionEnd,
-                    onDragSelectionCancel = onDragSelectionCancel,
-                    quickReactionEmojis = quickReactionEmojis,
-                    recentEmojis = recentEmojis,
-                    onEmojiUsed = onEmojiUsed,
-                    isActionMenuOpen = isActionMenuOpen,
-                    onActionMenuOpenChange = onActionMenuOpenChange,
-                    onQuickReactionsSave = onQuickReactionsSave,
-                    onQuickReactionsReset = onQuickReactionsReset,
-                    onReplyPreviewClick = onReplyPreviewClick,
-                    composerGate = composerGate,
-                    onBack = onBack,
-                    mentionCandidates = mentionCandidates,
-                    mentionPickerEnabled = mentionPickerEnabled,
-                    showSenderName = senderDecoration.showName,
-                    showSenderAvatar = senderDecoration.showAvatar,
-                    collapseLongMessages = collapseLongMessages,
-                    readOnly = controller.group.pendingConfirmation,
-                    ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
-                    ttsSentenceLayoutSink = ttsSentenceLayoutSink,
-                    onTtsSentenceSeek = onTtsSentenceSeek,
-                )
+            // The prototype opens each sender cluster with a 12 dp gap; rows inside a run keep the list spacing.
+            Box(
+                Modifier.padding(
+                    top = if (sameSenderAsOlderBubble) 0.dp else WhiteNoiseSpacing.ConversationCluster,
+                ),
+            ) {
+                key(item.record.messageIdHex) {
+                    TimelineRowMessageBubble(
+                        messageIdHex = item.record.messageIdHex,
+                        item = item,
+                        controller = controller,
+                        appState = appState,
+                        onOpenConversationMedia = onOpenConversationMedia,
+                        eventCardResolver = eventCardResolver,
+                        documentSaveFallback = documentSaveFallback,
+                        composerTextState = composerTextState,
+                        highlighted = highlighted,
+                        selectionMode = selectionMode,
+                        textSelectionMode = textSelectionMode,
+                        onTextSelectionModeChange = onTextSelectionModeChange,
+                        onTextSelectionBoundsChange = onTextSelectionBoundsChange,
+                        batchSelectable = batchSelectable,
+                        selected = selected,
+                        onToggleSelection = onToggleSelection,
+                        rangeDragActive = rangeDragActive,
+                        onDragSelectionStart = onDragSelectionStart,
+                        onDragSelection = onDragSelection,
+                        onDragSelectionEnd = onDragSelectionEnd,
+                        onDragSelectionCancel = onDragSelectionCancel,
+                        quickReactionEmojis = quickReactionEmojis,
+                        recentEmojis = recentEmojis,
+                        onEmojiUsed = onEmojiUsed,
+                        isActionMenuOpen = isActionMenuOpen,
+                        onActionMenuOpenChange = onActionMenuOpenChange,
+                        onQuickReactionsSave = onQuickReactionsSave,
+                        onReplyPreviewClick = onReplyPreviewClick,
+                        composerGate = composerGate,
+                        onBack = onBack,
+                        mentionCandidates = mentionCandidates,
+                        mentionPickerEnabled = mentionPickerEnabled,
+                        showSenderName = senderDecoration.showName,
+                        showSenderAvatar = senderDecoration.showAvatar,
+                        collapseLongMessages = collapseLongMessages,
+                        readOnly = controller.group.pendingConfirmation,
+                        ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
+                        ttsSentenceLayoutSink = ttsSentenceLayoutSink,
+                        onTtsSentenceSeek = onTtsSentenceSeek,
+                    )
+                }
             }
         }
     }

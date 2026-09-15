@@ -1,0 +1,13 @@
+<!-- Material Symbols Rounded: reply, weight 600. Licensed under Apache 2.0. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:autoMirrored="true"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <group android:translateY="960">
+        <path
+            android:fillColor="@android:color/white"
+            android:pathData="m302.39,-467 93.96,93.96q15.39,15.39 15.17,37.04t-15.61,37.04q-15.39,14.96 -37.04,15.18t-37.04,-15.18L138.39,-482.39q-15.96,-15.96 -15.96,-37.61t15.96,-37.61l183.44,-183.43Q336.78,-756 358.65,-756t37.26,14.96q15.39,15.39 15.39,37.26t-15.39,37.26L302.39,-573h343.83q88.08,0 150.54,62.46T859.22,-360v126.22q0,22.08 -15.46,37.54t-37.54,15.46q-22.09,0 -37.55,-15.46t-15.45,-37.54V-360q0,-44.91 -31.05,-75.96T646.22,-467H302.39Z" />
+    </group>
+</vector>

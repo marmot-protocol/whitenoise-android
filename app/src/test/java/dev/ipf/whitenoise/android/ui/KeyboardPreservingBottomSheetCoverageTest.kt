@@ -48,17 +48,6 @@ class KeyboardPreservingBottomSheetCoverageTest {
     }
 
     @Test
-    fun remainingMessageSheetsUseKeyboardPreservingContainer() {
-        listOf(
-            editHistorySource().readText().functionBody("EditHistorySheet"),
-            messageFullScreenSource().readText().functionBody("MessageInfoSheet"),
-        ).forEach { body ->
-            assertTrue("conversation sheet must use KeyboardPreservingBottomSheet", "KeyboardPreservingBottomSheet(" in body)
-            assertFalse("conversation sheet must not open a focus-stealing ModalBottomSheet", "ModalBottomSheet(" in body)
-        }
-    }
-
-    @Test
     fun forwardPickerUsesAFullScreenDialogInsteadOfASheet() {
         val body = forwardPickerSource().readText()
 
@@ -66,11 +55,8 @@ class KeyboardPreservingBottomSheetCoverageTest {
         assertFalse("the forward flow should not use a draggable sheet", "ModalBottomSheet(" in body)
     }
 
+    /** The AppSheets source file under either working directory. */
     private fun appSheetsSource(): File = source("ui/design/AppSheets.kt")
-
-    private fun editHistorySource(): File = source("ui/conversation/messages/EditHistory.kt")
-
-    private fun messageFullScreenSource(): File = source("ui/conversation/messages/MessageFullScreen.kt")
 
     private fun forwardPickerSource(): File = source("ui/conversation/messages/ForwardMessagePicker.kt")
 

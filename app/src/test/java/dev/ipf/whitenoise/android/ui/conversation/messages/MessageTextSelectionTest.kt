@@ -66,7 +66,7 @@ class MessageTextSelectionTest {
         composeRule.onNodeWithText(string(R.string.select_text)).assertIsDisplayed().performClick()
 
         assertEquals(1, selectTextClicks)
-        composeRule.onNodeWithText(string(R.string.copy_text)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.copy)).assertIsDisplayed()
     }
 
     @Test
@@ -74,7 +74,7 @@ class MessageTextSelectionTest {
         renderActionMenu(canCopyText = false, canSelectText = false)
 
         composeRule.onNodeWithText(string(R.string.select_text)).assertDoesNotExist()
-        composeRule.onNodeWithText(string(R.string.copy_text)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.copy)).assertDoesNotExist()
     }
 
     @Test
@@ -82,7 +82,7 @@ class MessageTextSelectionTest {
         renderActionMenu(canCopyText = true, canSelectText = false)
 
         composeRule.onNodeWithText(string(R.string.select_text)).assertDoesNotExist()
-        composeRule.onNodeWithText(string(R.string.copy_text)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.copy)).assertIsDisplayed()
     }
 
     @Test

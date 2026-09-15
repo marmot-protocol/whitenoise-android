@@ -10,22 +10,28 @@ internal enum class MainSection {
 }
 
 internal enum class SettingsDetail {
+    ShareConnect,
     Appearance,
     ActionColor,
     ChatBubbleColors,
+    Language,
     Data,
     Profile,
     AccountKeys,
     Relays,
+    Support,
+    SupportRelays,
     KeyPackages,
     Notifications,
     DevicePrivacy,
+    DiagnosticsImprovements,
     AiAgents,
     Donate,
     TextToSpeech,
     Dictation,
     ChatFolders,
     Help,
+    BugReport,
     About,
     Developer,
 }

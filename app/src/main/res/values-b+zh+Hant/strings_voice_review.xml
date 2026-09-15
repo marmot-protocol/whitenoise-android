@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_review_title">檢查語音訊息</string>
+    <string name="voice_record_again">重新錄音</string>
+    <string name="voice_message_release_to_review">放開以檢查 · 滑動以取消</string>
+    <string name="voice_recording_stop">停止錄音</string>
+</resources>

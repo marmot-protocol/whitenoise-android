@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="attachment_camera">Camera</string>
+    <string name="attachment_photos_videos">Photos and videos</string>
+    <string name="attachment_device_contact">Device contact</string>
+    <string name="attachment_recent_media">Recent media</string>
+</resources>

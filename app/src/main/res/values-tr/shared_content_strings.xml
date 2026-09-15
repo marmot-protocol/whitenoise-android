@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shared_content_in_chat">Sohbette paylaşılanlar</string>
+    <string name="shared_content_photos_videos">Fotoğraflar ve videolar</string>
+    <string name="shared_content_loaded_scope">Yalnızca bu sohbette önceden yüklenen mesajlar gösterilir.</string>
+    <string name="shared_content_loading">Paylaşılan içerik yükleniyor…</string>
+    <string name="shared_content_empty">Paylaşılan içerik yok</string>
+    <string name="shared_content_go_to_message">Mesaja git</string>
+    <plurals name="shared_item_count">
+        <item quantity="one">%1$d öğe</item>
+        <item quantity="other">%1$d öğe</item>
+    </plurals>
+</resources>

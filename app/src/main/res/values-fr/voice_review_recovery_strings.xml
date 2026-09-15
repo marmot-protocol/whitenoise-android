@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_review_unavailable_title">Enregistrement indisponible</string>
+    <string name="voice_review_unavailable_message">Cet enregistrement n’a pas pu être restauré. Enregistrez une nouvelle prise.</string>
+</resources>

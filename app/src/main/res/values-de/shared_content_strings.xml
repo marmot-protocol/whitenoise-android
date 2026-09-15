@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shared_content_in_chat">Im Chat geteilt</string>
+    <string name="shared_content_photos_videos">Fotos &amp; Videos</string>
+    <string name="shared_content_loaded_scope">Es werden nur bereits geladene Nachrichten dieses Chats angezeigt.</string>
+    <string name="shared_content_loading">Geteilte Inhalte werden geladen…</string>
+    <string name="shared_content_empty">Keine geteilten Inhalte</string>
+    <string name="shared_content_go_to_message">Zur Nachricht</string>
+    <plurals name="shared_item_count">
+        <item quantity="one">%1$d Element</item>
+        <item quantity="other">%1$d Elemente</item>
+    </plurals>
+</resources>

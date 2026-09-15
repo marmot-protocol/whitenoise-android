@@ -13,14 +13,16 @@ internal val CONVERSATION_TIMELINE_TAIL_GAP = 8.dp
 
 /** Bottom-aligns underfilled conversations while retaining chronological row spacing. */
 internal val CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT =
-    Arrangement.spacedBy(CONVERSATION_TIMELINE_TAIL_GAP, Alignment.Bottom)
+    Arrangement.spacedBy(2.dp, Alignment.Bottom)
 
 /**
  * Applies the resting tail gap and any temporary snackbar clearance at the
  * content edge, where Compose can keep the real final row as the scroll anchor.
  */
-internal fun conversationTimelineContentPadding(snackbarContentInset: Dp): PaddingValues =
-    PaddingValues(bottom = CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset)
+internal fun conversationTimelineContentPadding(
+    snackbarContentInset: Dp,
+    foregroundOverlap: Dp = 0.dp,
+): PaddingValues = PaddingValues(bottom = CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset + foregroundOverlap)
 
 /** Counts optional rows rendered between the permanent top spacer and the timeline. */
 internal fun conversationTimelineLeadingStructuralRowCount(

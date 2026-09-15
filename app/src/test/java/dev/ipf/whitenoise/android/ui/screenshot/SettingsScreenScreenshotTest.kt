@@ -4,7 +4,10 @@ import android.content.Context
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollToNodeAction
@@ -15,6 +18,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
@@ -45,47 +50,50 @@ class SettingsScreenScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** Captures the default production settings surface with the current release version. */
+    /** Captures the default settings home on the dark theme with one signed-in profile. */
     @Test
     fun settingsScreenDefaultDark() {
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true) {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    SettingsHomeContent(
-                        state = settingsHomeState(hasActiveAccount = true, selfUpdateEnabled = false),
-                        account =
-                            SettingsHomeAccount(
-                                title = "Alice",
-                                subtitle = FULL_NPUB,
-                                seed = "alice-account-id",
-                                pictureUrl = null,
-                            ),
-                        appUpdateInfo =
-                            AppUpdateInfo(
-                                installedVersion = "2026.9.11",
-                                latestVersion = null,
-                                checkedAtMillis = null,
-                                dismissedVersion = null,
-                                releasesBehind = null,
-                            ),
-                        versionName = "2026.9.11",
-                        mdkShortSha = "abc1234",
-                        staging = false,
-                        onBackToChats = {},
-                        onOpenAccountSelector = {},
-                        onOpenQr = {},
-                        onOpenDetail = {},
-                        onAppUpdateAction = {},
-                    )
-                }
-            }
-        }
-
-        composeRule
-            .onNodeWithTag(SETTINGS_HOME_CONTENT_TAG)
-            .captureRoboImage("src/test/snapshots/settings_screen_default_dark.png")
+        render(darkTheme = true)
+        capture("settings_screen_default_dark")
     }
 
+    /** Captures the settings home on the light theme. */
+    @Test
+    fun settingsScreenDefaultLight() {
+        render(darkTheme = false)
+        capture("settings_screen_default_light")
+    }
+
+    /** Captures the settings home on AMOLED: black groups with white connected outlines. */
+    @Test
+    fun settingsScreenDefaultAmoled() {
+        render(darkTheme = true, amoled = true)
+        capture("settings_screen_default_amoled")
+    }
+
+    /** Captures the light settings home mirrored for RTL at a 200 % font scale. */
+    @Test
+    fun settingsScreenRtlLargeFont() {
+        render(darkTheme = false, fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
+        capture("settings_screen_rtl_large_font")
+    }
+
+    /** Captures the header with several signed-in profiles, which offers switching instead of adding. */
+    @Test
+    fun settingsScreenSeveralProfilesLight() {
+        render(darkTheme = false, profileCount = 2)
+        capture("settings_screen_several_profiles_light")
+    }
+
+    /** Available Settings update row uses the requested green emblem and real release-version wording. */
+    @Test
+    fun settingsScreenAvailableUpdateLight() {
+        render(darkTheme = false, latestVersion = "2026.9.17")
+        composeRule.onNodeWithText("Version 2026.9.17 is available on Zapstore.").assertIsDisplayed()
+        capture("settings_screen_available_update_light")
+    }
+
+    /** Settings screen with global confirmation dark. */
     @Test
     fun settingsScreenWithGlobalConfirmationDark() {
         composeRule.setContent {
@@ -94,9 +102,7 @@ class SettingsScreenScreenshotTest {
                     notice = TransientNotice(id = 1L, title = AppText.Plain("Notifications enabled")),
                     modifier = Modifier.testTag(SETTINGS_WITH_CONFIRMATION_TAG),
                 ) {
-                    Surface(modifier = Modifier.fillMaxSize()) {
-                        settingsHomeContent()
-                    }
+                    settingsHomeContent()
                 }
             }
         }
@@ -109,18 +115,11 @@ class SettingsScreenScreenshotTest {
     /** Captures the release version footer below the initial settings viewport. */
     @Test
     fun settingsScreenVersionFooterDark() {
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true) {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    settingsHomeContent()
-                }
-            }
-        }
-
+        render(darkTheme = true)
         composeRule
             .onNode(hasScrollToNodeAction())
-            .performScrollToNode(hasText("Version 2026.9.11"))
-        composeRule.onNodeWithText("Version 2026.9.11").assertIsDisplayed()
+            .performScrollToNode(hasText("Version 2026.9.15"))
+        composeRule.onNodeWithText("Version 2026.9.15").assertIsDisplayed()
         composeRule
             .onNodeWithTag(SETTINGS_HOME_CONTENT_TAG)
             .captureRoboImage("src/test/snapshots/settings_screen_version_footer_dark.png")
@@ -163,35 +162,65 @@ class SettingsScreenScreenshotTest {
         )
     }
 
-    /** Renders reusable settings content with the current production release metadata. */
+    /** The settings home with Alice signed in, a self-updating build and no-op callbacks. */
     @Composable
-    private fun settingsHomeContent() {
+    private fun settingsHomeContent(
+        profileCount: Int = 1,
+        latestVersion: String? = null,
+    ) {
         SettingsHomeContent(
-            state = settingsHomeState(hasActiveAccount = true, selfUpdateEnabled = false),
+            state = settingsHomeState(hasActiveAccount = true, selfUpdateEnabled = true),
             account =
                 SettingsHomeAccount(
                     title = "Alice",
-                    subtitle = FULL_NPUB,
+                    subtitle = SHORT_NPUB,
                     seed = "alice-account-id",
                     pictureUrl = null,
                 ),
+            profileCount = profileCount,
             appUpdateInfo =
                 AppUpdateInfo(
-                    installedVersion = "2026.9.11",
-                    latestVersion = null,
+                    installedVersion = "2026.9.15",
+                    latestVersion = latestVersion,
                     checkedAtMillis = null,
                     dismissedVersion = null,
                     releasesBehind = null,
                 ),
-            versionName = "2026.9.11",
-            mdkShortSha = "abc1234",
-            staging = false,
-            onBackToChats = {},
-            onOpenAccountSelector = {},
-            onOpenQr = {},
+            versionName = "2026.9.15",
+            onBack = {},
+            onOpenShareConnect = {},
+            onAddProfile = {},
+            onSwitchProfile = {},
             onOpenDetail = {},
             onAppUpdateAction = {},
         )
+    }
+
+    /** Composes the settings home under the requested theme, density and layout direction. */
+    private fun render(
+        darkTheme: Boolean,
+        amoled: Boolean = false,
+        fontScale: Float = 1f,
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+        profileCount: Int = 1,
+        latestVersion: String? = null,
+    ) {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale),
+                LocalLayoutDirection provides layoutDirection,
+            ) {
+                WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
+                    settingsHomeContent(profileCount = profileCount, latestVersion = latestVersion)
+                }
+            }
+        }
+    }
+
+    /** Captures the whole home so the prominent title, groups and footer spacing are pinned. */
+    private fun capture(name: String) {
+        composeRule.onNodeWithTag(SETTINGS_HOME_CONTENT_TAG).captureRoboImage("src/test/snapshots/$name.png")
     }
 
     /** Creates an isolated app state whose dictation preferences can be mutated by Compose. */
@@ -213,6 +242,6 @@ class SettingsScreenScreenshotTest {
 
     private companion object {
         const val SETTINGS_WITH_CONFIRMATION_TAG = "settings-with-global-confirmation"
-        const val FULL_NPUB = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
+        const val SHORT_NPUB = "npub1alice…9x2k"
     }
 }

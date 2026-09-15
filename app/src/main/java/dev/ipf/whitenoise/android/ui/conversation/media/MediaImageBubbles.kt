@@ -3,23 +3,19 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Image
@@ -43,8 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.ContentScale
@@ -63,43 +57,31 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Fixed height of an in-timeline image bubble — constant across load states
- *  so async decode never reflows the list (would break the open-time anchor). */
-private val MediaBubbleHeight = 240.dp
+/** The prototype's single-media frame: 256 dp tall, width from the aspect ratio, capped at 256 dp. */
+internal const val SINGLE_MEDIA_MAX_EXTENT_DP = 256f
 
-/** Hard cap on the height a `dim`-shaped image bubble can claim, so a tall
- *  portrait can't dominate the chat viewport. Width fills the bubble; this
- *  bounds the height so the aspect-ratio sizing degrades to a cropped
- *  preview at the extremes. */
-private val MediaBubbleMaxHeight = 340.dp
+/** Sources smaller than the frame are shown at 192 dp instead of being upscaled to fill it. */
+internal const val SMALL_SOURCE_DISPLAY_EXTENT_DP = 192f
 
-/** Fixed card width used for portrait image bubbles, so every portrait
- *  reads as a consistently-sized card rather than a width-varying strip.
- *  Landscape bubbles still fill the parent. */
-private val MediaBubbleCardWidth = 280.dp
-
-/** Sizing modifier for both the optimistic and the confirmed single-image
- *  bubble. Portrait images become uniform-width cards with a height cap;
- *  landscape images fill the bubble width and derive their natural height
- *  (which can't exceed the width for ratio ≥ 1). Falls back to the legacy
- *  fixed-height slab when the aspect ratio is unknown. */
+/** Sizing modifier for the optimistic and confirmed single-image or video frame. */
 @Composable
-internal fun imageBubbleSizing(ratio: Float?): Modifier =
-    when {
-        ratio == null -> Modifier.fillMaxWidth().height(MediaBubbleHeight)
-        ratio >= 1f -> Modifier.fillMaxWidth().aspectRatio(ratio)
-        else -> {
-            val natural = (MediaBubbleCardWidth.value / ratio).dp
-            val height = if (natural > MediaBubbleMaxHeight) MediaBubbleMaxHeight else natural
-            Modifier.width(MediaBubbleCardWidth).height(height)
-        }
-    }
+internal fun imageBubbleSizing(
+    ratio: Float?,
+    sourceShortSidePx: Int? = null,
+): Modifier {
+    val (width, height) = singleMediaSizeDp(ratio, sourceShortSidePx)
+    return Modifier.width(width.dp).height(height.dp)
+}
+
+/** The prototype dims an album's overflow tile this far before drawing its "+N" label. */
+private const val ALBUM_OVERFLOW_SCRIM_ALPHA = 0.58f
 
 /**
  * Decode an imeta `thumbhash` field into a tiny ARGB ImageBitmap, cached
@@ -130,25 +112,6 @@ internal fun rememberThumbhashImage(thumbhash: String?): ImageBitmap? {
     return state.value
 }
 
-/**
- * Parse the imeta `dim` field ("WxH") into a width/height aspect ratio.
- * Returns null when [dim] is null, blank, malformed, or non-positive on
- * either axis. Caller falls back to [MediaBubbleHeight] in that case.
- */
-internal fun aspectRatioFromDim(dim: String?): Float? {
-    if (dim.isNullOrBlank()) return null
-    val parts = dim.split('x', 'X', ignoreCase = true)
-    if (parts.size != 2) return null
-    val w = parts[0].trim().toIntOrNull() ?: return null
-    val h = parts[1].trim().toIntOrNull() ?: return null
-    if (w <= 0 || h <= 0) return null
-    // Clamp wide panoramas so the bubble doesn't squeeze to a sliver.
-    // Tall portraits are bounded by [MediaBubbleMaxHeight] at the layout
-    // site instead — keeping the aspect ratio uncramped lets the placeholder
-    // still convey "this is a tall image" before the bytes arrive.
-    return (w.toFloat() / h.toFloat()).coerceIn(0.4f, 2.5f)
-}
-
 internal fun initialMediaBubbleAspectRatio(dim: String?): Float? = aspectRatioFromDim(dim)
 
 @Composable
@@ -173,7 +136,6 @@ internal fun MediaImageBubble(
     mine: Boolean,
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
-    attachedToCaption: Boolean = false,
 ) {
     val record = item.record
     val key = record.messageIdHex
@@ -319,16 +281,25 @@ internal fun MediaImageBubble(
         dispatchOpen = ::dispatchViewerOpen,
     )
 
+    // A GIF is framed by the prototype's fixed banner instead of its own aspect ratio.
+    val gifFrame =
+        isGifAttachmentMediaType(reference.mediaType) || presentation is DecodedAttachmentPresentation.Animated
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = visualMediaBubbleShape(attachedToCaption),
-        border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
+        shape = ConversationRichContentShape,
         // Single source of truth for image-bubble shape: portraits become
         // uniform-width cards (capped height), landscapes fill the bubble
         // width. Used by both the confirmed bubble and the optimistic
         // upload-phase bubble so the optimistic → confirmed swap is a
         // visual no-op.
-        modifier = imageBubbleSizing(bubbleAspectRatio),
+        modifier =
+            if (gifFrame) {
+                Modifier
+                    .width(ConversationMessageMetrics.RichContentCanvasWidth)
+                    .height(ConversationMessageMetrics.GifHeight)
+            } else {
+                imageBubbleSizing(bubbleAspectRatio, sourceShortSideFromDim(reference.dim))
+            },
     ) {
         Box(contentAlignment = Alignment.Center) {
             val downloadLabel = stringResource(R.string.media_tap_to_download)
@@ -441,65 +412,77 @@ internal fun MediaImageBubble(
  * placeholder.
  */
 @Composable
+@Suppress("MagicNumber", "FunctionNaming")
 internal fun MasonryImageLayout(
     visibleCount: Int,
     onLongPress: () -> Unit = {},
     tile: @Composable (index: Int, tileModifier: Modifier) -> Unit,
 ) {
+    val gap = ConversationMessageMetrics.GallerySpacing
     when (visibleCount) {
         2 ->
             Row(
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier.fillMaxWidth().padding(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(gap),
+                modifier = Modifier.fillMaxWidth().height(GALLERY_TWO_HEIGHT),
             ) {
-                tile(0, Modifier.weight(1f).aspectRatio(1f))
-                tile(1, Modifier.weight(1f).aspectRatio(1f))
+                tile(0, Modifier.weight(1f).fillMaxHeight())
+                tile(1, Modifier.weight(1f).fillMaxHeight())
             }
         3 ->
             Row(
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier.fillMaxWidth().padding(2.dp).aspectRatio(1f),
+                horizontalArrangement = Arrangement.spacedBy(gap),
+                modifier = Modifier.fillMaxWidth().height(GALLERY_THREE_HEIGHT),
             ) {
-                tile(0, Modifier.weight(1f).fillMaxHeight())
+                tile(0, Modifier.width(GALLERY_THREE_HEIGHT).fillMaxHeight())
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(gap),
                     modifier = Modifier.weight(1f).fillMaxHeight(),
                 ) {
                     tile(1, Modifier.weight(1f).fillMaxWidth())
                     tile(2, Modifier.weight(1f).fillMaxWidth())
                 }
             }
-        else ->
-            // 4 tiles in a 2×2 grid; any attachments beyond the fourth collapse
-            // into the "+N" overflow chip the caller draws on the fourth tile
-            // (index 3, the last visible tile) (#527).
+        4 ->
             Column(
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier.fillMaxWidth().padding(2.dp),
+                verticalArrangement = Arrangement.spacedBy(gap),
+                modifier = Modifier.fillMaxWidth().height(GALLERY_FOUR_HEIGHT),
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    tile(0, Modifier.weight(1f).aspectRatio(1f))
-                    tile(1, Modifier.weight(1f).aspectRatio(1f))
+                Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    tile(0, Modifier.weight(1f).fillMaxHeight())
+                    tile(1, Modifier.weight(1f).fillMaxHeight())
                 }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    tile(2, Modifier.weight(1f).aspectRatio(1f))
-                    tile(3, Modifier.weight(1f).aspectRatio(1f))
+                Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    tile(2, Modifier.weight(1f).fillMaxHeight())
+                    tile(3, Modifier.weight(1f).fillMaxHeight())
+                }
+            }
+        else ->
+            Column(
+                verticalArrangement = Arrangement.spacedBy(gap),
+                modifier = Modifier.fillMaxWidth().height(GALLERY_FIVE_HEIGHT),
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth()) {
+                    tile(0, Modifier.weight(1f).height(GALLERY_TWO_HEIGHT))
+                    tile(1, Modifier.weight(1f).height(GALLERY_TWO_HEIGHT))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth()) {
+                    for (index in 2 until visibleCount.coerceAtMost(MAX_VISIBLE_GALLERY_FRAMES)) {
+                        tile(index, Modifier.weight(1f).height(GALLERY_FIVE_SECOND_ROW_HEIGHT))
+                    }
                 }
             }
     }
 }
 
-/**
- * Mixed image + video album bubble. Each tile picks its renderer based on
- * MIME — image tiles open the image viewer, video tiles tap-to-play in the
- * fullscreen ExoPlayer. Layout is the shared [MasonryImageLayout] masonry.
- */
+/** Galleries show at most five frames; the last one carries the "+N" overflow. */
+internal const val MAX_VISIBLE_GALLERY_FRAMES = 5
+private val GALLERY_TWO_HEIGHT = 127.dp
+private val GALLERY_THREE_HEIGHT = 170.dp
+private val GALLERY_FOUR_HEIGHT = 256.dp
+private val GALLERY_FIVE_HEIGHT = 213.dp
+private val GALLERY_FIVE_SECOND_ROW_HEIGHT = 84.dp
+
+/** Gallery grid of up to five frames with the +N overflow tile. */
 @Composable
 internal fun MediaVisualGridBubble(
     item: TimelineMessage,
@@ -510,12 +493,10 @@ internal fun MediaVisualGridBubble(
     mine: Boolean,
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
-    attachedToCaption: Boolean = false,
 ) {
     val record = item.record
-    // Show up to four tiles before collapsing the remainder into a "+N"
-    // overlay on the fourth tile, matching the image grid (#527).
-    val visible = attachments.take(4)
+    // Five frames at most; the last one carries the "+N" overflow chip.
+    val visible = attachments.take(MAX_VISIBLE_GALLERY_FRAMES)
 
     /** Opens one grid attachment through the row-independent mixed-media session owner. */
     fun dispatchViewerOpen(attachmentIndex: Int) {
@@ -566,17 +547,13 @@ internal fun MediaVisualGridBubble(
     }
 
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = visualMediaBubbleShape(attachedToCaption),
-        border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
-        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = ConversationRichContentShape,
+        modifier = Modifier.width(ConversationMessageMetrics.RichContentCanvasWidth),
     ) {
         MasonryImageLayout(visibleCount = visible.size, onLongPress = onLongPress, tile = tileAt)
     }
 }
-
-@Suppress("MaxLineLength")
-internal fun visualMediaBubbleShape(attachedToCaption: Boolean): Shape = if (attachedToCaption) RectangleShape else RoundedCornerShape(12.dp)
 
 /**
  * One tile of the album grid: square thumbnail + per-tile download state.
@@ -789,13 +766,13 @@ internal fun MediaImageGridTile(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = ScrimAlpha.TILE)),
+                        .background(Color.Black.copy(alpha = ALBUM_OVERFLOW_SCRIM_ALPHA)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = "+$overflowCount",
                     color = Color.White,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
             }

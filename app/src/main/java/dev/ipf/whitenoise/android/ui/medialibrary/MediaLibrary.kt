@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -27,34 +26,25 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -66,8 +56,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,8 +76,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.SectionCard
-import dev.ipf.whitenoise.android.ui.common.SectionCardWithAction
+import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.media.FullScreenMediaViewer
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaImageGridTile
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVideoGridTile
@@ -100,6 +91,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaLaunchFailur
 import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberAttachmentOpener
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberDocumentSaveFallback
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerForwardActions
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentWithFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.shareImage
@@ -167,6 +159,8 @@ internal data class SharedMediaTiles(
     // Carried so the section can decide between the strip, the single
     // "View shared media" row, and hiding entirely without re-deriving.
     val hasOther: Boolean,
+    val visualSections: List<MediaMonthSection<SharedMediaTile>> = emptyList(),
+    val isLoading: Boolean = false,
 ) {
     val isEmpty: Boolean
         get() =
@@ -182,6 +176,8 @@ internal data class SharedMediaTiles(
 // Projected rows provide typed media carrying the real source epoch; only
 // optimistic/compatibility records fall back to MarmotKit tag parsing. Keyed
 // on timeline identity so it rebuilds on projection changes, not per frame.
+
+/** Remembers the shared media tiles derived from the loaded timeline. */
 @Composable
 internal fun rememberSharedMediaTiles(
     controller: ConversationController,
@@ -209,7 +205,7 @@ internal fun rememberSharedMediaTiles(
         // synchronously, so deleted or expired media cannot remain swipeable while
         // the replacement projection is still being built.
         val tiles by produceState(
-            initialValue = emptySharedMediaTiles(),
+            initialValue = emptySharedMediaTiles().copy(isLoading = true),
             timeline,
             deletedMessageIds,
             pendingTimelineRemovedMessageIds,
@@ -248,6 +244,7 @@ private fun emptySharedMediaTiles() =
         hasOther = false,
     )
 
+/** Tiles for the visible shared media of the loaded messages. */
 internal fun buildVisibleSharedMediaTiles(
     messages: List<TimelineMessage>,
     myAccountId: String?,
@@ -273,6 +270,8 @@ internal fun buildVisibleSharedMediaTiles(
 // Pure tile projection extracted from the composable so it can run on a
 // background dispatcher. Projected rows carry authoritative typed media;
 // optimistic/compatibility records alone fall back to MarmotKit tag parsing.
+
+/** Builds the visual, voice, file and link tiles from the messages. */
 private fun buildTiles(
     messages: List<TimelineMessage>,
     myAccountId: String?,
@@ -323,6 +322,7 @@ private fun buildTiles(
         voice = voice,
         files = files,
         urls = urls,
+        visualSections = groupIntoMonthSections(visuals) { it.recordedAt },
         imageSections = groupIntoMonthSections(images) { it.recordedAt },
         videoSections = groupIntoMonthSections(videos) { it.recordedAt },
         voiceSections = groupIntoMonthSections(voice) { it.recordedAt },
@@ -364,6 +364,8 @@ internal fun monthKeyForMedia(recordedAtSeconds: ULong): Int {
 // Group already-newest-first items by calendar month, preserving order so
 // section headers read newest → oldest. Runs during tile projection on a
 // background dispatcher — composition only renders the pre-built sections.
+
+/** Groups items into month sections by their recorded time, newest first. */
 internal fun <T> groupIntoMonthSections(
     items: List<T>,
     recordedAtOf: (T) -> ULong,
@@ -379,8 +381,6 @@ internal fun <T> groupIntoMonthSections(
 
 private val mediaMonthGroupingZone: ZoneId = ZoneId.systemDefault()
 
-private val ThumbStripSize = 96.dp
-
 internal enum class SharedMediaFallbackType {
     Generic,
     Voice,
@@ -393,6 +393,7 @@ internal data class SharedMediaFallback(
     val count: Int = 0,
 )
 
+/** Counts fallback for media the grid cannot show. */
 internal fun sharedMediaFallbackContent(
     videoCount: Int,
     voiceCount: Int,
@@ -409,288 +410,140 @@ internal fun sharedMediaFallbackContent(
         else -> SharedMediaFallback(SharedMediaFallbackType.Generic)
     }
 
-@Composable
-internal fun SharedMediaFallbackRow(
-    fallback: SharedMediaFallback,
-    onSeeAll: () -> Unit,
-) {
-    val icon =
-        when (fallback.type) {
-            SharedMediaFallbackType.Generic -> Icons.Default.Image
-            SharedMediaFallbackType.Voice -> Icons.Default.Mic
-            SharedMediaFallbackType.Files -> Icons.Default.Description
-            SharedMediaFallbackType.Urls -> Icons.Default.Language
-        }
-    val label =
-        when (fallback.type) {
-            SharedMediaFallbackType.Generic -> stringResource(R.string.shared_media_view)
-            SharedMediaFallbackType.Voice ->
-                pluralStringResource(R.plurals.shared_media_voice_count, fallback.count, fallback.count)
-            SharedMediaFallbackType.Files ->
-                pluralStringResource(R.plurals.shared_media_files_count, fallback.count, fallback.count)
-            SharedMediaFallbackType.Urls ->
-                pluralStringResource(R.plurals.shared_media_links_count, fallback.count, fallback.count)
-        }
-    SectionCard(title = stringResource(R.string.shared_media)) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .amoledSurfaceBorder(RoundedCornerShape(8.dp))
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { onSeeAll() }
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(icon, contentDescription = null)
-            Text(
-                label,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
-    }
-}
-
-/**
- * "Shared media" section for the group/DM details sheet. Shows a horizontal
- * strip of the most recent image thumbnails with a "See all" affordance into
- * [MediaLibraryRoute]. When there are no images or videos and exactly one of
- * voice, files, or URLs exists, it collapses to a type-specific counted row;
- * videos and mixed media retain the generic "View shared media" row. Renders
- * nothing when the conversation has no media at all.
- */
+/** Opens the four native per-chat categories from the same bounded, visibility-filtered source. */
 @Composable
 internal fun SharedMediaSection(
     tiles: SharedMediaTiles,
-    controller: ConversationController,
-    appState: WhiteNoiseAppState,
-    onSeeAll: () -> Unit,
-    onJumpToMessage: (String) -> Unit,
+    onOpenCategory: (SharedContentCategory) -> Unit,
 ) {
-    if (tiles.isEmpty) return
-
-    if (tiles.images.isEmpty()) {
-        SharedMediaFallbackRow(
-            fallback =
-                sharedMediaFallbackContent(
-                    videoCount = tiles.videos.size,
-                    voiceCount = tiles.voice.size,
-                    fileCount = tiles.files.size,
-                    urlCount = tiles.urls.size,
-                ),
-            onSeeAll = onSeeAll,
-        )
-        return
-    }
-
-    // Cross-image gallery for the strip: tapping any thumbnail opens the
-    // full-screen swipeable viewer spanning every shared image (newest first,
-    // matching the strip order), starting at the tapped one. Each page carries
-    // its own message context so save/share/decrypt act on the visible page.
-    val imagePages = remember(tiles.images) { tiles.images.toViewerPages() }
-    var viewerStartIndex by remember(tiles.images) { mutableStateOf<Int?>(null) }
-    viewerStartIndex?.let { start ->
-        FullScreenMediaViewer(
-            controller = controller,
-            appState = appState,
-            pages = imagePages,
-            startIndex = start,
-            onDismiss = { viewerStartIndex = null },
-        )
-    }
-
-    SectionCardWithAction(
-        title = stringResource(R.string.shared_media),
-        action = {
-            TextButton(onClick = onSeeAll) {
-                Text(stringResource(R.string.shared_media_see_all))
-            }
-        },
-    ) {
-        val strip = remember(tiles.images) { tiles.images.take(12) }
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(strip, key = { "${it.messageIdHex}#${it.attachmentIndex}" }) { tile ->
-                Box(
-                    modifier =
-                        Modifier
-                            .size(ThumbStripSize)
-                            .clip(RoundedCornerShape(10.dp)),
-                ) {
-                    MediaImageGridTile(
-                        messageIdHex = tile.messageIdHex,
-                        attachmentIndex = tile.attachmentIndex,
-                        reference = tile.reference,
-                        controller = controller,
-                        appState = appState,
-                        mine = tile.mine,
-                        onTap = {
-                            val index =
-                                imagePages.indexOfFirst {
-                                    it.messageIdHex == tile.messageIdHex && it.attachmentIndex == tile.attachmentIndex
-                                }
-                            viewerStartIndex = index.coerceAtLeast(0)
-                        },
-                        overflowCount = 0,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
-        }
-    }
+    SharedContentCategories(tiles, onOpenCategory)
 }
 
 // Project resolved image/video tiles onto the per-page descriptors the
 // full-screen viewer pages over. Order is preserved (the tiles are already
 // newest-first), so the gallery swipes newest → oldest matching the grid.
+
+/** Viewer pages for the tiles. */
 internal fun List<SharedMediaTile>.toViewerPages(): List<MediaViewerPage> =
     map { MediaViewerPage(it.messageIdHex, it.attachmentIndex, it.reference, it.mine, it.sender, it.recordedAt) }
 
-private enum class MediaTab(
-    val labelRes: Int,
-) {
-    Images(R.string.shared_media_tab_images),
-    Videos(R.string.shared_media_tab_videos),
-    Voice(R.string.shared_media_tab_voice),
-    Files(R.string.shared_media_tab_files),
-    Urls(R.string.shared_media_tab_urls),
-}
-
-/**
- * Full media library reachable from the "See all" affordance. A sticky tab bar
- * switches between Images, Videos, Voice, Files, and URLs. Images and Videos are
- * month-grouped grids; Voice, Files, and URLs are month-grouped vertical lists.
- * Tapping an image/video tile opens the full-screen swipeable viewer spanning
- * the whole tab; a voice/file row jumps back to that message in the
- * conversation; a URL row opens in the browser.
- */
-@OptIn(ExperimentalMaterial3Api::class)
+/** Opens one native per-chat category, with state isolated to its controller/account/runtime owner. */
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun MediaLibraryRoute(
     tiles: SharedMediaTiles,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    category: SharedContentCategory,
     onBack: () -> Unit,
     onJumpToMessage: (String) -> Unit,
 ) {
-    // The entry point opens for video/voice/file/URL-only conversations too, so
-    // seed the selection to the first non-empty tab rather than always Images.
-    val initialTab =
-        when {
-            tiles.images.isNotEmpty() -> MediaTab.Images
-            tiles.videos.isNotEmpty() -> MediaTab.Videos
-            tiles.voice.isNotEmpty() -> MediaTab.Voice
-            tiles.files.isNotEmpty() -> MediaTab.Files
-            tiles.urls.isNotEmpty() -> MediaTab.Urls
-            else -> MediaTab.Images
+    key(controller, appState.activeAccountRef, appState.runtimeGeneration, category) {
+        MediaLibraryContent(tiles, controller, appState, category, onBack, onJumpToMessage)
+    }
+}
+
+/** Owns the existing source-aware gallery and independent scroll positions for each media filter. */
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod", "CyclomaticComplexMethod")
+@Composable
+private fun MediaLibraryContent(
+    tiles: SharedMediaTiles,
+    controller: ConversationController,
+    appState: WhiteNoiseAppState,
+    category: SharedContentCategory,
+    onBack: () -> Unit,
+    onJumpToMessage: (String) -> Unit,
+) {
+    var filter by rememberSaveable { mutableStateOf(SharedVisualFilter.All) }
+    val viewerSelection = remember { SharedMediaViewerSelection() }
+    val forwardActions = rememberMediaViewerForwardActions(controller, appState)
+    val viewerStart = viewerSelection.source
+    val visualTiles = tiles.visualsFor(filter)
+    val viewerPages = remember(visualTiles) { visualTiles.toViewerPages() }
+    val viewerIndex =
+        viewerStart?.let { (messageId, attachmentIndex) ->
+            viewerPages.indexOfFirst { it.messageIdHex == messageId && it.attachmentIndex == attachmentIndex }
         }
-    var selectedTab by rememberSaveable { mutableIntStateOf(initialTab.ordinal) }
-    // Cross-message viewer state. Pages span the whole tapped tab (images or
-    // videos), so swiping crosses message boundaries; each page carries its own
-    // message context. Keyed null when closed.
-    var viewerPages by remember { mutableStateOf<List<MediaViewerPage>>(emptyList()) }
-    var viewerStartIndex by remember { mutableStateOf<Int?>(null) }
-    viewerStartIndex?.let { start ->
+    if (!tiles.isLoading && viewerIndex != null && viewerIndex >= 0) {
         FullScreenMediaViewer(
             controller = controller,
             appState = appState,
             pages = viewerPages,
-            startIndex = start,
-            onDismiss = { viewerStartIndex = null },
+            startIndex = viewerIndex,
+            onDismiss = viewerSelection::clear,
+            forwardActions = forwardActions,
+            onGoToMessage = { page ->
+                viewerSelection.clear()
+                onJumpToMessage(page.messageIdHex)
+            },
+            onCurrentPageChange = { viewerSelection.select(it.messageIdHex, it.attachmentIndex) },
         )
     }
-    val openGallery: (List<SharedMediaTile>, SharedMediaTile) -> Unit = { tabTiles, tapped ->
-        val pages = tabTiles.toViewerPages()
-        val index =
-            pages.indexOfFirst {
-                it.messageIdHex == tapped.messageIdHex && it.attachmentIndex == tapped.attachmentIndex
-            }
-        viewerPages = pages
-        viewerStartIndex = index.coerceAtLeast(0)
+    LaunchedEffect(tiles.isLoading, viewerPages, viewerStart) {
+        viewerSelection.reconcile(tiles.isLoading, viewerPages)
     }
-    // One grid state per visual tab so scroll position is preserved when
-    // switching back and forth.
+    val allGridState = rememberLazyGridState()
     val imagesGridState = rememberLazyGridState()
     val videosGridState = rememberLazyGridState()
     val voiceListState = rememberLazyListState()
     val filesListState = rememberLazyListState()
     val urlsListState = rememberLazyListState()
-
-    Scaffold(
-        topBar = {
-            Column {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.shared_media)) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.shared_media_back),
-                            )
-                        }
-                    },
+    val sections =
+        when (filter) {
+            SharedVisualFilter.All -> tiles.visualSections
+            SharedVisualFilter.Images -> tiles.imageSections
+            SharedVisualFilter.Videos -> tiles.videoSections
+        }
+    SharedContentScaffold(
+        category = category,
+        filter = filter,
+        onFilter = { filter = it },
+        onBack = onBack,
+        loading = tiles.isLoading,
+    ) {
+        when (category) {
+            SharedContentCategory.Media ->
+                MediaTileGrid(
+                    sections = sections,
+                    gridState =
+                        when (filter) {
+                            SharedVisualFilter.All -> allGridState
+                            SharedVisualFilter.Images -> imagesGridState
+                            SharedVisualFilter.Videos -> videosGridState
+                        },
+                    controller = controller,
+                    appState = appState,
+                    emptyLabel = stringResource(R.string.shared_content_empty),
+                    onTapTile = { viewerSelection.select(it.messageIdHex, it.attachmentIndex) },
                 )
-                ScrollableTabRow(
-                    selectedTabIndex = selectedTab,
-                    edgePadding = 12.dp,
-                ) {
-                    MediaTab.entries.forEach { tab ->
-                        Tab(
-                            selected = selectedTab == tab.ordinal,
-                            onClick = { selectedTab = tab.ordinal },
-                            text = { Text(stringResource(tab.labelRes)) },
-                        )
-                    }
-                }
-            }
-        },
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            when (MediaTab.entries[selectedTab]) {
-                MediaTab.Images ->
-                    MediaTileGrid(
-                        sections = tiles.imageSections,
-                        gridState = imagesGridState,
-                        controller = controller,
-                        appState = appState,
-                        emptyLabel = stringResource(R.string.shared_media_empty_images),
-                        onTapTile = { tapped -> openGallery(tiles.images, tapped) },
-                    )
-                MediaTab.Videos ->
-                    MediaTileGrid(
-                        sections = tiles.videoSections,
-                        gridState = videosGridState,
-                        controller = controller,
-                        appState = appState,
-                        emptyLabel = stringResource(R.string.shared_media_empty_videos),
-                        onTapTile = { tapped -> openGallery(tiles.videos, tapped) },
-                    )
-                MediaTab.Voice ->
-                    VoiceLibraryTab(
-                        tiles = tiles,
-                        listState = voiceListState,
-                        controller = controller,
-                        appState = appState,
-                        onJumpToMessage = onJumpToMessage,
-                    )
-                MediaTab.Files ->
-                    FileLibraryTab(
-                        tiles = tiles,
-                        listState = filesListState,
-                        controller = controller,
-                        appState = appState,
-                    )
-                MediaTab.Urls ->
-                    UrlLibraryTab(
-                        tiles = tiles,
-                        listState = urlsListState,
-                        appState = appState,
-                    )
-            }
+            SharedContentCategory.Links ->
+                UrlLibraryTab(
+                    tiles = tiles,
+                    listState = urlsListState,
+                    appState = appState,
+                    onJumpToMessage = onJumpToMessage,
+                )
+            SharedContentCategory.Documents ->
+                FileLibraryTab(
+                    tiles = tiles,
+                    listState = filesListState,
+                    controller = controller,
+                    appState = appState,
+                    onJumpToMessage = onJumpToMessage,
+                )
+            SharedContentCategory.Voice ->
+                VoiceLibraryTab(
+                    tiles = tiles,
+                    listState = voiceListState,
+                    controller = controller,
+                    appState = appState,
+                    onJumpToMessage = onJumpToMessage,
+                )
         }
     }
 }
 
+/** Month-sectioned grid of visual tiles. */
 @Composable
 private fun MediaTileGrid(
     sections: List<MediaMonthSection<SharedMediaTile>>,
@@ -705,25 +558,23 @@ private fun MediaTileGrid(
         return
     }
     LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
+        columns = GridCells.Adaptive(100.dp),
         state = gridState,
-        contentPadding = PaddingValues(2.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxSize().trackSharedContentHeader(gridState).testTag("shared.media.grid"),
     ) {
         sections.forEach { section ->
             item(key = "header-${section.monthKey}", span = { GridItemSpan(maxLineSpan) }) {
                 Text(
                     monthLabel(section.monthKey),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(16.dp).semantics { heading() },
                 )
             }
             gridItems(section.items, key = { "${it.messageIdHex}#${it.attachmentIndex}" }) { tile ->
-                Box(Modifier.aspectRatio(1f).clip(RoundedCornerShape(4.dp))) {
+                Box(Modifier.aspectRatio(1f), contentAlignment = Alignment.BottomStart) {
                     if (tile.isVideo) {
                         MediaVideoGridTile(
                             messageIdHex = tile.messageIdHex,
@@ -749,28 +600,67 @@ private fun MediaTileGrid(
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
+                    SharedMediaTileCaption(tile, appState)
                 }
             }
         }
     }
 }
 
+/**
+ * The prototype names the sender across the foot of every tile, and marks a video there
+ * in words rather than with a badge, so a dense grid still says who sent what.
+ */
+@Suppress("FunctionNaming")
+@Composable
+private fun SharedMediaTileCaption(
+    tile: SharedMediaTile,
+    appState: WhiteNoiseAppState,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = SHARED_TILE_CAPTION_ALPHA),
+    ) {
+        Column(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+            Text(
+                text = if (tile.mine) stringResource(R.string.you) else appState.displayName(tile.sender),
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (tile.isVideo) {
+                Text(
+                    text = stringResource(R.string.shared_media_tab_videos),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
+    }
+}
+
+/** Keeps the caption legible over bright artwork without hiding the photo behind it. */
+private const val SHARED_TILE_CAPTION_ALPHA = 0.86f
+
+/** Empty state of a library tab. */
 @Composable
 private fun EmptyPlaceholder(label: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+    SharedContentEmptyState(label)
 }
 
 // Shared LazyColumn skeleton for the Voice/Files/URLs tabs: groups already
 // newest-first items by calendar month and emits a sticky-style month header
 // per section, matching the grids' separators. [keyOf] keys each row stably.
+
+/** Month-sectioned list shared by the voice, file and link tabs. */
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
-private fun <T> MonthSectionedColumn(
+internal fun <T> MonthSectionedColumn(
     sections: List<MediaMonthSection<T>>,
     listState: androidx.compose.foundation.lazy.LazyListState,
     emptyLabel: String,
     keyOf: (T) -> Any,
+    messageIdOf: (T) -> String,
+    onJumpToMessage: (String) -> Unit,
     row: @Composable (T) -> Unit,
 ) {
     if (sections.isEmpty()) {
@@ -779,24 +669,33 @@ private fun <T> MonthSectionedColumn(
     }
     LazyColumn(
         state = listState,
-        contentPadding = PaddingValues(vertical = 4.dp),
-        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 24.dp),
+        modifier = Modifier.fillMaxSize().trackWhiteNoiseHeader(listState),
     ) {
         sections.forEach { section ->
             item(key = "header-${section.monthKey}") {
                 Text(
                     monthLabel(section.monthKey),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(16.dp).semantics { heading() },
                 )
             }
-            items(section.items, key = { keyOf(it) }) { row(it) }
+            items(section.items, key = { keyOf(it) }) { item ->
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    row(item)
+                    TextButton(
+                        onClick = { onJumpToMessage(messageIdOf(item)) },
+                        modifier = Modifier.testTag("shared.message.${keyOf(item)}"),
+                    ) {
+                        Text(stringResource(R.string.shared_content_go_to_message))
+                    }
+                }
+            }
         }
     }
 }
 
+/** Voice tab of the library. */
 @Composable
 private fun VoiceLibraryTab(
     tiles: SharedMediaTiles,
@@ -810,6 +709,8 @@ private fun VoiceLibraryTab(
         listState = listState,
         emptyLabel = stringResource(R.string.shared_media_empty_voice),
         keyOf = { "${it.messageIdHex}#${it.attachmentIndex}" },
+        messageIdOf = { it.messageIdHex },
+        onJumpToMessage = onJumpToMessage,
     ) { row ->
         VoiceLibraryRow(
             row = row,
@@ -820,6 +721,7 @@ private fun VoiceLibraryTab(
     }
 }
 
+/** One voice row with playback. */
 @Composable
 private fun VoiceLibraryRow(
     row: SharedMediaRow,
@@ -849,10 +751,11 @@ private fun VoiceLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                .clip(MaterialTheme.shapes.large)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .amoledSurfaceBorder(MaterialTheme.shapes.large)
                 .clickable { onJumpToMessage(row.messageIdHex) }
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -861,11 +764,11 @@ private fun VoiceLibraryRow(
         // playback). The tap target is isolated from the row's jump-to-message
         // click so the two affordances don't collide.
         Surface(
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.surfaceContainer,
             shape = CircleShape,
             modifier =
                 Modifier
-                    .size(44.dp)
+                    .size(48.dp)
                     .clickable(enabled = !loading) {
                         if (isPlayingThis) {
                             VoicePlaybackController.pause()
@@ -902,7 +805,7 @@ private fun VoiceLibraryRow(
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
                         strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 } else {
                     Icon(
@@ -911,7 +814,7 @@ private fun VoiceLibraryRow(
                             stringResource(
                                 if (isPlayingThis) R.string.voice_message_pause else R.string.voice_message_play,
                             ),
-                        tint = MaterialTheme.colorScheme.onPrimary,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(24.dp),
                     )
                 }
@@ -939,12 +842,14 @@ private fun VoiceLibraryRow(
     }
 }
 
+/** Files tab of the library. */
 @Composable
 private fun FileLibraryTab(
     tiles: SharedMediaTiles,
     listState: androidx.compose.foundation.lazy.LazyListState,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    onJumpToMessage: (String) -> Unit,
 ) {
     val documentSaveFallback = rememberDocumentSaveFallback()
     MonthSectionedColumn(
@@ -952,6 +857,8 @@ private fun FileLibraryTab(
         listState = listState,
         emptyLabel = stringResource(R.string.shared_media_empty_files),
         keyOf = { "${it.messageIdHex}#${it.attachmentIndex}" },
+        messageIdOf = { it.messageIdHex },
+        onJumpToMessage = onJumpToMessage,
     ) { row ->
         FileLibraryRow(
             row = row,
@@ -962,6 +869,7 @@ private fun FileLibraryTab(
     }
 }
 
+/** One file row with open and save actions. */
 @Composable
 private fun FileLibraryRow(
     row: SharedMediaRow,
@@ -990,6 +898,8 @@ private fun FileLibraryRow(
     // The tap is the user-initiated download trigger — files never auto-fetch
     // in the library. Prefer retained bytes for own in-flight sends, mirroring
     // the conversation file bubble.
+
+    /** Loads the row's file bytes from the retained or downloaded attachment. */
     suspend fun fetchBytes(): ByteArray {
         val retained =
             if (row.mine) {
@@ -1009,6 +919,7 @@ private fun FileLibraryRow(
             ).await()
     }
 
+    /** Materializes the row's document for opening or saving. */
     suspend fun fetchFile() =
         materializeDocumentAttachment(
             context = context,
@@ -1022,8 +933,9 @@ private fun FileLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                .clip(MaterialTheme.shapes.large)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .amoledSurfaceBorder(MaterialTheme.shapes.large)
                 .clickable(enabled = !inFlight) {
                     inFlight = true
                     scope.launch {
@@ -1071,7 +983,7 @@ private fun FileLibraryRow(
                         }
                         inFlight = false
                     }
-                }.padding(horizontal = 16.dp, vertical = 10.dp),
+                }.padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -1180,12 +1092,14 @@ private fun FileLibraryRow(
     }
 }
 
+/** Links tab of the library. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun UrlLibraryTab(
     tiles: SharedMediaTiles,
     listState: androidx.compose.foundation.lazy.LazyListState,
     appState: WhiteNoiseAppState,
+    onJumpToMessage: (String) -> Unit,
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -1194,6 +1108,8 @@ private fun UrlLibraryTab(
         listState = listState,
         emptyLabel = stringResource(R.string.shared_media_empty_urls),
         keyOf = { "${it.index}#${it.value.messageIdHex}#${it.value.url}" },
+        messageIdOf = { it.value.messageIdHex },
+        onJumpToMessage = onJumpToMessage,
     ) { indexed ->
         val entry = indexed.value
         UrlLibraryRow(
@@ -1221,6 +1137,7 @@ private fun UrlLibraryTab(
     }
 }
 
+/** One link row. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun UrlLibraryRow(
@@ -1241,10 +1158,11 @@ private fun UrlLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                .clip(MaterialTheme.shapes.large)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .amoledSurfaceBorder(MaterialTheme.shapes.large)
                 .combinedClickable(onClick = onOpen, onLongClick = onCopy)
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

@@ -994,6 +994,10 @@ class LocalizationResourceTest {
 
         val identicalValueAllowedKeys =
             setOf(
+                // Two translated labels joined by locale-independent punctuation.
+                "developer_work_status",
+                // "Audio" is the established media label in German, Spanish, French and Italian.
+                "library_audio",
                 // Pure positional-format string ("current/total"); no
                 // translatable text, identical across every locale by design.
                 "conversation_search_match_count",
@@ -1007,6 +1011,7 @@ class LocalizationResourceTest {
                 "photo_editor_crop_sixteen_nine",
                 "photo_editor_crop_nine_sixteen",
                 "photo_editor_quality_standard",
+                "photo_editor_quality_original",
                 "photo_editor_effective_quality",
                 // Dialog confirm button; "OK" is shared verbatim across most locales.
                 "ok",
@@ -1134,6 +1139,8 @@ class LocalizationResourceTest {
             mapOf(
                 "values-de" to
                     setOf(
+                        // "Version" is the German word for the About version label.
+                        "about_version",
                         // "Details" is also the standard German label for additional information.
                         "setup_details",
                         // "Name" is the German word for "name".
@@ -1150,6 +1157,14 @@ class LocalizationResourceTest {
                         "attachment_type_video",
                         // "Emoji" is the standard German loan word.
                         "group_image_source_emoji",
+                        // "System" is the German word for the system font choice.
+                        "appearance_font_system",
+                        // "Audio" is the same word in this locale.
+                        "download_audio",
+                        // "Videos" is the same word in German.
+                        "download_videos",
+                        // "Name" is the German word for "name".
+                        "name",
                     ),
                 "values-es" to
                     setOf(
@@ -1160,9 +1175,19 @@ class LocalizationResourceTest {
                         "media_counted_format",
                         // "Audio" is the standard Spanish media-type term.
                         "attachment_type_audio",
+                        // "Color" is also the Spanish word for colour.
+                        "color_swatch_description",
+                        // "Audio" is the same word in this locale.
+                        "download_audio",
                     ),
                 "values-fr" to
                     setOf(
+                        // "Messages" is also the French plural.
+                        "conversation_search_messages",
+                        // Source is also the standard French provenance label.
+                        "developer_package_source",
+                        // "Version" is spelled identically in French.
+                        "about_version",
                         "disappearing_unit_minutes",
                         "disappearing_minutes_format",
                         "disappearing_5_minutes",
@@ -1184,9 +1209,19 @@ class LocalizationResourceTest {
                         "attachment_type_image",
                         // "Photos" is the standard French label.
                         "group_image_source_photos",
+                        // "Action" is also the French word for action.
+                        "color_preview_action",
+                        // "Audio" is the same word in this locale.
+                        "download_audio",
+                        // "Photos" is the same word in French.
+                        "download_photos",
                     ),
                 "values-it" to
                     setOf(
+                        // "File" is the standard Italian computing term, as in attachment_type_file.
+                        "text_attachment_reader_title",
+                        // "Password" is the standard Italian loan word.
+                        "password",
                         // "chat" is a common loan word in Italian.
                         "archived_chats_count",
                         "chat_folder_chat_count",
@@ -1202,6 +1237,8 @@ class LocalizationResourceTest {
                         "nostr_event_type_video",
                         // "Emoji" is the standard Italian loan word.
                         "group_image_source_emoji",
+                        // "Audio" is the same word in this locale.
+                        "download_audio",
                     ),
                 "values-pt" to
                     setOf(

@@ -1,9 +1,6 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Surface
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -12,6 +9,8 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppThemeMode
+import dev.ipf.whitenoise.android.state.BubbleSide
+import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -25,53 +24,66 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
+/** The bubble colour editor with a saved sent colour: pinned preview, two pickers and the Save action. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+@Config(sdk = [36], qualifiers = "w360dp-h900dp-mdpi")
 class ChatBubbleColorsPreviewScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 
+    /** Dark editor; the received preview sits above the sent one, as in the prototype. */
     @Test
-    fun chatBubbleColorsScreenShowsSentPreviewFirst() {
-        val appState = testAppState()
+    fun chatBubbleColorsScreenDark() = capture(AppThemeMode.Dark, "chat_bubble_colors_screen_dark.png")
+
+    /** Light editor with the same layout. */
+    @Test
+    fun chatBubbleColorsScreenLight() = capture(AppThemeMode.Light, "chat_bubble_colors_screen_light.png")
+
+    /** Renders the editor, checks the preview order and records the window. */
+    private fun capture(
+        mode: AppThemeMode,
+        name: String,
+    ) {
+        val appState = testAppState(mode)
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true) {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    ChatBubbleColorsScreen(appState = appState, onBack = {})
-                }
+            WhiteNoiseTheme(darkTheme = mode == AppThemeMode.Dark) {
+                ChatBubbleColorsScreen(appState = appState, onBack = {})
             }
         }
         composeRule.waitForIdle()
 
-        val mineTop =
-            composeRule
-                .onNodeWithText(context.getString(R.string.bubble_preview_mine))
-                .fetchSemanticsNode()
-                .boundsInRoot
-                .top
-        val otherTop =
-            composeRule
-                .onNodeWithText(context.getString(R.string.bubble_preview_other))
-                .fetchSemanticsNode()
-                .boundsInRoot
-                .top
-        assertTrue("Expected sent preview above received preview", mineTop < otherTop)
+        val otherTop = previewTop(R.string.bubble_preview_other)
+        val mineTop = previewTop(R.string.bubble_preview_mine)
+        assertTrue("Expected received preview above sent preview", otherTop < mineTop)
 
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_bubble_colors_screen_dark.png")
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/$name")
     }
 
-    private fun testAppState(): WhiteNoiseAppState =
+    /** Top edge of the preview bubble carrying that text. */
+    private fun previewTop(textRes: Int): Float =
+        composeRule
+            .onNodeWithText(context.getString(textRes))
+            .fetchSemanticsNode()
+            .boundsInRoot.top
+
+    /** An active account on [mode] whose sent bubbles are saved as red for that theme. */
+    private fun testAppState(mode: AppThemeMode): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
             draftStore = DraftStore(InMemoryDraftPersistence()),
             accountIdHexResolver = { null },
             accounts = listOf(activeAccount()),
             activeAccountRef = ACCOUNT_REF,
-        ).also { it.updateThemeMode(AppThemeMode.Dark) }
+        ).also {
+            it.updateThemeMode(mode)
+            val theme = if (mode == AppThemeMode.Dark) BubbleTheme.Dark else BubbleTheme.Light
+            it.updateGlobalBubbleColor(theme, BubbleSide.Mine, SAVED_MINE)
+        }
 
+    /** The signed-in local account the editor scopes its colours to. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACCOUNT_REF,
@@ -85,9 +97,11 @@ class ChatBubbleColorsPreviewScreenshotTest {
     private companion object {
         const val ACCOUNT_REF = "alice"
         const val ACCOUNT_HEX = "alice"
+        const val SAVED_MINE = 0xFFB91C1CL
     }
 }
 
+/** Draft storage that never persists, so the screenshot fixture starts clean. */
 private class InMemoryDraftPersistence : DraftPersistence {
     override fun read(): Map<String, String> = emptyMap()
 

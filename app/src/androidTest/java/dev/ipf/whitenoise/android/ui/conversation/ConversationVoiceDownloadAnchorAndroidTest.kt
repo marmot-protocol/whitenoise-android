@@ -159,14 +159,10 @@ class ConversationVoiceDownloadAnchorAndroidTest {
                 } else {
                     0
                 },
-            waveform = WAVEFORM,
             progressFraction = 0f,
-            playbackSpeed = if (phase == VoiceVisualState.Playing) 1f else null,
-            attachedToCaption = false,
+            outgoing = false,
             onLongPress = {},
             onActionClick = {},
-            onSeek = null,
-            onCycleSpeed = {},
             modifier = Modifier.testTag(voiceTag(index)),
         )
     }
@@ -256,7 +252,6 @@ class ConversationVoiceDownloadAnchorAndroidTest {
         val NARROW_WIDTH = 320.dp
         val VIEWPORT_HEIGHT = 480.dp
         val STANDARD_ROW_HEIGHT = 72.dp
-        val WAVEFORM = FloatArray(64) { index -> 0.2f + (index % 5) * 0.1f }
 
         /** Stable semantic owner for one voice row in the device fixture. */
         fun voiceTag(index: Int): String = "device-voice-$index"

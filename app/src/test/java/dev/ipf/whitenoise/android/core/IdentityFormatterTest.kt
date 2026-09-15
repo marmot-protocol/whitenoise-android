@@ -58,10 +58,12 @@ class IdentityFormatterTest {
         assertEquals("now", IdentityFormatter.relativeTime(skewedAhead))
     }
 
+    /** Initials take the leading letter only. */
     @Test
-    fun initialsTakeLeadingCodePointFromEachWord() {
-        // Latin smoke test: the existing two-word path still works.
-        assertEquals("AB", IdentityFormatter.initials("alice bobson"))
+    fun initialsTakeTheLeadingLetterOnly() {
+        // The prototype's monogram is a single glyph, whatever the word count.
+        assertEquals("A", IdentityFormatter.initials("alice bobson"))
+        assertEquals("X", IdentityFormatter.initials("Xavier"))
     }
 
     @Test
@@ -87,15 +89,14 @@ class IdentityFormatterTest {
         assertEquals(grinningFace, IdentityFormatter.initials("$grinningFace$fire"))
     }
 
+    /** Initials single word with trailing emoji uses letters. */
     @Test
     fun initialsSingleWordWithTrailingEmojiUsesLetters() {
-        // A single word keeps the two-letter monogram from its letters; the
-        // trailing emoji is simply never reached (#427). Deliberately "BO", not
-        // "B" — single-word names always yield up to two letters, matching the
-        // existing "Xavier"-style behavior.
+        // A single word yields its first letter; the trailing emoji is never
+        // reached (#427).
         val fire = String(Character.toChars(0x1F525))
 
-        assertEquals("BO", IdentityFormatter.initials("Bob$fire"))
+        assertEquals("B", IdentityFormatter.initials("Bob$fire"))
     }
 
     @Test
@@ -131,14 +132,15 @@ class IdentityFormatterTest {
         assertTrue(farFuture.isNotBlank())
     }
 
+    /** Initials take two non bmp code points from one word. */
     @Test
     fun initialsTakeTwoNonBmpCodePointsFromOneWord() {
-        // Single-word name made entirely of non-BMP code points: both initials
+        // Single-word name made entirely of non-BMP code points: the initial
         // must arrive whole. Pre-fix this would split a surrogate pair.
         val mathBoldX = String(Character.toChars(0x1D54F))
         val mathBoldA = String(Character.toChars(0x1D400))
         val word = mathBoldX + mathBoldA + "vier"
-        val expected = (mathBoldX + mathBoldA).uppercase()
+        val expected = mathBoldX.uppercase()
 
         assertEquals(expected, IdentityFormatter.initials(word))
     }
@@ -331,28 +333,28 @@ class IdentityFormatterTest {
         assertTrue("expected the 12-hour US default, got $localeDefault", localeDefault.contains("3:28"))
     }
 
+    /** Message bubble clock portion honors the forced clock system. */
     @Test
     fun messageBubbleClockPortionHonorsTheForcedClockSystem() {
         // Older than an hour, so the footer shows a clock time — the portion the
-        // 12/24-hour preference governs. `now` is two hours after the message.
+        // 12/24-hour preference governs.
         val epoch = utcEpoch(hour = 15, minute = 28)
-        val now = Instant.parse("2026-07-23T17:28:00Z")
         val utc = ZoneId.of("UTC")
         assertEquals(
             "15:28",
-            IdentityFormatter.messageBubbleTime(epoch, locale = Locale.US, now = now, zone = utc, force24Hour = true),
+            IdentityFormatter.messageBubbleTime(epoch, locale = Locale.US, zone = utc, force24Hour = true),
         )
         val us12 =
             IdentityFormatter.messageBubbleTime(
                 epoch,
                 locale = Locale.GERMANY,
-                now = now,
                 zone = utc,
                 force24Hour = false,
             )
         assertTrue("expected a 12-hour rendering, got $us12", us12.startsWith("3:28"))
     }
 
+    /** Epoch seconds for a UTC civil time. */
     private fun utcEpoch(
         hour: Int,
         minute: Int,
@@ -364,65 +366,55 @@ class IdentityFormatterTest {
             .epochSecond
             .toULong()
 
-    // ---- messageBubbleTime (bubble footer timestamps, #1513) ----------------
+    // ---- messageBubbleTime (bubble footer timestamps) -----------------------
+    // The prototype's bubble footer is the clock time; the date headers carry day changes.
 
+    /** Message bubble time empty for unset sentinel. */
     @Test
     fun messageBubbleTimeEmptyForUnsetSentinel() {
         assertEquals("", IdentityFormatter.messageBubbleTime(0uL))
     }
 
+    /** Message bubble time shows clock time for recent messages. */
     @Test
-    fun messageBubbleTimeShowsNowWithinFirstMinute() {
-        val now = Instant.parse("2025-06-30T15:00:00Z")
-        val thirtySecondsAgo = now.minusSeconds(30L)
-
-        assertEquals("now", IdentityFormatter.messageBubbleTime(thirtySecondsAgo.epochSecond.toULong(), now = now))
-    }
-
-    @Test
-    fun messageBubbleTimeTreatsSlightFutureSkewAsNow() {
-        val now = Instant.parse("2025-06-30T15:00:00Z")
-        val skewedAhead = now.plusSeconds(5L)
-
-        assertEquals("now", IdentityFormatter.messageBubbleTime(skewedAhead.epochSecond.toULong(), now = now))
-    }
-
-    @Test
-    fun messageBubbleTimeShowsMinutesWithinFirstHour() {
-        val now = Instant.parse("2025-06-30T15:00:00Z")
-        val fortyFiveMinutesAgo = now.minusSeconds(45 * 60L)
-
-        assertEquals("45m", IdentityFormatter.messageBubbleTime(fortyFiveMinutesAgo.epochSecond.toULong(), now = now))
-    }
-
-    @Test
-    fun messageBubbleTimeShowsAbsoluteClockAtOneHourBoundary() {
+    fun messageBubbleTimeShowsClockTimeForRecentMessages() {
         val zone = ZoneId.of("UTC")
-        val now = Instant.parse("2025-06-30T15:00:00Z")
-        val oneHourAgo = now.minusSeconds(3_600L)
-        val expected =
-            DateTimeFormatter
-                .ofLocalizedTime(FormatStyle.SHORT)
-                .withLocale(Locale.US)
-                .format(oneHourAgo.atZone(zone))
-
+        val sentAt = Instant.parse("2025-06-30T14:15:00Z")
         assertEquals(
-            expected,
-            IdentityFormatter.messageBubbleTime(
-                oneHourAgo.epochSecond.toULong(),
-                RelativeTimeCopy.Default,
-                Locale.US,
-                now = now,
-                zone = zone,
-            ),
+            shortClock(sentAt, zone),
+            IdentityFormatter.messageBubbleTime(sentAt.epochSecond.toULong(), locale = Locale.US, zone = zone),
         )
     }
 
+    /** Message bubble time shows clock time at one hour boundary. */
     @Test
-    fun messageBubbleTimeUsesFutureLabelBeyondSkewTolerance() {
-        val now = Instant.parse("2025-06-30T15:00:00Z")
-        val farFuture = now.plusSeconds(3_600L)
-
-        assertEquals("future", IdentityFormatter.messageBubbleTime(farFuture.epochSecond.toULong(), now = now))
+    fun messageBubbleTimeShowsClockTimeAtOneHourBoundary() {
+        val zone = ZoneId.of("UTC")
+        val sentAt = Instant.parse("2025-06-30T14:00:00Z")
+        assertEquals(
+            shortClock(sentAt, zone),
+            IdentityFormatter.messageBubbleTime(sentAt.epochSecond.toULong(), locale = Locale.US, zone = zone),
+        )
     }
+
+    /** Message bubble time shows clock time for future skew. */
+    @Test
+    fun messageBubbleTimeShowsClockTimeForFutureSkew() {
+        val zone = ZoneId.of("UTC")
+        val sentAt = Instant.parse("2025-06-30T16:00:00Z")
+        assertEquals(
+            shortClock(sentAt, zone),
+            IdentityFormatter.messageBubbleTime(sentAt.epochSecond.toULong(), locale = Locale.US, zone = zone),
+        )
+    }
+
+    /** Formats a short clock label for the test locale. */
+    private fun shortClock(
+        instant: Instant,
+        zone: ZoneId,
+    ): String =
+        DateTimeFormatter
+            .ofLocalizedTime(FormatStyle.SHORT)
+            .withLocale(Locale.US)
+            .format(instant.atZone(zone))
 }

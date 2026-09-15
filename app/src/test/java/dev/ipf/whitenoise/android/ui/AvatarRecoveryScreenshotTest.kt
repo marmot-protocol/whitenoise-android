@@ -66,7 +66,7 @@ class AvatarRecoveryScreenshotTest {
                 }
             }
         }
-        composeRule.onNodeWithText("AT").assertExists()
+        composeRule.onNodeWithText("A").assertExists()
         composeRule.onNodeWithTag(TAG).captureToImage()
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/avatar_recovery_offline.png")
         composeRule.runOnIdle {
@@ -75,7 +75,7 @@ class AvatarRecoveryScreenshotTest {
         }
         composeRule.waitUntil(5_000) { AvatarImageLoader.peek(URL) != null }
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("AT").assertDoesNotExist()
+        composeRule.onNodeWithText("A").assertDoesNotExist()
         composeRule.onNodeWithTag(TAG).captureToImage()
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/avatar_recovery_connected.png")
     }
@@ -86,13 +86,13 @@ class AvatarRecoveryScreenshotTest {
         composeRule.setContent {
             Avatar(title = "Avatar Test", seed = "avatar-test", size = 64.dp, pictureUrl = URL)
         }
-        composeRule.onNodeWithText("AT").assertExists()
+        composeRule.onNodeWithText("A").assertExists()
         composeRule.runOnIdle {
             AvatarImageLoader.attachProfileImageFetcher { _, _ -> Base64.getDecoder().decode(PNG) }
         }
         composeRule.waitUntil(5_000) { AvatarImageLoader.peek(URL) != null }
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("AT").assertDoesNotExist()
+        composeRule.onNodeWithText("A").assertDoesNotExist()
     }
 
     /** A reused production slot cannot show pixels completed for its previous seed and URL. */
@@ -121,12 +121,12 @@ class AvatarRecoveryScreenshotTest {
             }
             composeRule.waitUntil(5_000) { oldStarted.isCompleted }
             composeRule.runOnIdle { identity.value = "new" }
-            composeRule.onNodeWithText("NA").assertExists()
+            composeRule.onNodeWithText("N").assertExists()
             composeRule.runOnIdle { releaseOld.complete(Unit) }
             composeRule.waitUntil(5_000) { AvatarImageLoader.peek("$URL/old") != null }
             composeRule.waitForIdle()
-            composeRule.onNodeWithText("NA").assertExists()
-            composeRule.onNodeWithText("OA").assertDoesNotExist()
+            composeRule.onNodeWithText("N").assertExists()
+            composeRule.onNodeWithText("O").assertDoesNotExist()
             assertEquals(null, AvatarImageLoader.peek("$URL/new"))
         } finally {
             releaseOld.complete(Unit)

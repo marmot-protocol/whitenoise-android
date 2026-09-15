@@ -5,31 +5,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -38,21 +26,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
-import androidx.core.view.WindowInsetsControllerCompat
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal const val DISAPPEARING_CUSTOM_VALUE_PICKER_TAG = "disappearing_custom_value_picker"
 internal const val DISAPPEARING_CUSTOM_UNIT_PICKER_TAG = "disappearing_custom_unit_picker"
@@ -61,7 +47,9 @@ internal const val DISAPPEARING_CUSTOM_UNIT_PICKER_TAG = "disappearing_custom_un
 // windows + Custom, and a Save action. The selection is STAGED — nothing
 // changes until Save, so the caller's [onPick] (which routes through the group
 // mutation lock + prune confirm) fires once. Custom opens a wheel picker.
-@OptIn(ExperimentalMaterial3Api::class)
+
+/** The prototype's disappearing-messages dialog: explainer, one radio row per preset, Custom time, Save / Cancel. */
+@Suppress("FunctionNaming")
 @Composable
 internal fun DisappearingMessagesPickerDialog(
     currentSecs: Long,
@@ -72,81 +60,25 @@ internal fun DisappearingMessagesPickerDialog(
     var showCustom by remember { mutableStateOf(false) }
     val isCustom = selected !in disappearingPresetSecs
 
-    Dialog(
+    WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
-        properties =
-            DialogProperties(
-                usePlatformDefaultWidth = false,
-                decorFitsSystemWindows = false,
-            ),
-    ) {
-        // The edge-to-edge dialog owns its own window, so tint the status/nav
-        // bar icons to match the active surface (light icons on dark themes,
-        // dark icons on the light theme) instead of inheriting stale activity
-        // appearance.
-        val view = LocalView.current
-        val lightBars = MaterialTheme.colorScheme.surface.luminance() > 0.5f
-        SideEffect {
-            val window = (view.parent as? DialogWindowProvider)?.window ?: return@SideEffect
-            WindowInsetsControllerCompat(window, view).apply {
-                isAppearanceLightStatusBars = lightBars
-                isAppearanceLightNavigationBars = lightBars
-            }
-        }
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-            Scaffold(
-                containerColor = MaterialTheme.colorScheme.surface,
-                topBar = {
-                    TopAppBar(
-                        title = { Text(stringResource(R.string.disappearing_messages)) },
-                        navigationIcon = {
-                            IconButton(onClick = onDismiss) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                            }
-                        },
-                    )
-                },
-                floatingActionButton = {
-                    ExtendedFloatingActionButton(onClick = { onPick(selected) }) {
-                        Text(stringResource(R.string.save))
-                    }
-                },
-            ) { padding ->
-                Column(
-                    Modifier
-                        .padding(padding)
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState()),
-                ) {
-                    Text(
-                        stringResource(R.string.disappearing_explainer),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier =
-                            Modifier.padding(
-                                start = 20.dp,
-                                end = 20.dp,
-                                top = 8.dp,
-                                bottom = 16.dp,
-                            ),
-                    )
-                    disappearingPresetSecs.forEach { secs ->
-                        DisappearingOptionRow(
-                            label = disappearingMessagesLabel(secs),
-                            selected = !isCustom && selected == secs,
-                            onClick = { selected = secs },
-                        )
-                    }
-                    DisappearingOptionRow(
-                        label = stringResource(R.string.disappearing_custom),
-                        selected = isCustom,
-                        onClick = { showCustom = true },
-                    )
-                    Spacer(Modifier.height(80.dp))
-                }
-            }
-        }
-    }
+        modifier = Modifier.testTag(DISAPPEARING_PICKER_TAG),
+        title = { Text(stringResource(R.string.disappearing_messages)) },
+        text = {
+            DisappearingPickerChoices(
+                selected = selected,
+                isCustom = isCustom,
+                onSelect = { selected = it },
+                onCustom = { showCustom = true },
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onPick(selected) }) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        },
+    )
     if (showCustom) {
         val initialSecs =
             if (isCustom && selected > 0L) {
@@ -165,6 +97,45 @@ internal fun DisappearingMessagesPickerDialog(
     }
 }
 
+/** Explainer, the preset radio rows and the Custom time action that the prototype's dialog body carries. */
+@Suppress("FunctionNaming")
+@Composable
+private fun DisappearingPickerChoices(
+    selected: Long,
+    isCustom: Boolean,
+    onSelect: (Long) -> Unit,
+    onCustom: () -> Unit,
+) {
+    Column(
+        Modifier.verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+    ) {
+        Text(stringResource(R.string.disappearing_explainer))
+        Column(Modifier.selectableGroup()) {
+            disappearingPresetSecs.forEach { secs ->
+                WhiteNoiseDialogChoiceRow(
+                    title = disappearingMessagesLabel(secs),
+                    selected = !isCustom && selected == secs,
+                    onClick = { onSelect(secs) },
+                )
+            }
+        }
+        TextButton(onClick = onCustom, modifier = Modifier.testTag(DISAPPEARING_CUSTOM_ACTION_TAG)) {
+            Text(
+                if (isCustom) {
+                    stringResource(R.string.disappearing_custom_value, disappearingMessagesLabel(selected))
+                } else {
+                    stringResource(R.string.disappearing_custom)
+                },
+            )
+        }
+    }
+}
+
+internal const val DISAPPEARING_PICKER_TAG = "disappearing.picker"
+internal const val DISAPPEARING_CUSTOM_ACTION_TAG = "disappearing.custom"
+
+/** Human label for a disappearing timer in seconds. */
 @Composable
 internal fun disappearingMessagesLabel(secs: Long): String =
     when (val spec = disappearingLabelSpec(secs)) {
@@ -186,29 +157,6 @@ internal fun disappearingMessagesLabel(secs: Long): String =
             pluralStringResource(R.plurals.disappearing_years_count, spec.count.toInt(), spec.count.toInt())
     }
 
-@Composable
-private fun DisappearingOptionRow(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        RadioButton(selected = selected, onClick = null)
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-    }
-}
-
-// Wheel picker for an arbitrary duration: a value column + a unit column
-// (seconds through years), using the platform NumberPicker for the native
-// wheel feel of the reference.
 @Composable
 private fun DisappearingCustomDialog(
     initialSecs: Long,

@@ -6,11 +6,14 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SettingsDetailNavigationTest {
+    /** Key Packages returns to Developer Tools, a hub destination; About returns to Help, which returns home. */
     @Test
-    fun helpAboutDeveloperFormABackStackDownToHome() {
-        // Developer → About → Help → home (null).
-        assertEquals(SettingsDetail.About, settingsDetailParent(SettingsDetail.Developer))
+    fun developerToolsAndHelpFormBackStacksDownToHome() {
+        // Key Packages → Developer Tools → home (null); About → Help → home (null).
+        assertEquals(SettingsDetail.Developer, settingsDetailParent(SettingsDetail.KeyPackages))
+        assertNull(settingsDetailParent(SettingsDetail.Developer))
         assertEquals(SettingsDetail.Help, settingsDetailParent(SettingsDetail.About))
+        assertEquals(SettingsDetail.Help, settingsDetailParent(SettingsDetail.BugReport))
         assertNull(settingsDetailParent(SettingsDetail.Help))
     }
 
@@ -18,6 +21,13 @@ class SettingsDetailNavigationTest {
     fun appearanceSubscreensReturnToAppearance() {
         assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.ActionColor))
         assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.ChatBubbleColors))
+    }
+
+    /** Diagnostics & Improvements returns to Privacy & Security, which returns home. */
+    @Test
+    fun diagnosticsReturnsToPrivacySecurity() {
+        assertEquals(SettingsDetail.DevicePrivacy, settingsDetailParent(SettingsDetail.DiagnosticsImprovements))
+        assertNull(settingsDetailParent(SettingsDetail.DevicePrivacy))
     }
 
     @Test

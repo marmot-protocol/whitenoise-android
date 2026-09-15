@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="disappearing">Исчезающие</string>
+    <string name="advanced">Дополнительно</string>
+    <string name="save_conversation_transcript">Сохранить переписку</string>
+</resources>

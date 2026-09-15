@@ -6,8 +6,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
-import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -15,6 +14,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceKey
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceOption
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceUnavailableReason
+import dev.ipf.whitenoise.android.ui.common.SpeechChoiceDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,6 +26,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.Locale
 
+/** Read Aloud's speech preferences: the media-mix switch and the voice picker's availability semantics. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en")
@@ -35,39 +36,52 @@ class TtsVoiceMediaSettingsComposeTest {
 
     private val app: Application = ApplicationProvider.getApplicationContext()
 
-    /** Ensures TalkBack announces the active-media behavior and normal fallback on the switch. */
+    /** The switch states the active-media constraint beside its title, and the row toggles. */
     @Test
     fun mediaMixSwitchExplainsItsConstraintAndToggles() {
         var changed: Boolean? = null
-        val description =
-            "${app.getString(R.string.tts_media_mix_title)}. " +
-                app.getString(R.string.tts_media_mix_subtitle)
         composeRule.setContent {
             WhiteNoiseTheme {
-                ttsMediaMixToggleRow(checked = false, onCheckedChange = { changed = it })
+                SettingsGroup {
+                    row("media_mix") { context ->
+                        SettingsSwitch(
+                            context = context,
+                            title = app.getString(R.string.tts_media_mix_title),
+                            checked = false,
+                            onCheckedChange = { changed = it },
+                            subtitle = app.getString(R.string.tts_media_mix_subtitle),
+                        )
+                    }
+                }
             }
         }
-
-        composeRule.onNodeWithContentDescription(description).assertIsOff().performClick()
+        composeRule.onNodeWithText(app.getString(R.string.tts_media_mix_subtitle)).assertExists()
+        composeRule.onNodeWithText(app.getString(R.string.tts_media_mix_title)).assertIsOff().performClick()
         composeRule.runOnIdle { assertEquals(true, changed) }
     }
 
-    /** Exposes the persisted enabled state through switch semantics. */
+    /** The persisted enabled state reaches switch semantics. */
     @Test
     fun mediaMixSwitchReportsTheEnabledState() {
-        val description =
-            "${app.getString(R.string.tts_media_mix_title)}. " +
-                app.getString(R.string.tts_media_mix_subtitle)
         composeRule.setContent {
             WhiteNoiseTheme {
-                ttsMediaMixToggleRow(checked = true, onCheckedChange = {})
+                SettingsGroup {
+                    row("media_mix") { context ->
+                        SettingsSwitch(
+                            context = context,
+                            title = app.getString(R.string.tts_media_mix_title),
+                            checked = true,
+                            onCheckedChange = {},
+                            subtitle = app.getString(R.string.tts_media_mix_subtitle),
+                        )
+                    }
+                }
             }
         }
-
-        composeRule.onNodeWithContentDescription(description).assertIsOn()
+        composeRule.onNodeWithText(app.getString(R.string.tts_media_mix_title)).assertIsOn()
     }
 
-    /** Announces a voice's locale and reason while keeping it unselectable. */
+    /** A network-only voice announces its locale and reason and stays unselectable. */
     @Test
     fun unavailableVoiceNamesLocaleAndReasonAndCannotBeActivated() {
         var clicked = false
@@ -80,10 +94,13 @@ class TtsVoiceMediaSettingsComposeTest {
             )
         composeRule.setContent {
             WhiteNoiseTheme {
-                ttsVoicePickerRow(voice, Locale.US, selected = false, onClick = { clicked = true })
+                SpeechChoiceDialog(
+                    title = app.getString(R.string.tts_voice_title),
+                    choices = listOf(speechVoiceChoice(voice, Locale.US, selected = false) { clicked = true }),
+                    onDismiss = {},
+                )
             }
         }
-
         val node = composeRule.onNodeWithText("Cloud voice")
         node.assertIsNotEnabled()
         val description =

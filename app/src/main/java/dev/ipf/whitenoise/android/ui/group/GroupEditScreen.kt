@@ -2,35 +2,25 @@ package dev.ipf.whitenoise.android.ui.group
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,13 +30,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -58,17 +46,22 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
-import dev.ipf.whitenoise.android.ui.common.SectionCard
+import dev.ipf.whitenoise.android.ui.common.IMAGE_DOCUMENT_MIME_TYPES
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
-import dev.ipf.whitenoise.android.ui.theme.Dimens
-import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
+import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -79,12 +72,14 @@ import kotlinx.coroutines.CancellationException
 @Suppress("MaxLineLength")
 internal fun safeAvatarUploadUrl(url: String): String = ProfileSanitizer.androidOwnedHttpsImageUrl(url) ?: error("unsafe upload URL")
 
+/** The name field accepts emoji only for an admin while no save or mutation runs. */
 internal fun groupNameEmojiEditable(
     canEdit: Boolean,
     saving: Boolean,
     mutationInFlight: Boolean,
 ): Boolean = canEdit && !saving && !mutationInFlight
 
+/** Edit Group: photo with its sources, name and description, Save in the bottom bar. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun GroupEditScreen(
@@ -246,138 +241,117 @@ internal fun GroupEditScreen(
     // wins the back event while the editor is open.
     BackHandler { onBack() }
 
-    val editImageLabel =
-        stringResource(
-            if (!hasGroupImage) {
-                R.string.group_image_search_set
-            } else {
-                R.string.group_image_search_edit
-            },
-        )
+    var photoMenuOpen by remember { mutableStateOf(false) }
+    val photoPicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri != null) uploadPublicAvatar(uri)
+        }
+    val filePicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) uploadPublicAvatar(uri)
+        }
 
-    Scaffold(
-        topBar = {
-            GroupEditTopBar(onBack = onBack)
-        },
+    val saveLabel = stringResource(if (saving) R.string.saving_group else R.string.save_group)
+    GroupEditScaffold(
+        onBack = onBack,
         bottomBar = {
             if (canEdit) {
                 StickyFormActionBar {
-                    Button(
+                    WhiteNoiseButton(
                         onClick = { saveGroupProfile() },
                         enabled = saveEnabled,
                         modifier = Modifier.fillMaxWidth(),
+                        loading = saving,
+                        loadingLabel = saveLabel,
                     ) {
-                        if (saving) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Check, contentDescription = null)
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(if (saving) R.string.saving_group else R.string.save_group))
+                        Text(saveLabel)
                     }
                 }
             }
         },
-    ) { padding ->
-        LazyColumn(
+    ) {
+        Column(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(padding),
-            contentPadding = PaddingValues(Dimens.spaceLg),
-            verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
+                    .whiteNoiseVerticalScroll(rememberScrollState())
+                    .padding(vertical = WhiteNoiseSpacing.Section),
+            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Section),
         ) {
-            item {
-                Column(
-                    Modifier.fillMaxWidth().padding(top = Dimens.spaceSm),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+            ) {
+                Text(stringResource(R.string.group_private_image), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.group_private_image_detail), style = MaterialTheme.typography.bodyMedium)
+                Box(
+                    modifier =
+                        Modifier
+                            .clip(CircleShape)
+                            .clickable(
+                                enabled = groupAvatarImageAvailable,
+                                onClickLabel = stringResource(R.string.profile_view_picture),
+                                role = Role.Button,
+                            ) { avatarViewerOpen = true },
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier =
-                                Modifier
-                                    .clip(CircleShape)
-                                    .clickable(
-                                        enabled = groupAvatarImageAvailable || canEdit,
-                                        onClickLabel =
-                                            stringResource(
-                                                if (groupAvatarImageAvailable) R.string.profile_view_picture else R.string.group_image_search_set,
-                                            ),
-                                        role = Role.Button,
-                                    ) {
-                                        if (groupAvatarImageAvailable) {
-                                            avatarViewerOpen = true
-                                        } else if (canEdit) {
-                                            showImageSearch = true
-                                        }
-                                    },
-                        ) {
-                            GroupAvatar(
-                                appState = appState,
-                                group = controller.group,
-                                title = controller.title(groupTitleCopy),
-                                seed = controller.group.groupIdHex,
-                                size = 96.dp,
-                            )
-                        }
-                        if (canEdit) {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .offset(x = 6.dp, y = 6.dp)
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.Black.copy(alpha = ScrimAlpha.HEAVY))
-                                        .clickable(
-                                            onClickLabel = editImageLabel,
-                                            role = Role.Button,
-                                        ) { showImageSearch = true },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    Icons.Default.PhotoCamera,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        }
+                    GroupAvatar(
+                        appState = appState,
+                        group = controller.group,
+                        title = controller.title(groupTitleCopy),
+                        seed = controller.group.groupIdHex,
+                        size = GroupEditAvatarSize,
+                    )
+                }
+                if (imageSaving) LinearProgressIndicator(Modifier.fillMaxWidth())
+                Box {
+                    WhiteNoiseFilledTonalButton(
+                        onClick = { photoMenuOpen = true },
+                        enabled = canEdit && !imageSaving,
+                        modifier = Modifier.testTag("group_edit.photoAction"),
+                    ) {
+                        Text(stringResource(if (hasGroupImage) R.string.change_photo else R.string.add_photo))
                     }
+                    GroupEditPhotoMenu(
+                        expanded = photoMenuOpen,
+                        hasImage = hasGroupImage,
+                        onDismiss = { photoMenuOpen = false },
+                        onChoosePhoto = {
+                            photoPicker.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                            )
+                        },
+                        onChooseFile = { filePicker.launch(IMAGE_DOCUMENT_MIME_TYPES) },
+                        onFindWebImage = { showImageSearch = true },
+                        onCreateEmoji = { showGroupEmojiImagePicker = true },
+                        onRemove = { updateImage { null } },
+                    )
                 }
             }
-            item {
-                SectionCard(title = stringResource(R.string.edit_group_info_title)) {
-                    val profileFieldColors =
-                        TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            disabledContainerColor = Color.Transparent,
-                            errorContainerColor = Color.Transparent,
-                        )
-                    GroupNameEmojiField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = stringResource(R.string.group_name),
-                        emojiPickerOpen = showEmojiPicker,
-                        onEmojiPickerClick = {
-                            if (nameEditable) showEmojiPicker = true
-                        },
-                        enabled = nameEditable,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    TextField(
-                        colors = profileFieldColors,
-                        value = description,
-                        onValueChange = { description = it },
-                        label = { Text(stringResource(R.string.description)) },
-                        minLines = 3,
-                        enabled = canEdit,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
+            ) {
+                GroupNameEmojiField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = stringResource(R.string.group_name),
+                    emojiPickerOpen = showEmojiPicker,
+                    onEmojiPickerClick = {
+                        if (nameEditable) showEmojiPicker = true
+                    },
+                    enabled = nameEditable,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text(stringResource(R.string.group_description)) },
+                    minLines = 3,
+                    maxLines = 6,
+                    enabled = canEdit,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }
@@ -448,16 +422,56 @@ internal fun GroupEditScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+private val GroupEditAvatarSize = 120.dp
+
+/** The prototype's photo sources behind the Add / Change photo button; Remove joins once the group has an image. */
 @Composable
-@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
-internal fun GroupEditTopBar(onBack: () -> Unit) {
-    TopAppBar(
-        title = { Text(stringResource(R.string.edit_group_info_title)) },
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-            }
-        },
+@Suppress("FunctionNaming", "LongParameterList")
+private fun GroupEditPhotoMenu(
+    expanded: Boolean,
+    hasImage: Boolean,
+    onDismiss: () -> Unit,
+    onChoosePhoto: () -> Unit,
+    onChooseFile: () -> Unit,
+    onFindWebImage: () -> Unit,
+    onCreateEmoji: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    WhiteNoiseDropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        items =
+            buildList {
+                add(WhiteNoiseMenuItem(stringResource(R.string.choose_photos), onChoosePhoto, R.drawable.ic_image))
+                add(WhiteNoiseMenuItem(stringResource(R.string.choose_files), onChooseFile, R.drawable.ic_description))
+                add(WhiteNoiseMenuItem(stringResource(R.string.find_web_image), onFindWebImage, R.drawable.ic_search))
+                add(WhiteNoiseMenuItem(stringResource(R.string.group_emoji_create), onCreateEmoji, R.drawable.ic_add))
+                if (hasImage) {
+                    add(
+                        WhiteNoiseMenuItem(
+                            stringResource(R.string.remove_photo),
+                            onRemove,
+                            icon = R.drawable.ic_delete,
+                            destructive = true,
+                        ),
+                    )
+                }
+            },
+    )
+}
+
+/** Settings frame shared by the native editor and its descriptive-title screenshot coverage. */
+@Composable
+@Suppress("FunctionNaming")
+internal fun GroupEditScaffold(
+    onBack: () -> Unit,
+    bottomBar: @Composable () -> Unit = {},
+    content: @Composable () -> Unit = {},
+) {
+    SettingsScaffold(
+        title = stringResource(R.string.edit_group_info_title),
+        onBack = onBack,
+        bottomBar = bottomBar,
+        content = content,
     )
 }

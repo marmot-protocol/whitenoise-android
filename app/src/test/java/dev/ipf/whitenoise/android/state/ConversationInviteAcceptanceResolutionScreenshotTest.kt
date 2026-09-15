@@ -211,7 +211,7 @@ class ConversationInviteAcceptanceResolutionScreenshotTest {
             showConversation(appState, controller, accepted, darkTheme)
             composeRule.runOnIdle { controller.applyGroupStateForTest(pending) }
             composeRule.onNode(hasSetTextAction()).assertIsDisplayed()
-            composeRule.onNodeWithText(context.getString(R.string.join_group)).assertDoesNotExist()
+            composeRule.onNodeWithText(context.getString(R.string.accept)).assertDoesNotExist()
             composeRule.onNodeWithText(context.getString(R.string.decline)).assertDoesNotExist()
             val theme = if (darkTheme) "dark" else "light"
             composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_accepted_invite_replay_$theme.png")
@@ -257,7 +257,6 @@ class ConversationInviteAcceptanceResolutionScreenshotTest {
                         isActionMenuOpen = false,
                         onActionMenuOpenChange = {},
                         onQuickReactionsSave = {},
-                        onQuickReactionsReset = {},
                         onReplyPreviewClick = {},
                         composerGate = ComposerGate.PENDING,
                         inviteMutationInFlight = false,

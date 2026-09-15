@@ -9,6 +9,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.MarmotEventFfi
@@ -35,7 +36,7 @@ class DiagnosticsScreenScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** Pins the empty event log and inactive performance controls in dark mode. */
+    /** Pins the empty Events card and truthful Idle indicator in dark mode. */
     @Test
     fun diagnosticsScreenDefaultDark() {
         composeRule.setContent {
@@ -112,8 +113,14 @@ class DiagnosticsScreenScreenshotTest {
             }
         }
 
+        composeRule.onNodeWithTag("diagnostics.actions").performClick()
+        composeRule.onNodeWithTag("diagnostics.action.health").performClick()
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("diagnostics.health").assertIsDisplayed()
+        composeRule.onNodeWithTag("diagnostics.actions.menu").assertDoesNotExist()
         composeRule
-            .onNodeWithTag(DIAGNOSTICS_CONTENT_TAG)
+            .onNodeWithTag("sheet.surface")
             .captureRoboImage("src/test/snapshots/diagnostics_screen_performance_active_dark.png")
     }
 
@@ -156,6 +163,9 @@ class DiagnosticsScreenScreenshotTest {
 
         composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("[alice] group event"))
         composeRule.onNodeWithText("[alice] group event").assertIsDisplayed()
+        listOf("private-account", "private-group", "private-commit", "private-payload").forEach {
+            composeRule.onNodeWithText(it, substring = true).assertDoesNotExist()
+        }
         composeRule
             .onNodeWithTag(DIAGNOSTICS_CONTENT_TAG)
             .captureRoboImage("src/test/snapshots/diagnostics_screen_superseded_group_change_dark.png")

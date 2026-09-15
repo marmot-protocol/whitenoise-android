@@ -3,22 +3,22 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.ClipData
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,6 +34,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -44,8 +45,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -55,11 +61,15 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
+
+private const val READER_ACTIONS_MAXIMUM_HEIGHT_FRACTION = 0.55f
 
 internal const val TEXT_ATTACHMENT_READER_TAG = "text-attachment-reader"
 internal const val TEXT_ATTACHMENT_READER_BODY_TAG = "text-attachment-reader-body"
@@ -69,12 +79,14 @@ internal const val TEXT_ATTACHMENT_READER_FILENAME_DIALOG_TAG = "text-attachment
 internal const val TEXT_ATTACHMENT_READER_FULL_FILENAME_TAG = "text-attachment-reader-full-filename"
 
 /** Projects a local text attachment and reports the precise media-mix start refusal. */
+@Suppress("LongParameterList", "LongMethod")
 private suspend fun WhiteNoiseAppState.speakTextAttachment(
     preview: TextAttachmentPreview,
     senderKey: String,
     senderDisplayName: String,
     messageIdHex: String,
     attachmentIndex: Int,
+    actions: TextAttachmentNativeActions,
 ) {
     val entry =
         withContext(Dispatchers.Default) {
@@ -86,13 +98,17 @@ private suspend fun WhiteNoiseAppState.speakTextAttachment(
                 attachmentIndex = attachmentIndex,
             )
         }
+    if (!actions.isCurrent()) return
     if (entry.text.isBlank() || !speakAloudPrepared(listOf(entry), Locale.getDefault())) {
         present(if (entry.text.isBlank()) R.string.tts_bar_error else ttsStartFailureMessage())
     }
 }
 
+/** Full-screen dialog reading a text attachment. */
 @Composable
+@Suppress("LongParameterList", "LongMethod")
 internal fun TextAttachmentReaderDialog(
+    actions: TextAttachmentNativeActions,
     candidate: TextAttachmentCandidate,
     appState: WhiteNoiseAppState,
     senderKey: String,
@@ -103,12 +119,17 @@ internal fun TextAttachmentReaderDialog(
     onOpenExternal: suspend () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var loadGeneration by remember(candidate) { mutableIntStateOf(0) }
-    var state by remember(candidate) { mutableStateOf<TextAttachmentReaderState>(TextAttachmentReaderState.Loading) }
+    var loadGeneration by remember(candidate, actions) { mutableIntStateOf(0) }
+    var state by remember(candidate, actions) {
+        mutableStateOf<TextAttachmentReaderState>(TextAttachmentReaderState.Loading)
+    }
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboard.current
+    val speechState by appState.ttsController.state.collectAsState()
+    var speechRequested by remember(actions) { mutableStateOf(false) }
+    val isReading = actions.isCurrent() && textAttachmentOwnsSpeech(speechState, messageIdHex, attachmentIndex)
 
-    LaunchedEffect(candidate, loadGeneration) {
+    LaunchedEffect(candidate, actions, loadGeneration) {
         state = TextAttachmentReaderState.Loading
         state =
             runCatchingCancellable {
@@ -143,16 +164,31 @@ internal fun TextAttachmentReaderDialog(
                 }
             },
             onReadAloud = { preview ->
-                scope.launch {
-                    appState.speakTextAttachment(
-                        preview = preview,
-                        senderKey = senderKey,
-                        senderDisplayName = senderDisplayName,
-                        messageIdHex = messageIdHex,
-                        attachmentIndex = attachmentIndex,
-                    )
+                if (actions.isCurrent() && !speechRequested) {
+                    if (textAttachmentOwnsSpeech(appState.ttsController.state.value, messageIdHex, attachmentIndex)) {
+                        appState.stopSpeaking()
+                    } else {
+                        speechRequested = true
+                        scope.launch {
+                            try {
+                                appState.speakTextAttachment(
+                                    preview,
+                                    senderKey,
+                                    senderDisplayName,
+                                    messageIdHex,
+                                    attachmentIndex,
+                                    actions,
+                                )
+                            } finally {
+                                speechRequested = false
+                            }
+                        }
+                    }
                 }
             },
+            onSave = { scope.launch { actions.save() } },
+            isReading = isReading,
+            readAloudBusy = speechRequested,
             onOpenExternal = { scope.launch { onOpenExternal() } },
             mentionDisplayName = appState::mentionDisplayName,
             onNostrProfileTap = appState::presentProfile,
@@ -161,8 +197,10 @@ internal fun TextAttachmentReaderDialog(
     }
 }
 
+/** Reader screen: metadata, body and native actions. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("LongParameterList", "LongMethod")
 internal fun TextAttachmentReaderScreen(
     candidate: TextAttachmentCandidate,
     state: TextAttachmentReaderState,
@@ -171,6 +209,9 @@ internal fun TextAttachmentReaderScreen(
     onCopy: (String) -> Unit,
     onReadAloud: (TextAttachmentPreview) -> Unit,
     onOpenExternal: () -> Unit,
+    onSave: () -> Unit = {},
+    isReading: Boolean = false,
+    readAloudBusy: Boolean = false,
     modifier: Modifier = Modifier,
     mentionDisplayName: ((String) -> String?)? = null,
     onNostrProfileTap: ((String) -> Unit)? = null,
@@ -178,121 +219,146 @@ internal fun TextAttachmentReaderScreen(
 ) {
     val selection = rememberTextAttachmentSelectionController(candidate, state)
     val preview = (state as? TextAttachmentReaderState.Ready)?.preview
+    val onBack = { if (selection.active) selection.reset() else onDismiss() }
+    BackHandler(enabled = selection.active, onBack = onBack)
     Scaffold(
         modifier =
             modifier
                 .fillMaxSize()
                 .testTag(TEXT_ATTACHMENT_READER_TAG),
         topBar = {
-            TextAttachmentReaderTopBar(
-                candidate = candidate,
+            TextAttachmentReaderTopBar(onDismiss = onBack, onOpenExternal = onOpenExternal, onSave = onSave)
+        },
+        bottomBar = {
+            TextAttachmentReaderBottomBar(
                 preview = preview,
                 selection = selection,
-                onDismiss = onDismiss,
                 onCopy = onCopy,
                 onReadAloud = onReadAloud,
-                onOpenExternal = onOpenExternal,
+                isReading = isReading,
+                busy = readAloudBusy,
                 transport = transport,
             )
         },
     ) { padding ->
-        TextAttachmentReaderContent(
-            state = state,
-            selection = selection,
-            onRetry = onRetry,
-            onOpenExternal = onOpenExternal,
-            onCopyLink = onCopy,
-            mentionDisplayName = mentionDisplayName,
-            onNostrProfileTap = onNostrProfileTap,
-            modifier = Modifier.padding(padding),
-        )
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
+            TextAttachmentMetadata(candidate = candidate, byteCount = preview?.byteCount, onCopy = onCopy)
+            HorizontalDivider()
+            TextAttachmentReaderContent(
+                state = state,
+                selection = selection,
+                onRetry = onRetry,
+                onOpenExternal = onOpenExternal,
+                onCopyLink = onCopy,
+                mentionDisplayName = mentionDisplayName,
+                onNostrProfileTap = onNostrProfileTap,
+            )
+        }
     }
 }
 
-/** Renders reader navigation and actions against the current native selection. */
+/** Keeps the prototype titled navigation and overflow on the existing external-open callback. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TextAttachmentReaderTopBar(
-    candidate: TextAttachmentCandidate,
+    onDismiss: () -> Unit,
+    onOpenExternal: () -> Unit,
+    onSave: () -> Unit,
+) {
+    var more by remember { mutableStateOf(false) }
+    TopAppBar(
+        title = { Text(stringResource(R.string.text_attachment_reader_title)) },
+        navigationIcon = {
+            IconButton(onClick = onDismiss) {
+                Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
+            }
+        },
+        actions = {
+            Box {
+                IconButton(onClick = { more = true }) {
+                    Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.more_options))
+                }
+                WhiteNoiseDropdownMenu(
+                    expanded = more,
+                    onDismissRequest = { more = false },
+                    items =
+                        listOf(
+                            WhiteNoiseMenuItem(
+                                label = stringResource(R.string.save),
+                                icon = R.drawable.ic_download,
+                                onClick = onSave,
+                            ),
+                            WhiteNoiseMenuItem(
+                                label = stringResource(R.string.text_attachment_open_external),
+                                onClick = onOpenExternal,
+                            ),
+                        ),
+                )
+            }
+        },
+    )
+}
+
+/** Keeps native transport and selection actions above navigation insets, scrollable at large text. */
+@Composable
+@Suppress("LongParameterList", "LongMethod")
+private fun TextAttachmentReaderBottomBar(
     preview: TextAttachmentPreview?,
     selection: TextAttachmentSelectionController,
-    onDismiss: () -> Unit,
     onCopy: (String) -> Unit,
     onReadAloud: (TextAttachmentPreview) -> Unit,
-    onOpenExternal: () -> Unit,
+    isReading: Boolean,
+    busy: Boolean,
     transport: @Composable () -> Unit,
 ) {
-    Column {
-        TopAppBar(
-            title = {},
-            navigationIcon = {
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.back),
-                    )
-                }
-            },
-            actions = {
-                TextAttachmentReaderActions(
-                    preview = preview,
-                    copyText = selection::selectedText,
-                    onCopy = onCopy,
-                    onReadAloud = onReadAloud,
-                    onOpenExternal = onOpenExternal,
-                )
-            },
-        )
-        TextAttachmentMetadata(candidate = candidate, onCopy = onCopy)
-        HorizontalDivider()
+    val maximumHeight =
+        with(LocalDensity.current) {
+            LocalWindowInfo.current.containerSize.height
+                .toDp()
+        } *
+            READER_ACTIONS_MAXIMUM_HEIGHT_FRACTION
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .heightIn(max = maximumHeight)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp),
+    ) {
         transport()
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val copyLabel = stringResource(R.string.copy_text)
+            TextButton(
+                enabled = preview?.text?.isNotEmpty() == true,
+                onClick = { preview?.let { onCopy(selection.selectedText(it.text)) } },
+                modifier = Modifier.semantics { contentDescription = copyLabel },
+            ) { Text(copyLabel) }
+            val speakLabel = stringResource(if (isReading) R.string.tts_bar_stop else R.string.speak_aloud)
+            TextButton(
+                enabled = !busy && preview?.text?.isNotBlank() == true,
+                onClick = {
+                    preview?.let { onReadAloud(textAttachmentSelectedPreview(it, selection.selectedText(it.text))) }
+                },
+                modifier = Modifier.semantics { contentDescription = speakLabel },
+            ) { Text(speakLabel) }
+        }
     }
 }
 
-@Composable
-private fun TextAttachmentReaderActions(
-    preview: TextAttachmentPreview?,
-    copyText: (String) -> String,
-    onCopy: (String) -> Unit,
-    onReadAloud: (TextAttachmentPreview) -> Unit,
-    onOpenExternal: () -> Unit,
-) {
-    IconButton(
-        enabled = preview?.text?.isNotEmpty() == true,
-        onClick = { preview?.let { onCopy(copyText(it.text)) } },
-    ) {
-        Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.copy_text))
-    }
-    IconButton(
-        enabled = preview?.text?.isNotBlank() == true,
-        onClick = { preview?.let(onReadAloud) },
-    ) {
-        Icon(
-            Icons.AutoMirrored.Filled.VolumeUp,
-            contentDescription = stringResource(R.string.speak_aloud),
-        )
-    }
-    IconButton(onClick = onOpenExternal) {
-        Icon(
-            Icons.AutoMirrored.Filled.OpenInNew,
-            contentDescription = stringResource(R.string.text_attachment_open_external),
-        )
-    }
-}
-
+/** File name, type and size with a copy action. */
 @Composable
 private fun TextAttachmentMetadata(
     candidate: TextAttachmentCandidate,
+    byteCount: Long?,
     onCopy: (String) -> Unit,
 ) {
     var showFullFilename by remember(candidate.displayName) { mutableStateOf(false) }
-    var filenameTruncated by remember(candidate.displayName) { mutableStateOf(false) }
     val viewFullFilenameLabel = stringResource(R.string.text_attachment_view_full_filename)
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(
@@ -300,11 +366,6 @@ private fun TextAttachmentMetadata(
             style = MaterialTheme.typography.titleMedium,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            onTextLayout = { result ->
-                if (filenameTruncated != result.hasVisualOverflow) {
-                    filenameTruncated = result.hasVisualOverflow
-                }
-            },
             modifier =
                 Modifier
                     .fillMaxWidth()
@@ -317,13 +378,11 @@ private fun TextAttachmentMetadata(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        if (filenameTruncated) {
-            TextButton(
-                onClick = { showFullFilename = true },
-                modifier = Modifier.align(Alignment.End),
-            ) {
-                Text(viewFullFilenameLabel)
-            }
+        byteCount?.let {
+            Text(stringResource(R.string.bytes_count, it), style = MaterialTheme.typography.labelMedium)
+        }
+        TextButton(onClick = { showFullFilename = true }) {
+            Text(viewFullFilenameLabel)
         }
     }
     if (showFullFilename) {
@@ -376,6 +435,7 @@ private fun TextAttachmentFilenameDialog(
     )
 }
 
+/** Loading, failed or ready body of the reader. */
 @Composable
 private fun TextAttachmentReaderContent(
     state: TextAttachmentReaderState,
@@ -387,7 +447,7 @@ private fun TextAttachmentReaderContent(
     onNostrProfileTap: ((String) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         when (state) {
             TextAttachmentReaderState.Loading -> TextAttachmentLoading()
             is TextAttachmentReaderState.Unavailable ->
@@ -416,6 +476,7 @@ private fun TextAttachmentLoading() {
     }
 }
 
+/** Selectable rendered text of a ready attachment. */
 @Composable
 private fun TextAttachmentReadyBody(
     preview: TextAttachmentPreview,
@@ -428,8 +489,7 @@ private fun TextAttachmentReadyBody(
     Column(
         modifier =
             Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .fillMaxWidth()
                 .padding(16.dp)
                 .textAttachmentSelectionLongPress(preview, selection::requestSelection)
                 .testTag(TEXT_ATTACHMENT_READER_BODY_TAG),

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_review_title">Vérifier le message vocal</string>
+    <string name="voice_record_again">Réenregistrer</string>
+    <string name="voice_message_release_to_review">Relâcher pour vérifier · glisser pour annuler</string>
+    <string name="voice_recording_stop">Arrêter l’enregistrement</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="disappearing">Selbstlöschend</string>
+    <string name="advanced">Erweitert</string>
+    <string name="save_conversation_transcript">Transkript speichern</string>
+</resources>

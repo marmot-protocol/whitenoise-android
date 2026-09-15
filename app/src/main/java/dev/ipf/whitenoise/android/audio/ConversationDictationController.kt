@@ -518,6 +518,7 @@ internal class ConversationDictationController internal constructor(
     private var accumulatedTranscript = ""
     private var pendingCompletedTranscript = ""
     private var finishRequested by mutableStateOf(false)
+    private var captureDeadlineElapsedMillis: Long? = null
     private var dispatchedSessionId by mutableStateOf<Long?>(null)
     private var sendJob: Job? = null
     private var requestedDeliveryMode: ConversationDictationDeliveryMode? = null
@@ -588,6 +589,12 @@ internal class ConversationDictationController internal constructor(
                     activeRecognitionGenerationId != null ||
                         state is ConversationDictationState.Starting
                 )
+
+    /** One logical capture owns one absolute budget across fresh recognition and service identities. */
+    private fun captureDeadlineReached(): Boolean {
+        val deadline = captureDeadlineElapsedMillis ?: return false
+        return elapsedRealtime() >= deadline
+    }
 
     /** Returns the completion revision used by Compose consumers to observe a terminal write. */
     fun completionRevision(
@@ -830,7 +837,9 @@ internal class ConversationDictationController internal constructor(
             } else {
                 runCatching {
                     recognitionSession?.stop {
-                        if (owns(sessionId, generationId)) finishPlaybackInterruption()
+                        if (owns(sessionId, generationId)) {
+                            finishPlaybackInterruption()
+                        }
                     }
                 }.onFailure {
                     failOrRetainTranscript(sessionId, target, ConversationDictationFailure.Unknown)
@@ -869,7 +878,9 @@ internal class ConversationDictationController internal constructor(
         }
         runCatching {
             recognitionSession?.stop {
-                if (owns(sessionId, generationId)) finishPlaybackInterruption()
+                if (owns(sessionId, generationId)) {
+                    finishPlaybackInterruption()
+                }
             }
         }.onFailure { failOrRetainTranscript(sessionId, target, ConversationDictationFailure.Unknown) }
     }
@@ -1504,11 +1515,16 @@ internal class ConversationDictationController internal constructor(
     }
 
     /** Starts one bounded recognizer generation while retaining logical-session ownership. */
+    @Suppress("LongMethod", "CyclomaticComplexMethod") // One generation's start is a single ownership-checked sequence.
     private fun startRecognition(
         sessionId: Long,
         target: ConversationDictationTarget,
     ) {
         if (state.sessionId != sessionId) return
+        if (!finishRequested && captureDeadlineReached()) {
+            failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
+            return
+        }
         clearRecognitionGeneration(cancel = false)
         if (!ensureDurableSession(sessionId, target)) return
         // Drain generations use sealed PCM; reacquiring capture would replace their drain deadline.
@@ -1525,7 +1541,11 @@ internal class ConversationDictationController internal constructor(
                 fail(sessionId, target, ConversationDictationFailure.Unknown)
                 return
             }
-            armSessionTimeout(sessionId, MAX_SESSION_MILLIS) {
+            val captureDeadline =
+                captureDeadlineElapsedMillis ?: (elapsedRealtime() + MAX_SESSION_MILLIS).also {
+                    captureDeadlineElapsedMillis = it
+                }
+            armSessionTimeout(sessionId, (captureDeadline - elapsedRealtime()).coerceAtLeast(0L)) {
                 when (state) {
                     is ConversationDictationState.Starting,
                     is ConversationDictationState.Listening,
@@ -1946,15 +1966,13 @@ internal class ConversationDictationController internal constructor(
         target: ConversationDictationTarget,
     ) {
         val transcript = accumulatedTranscript.trim()
-        if (transcript.isBlank()) {
-            fail(sessionId, target, unresolvedRecognitionFailure ?: ConversationDictationFailure.NoSpeech)
-            return
+        when {
+            unresolvedRecognitionFailure?.requiresTranscriptReview == true ->
+                failOrRetainTranscript(sessionId, target, requireNotNull(unresolvedRecognitionFailure))
+            transcript.isBlank() ->
+                fail(sessionId, target, unresolvedRecognitionFailure ?: ConversationDictationFailure.NoSpeech)
+            else -> validateAndDeliverTranscript(sessionId, target, transcript)
         }
-        if (unresolvedRecognitionFailure?.requiresTranscriptReview == true) {
-            retainAccumulatedTranscriptForReview(sessionId, target)
-            return
-        }
-        validateAndDeliverTranscript(sessionId, target, transcript)
     }
 
     /** An explicit finish can still use committed text during a transient reconnect. */
@@ -2415,6 +2433,7 @@ internal class ConversationDictationController internal constructor(
         accumulatedTranscript = ""
         pendingCompletedTranscript = ""
         finishRequested = false
+        captureDeadlineElapsedMillis = null
         dispatchedSessionId = null
         requestedDeliveryMode = null
         generationHasSpeech = false

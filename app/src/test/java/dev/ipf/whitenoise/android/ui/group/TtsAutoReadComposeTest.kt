@@ -8,7 +8,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
@@ -18,15 +17,13 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelectable
-import androidx.compose.ui.test.isToggleable
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -36,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.TtsAutoReadOverride
+import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -46,6 +44,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
+/** Contract of the per-chat Read Aloud row and its override picker: semantics, provenance and selection. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en")
@@ -55,60 +54,10 @@ class TtsAutoReadComposeTest {
 
     private val app: Application = ApplicationProvider.getApplicationContext()
 
+    /** Resolves a string resource in the test context. */
     private fun string(resId: Int): String = app.getString(resId)
 
-    @Test
-    fun globalDefaultRowReflectsOffAndOnToggleState() {
-        var checked by mutableStateOf(false)
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                TtsAutoReadGlobalDefaultRow(checked = checked, onCheckedChange = { checked = it })
-            }
-        }
-        composeRule.onNode(isToggleable()).assertIsOff()
-        checked = true
-        composeRule.waitForIdle()
-        composeRule.onNode(isToggleable()).assertIsOn()
-    }
-
-    @Test
-    fun globalDefaultRowExposesTitleAndSubtitleToTalkBack() {
-        val title = string(R.string.tts_auto_read_default_global_title)
-        val subtitle = string(R.string.tts_auto_read_default_global_subtitle)
-        renderGlobalDefault(checked = false)
-
-        val semantics =
-            composeRule
-                .onNodeWithTag(TTS_AUTO_READ_GLOBAL_DEFAULT_ROW_TAG)
-                .fetchSemanticsNode()
-                .config
-        val description = semantics.getOrNull(SemanticsProperties.ContentDescription)?.joinToString()
-        assertEquals("$title. $subtitle", description)
-    }
-
-    @Test
-    fun globalDefaultRowToggleInvokesCallback() {
-        var checked by mutableStateOf(false)
-        var enabled: Boolean? = null
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                TtsAutoReadGlobalDefaultRow(
-                    checked = checked,
-                    onCheckedChange = {
-                        checked = it
-                        enabled = it
-                    },
-                )
-            }
-        }
-
-        composeRule.onNode(isToggleable()).performClick()
-        composeRule.runOnIdle { assertEquals(true, enabled) }
-
-        composeRule.onNode(isToggleable()).performClick()
-        composeRule.runOnIdle { assertEquals(false, enabled) }
-    }
-
+    /** Every provenance label the row can show renders beside the title. */
     @Test
     fun groupActionRowRendersEachProvenanceLabel() {
         val title = string(R.string.tts_auto_read_title)
@@ -122,11 +71,16 @@ class TtsAutoReadComposeTest {
         var provenance by mutableStateOf(cases.first())
         composeRule.setContent {
             WhiteNoiseTheme {
-                TtsAutoReadGroupActionRow(
-                    title = title,
-                    provenanceLabel = provenance,
-                    onClick = {},
-                )
+                SettingsGroup {
+                    row("auto_read") { rowContext ->
+                        TtsAutoReadGroupActionRow(
+                            context = rowContext,
+                            title = title,
+                            provenanceLabel = provenance,
+                            onClick = {},
+                        )
+                    }
+                }
             }
         }
         for (label in cases) {
@@ -137,12 +91,12 @@ class TtsAutoReadComposeTest {
         }
     }
 
+    /** TalkBack hears the title and the provenance as one announcement. */
     @Test
     fun groupActionRowMergesTitleAndProvenanceForTalkBack() {
         val title = string(R.string.tts_auto_read_title)
         val provenance = string(R.string.tts_auto_read_use_default_on)
         renderGroupRow(provenanceLabel = provenance)
-
         val description =
             composeRule
                 .onNodeWithTag(TTS_AUTO_READ_GROUP_ROW_TAG)
@@ -153,12 +107,12 @@ class TtsAutoReadComposeTest {
         assertEquals("$title. $provenance", description)
     }
 
+    /** The row is a button and a tap reaches the caller. */
     @Test
     fun groupActionRowIsButtonAndInvokesClick() {
         var clicked = false
         val provenance = string(R.string.tts_auto_read_use_default_on)
         renderGroupRow(provenanceLabel = provenance, onClick = { clicked = true })
-
         composeRule
             .onNodeWithTag(TTS_AUTO_READ_GROUP_ROW_TAG)
             .assert(hasClickAction())
@@ -167,6 +121,7 @@ class TtsAutoReadComposeTest {
         composeRule.runOnIdle { assertTrue(clicked) }
     }
 
+    /** At 200 % type on a narrow screen the title sits above an unclipped provenance line inside the row. */
     @Test
     @Config(sdk = [36], qualifiers = "w320dp-h780dp-mdpi")
     fun groupActionRowAtLargeFontKeepsFullTitleAndProvenanceVisible() {
@@ -176,17 +131,21 @@ class TtsAutoReadComposeTest {
             CompositionLocalProvider(LocalDensity provides Density(density = 1f, fontScale = 2f)) {
                 WhiteNoiseTheme {
                     Box(Modifier.width(320.dp)) {
-                        TtsAutoReadGroupActionRow(
-                            title = title,
-                            provenanceLabel = provenance,
-                            onClick = {},
-                        )
+                        SettingsGroup {
+                            row("auto_read") { rowContext ->
+                                TtsAutoReadGroupActionRow(
+                                    context = rowContext,
+                                    title = title,
+                                    provenanceLabel = provenance,
+                                    onClick = {},
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
         composeRule.waitForIdle()
-
         val rowBounds =
             composeRule
                 .onNodeWithTag(TTS_AUTO_READ_GROUP_ROW_TAG, useUnmergedTree = true)
@@ -194,25 +153,13 @@ class TtsAutoReadComposeTest {
                 .boundsInRoot
         val titleBounds =
             composeRule
-                .onNodeWithTag(TTS_AUTO_READ_GROUP_TITLE_TAG, useUnmergedTree = true)
+                .onNode(hasText(title), useUnmergedTree = true)
                 .fetchSemanticsNode()
                 .boundsInRoot
-        val provenanceBounds =
-            composeRule
-                .onNodeWithTag(TTS_AUTO_READ_GROUP_PROVENANCE_TAG, useUnmergedTree = true)
-                .fetchSemanticsNode()
-                .boundsInRoot
-        val provenanceClipped =
-            composeRule
-                .onNodeWithTag(TTS_AUTO_READ_GROUP_PROVENANCE_TAG, useUnmergedTree = true)
-                .fetchSemanticsNode()
-                .boundsInRoot
-        val provenanceUnclipped =
-            composeRule
-                .onNodeWithTag(TTS_AUTO_READ_GROUP_PROVENANCE_TAG, useUnmergedTree = true)
-                .getUnclippedBoundsInRoot()
-
-        val clippedHeight = provenanceClipped.bottom - provenanceClipped.top
+        val provenanceNode = composeRule.onNode(hasText(provenance), useUnmergedTree = true)
+        val provenanceBounds = provenanceNode.fetchSemanticsNode().boundsInRoot
+        val provenanceUnclipped = provenanceNode.getUnclippedBoundsInRoot()
+        val clippedHeight = provenanceBounds.bottom - provenanceBounds.top
         val unclippedHeight = (provenanceUnclipped.bottom - provenanceUnclipped.top).value
         composeRule.onNodeWithText(provenance).assertIsDisplayed()
         assertTrue(titleBounds.bottom <= provenanceBounds.top)
@@ -220,6 +167,7 @@ class TtsAutoReadComposeTest {
         assertTrue(provenanceBounds.bottom <= rowBounds.bottom + 0.5f)
     }
 
+    /** The row reads and taps the same way under RTL. */
     @Test
     fun groupActionRowSupportsRtlLayoutAndInteraction() {
         val title = string(R.string.tts_auto_read_title)
@@ -228,21 +176,26 @@ class TtsAutoReadComposeTest {
         composeRule.setContent {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                 WhiteNoiseTheme {
-                    TtsAutoReadGroupActionRow(
-                        title = title,
-                        provenanceLabel = provenance,
-                        onClick = { clicked = true },
-                    )
+                    SettingsGroup {
+                        row("auto_read") { rowContext ->
+                            TtsAutoReadGroupActionRow(
+                                context = rowContext,
+                                title = title,
+                                provenanceLabel = provenance,
+                                onClick = { clicked = true },
+                            )
+                        }
+                    }
                 }
             }
         }
-
         composeRule.onNodeWithText(title).assertIsDisplayed()
         composeRule.onNodeWithText(provenance).assertIsDisplayed()
         composeRule.onNodeWithTag(TTS_AUTO_READ_GROUP_ROW_TAG).performClick()
         composeRule.runOnIdle { assertTrue(clicked) }
     }
 
+    /** The default option is named by the global default's current value and is selected when no override is set. */
     @Test
     fun pickerContentShowsResolvedDefaultOnAndOffOptions() {
         var globalDefault by mutableStateOf(false)
@@ -256,12 +209,12 @@ class TtsAutoReadComposeTest {
             }
         }
         composeRule.onNodeWithText(string(R.string.tts_auto_read_use_default_off)).assertIsSelected()
-
         globalDefault = true
         composeRule.waitForIdle()
         composeRule.onNodeWithText(string(R.string.tts_auto_read_use_default_on)).assertIsSelected()
     }
 
+    /** Explicit on and off overrides select their own row. */
     @Test
     fun pickerContentMarksExplicitOnAndOffSelections() {
         var selected by mutableStateOf<TtsAutoReadOverride?>(TtsAutoReadOverride.ON)
@@ -275,12 +228,12 @@ class TtsAutoReadComposeTest {
             }
         }
         composeRule.onNodeWithText(string(R.string.tts_auto_read_override_on)).assertIsSelected()
-
         selected = TtsAutoReadOverride.OFF
         composeRule.waitForIdle()
         composeRule.onNodeWithText(string(R.string.tts_auto_read_override_off)).assertIsSelected()
     }
 
+    /** Every option carries radio-style selectable semantics. */
     @Test
     fun pickerContentUsesRadioSelectableSemantics() {
         composeRule.setContent {
@@ -293,14 +246,14 @@ class TtsAutoReadComposeTest {
             }
         }
         composeRule.waitForIdle()
-
         composeRule.onNodeWithText(string(R.string.tts_auto_read_use_default_off)).assert(isSelectable())
         composeRule.onNodeWithText(string(R.string.tts_auto_read_override_on)).assert(isSelectable())
         composeRule.onNodeWithText(string(R.string.tts_auto_read_override_off)).assert(isSelectable())
     }
 
+    /** Exactly one option reports itself selected. */
     @Test
-    fun pickerContentShowsVisibleCheckOnlyOnSelectedOption() {
+    fun pickerContentSelectsExactlyOneOption() {
         composeRule.setContent {
             WhiteNoiseTheme {
                 TtsAutoReadPickerContent(
@@ -310,12 +263,11 @@ class TtsAutoReadComposeTest {
                 )
             }
         }
-
-        val selectedLabel = string(R.string.selected)
-        composeRule.onAllNodesWithContentDescription(selectedLabel).assertCountEquals(1)
+        composeRule.onAllNodes(isSelected()).assertCountEquals(1)
         composeRule.onNodeWithText(string(R.string.tts_auto_read_override_on)).assertIsSelected()
     }
 
+    /** Tapping an option reports that override; tapping the default reports null. */
     @Test
     fun pickerContentInvokesSelectedOverrideCallback() {
         var globalDefault by mutableStateOf(false)
@@ -329,10 +281,8 @@ class TtsAutoReadComposeTest {
                 )
             }
         }
-
         composeRule.onNodeWithText(string(R.string.tts_auto_read_override_off)).performClick()
         composeRule.runOnIdle { assertEquals(TtsAutoReadOverride.OFF, selected) }
-
         globalDefault = true
         selected = TtsAutoReadOverride.OFF
         composeRule.waitForIdle()
@@ -340,29 +290,23 @@ class TtsAutoReadComposeTest {
         composeRule.runOnIdle { assertEquals(null, selected) }
     }
 
-    private fun renderGlobalDefault(
-        checked: Boolean,
-        onCheckedChange: (Boolean) -> Unit = {},
-    ) {
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                TtsAutoReadGlobalDefaultRow(checked = checked, onCheckedChange = onCheckedChange)
-            }
-        }
-        composeRule.waitForIdle()
-    }
-
+    /** Renders group row. */
     private fun renderGroupRow(
         provenanceLabel: String,
         onClick: () -> Unit = {},
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
-                TtsAutoReadGroupActionRow(
-                    title = string(R.string.tts_auto_read_title),
-                    provenanceLabel = provenanceLabel,
-                    onClick = onClick,
-                )
+                SettingsGroup {
+                    row("auto_read") { rowContext ->
+                        TtsAutoReadGroupActionRow(
+                            context = rowContext,
+                            title = string(R.string.tts_auto_read_title),
+                            provenanceLabel = provenanceLabel,
+                            onClick = onClick,
+                        )
+                    }
+                }
             }
         }
         composeRule.waitForIdle()

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,7 +45,7 @@ internal fun MessageBubbleFrame(
     mentionedYouLabel: String,
     modifier: Modifier = Modifier,
     contentModifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(18.dp),
+    shape: Shape = MaterialTheme.shapes.large,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val highlightProgress =
@@ -84,10 +83,8 @@ internal fun MessageBubbleFrame(
             messageBubbleBorder(
                 highlighted = false,
                 mine = mine,
-                customArgb = presentation.borderOverrideArgb,
                 persistedFailure = presentation.suppressBorder,
             ),
-        tonalElevation = if (mine) 1.dp else 0.dp,
     ) {
         Column(
             modifier = bubbleContentModifier(contentModifier),
@@ -115,7 +112,7 @@ internal fun MediaCaptionFrame(
     alignEnd: Boolean,
     modifier: Modifier = Modifier,
     contentModifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(18.dp),
+    shape: Shape = MaterialTheme.shapes.large,
     media: @Composable ColumnScope.() -> Unit,
     caption: @Composable ColumnScope.() -> Unit,
 ) {
@@ -154,18 +151,23 @@ internal fun MediaCaptionFrame(
             messageBubbleBorder(
                 highlighted = false,
                 mine = mine,
-                customArgb = presentation.borderOverrideArgb,
                 persistedFailure = presentation.suppressBorder,
             ),
-        tonalElevation = if (mine) 1.dp else 0.dp,
     ) {
         MediaSupplementEnvelope(
             alignEnd = alignEnd,
+            modifier = Modifier.padding(ConversationMessageMetrics.RichOuterInset),
             media = media,
         ) {
             Column(modifier = contentModifier.fillMaxWidth()) {
                 Column(
-                    modifier = bubbleContentModifier(Modifier),
+                    modifier =
+                        Modifier.padding(
+                            start = ConversationMessageMetrics.RichTextHorizontalAdjustment,
+                            end = ConversationMessageMetrics.RichTextHorizontalAdjustment,
+                            top = ConversationMessageMetrics.RichContentSpacing,
+                            bottom = ConversationMessageMetrics.RichTextBottomAdjustment,
+                        ),
                     verticalArrangement = bubbleContentArrangement,
                     content = caption,
                 )
@@ -230,9 +232,10 @@ private enum class MediaEnvelopeSlot {
 
 private val bubbleContentArrangement = Arrangement.spacedBy(6.dp)
 
+/** Content insets inside the bubble frame. */
 private fun bubbleContentModifier(contentModifier: Modifier): Modifier =
     contentModifier
-        .padding(horizontal = 14.dp, vertical = 10.dp)
+        .padding(horizontal = 12.dp, vertical = 8.dp)
 
 @Composable
 @Suppress("FunctionNaming")
@@ -254,11 +257,13 @@ internal fun shouldFrameMessageBubbleSupplement(
     invalidationWarning: String?,
 ): Boolean = bodyText != null || invalidationWarning != null
 
+/** Highlight border colour: the custom bubble colour when set, else the fallback. */
 internal fun messageTargetHighlightColor(
     customBorderArgb: Long?,
     fallback: Color,
 ): Color = customBorderArgb?.let(::colorFromArgb) ?: fallback
 
+/** Animated highlight border for a jump-to-message target. */
 private fun messageTargetHighlightModifier(
     progress: State<Float>,
     customBorderArgb: Long?,
@@ -277,9 +282,9 @@ private fun messageTargetHighlightModifier(
                 size = Size((size.width - inset * 2).coerceAtLeast(0f), (size.height - inset * 2).coerceAtLeast(0f)),
                 cornerRadius =
                     if (customBorderArgb != null) {
-                        CornerRadius(14.dp.toPx(), 14.dp.toPx())
+                        CornerRadius(12.dp.toPx(), 12.dp.toPx())
                     } else {
-                        CornerRadius(17.dp.toPx(), 17.dp.toPx())
+                        CornerRadius(15.dp.toPx(), 15.dp.toPx())
                     },
                 style = Stroke(width = 2.dp.toPx()),
             )

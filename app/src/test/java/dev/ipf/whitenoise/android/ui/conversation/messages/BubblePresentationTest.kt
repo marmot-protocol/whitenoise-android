@@ -130,8 +130,9 @@ class BubblePresentationTest {
         )
     }
 
+    /** Amoled custom color keeps black background and default border. */
     @Test
-    fun amoledCustomColorKeepsBlackBackgroundAndRemovesBlueFromBorder() {
+    fun amoledCustomColorKeepsBlackBackgroundAndDefaultBorder() {
         val defaultPresentation = resolveBubblePresentationArgb(false, true, true, null, tokens)
         val customPresentation = resolveBubblePresentationArgb(false, true, true, 0xFF336699, tokens)
 
@@ -139,7 +140,7 @@ class BubblePresentationTest {
         assertNull(defaultPresentation.borderOverrideArgb)
         assertEquals(OPAQUE_BLACK_ARGB, customPresentation.backgroundArgb)
         assertEquals(tokens.surfaceContentArgb, customPresentation.contentArgb)
-        assertEquals(0xFF336600, customPresentation.borderOverrideArgb)
+        assertNull(customPresentation.borderOverrideArgb)
         assertNull(resolveBubblePresentationArgb(false, true, true, 0xFF0000FF, tokens).borderOverrideArgb)
     }
 

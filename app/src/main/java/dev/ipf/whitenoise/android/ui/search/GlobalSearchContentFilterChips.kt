@@ -1,32 +1,44 @@
 package dev.ipf.whitenoise.android.ui.search
 
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.search.labelRes
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal const val GLOBAL_SEARCH_CONTENT_FILTER_TAG = "global-search-content-filter"
 
-@Suppress("MaxLineLength")
-internal fun globalSearchContentChipTag(kind: GlobalSearchContentKind): String = "global-search-content-chip-${kind.name}"
+/** Stable identity preserved for the existing typed-filter state and tests. */
+internal fun globalSearchContentChipTag(kind: GlobalSearchContentKind): String {
+    val kindName = kind.name
+    return "global-search-content-chip-" + kindName
+}
 
+/** Prototype check rows for existing typed state; execution availability stays caller-owned. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun GlobalSearchContentFilterChips(
@@ -34,14 +46,13 @@ internal fun GlobalSearchContentFilterChips(
     onSelectionChange: (GlobalSearchContentFilterSelection) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 6.dp)
-                .testTag(GLOBAL_SEARCH_CONTENT_FILTER_TAG),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    Column(
+        modifier
+            .fillMaxWidth()
+            .heightIn(max = 320.dp)
+            .verticalScroll(rememberScrollState())
+            .testTag(GLOBAL_SEARCH_CONTENT_FILTER_TAG),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         GlobalSearchContentKind.entries.forEach { kind ->
             GlobalSearchContentChip(
@@ -54,6 +65,7 @@ internal fun GlobalSearchContentFilterChips(
     }
 }
 
+/** The prototype's dialog check row (label, trailing checkbox) with one native selected target per kind. */
 @Suppress("FunctionNaming")
 @Composable
 private fun GlobalSearchContentChip(
@@ -63,15 +75,26 @@ private fun GlobalSearchContentChip(
     modifier: Modifier = Modifier,
 ) {
     val label = stringResource(kind.labelRes())
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label) },
-        modifier =
-            modifier.semantics {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .toggleable(value = selected, role = Role.Checkbox, onValueChange = { onClick() })
+            .semantics {
                 contentDescription = label
-                role = Role.Checkbox
                 this.selected = selected
-            },
-    )
+            }.padding(WhiteNoiseSpacing.Related),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Checkbox(selected, onCheckedChange = null, modifier = Modifier.clearAndSetSemantics {})
+    }
 }

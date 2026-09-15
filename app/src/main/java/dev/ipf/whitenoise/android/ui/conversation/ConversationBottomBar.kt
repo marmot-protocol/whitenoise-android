@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
@@ -34,9 +35,13 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.DisbandedGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
+import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingReview
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 
 private val ConversationTopInteractionClearance = 64.dp
+
+/** The whole bottom chrome, whose top edge is where the timeline's resting tail gap ends. */
+internal const val CONVERSATION_BOTTOM_BAR_TAG = "conversation.bottom_bar"
 
 /** Renders the conversation action/composer surface from one generation-pinned state frame. */
 @Composable
@@ -76,6 +81,10 @@ internal fun ConversationBottomBar(
     onDraftChange: (TextFieldValue) -> Unit,
     composerTextState: ComposerTextState,
     composerAttachmentSheet: ComposerAttachmentSheetState,
+    attachmentContent: (@Composable () -> Unit)? = null,
+    hasPendingAttachments: Boolean = false,
+    attachmentsPreparing: Boolean = false,
+    onSendAttachments: ((String, (Boolean) -> Unit) -> Unit)? = null,
     onAfterSend: () -> Unit,
     onPickFromGallery: () -> Unit,
     onPickRecentMedia: (Uri) -> Unit,
@@ -86,6 +95,7 @@ internal fun ConversationBottomBar(
     onShareContact: () -> Unit,
     onPasteImageUris: (List<Uri>) -> Unit,
     voiceRecordingController: VoiceRecordingController,
+    voiceReview: VoiceRecordingReview? = null,
     mentionCandidates: List<MentionComposer.Candidate>,
     mentionPickerEnabled: Boolean,
     autoFocusOnEnter: Boolean,
@@ -94,12 +104,15 @@ internal fun ConversationBottomBar(
     composerFocus: FocusRequester,
     onComposerFocusChanged: (Boolean) -> Unit,
     onComposerPreImeBack: () -> Unit,
+    /** True while system Back is closing the keyboard, so the composer collapses in the same frame. */
+    composerDismissInProgress: Boolean = false,
     onBottomInputChanged: () -> Unit,
     onKeyboardRestoreFromCustomInput: () -> Unit,
     onKeyboardRestoreFromCustomInputFailed: () -> Unit,
     recentEmojis: List<String>,
     onEmojiUsed: (String) -> Unit,
     onBottomChromeMeasured: (heightPx: Int, chromeBottomPx: Int) -> Unit,
+    onTimelineComposerMeasured: (foregroundHeightPx: Int, compactHeightPx: Int) -> Unit = { _, _ -> },
 ) {
     val chromeInsets = WindowInsets.navigationBars.union(WindowInsets.ime)
     val density = LocalDensity.current
@@ -108,6 +121,7 @@ internal fun ConversationBottomBar(
     Box(
         Modifier
             .fillMaxWidth()
+            .testTag(CONVERSATION_BOTTOM_BAR_TAG)
             .onSizeChanged { size ->
                 onBottomChromeMeasured(size.height, chromeInsets.getBottom(density))
             },
@@ -168,9 +182,10 @@ internal fun ConversationBottomBar(
                     ComposerGate.DISBANDED ->
                         DisbandedGroupComposerNotice(disbanded = controller.group.disbanded)
                     ComposerGate.INVITE ->
-                        InvitePreviewActionBar(
+                        InvitationActions(
+                            inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
                             mutationInFlight = controller.mutationInFlight,
-                            onJoin = {
+                            onAccept = {
                                 appState.launchMutation {
                                     controller.acceptInvite(
                                         renderedGroupIdHex = renderedInviteGroupIdHex,
@@ -216,6 +231,10 @@ internal fun ConversationBottomBar(
                             draftGroupIdHex = controller.group.groupIdHex,
                             textState = composerTextState,
                             attachmentSheetState = composerAttachmentSheet,
+                            attachmentContent = attachmentContent,
+                            hasPendingAttachments = hasPendingAttachments,
+                            attachmentsPreparing = attachmentsPreparing,
+                            onSendAttachments = onSendAttachments,
                             editingMessageId = controller.editingMessageId,
                             editingInitialText = editingRecord?.let { controller.displayedText(it) },
                             onCancelEdit = { controller.editingMessageId = null },
@@ -229,6 +248,7 @@ internal fun ConversationBottomBar(
                             onShareContact = onShareContact,
                             onPasteImageUris = onPasteImageUris,
                             voiceRecordingController = voiceRecordingController,
+                            voiceReview = voiceReview,
                             dictationController = appState.conversationDictation,
                             dictationAccountRef = controller.boundAccountRef,
                             dictationGroupIdHex = controller.group.groupIdHex,
@@ -243,7 +263,9 @@ internal fun ConversationBottomBar(
                             composerFocus = composerFocus,
                             onComposerFocusChanged = onComposerFocusChanged,
                             onComposerPreImeBack = onComposerPreImeBack,
+                            composerDismissInProgress = composerDismissInProgress,
                             onBottomInputChanged = onBottomInputChanged,
+                            onTimelineComposerMeasured = onTimelineComposerMeasured,
                             onKeyboardRestoreFromCustomInput = onKeyboardRestoreFromCustomInput,
                             onKeyboardRestoreFromCustomInputFailed = onKeyboardRestoreFromCustomInputFailed,
                             recentEmojis = recentEmojis,

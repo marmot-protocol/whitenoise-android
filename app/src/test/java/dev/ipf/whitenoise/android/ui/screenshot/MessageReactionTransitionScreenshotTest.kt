@@ -82,6 +82,7 @@ class MessageReactionTransitionScreenshotTest {
             layoutDirection = LayoutDirection.Ltr,
         )
 
+    /** Reaction content change dark large rtl. */
     @Test
     fun reactionContentChangeDarkLargeRtl() =
         captureReactionContentChange(
@@ -91,6 +92,7 @@ class MessageReactionTransitionScreenshotTest {
             layoutDirection = LayoutDirection.Rtl,
         )
 
+    /** Captures reaction enter. */
     private fun captureReactionEnter(
         name: String,
         dark: Boolean,
@@ -111,7 +113,7 @@ class MessageReactionTransitionScreenshotTest {
             }
         }
         composeRule.waitForIdle()
-        val avatarTop = nodeTop("AL")
+        val avatarTop = nodeTop("A")
         val bubbleTextTop = nodeTop("Can you review the file?")
         composeRule
             .onNodeWithTag(GALLERY_TAG)
@@ -159,6 +161,7 @@ class MessageReactionTransitionScreenshotTest {
         assertAnchoring(avatarTop = avatarTop, bubbleTextTop = bubbleTextTop)
     }
 
+    /** Captures reaction content change. */
     private fun captureReactionContentChange(
         name: String,
         dark: Boolean,
@@ -192,7 +195,7 @@ class MessageReactionTransitionScreenshotTest {
         composeRule.runOnIdle { }
 
         composeRule.onNodeWithText("👍", substring = false, useUnmergedTree = true).assertExists()
-        composeRule.onNodeWithText("👍❤️", substring = false, useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("❤️", substring = false, useUnmergedTree = true).assertExists()
         composeRule
             .onNodeWithTag(GALLERY_TAG)
             .captureRoboImage("src/test/snapshots/${name}_mid.png")
@@ -205,6 +208,7 @@ class MessageReactionTransitionScreenshotTest {
             .boundsInRoot
             .height
 
+    /** Node top. */
     private fun nodeTop(text: String): Float =
         composeRule
             .onNodeWithText(text, useUnmergedTree = true)
@@ -212,11 +216,12 @@ class MessageReactionTransitionScreenshotTest {
             .boundsInRoot
             .top
 
+    /** Asserts anchoring. */
     private fun assertAnchoring(
         avatarTop: Float,
         bubbleTextTop: Float,
     ) {
-        assertEquals(avatarTop, nodeTop("AL"), POSITION_TOLERANCE)
+        assertEquals(avatarTop, nodeTop("A"), POSITION_TOLERANCE)
         assertEquals(bubbleTextTop, nodeTop("Can you review the file?"), POSITION_TOLERANCE)
     }
 

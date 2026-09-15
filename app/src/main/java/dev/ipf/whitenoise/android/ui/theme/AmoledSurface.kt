@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui.theme
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -55,3 +57,40 @@ internal fun Modifier.amoledSurfaceBorder(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun amoledSheetContainerColor(): Color = if (isAmoledSurfaceTheme()) Color.Black else BottomSheetDefaults.ContainerColor
+
+private const val AMOLED_DISABLED_OUTLINE_ALPHA = 0.38f
+
+/** Shared edges between touching AMOLED rows dim to this alpha so only the group's outer outline reads white. */
+internal const val AMOLED_ROW_SEAM_ALPHA = 0.24f
+
+/** The one-pixel divider two connected AMOLED rows share: the group [outline] at [AMOLED_ROW_SEAM_ALPHA]. */
+internal fun amoledRowSeamColor(outline: Color): Color = outline.copy(alpha = outline.alpha * AMOLED_ROW_SEAM_ALPHA)
+
+/** One-pixel white outline for buttons and surfaces on AMOLED; null elsewhere so Material fills stand alone. */
+@Composable
+internal fun amoledOutlineBorder(enabled: Boolean = true): BorderStroke? =
+    if (isAmoledSurfaceTheme()) {
+        BorderStroke(1.dp, Color.White.copy(alpha = if (enabled) 1f else AMOLED_DISABLED_OUTLINE_ALPHA))
+    } else {
+        null
+    }
+
+private const val AMOLED_SELECTION_ALPHA = 0.16f
+
+/** Selected-state fill: a faint white wash on AMOLED, where every tonal container is black, else [default]. */
+@Composable
+internal fun outlineSelectionColor(default: Color): Color =
+    if (isAmoledSurfaceTheme()) {
+        Color.White.copy(alpha = AMOLED_SELECTION_ALPHA)
+    } else {
+        default
+    }
+
+/** Filled buttons on AMOLED turn black with white content behind the outline instead of a tonal fill. */
+@Composable
+internal fun outlineButtonColors(): ButtonColors =
+    if (isAmoledSurfaceTheme()) {
+        ButtonDefaults.outlinedButtonColors(containerColor = Color.Black, contentColor = Color.White)
+    } else {
+        ButtonDefaults.buttonColors()
+    }
