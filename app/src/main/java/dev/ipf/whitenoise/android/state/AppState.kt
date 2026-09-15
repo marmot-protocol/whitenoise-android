@@ -64,7 +64,6 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationProvider
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
-import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
 import dev.ipf.whitenoise.android.audio.discoverConversationDictationProviders
 import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
@@ -208,6 +207,7 @@ import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
+import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation as TargetValidation
 import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
 
 internal data class ProfileGroupInviteOutcome(
@@ -1174,18 +1174,15 @@ class WhiteNoiseAppState private constructor(
             targetReplyAvailable = ::conversationDictationReplyTargetAvailable,
             targetValidator = { accountRef, groupIdHex ->
                 if (accounts.none { it.label == accountRef && it.signedOut != true }) {
-                    ConversationDictationTargetValidation.DefinitelyRemoved
+                    TargetValidation.DefinitelyRemoved
                 } else {
                     runCatchingCancellable {
                         marmotIo {
-                            when (groupDetails(accountRef, groupIdHex).group.selfMembership) {
-                                SelfMembershipFfi.MEMBER -> ConversationDictationTargetValidation.Available
-                                SelfMembershipFfi.LEFT,
-                                SelfMembershipFfi.REMOVED,
-                                -> ConversationDictationTargetValidation.DefinitelyRemoved
-                            }
+                            val isMember =
+                                groupDetails(accountRef, groupIdHex).group.selfMembership == SelfMembershipFfi.MEMBER
+                            if (isMember) TargetValidation.Available else TargetValidation.DefinitelyRemoved
                         }
-                    }.getOrDefault(ConversationDictationTargetValidation.Indeterminate)
+                    }.getOrDefault(TargetValidation.Indeterminate)
                 }
             },
             targetValidationScope = mutationsScope,
