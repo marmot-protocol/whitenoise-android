@@ -57,7 +57,7 @@ class ConversationDictationPersistentControlTest {
         val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         render(fixture)
-        composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertDoesNotExist()
         fixture.platform.listener.onReady()
 
         composeRule

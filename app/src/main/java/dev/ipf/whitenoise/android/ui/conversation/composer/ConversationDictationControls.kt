@@ -55,6 +55,7 @@ internal const val DICTATION_PROGRESS_TAG = "dictation-progress"
 
 /** Three native 48dp commands; narrow hosts expose them through the same horizontal scroll owner. */
 internal val DICTATION_ACTIVE_ACTIONS_WIDTH = 144.dp
+
 /** App-root bottom control used while the immutable dictation origin is not visible. */
 @Composable
 internal fun ConversationDictationPersistentControl(

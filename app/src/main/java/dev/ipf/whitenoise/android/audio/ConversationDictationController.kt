@@ -568,10 +568,7 @@ internal class ConversationDictationController internal constructor(
     /** The completion button that owns indeterminate work for the current visible phase. */
     val processingDeliveryMode: ConversationDictationDeliveryMode?
         get() =
-            if (
-                state is ConversationDictationState.Starting ||
-                state is ConversationDictationState.Processing
-            ) {
+            if (state is ConversationDictationState.Processing) {
                 requestedDeliveryMode ?: state.target?.deliveryMode
             } else {
                 null
@@ -951,6 +948,10 @@ internal class ConversationDictationController internal constructor(
 
     /** Handles involuntary teardown without routing already recognized text through cancellation. */
     private fun abortSessionPreservingTranscript() {
+        if (deliveryInProgress) {
+            conversationDictationDiagnostic("event=session_abort accepted=false reason=delivery_in_progress")
+            return
+        }
         val current = state
         val sessionId = current.sessionId
         val target = current.target

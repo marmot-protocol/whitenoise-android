@@ -2192,6 +2192,38 @@ class ConversationDictationControllerTest {
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
 
+    /** Involuntary foreground-service loss cannot recall a send after dispatch has been claimed. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun serviceTeardownAfterDispatchDoesNotCancelTheSend() =
+        runTest {
+            val completion = CompletableDeferred<Boolean>()
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Draft"),
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        assertTrue(request.beginDispatch())
+                        completion.await()
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            val token = requireNotNull(fixture.controller.notificationSessionToken)
+            fixture.controller.send()
+            fixture.platform.listener.onResult("dictated")
+            runCurrent()
+
+            assertTrue(fixture.controller.deliveryInProgress)
+            fixture.controller.onDurableServiceDestroyed(token)
+            assertTrue(fixture.controller.deliveryInProgress)
+
+            completion.complete(true)
+            advanceUntilIdle()
+
+            assertEquals("", fixture.drafts.getValue(key()).text)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun dispatchTimeoutIsUnknownButPreDispatchFailureRemainsRecoverable() =
