@@ -1801,4 +1801,10 @@
     <string name="usage_diagnostics_unknown">Non chargé</string>
     <string name="usage_diagnostics_done">Terminé</string>
     <string name="usage_diagnostics_loading">Chargement des paramètres de partage…</string>
+    <string name="audit_upload_title">Partager les journaux techniques</string>
+    <string name="audit_upload_subtitle">Envoyer automatiquement les journaux de diagnostic à White Noise, séparément du partage des données d’utilisation.</string>
+    <string name="audit_upload_confirm_title">Partager les journaux techniques avec White Noise ?</string>
+    <string name="audit_upload_disclosure">Lorsque cette option est activée, les journaux d’audit de diagnostic de tous les profils de cet appareil sont enregistrés localement et automatiquement envoyés à Goggles, exploité par Internet Privacy Foundation. Les journaux précédemment enregistrés peuvent également être envoyés. Ils peuvent contenir des identifiants de groupes et de messages, des adresses de relais, des horodatages, des références de comptes pseudonymes, des identifiants d’installation ainsi que le modèle de l’appareil et la version de l’application. Le contenu des messages et les clés privées sont exclus. Ces journaux sont sensibles et conservés pour analyser les problèmes de fiabilité. Ce choix est distinct du partage des données d’utilisation et de diagnostic. Vous pouvez arrêter ici les futurs enregistrements et envois à tout moment ; cela ne supprime pas les journaux déjà stockés localement ou envoyés. Annuler laisse le partage désactivé.</string>
+    <string name="audit_upload_confirm">Activer le partage automatique</string>
+    <string name="audit_upload_renew">Le partage des journaux techniques reste désactivé jusqu’à ce que vous consultiez l’information sur l’envoi automatique et fassiez un nouveau choix.</string>
 </resources>

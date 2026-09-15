@@ -1801,4 +1801,10 @@
     <string name="usage_diagnostics_unknown">Não carregado</string>
     <string name="usage_diagnostics_done">Concluído</string>
     <string name="usage_diagnostics_loading">A carregar definições de partilha…</string>
+    <string name="audit_upload_title">Compartilhar logs técnicos</string>
+    <string name="audit_upload_subtitle">Enviar automaticamente logs de diagnóstico ao White Noise, separadamente do compartilhamento de dados de uso.</string>
+    <string name="audit_upload_confirm_title">Compartilhar logs técnicos com o White Noise?</string>
+    <string name="audit_upload_disclosure">Quando ativado, os logs de auditoria de diagnóstico de todos os perfis deste dispositivo são gravados localmente e enviados automaticamente ao Goggles, operado pela Internet Privacy Foundation. Logs gravados anteriormente também podem ser enviados. Os logs podem incluir identificadores de grupos e mensagens, endereços de relays, datas e horários, referências pseudônimas de contas, identificadores de instalação, modelo do dispositivo e versão do aplicativo. O conteúdo das mensagens e as chaves privadas são excluídos. Esses logs são sensíveis e são mantidos para investigar problemas de confiabilidade. Esta opção é separada do compartilhamento de dados de uso e diagnóstico. Você pode interromper futuras gravações e envios aqui a qualquer momento; isso não exclui logs já armazenados localmente ou enviados. Cancelar mantém o compartilhamento desativado.</string>
+    <string name="audit_upload_confirm">Ativar envio automático</string>
+    <string name="audit_upload_renew">O compartilhamento de logs técnicos está desativado até que você leia o aviso sobre o envio automático e faça uma nova escolha.</string>
 </resources>

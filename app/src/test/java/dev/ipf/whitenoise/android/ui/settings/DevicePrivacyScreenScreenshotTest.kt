@@ -91,6 +91,26 @@ class DevicePrivacyScreenScreenshotTest {
         composeRule.runOnIdle { shell.release() }
     }
 
+    /** A current usage grant cannot hide renewal of the separate automatic-upload choice. */
+    @Test
+    fun oldAuditChoiceRequiresRenewalEvenWhenUsageConsentIsGranted() {
+        val state = privacyAppState(UsageDiagnosticsDecisionFfi.GRANTED, auditRenewal = true)
+        runBlocking { state.refreshSecurityPrivacySettings() }
+        val shell = presentBootstrappedApp(state, AppPhase.Ready)
+        composeRule.onNodeWithText("Help Improve White Noise").assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/audit_upload_renewal_prompt.png")
+        composeRule.onAllNodes(isToggleable())[1].performClick()
+        composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.onAllNodes(isToggleable())[1].assertIsOff()
+        assertTrue(state.auditUploadConsentRequired)
+        composeRule.onNodeWithText("Done").performClick()
+        composeRule.waitForIdle()
+        assertFalse(state.auditUploadConsentRequired)
+        assertEquals(UsageDiagnosticsDecisionFfi.GRANTED, state.usageDiagnosticsSettings?.decision)
+        assertFalse(state.auditLogSettings?.enabled ?: true)
+        composeRule.runOnIdle { shell.release() }
+    }
+
     /** A previous explicit decline is respected when an existing account opens Chats. */
     @Test
     fun existingAccountWithDeclinedConsentIsNotPromptedAgain() {
@@ -311,8 +331,9 @@ class DevicePrivacyScreenScreenshotTest {
             val release = CountDownLatch(1)
             writes.put(entered to release)
             try {
-                val title = if (index == 0) "Share usage and diagnostics" else "Audit logs"
+                val title = if (index == 0) "Share usage and diagnostics" else "Share technical logs"
                 composeRule.onNodeWithText(title).performClick()
+                if (index == 1 && enabled) composeRule.onNodeWithText("Enable automatic sharing").performClick()
                 waitForMutation { entered.count == 0L }
                 val toggle = composeRule.onAllNodes(isToggleable())[index]
                 if (enabled) toggle.assertIsOn() else toggle.assertIsOff()
@@ -339,7 +360,7 @@ class DevicePrivacyScreenScreenshotTest {
 
     /** Samples the static disclosure and completion action instead of relying on screenshot timing alone. */
     private fun promptContentBounds() =
-        listOf("Help Improve White Noise", "Share usage and diagnostics", "Audit logs", "Done").map {
+        listOf("Help Improve White Noise", "Share usage and diagnostics", "Share technical logs", "Done").map {
             composeRule.onNodeWithText(it).fetchSemanticsNode().boundsInRoot
         }
 
@@ -380,6 +401,7 @@ class DevicePrivacyScreenScreenshotTest {
     private fun privacyAppState(
         decision: UsageDiagnosticsDecisionFfi,
         hasAccount: Boolean = true,
+        auditRenewal: Boolean = false,
         beforeSave: () -> Unit = {},
     ): WhiteNoiseAppState {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -388,7 +410,11 @@ class DevicePrivacyScreenScreenshotTest {
                 "device-privacy-screenshot-${decision.name}",
                 Context.MODE_PRIVATE,
             )
-        preferences.edit().clear().commit()
+        preferences
+            .edit()
+            .clear()
+            .putBoolean("audit_upload_disclosure_pending", auditRenewal)
+            .commit()
         val marmot = privacyMarmot(decision, beforeSave)
         return WhiteNoiseAppState(
             context = context,
@@ -461,6 +487,7 @@ class DevicePrivacyScreenScreenshotTest {
                         exportEnabled = false,
                         exportIntervalSeconds = 60uL,
                     )
+                "setAuditLogTrackerConfig" -> arguments!!.first()
                 "auditLogSettings" -> auditSettings
                 "setAuditLogSettings" -> {
                     beforeSave()

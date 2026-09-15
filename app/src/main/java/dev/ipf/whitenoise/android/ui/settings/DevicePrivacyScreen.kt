@@ -56,6 +56,7 @@ internal fun DevicePrivacyScreen(
         appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.PRIVACY)
     }
     var auditLogsBusy by remember { mutableStateOf(false) }
+    var confirmAuditUpload by remember { mutableStateOf(false) }
     var exportAuditLogsConfirmOpen by remember { mutableStateOf(false) }
     var deleteAuditLogsConfirmOpen by remember { mutableStateOf(false) }
 
@@ -73,6 +74,16 @@ internal fun DevicePrivacyScreen(
     LaunchedEffect(appState.runtimeGeneration) {
         appState.refreshAppLockCredentialAvailability()
         appState.refreshSecurityPrivacySettings()
+    }
+
+    if (confirmAuditUpload) {
+        AuditUploadConsentDialog(
+            onDismiss = { confirmAuditUpload = false },
+            onConfirm = {
+                confirmAuditUpload = false
+                runAuditMutation { appState.setAuditLogsEnabled(true) }
+            },
+        )
     }
 
     Scaffold(
@@ -149,14 +160,14 @@ internal fun DevicePrivacyScreen(
                     item { UsageDiagnosticsSettings(appState) }
                     item {
                         GroupSwitchRow(
-                            title = stringResource(R.string.audit_logs),
-                            subtitle = stringResource(R.string.audit_logs_settings_subtitle),
+                            title = stringResource(R.string.audit_upload_title),
+                            subtitle = stringResource(R.string.audit_upload_subtitle),
                             checked = appState.auditLogSettings?.enabled == true,
                             enabled = !auditLogsBusy,
                             busy = auditLogsBusy,
                             icon = Icons.Filled.Article,
                             onCheckedChange = { enabled ->
-                                runAuditMutation { appState.setAuditLogsEnabled(enabled) }
+                                if (enabled) confirmAuditUpload = true else runAuditMutation { appState.setAuditLogsEnabled(false) }
                             },
                         )
                     }

@@ -1910,4 +1910,10 @@
     <string name="usage_diagnostics_unknown">Not loaded</string>
     <string name="usage_diagnostics_done">Done</string>
     <string name="usage_diagnostics_loading">Loading sharing settings…</string>
+    <string name="audit_upload_title">Share technical logs</string>
+    <string name="audit_upload_subtitle">Automatically send diagnostic audit logs to White Noise, separately from usage sharing.</string>
+    <string name="audit_upload_confirm_title">Share technical logs with White Noise?</string>
+    <string name="audit_upload_disclosure">When enabled, diagnostic audit logs from every profile on this device are recorded locally and automatically uploaded to Goggles, operated by the Internet Privacy Foundation. Previously recorded logs may also be uploaded. Logs can include group and message identifiers, relay addresses, timestamps, pseudonymous account references, installation identifiers, and device model and app version. Message contents and private keys are excluded. These logs are sensitive and are retained for investigating reliability problems. This is separate from usage and diagnostics sharing. You can stop future recording and uploads here at any time; this does not delete logs already stored locally or uploaded. Cancel leaves sharing off.</string>
+    <string name="audit_upload_confirm">Enable automatic sharing</string>
+    <string name="audit_upload_renew">Technical log sharing is off until you review the automatic-upload disclosure and make a fresh choice.</string>
 </resources>

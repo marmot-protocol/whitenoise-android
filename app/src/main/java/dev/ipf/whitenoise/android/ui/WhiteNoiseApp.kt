@@ -340,9 +340,10 @@ internal fun WhiteNoiseApp(
         appState.appLockScreenVisible,
         diagnosticsPromptOpen,
         appState.diagnostics.requiresChoice,
+        appState.auditUploadConsentRequired,
         appState.diagnostics.snapshot,
     ) {
-        if (diagnosticsPromptOpen || appState.diagnostics.requiresChoice) return@LaunchedEffect
+        if (diagnosticsPromptOpen || appState.diagnostics.requiresChoice || appState.auditUploadConsentRequired) return@LaunchedEffect
         if (appState.diagnostics.snapshot == null) return@LaunchedEffect
         if (appState.phase != AppPhase.Ready || appState.appLockScreenVisible) return@LaunchedEffect
         appState.refreshLocalNotificationPermission()
@@ -569,6 +570,7 @@ internal fun WhiteNoiseApp(
                                                                 appState.runtimeGeneration,
                                                                 appState.diagnostics.snapshot,
                                                                 appState.diagnostics.failed,
+                                                                appState.auditUploadConsentRequired,
                                                             ) {
                                                                 val decisionLoaded =
                                                                     appState.diagnostics.snapshot != null ||
@@ -577,6 +579,7 @@ internal fun WhiteNoiseApp(
                                                                     diagnosticsPromptSeen = true
                                                                     diagnosticsPromptOpen =
                                                                         appState.diagnostics.requiresChoice ||
+                                                                        appState.auditUploadConsentRequired ||
                                                                         appState.diagnostics.failed
                                                                 }
                                                             }

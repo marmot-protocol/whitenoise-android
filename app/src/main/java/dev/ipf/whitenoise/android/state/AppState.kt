@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.net.Uri
-import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.StringRes
@@ -43,8 +42,6 @@ import dev.ipf.marmotkit.ProductAnalyticsActivityFfi
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.RelayEndpointClassificationFfi
 import dev.ipf.marmotkit.RelayEndpointPolicyFfi
-import dev.ipf.marmotkit.RelayTelemetryResourceFfi
-import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.RetentionSweepGroupOutcomeFfi
 import dev.ipf.marmotkit.RetentionSweepStatusFfi
@@ -1363,6 +1360,8 @@ class WhiteNoiseAppState private constructor(
     private val nativePushFallback = NativePushFallbackCoordinator(nativePushFallbackPlatform)
     private val ttsRefreshMutex = Mutex()
     private val auditLogSettingsMutex = Mutex()
+    private val auditUploadConsent = AuditUploadConsent(preferences)
+    val auditUploadConsentRequired: Boolean get() = auditUploadConsent.requiresChoice
     private val conversationVibrationChannelMutex = Mutex()
 
     // Treat preference I/O plus observable-state publication as one transaction;
@@ -6148,7 +6147,13 @@ class WhiteNoiseAppState private constructor(
                 storeCachedSettings = { auditLogSettings = it },
                 loadFromEngine = { marmotIo { auditLogSettings() } },
                 transform = { it.copy(enabled = enabled) },
-                persistToEngine = { settings -> marmotIo { setAuditLogSettings(settings) } },
+                persistToEngine = { settings ->
+                    withContext(Dispatchers.IO) {
+                        auditUploadConsent.choose(enabled)
+                        marmot().configureAuditRuntime(uploadConsentGranted = enabled)
+                        marmot().setAuditLogSettings(settings)
+                    }
+                },
             )
             presentTransient(R.string.toast_security_privacy_updated)
             true
@@ -9262,24 +9267,10 @@ class WhiteNoiseAppState private constructor(
 
     /** Installs independent telemetry, audit and product destinations before native startup. */
     private suspend fun MarmotInterface.configurePrivacyRuntime() {
-        val installId = runCatchingCancellable { telemetryInstallId() }.getOrNull().orEmpty()
-        setRelayTelemetryRuntimeConfig(
-            RelayTelemetryRuntimeConfigFfi(
-                otlpEndpoint = BuildConfig.WHITENOISE_OTLP_ENDPOINT.nonBlankOrNull(),
-                authorizationBearerToken = BuildConfig.WHITENOISE_OTLP_AUTH_TOKEN.nonBlankOrNull(),
-                resource =
-                    RelayTelemetryResourceFfi(
-                        serviceVersion = telemetryServiceVersion(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
-                        serviceInstanceId = installId,
-                        deploymentEnvironment = telemetryDeploymentEnvironment(BuildConfig.WHITENOISE_DEPLOYMENT_ENVIRONMENT),
-                        tenant = BuildConfig.WHITENOISE_TELEMETRY_TENANT.ifBlank { "whitenoise-android" },
-                        osType = "linux",
-                        osVersion = Build.VERSION.RELEASE.ifBlank { Build.VERSION.SDK_INT.toString() },
-                        deviceModelIdentifier = telemetryDeviceModelIdentifier(Build.MODEL),
-                    ),
-            ),
-        )
-        configureAuditRuntime()
+        configureTelemetryRuntime()
+        auditLogSettingsMutex.withLock {
+            auditUploadConsent.prepare(this)
+        }
         setProductAnalyticsRuntimeConfig(androidProductAnalyticsRuntimeConfig())
     }
 

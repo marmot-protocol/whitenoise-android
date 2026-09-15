@@ -47,14 +47,14 @@ private val processAuditRuntimeReadinessMarker =
     AuditRuntimeReadinessMarker { marker -> Log.i("WhiteNoiseAudit", marker) }
 
 /** Configures v4 uploads with system model metadata, never user-assigned device labels. */
-internal suspend fun MarmotInterface.configureAuditRuntime() {
+internal suspend fun MarmotInterface.configureAuditRuntime(uploadConsentGranted: Boolean = false) {
     val auditEndpoint = BuildConfig.WHITENOISE_AUDIT_LOG_ENDPOINT.trim().takeIf(String::isNotEmpty)
     val auditAuthorizationBearerToken =
         BuildConfig.WHITENOISE_AUDIT_LOG_AUTH_TOKEN.trim().takeIf(String::isNotEmpty)
     setAuditLogTrackerConfig(
         AuditLogTrackerConfigV4Ffi(
             endpoint = auditEndpoint,
-            authorizationBearerToken = auditAuthorizationBearerToken,
+            authorizationBearerToken = auditAuthorizationBearerToken.takeIf { uploadConsentGranted },
             source =
                 AuditLogUploadSourceV4Ffi(
                     hardwareModel = Build.MODEL.trim().takeIf(String::isNotEmpty),
@@ -63,16 +63,7 @@ internal suspend fun MarmotInterface.configureAuditRuntime() {
                 ),
         ),
     )
-    val uploadConfigured = auditEndpoint != null && auditAuthorizationBearerToken != null
-    val auditedRuntimeRequired =
-        BuildConfig.WHITENOISE_AUDIT_RUNTIME_REQUIRED &&
-            BuildConfig.WHITENOISE_AUDIT_DATA_MODE == AUDIT_RUNTIME_DATA_MODE
-    if (uploadConfigured && auditedRuntimeRequired) {
-        // This enables every live session and persists the setting for sessions
-        // opened by start(). MarmotKit's pinned audit settings expose only this
-        // enabled switch; the recorder's sensitive-data obfuscation is fixed.
-        setAuditLogSettings(auditLogSettings().copy(enabled = true))
-    }
+    // Build configuration never substitutes for an explicit disclosure acknowledgement.
 }
 
 internal suspend fun MarmotInterface.emitAuditRuntimeReadinessAfterStart() {

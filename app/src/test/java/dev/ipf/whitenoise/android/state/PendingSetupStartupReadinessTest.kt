@@ -35,11 +35,12 @@ class PendingSetupStartupReadinessTest {
                         ),
                     emitStartupNotification = false,
                     onOnboardingSnapshot = { snapshot.get() },
-                    onAuditLogSettings = { phaseAtPrivacyRead.set(fixture.appState.phase) },
+                    onAuditLogSettings = { phaseAtPrivacyRead.compareAndSet(null, fixture.appState.phase) },
                 )
             try {
                 fixture.bootstrap()
                 assertEquals(AppPhase.Onboarding, fixture.appState.phase)
+                phaseAtPrivacyRead.set(null) // Observe the first read during setup completion, before later reconfiguration.
                 val controller = requireNotNull(fixture.appState.accountSetup.controller)
                 fixture.runWithMainLooperPumping {
                     withTimeout(5_000L) {

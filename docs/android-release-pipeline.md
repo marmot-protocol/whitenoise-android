@@ -103,6 +103,17 @@ printing keys. The general runtime-completeness flag does not require these
 optional product fields. Changing them requires a new build and may require
 renewed consent; configured artifacts alone do not prove Aptabase ingestion.
 
+Audit upload credentials are installed only after the user accepts the current
+**Share technical logs** disclosure. The native recording preference alone is
+not permission to upload. An upgrade with an older enabled recording choice
+clears upload authorization and disables recording before native startup,
+including background startup; the app then offers a fresh choice on Chats.
+Usage/Aptabase/OTLP consent is independent. Build flags must never opt a user in.
+For a consent-change candidate, qualify SEC-008 and SEC-012 using both a fresh
+installation and an upgrade with the old recording choice enabled. Cancel must
+leave uploads off; disabling sharing must stop new uploads without claiming to
+recall requests already in flight or delete previously stored logs.
+
 `google-play-internal` contains `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`. Give that
 account testing-track permissions only. The workflow hardcodes `internal`;
 there is no input for production, open testing, or a rollout percentage.
