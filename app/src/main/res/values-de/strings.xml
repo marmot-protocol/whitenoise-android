@@ -729,9 +729,9 @@
     <string name="toast_couldnt_load_push_debug_info">Push-Zustellungsinformationen konnten nicht geladen werden</string>
     <string name="toast_security_privacy_updated">Sicherheits- und Datenschutzeinstellungen aktualisiert</string>
     <string name="toast_couldnt_update_security_privacy">Sicherheits- und Datenschutzeinstellungen konnten nicht aktualisiert werden</string>
-    <string name="toast_audit_logs_deleted">Prüfprotokolle gelöscht</string>
-    <string name="toast_couldnt_delete_audit_logs">Prüfprotokolle konnten nicht gelöscht werden</string>
-    <string name="toast_no_audit_logs_to_delete">Keine Prüfprotokolle zum Löschen vorhanden</string>
+    <string name="toast_audit_logs_deleted">Diagnoseprotokolle gelöscht</string>
+    <string name="toast_couldnt_delete_audit_logs">Diagnoseprotokolle konnten nicht gelöscht werden</string>
+    <string name="toast_no_audit_logs_to_delete">Keine Diagnoseprotokolle zum Löschen vorhanden</string>
     <string name="toast_chat_created">Chat erstellt</string>
     <string name="group_create_stage_creating">Gruppe wird erstellt…</string>
     <string name="group_create_stage_applying_retention">Verschwindende Nachrichten werden angewendet…</string>
@@ -1973,4 +1973,10 @@
     <string name="usage_diagnostics_prompt_intro">Hilf uns zu verstehen, wie White Noise genutzt wird, und das Messaging zuverlässiger zu machen.</string>
     <string name="donate_open_failed">Die Spendenseite konnte nicht geöffnet werden. Versuche es erneut oder kehre zu den Einstellungen zurück.</string>
     <string name="export_audit_logs_confirm_body">Diagnoseprotokolle enthalten technische Kennungen und Aktivitätsdetails. Teile sie nur mit Personen, denen du vertraust.</string>
+    <string name="export_audit_logs">Diagnoseprotokolle exportieren</string>
+    <string name="export_audit_logs_subtitle">Eine Kopie der auf diesem Gerät gespeicherten Diagnoseprotokolle teilen</string>
+    <string name="export_audit_logs_confirm_title">Diagnoseprotokolle exportieren?</string>
+    <string name="export_audit_logs_confirm_action">Empfänger auswählen</string>
+    <string name="toast_couldnt_export_audit_logs">Diagnoseprotokolle konnten nicht für den Export vorbereitet werden</string>
+    <string name="toast_no_audit_logs_to_export">Keine Diagnoseprotokolle zum Exportieren vorhanden</string>
 </resources>

@@ -729,9 +729,9 @@
     <string name="toast_couldnt_load_push_debug_info">Push teslimat bilgileri yüklenemedi</string>
     <string name="toast_security_privacy_updated">Güvenlik ve gizlilik güncellendi</string>
     <string name="toast_couldnt_update_security_privacy">Güvenlik ve gizlilik güncellenemedi</string>
-    <string name="toast_audit_logs_deleted">Denetim günlükleri silindi</string>
-    <string name="toast_couldnt_delete_audit_logs">Denetim günlükleri silinemedi</string>
-    <string name="toast_no_audit_logs_to_delete">Silinecek denetim günlüğü yok</string>
+    <string name="toast_audit_logs_deleted">Tanılama günlükleri temizlendi</string>
+    <string name="toast_couldnt_delete_audit_logs">Tanılama günlükleri temizlenemedi</string>
+    <string name="toast_no_audit_logs_to_delete">Temizlenecek tanılama günlüğü yok</string>
     <string name="toast_chat_created">Sohbet oluşturuldu</string>
     <string name="group_create_stage_creating">Grup oluşturuluyor…</string>
     <string name="group_create_stage_applying_retention">Kaybolan mesajlar uygulanıyor…</string>
@@ -1957,4 +1957,10 @@
     <string name="usage_diagnostics_prompt_intro">White Noise’un nasıl kullanıldığını anlamamıza ve mesajlaşmayı daha güvenilir hâle getirmemize yardımcı olun.</string>
     <string name="donate_open_failed">Bağış sayfası açılamadı. Tekrar deneyin veya Ayarlar’a dönün.</string>
     <string name="export_audit_logs_confirm_body">Tanılama günlükleri teknik tanımlayıcılar ve etkinlik ayrıntıları içerir. Bunları yalnızca güvendiğiniz kişilerle paylaşın.</string>
+    <string name="export_audit_logs">Tanılama Günlüklerini Dışa Aktar</string>
+    <string name="export_audit_logs_subtitle">Bu cihazda saklanan tanılama günlüklerinin bir kopyasını paylaş</string>
+    <string name="export_audit_logs_confirm_title">Tanılama günlükleri dışa aktarılsın mı?</string>
+    <string name="export_audit_logs_confirm_action">Alıcı seç</string>
+    <string name="toast_couldnt_export_audit_logs">Tanılama günlükleri dışa aktarmaya hazırlanamadı</string>
+    <string name="toast_no_audit_logs_to_export">Dışa aktarılacak tanılama günlüğü yok</string>
 </resources>

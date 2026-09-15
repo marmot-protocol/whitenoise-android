@@ -523,11 +523,11 @@
     <string name="allow_chat_screenshots_subtitle">Blocks screenshots and hides previews in Recents</string>
     <string name="audit_logs">Audit logs</string>
     <string name="audit_logs_settings_subtitle">Create and export local group forensic audit files</string>
-    <string name="export_audit_logs" translatable="false">Export audit logs</string>
-    <string name="export_audit_logs_subtitle" translatable="false">Share a copy of the local audit files you explicitly recorded</string>
-    <string name="export_audit_logs_confirm_title" translatable="false">Export sensitive audit data?</string>
+    <string name="export_audit_logs">Export Diagnostic Logs</string>
+    <string name="export_audit_logs_subtitle">Share a copy of the diagnostic logs stored on this device</string>
+    <string name="export_audit_logs_confirm_title">Export diagnostic logs?</string>
     <string name="export_audit_logs_confirm_body">Diagnostic logs contain technical identifiers and activity details. Share them only with someone you trust.</string>
-    <string name="export_audit_logs_confirm_action" translatable="false">Choose recipient</string>
+    <string name="export_audit_logs_confirm_action">Choose recipient</string>
     <string name="delete_audit_logs">Clear Diagnostic Logs</string>
     <string name="delete_audit_logs_subtitle">Clearing diagnostic logs deletes logs from this device only. It does not delete copies already uploaded to White Noise servers or turn off recording and automatic uploads.</string>
     <string name="device_protection">Device protection</string>
@@ -986,11 +986,11 @@
     <string name="toast_couldnt_load_push_debug_info">Couldn\'t load push delivery info</string>
     <string name="toast_security_privacy_updated">Security &amp; Privacy updated</string>
     <string name="toast_couldnt_update_security_privacy">Couldn\'t update Security &amp; Privacy</string>
-    <string name="toast_audit_logs_deleted">Audit logs deleted</string>
-    <string name="toast_couldnt_delete_audit_logs">Couldn\'t delete audit logs</string>
-    <string name="toast_no_audit_logs_to_delete">No audit logs to delete</string>
-    <string name="toast_couldnt_export_audit_logs" translatable="false">Couldn\'t prepare audit logs for export</string>
-    <string name="toast_no_audit_logs_to_export" translatable="false">No audit logs to export</string>
+    <string name="toast_audit_logs_deleted">Diagnostic logs cleared</string>
+    <string name="toast_couldnt_delete_audit_logs">Couldn\'t clear diagnostic logs</string>
+    <string name="toast_no_audit_logs_to_delete">No diagnostic logs to clear</string>
+    <string name="toast_couldnt_export_audit_logs">Couldn\'t prepare diagnostic logs for export</string>
+    <string name="toast_no_audit_logs_to_export">No diagnostic logs to export</string>
     <string name="toast_chat_created">Chat created</string>
     <string name="group_create_stage_creating">Creating group…</string>
     <string name="group_create_stage_applying_retention">Applying disappearing messages…</string>

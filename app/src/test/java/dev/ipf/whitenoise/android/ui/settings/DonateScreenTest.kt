@@ -4,6 +4,10 @@ import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -52,7 +56,9 @@ class DonateScreenTest {
         refuseUri = true
         show()
         composeRule.onNodeWithTag("donate.open").performClick()
-        composeRule.onNodeWithTag("donate.open_failed").assertIsDisplayed()
+        composeRule.onNodeWithTag("donate.open_failed").assertIsDisplayed().assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite),
+        )
         composeRule.runOnIdle {
             assertEquals(emptyList<String>(), openedUris)
             refuseUri = false

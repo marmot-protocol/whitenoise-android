@@ -759,9 +759,9 @@
     <string name="toast_couldnt_load_push_debug_info">Не удалось загрузить сведения о доставке push</string>
     <string name="toast_security_privacy_updated">Настройки безопасности и конфиденциальности обновлены</string>
     <string name="toast_couldnt_update_security_privacy">Не удалось обновить настройки безопасности и конфиденциальности</string>
-    <string name="toast_audit_logs_deleted">Журналы аудита удалены</string>
-    <string name="toast_couldnt_delete_audit_logs">Не удалось удалить журналы аудита</string>
-    <string name="toast_no_audit_logs_to_delete">Нет журналов аудита для удаления</string>
+    <string name="toast_audit_logs_deleted">Диагностические журналы очищены</string>
+    <string name="toast_couldnt_delete_audit_logs">Не удалось очистить диагностические журналы</string>
+    <string name="toast_no_audit_logs_to_delete">Нет диагностических журналов для очистки</string>
     <string name="toast_chat_created">Чат создан</string>
     <string name="group_create_stage_creating">Создание группы…</string>
     <string name="group_create_stage_applying_retention">Применение исчезающих сообщений…</string>
@@ -2017,4 +2017,10 @@
     <string name="usage_diagnostics_prompt_intro">Помогите нам понять, как используется White Noise, и сделать обмен сообщениями надёжнее.</string>
     <string name="donate_open_failed">Не удалось открыть страницу пожертвований. Попробуйте снова или вернитесь в настройки.</string>
     <string name="export_audit_logs_confirm_body">Диагностические журналы содержат технические идентификаторы и сведения об активности. Делитесь ими только с теми, кому доверяете.</string>
+    <string name="export_audit_logs">Экспортировать диагностические журналы</string>
+    <string name="export_audit_logs_subtitle">Поделиться копией диагностических журналов, хранящихся на этом устройстве</string>
+    <string name="export_audit_logs_confirm_title">Экспортировать диагностические журналы?</string>
+    <string name="export_audit_logs_confirm_action">Выбрать получателя</string>
+    <string name="toast_couldnt_export_audit_logs">Не удалось подготовить диагностические журналы к экспорту</string>
+    <string name="toast_no_audit_logs_to_export">Нет диагностических журналов для экспорта</string>
 </resources>

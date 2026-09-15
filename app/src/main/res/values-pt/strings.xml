@@ -729,9 +729,9 @@
     <string name="toast_couldnt_load_push_debug_info">Não foi possível carregar as informações de entrega push</string>
     <string name="toast_security_privacy_updated">Segurança e privacidade atualizadas</string>
     <string name="toast_couldnt_update_security_privacy">Não foi possível atualizar segurança e privacidade</string>
-    <string name="toast_audit_logs_deleted">Logs de auditoria excluídos</string>
-    <string name="toast_couldnt_delete_audit_logs">Não foi possível excluir os logs de auditoria</string>
-    <string name="toast_no_audit_logs_to_delete">Nenhum log de auditoria para excluir</string>
+    <string name="toast_audit_logs_deleted">Logs de diagnóstico limpos</string>
+    <string name="toast_couldnt_delete_audit_logs">Não foi possível limpar os logs de diagnóstico</string>
+    <string name="toast_no_audit_logs_to_delete">Não há logs de diagnóstico para limpar</string>
     <string name="toast_chat_created">Chat criado</string>
     <string name="group_create_stage_creating">A criar grupo…</string>
     <string name="group_create_stage_applying_retention">A aplicar mensagens temporárias…</string>
@@ -1959,4 +1959,10 @@
     <string name="usage_diagnostics_prompt_intro">Ajude-nos a entender como o White Noise é usado e a tornar as mensagens mais confiáveis.</string>
     <string name="donate_open_failed">Não foi possível abrir a página de doações. Tente novamente ou volte às Configurações.</string>
     <string name="export_audit_logs_confirm_body">Os logs de diagnóstico contêm identificadores técnicos e detalhes de atividade. Compartilhe-os apenas com alguém de confiança.</string>
+    <string name="export_audit_logs">Exportar logs de diagnóstico</string>
+    <string name="export_audit_logs_subtitle">Compartilhar uma cópia dos logs de diagnóstico armazenados neste dispositivo</string>
+    <string name="export_audit_logs_confirm_title">Exportar logs de diagnóstico?</string>
+    <string name="export_audit_logs_confirm_action">Escolher destinatário</string>
+    <string name="toast_couldnt_export_audit_logs">Não foi possível preparar os logs de diagnóstico para exportação</string>
+    <string name="toast_no_audit_logs_to_export">Não há logs de diagnóstico para exportar</string>
 </resources>

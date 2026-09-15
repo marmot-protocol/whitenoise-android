@@ -28,6 +28,9 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -116,7 +119,11 @@ internal fun DonateScreen(onBack: () -> Unit) {
                     if (openFailed) {
                         Text(
                             stringResource(R.string.donate_open_failed),
-                            modifier = Modifier.padding(top = WhiteNoiseSpacing.Related).testTag("donate.open_failed"),
+                            modifier =
+                                Modifier
+                                    .padding(top = WhiteNoiseSpacing.Related)
+                                    .testTag("donate.open_failed")
+                                    .semantics { liveRegion = LiveRegionMode.Polite },
                             color = MaterialTheme.colorScheme.error,
                             textAlign = TextAlign.Center,
                             style = MaterialTheme.typography.bodyMedium,

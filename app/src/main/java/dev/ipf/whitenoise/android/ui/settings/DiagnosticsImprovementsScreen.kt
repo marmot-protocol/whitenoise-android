@@ -20,6 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.auditLogShareChooserIntent
@@ -37,6 +39,12 @@ internal fun DiagnosticsImprovementsScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val clearLogsDescription =
+        listOf(
+            stringResource(R.string.delete_audit_logs),
+            stringResource(R.string.diagnostics_storage_device),
+            stringResource(R.string.delete_audit_logs_subtitle),
+        ).joinToString(". ")
     val state = appState.diagnostics
     var auditLogsBusy by remember { mutableStateOf(false) }
     var confirmAuditUpload by remember { mutableStateOf(false) }
@@ -119,6 +127,7 @@ internal fun DiagnosticsImprovementsScreen(
                         SettingsAction(
                             context = rowContext,
                             title = stringResource(R.string.delete_audit_logs),
+                            modifier = Modifier.semantics { contentDescription = clearLogsDescription },
                             onClick = { deleteConfirmOpen = true },
                             subtitle = stringResource(R.string.diagnostics_storage_device),
                             enabled = !auditLogsBusy,

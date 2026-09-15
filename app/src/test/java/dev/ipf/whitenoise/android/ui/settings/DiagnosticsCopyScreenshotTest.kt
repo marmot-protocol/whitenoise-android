@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -39,6 +40,10 @@ class DiagnosticsCopyScreenshotTest {
     @Test fun storedLogsAmoled() = captureStored("amoled", dark = true)
 
     @Test fun exportConfirmation() = captureStored("export_confirmation", export = true)
+
+    @Test
+    @Config(qualifiers = "de-w360dp-h780dp-mdpi")
+    fun translatedExportConfirmation() = captureStored("export_german_large", export = true, fontScale = 1.6f)
 
     @Test fun clearConfirmation() = captureStored("confirmation", confirmation = true)
 
@@ -81,6 +86,13 @@ class DiagnosticsCopyScreenshotTest {
         composeRule
             .onNodeWithTag("settings.list")
             .performScrollToNode(hasText(context.getString(R.string.delete_audit_logs_subtitle)))
+        composeRule.onNodeWithText(context.getString(R.string.delete_audit_logs)).assertContentDescriptionEquals(
+            listOf(
+                context.getString(R.string.delete_audit_logs),
+                context.getString(R.string.diagnostics_storage_device),
+                context.getString(R.string.delete_audit_logs_subtitle),
+            ).joinToString(". "),
+        )
         if (export) {
             composeRule.onNodeWithText(context.getString(R.string.export_audit_logs)).performScrollTo().performClick()
             composeRule.onNodeWithText(context.getString(R.string.export_audit_logs_confirm_body)).assertIsDisplayed()

@@ -729,9 +729,9 @@
     <string name="toast_couldnt_load_push_debug_info">Impossible de charger les informations de livraison push</string>
     <string name="toast_security_privacy_updated">Sécurité et confidentialité mises à jour</string>
     <string name="toast_couldnt_update_security_privacy">Impossible de mettre à jour la sécurité et la confidentialité</string>
-    <string name="toast_audit_logs_deleted">Journaux d’audit supprimés</string>
-    <string name="toast_couldnt_delete_audit_logs">Impossible de supprimer les journaux d’audit</string>
-    <string name="toast_no_audit_logs_to_delete">Aucun journal d’audit à supprimer</string>
+    <string name="toast_audit_logs_deleted">Journaux de diagnostic effacés</string>
+    <string name="toast_couldnt_delete_audit_logs">Impossible d’effacer les journaux de diagnostic</string>
+    <string name="toast_no_audit_logs_to_delete">Aucun journal de diagnostic à effacer</string>
     <string name="toast_chat_created">Chat créé</string>
     <string name="group_create_stage_creating">Création du groupe…</string>
     <string name="group_create_stage_applying_retention">Application des messages éphémères…</string>
@@ -1959,4 +1959,10 @@
     <string name="usage_diagnostics_prompt_intro">Aidez-nous à comprendre comment White Noise est utilisé et à rendre la messagerie plus fiable.</string>
     <string name="donate_open_failed">Impossible d’ouvrir la page de dons. Réessayez ou revenez aux paramètres.</string>
     <string name="export_audit_logs_confirm_body">Les journaux de diagnostic contiennent des identifiants techniques et des détails d’activité. Partagez-les uniquement avec une personne de confiance.</string>
+    <string name="export_audit_logs">Exporter les journaux de diagnostic</string>
+    <string name="export_audit_logs_subtitle">Partager une copie des journaux de diagnostic stockés sur cet appareil</string>
+    <string name="export_audit_logs_confirm_title">Exporter les journaux de diagnostic ?</string>
+    <string name="export_audit_logs_confirm_action">Choisir le destinataire</string>
+    <string name="toast_couldnt_export_audit_logs">Impossible de préparer les journaux de diagnostic pour l’exportation</string>
+    <string name="toast_no_audit_logs_to_export">Aucun journal de diagnostic à exporter</string>
 </resources>

@@ -718,9 +718,9 @@
     <string name="toast_couldnt_load_push_debug_info">无法加载推送送达信息</string>
     <string name="toast_security_privacy_updated">安全与隐私已更新</string>
     <string name="toast_couldnt_update_security_privacy">无法更新安全与隐私</string>
-    <string name="toast_audit_logs_deleted">审计日志已删除</string>
-    <string name="toast_couldnt_delete_audit_logs">无法删除审计日志</string>
-    <string name="toast_no_audit_logs_to_delete">没有可删除的审计日志</string>
+    <string name="toast_audit_logs_deleted">诊断日志已清除</string>
+    <string name="toast_couldnt_delete_audit_logs">无法清除诊断日志</string>
+    <string name="toast_no_audit_logs_to_delete">没有可清除的诊断日志</string>
     <string name="toast_chat_created">聊天已创建</string>
     <string name="group_create_stage_creating">正在创建群组…</string>
     <string name="group_create_stage_applying_retention">正在应用阅后即焚…</string>
@@ -1932,4 +1932,10 @@
     <string name="usage_diagnostics_prompt_intro">帮助我们了解 White Noise 的使用情况，并提高消息传递的可靠性。</string>
     <string name="donate_open_failed">无法打开捐赠页面。请重试或返回设置。</string>
     <string name="export_audit_logs_confirm_body">诊断日志包含技术标识符和活动详情。请仅与您信任的人分享。</string>
+    <string name="export_audit_logs">导出诊断日志</string>
+    <string name="export_audit_logs_subtitle">分享此设备上存储的诊断日志副本</string>
+    <string name="export_audit_logs_confirm_title">导出诊断日志？</string>
+    <string name="export_audit_logs_confirm_action">选择接收人</string>
+    <string name="toast_couldnt_export_audit_logs">无法准备要导出的诊断日志</string>
+    <string name="toast_no_audit_logs_to_export">没有可导出的诊断日志</string>
 </resources>

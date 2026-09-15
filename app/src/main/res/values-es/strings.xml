@@ -729,9 +729,9 @@
     <string name="toast_couldnt_load_push_debug_info">No se pudo cargar la información de entrega push</string>
     <string name="toast_security_privacy_updated">Seguridad y privacidad actualizadas</string>
     <string name="toast_couldnt_update_security_privacy">No se pudieron actualizar la seguridad y la privacidad</string>
-    <string name="toast_audit_logs_deleted">Registros de auditoría eliminados</string>
-    <string name="toast_couldnt_delete_audit_logs">No se pudieron eliminar los registros de auditoría</string>
-    <string name="toast_no_audit_logs_to_delete">No hay registros de auditoría para eliminar</string>
+    <string name="toast_audit_logs_deleted">Registros de diagnóstico borrados</string>
+    <string name="toast_couldnt_delete_audit_logs">No se pudieron borrar los registros de diagnóstico</string>
+    <string name="toast_no_audit_logs_to_delete">No hay registros de diagnóstico para borrar</string>
     <string name="toast_chat_created">Chat creado</string>
     <string name="group_create_stage_creating">Creando grupo…</string>
     <string name="group_create_stage_applying_retention">Aplicando mensajes temporales…</string>
@@ -1959,4 +1959,10 @@
     <string name="usage_diagnostics_prompt_intro">Ayúdanos a entender cómo se utiliza White Noise y a hacer que la mensajería sea más fiable.</string>
     <string name="donate_open_failed">No se pudo abrir la página de donaciones. Inténtalo de nuevo o vuelve a Ajustes.</string>
     <string name="export_audit_logs_confirm_body">Los registros de diagnóstico contienen identificadores técnicos y detalles de actividad. Compártelos solo con alguien de confianza.</string>
+    <string name="export_audit_logs">Exportar registros de diagnóstico</string>
+    <string name="export_audit_logs_subtitle">Comparte una copia de los registros de diagnóstico almacenados en este dispositivo</string>
+    <string name="export_audit_logs_confirm_title">¿Exportar registros de diagnóstico?</string>
+    <string name="export_audit_logs_confirm_action">Elegir destinatario</string>
+    <string name="toast_couldnt_export_audit_logs">No se pudieron preparar los registros de diagnóstico para exportarlos</string>
+    <string name="toast_no_audit_logs_to_export">No hay registros de diagnóstico para exportar</string>
 </resources>

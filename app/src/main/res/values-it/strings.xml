@@ -729,9 +729,9 @@
     <string name="toast_couldnt_load_push_debug_info">Impossibile caricare le informazioni di consegna push</string>
     <string name="toast_security_privacy_updated">Sicurezza e privacy aggiornate</string>
     <string name="toast_couldnt_update_security_privacy">Impossibile aggiornare sicurezza e privacy</string>
-    <string name="toast_audit_logs_deleted">Log di audit eliminati</string>
-    <string name="toast_couldnt_delete_audit_logs">Impossibile eliminare i log di audit</string>
-    <string name="toast_no_audit_logs_to_delete">Nessun log di audit da eliminare</string>
+    <string name="toast_audit_logs_deleted">Log diagnostici cancellati</string>
+    <string name="toast_couldnt_delete_audit_logs">Impossibile cancellare i log diagnostici</string>
+    <string name="toast_no_audit_logs_to_delete">Nessun log diagnostico da cancellare</string>
     <string name="toast_chat_created">Chat creata</string>
     <string name="group_create_stage_creating">Creazione gruppo…</string>
     <string name="group_create_stage_applying_retention">Applicazione messaggi effimeri…</string>
@@ -1959,4 +1959,10 @@
     <string name="usage_diagnostics_prompt_intro">Aiutaci a capire come viene usato White Noise e a rendere la messaggistica più affidabile.</string>
     <string name="donate_open_failed">Impossibile aprire la pagina delle donazioni. Riprova o torna alle impostazioni.</string>
     <string name="export_audit_logs_confirm_body">I log diagnostici contengono identificatori tecnici e dettagli delle attività. Condividili solo con persone di cui ti fidi.</string>
+    <string name="export_audit_logs">Esporta log diagnostici</string>
+    <string name="export_audit_logs_subtitle">Condividi una copia dei log diagnostici memorizzati su questo dispositivo</string>
+    <string name="export_audit_logs_confirm_title">Esportare i log diagnostici?</string>
+    <string name="export_audit_logs_confirm_action">Scegli destinatario</string>
+    <string name="toast_couldnt_export_audit_logs">Impossibile preparare i log diagnostici per l’esportazione</string>
+    <string name="toast_no_audit_logs_to_export">Nessun log diagnostico da esportare</string>
 </resources>

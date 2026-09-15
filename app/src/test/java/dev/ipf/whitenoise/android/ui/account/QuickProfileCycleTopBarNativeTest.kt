@@ -49,9 +49,7 @@ class QuickProfileCycleTopBarNativeTest {
                         AccountSummaryFfi("b", "bb".repeat(32), true, false, false, true),
                     ),
                 emitStartupNotification = false,
-                // Keep each hydrated name equal to its account-label fallback so the toast
-                // assertion tests destination fencing, independently of profile-read timing.
-                onDisplayName = { _, accountId -> if (accountId == "bb".repeat(32)) "b" else "a" },
+                onDisplayName = { _, accountId -> if (accountId == "bb".repeat(32)) "Bea" else "Alice" },
                 onPresentedChatList = { account ->
                     if (account == "b") {
                         reads.incrementAndGet()
@@ -63,6 +61,14 @@ class QuickProfileCycleTopBarNativeTest {
         try {
             runBlocking { fixture.bootstrap() }
             val app = fixture.appState
+            // Start with a distinct hydrated name. Activation clears cross-account
+            // presentation state before its local-ready callback; the name returns later.
+            runBlocking {
+                fixture.runWithMainLooperPumping {
+                    app.warmProfilePresentationsBlocking(listOf("aa".repeat(32), "bb".repeat(32)))
+                }
+            }
+            assertEquals("Bea", app.accountDisplayNameCached("bb".repeat(32)))
             app.updateQuickProfileCycling(true)
             ShadowToast.reset()
             composeRule.setContent {
@@ -103,6 +109,13 @@ class QuickProfileCycleTopBarNativeTest {
                 context.getString(R.string.quick_account_switched, "b"),
                 ShadowToast.getTextOfLatestToast(),
             )
+            composeRule.waitUntil(5_000) {
+                shadowOf(Looper.getMainLooper()).idle()
+                app.accountDisplayNameCached("bb".repeat(32)) == "Bea"
+            }
+            // Later hydration must neither rewrite nor duplicate the completion notice.
+            assertEquals(1, ShadowToast.shownToastCount())
+            assertEquals(context.getString(R.string.quick_account_switched, "b"), ShadowToast.getTextOfLatestToast())
         } finally {
             release.countDown()
             fixture.close()
