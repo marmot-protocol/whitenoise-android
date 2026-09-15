@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertArrayEquals
@@ -27,6 +28,7 @@ import java.util.UUID
  * downloads its plaintext, creates fresh references for two destination
  * groups, publishes those references, and decrypts every destination file.
  */
+@PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class ForwardMediaReferenceFfiIntegrationTest {
     @Test

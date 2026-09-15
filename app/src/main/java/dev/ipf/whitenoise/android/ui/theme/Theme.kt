@@ -165,6 +165,11 @@ private val AmoledColorScheme =
         surfaceContainerLowest = Color.Black,
         outline = AmoledEmphasizedSurfaceBorder,
         outlineVariant = AmoledSurfaceBorder,
+        // Inverse roles paint snackbars and floating badges — black with white content, like every
+        // other AMOLED surface, so a transient never lifts a grey panel off the black canvas (#446).
+        inverseSurface = Color.Black,
+        inverseOnSurface = Color.White,
+        inversePrimary = Color.White,
         scrim = Color.Black,
     )
 

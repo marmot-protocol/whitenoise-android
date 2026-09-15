@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.UserProfileMetadataFfi
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +29,7 @@ import java.io.File
 import java.util.UUID
 
 /** Reopens disposable native state whose only configured relay cannot resolve. */
+@PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class StartupSelfProfilePresentationFfiIntegrationTest {
     /** Reopening retained native state models the data boundary shared by process death and replacement. */

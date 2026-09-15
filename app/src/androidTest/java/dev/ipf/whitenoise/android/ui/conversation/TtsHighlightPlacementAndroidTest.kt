@@ -42,6 +42,7 @@ import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.audio.tts.TtsSeekResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
@@ -78,6 +79,7 @@ import java.util.Locale
  * spoken characters, that the sentence band stops at the sentence being spoken,
  * and that each word's marker occupies its own place under real font metrics.
  */
+@PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class TtsHighlightPlacementAndroidTest {
     @get:Rule
