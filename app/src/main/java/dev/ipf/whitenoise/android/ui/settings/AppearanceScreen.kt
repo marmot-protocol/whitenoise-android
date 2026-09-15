@@ -157,24 +157,24 @@ internal fun AppearanceScreen(
                 }
             }
             item { SettingsExplainer(stringResource(R.string.appearance_theme_help)) }
-            item {
-                SettingsGroup {
-                    row("action_color") { context ->
-                        SettingsLink(
-                            context = context,
-                            title = stringResource(R.string.action_color),
-                            enabled = !amoled,
-                            subtitle = if (amoled) stringResource(R.string.appearance_outline_colors_fixed) else null,
-                            onClick = onOpenActionColor,
-                        )
-                    }
-                    row("chat_bubble_colors") { context ->
-                        SettingsLink(
-                            context = context,
-                            title = stringResource(R.string.chat_bubble_colors),
-                            enabled = !amoled,
-                            onClick = onOpenChatBubbleColors,
-                        )
+            // AMOLED fixes both palettes to white, so the colour editors leave the list instead of sitting disabled.
+            if (!amoled) {
+                item {
+                    SettingsGroup(modifier = Modifier.testTag("appearance.colors.group")) {
+                        row("action_color") { context ->
+                            SettingsLink(
+                                context = context,
+                                title = stringResource(R.string.action_color),
+                                onClick = onOpenActionColor,
+                            )
+                        }
+                        row("chat_bubble_colors") { context ->
+                            SettingsLink(
+                                context = context,
+                                title = stringResource(R.string.chat_bubble_colors),
+                                onClick = onOpenChatBubbleColors,
+                            )
+                        }
                     }
                 }
             }

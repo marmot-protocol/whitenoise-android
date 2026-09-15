@@ -677,7 +677,7 @@
     <string name="toast_couldnt_load_profile">Couldn\'t load the profile.</string>
     <string name="profile_nip05_hint">name@domain</string>
     <string name="profile_nip05_invalid">Enter an address like name@example.com.</string>
-    <string name="profile_lightning_hint">Lightning address, e.g. you@walletprovider.com</string>
+    <string name="profile_lightning_hint">e.g. you@walletprovider.com</string>
     <string name="profile_lightning_invalid">Enter a Lightning address like name@example.com.</string>
     <string name="profile_lightning_checking">Checking…</string>
     <string name="profile_lightning_unresolved">This Lightning address doesn\'t resolve. Check it and try again.</string>
@@ -1391,6 +1391,7 @@
     <string name="dictation_send_safety_note">Send message fails closed: if the original draft, membership, or session changes, White Noise keeps the transcript for review instead of sending it.</string>
     <string name="voice_message_play">Play voice message</string>
     <string name="voice_message_pause">Pause voice message</string>
+    <string name="voice_message_speed">Playback speed %1$s</string>
     <string name="voice_message_failed">Voice message couldn\'t load</string>
     <string name="voice_message_locked">Locked</string>
     <string name="voice_message_cancel">Cancel voice message</string>

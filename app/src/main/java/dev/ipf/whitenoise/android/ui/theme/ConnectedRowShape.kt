@@ -48,14 +48,16 @@ internal data class ConnectedRowShape(
 /**
  * Native-weight perimeter with one physical-pixel divider, including independently lazy rows.
  *
- * Each row strokes its own side edges. Only the first row strokes the top and only the last row
- * strokes the bottom, while every non-last row paints the seam below it, so touching rows never
- * double their shared edge the way per-row outlines did in the existing AMOLED group.
+ * Each row strokes its own side edges in [color]. Only the first row strokes the top and only the last
+ * row strokes the bottom, while every non-last row paints the seam below it in [seamColor], so touching
+ * rows never double their shared edge the way per-row outlines did in the existing AMOLED group, and the
+ * inner dividers can sit quieter than the group's outline.
  */
 @Suppress("LongMethod")
 internal fun Modifier.connectedRowBorder(
     shape: ConnectedRowShape,
     color: Color,
+    seamColor: Color = color,
 ): Modifier =
     drawWithCache {
         val corners =
@@ -115,7 +117,7 @@ internal fun Modifier.connectedRowBorder(
         onDrawWithContent {
             drawContent()
             if (!shape.last) {
-                drawLine(color, Offset(left, seamCenterY), Offset(right, seamCenterY), strokeWidth = seamWidth)
+                drawLine(seamColor, Offset(left, seamCenterY), Offset(right, seamCenterY), strokeWidth = seamWidth)
             }
             drawPath(path, color, style = Stroke(width = strokeWidth))
         }

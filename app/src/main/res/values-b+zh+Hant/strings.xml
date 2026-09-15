@@ -1049,6 +1049,7 @@
     <string name="voice_message_microphone_busy">麥克風正由其他應用程式使用。請關閉該應用程式，然後重試。</string>
     <string name="voice_message_play">播放語音訊息</string>
     <string name="voice_message_pause">暫停語音訊息</string>
+    <string name="voice_message_speed">播放速度 %1$s</string>
     <string name="voice_message_failed">語音訊息載入失敗</string>
     <string name="voice_message_locked">已鎖定</string>
     <string name="reply_you">你</string>
@@ -1082,7 +1083,7 @@
     <string name="toast_couldnt_upload_profile_image">無法上傳個人檔案圖片。</string>
     <string name="profile_nip05_hint">名稱@網域</string>
     <string name="profile_nip05_invalid">請輸入類似 name@example.com 的位址。</string>
-    <string name="profile_lightning_hint">Lightning 位址，例如 you@walletprovider.com</string>
+    <string name="profile_lightning_hint">例如 you@walletprovider.com</string>
     <string name="profile_lightning_invalid">請輸入類似 name@example.com 的 Lightning 位址。</string>
     <string name="profile_lightning_checking">正在檢查…</string>
     <string name="profile_lightning_unresolved">此 Lightning 位址無法解析。請檢查後重試。</string>

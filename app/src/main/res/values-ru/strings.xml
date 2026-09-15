@@ -1110,6 +1110,7 @@
     <string name="voice_message_microphone_busy">Микрофон используется другим приложением. Закройте его и повторите попытку.</string>
     <string name="voice_message_play">Воспроизвести голосовое</string>
     <string name="voice_message_pause">Пауза</string>
+    <string name="voice_message_speed">Скорость воспроизведения %1$s</string>
     <string name="voice_message_failed">Не удалось загрузить голосовое сообщение</string>
     <string name="voice_message_locked">Закреплено</string>
     <string name="reply_you">Вы</string>
@@ -1143,7 +1144,7 @@
     <string name="toast_couldnt_upload_profile_image">Не удалось загрузить изображение профиля.</string>
     <string name="profile_nip05_hint">имя@домен</string>
     <string name="profile_nip05_invalid">Введите адрес вида name@example.com.</string>
-    <string name="profile_lightning_hint">Lightning-адрес, например you@walletprovider.com</string>
+    <string name="profile_lightning_hint">например you@walletprovider.com</string>
     <string name="profile_lightning_invalid">Введите Lightning-адрес вида name@example.com.</string>
     <string name="profile_lightning_checking">Проверка…</string>
     <string name="profile_lightning_unresolved">Этот Lightning-адрес не разрешается. Проверьте его и попробуйте снова.</string>

@@ -405,6 +405,9 @@ internal fun ComposerBar(
     // resume observer can tell whether the keyboard was up when we were paused.
     onComposerFocusChanged: (Boolean) -> Unit = {},
     onComposerPreImeBack: (() -> Unit)? = null,
+    // True from the moment Back asks the keyboard to hide until focus clears. The
+    // composer collapses in that same frame so height and IME animate together.
+    composerDismissInProgress: Boolean = false,
     onBottomInputChanged: () -> Unit = {},
     onTimelineComposerMeasured: (foregroundHeightPx: Int, compactHeightPx: Int) -> Unit = { _, _ -> },
     onKeyboardRestoreFromCustomInput: () -> Unit = {},
@@ -1471,6 +1474,7 @@ internal fun ComposerBar(
                                 hasPendingAttachments,
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
                         multilineControlsSuppressed = composerMultilineControlsSuppressed(automaticComposerCeiling),
+                        dismissInProgress = composerDismissInProgress,
                         modifier =
                             Modifier
                                 .fillMaxWidth()

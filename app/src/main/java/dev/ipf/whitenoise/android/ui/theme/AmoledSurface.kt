@@ -60,6 +60,12 @@ internal fun amoledSheetContainerColor(): Color = if (isAmoledSurfaceTheme()) Co
 
 private const val AMOLED_DISABLED_OUTLINE_ALPHA = 0.38f
 
+/** Shared edges between touching AMOLED rows dim to this alpha so only the group's outer outline reads white. */
+internal const val AMOLED_ROW_SEAM_ALPHA = 0.24f
+
+/** The one-pixel divider two connected AMOLED rows share: the group [outline] at [AMOLED_ROW_SEAM_ALPHA]. */
+internal fun amoledRowSeamColor(outline: Color): Color = outline.copy(alpha = outline.alpha * AMOLED_ROW_SEAM_ALPHA)
+
 /** One-pixel white outline for buttons and surfaces on AMOLED; null elsewhere so Material fills stand alone. */
 @Composable
 internal fun amoledOutlineBorder(enabled: Boolean = true): BorderStroke? =

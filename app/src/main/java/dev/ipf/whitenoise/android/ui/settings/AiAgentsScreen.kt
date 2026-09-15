@@ -4,13 +4,13 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -23,11 +23,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -174,8 +176,9 @@ internal fun AiAgentsContent(
 }
 
 /**
- * Prompt review before any copy: the instruction, the exact prompt in selectable monospace, the next step,
- * and one copy action pinned below the scrolling body. Copying changes no app or agent state.
+ * Prompt review before any copy: the instruction, the exact prompt in monospace, the next step, and one copy
+ * action pinned below the scrolling body. Tapping the prompt itself copies it too, with the same feedback as
+ * the button. Copying changes no app or agent state.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongMethod")
@@ -191,6 +194,11 @@ private fun AgentSetupSheet(
     val prompt = stringResource(connector.promptRes, npub)
     var copied by rememberSaveable(connector.id, npub) { mutableStateOf(false) }
     val manualSetup = stringResource(R.string.ai_agents_manual_setup_body, stringResource(R.string.new_message))
+    val copyLabel = stringResource(R.string.ai_agents_copy_prompt)
+    val copyPrompt = {
+        onCopy(title, prompt)
+        copied = true
+    }
     WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth()) {
             WhiteNoiseSheetHeader(title = title, onClose = onDismiss)
@@ -204,24 +212,25 @@ private fun AgentSetupSheet(
                 verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
             ) {
                 SettingsCallout(text = stringResource(R.string.ai_agents_setup_instruction, name))
+                // The whole prompt card is one copy button, so the text no longer needs its own selection gesture.
                 Surface(
                     modifier =
                         Modifier
                             .fillMaxWidth()
                             .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+                            .clip(MaterialTheme.shapes.large)
+                            .clickable(onClickLabel = copyLabel, role = Role.Button, onClick = copyPrompt)
                             .testTag("ai_agents.prompt.${connector.id}"),
                     shape = MaterialTheme.shapes.large,
                     color = MaterialTheme.colorScheme.surfaceContainerLowest,
                     border = amoledOutlineBorder(),
                 ) {
-                    SelectionContainer {
-                        Text(
-                            text = prompt,
-                            modifier = Modifier.padding(WhiteNoiseSpacing.FormField),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontFamily = FontFamily.Monospace,
-                        )
-                    }
+                    Text(
+                        text = prompt,
+                        modifier = Modifier.padding(WhiteNoiseSpacing.FormField),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontFamily = FontFamily.Monospace,
+                    )
                 }
                 SettingsExplainer(manualSetup)
             }
@@ -238,10 +247,7 @@ private fun AgentSetupSheet(
                     )
                 }
                 WhiteNoiseButton(
-                    onClick = {
-                        onCopy(title, prompt)
-                        copied = true
-                    },
+                    onClick = copyPrompt,
                     modifier = Modifier.fillMaxWidth().testTag("ai_agents.copy.${connector.id}"),
                 ) {
                     Icon(

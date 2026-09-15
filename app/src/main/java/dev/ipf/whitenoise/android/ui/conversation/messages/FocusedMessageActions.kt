@@ -4,6 +4,7 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -34,13 +36,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -52,6 +59,8 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -75,11 +84,18 @@ internal data class FocusedMessageAction(
     val onClick: () -> Unit,
 )
 
-/** Centers the measured stack around its frozen message anchor within the keyboard-safe popup frame. */
+/**
+ * Centers the measured stack around its frozen message anchor within the keyboard-safe popup frame.
+ * The provider is remembered by the host, so the last measured content size survives the popup
+ * window being torn down and re-shown on resume: the first post-resume frame lands exactly where
+ * the stack was, instead of jumping once the content reports its size again.
+ */
 internal class FocusedMessageActionsPositionProvider(
     private val sourceBounds: IntRect?,
     private val touchY: Float?,
 ) : PopupPositionProvider {
+    private var lastContentSize: IntSize = IntSize.Zero
+
     /** Positions the actions above or below the focused bubble within the window. */
     override fun calculatePosition(
         anchorBounds: IntRect,
@@ -87,6 +103,8 @@ internal class FocusedMessageActionsPositionProvider(
         layoutDirection: LayoutDirection,
         popupContentSize: IntSize,
     ): IntOffset {
+        @Suppress("NAME_SHADOWING")
+        val popupContentSize = stableContentSize(popupContentSize)
         val desiredY =
             (sourceBounds?.center?.y ?: touchY?.roundToInt() ?: (windowSize.height / 2)) -
                 popupContentSize.height / 2
@@ -95,6 +113,14 @@ internal class FocusedMessageActionsPositionProvider(
             y = desiredY.coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0)),
         )
     }
+
+    /** Remembers a measured size and substitutes it for the zero size of a not-yet-measured frame. */
+    private fun stableContentSize(measured: IntSize): IntSize =
+        if (measured.width > 0 && measured.height > 0) {
+            measured.also { lastContentSize = it }
+        } else {
+            lastContentSize
+        }
 }
 
 private const val FOCUSED_BACKDROP_ALPHA = 0.88f
@@ -112,6 +138,11 @@ private val FocusedReactionEmojiSize = 28.dp
 private val FocusedMoreIconSize = 24.dp
 private val FocusedMenuMinimumWidth = 248.dp
 private val FocusedMenuMaximumWidth = 300.dp
+private val FocusedMenuMinimumCellWidth = 123.dp
+private val FocusedActionCellMinimumHeight = 48.dp
+private val FocusedActionCellVerticalPadding = 8.dp
+private val FocusedActionStackedLabelSpacing = 4.dp
+private const val FOCUSED_SUPPORTING_LABEL_MAX_LINES = 2
 
 /** Prototype reaction rail, inert real-message preview and grouped command menu; preserves the host IME. */
 @Composable
@@ -134,7 +165,10 @@ internal fun FocusedMessageActions(
     val position = remember(sourceBounds, touchY) { FocusedMessageActionsPositionProvider(sourceBounds, touchY) }
     val title = stringResource(R.string.message_actions)
     val close = stringResource(R.string.close)
-    var measured by remember { mutableStateOf(false) }
+    // Saveable so a popup window re-shown after an app switch does not hide content it already
+    // revealed; the value lives in the host composition, not in the popup's own.
+    var measured by rememberSaveable { mutableStateOf(false) }
+    val currentOnDismiss by rememberUpdatedState(onDismiss)
     KeyboardSafePopup(
         expanded = true,
         onDismissRequest = onDismiss,
@@ -153,6 +187,9 @@ internal fun FocusedMessageActions(
                         .heightIn(max = maxHeight)
                         .onSizeChanged { measured = it.width > 0 && it.height > 0 }
                         .graphicsLayer { alpha = if (measured && previewReady) 1f else 0f }
+                        // Children consume their own taps first, so a tap that reaches the column
+                        // landed on empty stack space or its padding and dismisses like the scrim.
+                        .pointerInput(Unit) { detectTapGestures { currentOnDismiss() } }
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = FocusedOverlayShadowSafeInset)
                         .semantics {
@@ -180,8 +217,11 @@ internal fun FocusedMessageActions(
                     Box(
                         modifier =
                             Modifier
+                                // The tag precedes clearAndSetSemantics, which wipes semantics set after it.
+                                .testTag("message-actions-preview")
                                 .clearAndSetSemantics { contentDescription = previewDescription }
-                                .testTag("message-actions-preview"),
+                                // The preview is inert: it neither dismisses nor acts on a tap.
+                                .pointerInput(Unit) { detectTapGestures { } },
                     ) { preview() }
                 }
                 FocusedActionMenu(actions)
@@ -327,46 +367,119 @@ private fun FocusedMoreReactionsTarget(onClick: () -> Unit) {
     }
 }
 
-/** Material's grouped menu: leading icon, label with an optional second line, error colours for destructive rows. */
+/** Material's bodyLarge size before any text-size preference is applied. */
+private const val BODY_LARGE_SP = 16f
+
+/**
+ * Material's grouped menu laid out as a compact grid: two cells per row when at least 248dp is
+ * available and the font scale is below 1.5, one column otherwise. Delete keeps its error colours
+ * and sits alone on the last row, spanning the full width. Container, group shapes and colours are
+ * unchanged from the single-column menu.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FocusedActionMenu(actions: List<FocusedMessageAction>) {
+    // The app's text-size preference scales the typography itself rather than the density, so the
+    // effective scale is the system font scale times how far the body style has grown.
+    val typographyScale = MaterialTheme.typography.bodyLarge.fontSize.value / BODY_LARGE_SP
+    val fontScale = LocalDensity.current.fontScale * typographyScale
     DropdownMenuGroup(
         shapes = MenuDefaults.groupShapes(),
         border = amoledOutlineBorder(),
         modifier = Modifier.widthIn(min = FocusedMenuMinimumWidth, max = FocusedMenuMaximumWidth),
         shadowElevation = MenuDefaults.ShadowElevation,
     ) {
-        Column {
-            actions.forEachIndexed { index, action ->
-                val contentColor =
-                    if (action.destructive) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    }
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(action.label, style = MaterialTheme.typography.bodyLarge)
-                            if (action.supportingLabel != null) {
-                                Text(action.supportingLabel, style = MaterialTheme.typography.bodySmall)
-                            }
+        BoxWithConstraints {
+            val columns = messageActionColumnCount(maxWidth, FocusedMenuMinimumCellWidth, fontScale)
+            val rows = messageActionGridRows(actions, columns) { it.destructive }
+            Column(verticalArrangement = Arrangement.spacedBy(messageActionColumnGap)) {
+                rows.forEachIndexed { rowIndex, row ->
+                    val shape = MenuDefaults.itemShape(rowIndex, rows.size).shape
+                    Row(horizontalArrangement = Arrangement.spacedBy(messageActionColumnGap)) {
+                        row.forEach { action ->
+                            FocusedActionCell(
+                                action = action,
+                                stacked = columns > 1 && !action.destructive,
+                                shape = shape,
+                                modifier = Modifier.weight(1f),
+                            )
                         }
-                    },
-                    onClick = action.onClick,
-                    shape = MenuDefaults.itemShape(index, actions.size).shape,
-                    leadingIcon = action.icon,
-                    enabled = action.enabled,
-                    colors =
-                        MenuDefaults.itemColors(
-                            textColor = contentColor,
-                            leadingIconColor = contentColor,
-                            disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                )
+                        if (row.size < columns && row.none { it.destructive }) {
+                            repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                        }
+                    }
+                }
             }
+        }
+    }
+}
+
+/** One grid cell: Material's menu item, its icon stacked above a one-line label when two cells share a row. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FocusedActionCell(
+    action: FocusedMessageAction,
+    stacked: Boolean,
+    shape: Shape,
+    modifier: Modifier = Modifier,
+) {
+    val contentColor =
+        if (action.destructive) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        }
+    DropdownMenuItem(
+        text = { FocusedActionLabel(action, stacked) },
+        onClick = action.onClick,
+        shape = shape,
+        leadingIcon = if (stacked) null else action.icon,
+        enabled = action.enabled,
+        colors =
+            MenuDefaults.itemColors(
+                textColor = contentColor,
+                leadingIconColor = contentColor,
+                disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+        modifier = modifier.heightIn(min = FocusedActionCellMinimumHeight),
+    )
+}
+
+/** The cell's label block: icon above a centred one-line label when stacked, beside it otherwise. */
+@Composable
+private fun FocusedActionLabel(
+    action: FocusedMessageAction,
+    stacked: Boolean,
+) {
+    Column(
+        modifier =
+            if (stacked) {
+                Modifier.fillMaxWidth().padding(vertical = FocusedActionCellVerticalPadding)
+            } else {
+                Modifier
+            },
+        horizontalAlignment = if (stacked) Alignment.CenterHorizontally else Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(if (stacked) FocusedActionStackedLabelSpacing else 0.dp),
+    ) {
+        if (stacked) action.icon()
+        // A grid cell keeps its label on one line; the single column is the large-text fallback
+        // and must let a long label wrap rather than clip it.
+        Text(
+            text = action.label,
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = if (stacked) 1 else Int.MAX_VALUE,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = if (stacked) TextAlign.Center else null,
+        )
+        if (action.supportingLabel != null) {
+            Text(
+                text = action.supportingLabel,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = FOCUSED_SUPPORTING_LABEL_MAX_LINES,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = if (stacked) TextAlign.Center else null,
+            )
         }
     }
 }

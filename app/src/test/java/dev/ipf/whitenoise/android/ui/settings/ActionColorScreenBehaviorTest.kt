@@ -71,6 +71,17 @@ class ActionColorScreenBehaviorTest {
         }
     }
 
+    /** With nothing stored and nothing drafted there is nothing to reset, so the button waits for a swatch. */
+    @Test
+    fun resetAppearsOnlyOnceThereIsADraftToClear() {
+        show()
+        composeRule.onNodeWithTag("action_color.reset").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Color #1D4ED8").performClick()
+        composeRule.onNodeWithTag("action_color.reset").assertIsEnabled().performClick()
+        composeRule.onNodeWithTag("action_color.reset").assertDoesNotExist()
+        composeRule.onNodeWithTag("action_color.save").assertIsNotEnabled()
+    }
+
     /** Back without Save leaves the stored colour untouched. */
     @Test
     fun backWithoutSaveKeepsTheStoredColour() {

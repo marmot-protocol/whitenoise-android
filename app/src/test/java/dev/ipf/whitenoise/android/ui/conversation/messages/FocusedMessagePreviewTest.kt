@@ -123,4 +123,17 @@ class FocusedMessagePreviewTest {
         assertEquals(0, regular.x)
         assertEquals(0, ime.x)
     }
+
+    /** A re-shown popup reports a zero size on its first frame; the stack must not jump before it measures. */
+    @Test fun focusedStackKeepsItsMeasuredPlacementAcrossAnUnmeasuredFrame() {
+        val provider = FocusedMessageActionsPositionProvider(IntRect(20, 200, 220, 260), null)
+        val measured =
+            provider.calculatePosition(IntRect.Zero, IntSize(360, 780), LayoutDirection.Ltr, IntSize(328, 300))
+
+        val unmeasured = provider.calculatePosition(IntRect.Zero, IntSize(360, 780), LayoutDirection.Ltr, IntSize.Zero)
+
+        assertEquals(measured, unmeasured)
+        assertEquals(16, measured.x)
+        assertEquals(80, measured.y)
+    }
 }

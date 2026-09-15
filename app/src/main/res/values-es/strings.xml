@@ -1068,6 +1068,7 @@
     <string name="voice_message_microphone_busy">Otra aplicación está usando el micrófono. Ciérrala y vuelve a intentarlo.</string>
     <string name="voice_message_play">Reproducir mensaje de voz</string>
     <string name="voice_message_pause">Pausar mensaje de voz</string>
+    <string name="voice_message_speed">Velocidad de reproducción %1$s</string>
     <string name="voice_message_failed">No se pudo cargar el mensaje de voz</string>
     <string name="voice_message_locked">Bloqueado</string>
     <string name="reply_you">Tú</string>
@@ -1101,7 +1102,7 @@
     <string name="toast_couldnt_upload_profile_image">No se pudo subir la imagen del perfil.</string>
     <string name="profile_nip05_hint">nombre@dominio</string>
     <string name="profile_nip05_invalid">Introduce una dirección como name@example.com.</string>
-    <string name="profile_lightning_hint">Dirección Lightning, p. ej. you@walletprovider.com</string>
+    <string name="profile_lightning_hint">p. ej. you@walletprovider.com</string>
     <string name="profile_lightning_invalid">Introduce una dirección Lightning como name@example.com.</string>
     <string name="profile_lightning_checking">Comprobando…</string>
     <string name="profile_lightning_unresolved">Esta dirección Lightning no se resuelve. Compruébala e inténtalo de nuevo.</string>

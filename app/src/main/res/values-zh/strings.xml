@@ -1049,6 +1049,7 @@
     <string name="voice_message_microphone_busy">麦克风正被其他应用使用。请关闭该应用，然后重试。</string>
     <string name="voice_message_play">播放语音消息</string>
     <string name="voice_message_pause">暂停语音消息</string>
+    <string name="voice_message_speed">播放速度 %1$s</string>
     <string name="voice_message_failed">语音消息加载失败</string>
     <string name="voice_message_locked">已锁定</string>
     <string name="reply_you">你</string>
@@ -1082,7 +1083,7 @@
     <string name="toast_couldnt_upload_profile_image">无法上传个人资料图片。</string>
     <string name="profile_nip05_hint">名称@域名</string>
     <string name="profile_nip05_invalid">请输入类似 name@example.com 的地址。</string>
-    <string name="profile_lightning_hint">Lightning 地址，例如 you@walletprovider.com</string>
+    <string name="profile_lightning_hint">例如 you@walletprovider.com</string>
     <string name="profile_lightning_invalid">请输入类似 name@example.com 的 Lightning 地址。</string>
     <string name="profile_lightning_checking">正在检查…</string>
     <string name="profile_lightning_unresolved">此 Lightning 地址无法解析。请检查后重试。</string>

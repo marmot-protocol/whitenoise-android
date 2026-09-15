@@ -3,8 +3,11 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.content.Context
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -48,6 +51,27 @@ class SettingsHomeBehaviorTest {
             scrollToAndClick(context.getString(row.titleRes))
         }
         composeRule.runOnIdle { assertEquals(expected, opened) }
+    }
+
+    /** The rows sit under three labelled groups whose headings are announced as headings, in display order. */
+    @Test
+    fun rowsAreGroupedUnderAccountAppAndSupportHeadings() {
+        mount(profileCount = 1)
+        val expectedHeadings = listOf("Account", "App", "Support")
+        val sections = SettingsHomeSection.entries.filter { it.groupTitleRes != null }
+        assertEquals(expectedHeadings, sections.map { context.getString(requireNotNull(it.groupTitleRes)) })
+        sections.zip(expectedHeadings).forEach { (section, heading) ->
+            composeRule
+                .onNode(hasScrollToNodeAction())
+                .performScrollToNode(hasTestTag("settings.section.${section.name}"))
+            composeRule.onNode(hasText(heading) and isHeading()).assertIsDisplayed()
+        }
+        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Relays"))
+        composeRule.onNode(hasText("Relays") and hasAnyAncestor(hasTestTag("settings.section.Account"))).assertExists()
+        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("AI Agents"))
+        composeRule
+            .onNode(hasText("AI Agents") and hasAnyAncestor(hasTestTag("settings.section.AppPreferences")))
+            .assertExists()
     }
 
     /** Chat with support runs the support-chat routing instead of opening a detail. */

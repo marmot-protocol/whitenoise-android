@@ -151,7 +151,6 @@ import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
 import dev.ipf.whitenoise.android.ui.theme.LocalMessageBubbleBaseColorScheme
 import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
-import dev.ipf.whitenoise.android.ui.theme.messageFooterLabelColor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -859,10 +858,6 @@ internal fun MessageBubble(
         }
     reactionVisibilityState.targetState = showReactionSummary
     val reactionHostPresent = reactionVisibilityState.currentState || reactionVisibilityState.targetState
-    // Match the timestamp to the bubble's visual cue. AMOLED uses the same
-    // directional accent as the border; other themes keep their paired M3
-    // on-color tokens.
-    val timestampColor = messageBubbleTimestampColor(mine, deleted, persistedFailure)
     var emojiPickerOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     // A long body clips to a few lines with an inline Read More; opening it
     // routes through a full-screen view rather than expanding in place, so the
@@ -1885,12 +1880,17 @@ internal fun MessageBubble(
                     )
                 val bodyOrWarningInsideBubble =
                     shouldFrameMessageBubbleSupplement(bodyTextToRender, outerInvalidationWarning)
-                // Captions/plain bodies sit on the resolved bubble background and therefore use
-                // its paired WCAG-safe content color. Footer-only media rows are
-                // outside the bubble and retain the page's surface foreground.
+                // The footer's time and delivery glyph are secondary metadata: a quiet
+                // gray against the resolved bubble fill, the error pairing for a
+                // persisted failure, and the AMOLED directional accent. Media scrim
+                // footers stay white on black and do not route through here.
                 val timestampColor =
-                    amoledDirectionalAccentColor(mine)
-                        ?: messageFooterLabelColor(bubbleBackgroundColor, bubbleContentColor)
+                    messageBubbleFooterColor(
+                        mine = mine,
+                        persistedFailure = persistedFailure,
+                        bubbleBackgroundColor = bubbleBackgroundColor,
+                        bubbleContentColor = bubbleContentColor,
+                    )
                 LaunchedEffect(textSelectionMode, bodyTextToRender) {
                     if (textSelectionMode && bodyTextToRender.isNullOrBlank()) {
                         onTextSelectionModeChange(false)

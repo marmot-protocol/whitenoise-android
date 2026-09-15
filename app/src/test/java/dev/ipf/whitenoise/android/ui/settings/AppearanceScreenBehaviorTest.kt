@@ -2,13 +2,13 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -88,22 +88,25 @@ class AppearanceScreenBehaviorTest {
         }
     }
 
-    /** AMOLED fixes the palette: both colour editors disable, explain why, and never open. */
+    /** AMOLED fixes the palette: both colour editor rows leave the list instead of sitting disabled. */
     @Test
-    fun amoledDisablesColourEditorsWithAFixedColoursNotice() {
+    fun amoledHidesTheColourEditorRows() {
+        composeRule.onNodeWithTag("appearance.colors.group").assertExists()
         composeRule.onNodeWithText("AMOLED").performClick()
         composeRule.runOnIdle { assertEquals(AppThemeMode.Amoled, appState.themeMode) }
-        composeRule.onNodeWithText("Action color").assertIsNotEnabled().performClick()
-        composeRule.onNodeWithText("Chat bubble colors").assertIsNotEnabled().performClick()
+        composeRule.onNodeWithTag("appearance.colors.group").assertDoesNotExist()
+        composeRule.onNodeWithText("Action color").assertDoesNotExist()
+        composeRule.onNodeWithText("Chat bubble colors").assertDoesNotExist()
         composeRule
             .onNodeWithText("AMOLED uses fixed white action and bubble colors. Switch themes to customize colors.")
-            .assertExists()
+            .assertDoesNotExist()
         composeRule.runOnIdle {
             assertEquals(0, actionColorCount)
             assertEquals(0, bubbleColorsCount)
         }
         composeRule.onNodeWithText("Light").performClick()
         composeRule.onNodeWithText("Action color").assertIsEnabled()
+        composeRule.onNodeWithText("Chat bubble colors").assertIsEnabled()
     }
 
     /** Tapping a theme row selects it and writes the mode, including the AMOLED mode. */

@@ -1066,6 +1066,7 @@
     <string name="voice_message_microphone_busy">Mikrofon başka bir uygulama tarafından kullanılıyor. O uygulamayı kapatıp tekrar deneyin.</string>
     <string name="voice_message_play">Sesli mesajı oynat</string>
     <string name="voice_message_pause">Sesli mesajı duraklat</string>
+    <string name="voice_message_speed">Oynatma hızı %1$s</string>
     <string name="voice_message_failed">Sesli mesaj yüklenemedi</string>
     <string name="voice_message_locked">Kilitli</string>
     <string name="reply_you">Sen</string>
@@ -1099,7 +1100,7 @@
     <string name="toast_couldnt_upload_profile_image">Profil görseli yüklenemedi.</string>
     <string name="profile_nip05_hint">ad@alan</string>
     <string name="profile_nip05_invalid">name@example.com gibi bir adres girin.</string>
-    <string name="profile_lightning_hint">Lightning adresi, örn. you@walletprovider.com</string>
+    <string name="profile_lightning_hint">örn. you@walletprovider.com</string>
     <string name="profile_lightning_invalid">name@example.com gibi bir Lightning adresi girin.</string>
     <string name="profile_lightning_checking">Kontrol ediliyor…</string>
     <string name="profile_lightning_unresolved">Bu Lightning adresi çözümlenemiyor. Kontrol edip tekrar deneyin.</string>

@@ -63,10 +63,38 @@ internal fun messageActionKinds(
         if (canInfo) add(MessageActionKind.Info)
     }
 
+/** Font scale at and above which the action grid falls back to one readable column. */
+internal const val MESSAGE_ACTION_SINGLE_COLUMN_FONT_SCALE = 1.5f
+
+/**
+ * Two action columns when both cells fit the available width and the font scale stays below
+ * [MESSAGE_ACTION_SINGLE_COLUMN_FONT_SCALE]; otherwise one column so labels stay on a single line.
+ */
 internal fun messageActionColumnCount(
     availableWidth: Dp,
     minimumCellWidth: Dp,
-): Int = if (availableWidth >= minimumCellWidth * 2 + messageActionColumnGap) 2 else 1
+    fontScale: Float = 1f,
+): Int =
+    if (fontScale < MESSAGE_ACTION_SINGLE_COLUMN_FONT_SCALE &&
+        availableWidth >= minimumCellWidth * 2 + messageActionColumnGap
+    ) {
+        2
+    } else {
+        1
+    }
+
+/**
+ * Splits actions into grid rows of [columns] cells in reading order; every action for which
+ * [spansRow] is true (Delete) is pulled out and given its own full-width row at the end.
+ */
+internal fun <T> messageActionGridRows(
+    actions: List<T>,
+    columns: Int,
+    spansRow: (T) -> Boolean,
+): List<List<T>> {
+    val (spanning, gridded) = actions.partition(spansRow)
+    return gridded.chunked(columns.coerceAtLeast(1)) + spanning.map(::listOf)
+}
 
 internal fun estimatedMessageActionMenuHeight(
     actionCount: Int,

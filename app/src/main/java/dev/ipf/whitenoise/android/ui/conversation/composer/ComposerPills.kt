@@ -113,6 +113,9 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
@@ -139,6 +142,30 @@ private val ExpandedEditorEndInset = 14.dp
 private val CompactEditorTopInset = 12.dp
 private val CompactEditorBottomInset = 12.dp
 private val ExpandedEditorBottomInset = 44.dp
+
+private const val COMPOSER_ACTION_CENTER_BIAS = 0.5f
+
+/**
+ * Vertical placement for the composer's inline action clusters: centred in the compact one-line row
+ * and pinned to the bottom of the editing row, blending between the two with the animated editing
+ * progress. The progress is read during placement so the text field never recomposes per frame.
+ */
+private class ComposerActionRowAlignment(
+    private val horizontal: Alignment.Horizontal,
+    private val editingProgress: () -> Float,
+) : Alignment {
+    /** Places the cluster at the horizontal edge and at the progress-weighted vertical bias. */
+    override fun align(
+        size: IntSize,
+        space: IntSize,
+        layoutDirection: LayoutDirection,
+    ): IntOffset {
+        val x = horizontal.align(size.width, space.width, layoutDirection)
+        val slack = (space.height - size.height).coerceAtLeast(0)
+        val bias = COMPOSER_ACTION_CENTER_BIAS + (1f - COMPOSER_ACTION_CENTER_BIAS) * editingProgress().coerceIn(0f, 1f)
+        return IntOffset(x, (slack * bias).roundToInt())
+    }
+}
 
 /** Interpolates one layout-space distance without allocating an animation object. */
 private fun interpolateDp(
@@ -388,6 +415,9 @@ internal fun ComposerPill(
     // ceiling and squeezes the editor viewport to zero, so they pin the inline
     // single-row controls regardless of the measured line count.
     multilineControlsSuppressed: Boolean = false,
+    // Back has asked the keyboard to hide: the editing row collapses now, in the
+    // same frame, instead of waiting for focus to clear once the IME inset lands.
+    dismissInProgress: Boolean = false,
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -589,10 +619,13 @@ internal fun ComposerPill(
         )
     val textMeasurer = rememberTextMeasurer()
     val editingRequested =
-        composerFocused ||
-            textFieldValue.text.isNotEmpty() ||
-            forceEditingLayout ||
-            expansionMode != ComposerExpansionMode.Automatic
+        composerEditingRequested(
+            focused = composerFocused,
+            hasText = textFieldValue.text.isNotEmpty(),
+            forceEditingLayout = forceEditingLayout,
+            mode = expansionMode,
+            dismissInProgress = dismissInProgress,
+        )
     val compactTextLayout =
         compactMeasurementWidth?.let { measurementWidth ->
             val maxTextWidthPx =
@@ -665,6 +698,12 @@ internal fun ComposerPill(
             animationSpec = tween(COMPOSER_EXPANSION_ANIMATION_MILLIS, easing = FastOutSlowInEasing),
             label = "composer editing row",
         )
+    // The compact one-line row centres its inline actions; as the editing row
+    // unfolds they slide down to the bottom action row. Read during placement.
+    val leadingActionsAlignment =
+        remember(editingProgress) { ComposerActionRowAlignment(Alignment.Start) { editingProgress.value } }
+    val trailingActionsAlignment =
+        remember(editingProgress) { ComposerActionRowAlignment(Alignment.End) { editingProgress.value } }
     // The editor and action edges animate without reserving space above the surface.
     val expansionProgress =
         animateFloatAsState(
@@ -977,7 +1016,7 @@ internal fun ComposerPill(
                     Box(
                         modifier =
                             Modifier
-                                .align(Alignment.BottomStart)
+                                .align(leadingActionsAlignment)
                                 .deferredPadding(
                                     start = { 0.dp },
                                 ).alpha(if (inputContentVisible) 1f else 0f)
@@ -1053,8 +1092,9 @@ internal fun ComposerPill(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier =
                             Modifier
-                                .align(Alignment.BottomEnd)
-                                .height(48.dp),
+                                .align(
+                                    if (voiceReviewContent == null) trailingActionsAlignment else Alignment.BottomEnd,
+                                ).height(48.dp),
                     ) {
                         if (dictationControls != null) {
                             Row(

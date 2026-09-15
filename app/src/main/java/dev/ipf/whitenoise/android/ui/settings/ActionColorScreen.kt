@@ -140,16 +140,18 @@ private fun ActionColorEditor(
                                             onValidityChanged = { valid = it },
                                         )
                                     }
-                                    WhiteNoiseOutlinedButton(
-                                        onClick = {
-                                            draft = null
-                                            valid = true
-                                            reset = true
-                                            resetRevision++
-                                        },
-                                        enabled = draft != null || !valid,
-                                        modifier = Modifier.fillMaxWidth().testTag("action_color.reset"),
-                                    ) { Text(stringResource(R.string.reset_to_default)) }
+                                    // Reset appears only once there is a draft or invalid entry to clear.
+                                    if (draft != null || !valid) {
+                                        WhiteNoiseOutlinedButton(
+                                            onClick = {
+                                                draft = null
+                                                valid = true
+                                                reset = true
+                                                resetRevision++
+                                            },
+                                            modifier = Modifier.fillMaxWidth().testTag("action_color.reset"),
+                                        ) { Text(stringResource(R.string.reset_to_default)) }
+                                    }
                                 }
                             }
                         }

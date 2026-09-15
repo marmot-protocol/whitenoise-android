@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -64,57 +63,148 @@ import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
-/** Keyed items of the Settings home list, in display order; the viewport is restored by section key. */
-internal enum class SettingsHomeSection {
+/**
+ * Keyed items of the Settings home list, in display order; the viewport is restored by section key.
+ * The labelled hub sections carry the heading shown above their group of [SettingsHomeRow]s, every other
+ * item renders its own content.
+ */
+internal enum class SettingsHomeSection(
+    @param:StringRes val groupTitleRes: Int? = null,
+) {
     Profile,
     AppUpdates,
-    Hub,
-    Support,
+    Account(R.string.account),
+    AppPreferences(R.string.app_preferences),
+    Support(R.string.support),
     SignOut,
     Version,
 }
 
 /**
- * Rows of the Settings home in the prototype's order. Each row carries its label, Material Symbols icon and
- * test-tag suffix; [detail] is the destination it opens, or null for rows that run an action instead.
+ * Rows of the Settings home in display order, grouped under the labelled [section] each one belongs to.
+ * Each row carries its label, Material Symbols icon and test-tag suffix; [detail] is the destination it
+ * opens, or null for rows that run an action instead.
  */
 internal enum class SettingsHomeRow(
+    val section: SettingsHomeSection,
     @param:StringRes val titleRes: Int,
     @param:DrawableRes val iconRes: Int,
     val iconTag: String,
     val detail: SettingsDetail?,
 ) {
-    Profile(R.string.profile, R.drawable.ic_settings_account_circle, "profile", SettingsDetail.Profile),
-    ProfileKeys(R.string.settings_profile_keys, R.drawable.ic_settings_key, "profile_keys", SettingsDetail.AccountKeys),
-    AiAgents(R.string.ai_agents, R.drawable.ic_settings_person_add, "ai_agents", SettingsDetail.AiAgents),
+    Profile(
+        SettingsHomeSection.Account,
+        R.string.profile,
+        R.drawable.ic_settings_account_circle,
+        "profile",
+        SettingsDetail.Profile,
+    ),
+    ProfileKeys(
+        SettingsHomeSection.Account,
+        R.string.settings_profile_keys,
+        R.drawable.ic_settings_key,
+        "profile_keys",
+        SettingsDetail.AccountKeys,
+    ),
+    Relays(
+        SettingsHomeSection.Account,
+        R.string.relays,
+        R.drawable.ic_settings_cell_tower,
+        "relays",
+        SettingsDetail.Relays,
+    ),
+    Appearance(
+        SettingsHomeSection.AppPreferences,
+        R.string.appearance,
+        R.drawable.ic_settings_contrast,
+        "appearance",
+        SettingsDetail.Appearance,
+    ),
+    ChatFolders(
+        SettingsHomeSection.AppPreferences,
+        R.string.chat_folders_title,
+        R.drawable.ic_folder,
+        "folders",
+        SettingsDetail.ChatFolders,
+    ),
     Notifications(
+        SettingsHomeSection.AppPreferences,
         R.string.notifications,
         R.drawable.ic_settings_notifications,
         "notifications",
         SettingsDetail.Notifications,
     ),
-    ReadAloud(R.string.settings_read_aloud, R.drawable.ic_volume_up, "read_aloud", SettingsDetail.TextToSpeech),
-    Dictation(R.string.dictation_settings_title, R.drawable.ic_mic, "dictation", SettingsDetail.Dictation),
-    Appearance(R.string.appearance, R.drawable.ic_settings_contrast, "appearance", SettingsDetail.Appearance),
-    ChatFolders(R.string.chat_folders_title, R.drawable.ic_folder, "folders", SettingsDetail.ChatFolders),
+    ReadAloud(
+        SettingsHomeSection.AppPreferences,
+        R.string.settings_read_aloud,
+        R.drawable.ic_volume_up,
+        "read_aloud",
+        SettingsDetail.TextToSpeech,
+    ),
+    Dictation(
+        SettingsHomeSection.AppPreferences,
+        R.string.dictation_settings_title,
+        R.drawable.ic_mic,
+        "dictation",
+        SettingsDetail.Dictation,
+    ),
+    DataUsage(
+        SettingsHomeSection.AppPreferences,
+        R.string.settings_data_usage,
+        R.drawable.ic_settings_hard_drive,
+        "data_usage",
+        SettingsDetail.Data,
+    ),
     PrivacySecurity(
+        SettingsHomeSection.AppPreferences,
         R.string.settings_privacy_security,
         R.drawable.ic_settings_front_hand,
         "privacy_security",
         SettingsDetail.DevicePrivacy,
     ),
-    DataUsage(R.string.settings_data_usage, R.drawable.ic_settings_hard_drive, "data_usage", SettingsDetail.Data),
-    Relays(R.string.relays, R.drawable.ic_settings_cell_tower, "relays", SettingsDetail.Relays),
-    Help(R.string.help, R.drawable.ic_info, "help", SettingsDetail.Help),
-    ChatWithSupport(R.string.chat_with_support, R.drawable.ic_settings_chat_bubble_outline, "support", null),
-    Donate(R.string.settings_donate, R.drawable.ic_settings_favorite_border, "donate", SettingsDetail.Donate),
+    AiAgents(
+        SettingsHomeSection.AppPreferences,
+        R.string.ai_agents,
+        R.drawable.ic_settings_person_add,
+        "ai_agents",
+        SettingsDetail.AiAgents,
+    ),
+    Help(
+        SettingsHomeSection.Support,
+        R.string.help,
+        R.drawable.ic_info,
+        "help",
+        SettingsDetail.Help,
+    ),
+    ChatWithSupport(
+        SettingsHomeSection.Support,
+        R.string.chat_with_support,
+        R.drawable.ic_settings_chat_bubble_outline,
+        "support",
+        null,
+    ),
+    Donate(
+        SettingsHomeSection.Support,
+        R.string.settings_donate,
+        R.drawable.ic_settings_favorite_border,
+        "donate",
+        SettingsDetail.Donate,
+    ),
     DeveloperTools(
+        SettingsHomeSection.Support,
         R.string.settings_developer_tools,
         R.drawable.ic_settings_handyman,
         "developer_tools",
         SettingsDetail.Developer,
     ),
 }
+
+/** One labelled group of the Settings home: its section key, heading and rows in display order. */
+internal data class SettingsHomeGroup(
+    val section: SettingsHomeSection,
+    @param:StringRes val titleRes: Int,
+    val rows: List<SettingsHomeRow>,
+)
 
 /**
  * Saveable position of the Settings home list, anchored by stable section key
@@ -180,12 +270,18 @@ internal fun reduceSettingsHomeViewport(
 @Stable
 internal data class SettingsHomeState(
     val sections: List<SettingsHomeSection>,
-    val hubRows: List<SettingsHomeRow>,
-    val supportRows: List<SettingsHomeRow>,
+    val groups: List<SettingsHomeGroup>,
     val showProfileHeader: Boolean,
 )
 
-/** Sections and rows of the Settings home; the account-bound sections appear only with an active account. */
+/** The labelled hub sections in display order, derived from the enum rather than from fixed indices. */
+private val settingsHomeGroupSections: List<SettingsHomeSection>
+    get() = SettingsHomeSection.entries.filter { it.groupTitleRes != null }
+
+/**
+ * Sections and groups of the Settings home; the account-bound sections appear only with an active account.
+ * Every labelled section always appears, with the rows that declare it as their [SettingsHomeRow.section].
+ */
 internal fun settingsHomeState(
     hasActiveAccount: Boolean,
     selfUpdateEnabled: Boolean,
@@ -196,32 +292,18 @@ internal fun settingsHomeState(
                 if (hasActiveAccount) add(SettingsHomeSection.Profile)
                 // Store-managed builds own updates; off-store redirects violate policy.
                 if (selfUpdateEnabled) add(SettingsHomeSection.AppUpdates)
-                add(SettingsHomeSection.Hub)
-                add(SettingsHomeSection.Support)
+                addAll(settingsHomeGroupSections)
                 if (hasActiveAccount) add(SettingsHomeSection.SignOut)
                 add(SettingsHomeSection.Version)
             },
-        hubRows =
-            listOf(
-                SettingsHomeRow.Profile,
-                SettingsHomeRow.ProfileKeys,
-                SettingsHomeRow.AiAgents,
-                SettingsHomeRow.Notifications,
-                SettingsHomeRow.ReadAloud,
-                SettingsHomeRow.Dictation,
-                SettingsHomeRow.Appearance,
-                SettingsHomeRow.ChatFolders,
-                SettingsHomeRow.PrivacySecurity,
-                SettingsHomeRow.DataUsage,
-                SettingsHomeRow.Relays,
-            ),
-        supportRows =
-            listOf(
-                SettingsHomeRow.Help,
-                SettingsHomeRow.ChatWithSupport,
-                SettingsHomeRow.Donate,
-                SettingsHomeRow.DeveloperTools,
-            ),
+        groups =
+            settingsHomeGroupSections.map { section ->
+                SettingsHomeGroup(
+                    section = section,
+                    titleRes = requireNotNull(section.groupTitleRes),
+                    rows = SettingsHomeRow.entries.filter { it.section == section },
+                )
+            },
         showProfileHeader = hasActiveAccount,
     )
 
@@ -490,8 +572,9 @@ private fun SettingsHomeScreen(
 }
 
 /**
- * Settings home as the prototype lays it out: profile header, optional app updates, the hub group, the
- * support group, sign out and the version footer, in one lazy list whose viewport survives detail visits.
+ * Settings home as the prototype lays it out: profile header, optional app updates, the labelled Account,
+ * App and Support groups, sign out and the version footer, in one lazy list whose viewport survives
+ * detail visits.
  */
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
@@ -555,20 +638,13 @@ internal fun SettingsHomeContent(
                                 )
                             }
                         SettingsHomeSection.AppUpdates -> AppUpdateGroup(appUpdateInfo, onAppUpdateAction)
-                        SettingsHomeSection.Hub ->
-                            SettingsHubGroup(
-                                rows = state.hubRows,
-                                modifier = Modifier.padding(top = WhiteNoiseSpacing.FormField),
-                                onOpenDetail = onOpenDetail,
-                                onChatWithSupport = onChatWithSupport,
-                            )
-                        SettingsHomeSection.Support ->
-                            SettingsHubGroup(
-                                rows = state.supportRows,
-                                modifier = Modifier.padding(top = WhiteNoiseSpacing.Section),
-                                onOpenDetail = onOpenDetail,
-                                onChatWithSupport = onChatWithSupport,
-                            )
+                        SettingsHomeSection.Account,
+                        SettingsHomeSection.AppPreferences,
+                        SettingsHomeSection.Support,
+                        ->
+                            state.groups.firstOrNull { it.section == section }?.let { group ->
+                                SettingsHubSection(group, onOpenDetail, onChatWithSupport)
+                            }
                         SettingsHomeSection.SignOut -> SignOutGroup(onSignOut)
                         SettingsHomeSection.Version -> SettingsVersionFooter(versionName)
                     }
@@ -697,16 +773,32 @@ private fun SettingsProfileTrailing() {
     }
 }
 
-/** One connected group of hub rows; the support group reuses it with a different top spacing. */
+/** A labelled hub section: the heading at the 32 dp content line, then one connected group of its rows. */
+@Composable
+@Suppress("FunctionNaming")
+private fun SettingsHubSection(
+    group: SettingsHomeGroup,
+    onOpenDetail: (SettingsDetail) -> Unit,
+    onChatWithSupport: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.testTag("settings.section.${group.section.name}"),
+        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+    ) {
+        SettingsSection(stringResource(group.titleRes))
+        SettingsHubGroup(rows = group.rows, onOpenDetail = onOpenDetail, onChatWithSupport = onChatWithSupport)
+    }
+}
+
+/** One connected group of hub rows; every labelled section renders its rows through it. */
 @Composable
 @Suppress("FunctionNaming")
 private fun SettingsHubGroup(
     rows: List<SettingsHomeRow>,
-    modifier: Modifier,
     onOpenDetail: (SettingsDetail) -> Unit,
     onChatWithSupport: () -> Unit,
 ) {
-    SettingsGroup(modifier = modifier) {
+    SettingsGroup {
         rows.forEach { entry ->
             row(entry.name) { context ->
                 SettingsHubLink(

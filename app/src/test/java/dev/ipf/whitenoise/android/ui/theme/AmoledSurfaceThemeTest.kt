@@ -85,6 +85,16 @@ class AmoledSurfaceThemeTest {
         assertEquals(Color.White, AmoledEmphasizedSurfaceBorder)
     }
 
+    /** The seam between touching AMOLED rows keeps the outline's hue at the quieter seam alpha, scaled if dimmed. */
+    @Test
+    fun amoledRowSeamDimsTheOutlineToTheSeamAlpha() {
+        assertTrue(AMOLED_ROW_SEAM_ALPHA in 0f..1f)
+        assertEquals(Color.White.copy(alpha = AMOLED_ROW_SEAM_ALPHA), amoledRowSeamColor(Color.White))
+        val halfOutline = Color.White.copy(alpha = 0.5f)
+        // Colour channels round to 8 bits, so allow one step of that quantisation.
+        assertEquals(halfOutline.alpha * AMOLED_ROW_SEAM_ALPHA, amoledRowSeamColor(halfOutline).alpha, 1f / 255f)
+    }
+
     /** AMOLED is a fixed black-and-white palette: a saved account accent is stored but never applied. */
     @Test
     fun everyAmoledColorSchemeRoleIsMonochromeAndIgnoresCustomAccountAccent() {

@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
+import dev.ipf.whitenoise.android.ui.theme.amoledRowSeamColor
 import dev.ipf.whitenoise.android.ui.theme.connectedRowBorder
 
 internal object SettingsRowDefaults {
@@ -71,14 +72,18 @@ internal fun Color.dimmedUnless(editable: Boolean): Color =
         copy(alpha = alpha * SettingsRowDefaults.DisabledAlpha)
     }
 
-/** Each AMOLED row owns its side edges and the preceding row owns the single-pixel shared divider. */
+/**
+ * Each AMOLED row owns its side edges in the group's outline colour and the preceding row owns the
+ * single-pixel shared divider, drawn as the dimmed seam so the outer outline stays the only white edge.
+ */
 internal fun Modifier.settingsRowBorder(
     context: SettingsRowContext,
     editable: Boolean,
 ): Modifier {
     val shape = context.shapes.shape
     return if (shape is ConnectedRowShape) {
-        connectedRowBorder(shape, context.borderColor.dimmedUnless(editable))
+        val outline = context.borderColor.dimmedUnless(editable)
+        connectedRowBorder(shape, outline, seamColor = amoledRowSeamColor(outline))
     } else {
         this
     }

@@ -91,14 +91,18 @@ class ChatBubbleColorsScreenBehaviorTest {
         }
     }
 
-    /** A chat override starts from the account defaults and its menu offers a disabled reset to those defaults. */
+    /** A chat override starts from the account defaults with no overflow; a draft brings the per-chat reset. */
     @Test
-    fun chatOverrideInheritsDefaultsAndLabelsReset() {
+    fun chatOverrideInheritsDefaultsAndShowsResetOnlyWithADraft() {
         appState.updateGlobalBubbleColor(BubbleTheme.Light, BubbleSide.Mine, 0xFFB91C1CL)
         show(groupIdHex = "group-1")
         composeRule.onNode(swatch("#B91C1C", "mine")).assertIsSelected()
+        composeRule.onNodeWithTag("bubble_colors.menu").assertDoesNotExist()
+        composeRule.onNode(swatch("#0E7490", "other")).performScrollTo().performClick()
         composeRule.onNodeWithTag("bubble_colors.menu").performClick()
-        composeRule.onNodeWithText("Reset to global colors").assertIsNotEnabled()
+        composeRule.onNodeWithText("Reset to global colors").performClick()
+        composeRule.onNodeWithTag("bubble_colors.menu").assertDoesNotExist()
+        composeRule.onNodeWithTag("bubble_colors.save").assertIsNotEnabled()
     }
 
     /** Saving a chat override writes only the changed side for that chat and leaves the account defaults alone. */

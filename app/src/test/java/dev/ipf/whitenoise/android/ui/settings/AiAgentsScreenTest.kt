@@ -110,6 +110,24 @@ class AiAgentsScreenTest {
         composeRule.onNodeWithText(app.getString(R.string.ai_agents_prompt_copied)).assertExists()
     }
 
+    /** The prompt card is itself a copy button: one tap hands over the exact prompt and shows the same feedback. */
+    @Test
+    fun tappingThePromptCopiesItWithTheSameFeedbackAsTheButton() {
+        render()
+
+        openSetupSheet("codex")
+        val card = composeRule.onNodeWithTag("ai_agents.prompt.codex")
+        assertEquals(Role.Button, card.fetchSemanticsNode().config[SemanticsProperties.Role])
+        card.performClick()
+
+        val prompt = app.getString(R.string.agent_connector_codex_prompt, TEST_NPUB)
+        composeRule.runOnIdle {
+            assertEquals(listOf(app.getString(R.string.ai_agents_setup_title, "Codex") to prompt), copies)
+        }
+        composeRule.onNodeWithTag("ai_agents.copy_feedback").assertExists()
+        composeRule.onNodeWithText(app.getString(R.string.ai_agents_prompt_copied)).assertExists()
+    }
+
     /** Manual setup copies the complete key while the row itself only shows its abbreviation. */
     @Test
     fun copyPublicKeyWritesTheCompleteKeyWhileTheRowStaysShort() {

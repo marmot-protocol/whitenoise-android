@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -11,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -120,6 +123,8 @@ class MessageActionMenuLayoutTest {
     fun columnAndHeightEstimatesTrackGridRowsWithIntegratedDelete() {
         assertEquals(2, messageActionColumnCount(312.dp, 136.dp))
         assertEquals(1, messageActionColumnCount(260.dp, 136.dp))
+        assertEquals(1, messageActionColumnCount(312.dp, 136.dp, fontScale = 1.5f))
+        assertEquals(2, messageActionColumnCount(312.dp, 136.dp, fontScale = 1.3f))
         assertEquals(379.dp, estimatedMessageActionMenuHeight(10, 2, canReact = true, canDelete = true))
         assertEquals(629.dp, estimatedMessageActionMenuHeight(10, 1, canReact = true, canDelete = true))
     }
@@ -336,26 +341,69 @@ class MessageActionMenuLayoutTest {
         assertEquals(163, position.y)
     }
 
-    /** Maximum menu uses prototype single column with delete last. */
+    /** Grid rows pair consecutive actions in reading order; Delete alone spans the last row. */
     @Test
-    fun maximumMenuUsesPrototypeSingleColumnWithDeleteLast() {
+    fun gridRowsPairActionsAndGiveDeleteItsOwnFullRow() {
+        assertEquals(
+            listOf(listOf("a", "b"), listOf("c", "d"), listOf("e"), listOf("delete")),
+            messageActionGridRows(listOf("a", "b", "delete", "c", "d", "e"), columns = 2) { it == "delete" },
+        )
+        assertEquals(
+            listOf(listOf("a"), listOf("b"), listOf("delete")),
+            messageActionGridRows(listOf("a", "b", "delete"), columns = 1) { it == "delete" },
+        )
+    }
+
+    /** Maximum menu lays its actions out two per row with Delete alone on a full-width last row. */
+    @Test
+    fun maximumMenuUsesTwoColumnGridWithDeleteSpanningTheLastRow() {
         renderMenu(fontScale = 1f)
 
-        val reply = bounds("Reply")
         val edit = bounds("Edit")
-        val select = bounds("Select")
         val selectText = bounds("Select text")
+        val reply = bounds("Reply")
+        val forward = bounds("Forward")
+        val info = bounds("Info")
         val delete = bounds("Delete")
 
-        assertTrue(selectText.top > edit.top)
+        // Edit and Select text share the first row; Reply and Forward the second.
+        assertEquals(edit.top, selectText.top, 0.5f)
+        assertTrue(selectText.left > edit.left)
+        assertTrue(reply.top > edit.top)
+        assertEquals(reply.top, forward.top, 0.5f)
         assertEquals(reply.left, edit.left, 0.5f)
-        assertTrue(reply.top > selectText.top)
-        assertTrue(select.top > reply.top)
-        val save = bounds("Save attachments")
-        val info = bounds("Info")
-        assertTrue(info.top > save.top)
+        // Delete is last and spans both columns.
         assertTrue(delete.top > info.top)
-        assertEquals(reply.width, delete.width, 0.5f)
+        assertTrue(delete.width > reply.width * 1.5f)
+    }
+
+    /** A tap on the stack's empty padding dismisses the actions like the scrim does. */
+    @Test
+    fun tapOutsideEveryActionTargetDismisses() {
+        var dismissals = 0
+        renderMenu(fontScale = 1f, onDismiss = { dismissals++ })
+
+        // The 8 dp gap between the preview and the menu is the column's own surface: a tap there
+        // touches neither a reaction, the inert preview nor a menu item, so it must dismiss.
+        val column = composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).fetchSemanticsNode().boundsInRoot
+        val preview = composeRule.onNodeWithTag("message-actions-preview").fetchSemanticsNode().boundsInRoot
+        val gapY = preview.bottom - column.top + with(composeRule.density) { 4.dp.toPx() }
+        composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).performTouchInput { click(Offset(1f, gapY)) }
+
+        assertEquals(1, dismissals)
+    }
+
+    /** The inert preview neither dismisses nor acts when tapped. */
+    @Test
+    fun tapOnThePreviewStaysInert() {
+        var dismissals = 0
+        val callbacks = mutableListOf<String>()
+        renderMenu(fontScale = 1f, callbacks = callbacks, onDismiss = { dismissals++ })
+
+        composeRule.onNodeWithTag("message-actions-preview").performTouchInput { click() }
+
+        assertEquals(0, dismissals)
+        assertTrue(callbacks.isEmpty())
     }
 
     @Test
@@ -372,9 +420,10 @@ class MessageActionMenuLayoutTest {
     fun largeFontFallsBackToOneReadableColumn() {
         renderMenu(fontScale = 2f, literalCode = true)
 
-        assertTrue(bounds("Select text").top > bounds("Edit").top)
-        // At this font the column scrolls, so a row further down the list is composed but
-        // unmeasured until it is scrolled to. Reachability is the claim worth pinning.
+        // At this font the single column scrolls, so rows further down are composed but unmeasured
+        // until scrolled to; the first row is on screen and every later row must be reachable.
+        composeRule.onNodeWithText("Edit", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("Select text", substring = false).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Select", substring = false).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Delete", substring = false).performScrollTo().assertIsDisplayed()
         val layouts = mutableListOf<TextLayoutResult>()
@@ -394,13 +443,14 @@ class MessageActionMenuLayoutTest {
         )
     }
 
-    /** Rtl keeps single column command order. */
+    /** RTL mirrors the grid: the first cell of each row sits at the trailing (right) edge. */
     @Test
-    fun rtlKeepsSingleColumnCommandOrder() {
+    fun rtlMirrorsTheGridReadingOrder() {
         renderMenu(fontScale = 1f, layoutDirection = LayoutDirection.Rtl)
 
         assertTrue(bounds("Reply").top > bounds("Edit").top)
         assertEquals(bounds("Reply").right, bounds("Edit").right, 0.5f)
+        assertTrue(bounds("Select text").right < bounds("Edit").right)
     }
 
     /** Every maximum variant action invokes its original callback. */
@@ -501,6 +551,7 @@ class MessageActionMenuLayoutTest {
         canReact: Boolean = false,
         literalCode: Boolean = false,
         quickReactionEmojis: List<String> = if (canReact) listOf("👍") else emptyList(),
+        onDismiss: () -> Unit = {},
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(fontScale = fontScale) {
@@ -525,7 +576,7 @@ class MessageActionMenuLayoutTest {
                         canShare = true,
                         canSave = true,
                         quickReactionEmojis = quickReactionEmojis,
-                        onDismissRequest = {},
+                        onDismissRequest = onDismiss,
                         onReact = {},
                         onOpenEmojiPicker = {},
                         onReply = { callbacks += "reply" },

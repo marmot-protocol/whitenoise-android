@@ -4,8 +4,10 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenuGroup
@@ -112,11 +114,14 @@ internal fun ComposerAttachmentMenu(
     KeyboardSafePopup(expanded, onDismiss, position) {
         BoxWithConstraints {
             val menuMaxHeight = (maxHeight - 16.dp).coerceAtLeast(0.dp)
+            // A popup hands its content the window's width, and the Expressive menu rows fill
+            // whatever they are given, so without this the menu ran edge to edge. The prototype's
+            // menu popup sizes to its widest label; wrapping to the intrinsic width matches it.
             DropdownMenuGroup(
                 shapes = MenuDefaults.groupShapes(),
                 border = amoledOutlineBorder(),
                 shadowElevation = MenuDefaults.ShadowElevation,
-                modifier = Modifier.testTag("conversation.attachment.menu"),
+                modifier = Modifier.width(IntrinsicSize.Max).testTag("conversation.attachment.menu"),
             ) {
                 Column(
                     Modifier

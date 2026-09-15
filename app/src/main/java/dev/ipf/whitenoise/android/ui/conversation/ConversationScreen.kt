@@ -3535,6 +3535,7 @@ internal fun ConversationScreen(
                         keyboardController?.hide()
                     }
                 },
+                composerDismissInProgress = composerDismissInProgress,
                 onBottomInputChanged = { bottomInputRevision++ },
                 onKeyboardRestoreFromCustomInput = { suppressNextImeOpenReanchor.set(true) },
                 onKeyboardRestoreFromCustomInputFailed = { suppressNextImeOpenReanchor.set(false) },

@@ -1485,7 +1485,9 @@ internal fun ChatsScreen(
         Column(Modifier.fillMaxSize().padding(padding)) {
             // Chats reset and folder management remain available with an empty list.
             // Native folder models still own visibility/counts; this row stays above list/empty-state swaps.
-            if (appState.activeAccountRef != null) {
+            // The prototype swaps the whole top column for the search bar and its mode chips, so the
+            // folder pills leave with it and come back when search closes.
+            if (appState.activeAccountRef != null && !searchOpen) {
                 key(appState.activeAccountRef, appState.runtimeGeneration) {
                     ChatListFilterChips(
                         chips = folderChipModels,

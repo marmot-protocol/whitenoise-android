@@ -1066,6 +1066,7 @@
     <string name="voice_message_microphone_busy">Das Mikrofon wird von einer anderen App verwendet. Schließen Sie diese App und versuchen Sie es erneut.</string>
     <string name="voice_message_play">Sprachnachricht abspielen</string>
     <string name="voice_message_pause">Sprachnachricht pausieren</string>
+    <string name="voice_message_speed">Wiedergabegeschwindigkeit %1$s</string>
     <string name="voice_message_failed">Sprachnachricht konnte nicht geladen werden</string>
     <string name="voice_message_locked">Gesperrt</string>
     <string name="reply_you">Du</string>
@@ -1099,7 +1100,7 @@
     <string name="toast_couldnt_upload_profile_image">Das Profilbild konnte nicht hochgeladen werden.</string>
     <string name="profile_nip05_hint">name@domäne</string>
     <string name="profile_nip05_invalid">Gib eine Adresse wie name@example.com ein.</string>
-    <string name="profile_lightning_hint">Lightning-Adresse, z. B. you@walletprovider.com</string>
+    <string name="profile_lightning_hint">z. B. you@walletprovider.com</string>
     <string name="profile_lightning_invalid">Gib eine Lightning-Adresse wie name@example.com ein.</string>
     <string name="profile_lightning_checking">Wird geprüft…</string>
     <string name="profile_lightning_unresolved">Diese Lightning-Adresse lässt sich nicht auflösen. Prüfe sie und versuche es erneut.</string>

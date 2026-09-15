@@ -117,32 +117,34 @@ private fun ChatBubbleColorEditor(
         title = stringResource(R.string.chat_bubble_colors),
         onBack = onBack,
         topBarActions = {
-            Box {
-                IconButton(onClick = { menuOpen = true }, modifier = Modifier.testTag("bubble_colors.menu")) {
-                    Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.more_options))
-                }
-                WhiteNoiseDropdownMenu(
-                    expanded = menuOpen,
-                    onDismissRequest = { menuOpen = false },
-                    items =
-                        listOf(
-                            WhiteNoiseMenuItem(
-                                label =
-                                    stringResource(
-                                        if (perChat) R.string.reset_to_global_colors else R.string.reset_to_default,
-                                    ),
-                                enabled = canReset,
-                                onClick = {
-                                    mine = null
-                                    other = null
-                                    mineValid = true
-                                    otherValid = true
-                                    reset = true
-                                    resetRevision++
-                                },
+            // The overflow holds only Reset, so it appears only once there is something to reset.
+            if (canReset) {
+                Box {
+                    IconButton(onClick = { menuOpen = true }, modifier = Modifier.testTag("bubble_colors.menu")) {
+                        Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.more_options))
+                    }
+                    WhiteNoiseDropdownMenu(
+                        expanded = menuOpen,
+                        onDismissRequest = { menuOpen = false },
+                        items =
+                            listOf(
+                                WhiteNoiseMenuItem(
+                                    label =
+                                        stringResource(
+                                            if (perChat) R.string.reset_to_global_colors else R.string.reset_to_default,
+                                        ),
+                                    onClick = {
+                                        mine = null
+                                        other = null
+                                        mineValid = true
+                                        otherValid = true
+                                        reset = true
+                                        resetRevision++
+                                    },
+                                ),
                             ),
-                        ),
-                )
+                    )
+                }
             }
         },
         bottomBar = {
