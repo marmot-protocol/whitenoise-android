@@ -100,7 +100,7 @@ internal fun DonateScreen(onBack: () -> Unit) {
                         )
                     }
                     WhiteNoiseButton(
-                        onClick = { uriHandler.openUri("https://ipf.dev/donate") },
+                        onClick = { uriHandler.openUri(DONATION_URL) },
                         modifier = Modifier.fillMaxWidth().padding(top = DonationTopInset).testTag("donate.open"),
                     ) {
                         Text(stringResource(R.string.settings_donate))
@@ -113,3 +113,6 @@ internal fun DonateScreen(onBack: () -> Unit) {
 
 private val DonationTopInset = 40.dp
 private val DonationHeartSize = 40.dp
+
+private const val DONATION_URL =
+    "https://ipf.dev/donate/?utm_source=whitenoise_android&utm_medium=app&utm_campaign=donations"

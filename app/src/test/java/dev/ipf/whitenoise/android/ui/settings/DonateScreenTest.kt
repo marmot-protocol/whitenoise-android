@@ -36,7 +36,12 @@ class DonateScreenTest {
         composeRule.onNodeWithTag("donate.qr_surface").assertDoesNotExist()
         composeRule.onNodeWithTag("donate.copy_address").assertDoesNotExist()
         composeRule.onNodeWithTag("donate.open").performClick()
-        composeRule.runOnIdle { assertEquals(listOf("https://ipf.dev/donate"), openedUris) }
+        composeRule.runOnIdle {
+            assertEquals(
+                listOf("https://ipf.dev/donate/?utm_source=whitenoise_android&utm_medium=app&utm_campaign=donations"),
+                openedUris,
+            )
+        }
     }
 
     /** Back invokes the caller once. */

@@ -5860,6 +5860,7 @@
       },
       {
         "surface": "DonateScreen",
+        "note": "Donate opens the foundation page with whitenoise_android/app/donations UTM attribution.",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
         "anchor": "fun DonateScreen(",
         "test_ids": [
