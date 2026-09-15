@@ -1626,14 +1626,6 @@
         ]
       },
       {
-        "surface": "ConversationDictationProgressHairline",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
-        "anchor": "fun ConversationDictationProgressHairline(",
-        "test_ids": [
-          "DIC-001"
-        ]
-      },
-      {
         "surface": "ConversationDictationNotificationNotice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationNotificationNotice.kt",
         "anchor": "fun ConversationDictationNotificationNotice(",

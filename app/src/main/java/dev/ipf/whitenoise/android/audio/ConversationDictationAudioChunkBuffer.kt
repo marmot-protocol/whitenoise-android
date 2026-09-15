@@ -74,6 +74,15 @@ internal class ConversationDictationAudioChunkBuffer(
         if (currentSize > 0) sealCurrent()
     }
 
+    /** Seals an utterance boundary once enough PCM exists to avoid rapid tiny provider requests. */
+    @Synchronized
+    fun sealCurrentIfAtLeast(minimumBytes: Int): Boolean {
+        require(minimumBytes > 0 && minimumBytes % 2 == 0)
+        if (finished || currentSize < minimumBytes) return false
+        sealCurrent()
+        return true
+    }
+
     /** Moves the oldest sealed chunk into the in-flight set. */
     @Synchronized
     fun poll(): ConversationDictationAudioChunk? =

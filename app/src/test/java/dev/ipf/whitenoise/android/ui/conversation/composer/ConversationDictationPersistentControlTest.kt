@@ -73,6 +73,7 @@ class ConversationDictationPersistentControlTest {
             assertTrue(bounds.bottom - bounds.top >= 48.dp)
         }
         composeRule.onNodeWithContentDescription("Record voice message").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Pause").assertDoesNotExist()
         composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertDoesNotExist()
 
         fixture.platform.listener.onEndOfSpeech()
@@ -92,6 +93,24 @@ class ConversationDictationPersistentControlTest {
                     ProgressBarRangeInfo.Indeterminate,
                 ),
             )
+    }
+
+    /** The selected completion action owns the only processing animation. */
+    @Test
+    fun tappedSendReplacesItsOwnIconWithTheProcessingIndicator() {
+        val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        render(fixture)
+
+        composeRule.onNodeWithContentDescription("Send").performClick()
+
+        assertTrue(fixture.controller.state is ConversationDictationState.Processing)
+        val send = composeRule.onNodeWithContentDescription("Send").getUnclippedBoundsInRoot()
+        val progress = composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertTrue(progress.left >= send.left && progress.right <= send.right)
+        assertTrue(progress.top >= send.top && progress.bottom <= send.bottom)
+        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Pause").assertDoesNotExist()
     }
 
     /** Verifies an ambiguous merge retains explicit copy, insert, and discard choices. */

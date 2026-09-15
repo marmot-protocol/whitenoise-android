@@ -1695,6 +1695,54 @@ class ConversationDictationControllerTest {
         assertEquals(1, lastSession.acknowledgedCallerAudio)
     }
 
+    /** An empty provider final retains its exact 30-second chunk and retries it before delivery. */
+    @Test
+    fun stopRetriesBlankCallerAudioChunkWithoutLosingItsTail() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("first")
+        fixture.scheduler.runDelay(250L)
+
+        fixture.controller.stop()
+        val blankSession = fixture.platform.session
+        fixture.platform.listener.onResult(null)
+
+        assertEquals(0, blankSession.acknowledgedCallerAudio)
+        assertEquals(1, blankSession.retriedCallerAudio)
+        assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+        assertEquals("", fixture.drafts.getValue(key()).text)
+
+        fixture.platform.pendingCallerAudio = false
+        fixture.platform.listener.onResult("last sentence")
+
+        assertEquals("first last sentence", fixture.drafts.getValue(key()).text)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
+    /** A transient final-chunk failure retries retained PCM instead of delivering earlier text alone. */
+    @Test
+    fun stopRetriesDisconnectedCallerAudioChunkWithoutFinalizingPartialText() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("first")
+        fixture.scheduler.runDelay(250L)
+
+        fixture.controller.stop()
+        val failedSession = fixture.platform.session
+        fixture.platform.listener.onError(ConversationDictationFailure.ProviderDisconnected)
+
+        assertEquals(1, failedSession.retriedCallerAudio)
+        assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+        assertEquals("", fixture.drafts.getValue(key()).text)
+
+        fixture.platform.pendingCallerAudio = false
+        fixture.platform.listener.onResult("recovered tail")
+
+        assertEquals("first recovered tail", fixture.drafts.getValue(key()).text)
+    }
+
     /** Captured tail audio survives a stop request that lands between provider generations. */
     @Test
     fun stopDuringRestartGapSealsAndDrainsCallerAudioTail() {
@@ -2178,10 +2226,10 @@ class ConversationDictationControllerTest {
             assertTrue(rejected.controller.state is ConversationDictationState.ReviewRequired)
         }
 
-    /** Verifies foreground-service ownership remains active until asynchronous delivery accepts or rejects. */
+    /** Releases dictation as soon as the pending bubble is visible, without cancelling its transport. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun sendOnFinishKeepsDurableOwnershipUntilTheCommitFinishes() =
+    fun sendOnFinishCompletesWhenThePendingBubbleIsPublished() =
         runTest {
             val sendStarted = CompletableDeferred<Unit>()
             val finishSend = CompletableDeferred<Boolean>()
@@ -2193,8 +2241,10 @@ class ConversationDictationControllerTest {
                     targetValidationScope = this,
                     deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     stopDurableSession = { durableStops += 1 },
-                    sendTranscriptIfOriginUnchanged = {
+                    sendTranscriptIfOriginUnchanged = { request ->
                         sendStarted.complete(Unit)
+                        assertTrue(request.beginDispatch())
+                        request.onPendingShown()
                         finishSend.await()
                     },
                 )
@@ -2205,9 +2255,11 @@ class ConversationDictationControllerTest {
             runCurrent()
 
             assertTrue(sendStarted.isCompleted)
-            assertTrue(fixture.controller.hasDurableSession)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+            assertFalse(fixture.controller.hasDurableSession)
             assertFalse(fixture.controller.ownsMicrophone)
-            assertEquals(0, durableStops)
+            assertEquals(1, durableStops)
+            assertEquals("", fixture.drafts.getValue(key()).text)
 
             finishSend.complete(true)
             advanceUntilIdle()
@@ -3519,7 +3571,13 @@ class ConversationDictationControllerTest {
             createFailure?.let { throw it }
             this.listener = listener
             listeners += listener
-            session = FakeSession(listener, completePreparationOnStop, deferCaptureCompletion)
+            session =
+                FakeSession(
+                    listener,
+                    completePreparationOnStop,
+                    deferCaptureCompletion,
+                    callerAudioOwned = pendingCallerAudio,
+                )
             sessions += session
             return session
         }
@@ -3529,6 +3587,7 @@ class ConversationDictationControllerTest {
         private val listener: ConversationDictationRecognitionListener? = null,
         private val completePreparationOnStop: Boolean = false,
         private val deferCaptureCompletion: Boolean = false,
+        private val callerAudioOwned: Boolean = false,
     ) : ConversationDictationRecognitionSession {
         var started = false
         var stopped = false
@@ -3537,6 +3596,7 @@ class ConversationDictationControllerTest {
         var cancelCalls = 0
         var destroyCalls = 0
         var acknowledgedCallerAudio = 0
+        var retriedCallerAudio = 0
         private val captureFinished = mutableListOf<() -> Unit>()
         private var captureClosed = false
         private var deferredProviderError: ConversationDictationFailure? = null
@@ -3611,7 +3671,15 @@ class ConversationDictationControllerTest {
 
         /** Tracks final-result acknowledgments so tests can verify serial chunk ownership. */
         override fun acknowledgeCallerAudio(): Boolean {
+            if (!callerAudioOwned) return false
             acknowledgedCallerAudio += 1
+            return true
+        }
+
+        /** Tracks exact-chunk retry so blank and failed finals cannot consume retained PCM. */
+        override fun retryCallerAudio(): Boolean {
+            if (!callerAudioOwned) return false
+            retriedCallerAudio += 1
             return true
         }
     }
