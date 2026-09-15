@@ -824,7 +824,7 @@ private class InstrumentedGroupSubscription(
     }
 }
 
-/** Per-message gates for materialization plus waveform/duration publication. */
+/** Per-message gates for materialization plus duration publication. */
 private class InstrumentedVoiceControl(
     val messageId: String,
     materializationAttemptCount: Int = 1,
@@ -832,10 +832,8 @@ private class InstrumentedVoiceControl(
     private val materializationStarted = List(materializationAttemptCount) { CompletableDeferred<Unit>() }
     private val materializationResults =
         List(materializationAttemptCount) { CompletableDeferred<InstrumentedMaterializationResult>() }
-    val waveformStarted = CompletableDeferred<Unit>()
     val durationStarted = CompletableDeferred<Unit>()
     val hydrationReleased = CompletableDeferred<Unit>()
-    val waveformCompleted = CompletableDeferred<Unit>()
     val durationCompleted = CompletableDeferred<Unit>()
     private val nextMaterializationAttempt = AtomicInteger(0)
 
@@ -881,7 +879,7 @@ private class InstrumentedVoiceControl(
     /** Waits for both production hydration effects to consume the published file. */
     fun awaitHydrationStart(rule: androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, *>) {
         rule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MS) {
-            waveformStarted.isCompleted && durationStarted.isCompleted
+            durationStarted.isCompleted
         }
     }
 
@@ -890,10 +888,10 @@ private class InstrumentedVoiceControl(
         hydrationReleased.complete(Unit)
     }
 
-    /** Waits until waveform and duration state publications both complete. */
+    /** Waits until the duration state publication completes. */
     fun awaitHydrationCompletion(rule: androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, *>) {
         rule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MS) {
-            waveformCompleted.isCompleted && durationCompleted.isCompleted
+            durationCompleted.isCompleted
         }
         rule.waitForIdle()
     }
@@ -942,15 +940,6 @@ private class InstrumentedVoiceRuntime(
             fileOwners[file.absolutePath] = request.messageIdHex
             publishedFiles += file
         }
-
-    /** Records waveform work on the owning message and holds publication at the shared hydration gate. */
-    override suspend fun waveform(file: File): FloatArray {
-        val control = controlFor(file)
-        control.waveformStarted.complete(Unit)
-        control.hydrationReleased.await()
-        control.waveformCompleted.complete(Unit)
-        return FloatArray(64) { index -> 0.2f + (index % 5) * 0.1f }
-    }
 
     /** Records duration work on the owning message and publishes only after hydration is released. */
     override suspend fun durationMs(file: File): Int {
