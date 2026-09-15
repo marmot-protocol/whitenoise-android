@@ -27,7 +27,8 @@ original recording; do not substitute generated or simulated evidence.
 
 ## Foreground-service form explanations
 
-Use Media playback for playback and Background audio input for dictation.
+Use Media playback for playback and Background audio input for dictation
+(the current Console label; Google’s guidance also calls it Background Audio Access).
 White Noise's remote-messaging behavior is a background relay connection, not a
 phone-to-web SMS bridge. Describe that actual behavior under Other instead of
 claiming a device-continuity feature the app does not implement. Google reviews
@@ -63,8 +64,11 @@ Recheck the candidate manifest and these paths before reusing an explanation.
    required evidence is missing.
 2. Confirm the intended closed track, tester list, and countries. A production
    country selection is not a production release.
-3. Promote the verified candidate AAB from the library; do not rebuild it. Check
-   the release summary explicitly names the closed track before submission.
+3. The automated pipeline uploads only to internal testing. In a separate manual
+   Play Console step, promote the verified candidate AAB from the library to the
+   closed track; do not rebuild it. The pipeline does not publish this closed
+   release. Check the release summary explicitly names the closed track before
+   submission.
 4. With managed publishing off, an approved closed release may become available
    to its eligible testers automatically. Do not create or submit a production
    release during this preparation.

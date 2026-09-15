@@ -1777,7 +1777,7 @@
     <string name="audit_upload_title">分享技术日志</string>
     <string name="audit_upload_subtitle">自动向 White Noise 发送诊断审计日志，与使用情况分享分开控制。</string>
     <string name="audit_upload_confirm_title">与 White Noise 分享技术日志？</string>
-    <string name="audit_upload_disclosure">启用后，此设备上所有身份的诊断审计日志都会保存在本地，并自动上传到由 Internet Privacy Foundation 运营的 Goggles。以前记录的日志也可能上传。日志可能包含群组和消息标识符、中继地址、时间戳、假名化的账户引用、安装标识符、设备型号和应用版本，但不包含消息内容或私钥。这些日志属于敏感数据，会保留用于调查可靠性问题。此选项与使用情况和诊断分享相互独立。你随时可以在此停止未来的记录和上传；这不会删除已保存在本地或已上传的日志。取消会使分享保持关闭。</string>
+    <string name="audit_upload_disclosure">启用后，此设备上所有身份的诊断审计日志都会保存在本地，并自动上传到由 Internet Privacy Foundation 运营的 Goggles。以前记录的日志也可能上传。日志可能包含群组和消息标识符、中继地址、时间戳、假名化的账户引用、安装标识符、设备型号和应用版本，但不包含消息内容或私钥。这些日志属于敏感数据，会保留用于调查可靠性问题。此选项与使用情况和诊断分享相互独立。关闭分享会停止新的记录并阻止启动新的上传批次。已在进行的批次可能会继续完成其中所有文件的上传。这不会删除已保存在本地或已上传的日志。取消会使分享保持关闭。</string>
     <string name="audit_upload_confirm">启用自动分享</string>
     <string name="audit_upload_renew">技术日志分享将保持关闭，直到你阅读自动上传说明并重新作出选择。</string>
 </resources>

@@ -111,8 +111,10 @@ including background startup; the app then offers a fresh choice on Chats.
 Usage/Aptabase/OTLP consent is independent. Build flags must never opt a user in.
 For a consent-change candidate, qualify SEC-008 and SEC-012 using both a fresh
 installation and an upgrade with the old recording choice enabled. Cancel must
-leave uploads off; disabling sharing must stop new uploads without claiming to
-recall requests already in flight or delete previously stored logs.
+leave uploads off; disabling sharing must stop new recording and prevent new
+upload batches. The pinned native uploader snapshots its configuration for each
+batch: a batch already running can finish uploading its files after withdrawal.
+The disclosure must state this limit and must not promise deletion of stored logs.
 
 `google-play-internal` contains `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`. Give that
 account testing-track permissions only. The workflow hardcodes `internal`;

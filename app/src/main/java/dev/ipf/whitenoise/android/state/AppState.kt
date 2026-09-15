@@ -6149,9 +6149,12 @@ class WhiteNoiseAppState private constructor(
                 transform = { it.copy(enabled = enabled) },
                 persistToEngine = { settings ->
                     withContext(Dispatchers.IO) {
-                        auditUploadConsent.choose(enabled)
-                        marmot().configureAuditRuntime(uploadConsentGranted = enabled)
-                        marmot().setAuditLogSettings(settings)
+                        val runtime = marmot()
+                        auditUploadConsent.applyChoice(
+                            settings,
+                            configureUpload = { runtime.configureAuditRuntime(uploadConsentGranted = it) },
+                            persistSettings = { runtime.setAuditLogSettings(it) },
+                        )
                     }
                 },
             )
