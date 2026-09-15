@@ -258,15 +258,14 @@ internal class ConversationDictationCallerAudio internal constructor(
 
         val chunkHasSpeech = currentChunkHasSpeech || recordCaptureActivity(samples, read, progress)
         val quietMillis = SystemClock.elapsedRealtime() - lastSpeechAt.get()
-        if (
+        val sealed =
             chunkHasSpeech &&
-            quietMillis >= SENTENCE_BOUNDARY_SILENCE_MILLIS &&
-            buffer.sealCurrentIfAtLeast(MIN_SENTENCE_CHUNK_BYTES)
-        ) {
+                quietMillis >= SENTENCE_BOUNDARY_SILENCE_MILLIS &&
+                buffer.sealCurrentIfAtLeast(MIN_SENTENCE_CHUNK_BYTES)
+        if (sealed) {
             conversationDictationDiagnostic("event=caller_audio_chunk_sealed reason=silence")
-            return false
         }
-        return chunkHasSpeech
+        return chunkHasSpeech && !sealed
     }
 
     /** Tracks capture-side speech before a provider receives the next sealed chunk. */
