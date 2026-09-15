@@ -226,6 +226,7 @@ internal fun rememberDraftVideoPlayer(
 
 /** Renders the decoder output without Media3's own controller; the prototype owns every affordance. */
 @Composable
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 private fun DraftVideoSurface(
     player: ExoPlayer?,
     modifier: Modifier = Modifier,

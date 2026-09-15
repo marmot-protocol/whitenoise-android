@@ -129,8 +129,12 @@ class MediaPreviewContentTest {
         renderPreview(listOf(uri(1), uri(2), uri(3)), previewOnly = true)
         composeRule.onAllNodesWithTag("conversation.media.inclusion.target").onFirst().performClick()
         composeRule.onNodeWithText(string(R.string.done)).performClick()
-        composeRule.waitForIdle()
-        composeRule.onNodeWithContentDescription(string(R.string.media_preview_position_badge, 3)).assertDoesNotExist()
+        // Exclusions apply one frame at a time across recompositions, and a single idle pass
+        // returned early on the Play flavour's dispatcher, so wait for the removal itself.
+        val removedBadge = string(R.string.media_preview_position_badge, 3)
+        composeRule.waitUntil(timeoutMillis = 5_000L) {
+            composeRule.onAllNodesWithContentDescription(removedBadge).fetchSemanticsNodes().isEmpty()
+        }
         composeRule
             .onNodeWithContentDescription(string(R.string.media_preview_position_badge, 1))
             .assertIsDisplayed()

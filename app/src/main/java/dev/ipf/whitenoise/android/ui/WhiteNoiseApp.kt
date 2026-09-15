@@ -708,6 +708,12 @@ private fun WarmResumeFrameSurface(
                 }
             }
         observer.addOnDrawListener(listener)
+        // Registering a draw listener schedules nothing by itself. When this epoch's
+        // composition lands after the resume redraw (or before onStart on a recreate
+        // that preserves the DecorView), the view is already clean and the listener
+        // would wait for an unrelated repaint — request one frame so the rendered
+        // surface is recorded promptly.
+        view.invalidate()
         onDispose(::detachListener)
     }
     content()
