@@ -178,6 +178,11 @@ jobs:
 
       - name: Set up Android SDK tools
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
+        with:
+          # The action's default package list still names the legacy `tools` package, which
+          # current command-line tools no longer publish; sdkmanager then exits 1 and the
+          # preview links never reach the PR description. Only platform-tools is needed here.
+          packages: platform-tools
 
       - name: Verify untrusted candidates
         shell: bash
