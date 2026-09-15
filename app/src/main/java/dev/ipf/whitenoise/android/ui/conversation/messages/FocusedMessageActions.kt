@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -43,11 +42,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -59,8 +56,6 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -138,11 +133,6 @@ private val FocusedReactionEmojiSize = 28.dp
 private val FocusedMoreIconSize = 24.dp
 private val FocusedMenuMinimumWidth = 248.dp
 private val FocusedMenuMaximumWidth = 300.dp
-private val FocusedMenuMinimumCellWidth = 123.dp
-private val FocusedActionCellMinimumHeight = 48.dp
-private val FocusedActionCellVerticalPadding = 8.dp
-private val FocusedActionStackedLabelSpacing = 4.dp
-private const val FOCUSED_SUPPORTING_LABEL_MAX_LINES = 2
 
 /** Prototype reaction rail, inert real-message preview and grouped command menu; preserves the host IME. */
 @Composable
@@ -367,119 +357,46 @@ private fun FocusedMoreReactionsTarget(onClick: () -> Unit) {
     }
 }
 
-/** Material's bodyLarge size before any text-size preference is applied. */
-private const val BODY_LARGE_SP = 16f
-
-/**
- * Material's grouped menu laid out as a compact grid: two cells per row when at least 248dp is
- * available and the font scale is below 1.5, one column otherwise. Delete keeps its error colours
- * and sits alone on the last row, spanning the full width. Container, group shapes and colours are
- * unchanged from the single-column menu.
- */
+/** Material's grouped menu: leading icon, label with an optional second line, error colours for destructive rows. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FocusedActionMenu(actions: List<FocusedMessageAction>) {
-    // The app's text-size preference scales the typography itself rather than the density, so the
-    // effective scale is the system font scale times how far the body style has grown.
-    val typographyScale = MaterialTheme.typography.bodyLarge.fontSize.value / BODY_LARGE_SP
-    val fontScale = LocalDensity.current.fontScale * typographyScale
     DropdownMenuGroup(
         shapes = MenuDefaults.groupShapes(),
         border = amoledOutlineBorder(),
         modifier = Modifier.widthIn(min = FocusedMenuMinimumWidth, max = FocusedMenuMaximumWidth),
         shadowElevation = MenuDefaults.ShadowElevation,
     ) {
-        BoxWithConstraints {
-            val columns = messageActionColumnCount(maxWidth, FocusedMenuMinimumCellWidth, fontScale)
-            val rows = messageActionGridRows(actions, columns) { it.destructive }
-            Column(verticalArrangement = Arrangement.spacedBy(messageActionColumnGap)) {
-                rows.forEachIndexed { rowIndex, row ->
-                    val shape = MenuDefaults.itemShape(rowIndex, rows.size).shape
-                    Row(horizontalArrangement = Arrangement.spacedBy(messageActionColumnGap)) {
-                        row.forEach { action ->
-                            FocusedActionCell(
-                                action = action,
-                                stacked = columns > 1 && !action.destructive,
-                                shape = shape,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        if (row.size < columns && row.none { it.destructive }) {
-                            repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
-                        }
+        Column {
+            actions.forEachIndexed { index, action ->
+                val contentColor =
+                    if (action.destructive) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
                     }
-                }
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(action.label, style = MaterialTheme.typography.bodyLarge)
+                            if (action.supportingLabel != null) {
+                                Text(action.supportingLabel, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    },
+                    onClick = action.onClick,
+                    shape = MenuDefaults.itemShape(index, actions.size).shape,
+                    leadingIcon = action.icon,
+                    enabled = action.enabled,
+                    colors =
+                        MenuDefaults.itemColors(
+                            textColor = contentColor,
+                            leadingIconColor = contentColor,
+                            disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                )
             }
-        }
-    }
-}
-
-/** One grid cell: Material's menu item, its icon stacked above a one-line label when two cells share a row. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun FocusedActionCell(
-    action: FocusedMessageAction,
-    stacked: Boolean,
-    shape: Shape,
-    modifier: Modifier = Modifier,
-) {
-    val contentColor =
-        if (action.destructive) {
-            MaterialTheme.colorScheme.error
-        } else {
-            MaterialTheme.colorScheme.onSurface
-        }
-    DropdownMenuItem(
-        text = { FocusedActionLabel(action, stacked) },
-        onClick = action.onClick,
-        shape = shape,
-        leadingIcon = if (stacked) null else action.icon,
-        enabled = action.enabled,
-        colors =
-            MenuDefaults.itemColors(
-                textColor = contentColor,
-                leadingIconColor = contentColor,
-                disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-        modifier = modifier.heightIn(min = FocusedActionCellMinimumHeight),
-    )
-}
-
-/** The cell's label block: icon above a centred one-line label when stacked, beside it otherwise. */
-@Composable
-private fun FocusedActionLabel(
-    action: FocusedMessageAction,
-    stacked: Boolean,
-) {
-    Column(
-        modifier =
-            if (stacked) {
-                Modifier.fillMaxWidth().padding(vertical = FocusedActionCellVerticalPadding)
-            } else {
-                Modifier
-            },
-        horizontalAlignment = if (stacked) Alignment.CenterHorizontally else Alignment.Start,
-        verticalArrangement = Arrangement.spacedBy(if (stacked) FocusedActionStackedLabelSpacing else 0.dp),
-    ) {
-        if (stacked) action.icon()
-        // A grid cell keeps its label on one line; the single column is the large-text fallback
-        // and must let a long label wrap rather than clip it.
-        Text(
-            text = action.label,
-            style = MaterialTheme.typography.bodyLarge,
-            maxLines = if (stacked) 1 else Int.MAX_VALUE,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = if (stacked) TextAlign.Center else null,
-        )
-        if (action.supportingLabel != null) {
-            Text(
-                text = action.supportingLabel,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = FOCUSED_SUPPORTING_LABEL_MAX_LINES,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = if (stacked) TextAlign.Center else null,
-            )
         }
     }
 }
