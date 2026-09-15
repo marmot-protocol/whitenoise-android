@@ -1170,15 +1170,13 @@ class WhiteNoiseAppState private constructor(
                     (activeAccountRef != accountRef || chatsController?.containsGroup(groupIdHex) != false)
             },
             targetReplyAvailable = ::conversationDictationReplyTargetAvailable,
-            targetValidator = { accountRef, groupIdHex ->
+            targetValidator = { account, group ->
                 val cached =
                     synchronized(conversationControllerLock) {
-                        newestMatchingController(conversationControllers) {
-                            it.matchesConversation(accountRef, groupIdHex)
-                        }
+                        newestMatchingController(conversationControllers) { it.matchesConversation(account, group) }
                     }
                 when {
-                    accounts.none { it.label == accountRef && it.signedOut != true } ->
+                    accounts.none { it.label == account && it.signedOut != true } ->
                         TargetValidation.DefinitelyRemoved
                     cached?.membersVerified == true && cached.isSelfMember -> TargetValidation.Available
                     cached?.membersVerified == true -> TargetValidation.DefinitelyRemoved
@@ -1186,7 +1184,7 @@ class WhiteNoiseAppState private constructor(
                         runCatchingCancellable {
                             marmotIo {
                                 val member =
-                                    groupDetails(accountRef, groupIdHex).group.selfMembership ==
+                                    groupDetails(account, group).group.selfMembership ==
                                         SelfMembershipFfi.MEMBER
                                 if (member) TargetValidation.Available else TargetValidation.DefinitelyRemoved
                             }
