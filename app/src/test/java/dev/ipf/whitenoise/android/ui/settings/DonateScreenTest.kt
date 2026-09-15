@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -26,6 +27,7 @@ class DonateScreenTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private var backCount = 0
+    private var refuseUri = false
     private val openedUris = mutableListOf<String>()
 
     /** The single action opens the exact HTTPS donation page. */
@@ -44,6 +46,22 @@ class DonateScreenTest {
         }
     }
 
+    /** A missing browser reports failure, and retrying the same button can succeed. */
+    @Test
+    fun refusedHandoffKeepsScreenAndCanRetry() {
+        refuseUri = true
+        show()
+        composeRule.onNodeWithTag("donate.open").performClick()
+        composeRule.onNodeWithTag("donate.open_failed").assertIsDisplayed()
+        composeRule.runOnIdle {
+            assertEquals(emptyList<String>(), openedUris)
+            refuseUri = false
+        }
+        composeRule.onNodeWithTag("donate.open").performClick()
+        composeRule.onNodeWithTag("donate.open_failed").assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(1, openedUris.size) }
+    }
+
     /** Back invokes the caller once. */
     @Test
     fun backReturnsOnce() {
@@ -59,6 +77,7 @@ class DonateScreenTest {
                 LocalUriHandler provides
                     object : UriHandler {
                         override fun openUri(uri: String) {
+                            if (refuseUri) throw IllegalArgumentException("No browser")
                             openedUris.add(uri)
                         }
                     },

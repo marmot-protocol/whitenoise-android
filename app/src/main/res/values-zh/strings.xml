@@ -1723,8 +1723,6 @@
     <string name="usage_diagnostics_subtitle">自动收集并上传此设备上所有个人资料的功能活动和遥测指标。</string>
     <string name="usage_diagnostics_prompt_title">帮助改进 White Noise</string>
     <string name="usage_diagnostics_disclosure">功能活动和遥测数据包括功能使用次数和应用性能指标。使用情况数据采用临时会话标识符，遥测数据采用可重置的安装标识符。两者均不包含账号或群组标识符。</string>
-    <string name="usage_diagnostics_operator">由 %1$s 运营。</string>
-    <string name="usage_diagnostics_retention_unknown">此版本的数据保留政策尚未经过验证。</string>
     <string name="usage_diagnostics_logs_separate">此设备上所有个人资料的已清理技术日志，单独分享。</string>
     <string name="usage_diagnostics_renew">分享范围现在包含功能使用情况。请查看此信息并重新选择。</string>
     <string name="usage_diagnostics_status">使用情况：%1$s。诊断：%2$s。</string>
@@ -1932,4 +1930,6 @@
     <string name="diagnostics_clear_confirm_body">这将从此设备永久移除所有个人资料已记录的诊断活动。您的日志记录偏好不会改变。</string>
     <string name="diagnostics_clear_confirm_action">清除日志</string>
     <string name="usage_diagnostics_prompt_intro">帮助我们了解 White Noise 的使用情况，并提高消息传递的可靠性。</string>
+    <string name="donate_open_failed">无法打开捐赠页面。请重试或返回设置。</string>
+    <string name="export_audit_logs_confirm_body">诊断日志包含技术标识符和活动详情。请仅与您信任的人分享。</string>
 </resources>

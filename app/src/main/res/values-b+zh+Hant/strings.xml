@@ -1723,8 +1723,6 @@
     <string name="usage_diagnostics_subtitle">自動收集並上傳此裝置上所有個人檔案的功能活動和遙測指標。</string>
     <string name="usage_diagnostics_prompt_title">協助改進 White Noise</string>
     <string name="usage_diagnostics_disclosure">功能活動和遙測資料包括功能使用次數和應用程式效能指標。使用情況資料採用暫時性的工作階段識別碼，遙測資料採用可重設的安裝識別碼。兩者均不包含帳號或群組識別碼。</string>
-    <string name="usage_diagnostics_operator">由 %1$s 營運。</string>
-    <string name="usage_diagnostics_retention_unknown">此版本的資料保留政策尚未經過驗證。</string>
     <string name="usage_diagnostics_logs_separate">此裝置上所有個人檔案的已清理技術記錄，單獨分享。</string>
     <string name="usage_diagnostics_renew">分享範圍現在包含功能使用情況。請查看此資訊並重新選擇。</string>
     <string name="usage_diagnostics_status">使用情況：%1$s。診斷：%2$s。</string>
@@ -1932,4 +1930,6 @@
     <string name="diagnostics_clear_confirm_body">這將從此裝置永久移除所有個人檔案已記錄的診斷活動。您的日誌記錄偏好不會改變。</string>
     <string name="diagnostics_clear_confirm_action">清除日誌</string>
     <string name="usage_diagnostics_prompt_intro">協助我們了解 White Noise 的使用情況，並提高訊息傳遞的可靠性。</string>
+    <string name="donate_open_failed">無法開啟捐款頁面。請重試或返回設定。</string>
+    <string name="export_audit_logs_confirm_body">診斷日誌包含技術識別碼和活動詳情。請僅與您信任的人分享。</string>
 </resources>

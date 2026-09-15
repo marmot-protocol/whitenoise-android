@@ -1799,8 +1799,6 @@
     <string name="usage_diagnostics_subtitle">Автоматически собирает и загружает сведения об использовании функций и показатели телеметрии для всех профилей на этом устройстве.</string>
     <string name="usage_diagnostics_prompt_title">Помогите улучшить White Noise</string>
     <string name="usage_diagnostics_disclosure">Данные об использовании функций и телеметрия включают количество использований функций и показатели производительности приложения. Данные об использовании содержат временные идентификаторы сеансов, а телеметрия — сбрасываемый идентификатор установки. Ни те, ни другие не содержат идентификаторов аккаунтов или групп.</string>
-    <string name="usage_diagnostics_operator">Оператор: %1$s.</string>
-    <string name="usage_diagnostics_retention_unknown">Политика хранения данных для этой версии ещё не проверена.</string>
     <string name="usage_diagnostics_logs_separate">Очищенные технические журналы всех профилей на этом устройстве, передаваемые отдельно.</string>
     <string name="usage_diagnostics_renew">Передаваемые данные теперь включают использование функций. Ознакомьтесь с этой информацией и сделайте новый выбор.</string>
     <string name="usage_diagnostics_status">Использование: %1$s. Диагностика: %2$s.</string>
@@ -2017,4 +2015,6 @@
     <string name="diagnostics_clear_confirm_body">Это навсегда удалит с этого устройства записанные диагностические данные всех профилей. Настройка ведения журналов не изменится.</string>
     <string name="diagnostics_clear_confirm_action">Очистить журналы</string>
     <string name="usage_diagnostics_prompt_intro">Помогите нам понять, как используется White Noise, и сделать обмен сообщениями надёжнее.</string>
+    <string name="donate_open_failed">Не удалось открыть страницу пожертвований. Попробуйте снова или вернитесь в настройки.</string>
+    <string name="export_audit_logs_confirm_body">Диагностические журналы содержат технические идентификаторы и сведения об активности. Делитесь ими только с теми, кому доверяете.</string>
 </resources>

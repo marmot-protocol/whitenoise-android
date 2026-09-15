@@ -214,7 +214,7 @@ private fun DiagnosticsDisclosure(appState: WhiteNoiseAppState) {
     }
 }
 
-/** Export waits for an explicit acknowledgement that audit files may hold message content and identities. */
+/** Export requires an explicit acknowledgement that technical diagnostic data is sensitive. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun AuditLogExportConsentDialog(

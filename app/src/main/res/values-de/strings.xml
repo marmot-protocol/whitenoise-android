@@ -1761,8 +1761,6 @@
     <string name="usage_diagnostics_subtitle">Erfasst automatisch Funktionsaktivitäten und Telemetriemetriken für alle Profile auf diesem Gerät und lädt sie hoch.</string>
     <string name="usage_diagnostics_prompt_title">Hilf, White Noise zu verbessern</string>
     <string name="usage_diagnostics_disclosure">Funktionsaktivitäts- und Telemetriedaten umfassen die Anzahl der Funktionsnutzungen und Messwerte zur App-Leistung. Nutzungsdaten verwenden vorübergehende Sitzungskennungen, Telemetriedaten eine zurücksetzbare Installationskennung. Beide enthalten keine Konto- oder Gruppenkennungen.</string>
-    <string name="usage_diagnostics_operator">Betrieben von %1$s.</string>
-    <string name="usage_diagnostics_retention_unknown">Die Aufbewahrungsrichtlinie wurde für diese Version noch nicht überprüft.</string>
     <string name="usage_diagnostics_logs_separate">Bereinigte technische Protokolle aller Profile auf diesem Gerät, die separat geteilt werden.</string>
     <string name="usage_diagnostics_renew">Die Datenfreigabe umfasst jetzt auch die Funktionsnutzung. Bitte prüfe diese Informationen und triff eine neue Entscheidung.</string>
     <string name="usage_diagnostics_status">Nutzung: %1$s. Diagnose: %2$s.</string>
@@ -1973,4 +1971,6 @@
     <string name="diagnostics_clear_confirm_body">Dadurch werden aufgezeichnete Diagnoseaktivitäten für alle Profile dauerhaft von diesem Gerät entfernt. Deine Protokollierungseinstellung bleibt unverändert.</string>
     <string name="diagnostics_clear_confirm_action">Protokolle löschen</string>
     <string name="usage_diagnostics_prompt_intro">Hilf uns zu verstehen, wie White Noise genutzt wird, und das Messaging zuverlässiger zu machen.</string>
+    <string name="donate_open_failed">Die Spendenseite konnte nicht geöffnet werden. Versuche es erneut oder kehre zu den Einstellungen zurück.</string>
+    <string name="export_audit_logs_confirm_body">Diagnoseprotokolle enthalten technische Kennungen und Aktivitätsdetails. Teile sie nur mit Personen, denen du vertraust.</string>
 </resources>

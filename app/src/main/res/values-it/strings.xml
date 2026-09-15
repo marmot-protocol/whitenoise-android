@@ -1747,8 +1747,6 @@
     <string name="usage_diagnostics_subtitle">Raccoglie e carica automaticamente l’attività delle funzionalità e le metriche di telemetria per tutti i profili su questo dispositivo.</string>
     <string name="usage_diagnostics_prompt_title">Aiuta a migliorare White Noise</string>
     <string name="usage_diagnostics_disclosure">I dati sull’attività delle funzionalità e sulla telemetria includono conteggi di utilizzo delle funzionalità e metriche delle prestazioni dell’app. I dati di utilizzo usano identificatori di sessione temporanei e la telemetria usa un identificatore di installazione reimpostabile. Nessuno dei due include identificatori di account o gruppi.</string>
-    <string name="usage_diagnostics_operator">Gestito da %1$s.</string>
-    <string name="usage_diagnostics_retention_unknown">La politica di conservazione non è ancora stata verificata per questa versione.</string>
     <string name="usage_diagnostics_logs_separate">Log tecnici ripuliti di tutti i profili su questo dispositivo, condivisi separatamente.</string>
     <string name="usage_diagnostics_renew">La condivisione ora include l’utilizzo delle funzionalità. Consulta queste informazioni ed esprimi una nuova scelta.</string>
     <string name="usage_diagnostics_status">Utilizzo: %1$s. Diagnostica: %2$s.</string>
@@ -1959,4 +1957,6 @@
     <string name="diagnostics_clear_confirm_body">Questa operazione rimuove definitivamente da questo dispositivo l’attività diagnostica registrata per tutti i profili. La tua preferenza di registrazione dei log non cambierà.</string>
     <string name="diagnostics_clear_confirm_action">Cancella i log</string>
     <string name="usage_diagnostics_prompt_intro">Aiutaci a capire come viene usato White Noise e a rendere la messaggistica più affidabile.</string>
+    <string name="donate_open_failed">Impossibile aprire la pagina delle donazioni. Riprova o torna alle impostazioni.</string>
+    <string name="export_audit_logs_confirm_body">I log diagnostici contengono identificatori tecnici e dettagli delle attività. Condividili solo con persone di cui ti fidi.</string>
 </resources>

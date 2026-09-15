@@ -38,32 +38,42 @@ class DiagnosticsCopyScreenshotTest {
 
     @Test fun storedLogsAmoled() = captureStored("amoled", dark = true)
 
+    @Test fun exportConfirmation() = captureStored("export_confirmation", export = true)
+
     @Test fun clearConfirmation() = captureStored("confirmation", confirmation = true)
 
     @Test
-    fun clearConfirmationRtlLarge() = captureStored("confirmation_rtl_large", confirmation = true, largeRtl = true)
+    fun clearConfirmationRtlLarge() =
+        captureStored(
+            "confirmation_rtl_large",
+            confirmation = true,
+            fontScale = 1.6f,
+            rtl = true,
+        )
 
     @Test fun sharedDisclosureEnd() = capturePromptEnd("light")
 
-    @Test fun sharedDisclosureEndRtlLarge() = capturePromptEnd("rtl_large", largeRtl = true)
+    @Test fun sharedDisclosureEndRtlLarge() = capturePromptEnd("rtl_large", dark = true, fontScale = 1.6f, rtl = true)
 
     @Test
     @Config(qualifiers = "de-w360dp-h780dp-mdpi")
-    fun translatedStoredLogs() = captureStored("german_large", largeRtl = true)
+    fun translatedStoredLogs() = captureStored("german_large", fontScale = 1.6f)
 
     private fun captureStored(
         name: String,
         dark: Boolean = false,
         confirmation: Boolean = false,
-        largeRtl: Boolean = false,
+        export: Boolean = false,
+        fontScale: Float = 1f,
+        rtl: Boolean = false,
     ) {
         val state = privacyAppState(UsageDiagnosticsDecisionFfi.DECLINED)
         runBlocking { state.refreshSecurityPrivacySettings() }
         composeRule.setContent {
             CompositionLocalProvider(
-                LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = dark, fontScale = if (largeRtl) 1.6f else 1f) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = dark, fontScale = fontScale) {
                     DiagnosticsImprovementsScreen(state, onBack = {})
                 }
             }
@@ -71,6 +81,10 @@ class DiagnosticsCopyScreenshotTest {
         composeRule
             .onNodeWithTag("settings.list")
             .performScrollToNode(hasText(context.getString(R.string.delete_audit_logs_subtitle)))
+        if (export) {
+            composeRule.onNodeWithText(context.getString(R.string.export_audit_logs)).performScrollTo().performClick()
+            composeRule.onNodeWithText(context.getString(R.string.export_audit_logs_confirm_body)).assertIsDisplayed()
+        }
         if (confirmation) {
             composeRule.onNodeWithText(context.getString(R.string.delete_audit_logs)).performScrollTo().performClick()
             composeRule.onNodeWithText(context.getString(R.string.diagnostics_clear_confirm_action)).assertIsDisplayed()
@@ -85,15 +99,17 @@ class DiagnosticsCopyScreenshotTest {
 
     private fun capturePromptEnd(
         name: String,
-        largeRtl: Boolean = false,
+        dark: Boolean = false,
+        fontScale: Float = 1f,
+        rtl: Boolean = false,
     ) {
         val state = privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED)
         runBlocking { state.refreshSecurityPrivacySettings() }
         composeRule.setContent {
             CompositionLocalProvider(
-                LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = largeRtl, fontScale = if (largeRtl) 1.6f else 1f) {
+                WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
                     UsageDiagnosticsPrompt(state, onDone = {})
                 }
             }

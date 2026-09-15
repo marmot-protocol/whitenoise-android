@@ -6,7 +6,7 @@ from scripts.check_product_analytics_config import read_config, validate
 class ProductAnalyticsConfigTest(unittest.TestCase):
     def setUp(self):
         """Create a complete synthetic release configuration without operator credentials."""
-        self.values = dict(EVENTS_ENDPOINT="https://aptabase.example/api/v0/events", APP_KEY="A-SH-test-123", OPERATOR="white_noise", RETENTION="Scheduled deletion after 180 days.")
+        self.values = dict(EVENTS_ENDPOINT="https://aptabase.example/api/v0/events", APP_KEY="A-SH-test-123", OPERATOR="white_noise")
 
     def test_resolved_java_configuration(self):
         """Validate generated Java literals so release checks inspect the actual packaged values."""
@@ -16,7 +16,7 @@ class ProductAnalyticsConfigTest(unittest.TestCase):
         self.assertEqual([], validate(read_config(source)))
 
     def test_every_value_required(self):
-        """Reject blank disclosure or destination fields in the optional product release check."""
+        """Reject blank operator or destination fields in the optional product release check."""
         for field in self.values:
             with self.subTest(field=field):
                 self.assertIn(field, validate(self.values | {field: " "}))

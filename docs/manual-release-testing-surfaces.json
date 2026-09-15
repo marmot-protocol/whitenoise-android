@@ -5860,11 +5860,12 @@
       },
       {
         "surface": "DonateScreen",
-        "note": "Donate opens the foundation page with whitenoise_android/app/donations UTM attribution.",
+        "note": "Donate opens the Android-attributed foundation URL and reports browser refusal with a retryable action.",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
         "anchor": "fun DonateScreen(",
         "test_ids": [
-          "SET-022"
+          "SET-022",
+          "SET-026"
         ]
       },
       {
@@ -20996,6 +20997,14 @@
         "anchor": "R.string.diagnostics_storage_device",
         "test_ids": [
           "SEC-010"
+        ]
+      },
+      {
+        "surface": "string:donate_open_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
+        "anchor": "R.string.donate_open_failed",
+        "test_ids": [
+          "SET-026"
         ]
       }
     ],

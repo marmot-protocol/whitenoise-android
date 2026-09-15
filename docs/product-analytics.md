@@ -16,16 +16,27 @@ builds. Production and staging must have separate Aptabase applications and keys
 
 | Environment | Required variables |
 | --- | --- |
-| Production | `WHITENOISE_PRODUCTION_PRODUCT_EVENTS_ENDPOINT`, `WHITENOISE_PRODUCTION_PRODUCT_APP_KEY`, `WHITENOISE_PRODUCTION_PRODUCT_OPERATOR`, `WHITENOISE_PRODUCTION_PRODUCT_RETENTION` |
-| Staging | `WHITENOISE_STAGING_PRODUCT_EVENTS_ENDPOINT`, `WHITENOISE_STAGING_PRODUCT_APP_KEY`, `WHITENOISE_STAGING_PRODUCT_OPERATOR`, `WHITENOISE_STAGING_PRODUCT_RETENTION` |
-| Optional development | `WHITENOISE_DEV_PRODUCT_EVENTS_ENDPOINT`, `WHITENOISE_DEV_PRODUCT_APP_KEY`, `WHITENOISE_DEV_PRODUCT_OPERATOR`, `WHITENOISE_DEV_PRODUCT_RETENTION` |
+| Production | `WHITENOISE_PRODUCTION_PRODUCT_EVENTS_ENDPOINT`, `WHITENOISE_PRODUCTION_PRODUCT_APP_KEY`, `WHITENOISE_PRODUCTION_PRODUCT_OPERATOR` |
+| Staging | `WHITENOISE_STAGING_PRODUCT_EVENTS_ENDPOINT`, `WHITENOISE_STAGING_PRODUCT_APP_KEY`, `WHITENOISE_STAGING_PRODUCT_OPERATOR` |
+| Optional development | `WHITENOISE_DEV_PRODUCT_EVENTS_ENDPOINT`, `WHITENOISE_DEV_PRODUCT_APP_KEY`, `WHITENOISE_DEV_PRODUCT_OPERATOR` |
 
 Use `https://aptabase.ipf.dev/api/v0/events` after the operator confirms the
 Android destination, an `A-SH-…` application key, and the verified operator label
-(e.g. `white_noise`). `PRODUCT_RETENTION` is the human-readable disclosure shown
-to users. iOS currently discloses “Usage analytics are scheduled for automatic
-deletion after 180 days.” Reuse that only if the operator confirms the same policy
-for the Android applications. Do not reuse OTLP or audit tokens as Aptabase keys.
+(e.g. `white_noise`). `PRODUCT_OPERATOR` is native runtime metadata, not UI copy.
+The localized resources shared by Diagnostics & Improvements and Help Improve
+White Noise define the user-facing policy: group diagnostic logs are deleted
+from our servers after 30 days, telemetry after 90 days, and product analytics
+after 180 days. The obsolete `PRODUCT_RETENTION` build field is no longer read
+or generated; existing secrets/local properties for it can be removed.
+
+Every configured White Noise destination must implement that policy; confirm
+server enforcement with the operator before enabling a destination. Configuration
+presence does not verify retention. Unconfigured preview/dev builds retain the
+same translated disclosure and show exporter readiness separately; an
+unconfigured exporter cannot upload data. Do not restore untranslated policy
+text from build configuration. A different deployment policy requires an
+explicit change to the shared localized copy and consent review.
+Do not reuse OTLP or audit tokens as Aptabase keys.
 Do not commit credentials. Local properties override environment variables.
 
 Previews always receive empty product configuration. Development builds may run
@@ -49,10 +60,10 @@ bottom sheet only after signup/login and account setup finish, when Chats is
 visible. Welcome and onboarding never present the sheet. Conversation navigation,
 account switching, app lock, wiping, and other foreground flows or sheets defer
 it until the unobstructed Chats list returns. Existing signed-in users with a
-pending receipt can see it when they launch directly into Chats. Its details scroll while Done stays reachable. Sharing defaults off. Done saves a decline unless the user
+pending receipt can see it when they launch directly into Chats. Its details scroll while Close stays reachable. Sharing defaults off. Closing saves a decline unless the user
 has explicitly granted sharing. Technical logging has a separate switch and is
 never enabled by a usage choice. Failed reads/writes remain visible with Retry.
-The same disclosure and independent exporter status appear in Device privacy.
+The same disclosure and independent exporter status appear in Diagnostics & Improvements.
 
 The registry now includes `app_android_entry` with only a notification/profile/share
 source. That meaningful scope expansion invalidates existing MDK receipts,

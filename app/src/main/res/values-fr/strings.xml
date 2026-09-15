@@ -1747,8 +1747,6 @@
     <string name="usage_diagnostics_subtitle">Collecte et envoie automatiquement l’activité des fonctionnalités et les mesures de télémétrie pour tous les profils sur cet appareil.</string>
     <string name="usage_diagnostics_prompt_title">Aidez à améliorer White Noise</string>
     <string name="usage_diagnostics_disclosure">Les données d’activité des fonctionnalités et de télémétrie comprennent le nombre d’utilisations des fonctionnalités et les mesures de performance de l’application. Les données d’utilisation emploient des identifiants de session temporaires, et la télémétrie un identifiant d’installation réinitialisable. Aucune de ces données ne contient d’identifiants de compte ou de groupe.</string>
-    <string name="usage_diagnostics_operator">Service exploité par %1$s.</string>
-    <string name="usage_diagnostics_retention_unknown">La politique de conservation n’a pas encore été vérifiée pour cette version.</string>
     <string name="usage_diagnostics_logs_separate">Journaux techniques nettoyés de tous les profils sur cet appareil, partagés séparément.</string>
     <string name="usage_diagnostics_renew">Le partage inclut désormais l’utilisation des fonctionnalités. Consultez ces informations et faites un nouveau choix.</string>
     <string name="usage_diagnostics_status">Utilisation : %1$s. Diagnostics : %2$s.</string>
@@ -1959,4 +1957,6 @@
     <string name="diagnostics_clear_confirm_body">Cela supprime définitivement de cet appareil l’activité de diagnostic enregistrée pour tous les profils. Votre préférence de journalisation ne changera pas.</string>
     <string name="diagnostics_clear_confirm_action">Effacer les journaux</string>
     <string name="usage_diagnostics_prompt_intro">Aidez-nous à comprendre comment White Noise est utilisé et à rendre la messagerie plus fiable.</string>
+    <string name="donate_open_failed">Impossible d’ouvrir la page de dons. Réessayez ou revenez aux paramètres.</string>
+    <string name="export_audit_logs_confirm_body">Les journaux de diagnostic contiennent des identifiants techniques et des détails d’activité. Partagez-les uniquement avec une personne de confiance.</string>
 </resources>

@@ -18,6 +18,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -27,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
@@ -40,6 +45,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 @Composable
 internal fun DonateScreen(onBack: () -> Unit) {
     val uriHandler = LocalUriHandler.current
+    var openFailed by rememberSaveable { mutableStateOf(false) }
     WhiteNoiseScaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets.safeDrawing,
@@ -100,10 +106,21 @@ internal fun DonateScreen(onBack: () -> Unit) {
                         )
                     }
                     WhiteNoiseButton(
-                        onClick = { uriHandler.openUri(DONATION_URL) },
+                        onClick = {
+                            openFailed = runCatching { uriHandler.openUri(WhiteNoiseUrls.DONATE) }.isFailure
+                        },
                         modifier = Modifier.fillMaxWidth().padding(top = DonationTopInset).testTag("donate.open"),
                     ) {
                         Text(stringResource(R.string.settings_donate))
+                    }
+                    if (openFailed) {
+                        Text(
+                            stringResource(R.string.donate_open_failed),
+                            modifier = Modifier.padding(top = WhiteNoiseSpacing.Related).testTag("donate.open_failed"),
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
                     }
                 }
             }
@@ -113,6 +130,3 @@ internal fun DonateScreen(onBack: () -> Unit) {
 
 private val DonationTopInset = 40.dp
 private val DonationHeartSize = 40.dp
-
-private const val DONATION_URL =
-    "https://ipf.dev/donate/?utm_source=whitenoise_android&utm_medium=app&utm_campaign=donations"

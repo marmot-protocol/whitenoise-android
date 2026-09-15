@@ -1747,8 +1747,6 @@
     <string name="usage_diagnostics_subtitle">Recopila y sube automáticamente la actividad de las funciones y las métricas de telemetría de todos los perfiles de este dispositivo.</string>
     <string name="usage_diagnostics_prompt_title">Ayuda a mejorar White Noise</string>
     <string name="usage_diagnostics_disclosure">Los datos de actividad de las funciones y telemetría incluyen recuentos de uso de funciones y métricas de rendimiento de la app. Los datos de uso utilizan identificadores de sesión temporales y la telemetría utiliza un identificador de instalación que se puede restablecer. Ninguno incluye identificadores de cuentas o grupos.</string>
-    <string name="usage_diagnostics_operator">Operado por %1$s.</string>
-    <string name="usage_diagnostics_retention_unknown">La política de conservación aún no se ha verificado para esta versión.</string>
     <string name="usage_diagnostics_logs_separate">Registros técnicos depurados de todos los perfiles de este dispositivo, compartidos por separado.</string>
     <string name="usage_diagnostics_renew">Ahora los datos compartidos incluyen el uso de funciones. Revisa esta información y elige de nuevo.</string>
     <string name="usage_diagnostics_status">Uso: %1$s. Diagnósticos: %2$s.</string>
@@ -1959,4 +1957,6 @@
     <string name="diagnostics_clear_confirm_body">Esto elimina permanentemente de este dispositivo la actividad de diagnóstico registrada de todos los perfiles. Tu preferencia de registro no cambiará.</string>
     <string name="diagnostics_clear_confirm_action">Borrar registros</string>
     <string name="usage_diagnostics_prompt_intro">Ayúdanos a entender cómo se utiliza White Noise y a hacer que la mensajería sea más fiable.</string>
+    <string name="donate_open_failed">No se pudo abrir la página de donaciones. Inténtalo de nuevo o vuelve a Ajustes.</string>
+    <string name="export_audit_logs_confirm_body">Los registros de diagnóstico contienen identificadores técnicos y detalles de actividad. Compártelos solo con alguien de confianza.</string>
 </resources>

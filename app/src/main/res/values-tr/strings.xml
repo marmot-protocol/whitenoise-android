@@ -1745,8 +1745,6 @@
     <string name="usage_diagnostics_subtitle">Bu cihazdaki tüm profiller için özellik etkinliğini ve telemetri ölçümlerini otomatik olarak toplar ve yükler.</string>
     <string name="usage_diagnostics_prompt_title">White Noise’u İyileştirmeye Yardım Et</string>
     <string name="usage_diagnostics_disclosure">Özellik etkinliği ve telemetri verileri, özellik kullanım sayılarını ve uygulama performans ölçümlerini içerir. Kullanım verileri geçici oturum tanımlayıcıları, telemetri ise sıfırlanabilir bir kurulum tanımlayıcısı kullanır. Hiçbiri hesap veya grup tanımlayıcılarını içermez.</string>
-    <string name="usage_diagnostics_operator">%1$s tarafından işletilir.</string>
-    <string name="usage_diagnostics_retention_unknown">Saklama politikası bu sürüm için henüz doğrulanmadı.</string>
     <string name="usage_diagnostics_logs_separate">Bu cihazdaki tüm profillerin temizlenmiş teknik günlükleri, ayrı olarak paylaşılır.</string>
     <string name="usage_diagnostics_renew">Paylaşım artık özellik kullanımını da içeriyor. Lütfen bu bilgileri inceleyip yeniden seçim yapın.</string>
     <string name="usage_diagnostics_status">Kullanım: %1$s. Tanılama: %2$s.</string>
@@ -1957,4 +1955,6 @@
     <string name="diagnostics_clear_confirm_body">Bu işlem, tüm profiller için kaydedilmiş tanılama etkinliğini bu cihazdan kalıcı olarak kaldırır. Günlük kaydı tercihiniz değişmez.</string>
     <string name="diagnostics_clear_confirm_action">Günlükleri Temizle</string>
     <string name="usage_diagnostics_prompt_intro">White Noise’un nasıl kullanıldığını anlamamıza ve mesajlaşmayı daha güvenilir hâle getirmemize yardımcı olun.</string>
+    <string name="donate_open_failed">Bağış sayfası açılamadı. Tekrar deneyin veya Ayarlar’a dönün.</string>
+    <string name="export_audit_logs_confirm_body">Tanılama günlükleri teknik tanımlayıcılar ve etkinlik ayrıntıları içerir. Bunları yalnızca güvendiğiniz kişilerle paylaşın.</string>
 </resources>

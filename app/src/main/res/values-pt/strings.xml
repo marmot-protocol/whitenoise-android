@@ -1747,8 +1747,6 @@
     <string name="usage_diagnostics_subtitle">Coleta e envia automaticamente a atividade dos recursos e as métricas de telemetria de todos os perfis neste dispositivo.</string>
     <string name="usage_diagnostics_prompt_title">Ajude a melhorar o White Noise</string>
     <string name="usage_diagnostics_disclosure">Os dados de atividade dos recursos e de telemetria incluem contagens de uso dos recursos e métricas de desempenho do aplicativo. Os dados de uso utilizam identificadores de sessão temporários, e a telemetria utiliza um identificador de instalação que pode ser redefinido. Nenhum deles inclui identificadores de contas ou grupos.</string>
-    <string name="usage_diagnostics_operator">Operado por %1$s.</string>
-    <string name="usage_diagnostics_retention_unknown">A política de retenção ainda não foi verificada para esta versão.</string>
     <string name="usage_diagnostics_logs_separate">Registos técnicos depurados de todos os perfis neste dispositivo, partilhados separadamente.</string>
     <string name="usage_diagnostics_renew">A partilha inclui agora a utilização de funcionalidades. Reveja estas informações e faça uma nova escolha.</string>
     <string name="usage_diagnostics_status">Utilização: %1$s. Diagnósticos: %2$s.</string>
@@ -1959,4 +1957,6 @@
     <string name="diagnostics_clear_confirm_body">Isso remove permanentemente deste dispositivo a atividade de diagnóstico registrada de todos os perfis. Sua preferência de registro de logs não será alterada.</string>
     <string name="diagnostics_clear_confirm_action">Limpar logs</string>
     <string name="usage_diagnostics_prompt_intro">Ajude-nos a entender como o White Noise é usado e a tornar as mensagens mais confiáveis.</string>
+    <string name="donate_open_failed">Não foi possível abrir a página de doações. Tente novamente ou volte às Configurações.</string>
+    <string name="export_audit_logs_confirm_body">Os logs de diagnóstico contêm identificadores técnicos e detalhes de atividade. Compartilhe-os apenas com alguém de confiança.</string>
 </resources>
