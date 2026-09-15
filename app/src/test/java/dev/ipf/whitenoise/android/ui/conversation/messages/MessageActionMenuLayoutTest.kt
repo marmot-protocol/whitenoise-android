@@ -46,19 +46,21 @@ class MessageActionMenuLayoutTest {
         assertEquals(listOf("literalCode"), callbacks)
     }
 
+    /** The model emits the prototype's action order, not the capability-argument order. */
     @Test
     fun actionModelPreservesCapabilityOrder() {
         assertEquals(
             listOf(
-                MessageActionKind.Reply,
                 MessageActionKind.Edit,
-                MessageActionKind.Select,
                 MessageActionKind.SelectText,
-                MessageActionKind.CopyText,
-                MessageActionKind.Speak,
+                MessageActionKind.Reply,
                 MessageActionKind.Forward,
+                MessageActionKind.KeepOnScreen,
                 MessageActionKind.Share,
                 MessageActionKind.Save,
+                MessageActionKind.CopyText,
+                MessageActionKind.Speak,
+                MessageActionKind.Select,
                 MessageActionKind.Info,
             ),
             messageActionKinds(
@@ -69,10 +71,31 @@ class MessageActionMenuLayoutTest {
                 canCopyText = true,
                 canSpeak = true,
                 canForward = true,
+                canKeepOnScreen = true,
                 canShare = true,
                 canSave = true,
             ),
         )
+    }
+
+    /** Literal-code reading is a production-only action that trails Read Aloud. */
+    @Test
+    fun literalCodeReadingFollowsReadAloud() {
+        val kinds =
+            messageActionKinds(
+                canReply = false,
+                canEdit = false,
+                canSelect = false,
+                canSelectText = false,
+                canCopyText = false,
+                canSpeak = true,
+                canSpeakCodeLiterally = true,
+                canForward = false,
+                canSave = false,
+                canInfo = false,
+            )
+
+        assertEquals(listOf(MessageActionKind.Speak, MessageActionKind.SpeakCodeLiterally), kinds)
     }
 
     @Test
@@ -122,10 +145,10 @@ class MessageActionMenuLayoutTest {
             assertEquals(
                 buildList {
                     add(MessageActionKind.Reply)
-                    add(MessageActionKind.Select)
-                    add(MessageActionKind.CopyText)
                     add(MessageActionKind.Share)
                     if (canSave) add(MessageActionKind.Save)
+                    add(MessageActionKind.CopyText)
+                    add(MessageActionKind.Select)
                     add(MessageActionKind.Info)
                 },
                 actionKinds,
@@ -324,12 +347,12 @@ class MessageActionMenuLayoutTest {
         val selectText = bounds("Select text")
         val delete = bounds("Delete")
 
-        assertTrue(edit.top > reply.top)
+        assertTrue(selectText.top > edit.top)
         assertEquals(reply.left, edit.left, 0.5f)
-        assertTrue(selectText.top > select.top)
+        assertTrue(reply.top > selectText.top)
         assertTrue(select.top > reply.top)
-        val save = bounds("Save")
-        val info = bounds("Message info")
+        val save = bounds("Save attachments")
+        val info = bounds("Info")
         assertTrue(info.top > save.top)
         assertTrue(delete.top > info.top)
         assertEquals(reply.width, delete.width, 0.5f)
@@ -349,8 +372,10 @@ class MessageActionMenuLayoutTest {
     fun largeFontFallsBackToOneReadableColumn() {
         renderMenu(fontScale = 2f, literalCode = true)
 
-        assertTrue(bounds("Edit").top > bounds("Reply").top)
-        assertTrue(bounds("Select text").top > bounds("Select").top)
+        assertTrue(bounds("Select text").top > bounds("Edit").top)
+        // At this font the column scrolls, so a row further down the list is composed but
+        // unmeasured until it is scrolled to. Reachability is the claim worth pinning.
+        composeRule.onNodeWithText("Select", substring = false).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Delete", substring = false).performScrollTo().assertIsDisplayed()
         val layouts = mutableListOf<TextLayoutResult>()
         composeRule
@@ -374,7 +399,7 @@ class MessageActionMenuLayoutTest {
     fun rtlKeepsSingleColumnCommandOrder() {
         renderMenu(fontScale = 1f, layoutDirection = LayoutDirection.Rtl)
 
-        assertTrue(bounds("Edit").top > bounds("Reply").top)
+        assertTrue(bounds("Reply").top > bounds("Edit").top)
         assertEquals(bounds("Reply").right, bounds("Edit").right, 0.5f)
     }
 
@@ -385,30 +410,32 @@ class MessageActionMenuLayoutTest {
         renderMenu(fontScale = 1f, callbacks = callbacks)
 
         listOf(
-            "Reply",
             "Edit",
-            "Select",
             "Select text",
-            "Copy text",
-            "Speak aloud",
+            "Reply",
             "Forward",
+            "Keep on screen",
             "Share",
-            "Save",
-            "Message info",
+            "Save attachments",
+            "Copy",
+            "Read Aloud",
+            "Select",
+            "Info",
             "Delete",
         ).forEach { composeRule.onNodeWithText(it, substring = false).performScrollTo().performClick() }
 
         assertEquals(
             listOf(
-                "reply",
                 "edit",
-                "select",
                 "selectText",
-                "copy",
-                "speak",
+                "reply",
                 "forward",
+                "keepOnScreen",
                 "share",
                 "save",
+                "copy",
+                "speak",
+                "select",
                 "info",
                 "delete",
             ),
@@ -494,6 +521,7 @@ class MessageActionMenuLayoutTest {
                         canSpeak = true,
                         canSpeakCodeLiterally = literalCode,
                         canSelectText = true,
+                        canKeepOnScreen = true,
                         canShare = true,
                         canSave = true,
                         quickReactionEmojis = quickReactionEmojis,
@@ -508,6 +536,7 @@ class MessageActionMenuLayoutTest {
                         onCopyText = { callbacks += "copy" },
                         onSpeak = { callbacks += "speak" },
                         onSpeakCodeLiterally = { callbacks += "literalCode" },
+                        onKeepOnScreen = { callbacks += "keepOnScreen" },
                         onShare = { callbacks += "share" },
                         onSave = { callbacks += "save" },
                         onInfo = { callbacks += "info" },

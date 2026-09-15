@@ -143,7 +143,8 @@ private fun RecoveryNoticeSurface(
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier = Modifier.widthIn(max = 440.dp).fillMaxWidth(),
+            // The prototype's notice hugs its text up to 440 dp rather than filling the row.
+            modifier = Modifier.widthIn(max = 440.dp),
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -43,6 +43,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -180,10 +181,15 @@ import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachme
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
+import dev.ipf.whitenoise.android.ui.conversation.messages.KeptMessagesOverlay
+import dev.ipf.whitenoise.android.ui.conversation.messages.KeptMessagesOverlayState
+import dev.ipf.whitenoise.android.ui.conversation.messages.LocalKeptMessages
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDetailsScreen
 import dev.ipf.whitenoise.android.ui.conversation.messages.RestoredForwardRequestHost
 import dev.ipf.whitenoise.android.ui.conversation.messages.dismissTextSelectionOnOutsideTap
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageDetailsRecipients
+import dev.ipf.whitenoise.android.ui.conversation.messages.rememberKeptMessageEntries
+import dev.ipf.whitenoise.android.ui.conversation.messages.rememberKeptMessagesController
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import dev.ipf.whitenoise.android.ui.conversation.nostr.publicEventCardRelays
@@ -2272,6 +2278,28 @@ internal fun ConversationScreen(
         }
     }
 
+    // Kept messages are per account and outlive any one conversation, so the holder is
+    // keyed by the runtime generation rather than by the open chat.
+    val keptMessagesController = rememberKeptMessagesController(appState.runtimeGeneration)
+
+    /** Centers and highlights a kept message when the open transcript still holds it. */
+    fun jumpToKeptMessage(messageIdHex: String) {
+        scope.launch {
+            val visibleRows = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+            val timelineIndex = visibleRows.indexOfFirst { it.record.messageIdHex == messageIdHex }
+            if (timelineIndex >= 0) {
+                val leadingRows = controller.conversationLeadingStructuralRowCount(visibleRows.size)
+                val centered =
+                    centerTimelineItemAt(
+                        messageIdHex,
+                        1 + leadingRows + timelineIndex,
+                        ConversationScrollReason.Search,
+                    )
+                if (centered) showTransientMessageHighlight(messageIdHex)
+            }
+        }
+    }
+
     /** Centers and highlights a loaded search row only while its navigation request remains current. */
     suspend fun centerLoadedSearchMessage(
         messageIdHex: String,
@@ -3525,430 +3553,458 @@ internal fun ConversationScreen(
             )
         },
     ) { padding ->
-        val overlayPadding = timelineViewport.overlayPadding(density, timelineUnderlayEnabled)
-        ConversationTransientNoticeLayout(
-            notice = appState.transientNotice,
-            accountRef = conversationAccountRef,
-            groupIdHex = controller.group.groupIdHex,
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(conversationUnderlayScaffoldPadding(padding, overlayPadding))
-                    // The composer bottomBar owns IME padding; consume here so the
-                    // transcript does not count the keyboard a second time (#895).
-                    .consumeWindowInsets(WindowInsets.ime),
-        ) {
-            when {
-                navigationState.initialTimelineBackfillNoProgress ->
-                    ConversationLoadErrorContent(
-                        error = InitialTimelineBackfillNoProgressError,
-                        onRetry = {
-                            navigationState.initialTimelineBackfillNoProgress = false
-                            navigationState.initialTimelineBackfillRetryGeneration += 1L
-                        },
-                    )
-                loadFailurePlacement == LoadFailurePlacement.FullScreen ->
-                    ConversationLoadErrorContent(
-                        error = requireNotNull(controller.error),
-                        onRetry = {
-                            scope.launch {
-                                controller.retryLoadFailure()
+        CompositionLocalProvider(LocalKeptMessages provides keptMessagesController) {
+            val overlayPadding = timelineViewport.overlayPadding(density, timelineUnderlayEnabled)
+            ConversationTransientNoticeLayout(
+                notice = appState.transientNotice,
+                accountRef = conversationAccountRef,
+                groupIdHex = controller.group.groupIdHex,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(conversationUnderlayScaffoldPadding(padding, overlayPadding))
+                        // The composer bottomBar owns IME padding; consume here so the
+                        // transcript does not count the keyboard a second time (#895).
+                        .consumeWindowInsets(WindowInsets.ime),
+            ) {
+                when {
+                    navigationState.initialTimelineBackfillNoProgress ->
+                        ConversationLoadErrorContent(
+                            error = InitialTimelineBackfillNoProgressError,
+                            onRetry = {
+                                navigationState.initialTimelineBackfillNoProgress = false
                                 navigationState.initialTimelineBackfillRetryGeneration += 1L
-                            }
-                        },
-                    )
-                controller.group.pendingConfirmation && renderedTimeline.isEmpty() ->
-                    InvitePreviewPlaceholder(
-                        inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
-                    )
-                transcriptPresentationNeedsRetry ->
-                    ConversationLoadErrorContent(
-                        error = InitialTranscriptRosterError,
-                        onRetry = { scope.launch { controller.retryMembers() } },
-                    )
-                renderedTimeline.isEmpty() &&
-                    notificationOpenRequestId != 0L &&
-                    !controller.terminalConversationUnavailable &&
-                    !transcriptReadyToReveal ->
-                    ConversationInitialLoadingOverlay(
-                        visible = true,
-                        graceMillis = CONVERSATION_ANCHORED_LOADING_GRACE_MILLIS,
-                    )
-                renderedTimeline.isEmpty() && controller.isLoading ->
-                    ConversationInitialLoadingOverlay(visible = true)
-                renderedTimeline.isEmpty() &&
-                    (
-                        controller.groupRecoveryReadFailed ||
-                            controller.groupRecoveryStatus?.hasVisibleRecoveryState() == true
-                    ) ->
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        ConversationGroupRecoveryCard(controller, appState)
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                stringResource(R.string.no_messages_yet),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                renderedTimeline.isEmpty() &&
-                    !controller.hasMoreBefore &&
-                    !controller.hasMoreAfterTimeline &&
-                    !controller.isLoadingOlder &&
-                    !controller.isLoading &&
-                    navigationState.initialTimelineLoadStarted -> {
-                    if (
-                        canInviteFromEmptyGroup(
-                            isSelfMember = controller.isSelfMember,
-                            isSelfAdmin = controller.isSelfAdmin,
-                            membersLoaded = controller.membersLoaded,
-                            memberCount = controller.memberCount,
-                        )
-                    ) {
-                        EmptyGroupConversation(
-                            onAddMembers = {
-                                openAddMemberOnDetails = true
-                                showDetails = true
                             },
                         )
-                    } else {
-                        Box(
-                            Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(stringResource(R.string.no_messages_yet), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-                else ->
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxSize(),
-                    ) {
-                        LazyColumn(
-                            state = listState,
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .measureConversationTimelinePadding(
-                                        timelineViewport,
-                                        CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset.value,
-                                        overlayPadding,
-                                    ).trackWhiteNoiseHeader(listState)
-                                    .padding(horizontal = 12.dp)
-                                    // Paint, TalkBack exposure, and first-useful-frame
-                                    // reporting share one predicate. An oversized cached
-                                    // final row or unknown notification roster therefore
-                                    // cannot become observable before both owners commit.
-                                    .drawWithContent {
-                                        if (transcriptReadyToReveal) drawContent()
-                                    }.graphicsLayer {
-                                        alpha = if (transcriptReadyToReveal) 1f else 0f
-                                    }.semantics {
-                                        if (!transcriptReadyToReveal) hideFromAccessibility()
-                                    }.performanceTestTag(
-                                        PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE,
-                                        enabled = transcriptReadyToReveal && renderedTimeline.isNotEmpty(),
-                                    ).onGloballyPositioned(timelineViewport::onPaintViewportMeasured),
-                            verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
-                            // Content padding owns the final composer interval
-                            // and temporary notice clearance. Keeping spacing
-                            // out of a lazy sentinel leaves the real last row as
-                            // the stable tail anchor.
-                            contentPadding =
-                                conversationTimelineContentPadding(snackbarContentInset.value, overlayPadding),
-                        ) {
-                            item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
-                            if (
-                                controller.groupRecoveryReadFailed ||
-                                controller.groupRecoveryStatus?.hasVisibleRecoveryState() == true
-                            ) {
-                                item(key = "group-recovery") {
-                                    ConversationGroupRecoveryCard(controller, appState)
+                    loadFailurePlacement == LoadFailurePlacement.FullScreen ->
+                        ConversationLoadErrorContent(
+                            error = requireNotNull(controller.error),
+                            onRetry = {
+                                scope.launch {
+                                    controller.retryLoadFailure()
+                                    navigationState.initialTimelineBackfillRetryGeneration += 1L
                                 }
-                            }
-                            conversationLoadErrorItem(
-                                key = "conversation-load-error-top",
-                                error = controller.error,
-                                placement = loadFailurePlacement,
-                                errorEdge = controller.errorEdge,
-                                targetEdge = ConversationLoadFailureEdge.TOP,
-                                onRetry = { scope.launch { controller.retryLoadFailure() } },
-                            )
-                            if (controller.hasMoreBefore || controller.isLoadingOlder) {
-                                item(key = "older-messages-loading") {
-                                    Box(
-                                        Modifier.fillMaxWidth().height(40.dp),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        if (controller.isLoadingOlder) {
-                                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                                        } else {
-                                            IconButton(onClick = { scope.launch { controller.loadOlder() } }) {
-                                                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            itemsIndexed(
-                                renderedTimeline,
-                                key = { _, item -> item.id },
-                                // Pool layouts by category so Compose can reuse
-                                // structurally similar rows across scroll.
-                                contentType = { _, item ->
-                                    when {
-                                        MessageProjector.isGroupSystem(item.record) -> "groupSystem"
-                                        MessageProjector.isAgentOperation(item.record) -> "agentOperation"
-                                        else -> "message"
-                                    }
-                                },
-                            ) { index, item ->
-                                val messageId = item.record.messageIdHex
-                                TimelineRow(
-                                    modifier = Modifier.timelineReadingExposure(timelineViewport),
-                                    item = item,
-                                    older = renderedTimeline.getOrNull(index - 1),
-                                    newer = renderedTimeline.getOrNull(index + 1),
-                                    transcriptLocale = transcriptLocale,
-                                    entryUnreadCount = entryUnreadCount,
-                                    entryUnreadDividerRetired = entryUnreadDividerRetired,
-                                    entryFirstUnreadMessageId = entryFirstUnreadMessageId,
-                                    onMeasured = { id, height ->
-                                        if (navigationState.timelineItemHeightsPx[id] != height) {
-                                            navigationState.timelineItemHeightsPx[id] = height
-                                        }
-                                    },
-                                    appState = appState,
-                                    controller = controller,
-                                    onOpenConversationMedia = { request -> mediaViewerSessionState.open(request) },
-                                    eventCardResolver = eventCardResolver,
-                                    documentSaveFallback = documentSaveFallback,
-                                    composerTextState = composerTextState,
-                                    highlighted = messageId == navigationState.targetHighlight.highlightedMessageId,
-                                    selectionMode = selectionMode,
-                                    textSelectionMode = textSelectionMessageId == messageId,
-                                    onTextSelectionModeChange = { enabled ->
-                                        if (enabled) {
-                                            openActionMenuId = null
-                                            textSelectionMessageId = messageId
-                                            textSelectionBubbleBounds = null
-                                        } else if (textSelectionMessageId == messageId) {
-                                            clearTextSelection()
-                                        }
-                                    },
-                                    onTextSelectionBoundsChange = { bounds ->
-                                        if (textSelectionMessageId == messageId) textSelectionBubbleBounds = bounds
-                                    },
-                                    batchSelectable =
-                                        messageId in selectableMessages &&
-                                            batchDeleteRetryState == null &&
-                                            !batchDeleteInFlight,
-                                    selected = selectedMessages.containsKey(messageId),
-                                    onToggleSelection = {
-                                        if (batchDeleteRetryState == null && !batchDeleteInFlight) {
-                                            if (selectedMessages.containsKey(messageId)) {
-                                                selectedMessages.remove(messageId)
-                                            } else {
-                                                selectableMessages[messageId]?.let { selectedMessages[messageId] = it }
-                                            }
-                                        }
-                                    },
-                                    rangeDragActive = dragAnchorTimelineId == item.id,
-                                    onDragSelectionStart = { pointerWindowY ->
-                                        openActionMenuId = null
-                                        clearTextSelection()
-                                        ttsFollowHandle.suspendForDirectDrag(
-                                            state = appState.ttsController.state.value,
-                                            ownsSession =
-                                                appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
-                                        )
-                                        scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
-                                        dragAnchorTimelineId = item.id
-                                        dragPointerWindowY = pointerWindowY
-                                    },
-                                    onDragSelection = { pointerWindowY ->
-                                        dragPointerWindowY = pointerWindowY
-                                        updateMessageDragSelection(pointerWindowY)
-                                    },
-                                    onDragSelectionEnd = { finishMessageDrag(clearSelection = false) },
-                                    onDragSelectionCancel = { finishMessageDrag(clearSelection = true) },
-                                    quickReactionEmojis = quickReactionEmojis,
-                                    recentEmojis = recentEmojiRecentsOwner.recents,
-                                    onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
-                                    isActionMenuOpen = openActionMenuId == messageId,
-                                    onActionMenuOpenChange = { open ->
-                                        if (open) clearTextSelection()
-                                        if (open) {
-                                            openActionMenuId = messageId
-                                        } else if (openActionMenuId == messageId) {
-                                            openActionMenuId = null
-                                        }
-                                    },
-                                    onQuickReactionsSave = { saveQuickReactionEmojis(it) },
-                                    onReplyPreviewClick = { navigateToReplyTarget(it) },
-                                    composerGate = composerGate,
-                                    onBack = exitConversation,
-                                    mentionCandidates = mentionPicker.candidates,
-                                    mentionPickerEnabled = mentionPicker.enabled,
-                                    collapseLongMessages = collapseLongMessages,
-                                    ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
-                                    ttsSentenceLayoutSink = ttsFollowHandle.sentenceLayouts,
-                                    onTtsSentenceSeek = { state ->
-                                        ttsFollowHandle.onSentenceSeek(
-                                            state = state,
-                                            ownsSession =
-                                                appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
-                                        )
-                                    },
-                                )
-                            }
-                            conversationLoadErrorItem(
-                                key = "conversation-load-error-bottom",
-                                error = controller.error,
-                                placement = loadFailurePlacement,
-                                errorEdge = controller.errorEdge,
-                                targetEdge = ConversationLoadFailureEdge.BOTTOM,
-                                onRetry = { scope.launch { controller.retryLoadFailure() } },
-                            )
-                        }
+                            },
+                        )
+                    controller.group.pendingConfirmation && renderedTimeline.isEmpty() ->
+                        InvitePreviewPlaceholder(
+                            inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
+                        )
+                    transcriptPresentationNeedsRetry ->
+                        ConversationLoadErrorContent(
+                            error = InitialTranscriptRosterError,
+                            onRetry = { scope.launch { controller.retryMembers() } },
+                        )
+                    renderedTimeline.isEmpty() &&
+                        notificationOpenRequestId != 0L &&
+                        !controller.terminalConversationUnavailable &&
+                        !transcriptReadyToReveal ->
                         ConversationInitialLoadingOverlay(
-                            visible =
-                                !transcriptReadyToReveal &&
-                                    !transcriptPresentationNeedsRetry &&
-                                    !seededTailAlignmentRecoveryVisible,
+                            visible = true,
                             graceMillis = CONVERSATION_ANCHORED_LOADING_GRACE_MILLIS,
                         )
-                        ConversationSeededTailAlignmentRecovery(
-                            visible = seededTailAlignmentRecoveryVisible,
-                            onRetry = {
-                                seededTailAlignmentRecoveryVisible = false
-                                seededTailAlignmentRetryGeneration++
-                            },
-                        )
-                        // Day of the topmost visible message, shown only while
-                        // scrolling — the inline separators carry it at rest.
-                        // Confined to its own child so the scroll-backed reads
-                        // (label + isScrollInProgress) recompose only the ribbon,
-                        // not this LazyColumn-hosting Box scope (#375).
-                        if (transcriptReadyToReveal) {
-                            StickyDayRibbon(
-                                listState = listState,
-                                labelState = stickyDayLabelState,
-                            )
+                    renderedTimeline.isEmpty() && controller.isLoading ->
+                        ConversationInitialLoadingOverlay(visible = true)
+                    renderedTimeline.isEmpty() &&
+                        (
+                            controller.groupRecoveryReadFailed ||
+                                controller.groupRecoveryStatus?.hasVisibleRecoveryState() == true
+                        ) ->
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            ConversationGroupRecoveryCard(controller, appState)
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    stringResource(R.string.no_messages_yet),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
-                        if (transcriptReadyToReveal && !selectionMode) {
-                            Column(
+                    renderedTimeline.isEmpty() &&
+                        !controller.hasMoreBefore &&
+                        !controller.hasMoreAfterTimeline &&
+                        !controller.isLoadingOlder &&
+                        !controller.isLoading &&
+                        navigationState.initialTimelineLoadStarted -> {
+                        if (
+                            canInviteFromEmptyGroup(
+                                isSelfMember = controller.isSelfMember,
+                                isSelfAdmin = controller.isSelfAdmin,
+                                membersLoaded = controller.membersLoaded,
+                                memberCount = controller.memberCount,
+                            )
+                        ) {
+                            EmptyGroupConversation(
+                                onAddMembers = {
+                                    openAddMemberOnDetails = true
+                                    showDetails = true
+                                },
+                            )
+                        } else {
+                            Box(
+                                Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(stringResource(R.string.no_messages_yet), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                    else ->
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize(),
+                        ) {
+                            LazyColumn(
+                                state = listState,
                                 modifier =
                                     Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .padding(bottom = overlayPadding)
-                                        .padding(12.dp),
-                                horizontalAlignment = Alignment.End,
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                        .fillMaxSize()
+                                        .measureConversationTimelinePadding(
+                                            timelineViewport,
+                                            CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset.value,
+                                            overlayPadding,
+                                        ).trackWhiteNoiseHeader(listState)
+                                        .padding(horizontal = 12.dp)
+                                        // Paint, TalkBack exposure, and first-useful-frame
+                                        // reporting share one predicate. An oversized cached
+                                        // final row or unknown notification roster therefore
+                                        // cannot become observable before both owners commit.
+                                        .drawWithContent {
+                                            if (transcriptReadyToReveal) drawContent()
+                                        }.graphicsLayer {
+                                            alpha = if (transcriptReadyToReveal) 1f else 0f
+                                        }.semantics {
+                                            if (!transcriptReadyToReveal) hideFromAccessibility()
+                                        }.performanceTestTag(
+                                            PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE,
+                                            enabled = transcriptReadyToReveal && renderedTimeline.isNotEmpty(),
+                                        ).onGloballyPositioned(timelineViewport::onPaintViewportMeasured),
+                                verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
+                                // Content padding owns the final composer interval
+                                // and temporary notice clearance. Keeping spacing
+                                // out of a lazy sentinel leaves the real last row as
+                                // the stable tail anchor.
+                                contentPadding =
+                                    conversationTimelineContentPadding(snackbarContentInset.value, overlayPadding),
                             ) {
-                                if (ttsFollowHandle.showResumeAction) {
-                                    TtsResumeFollowButton(
-                                        onClick = ttsFollowHandle::resumeFollow,
-                                    )
+                                item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
+                                if (
+                                    controller.groupRecoveryReadFailed ||
+                                    controller.groupRecoveryStatus?.hasVisibleRecoveryState() == true
+                                ) {
+                                    item(key = "group-recovery") {
+                                        ConversationGroupRecoveryCard(controller, appState)
+                                    }
                                 }
-                                // Jump-to-mention chip: tap visits the oldest unread
-                                // mention and marks it read, so the count steps down.
-                                val mentionCount = unreadMentionMessageIds.size
-                                if (mentionCount > 0) {
-                                    val jumpToMentionLabel = stringResource(R.string.conversation_jump_to_mention)
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.tertiaryContainer,
-                                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                                        shadowElevation = 2.dp,
-                                        modifier =
-                                            Modifier
-                                                .height(34.dp)
-                                                .semantics { contentDescription = jumpToMentionLabel }
-                                                .clickable { jumpToNextUnreadMention() },
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                            modifier = Modifier.padding(horizontal = 12.dp),
+                                conversationLoadErrorItem(
+                                    key = "conversation-load-error-top",
+                                    error = controller.error,
+                                    placement = loadFailurePlacement,
+                                    errorEdge = controller.errorEdge,
+                                    targetEdge = ConversationLoadFailureEdge.TOP,
+                                    onRetry = { scope.launch { controller.retryLoadFailure() } },
+                                )
+                                if (controller.hasMoreBefore || controller.isLoadingOlder) {
+                                    item(key = "older-messages-loading") {
+                                        Box(
+                                            Modifier.fillMaxWidth().height(40.dp),
+                                            contentAlignment = Alignment.Center,
                                         ) {
-                                            Text("@", style = MaterialTheme.typography.titleMedium)
-                                            Text(
-                                                if (mentionCount > 99) "99+" else mentionCount.toString(),
-                                                style = MaterialTheme.typography.labelLarge,
-                                            )
+                                            if (controller.isLoadingOlder) {
+                                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                                            } else {
+                                                IconButton(onClick = { scope.launch { controller.loadOlder() } }) {
+                                                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
+                                                }
+                                            }
                                         }
                                     }
                                 }
-                                if (!nearBottom) {
-                                    ConversationJumpToNewestButton(
-                                        unreadIncomingCount = unreadIncomingCount,
-                                        onClick = {
-                                            scope.launch {
-                                                val pendingMessageId = unreadJumpState.pendingMessageId
-                                                val outcome =
-                                                    scrollCoordinator.jumpToUnreadOrNewest(
-                                                        pendingUnreadMessageId = pendingMessageId,
-                                                        resolveUnreadIndex = {
-                                                            pendingMessageId?.let(::currentTimelineListIndex)
-                                                        },
-                                                        isUnreadTopAligned = {
-                                                            val targetIndex =
-                                                                pendingMessageId?.let(::currentTimelineListIndex)
-                                                            targetIndex != null &&
-                                                                isConversationItemTopAligned(
-                                                                    listState,
-                                                                    targetIndex,
-                                                                    timelineViewport = timelineViewport,
-                                                                )
-                                                        },
-                                                        prepareTail = {
-                                                            loadConversationTimelineToNewest(
-                                                                hasMoreAfter = { controller.hasMoreAfterTimeline },
-                                                                loadNewer = controller::loadNewerTimelinePage,
-                                                            )
-                                                        },
-                                                        resolveTailIndex = { currentTailIndex },
-                                                    )
-                                                when (outcome) {
-                                                    ConversationJumpToNewestOutcome.UnreadStart -> {
-                                                        scrollCoordinator.settleReadingAt(currentScrollAnchor())
-                                                        unreadJumpState = unreadJumpState.suppressCurrentStack()
+                                itemsIndexed(
+                                    renderedTimeline,
+                                    key = { _, item -> item.id },
+                                    // Pool layouts by category so Compose can reuse
+                                    // structurally similar rows across scroll.
+                                    contentType = { _, item ->
+                                        when {
+                                            MessageProjector.isGroupSystem(item.record) -> "groupSystem"
+                                            MessageProjector.isAgentOperation(item.record) -> "agentOperation"
+                                            else -> "message"
+                                        }
+                                    },
+                                ) { index, item ->
+                                    val messageId = item.record.messageIdHex
+                                    TimelineRow(
+                                        modifier = Modifier.timelineReadingExposure(timelineViewport),
+                                        item = item,
+                                        older = renderedTimeline.getOrNull(index - 1),
+                                        newer = renderedTimeline.getOrNull(index + 1),
+                                        transcriptLocale = transcriptLocale,
+                                        entryUnreadCount = entryUnreadCount,
+                                        entryUnreadDividerRetired = entryUnreadDividerRetired,
+                                        entryFirstUnreadMessageId = entryFirstUnreadMessageId,
+                                        onMeasured = { id, height ->
+                                            if (navigationState.timelineItemHeightsPx[id] != height) {
+                                                navigationState.timelineItemHeightsPx[id] = height
+                                            }
+                                        },
+                                        appState = appState,
+                                        controller = controller,
+                                        onOpenConversationMedia = { request -> mediaViewerSessionState.open(request) },
+                                        eventCardResolver = eventCardResolver,
+                                        documentSaveFallback = documentSaveFallback,
+                                        composerTextState = composerTextState,
+                                        highlighted = messageId == navigationState.targetHighlight.highlightedMessageId,
+                                        selectionMode = selectionMode,
+                                        textSelectionMode = textSelectionMessageId == messageId,
+                                        onTextSelectionModeChange = { enabled ->
+                                            if (enabled) {
+                                                openActionMenuId = null
+                                                textSelectionMessageId = messageId
+                                                textSelectionBubbleBounds = null
+                                            } else if (textSelectionMessageId == messageId) {
+                                                clearTextSelection()
+                                            }
+                                        },
+                                        onTextSelectionBoundsChange = { bounds ->
+                                            if (textSelectionMessageId == messageId) textSelectionBubbleBounds = bounds
+                                        },
+                                        batchSelectable =
+                                            messageId in selectableMessages &&
+                                                batchDeleteRetryState == null &&
+                                                !batchDeleteInFlight,
+                                        selected = selectedMessages.containsKey(messageId),
+                                        onToggleSelection = {
+                                            if (batchDeleteRetryState == null && !batchDeleteInFlight) {
+                                                if (selectedMessages.containsKey(messageId)) {
+                                                    selectedMessages.remove(messageId)
+                                                } else {
+                                                    selectableMessages[messageId]?.let { selectable ->
+                                                        selectedMessages[messageId] = selectable
                                                     }
-                                                    ConversationJumpToNewestOutcome.Tail -> {
-                                                        unreadJumpState = unreadJumpState.suppressCurrentStack()
-                                                    }
-                                                    ConversationJumpToNewestOutcome.Cancelled -> Unit
                                                 }
                                             }
                                         },
+                                        rangeDragActive = dragAnchorTimelineId == item.id,
+                                        onDragSelectionStart = { pointerWindowY ->
+                                            openActionMenuId = null
+                                            clearTextSelection()
+                                            ttsFollowHandle.suspendForDirectDrag(
+                                                state = appState.ttsController.state.value,
+                                                ownsSession =
+                                                    appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+                                            )
+                                            scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
+                                            dragAnchorTimelineId = item.id
+                                            dragPointerWindowY = pointerWindowY
+                                        },
+                                        onDragSelection = { pointerWindowY ->
+                                            dragPointerWindowY = pointerWindowY
+                                            updateMessageDragSelection(pointerWindowY)
+                                        },
+                                        onDragSelectionEnd = { finishMessageDrag(clearSelection = false) },
+                                        onDragSelectionCancel = { finishMessageDrag(clearSelection = true) },
+                                        quickReactionEmojis = quickReactionEmojis,
+                                        recentEmojis = recentEmojiRecentsOwner.recents,
+                                        onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
+                                        isActionMenuOpen = openActionMenuId == messageId,
+                                        onActionMenuOpenChange = { open ->
+                                            if (open) clearTextSelection()
+                                            if (open) {
+                                                openActionMenuId = messageId
+                                            } else if (openActionMenuId == messageId) {
+                                                openActionMenuId = null
+                                            }
+                                        },
+                                        onQuickReactionsSave = { saveQuickReactionEmojis(it) },
+                                        onReplyPreviewClick = { navigateToReplyTarget(it) },
+                                        composerGate = composerGate,
+                                        onBack = exitConversation,
+                                        mentionCandidates = mentionPicker.candidates,
+                                        mentionPickerEnabled = mentionPicker.enabled,
+                                        collapseLongMessages = collapseLongMessages,
+                                        ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
+                                        ttsSentenceLayoutSink = ttsFollowHandle.sentenceLayouts,
+                                        onTtsSentenceSeek = { state ->
+                                            ttsFollowHandle.onSentenceSeek(
+                                                state = state,
+                                                ownsSession =
+                                                    appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+                                            )
+                                        },
                                     )
+                                }
+                                conversationLoadErrorItem(
+                                    key = "conversation-load-error-bottom",
+                                    error = controller.error,
+                                    placement = loadFailurePlacement,
+                                    errorEdge = controller.errorEdge,
+                                    targetEdge = ConversationLoadFailureEdge.BOTTOM,
+                                    onRetry = { scope.launch { controller.retryLoadFailure() } },
+                                )
+                            }
+                            ConversationInitialLoadingOverlay(
+                                visible =
+                                    !transcriptReadyToReveal &&
+                                        !transcriptPresentationNeedsRetry &&
+                                        !seededTailAlignmentRecoveryVisible,
+                                graceMillis = CONVERSATION_ANCHORED_LOADING_GRACE_MILLIS,
+                            )
+                            ConversationSeededTailAlignmentRecovery(
+                                visible = seededTailAlignmentRecoveryVisible,
+                                onRetry = {
+                                    seededTailAlignmentRecoveryVisible = false
+                                    seededTailAlignmentRetryGeneration++
+                                },
+                            )
+                            // Day of the topmost visible message, shown only while
+                            // scrolling — the inline separators carry it at rest.
+                            // Confined to its own child so the scroll-backed reads
+                            // (label + isScrollInProgress) recompose only the ribbon,
+                            // not this LazyColumn-hosting Box scope (#375).
+                            if (transcriptReadyToReveal) {
+                                StickyDayRibbon(
+                                    listState = listState,
+                                    labelState = stickyDayLabelState,
+                                )
+                            }
+                            if (transcriptReadyToReveal && !selectionMode) {
+                                Column(
+                                    modifier =
+                                        Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .padding(bottom = overlayPadding)
+                                            .padding(12.dp),
+                                    horizontalAlignment = Alignment.End,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    if (ttsFollowHandle.showResumeAction) {
+                                        TtsResumeFollowButton(
+                                            onClick = ttsFollowHandle::resumeFollow,
+                                        )
+                                    }
+                                    // Jump-to-mention chip: tap visits the oldest unread
+                                    // mention and marks it read, so the count steps down.
+                                    val mentionCount = unreadMentionMessageIds.size
+                                    if (mentionCount > 0) {
+                                        val jumpToMentionLabel = stringResource(R.string.conversation_jump_to_mention)
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = MaterialTheme.colorScheme.tertiaryContainer,
+                                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                            shadowElevation = 2.dp,
+                                            modifier =
+                                                Modifier
+                                                    .height(34.dp)
+                                                    .semantics { contentDescription = jumpToMentionLabel }
+                                                    .clickable { jumpToNextUnreadMention() },
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                modifier = Modifier.padding(horizontal = 12.dp),
+                                            ) {
+                                                Text("@", style = MaterialTheme.typography.titleMedium)
+                                                Text(
+                                                    if (mentionCount > 99) "99+" else mentionCount.toString(),
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                )
+                                            }
+                                        }
+                                    }
+                                    if (!nearBottom) {
+                                        ConversationJumpToNewestButton(
+                                            unreadIncomingCount = unreadIncomingCount,
+                                            onClick = {
+                                                scope.launch {
+                                                    val pendingMessageId = unreadJumpState.pendingMessageId
+                                                    val outcome =
+                                                        scrollCoordinator.jumpToUnreadOrNewest(
+                                                            pendingUnreadMessageId = pendingMessageId,
+                                                            resolveUnreadIndex = {
+                                                                pendingMessageId?.let(::currentTimelineListIndex)
+                                                            },
+                                                            isUnreadTopAligned = {
+                                                                val targetIndex =
+                                                                    pendingMessageId?.let(::currentTimelineListIndex)
+                                                                targetIndex != null &&
+                                                                    isConversationItemTopAligned(
+                                                                        listState,
+                                                                        targetIndex,
+                                                                        timelineViewport = timelineViewport,
+                                                                    )
+                                                            },
+                                                            prepareTail = {
+                                                                loadConversationTimelineToNewest(
+                                                                    hasMoreAfter = { controller.hasMoreAfterTimeline },
+                                                                    loadNewer = controller::loadNewerTimelinePage,
+                                                                )
+                                                            },
+                                                            resolveTailIndex = { currentTailIndex },
+                                                        )
+                                                    when (outcome) {
+                                                        ConversationJumpToNewestOutcome.UnreadStart -> {
+                                                            scrollCoordinator.settleReadingAt(currentScrollAnchor())
+                                                            unreadJumpState = unreadJumpState.suppressCurrentStack()
+                                                        }
+                                                        ConversationJumpToNewestOutcome.Tail -> {
+                                                            unreadJumpState = unreadJumpState.suppressCurrentStack()
+                                                        }
+                                                        ConversationJumpToNewestOutcome.Cancelled -> Unit
+                                                    }
+                                                }
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
-            }
-            if (composerAttachmentSheet.isOpen) {
-                // Transparent scrim over the transcript only — the composer
-                // stays reachable, so the keyboard and emoji toggles can still
-                // swap the sheet away directly. Carries a dismiss semantics
-                // action + label so a screen reader announces (and can trigger)
-                // this otherwise-invisible touch layer.
-                val dismissLabel = stringResource(R.string.close)
-                Box(
-                    Modifier
-                        .matchParentSize()
-                        .pointerInput(composerAttachmentSheet) {
-                            detectTapGestures { composerAttachmentSheet.dismiss() }
-                        }.semantics {
-                            contentDescription = dismissLabel
-                            onClick(label = dismissLabel) {
-                                composerAttachmentSheet.dismiss()
-                                true
+                }
+                conversationAccountRef?.let { keptAccountRef ->
+                    val keptEntries =
+                        rememberKeptMessageEntries(keptMessagesController, keptAccountRef) { key ->
+                            controller.timeline.firstOrNull { row ->
+                                key.groupIdHex == controller.group.groupIdHex &&
+                                    row.record.messageIdHex == key.messageIdHex
                             }
-                        },
-                )
+                        }
+                    val youLabel = stringResource(R.string.you)
+                    val keptPresentations =
+                        keptMessagePresentations(
+                            entries = keptEntries,
+                            chatTitle = controller.title,
+                            youLabel = youLabel,
+                            isMine = controller::isMessageMine,
+                            senderName = appState::displayName,
+                        )
+                    KeptMessagesOverlay(
+                        state = KeptMessagesOverlayState(keptEntries, keptMessagesController, keptAccountRef),
+                        composerHeight = overlayPadding,
+                        presentation = { entry -> keptPresentations.getValue(entry.key) },
+                        onOpenMessage = { key -> jumpToKeptMessage(key.messageIdHex) },
+                    )
+                }
+                if (composerAttachmentSheet.isOpen) {
+                    // Transparent scrim over the transcript only — the composer
+                    // stays reachable, so the keyboard and emoji toggles can still
+                    // swap the sheet away directly. Carries a dismiss semantics
+                    // action + label so a screen reader announces (and can trigger)
+                    // this otherwise-invisible touch layer.
+                    val dismissLabel = stringResource(R.string.close)
+                    Box(
+                        Modifier
+                            .matchParentSize()
+                            .pointerInput(composerAttachmentSheet) {
+                                detectTapGestures { composerAttachmentSheet.dismiss() }
+                            }.semantics {
+                                contentDescription = dismissLabel
+                                onClick(label = dismissLabel) {
+                                    composerAttachmentSheet.dismiss()
+                                    true
+                                }
+                            },
+                    )
+                }
             }
         }
     }

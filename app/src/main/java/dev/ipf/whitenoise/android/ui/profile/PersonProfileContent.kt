@@ -50,9 +50,15 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
+import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
-/** Prototype Person Profile chrome consumes real identity/relationship state and leaves every mutation to its owner. */
+/**
+ * Prototype Person Profile chrome consumes real identity/relationship state and leaves every mutation to its owner.
+ *
+ * [fromGroup] marks a profile opened from inside a group: the relationship rows then carry the Profile Actions
+ * heading that separates them from the group-scoped moderation block supplied through [adminActions].
+ */
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
 @Composable
 internal fun PersonProfileContent(
@@ -60,6 +66,7 @@ internal fun PersonProfileContent(
     scroll: ScrollState,
     follow: ProfileFollowRowState,
     busy: Boolean,
+    fromGroup: Boolean,
     canPromote: Boolean,
     showSharedGroups: Boolean,
     copied: Boolean,
@@ -112,7 +119,11 @@ internal fun PersonProfileContent(
                     )
                 }
                 if (person.hasTarget && !person.self) {
-                    Spacer(Modifier.height(WhiteNoiseSpacing.Section))
+                    if (fromGroup) {
+                        SettingsSection(stringResource(R.string.profile_actions))
+                    } else {
+                        Spacer(Modifier.height(WhiteNoiseSpacing.Section))
+                    }
                     SettingsGroup {
                         row("groups") { row ->
                             if (showSharedGroups) {

@@ -13,7 +13,11 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 
-/** Full roster destination; the caller retains its native renderer and controller-owned selection and mutations. */
+/**
+ * Full roster destination: the Members title over a plain back arrow, with no top-bar actions and no
+ * add-members affordance — adding members belongs to the group info screen alone. The caller retains
+ * its native renderer and controller-owned selection and mutations.
+ */
 @Suppress("FunctionNaming")
 @Composable
 internal fun GroupMembersScreen(

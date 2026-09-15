@@ -137,7 +137,6 @@ internal fun TimelineRow(
                         record = item.record,
                         appState = appState,
                         groupSystem = item.projected?.groupSystem,
-                        followsStructuralHeader = daySeparatorLabel != null || showUnreadDivider || followsGroupEvent,
                         onDeleteForMe =
                             if (controller.group.pendingConfirmation) {
                                 null

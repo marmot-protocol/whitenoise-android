@@ -41,6 +41,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
@@ -662,6 +663,9 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                         Text(
                             bodyText,
                             style = MaterialTheme.typography.bodyLarge,
+                            // A tombstone is narration, not authored content, and
+                            // the prototype italicises it to say so.
+                            fontStyle = if (deleted) FontStyle.Italic else null,
                             modifier =
                                 plainTextSelectionModifier
                                     .semantics { customActions = sentenceActions }

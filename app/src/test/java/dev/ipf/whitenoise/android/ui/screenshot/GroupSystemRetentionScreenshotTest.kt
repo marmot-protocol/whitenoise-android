@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,6 +22,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT
 import dev.ipf.whitenoise.android.ui.conversation.DaySeparator
 import dev.ipf.whitenoise.android.ui.conversation.GroupSystemRow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -82,7 +82,9 @@ class GroupSystemRetentionScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface(Modifier.width(360.dp)) {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // The real transcript's arrangement, so the measured gaps are
+                    // the ones the conversation actually renders.
+                    LazyColumn(verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT) {
                         item {
                             GroupSystemRow(
                                 record = retentionChangeRecord(),
@@ -95,7 +97,6 @@ class GroupSystemRetentionScreenshotTest {
                                 record = retentionChangeRecord(),
                                 appState = appState,
                                 groupSystem = retentionChangeEvent(),
-                                followsStructuralHeader = true,
                             )
                         }
                         item { DaySeparator("September 13, 2026", followsGroupEvent = true) }

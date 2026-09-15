@@ -80,7 +80,7 @@ class DevicePrivacyScreenScreenshotTest {
         runBlocking { state.refreshSecurityPrivacySettings() }
         val shell = presentBootstrappedApp(state, AppPhase.Ready)
         composeRule.onNodeWithText("Help Improve White Noise").assertIsDisplayed()
-        composeRule.onNodeWithText("Done").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Close").assertIsDisplayed()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/usage_diagnostics_chats_prompt.png")
         composeRule.runOnIdle { shell.release() }
     }
@@ -97,7 +97,7 @@ class DevicePrivacyScreenScreenshotTest {
         composeRule.onNodeWithText("Cancel").performClick()
         composeRule.onAllNodes(isToggleable())[1].assertIsOff()
         assertTrue(state.auditUploadConsentRequired)
-        composeRule.onNodeWithText("Done").performClick()
+        composeRule.onNodeWithContentDescription("Close").performClick()
         composeRule.waitUntil(5_000L) { !state.auditUploadConsentRequired }
         composeRule.waitForIdle()
         assertFalse(state.auditUploadConsentRequired)
@@ -244,21 +244,21 @@ class DevicePrivacyScreenScreenshotTest {
         }
         composeRule.waitForIdle()
         composeRule.onAllNodes(isToggleable())[0].assertIsOff()
-        composeRule.onNodeWithText("Done").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Close").assertIsDisplayed()
         val viewport =
             composeRule
                 .onAllNodes(isRoot())
                 .fetchSemanticsNodes()
                 .maxBy { it.boundsInRoot.height }
                 .boundsInRoot
-        val done = composeRule.onNodeWithText("Done").fetchSemanticsNode().boundsInRoot
-        assertTrue("Done $done must fit inside $viewport", done.bottom <= viewport.bottom)
+        val disclosure = composeRule.onNodeWithText("Audit logs").fetchSemanticsNode().boundsInRoot
+        assertTrue("Choices $disclosure must fit inside $viewport", disclosure.bottom <= viewport.bottom)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 
-    /** Done records decline while leaving the separate logging preference untouched. */
+    /** Closing the sheet records decline while leaving the separate logging preference untouched. */
     @Test
-    fun doneSavesDeclineWithLogsOff() {
+    fun closingSavesDeclineWithLogsOff() {
         val state = privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED)
         runBlocking { state.refreshSecurityPrivacySettings() }
         var dismissed = false
@@ -267,7 +267,7 @@ class DevicePrivacyScreenScreenshotTest {
                 UsageDiagnosticsPrompt(state) { dismissed = true }
             }
         }
-        composeRule.onNodeWithText("Done").performClick()
+        composeRule.onNodeWithContentDescription("Close").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             org.robolectric.Shadows
                 .shadowOf(android.os.Looper.getMainLooper())
@@ -296,7 +296,7 @@ class DevicePrivacyScreenScreenshotTest {
                 .idle()
             state.isUsageDiagnosticsGranted() && !state.diagnostics.busy
         }
-        composeRule.onNodeWithText("Done").performClick()
+        composeRule.onNodeWithContentDescription("Close").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             org.robolectric.Shadows
                 .shadowOf(android.os.Looper.getMainLooper())
@@ -309,7 +309,7 @@ class DevicePrivacyScreenScreenshotTest {
         assertFalse(state.auditLogSettings?.enabled ?: true)
     }
 
-    /** Both directions of each slow save retain switch geometry, text wrapping, and the Done position. */
+    /** Both directions of each slow save retain switch geometry, text wrapping, and the header position. */
     @Test
     fun savingEitherChoiceKeepsTheSheetLayoutStable() {
         val writes = LinkedBlockingQueue<Pair<CountDownLatch, CountDownLatch>>()
@@ -336,7 +336,7 @@ class DevicePrivacyScreenScreenshotTest {
                 val toggle = composeRule.onAllNodes(isToggleable())[index]
                 if (enabled) toggle.assertIsOn() else toggle.assertIsOff()
                 toggle.assertIsNotEnabled()
-                composeRule.onNodeWithText("Done").assertIsNotEnabled()
+                composeRule.onNodeWithContentDescription("Close").assertIsNotEnabled()
                 assertEquals(initialBounds, promptContentBounds())
                 if (index == 0 && enabled) {
                     composeRule.onRoot().captureRoboImage("src/test/snapshots/usage_diagnostics_prompt_saving.png")
@@ -351,14 +351,14 @@ class DevicePrivacyScreenScreenshotTest {
                     state.auditLogSettings?.enabled == enabled
                 }
             }
-            composeRule.onNodeWithText("Done").assertIsEnabled()
+            composeRule.onNodeWithContentDescription("Close").assertIsEnabled()
             assertEquals(initialBounds, promptContentBounds())
         }
     }
 
-    /** Samples the static disclosure and completion action instead of relying on screenshot timing alone. */
+    /** Samples the header and the choice rows instead of relying on screenshot timing alone. */
     private fun promptContentBounds() =
-        listOf("Help Improve White Noise", "Share usage and diagnostics", "Share technical logs", "Done").map {
+        listOf("Help Improve White Noise", "Share usage and diagnostics", "Share technical logs").map {
             composeRule.onNodeWithText(it).fetchSemanticsNode().boundsInRoot
         }
 

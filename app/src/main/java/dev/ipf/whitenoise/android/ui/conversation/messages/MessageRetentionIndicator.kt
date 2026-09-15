@@ -1,11 +1,9 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import android.text.format.DateUtils
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -15,13 +13,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -161,10 +156,10 @@ internal fun MessageRetentionIndicator(
         RetentionIndicatorPresentation.Hidden -> Unit
         RetentionIndicatorPresentation.Waiting ->
             Icon(
-                imageVector = Icons.Outlined.Timer,
+                painter = painterResource(R.drawable.ic_timer),
                 contentDescription = label,
                 modifier = Modifier.size(RetentionIndicatorSize),
-                tint = color.copy(alpha = 0.76f),
+                tint = color,
             )
         is RetentionIndicatorPresentation.Running ->
             RunningRetentionIndicator(presentation, color, label)
@@ -200,6 +195,12 @@ private fun RunningRetentionIndicator(
     RetentionProgressRing(presentation.remainingFraction, color, label, expiryState)
 }
 
+/**
+ * The countdown ring: the determinate Material 3 indicator at the same 14.dp
+ * footprint as the waiting glyph, drawn in the footer label colour over a
+ * faint track of the same hue. The remaining time is never drawn — it reaches
+ * assistive technology through the state description alone.
+ */
 @Composable
 @Suppress("FunctionNaming") // Compose UI entry point.
 private fun RetentionProgressRing(
@@ -208,39 +209,24 @@ private fun RetentionProgressRing(
     label: String,
     expiryState: String,
 ) {
-    val indicatorColor = color.copy(alpha = 0.82f)
-    Canvas(
+    // The ring carries its own progress semantics, which do not merge into the bubble's
+    // accessible summary. Wrapping it keeps one plain node the merged card can absorb.
+    Box(
         modifier =
             Modifier
                 .size(RetentionIndicatorSize)
-                .semantics {
+                .semantics(mergeDescendants = true) {
                     contentDescription = label
                     stateDescription = expiryState
                 },
+        contentAlignment = Alignment.Center,
     ) {
-        val strokeWidth = 1.35.dp.toPx()
-        val radius = (size.minDimension - strokeWidth) / 2f
-        drawCircle(
-            color = color.copy(alpha = 0.24f),
-            radius = radius,
-            center = center,
-            style = Stroke(width = strokeWidth),
-        )
-        if (remainingFraction > 0f) {
-            drawArc(
-                color = indicatorColor,
-                startAngle = -90f,
-                sweepAngle = FULL_CIRCLE_DEGREES * remainingFraction,
-                useCenter = false,
-                topLeft = Offset(center.x - radius, center.y - radius),
-                size = Size(radius * 2f, radius * 2f),
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-            )
-        }
-        drawCircle(
-            color = indicatorColor,
-            radius = 1.1.dp.toPx(),
-            center = center,
+        CircularProgressIndicator(
+            progress = { remainingFraction },
+            modifier = Modifier.size(RetentionIndicatorSize),
+            color = color,
+            trackColor = color.copy(alpha = RETENTION_TRACK_ALPHA),
+            strokeWidth = RetentionIndicatorStrokeWidth,
         )
     }
 }
@@ -269,6 +255,7 @@ internal const val MILLIS_PER_MINUTE = 60L * MILLIS_PER_SECOND
 internal const val MILLIS_PER_HOUR = 60L * MILLIS_PER_MINUTE
 internal const val MILLIS_PER_DAY = 24L * MILLIS_PER_HOUR
 private const val MIN_REFRESH_DELAY_MILLIS = 250L
-private const val FULL_CIRCLE_DEGREES = 360f
+private const val RETENTION_TRACK_ALPHA = 0.24f
 private val MAX_EPOCH_SECONDS = Long.MAX_VALUE.toULong() / MILLIS_PER_SECOND.toULong()
 private val RetentionIndicatorSize = 14.dp
+private val RetentionIndicatorStrokeWidth = 1.5.dp

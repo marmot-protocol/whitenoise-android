@@ -1011,6 +1011,7 @@ class LocalizationResourceTest {
                 "photo_editor_crop_sixteen_nine",
                 "photo_editor_crop_nine_sixteen",
                 "photo_editor_quality_standard",
+                "photo_editor_quality_original",
                 "photo_editor_effective_quality",
                 // Dialog confirm button; "OK" is shared verbatim across most locales.
                 "ok",

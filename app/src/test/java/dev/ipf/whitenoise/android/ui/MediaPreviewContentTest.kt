@@ -16,7 +16,8 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -26,7 +27,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewContent
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
-import dev.ipf.whitenoise.android.ui.conversation.media.PhotoQualitySelector
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoPreview
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.photoApprovalOutputQuality
@@ -63,7 +63,13 @@ class MediaPreviewContentTest {
 
     private fun uri(n: Int): Uri = Uri.parse("content://test/$n")
 
-    private fun qualityDescription(resId: Int) = string(R.string.photo_editor_announcement_quality, string(resId))
+    /** A real one-pixel PNG, so the preview decodes a bitmap instead of holding its spinner. */
+    private fun decodableImageBytes(): ByteArray {
+        val bitmap = android.graphics.Bitmap.createBitmap(1, 1, android.graphics.Bitmap.Config.ARGB_8888)
+        val stream = java.io.ByteArrayOutputStream()
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
+        return stream.toByteArray()
+    }
 
     private fun renderPreview(
         initialMedia: List<Uri>,
@@ -72,6 +78,8 @@ class MediaPreviewContentTest {
         onEditMediaAt: ((Int) -> Unit)? = null,
         onSelectMediaQuality: ((String, MediaQuality) -> Unit)? = null,
         onSend: (String, (Boolean) -> Unit) -> Unit = { _, onResult -> onResult(true) },
+        onClose: () -> Unit = {},
+        previewOnly: Boolean = false,
     ) {
         val initialSlots = initialMedia.mapIndexed { index, uri -> PendingMediaSlot("slot-$index", uri) }
         val preparingSlotIds = initialSlots.filter { it.uri in preparingMedia }.mapTo(mutableSetOf()) { it.id }
@@ -79,7 +87,7 @@ class MediaPreviewContentTest {
             initialSlots.mapNotNull { slot -> preparedQualities[slot.uri]?.let { slot.id to it } }.toMap()
         initialMedia.forEach { stagedUri ->
             shadowOf(app.contentResolver).registerInputStreamSupplier(stagedUri) {
-                ByteArrayInputStream(ByteArray(1))
+                ByteArrayInputStream(decodableImageBytes())
             }
         }
         composeRule.setContent {
@@ -89,7 +97,7 @@ class MediaPreviewContentTest {
                     mediaSlots = media,
                     documentUris = emptyList(),
                     chatTitle = "Test chat",
-                    onClose = {},
+                    onClose = onClose,
                     onSend = onSend,
                     onRemoveMediaAt = { index ->
                         media = media.toMutableList().apply { if (index in indices) removeAt(index) }
@@ -101,6 +109,7 @@ class MediaPreviewContentTest {
                     preparedPhotoQualities = qualitiesBySlot,
                     onEditMediaAt = onEditMediaAt,
                     onSelectMediaQuality = onSelectMediaQuality,
+                    previewOnly = previewOnly,
                 )
             }
         }
@@ -115,15 +124,26 @@ class MediaPreviewContentTest {
     }
 
     @Test
-    fun removingCurrentItemRenumbersAndKeepsASelection() {
-        renderPreview(listOf(uri(1), uri(2), uri(3)))
-        composeRule.onNodeWithContentDescription(string(R.string.media_attachment_remove)).performClick()
+    fun uncheckingAFrameAndPressingDoneRemovesItAndRenumbers() {
+        // The shelf tap is the only production entry into this screen and it always previews.
+        renderPreview(listOf(uri(1), uri(2), uri(3)), previewOnly = true)
+        composeRule.onAllNodesWithTag("conversation.media.inclusion.target").onFirst().performClick()
+        composeRule.onNodeWithText(string(R.string.done)).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithContentDescription(string(R.string.media_preview_position_badge, 3)).assertDoesNotExist()
         composeRule
             .onNodeWithContentDescription(string(R.string.media_preview_position_badge, 1))
             .assertIsDisplayed()
             .assertIsSelected()
+    }
+
+    @Test
+    fun cancelUsesTheMediaChangesDescriptionAndKeepsEveryFrame() {
+        var closed = 0
+        renderPreview(listOf(uri(1), uri(2)), onClose = { closed++ })
+        composeRule.onNodeWithContentDescription(string(R.string.cancel_media_changes)).performClick()
+        assertEquals(1, closed)
+        composeRule.onNodeWithContentDescription(string(R.string.media_preview_position_badge, 2)).assertIsDisplayed()
     }
 
     @Test
@@ -187,69 +207,6 @@ class MediaPreviewContentTest {
             .onNodeWithContentDescription(string(R.string.photo_editor_edit_action))
             .performClick()
         assertEquals(0, editedIndex)
-    }
-
-    @Test
-    fun photoQualityIsChosenFromApprovalWithTwoClearOptions() {
-        val staged = uri(1)
-        var selected: Pair<String, MediaQuality>? = null
-        renderPreview(
-            initialMedia = listOf(staged),
-            preparedQualities =
-                mapOf(
-                    staged to
-                        PreparedPhotoQuality(
-                            selectedQuality = MediaQuality.Standard,
-                            standardDimensions = "2048 × 1536",
-                            hdDimensions = "4096 × 3072",
-                        ),
-                ),
-            onSelectMediaQuality = { slotId, quality -> selected = slotId to quality },
-        )
-
-        val standardDescription = qualityDescription(R.string.photo_editor_quality_standard)
-        composeRule.onAllNodesWithText(string(R.string.photo_editor_quality_hd)).assertCountEquals(0)
-        composeRule.onNodeWithContentDescription(standardDescription).performClick()
-        composeRule.onNodeWithText(string(R.string.photo_editor_quality)).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.photo_editor_quality_standard)).assertIsSelected()
-        composeRule.onNodeWithText("2048 × 1536").assertIsDisplayed()
-        composeRule.onNodeWithText("4096 × 3072").assertIsDisplayed()
-        composeRule.onAllNodesWithText(string(R.string.photo_editor_quality_high)).assertCountEquals(0)
-        composeRule.onAllNodesWithText(string(R.string.photo_editor_quality_original)).assertCountEquals(0)
-
-        composeRule.onNodeWithText(string(R.string.photo_editor_quality_hd)).performClick()
-
-        assertEquals("slot-0" to MediaQuality.High, selected)
-    }
-
-    @Test
-    fun photoQualitySelectionKeepsItsStableSlotWhenCurrentSlotChanges() {
-        val qualities =
-            mapOf(
-                "first" to PreparedPhotoQuality(MediaQuality.Standard, "first standard", "first HD"),
-                "second" to PreparedPhotoQuality(MediaQuality.Standard, "second standard", "second HD"),
-            )
-        var currentSlotId by mutableStateOf("first")
-        var selected: Pair<String, MediaQuality>? = null
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true) {
-                PhotoQualitySelector(
-                    slotId = currentSlotId,
-                    qualities = qualities,
-                    enabled = true,
-                    onSelect = { slotId, quality -> selected = slotId to quality },
-                )
-            }
-        }
-
-        val standardDescription = qualityDescription(R.string.photo_editor_quality_standard)
-        composeRule.onNodeWithContentDescription(standardDescription).performClick()
-        composeRule.runOnIdle { currentSlotId = "second" }
-        composeRule.onNodeWithText("first HD").assertIsDisplayed()
-        composeRule.onNodeWithText("second HD").assertDoesNotExist()
-        composeRule.onNodeWithText(string(R.string.photo_editor_quality_hd)).performClick()
-
-        assertEquals("first" to MediaQuality.High, selected)
     }
 
     @Test

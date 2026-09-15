@@ -15,20 +15,10 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Forward
-import androidx.compose.material.icons.automirrored.filled.Reply
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -48,6 +38,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -103,6 +94,7 @@ internal fun MessageActionMenu(
     canSpeak: Boolean,
     canSpeakCodeLiterally: Boolean = false,
     canSelectText: Boolean,
+    canKeepOnScreen: Boolean = false,
     canShare: Boolean = false,
     canSave: Boolean,
     canInfo: Boolean = true,
@@ -118,6 +110,7 @@ internal fun MessageActionMenu(
     onCopyText: () -> Unit,
     onSpeak: () -> Unit,
     onSpeakCodeLiterally: () -> Unit = {},
+    onKeepOnScreen: () -> Unit = {},
     onShare: () -> Unit = {},
     onSave: () -> Unit,
     onInfo: () -> Unit,
@@ -142,6 +135,7 @@ internal fun MessageActionMenu(
             canSpeak,
             canSpeakCodeLiterally,
             showForwardAction,
+            canKeepOnScreen,
             canShare,
             canSave,
             canInfo,
@@ -155,6 +149,7 @@ internal fun MessageActionMenu(
                 canSpeak = canSpeak,
                 canSpeakCodeLiterally = canSpeakCodeLiterally,
                 canForward = showForwardAction,
+                canKeepOnScreen = canKeepOnScreen,
                 canShare = canShare,
                 canSave = canSave,
                 canInfo = canInfo,
@@ -177,13 +172,7 @@ internal fun MessageActionMenu(
                     },
                 enabled = kind != MessageActionKind.Forward || canForward,
                 destructive = kind == null,
-                icon = {
-                    if (kind == null) {
-                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(24.dp))
-                    } else {
-                        MessageActionIcon(kind)
-                    }
-                },
+                icon = { MessageActionIcon(kind) },
                 onClick = {
                     when (kind) {
                         MessageActionKind.Reply -> onReply()
@@ -194,6 +183,7 @@ internal fun MessageActionMenu(
                         MessageActionKind.Speak -> onSpeak()
                         MessageActionKind.SpeakCodeLiterally -> onSpeakCodeLiterally()
                         MessageActionKind.Forward -> onForward()
+                        MessageActionKind.KeepOnScreen -> onKeepOnScreen()
                         MessageActionKind.Share -> onShare()
                         MessageActionKind.Save -> onSave()
                         MessageActionKind.Info -> onInfo()
@@ -219,6 +209,9 @@ internal fun MessageActionMenu(
     )
 }
 
+/** Leading-glyph size shared by every message action row. */
+private val messageActionIconSize = 24.dp
+
 /** Label explaining why forwarding is blocked. */
 @Composable
 internal fun forwardBlockedReasonLabel(reason: ForwardBlockedReason): String =
@@ -232,24 +225,18 @@ internal fun forwardBlockedReasonLabel(reason: ForwardBlockedReason): String =
         ForwardBlockedReason.Unsupported -> stringResource(R.string.forward_blocked_unsupported)
     }
 
-/** Glyph for a message action kind. */
+/**
+ * Glyph for a message action row. A null [kind] is the destructive Delete row,
+ * which the menu tints with the error colour on its own.
+ */
 @Composable
 @Suppress("FunctionNaming")
-private fun MessageActionIcon(kind: MessageActionKind) {
-    val icon =
-        when (kind) {
-            MessageActionKind.Reply -> Icons.AutoMirrored.Filled.Reply
-            MessageActionKind.Edit -> Icons.Default.Edit
-            MessageActionKind.Select -> Icons.Default.CheckCircle
-            MessageActionKind.SelectText -> Icons.Default.TextFields
-            MessageActionKind.CopyText -> Icons.Default.ContentCopy
-            MessageActionKind.Speak, MessageActionKind.SpeakCodeLiterally -> Icons.AutoMirrored.Filled.VolumeUp
-            MessageActionKind.Forward -> Icons.AutoMirrored.Filled.Forward
-            MessageActionKind.Share -> Icons.Default.Share
-            MessageActionKind.Save -> Icons.Default.Download
-            MessageActionKind.Info -> Icons.Default.Info
-        }
-    Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
+private fun MessageActionIcon(kind: MessageActionKind?) {
+    Icon(
+        painter = painterResource(kind?.let(::messageActionIconRes) ?: R.drawable.ic_delete),
+        contentDescription = null,
+        modifier = Modifier.size(messageActionIconSize),
+    )
 }
 
 /**

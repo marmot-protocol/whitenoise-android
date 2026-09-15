@@ -421,4 +421,43 @@ class GlobalSearchStateTest {
             decodeGlobalSearchState("2\u001ftrue\u001f%%%\u001ffalse\u001f\u001f\u001f\u001f\u001f"),
         )
     }
+
+    /** A library mode writes the content filter, so the Filters menu shows Content selected. */
+    @Test
+    fun attachmentModeMarksTheContentCategoryActive() {
+        val browsing =
+            GlobalSearchTransitions.setContentFilterSelection(
+                GlobalSearchState(isOpen = true),
+                GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.IMAGES_VIDEO)),
+            )
+
+        assertTrue(browsing.isCategoryActive(GlobalSearchFilterCategory.Content))
+        assertTrue(browsing.isBrowsingAttachments())
+    }
+
+    /** Clearing the mode leaves the category inactive and the search back on messages. */
+    @Test
+    fun clearingTheModeLeavesTheContentCategoryInactive() {
+        val cleared =
+            GlobalSearchTransitions.setContentFilterSelection(
+                GlobalSearchState(isOpen = true),
+                GlobalSearchContentFilterSelection(emptySet()),
+            )
+
+        assertFalse(cleared.isCategoryActive(GlobalSearchFilterCategory.Content))
+        assertFalse(cleared.isBrowsingAttachments())
+    }
+
+    /** Text and link kinds are message filters, not library modes. */
+    @Test
+    fun textAndLinkContentIsNotAttachmentBrowsing() {
+        val textOnly =
+            GlobalSearchTransitions.setContentFilterSelection(
+                GlobalSearchState(isOpen = true),
+                GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.TEXT)),
+            )
+
+        assertTrue(textOnly.isCategoryActive(GlobalSearchFilterCategory.Content))
+        assertFalse(textOnly.isBrowsingAttachments())
+    }
 }

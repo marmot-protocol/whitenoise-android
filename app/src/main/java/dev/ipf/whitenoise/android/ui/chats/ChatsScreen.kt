@@ -78,6 +78,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
+import dev.ipf.whitenoise.android.core.GlobalAttachmentItem
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.MessageSearchConstraints
 import dev.ipf.whitenoise.android.core.Nip05Resolver
@@ -90,6 +91,7 @@ import dev.ipf.whitenoise.android.core.projectChatListSearchSections
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.collectGlobalAttachments
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
@@ -213,6 +215,7 @@ internal fun ChatsScreen(
     // A superseding key therefore hides stale matches synchronously, before
     // the replacement effect gets its first post-composition frame (#2202).
     var bodySearchResult by remember { mutableStateOf<ChatListBodySearchResult?>(null) }
+    var libraryResult by remember { mutableStateOf<ChatListAttachmentLibraryResult?>(null) }
     // Resolution state for a pasted Nostr identifier in the search field (#344).
     // An npub resolves synchronously; a NIP-05 address resolves over the network
     // (loading → resolved/failed). Plain-text queries stay [None] and the list
@@ -496,6 +499,38 @@ internal fun ChatsScreen(
                     ),
             )
     }
+    // Files-and-media browsing replaces the result list while a mode chip narrows the
+    // search to attachments. It pages the plain timeline, so it runs on its own request
+    // token rather than sharing the body search's.
+    val browsingAttachments = searchOpen && globalSearchState.isBrowsingAttachments()
+    val libraryKinds = globalSearchState.contentFilterSelection.selectedKinds
+    val librarySources =
+        remember(scopedSourceList, groupTitleCopy, profileRev) {
+            globalAttachmentSources(appState, scopedSourceList, groupTitleCopy)
+        }
+    val libraryRequest =
+        remember(browsingAttachments, bodySearchKey, libraryKinds) { ChatListBodySearchRequest() }
+    val libraryItems =
+        libraryResult?.takeIf { it.request === libraryRequest }?.items.orEmpty()
+    val libraryLoading = browsingAttachments && libraryResult?.request !== libraryRequest
+    LaunchedEffect(libraryRequest) {
+        if (!browsingAttachments) return@LaunchedEffect
+        delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
+        val account = controller.boundAccountRef ?: return@LaunchedEffect
+        libraryResult =
+            ChatListAttachmentLibraryResult(
+                request = libraryRequest,
+                items =
+                    collectGlobalAttachments(
+                        appState = appState,
+                        accountRef = account,
+                        sources = librarySources,
+                        rawQuery = trimmedQuery,
+                        constraints = messageSearchConstraints,
+                        kinds = libraryKinds,
+                    ),
+            )
+    }
     // Resolve a pasted Nostr identifier in the search field (#344). An npub is
     // validated (and normalized) via the FFI key parser — no network. A NIP-05
     // address shows a loading state, then a `/.well-known/nostr.json` lookup
@@ -653,6 +688,18 @@ internal fun ChatsScreen(
         val visibleHeadId =
             if (showArchived) null else visibleItems.firstOrNull()?.id
         onOpenGroup(item, focusMessageId, justCreated, visibleHeadId)
+    }
+
+    /** Opens the chat a search result came from, focused on that result's message. */
+    fun openSearchMessage(
+        groupIdHex: String,
+        messageIdHex: String,
+    ) {
+        val canonical = canonicalChatListGroupId(groupIdHex)
+        val item =
+            sourceList.firstOrNull { canonicalChatListGroupId(it.group.groupIdHex) == canonical }
+                ?: return
+        openGroupFromVisibleList(item, messageIdHex, false)
     }
 
     /** Presents a profile from the visible list, remembering the list head for the return scroll. */
@@ -1499,6 +1546,17 @@ internal fun ChatsScreen(
                 },
             ) {
                 when {
+                    browsingAttachments ->
+                        GlobalAttachmentBrowser(
+                            items = libraryItems,
+                            kinds = libraryKinds,
+                            loading = libraryLoading,
+                            bottomPadding = snackbarContentInset.value,
+                            onOpenMessage = { groupIdHex, messageIdHex ->
+                                openSearchMessage(groupIdHex, messageIdHex)
+                            },
+                            thumbnail = { item -> libraryThumbnail(appState, controller.boundAccountRef, item) },
+                        )
                     controller.isLoading && sourceList.isEmpty() -> LoadingScreen()
                     loadFailurePlacement == LoadFailurePlacement.FullScreen ->
                         ErrorContent(
@@ -1886,6 +1944,12 @@ private class ChatListBodySearchRequest
 private data class ChatListBodySearchResult(
     val request: ChatListBodySearchRequest,
     val matches: Map<String, MessageBodyMatch>,
+)
+
+/** One library scan's results, held against the token that asked for them. */
+private data class ChatListAttachmentLibraryResult(
+    val request: ChatListBodySearchRequest,
+    val items: List<GlobalAttachmentItem>,
 )
 
 // Debounce before the chat-list message-body search fires its per-chat FFI

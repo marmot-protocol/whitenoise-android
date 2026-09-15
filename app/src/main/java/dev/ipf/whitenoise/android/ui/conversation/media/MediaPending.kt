@@ -48,6 +48,9 @@ import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** The optimistic tile dims exactly as far as the confirmed album overflow tile does. */
+private const val PENDING_OVERFLOW_SCRIM_ALPHA = 0.58f
+
 /** Placeholder for attachments still uploading, with retry on failure. */
 @Composable
 internal fun MediaPendingPlaceholder(
@@ -236,13 +239,13 @@ private fun PendingGridTile(
         }
         if (overflowCount > 0 && preview != null) {
             Box(
-                Modifier.fillMaxSize().background(Color.Black.copy(alpha = ScrimAlpha.TILE)),
+                Modifier.fillMaxSize().background(Color.Black.copy(alpha = PENDING_OVERFLOW_SCRIM_ALPHA)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     "+$overflowCount",
                     color = Color.White,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
             }

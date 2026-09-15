@@ -1249,8 +1249,14 @@ internal fun ComposerBar(
                             MentionComposer.filter(mentionQuery.query, mentionCandidates)
                         }
                     }
-                if (mentionQuery != null && mentionMatches.isNotEmpty()) {
-                    val openQuery = mentionQuery
+                // The box is a sibling of the composer surface, so a manually
+                // expanded composer owns the whole area and suppresses it.
+                val openQuery =
+                    mentionQuery?.takeIf {
+                        mentionMatches.isNotEmpty() &&
+                            composerExpansion.mode == ComposerExpansionMode.Automatic
+                    }
+                if (openQuery != null) {
                     MentionPicker(
                         candidates = mentionMatches,
                         onPick = { candidate ->

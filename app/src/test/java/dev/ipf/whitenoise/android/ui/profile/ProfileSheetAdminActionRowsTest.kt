@@ -136,7 +136,7 @@ class ProfileSheetAdminActionRowsTest {
 
         composeRule.onAllNodes(progressMatcher, useUnmergedTree = true).assertCountEquals(0)
         composeRule.onNodeWithText(string(R.string.make_admin)).assertIsNotEnabled().performClick()
-        composeRule.onNodeWithText(string(R.string.remove_member)).assertIsNotEnabled().performClick()
+        composeRule.onNodeWithText(string(R.string.remove_from_group)).assertIsNotEnabled().performClick()
         assertEquals(0, grantClicks)
         assertEquals(0, removeClicks)
     }
@@ -238,6 +238,16 @@ class ProfileSheetAdminActionRowsTest {
             assertTrue(retryStarted)
             assertEquals(2, launches)
         }
+
+    /** Moderation carries its own heading and prototype wording, so group scope reads apart from profile scope. */
+    @Test
+    fun moderationRowsSitUnderTheGroupActionsHeading() {
+        setActionRows(actions = listOf(GroupMemberMenuAction.RevokeAdmin, GroupMemberMenuAction.RemoveMember))
+
+        composeRule.onNodeWithText(string(R.string.group_actions)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.remove_admin)).assertExists()
+        composeRule.onNodeWithText(string(R.string.remove_from_group)).assertExists()
+    }
 
     private fun setActionRows(
         actions: List<GroupMemberMenuAction>,

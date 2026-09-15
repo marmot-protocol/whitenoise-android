@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -32,7 +31,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,6 +50,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.LookaheadScope
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -60,6 +59,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -72,6 +72,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -356,6 +357,19 @@ internal fun MessageBubble(
             sourceEpoch = record.sourceEpoch,
             projectedMedia = item.projected?.media,
         )
+    val keptMessages = LocalKeptMessages.current
+    // Null until the controller has bound an account, which is also the only
+    // state in which a kept reference could not be scoped to one identity.
+    val keptMessageKey =
+        remember(controller.boundAccountRef, controller.group.groupIdHex, record.messageIdHex) {
+            controller.boundAccountRef?.takeIf { record.messageIdHex.isNotBlank() }?.let { accountRef ->
+                KeptMessageKey(
+                    accountRef = accountRef,
+                    groupIdHex = controller.group.groupIdHex,
+                    messageIdHex = record.messageIdHex,
+                )
+            }
+        }
     val mine = controller.isMessageMine(record)
     val deleted = item.projected?.deleted == true || MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
     // The same capability model the controller re-validates on the mutation
@@ -480,13 +494,15 @@ internal fun MessageBubble(
                     bottom = bounds.bottom.roundToInt(),
                 )
         }
-    var swipeDrag by remember(record.messageIdHex) { mutableFloatStateOf(0f) }
-    val animatedSwipeOffset by animateFloatAsState(targetValue = swipeDrag, label = "replySwipeOffset")
+    val replySwipe = rememberMessageReplySwipeState(record.messageIdHex)
+    // Physical drag deltas run right-to-left in an RTL layout, so they are
+    // folded onto the gesture's semantic "forward" axis before measurement. The
+    // bubble's own translation stays unsigned because `Modifier.offset {}`
+    // mirrors placement for the layout direction on its own.
+    val replySwipeDirection = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1f else -1f
     val clipboard = LocalClipboardManager.current
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
-    val replySwipeThresholdPx = with(density) { 64.dp.toPx() }
-    val maxSwipeOffsetPx = with(density) { 72.dp.toPx() }
     val messageTextCopy = rememberMessageTextCopy()
     val messageTextSelectionState = rememberSelectionState()
     val selectableTextLayouts =
@@ -562,7 +578,12 @@ internal fun MessageBubble(
         } else {
             Modifier
         }
-    val deletedBodyText = stringResource(R.string.message_deleted)
+    // The prototype speaks in the first person whenever this account is
+    // responsible for the removal — because it authored the message, or because
+    // it hid the message locally — and in the passive voice otherwise.
+    val deletedByMe = mine || MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
+    val deletedBodyText =
+        stringResource(if (deletedByMe) R.string.message_deleted_by_you else R.string.message_deleted_by_other)
     val invalidatedBodyText = stringResource(R.string.message_invalidated)
     val messageActionsLabel = stringResource(R.string.message_actions)
     val invalidationWarning =
@@ -1337,7 +1358,13 @@ internal fun MessageBubble(
         }
     }
 
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            .onGloballyPositioned {
+                if (replySwipe.atRest) replySwipe.rowBoundsInRoot = it.boundsInRoot()
+            },
+    ) {
         val selectionGutterWidth = if (selectionMode) messageBubbleSelectionGutterWidth else 0.dp
         val senderAvatarSlotWidth = if (reserveSenderAvatarSlot) MessageBubbleSenderAvatarSlotWidth else 0.dp
         val bubbleColumnMaxWidth =
@@ -1353,6 +1380,11 @@ internal fun MessageBubble(
             )
         val longPressBlockedBySelection = selectionMode && !rangeDragActive
         val replySwipeUnavailable = deleted || readOnly || textSelectionMode
+
+        // Drawn under the row so the bubble uncovers it as it slides away.
+        if (!replySwipeUnavailable) {
+            MessageReplySwipeGlyph(state = replySwipe, messageIdHex = record.messageIdHex)
+        }
 
         Row(
             // Both reply-swipe and long-press hitboxes cover the ENTIRE row,
@@ -1393,32 +1425,30 @@ internal fun MessageBubble(
                         if (replySwipeUnavailable || longPressBlockedBySelection) {
                             Modifier
                         } else {
-                            Modifier.pointerInput(record.messageIdHex, replySwipeThresholdPx, maxSwipeOffsetPx) {
+                            Modifier.pointerInput(record.messageIdHex, replySwipeDirection) {
                                 var gesture = ReplySwipeGesture()
                                 detectHorizontalDragGestures(
                                     onDragStart = {
                                         gesture = ReplySwipeGesture()
                                     },
                                     onHorizontalDrag = { change, dragAmount ->
+                                        val forward = dragAmount * replySwipeDirection
                                         gesture =
                                             gesture.dragBy(
-                                                deltaX = dragAmount,
+                                                deltaX = forward,
                                                 deltaY = change.position.y - change.previousPosition.y,
                                             )
-                                        val next = gesture.visualOffset(maxSwipeOffsetPx)
-                                        if (next != swipeDrag || dragAmount > 0f) change.consume()
-                                        swipeDrag = next
+                                        val raw = gesture.forwardReplySwipeDistance()
+                                        if (forward > 0f || raw > 0f) change.consume()
+                                        replySwipe.dragTo(raw)
                                     },
                                     onDragEnd = {
-                                        if (gesture.shouldTriggerReply(threshold = replySwipeThresholdPx)) {
-                                            beginReply()
-                                        }
+                                        replySwipe.release { beginReply() }
                                         gesture = ReplySwipeGesture()
-                                        swipeDrag = 0f
                                     },
                                     onDragCancel = {
+                                        replySwipe.cancel()
                                         gesture = ReplySwipeGesture()
-                                        swipeDrag = 0f
                                     },
                                 )
                             }
@@ -1471,6 +1501,12 @@ internal fun MessageBubble(
                                         androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
                                     )
                                     pendingLongPressLinkDestination[0] = null
+                                    // A tombstone has exactly one action, so it skips
+                                    // the menu and opens its confirmation directly.
+                                    if (deleted) {
+                                        requestDelete()
+                                        return@longPressOrVerticalDrag
+                                    }
                                     val windowPosition =
                                         rowCoordinates[0]?.let {
                                             messageBubbleLongPressPositionInWindow(it, position)
@@ -1561,7 +1597,7 @@ internal fun MessageBubble(
                                     selectionSeedVisibleOffset = null
                                     longPressWindowY = null
                                     actionMenuAnchorBounds = messageBoundsInWindow[0]
-                                    onActionMenuOpenChange(true)
+                                    if (deleted) requestDelete() else onActionMenuOpenChange(true)
                                     true
                                 }
                             }
@@ -1613,7 +1649,10 @@ internal fun MessageBubble(
                             } else {
                                 Modifier
                             },
-                        ).offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) },
+                        ).offset { IntOffset(replySwipe.displayedDistance.roundToInt(), 0) }
+                        .onGloballyPositioned {
+                            if (replySwipe.atRest) replySwipe.bubbleBoundsInRoot = it.boundsInRoot()
+                        },
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
             ) {
                 // Resolved before the content column so its presence can pick
@@ -1628,7 +1667,11 @@ internal fun MessageBubble(
                 // resolve outside the cache either way so a late profile
                 // load still updates them. See #131.
                 val replyPreview =
-                    if (item.projected != null) {
+                    if (deleted) {
+                        // A tombstone keeps only its body, reactions and footer;
+                        // the quoted target is part of the removed content.
+                        null
+                    } else if (item.projected != null) {
                         remember(item, messageTextCopy) {
                             controller.replyPreview(item, messageTextCopy)
                         }
@@ -2273,6 +2316,11 @@ internal fun MessageBubble(
                     canSpeak = !deleted && canSpeakAloud,
                     canSpeakCodeLiterally = speakableProjection?.speechRoles?.isNotEmpty() == true,
                     canSelectText = !deleted && !bodyTextToRender.isNullOrBlank(),
+                    canKeepOnScreen =
+                        keptMessages != null &&
+                            keptMessageKey != null &&
+                            !deleted &&
+                            !keptMessages.isKept(keptMessageKey),
                     canShare = canShareMessage,
                     canSave = !deleted && mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
                     canInfo = !deleted,
@@ -2284,6 +2332,10 @@ internal fun MessageBubble(
                             onEmojiUsed(emoji)
                             reactWithEmoji(emoji)
                         }
+                    },
+                    onKeepOnScreen = {
+                        onActionMenuOpenChange(false)
+                        if (keptMessageKey != null) keptMessages?.keep(keptMessageKey)
                     },
                     onOpenEmojiPicker = {
                         if (!deleted && !readOnly) {

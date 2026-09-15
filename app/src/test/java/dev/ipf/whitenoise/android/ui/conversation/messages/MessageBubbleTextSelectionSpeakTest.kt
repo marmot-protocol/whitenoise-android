@@ -120,7 +120,7 @@ class MessageBubbleTextSelectionSpeakTest {
         assertTrue(actionMenuOpen)
 
         composeRule
-            .onNodeWithText(app.getString(R.string.speak_aloud))
+            .onNodeWithText(app.getString(R.string.read_aloud))
             .performScrollTo()
             .assertIsDisplayed()
             .performClick()
@@ -223,7 +223,7 @@ class MessageBubbleTextSelectionSpeakTest {
         composeRule.waitForIdle()
         longPressOnMessageText("First sentence")
         composeRule
-            .onNodeWithText(app.getString(R.string.speak_aloud))
+            .onNodeWithText(app.getString(R.string.read_aloud))
             .performScrollTo()
             .assertIsDisplayed()
             .performClick()

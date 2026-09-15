@@ -259,13 +259,13 @@ class ProfileStartGroupNavigationTest {
         assertOwnerSurfaceVisible(fixture)
         assertProfileActionVisible(scrollToAction = true)
         composeRule.onNodeWithText(app.getString(R.string.make_admin)).assertExists()
-        composeRule.onNodeWithText(app.getString(R.string.remove_member)).assertExists()
+        composeRule.onNodeWithText(app.getString(R.string.remove_from_group)).assertExists()
         startGroupFromProfile()
 
         assertProfileOverlayAbsent()
         assertOwnerSurfaceAbsent(fixture)
         composeRule.onNodeWithText(app.getString(R.string.make_admin)).assertDoesNotExist()
-        composeRule.onNodeWithText(app.getString(R.string.remove_member)).assertDoesNotExist()
+        composeRule.onNodeWithText(app.getString(R.string.remove_from_group)).assertDoesNotExist()
         assertSelectedMemberPicker(fixture)
 
         closePicker()

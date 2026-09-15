@@ -79,16 +79,20 @@ import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
 import dev.ipf.whitenoise.android.media.editor.PhotoStrokeMode
 import dev.ipf.whitenoise.android.state.MediaQuality
+import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 import kotlin.math.hypot
 import kotlin.math.min
 
 @Composable
+@Suppress("LongParameterList")
 internal fun PhotoEditorDialog(
     previewBitmap: Bitmap,
     sourceInfo: PhotoEditorSourceInfo,
     stateHolder: PhotoEditorStateHolder,
     onCancel: () -> Unit,
     onSave: (PhotoEditRecipe, MediaQuality) -> Unit,
+    frameIndex: Int = 0,
+    frameCount: Int = 1,
 ) {
     Dialog(
         // Back is handled by [PhotoEditorScreen] so a dirty recipe always goes
@@ -102,6 +106,8 @@ internal fun PhotoEditorDialog(
             stateHolder = stateHolder,
             onCancel = onCancel,
             onSave = onSave,
+            frameIndex = frameIndex,
+            frameCount = frameCount,
         )
     }
 }
@@ -109,7 +115,7 @@ internal fun PhotoEditorDialog(
 /** Photo editor: canvas, tools and the save flow for a staged photo. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("LongMethod") // Screen-level orchestration keeps save/back semantics alongside editor state.
+@Suppress("LongMethod", "LongParameterList") // Screen-level orchestration keeps save/back semantics together.
 internal fun PhotoEditorScreen(
     previewBitmap: Bitmap,
     sourceInfo: PhotoEditorSourceInfo,
@@ -117,9 +123,13 @@ internal fun PhotoEditorScreen(
     onCancel: () -> Unit,
     onSave: (PhotoEditRecipe, MediaQuality) -> Unit,
     modifier: Modifier = Modifier,
+    frameIndex: Int = 0,
+    frameCount: Int = 1,
 ) {
     val state = stateHolder.state
     var showDiscardDialog by remember { mutableStateOf(false) }
+    var showCoordinates by remember { mutableStateOf(false) }
+    var showQuality by remember { mutableStateOf(false) }
 
     fun requestCancel() {
         if (state.isSaving) return
@@ -133,6 +143,8 @@ internal fun PhotoEditorScreen(
         topBar = {
             PhotoEditorTopBar(
                 saving = state.isSaving,
+                frameIndex = frameIndex,
+                frameCount = frameCount,
                 onCancel = ::requestCancel,
                 onSave = {
                     stateHolder.beginSaving()
@@ -142,7 +154,7 @@ internal fun PhotoEditorScreen(
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            PhotoEditorHistoryActions(state, stateHolder)
+            PhotoEditorHistoryActions(state, stateHolder, stateHolder.hasUnsavedChanges)
             if (state.isSaving) LinearProgressIndicator(Modifier.fillMaxWidth())
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 val wide = maxWidth >= 600.dp || maxHeight < 360.dp
@@ -161,12 +173,24 @@ internal fun PhotoEditorScreen(
                     Row(Modifier.fillMaxSize()) {
                         photo(Modifier.weight(1f).fillMaxHeight())
                         val controlsWidth = sidePanelWidth
-                        PhotoEditorControls(state, stateHolder, Modifier.width(controlsWidth).fillMaxHeight())
+                        PhotoEditorControls(
+                            state = state,
+                            stateHolder = stateHolder,
+                            onCoordinates = { showCoordinates = true },
+                            onQuality = { showQuality = true },
+                            modifier = Modifier.width(controlsWidth).fillMaxHeight(),
+                        )
                     }
                 } else {
                     Column(Modifier.fillMaxSize()) {
                         photo(Modifier.weight(1f).fillMaxWidth().heightIn(min = 120.dp))
-                        PhotoEditorControls(state, stateHolder, Modifier.fillMaxWidth().heightIn(max = 300.dp))
+                        PhotoEditorControls(
+                            state = state,
+                            stateHolder = stateHolder,
+                            onCoordinates = { showCoordinates = true },
+                            onQuality = { showQuality = true },
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp),
+                        )
                     }
                 }
             }
@@ -188,9 +212,41 @@ internal fun PhotoEditorScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDiscardDialog = false }) {
-                    Text(stringResource(R.string.cancel))
+                    Text(stringResource(R.string.photo_editor_keep_editing))
                 }
             },
+        )
+    }
+    if (showCoordinates) {
+        PhotoEditorCoordinatesDialog(
+            tool = state.activeTool,
+            crop = state.recipe.crop,
+            minimumFraction = minimumCropFraction(sourceInfo.orientedSize),
+            onDismiss = { showCoordinates = false },
+            onCrop = { crop ->
+                showCoordinates = false
+                stateHolder.commitFreeCrop(crop)
+            },
+            onStroke = { points ->
+                showCoordinates = false
+                stateHolder.commitStroke(points)
+            },
+        )
+    }
+    if (showQuality) {
+        // ChoiceDialog labels are plain strings, so resolve each level's name up front.
+        val qualityLabels = MediaQuality.entries.associateWith { level -> photoQualityLevelLabel(level) }
+        ChoiceDialog(
+            title = stringResource(R.string.photo_editor_quality),
+            values = MediaQuality.entries,
+            selected = state.quality,
+            label = { level -> qualityLabels.getValue(level) },
+            onDismiss = { showQuality = false },
+            onSelect = { level ->
+                showQuality = false
+                stateHolder.selectQuality(level)
+            },
+            supportingText = stringResource(R.string.photo_editor_quality_explanation),
         )
     }
 }
@@ -200,18 +256,34 @@ internal fun PhotoEditorScreen(
 @Composable
 private fun PhotoEditorTopBar(
     saving: Boolean,
+    frameIndex: Int,
+    frameCount: Int,
     onCancel: () -> Unit,
     onSave: () -> Unit,
 ) {
     TopAppBar(
-        title = { Text(stringResource(R.string.photo_editor_title)) },
+        title = {
+            Column {
+                Text(stringResource(R.string.photo_editor_title))
+                if (frameCount > 1) {
+                    Text(
+                        stringResource(R.string.photo_editor_frame, frameIndex + 1),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
+        },
         navigationIcon = {
             IconButton(onClick = onCancel, enabled = !saving) {
-                Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.cancel))
+                Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.close))
             }
         },
         actions = {
-            EditorTextAction(stringResource(R.string.save), !saving, onSave)
+            EditorTextAction(
+                stringResource(if (saving) R.string.photo_editor_saving_action else R.string.save),
+                !saving,
+                onSave,
+            )
         },
     )
 }
@@ -221,6 +293,7 @@ private fun PhotoEditorTopBar(
 private fun PhotoEditorHistoryActions(
     state: PhotoEditorUiState,
     holder: PhotoEditorStateHolder,
+    dirty: Boolean,
 ) {
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -228,7 +301,7 @@ private fun PhotoEditorHistoryActions(
     ) {
         EditorTextAction(stringResource(R.string.photo_editor_undo), state.canUndo, holder::undo)
         EditorTextAction(stringResource(R.string.photo_editor_redo), state.canRedo, holder::redo)
-        EditorTextAction(stringResource(R.string.photo_editor_reset), !state.isSaving, holder::reset)
+        EditorTextAction(stringResource(R.string.photo_editor_reset), !state.isSaving && dirty, holder::reset)
         EditorTextAction(
             stringResource(R.string.photo_editor_rotate_clockwise),
             !state.isSaving,
@@ -253,9 +326,12 @@ private fun EditorTextAction(
 
 /** Arranges the native tool/preset/color/width commands in the prototype labeled chip rows. */
 @Composable
+@Suppress("LongParameterList")
 private fun PhotoEditorControls(
     state: PhotoEditorUiState,
     stateHolder: PhotoEditorStateHolder,
+    onCoordinates: () -> Unit,
+    onQuality: () -> Unit,
     modifier: Modifier,
 ) {
     Column(
@@ -277,8 +353,57 @@ private fun PhotoEditorControls(
         } else {
             DrawControls(state, stateHolder, showColors = state.activeTool == PhotoEditorTool.Draw)
         }
+        Text(
+            stringResource(
+                if (state.activeTool == PhotoEditorTool.Crop) {
+                    R.string.photo_editor_crop_hint
+                } else {
+                    R.string.photo_editor_draw_hint
+                },
+            ),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        EditorTextAction(coordinateDialogTitle(state.activeTool), !state.isSaving, onCoordinates)
+        PhotoEditorQualityAction(state.quality, !state.isSaving, onQuality)
+        if (state.quality == MediaQuality.Original && state.recipe != stateHolder.initialRecipe) {
+            Text(
+                stringResource(R.string.photo_editor_original_edited),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
     }
 }
+
+/** The output-quality control the prototype keeps inside the editor rather than in the preview chrome. */
+@Composable
+private fun PhotoEditorQualityAction(
+    quality: MediaQuality,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val label = stringResource(R.string.photo_editor_quality) + ": " + photoQualityLevelLabel(quality)
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier =
+            Modifier
+                .heightIn(min = 48.dp)
+                .semantics { contentDescription = label }
+                .testTag("photo.editor.quality"),
+    ) { Text(label) }
+}
+
+/** Name of one selectable output level, as offered in the editor's quality dialog. */
+@Composable
+internal fun photoQualityLevelLabel(quality: MediaQuality): String =
+    stringResource(
+        when (quality) {
+            MediaQuality.Low -> R.string.photo_editor_quality_low
+            MediaQuality.Standard -> R.string.photo_editor_quality_standard
+            MediaQuality.High -> R.string.photo_editor_quality_high
+            MediaQuality.Original -> R.string.photo_editor_quality_original
+        },
+    )
 
 /** Keeps all native crop presets available without requiring a canvas gesture. */
 @Composable

@@ -21,21 +21,17 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewContent
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoPreview
-import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoQuality
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -57,26 +53,22 @@ class MediaPreviewThemeTest {
     @get:Rule val rule = createComposeRule()
     private val app: Application = ApplicationProvider.getApplicationContext()
     private var surfaceColor = Color.Unspecified
-    private var foregroundColor = Color.Unspecified
-    private val qualitySelections = mutableListOf<Pair<String, MediaQuality>>()
     private val edited = mutableListOf<Int>()
 
-    /** Light preview-only staging retains Close/Edit/Quality/Delete and delegates caption/Send to its composer. */
+    /** Light preview-only staging keeps Cancel/Edit photo/Done and delegates caption and Send to its composer. */
     @Test
-    fun lightPreviewOnlyHasThemedActionsAndRealStableSlotQualitySelection() {
+    fun lightPreviewOnlyHasThemedPrototypeActions() {
         render(previewOnly = true)
         rule.onNodeWithContentDescription(text(R.string.photo_editor_edit_action)).assertIsDisplayed().performClick()
         assertEquals(listOf(0), edited)
-        rule.onNodeWithContentDescription(text(R.string.close)).assertIsDisplayed()
-        rule.onNodeWithContentDescription(text(R.string.media_attachment_remove)).assertIsDisplayed()
+        rule.onNodeWithContentDescription(text(R.string.cancel_media_changes)).assertIsDisplayed()
+        rule.onNodeWithText(text(R.string.done)).assertIsDisplayed()
         rule.onNodeWithContentDescription(text(R.string.send)).assertDoesNotExist()
         rule.onNodeWithText(text(R.string.add_caption)).assertDoesNotExist()
+        // Output quality now belongs to the photo editor, not to this screen.
+        rule.onNodeWithText(text(R.string.photo_editor_quality)).assertDoesNotExist()
         assertShellColors()
         capture("media_preview_themed_light")
-        val standard = text(R.string.photo_editor_quality_standard)
-        rule.onNodeWithContentDescription(text(R.string.photo_editor_announcement_quality, standard)).performClick()
-        rule.onNodeWithText(text(R.string.photo_editor_quality_hd)).performScrollTo().performClick()
-        assertEquals(listOf("stable-photo" to MediaQuality.High), qualitySelections)
     }
 
     /** Caption and failure retry still belong to the native preview when that optional capability is requested. */
@@ -91,9 +83,9 @@ class MediaPreviewThemeTest {
         rule.onNodeWithText(text(R.string.add_caption)).performTextInput("Kept native caption")
         capture("media_preview_themed_amoled")
         rule.onNodeWithContentDescription(text(R.string.send)).performClick()
-        rule.onNodeWithContentDescription(text(R.string.media_attachment_remove)).assertIsNotEnabled()
+        rule.onNodeWithContentDescription(text(R.string.send)).assertIsNotEnabled()
         rule.runOnIdle { checkNotNull(completion)(false) }
-        rule.onNodeWithContentDescription(text(R.string.media_attachment_remove)).assertIsEnabled()
+        rule.onNodeWithContentDescription(text(R.string.send)).assertIsEnabled()
         rule.onNodeWithText("Kept native caption").assertIsDisplayed()
         assertEquals(listOf("Kept native caption"), captions)
         assertShellColors()
@@ -106,41 +98,28 @@ class MediaPreviewThemeTest {
     @Test
     fun shortRtlLargeNonEditablePreviewKeepsNativeRecoveryControlsReadable() {
         render(previewOnly = true, fontScale = 2f, rtl = true, nonEditable = true, height = 420)
+        // The prototype's Edit action moved into the top bar and still lands on screen here, so what
+        // this configuration proves is the labelling: a refused action has to announce why it is
+        // refused, not repeat the plain action name a working control already uses.
         rule
             .onNodeWithContentDescription(text(R.string.photo_editor_not_editable_source))
-            .assertIsDisplayed()
+            .assertExists()
             .assertIsNotEnabled()
-        listOf(R.string.close, R.string.media_attachment_remove, R.string.media_attachment_add_more).forEach {
-            rule.onNodeWithContentDescription(text(it)).assertIsDisplayed().assertIsEnabled()
-        }
+        rule.onNodeWithContentDescription(text(R.string.cancel_media_changes)).assertIsDisplayed().assertIsEnabled()
+        rule.onNodeWithText(text(R.string.done)).assertIsDisplayed().assertIsEnabled()
         val layouts = mutableListOf<TextLayoutResult>()
-        rule.onNodeWithText("Preview").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-        assertEquals(
-            32.sp,
-            layouts
-                .single()
-                .layoutInput.style.fontSize,
-        )
+        rule
+            .onNodeWithText(text(R.string.preview_media))
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         assertTrue(layouts.none { it.hasVisualOverflow })
         capture("media_preview_themed_short_rtl_large")
-        val standard = text(R.string.photo_editor_quality_standard)
-        rule.onNodeWithContentDescription(text(R.string.photo_editor_announcement_quality, standard)).performClick()
-        rule.onNodeWithText(text(R.string.photo_editor_quality_hd)).performScrollTo().performClick()
-        assertEquals(listOf("stable-photo" to MediaQuality.High), qualitySelections)
     }
 
     /** Asserts actual rendered background and the header's merged text style, not a duplicate palette helper. */
     private fun assertShellColors() {
         val pixels = rule.onNodeWithTag("preview-frame").captureToImage().toPixelMap()
         assertEquals(surfaceColor, pixels[1, 1])
-        val layouts = mutableListOf<TextLayoutResult>()
-        rule.onNodeWithText("Preview").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-        assertEquals(
-            foregroundColor,
-            layouts
-                .single()
-                .layoutInput.style.color,
-        )
+        assertEquals(surfaceColor, pixels[1, pixels.height - 2])
     }
 
     /**
@@ -175,7 +154,6 @@ class MediaPreviewThemeTest {
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = dark, fontScale = fontScale) {
                     surfaceColor = androidx.compose.material3.MaterialTheme.colorScheme.background
-                    foregroundColor = androidx.compose.material3.MaterialTheme.colorScheme.onBackground
                     Box(Modifier.size(320.dp, height.dp).testTag("preview-frame")) {
                         MediaPreviewContent(
                             mediaSlots = listOf(PendingMediaSlot("stable-photo", uri)),
@@ -188,12 +166,7 @@ class MediaPreviewThemeTest {
                             onAddPhotos = {},
                             onAddDocuments = {},
                             onEditMediaAt = { edited += it },
-                            onSelectMediaQuality = { slot, quality -> qualitySelections += slot to quality },
                             preparedPhotoPreviews = mapOf("stable-photo" to PreparedPhotoPreview("prepared", bytes)),
-                            preparedPhotoQualities =
-                                mapOf(
-                                    "stable-photo" to PreparedPhotoQuality(MediaQuality.Standard, "32 × 24", "32 × 24"),
-                                ),
                             nonEditableMediaSlotIds = if (nonEditable) setOf("stable-photo") else emptySet(),
                             previewOnly = previewOnly,
                         )

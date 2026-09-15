@@ -5,9 +5,12 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -98,7 +101,7 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.quick_action_search)).performClick()
         assertEquals(1, searchRequests)
         composeRule.onNodeWithContentDescription(context.getString(R.string.mute)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.mute_dialog_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.mute_for)).assertIsDisplayed()
     }
 
     /** A native technical-info round trip retains the actual overview viewport and scrolled identity. */
@@ -160,11 +163,11 @@ class GroupDetailsEditNavigationTest {
             }
         }
         composeRule.onNodeWithContentDescription(context.getString(R.string.mute)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.mute_dialog_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.mute_for)).assertIsDisplayed()
         composeRule.runOnIdle {
             current.value = controller(group(groupId = "group-b", name = "Second group"))
         }
-        composeRule.onNodeWithText(context.getString(R.string.mute_dialog_title)).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.mute_for)).assertDoesNotExist()
         composeRule.onNode(hasText("Second group") and hasClickAction()).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(context.getString(R.string.mute)).assertIsDisplayed()
     }
@@ -183,6 +186,25 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         composeRule.onNodeWithTag("chat_info.members_screen").assertDoesNotExist()
         assertEquals(offset, overviewScrollOffset(), 1f)
+    }
+
+    /**
+     * The full roster is a reading surface: adding members stays on the group info screen, and a row whose
+     * identity does not resolve to a profile neither opens one nor advertises that it would.
+     */
+    @Test
+    fun fullMembersOffersNoAddActionAndLeavesUnresolvableRowsInert() {
+        render(controller(group(), extraMembers = 5, verifiedRoster = true))
+
+        composeRule.onNodeWithTag("chat_info.all_members").performScrollTo().performClick()
+        composeRule.onNodeWithTag("chat_info.members_screen").assertIsDisplayed()
+
+        composeRule.onNodeWithText(context.getString(R.string.add_member)).assertDoesNotExist()
+        val memberTag = "chat_info.member.member-h"
+        composeRule.onNodeWithTag(memberTag).performScrollTo().assert(hasClickAction().not())
+        composeRule
+            .onAllNodes(hasClickAction() and hasAnyAncestor(hasTestTag(memberTag)), useUnmergedTree = true)
+            .assertCountEquals(0)
     }
 
     /** Native mutation feedback remains visible and dismissible even deep in the full roster. */

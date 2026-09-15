@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.ui.profile
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
@@ -33,15 +34,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -66,6 +68,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -95,23 +98,25 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentationNpubFromReference
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
-import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
-import dev.ipf.whitenoise.android.ui.chats.newchat.SettingsActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatAttemptResult
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorCard
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorUiState
 import dev.ipf.whitenoise.android.ui.chats.newchat.attemptOpenOrStartProfileChat
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
-import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
 import dev.ipf.whitenoise.android.ui.group.groupMemberMenuActions
+import dev.ipf.whitenoise.android.ui.settings.SettingsAction
+import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
+import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.delay
@@ -297,8 +302,12 @@ internal fun resolveProfileSheetMetadata(
             ),
     )
 
+/**
+ * The group-scoped half of a member profile: a labelled Group Actions section whose rows promote,
+ * demote, or remove the member. Only an admin viewing someone else receives any [actions] at all.
+ */
 @Composable
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongParameterList")
 internal fun ProfileSheetAdminActionRows(
     actions: List<GroupMemberMenuAction>,
     pendingAction: GroupMemberMenuAction?,
@@ -308,43 +317,95 @@ internal fun ProfileSheetAdminActionRows(
     onRemoveMember: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().testTag(PROFILE_SHEET_ADMIN_ACTIONS_TAG)) {
-        AppDivider()
-        actions.forEach { action ->
-            when (action) {
-                GroupMemberMenuAction.GrantAdmin ->
-                    SettingsActionRow(
-                        icon = Icons.Default.Shield,
-                        title = stringResource(R.string.make_admin),
-                        modifier = Modifier.testTag(adminActionRowTag(action)),
-                        enabled = !busy,
-                        inProgress = pendingAction == action,
-                        onClick = onGrantAdmin,
-                    )
-                GroupMemberMenuAction.RevokeAdmin ->
-                    SettingsActionRow(
-                        icon = Icons.Default.Shield,
-                        title = stringResource(R.string.remove_admin),
-                        modifier = Modifier.testTag(adminActionRowTag(action)),
-                        enabled = !busy,
-                        inProgress = pendingAction == action,
-                        onClick = onRevokeAdmin,
-                    )
-                GroupMemberMenuAction.RemoveMember ->
-                    DangerActionRow(
-                        icon = Icons.Default.Delete,
-                        title = stringResource(R.string.remove_member),
-                        modifier = Modifier.testTag(adminActionRowTag(action)),
-                        enabled = !busy,
-                        inProgress = pendingAction == action,
-                        onClick = onRemoveMember,
-                    )
-                // Self is excluded on this surface, so StepDownAsAdmin never
-                // appears (it is filtered out by profileSheetAdminActions).
-                GroupMemberMenuAction.StepDownAsAdmin -> Unit
+        SettingsSection(stringResource(R.string.group_actions))
+        SettingsGroup {
+            actions.forEach { action ->
+                when (action) {
+                    GroupMemberMenuAction.GrantAdmin ->
+                        row(action.name) { rowContext ->
+                            ProfileSheetAdminActionRow(
+                                context = rowContext,
+                                action = action,
+                                title = stringResource(R.string.make_admin),
+                                icon = R.drawable.ic_admin_panel_settings,
+                                inProgress = pendingAction == action,
+                                enabled = !busy,
+                                onClick = onGrantAdmin,
+                            )
+                        }
+                    GroupMemberMenuAction.RevokeAdmin ->
+                        row(action.name) { rowContext ->
+                            ProfileSheetAdminActionRow(
+                                context = rowContext,
+                                action = action,
+                                title = stringResource(R.string.remove_admin),
+                                icon = R.drawable.ic_person,
+                                inProgress = pendingAction == action,
+                                enabled = !busy,
+                                onClick = onRevokeAdmin,
+                            )
+                        }
+                    GroupMemberMenuAction.RemoveMember ->
+                        row(action.name) { rowContext ->
+                            ProfileSheetAdminActionRow(
+                                context = rowContext,
+                                action = action,
+                                title = stringResource(R.string.remove_from_group),
+                                icon = R.drawable.ic_person_remove,
+                                inProgress = pendingAction == action,
+                                enabled = !busy,
+                                destructive = true,
+                                onClick = onRemoveMember,
+                            )
+                        }
+                    // Self is excluded on this surface, so StepDownAsAdmin never
+                    // appears (it is filtered out by profileSheetAdminActions).
+                    GroupMemberMenuAction.StepDownAsAdmin -> Unit
+                }
             }
         }
     }
 }
+
+/**
+ * One moderation row. A running mutation swaps the leading glyph for a same-sized indicator, so the
+ * row that owns the work says so without the block changing height or the label moving.
+ */
+@Composable
+@Suppress("FunctionNaming", "LongParameterList")
+private fun ProfileSheetAdminActionRow(
+    context: SettingsRowContext,
+    action: GroupMemberMenuAction,
+    title: String,
+    @DrawableRes icon: Int,
+    inProgress: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    destructive: Boolean = false,
+) {
+    SettingsAction(
+        context = context,
+        title = title,
+        onClick = onClick,
+        modifier = Modifier.testTag(adminActionRowTag(action)),
+        enabled = enabled,
+        destructive = destructive,
+        leading = {
+            if (inProgress) {
+                CircularProgressIndicator(Modifier.size(ProfileAdminGlyphSize))
+            } else {
+                Icon(
+                    painterResource(icon),
+                    contentDescription = null,
+                    tint = if (destructive) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                )
+            }
+        },
+    )
+}
+
+/** Moderation glyph box; the busy indicator matches the icon so the row never reflows. */
+private val ProfileAdminGlyphSize = 24.dp
 
 private enum class ProfileSheetPage {
     PROFILE,
@@ -680,6 +741,7 @@ internal fun ProfileSheet(
             scroll = contentScrollState,
             follow = followRow,
             busy = creatingChat,
+            fromGroup = adminController != null,
             canPromote =
                 adminController == null &&
                     (
@@ -1447,6 +1509,7 @@ private fun ProfileSheetAdminActions(
     // MDK state can land one frame before the local pending flag clears.
     var pendingAction by remember(targetHex) { mutableStateOf<GroupMemberMenuAction?>(null) }
     var confirmRemove by remember(targetHex) { mutableStateOf(false) }
+    var confirmRoleChange by remember(targetHex) { mutableStateOf<GroupMemberMenuAction?>(null) }
     val targetMember =
         remember(controller.presentedMembers, targetHex) {
             controller.presentedMembers.firstOrNull { it.memberIdHex.equals(targetHex, ignoreCase = true) }
@@ -1500,28 +1563,38 @@ private fun ProfileSheetAdminActions(
         actions = actions,
         pendingAction = pendingAction,
         busy = busy,
-        onGrantAdmin = {
-            runMutation(GroupMemberMenuAction.GrantAdmin) {
-                controller.setMemberAdmin(targetMember, admin = true)
-            }
-        },
-        onRevokeAdmin = {
-            runMutation(GroupMemberMenuAction.RevokeAdmin) {
-                controller.setMemberAdmin(targetMember, admin = false)
-            }
-        },
+        onGrantAdmin = { if (isCurrent()) confirmRoleChange = GroupMemberMenuAction.GrantAdmin },
+        onRevokeAdmin = { if (isCurrent()) confirmRoleChange = GroupMemberMenuAction.RevokeAdmin },
         onRemoveMember = { if (isCurrent()) confirmRemove = true },
     )
 
-    if (confirmRemove) {
-        ConfirmDialog(
-            title = stringResource(R.string.confirm_remove_member_title),
-            message =
+    confirmRoleChange?.let { roleChange ->
+        val promoting = roleChange == GroupMemberMenuAction.GrantAdmin
+        ProfileSheetModerationConfirmDialog(
+            title =
                 stringResource(
-                    R.string.confirm_remove_member_message,
+                    if (promoting) R.string.make_admin_question else R.string.remove_admin_question,
                     controller.memberDisplayName(targetMember),
                 ),
-            confirmLabel = stringResource(R.string.remove_member),
+            confirmLabel = stringResource(if (promoting) R.string.make_admin else R.string.remove_admin),
+            onConfirm = {
+                confirmRoleChange = null
+                runMutation(roleChange) {
+                    controller.setMemberAdmin(targetMember, admin = promoting)
+                }
+            },
+            onDismiss = { confirmRoleChange = null },
+        )
+    }
+
+    if (confirmRemove) {
+        ProfileSheetModerationConfirmDialog(
+            title =
+                stringResource(
+                    R.string.remove_member_question,
+                    controller.memberDisplayName(targetMember),
+                ),
+            confirmLabel = stringResource(R.string.remove_from_group),
             onConfirm = {
                 confirmRemove = false
                 runMutation(GroupMemberMenuAction.RemoveMember) {
@@ -1532,6 +1605,37 @@ private fun ProfileSheetAdminActions(
             destructive = true,
         )
     }
+}
+
+/**
+ * Moderation confirmations carry the whole question in the title, as the prototype does, so no body
+ * copy repeats it; a destructive confirm takes the error role and the dismiss is always Cancel.
+ */
+@Composable
+@Suppress("FunctionNaming")
+private fun ProfileSheetModerationConfirmDialog(
+    title: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    destructive: Boolean = false,
+) {
+    WhiteNoiseAlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                colors =
+                    if (destructive) {
+                        ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    } else {
+                        ButtonDefaults.textButtonColors()
+                    },
+            ) { Text(confirmLabel) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        title = { Text(title) },
+    )
 }
 
 private const val PROFILE_COPY_FEEDBACK_MILLIS = 2_000L

@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertCountEquals
@@ -639,21 +640,26 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         cardTag: String,
         vararg expectedDescriptions: String,
     ) {
-        val mergedDescriptions =
+        // The footer's own nodes carry their descriptions; the card's merge boundary moved when
+        // the clock took the lead, so count across the card's subtree rather than its merged config.
+        val cardDescriptions =
             composeRule
-                .onNodeWithTag(cardTag)
+                .onNodeWithTag(cardTag, useUnmergedTree = true)
                 .fetchSemanticsNode()
-                .config
-                .getOrNull(SemanticsProperties.ContentDescription)
-                .orEmpty()
+                .subtreeContentDescriptions()
         expectedDescriptions.forEach { description ->
             assertEquals(
-                "Expected one merged semantic description for '$description'",
+                "Expected one semantic description for '$description' in $cardDescriptions",
                 1,
-                mergedDescriptions.count { it == description },
+                cardDescriptions.count { it == description },
             )
         }
     }
+
+    /** Every content description carried by this node or anything it contains. */
+    private fun SemanticsNode.subtreeContentDescriptions(): List<String> =
+        config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() +
+            children.flatMap { it.subtreeContentDescriptions() }
 
     /** Verifies visible warning or timestamp bounds remain within the owning file card. */
     private fun assertNodeInsideCard(

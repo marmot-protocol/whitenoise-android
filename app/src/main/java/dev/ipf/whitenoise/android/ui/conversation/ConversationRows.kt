@@ -145,6 +145,9 @@ internal fun messageDayLabel(
     }
 }
 
+/** Flat inset the prototype gives a system-event row on both sides. */
+private val GroupSystemRowVerticalPadding = 8.dp
+
 /** Localized native date, presented as the prototype's transparent inline heading. */
 @Composable
 internal fun DaySeparator(
@@ -200,7 +203,6 @@ internal fun GroupSystemRow(
     appState: WhiteNoiseAppState,
     groupSystem: GroupSystemEventFfi? = null,
     onDeleteForMe: (() -> Unit)? = null,
-    followsStructuralHeader: Boolean = false,
 ) {
     val copy = rememberGroupSystemCopy()
     val event =
@@ -229,11 +231,14 @@ internal fun GroupSystemRow(
             copy.fallback
         }
     var actionMenuOpen by remember(record.messageIdHex) { mutableStateOf(false) }
+    // The prototype gives every event row a flat 8.dp above and below inside a
+    // full-width centred box; the transcript's own 2.dp row arrangement then
+    // reads as the 18.dp the prototype leaves between adjacent events.
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(top = if (followsStructuralHeader) 8.dp else 2.dp, bottom = 2.dp),
+                .padding(vertical = GroupSystemRowVerticalPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box {

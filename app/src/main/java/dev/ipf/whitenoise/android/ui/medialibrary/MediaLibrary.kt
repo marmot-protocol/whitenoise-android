@@ -570,12 +570,11 @@ private fun MediaTileGrid(
                 Text(
                     monthLabel(section.monthKey),
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(16.dp).semantics { heading() },
                 )
             }
             gridItems(section.items, key = { "${it.messageIdHex}#${it.attachmentIndex}" }) { tile ->
-                Box(Modifier.aspectRatio(1f)) {
+                Box(Modifier.aspectRatio(1f), contentAlignment = Alignment.BottomStart) {
                     if (tile.isVideo) {
                         MediaVideoGridTile(
                             messageIdHex = tile.messageIdHex,
@@ -601,11 +600,46 @@ private fun MediaTileGrid(
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
+                    SharedMediaTileCaption(tile, appState)
                 }
             }
         }
     }
 }
+
+/**
+ * The prototype names the sender across the foot of every tile, and marks a video there
+ * in words rather than with a badge, so a dense grid still says who sent what.
+ */
+@Suppress("FunctionNaming")
+@Composable
+private fun SharedMediaTileCaption(
+    tile: SharedMediaTile,
+    appState: WhiteNoiseAppState,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = SHARED_TILE_CAPTION_ALPHA),
+    ) {
+        Column(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+            Text(
+                text = if (tile.mine) stringResource(R.string.you) else appState.displayName(tile.sender),
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (tile.isVideo) {
+                Text(
+                    text = stringResource(R.string.shared_media_tab_videos),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
+    }
+}
+
+/** Keeps the caption legible over bright artwork without hiding the photo behind it. */
+private const val SHARED_TILE_CAPTION_ALPHA = 0.86f
 
 /** Empty state of a library tab. */
 @Composable
@@ -643,7 +677,6 @@ internal fun <T> MonthSectionedColumn(
                 Text(
                     monthLabel(section.monthKey),
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(16.dp).semantics { heading() },
                 )
             }

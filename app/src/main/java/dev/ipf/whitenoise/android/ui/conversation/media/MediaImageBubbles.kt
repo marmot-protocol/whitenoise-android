@@ -64,29 +64,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** The prototype's single-media frame: 256dp tall, width from the aspect ratio (capped at 256dp). */
-private const val SINGLE_MEDIA_MAX_EXTENT_DP = 256f
+/** The prototype's single-media frame: 256 dp tall, width from the aspect ratio, capped at 256 dp. */
+internal const val SINGLE_MEDIA_MAX_EXTENT_DP = 256f
 
-/** Sources smaller than the frame are shown at 192dp instead of being upscaled to the full frame. */
-private const val SMALL_SOURCE_DISPLAY_EXTENT_DP = 192f
-
-/** Width and height in dp for one photo or video, following the prototype's SingleMediaLayout. */
-internal fun singleMediaSizeDp(
-    ratio: Float?,
-    sourceShortSidePx: Int? = null,
-): Pair<Float, Float> {
-    if (ratio == null || ratio <= 0f) return SINGLE_MEDIA_MAX_EXTENT_DP to SINGLE_MEDIA_MAX_EXTENT_DP
-    var height = SINGLE_MEDIA_MAX_EXTENT_DP
-    var width = (height * ratio).coerceAtMost(SINGLE_MEDIA_MAX_EXTENT_DP)
-    val destinationShort = minOf(width, height)
-    val smallSource = sourceShortSidePx != null && destinationShort > sourceShortSidePx
-    if (smallSource && destinationShort > SMALL_SOURCE_DISPLAY_EXTENT_DP) {
-        val scale = SMALL_SOURCE_DISPLAY_EXTENT_DP / destinationShort
-        width *= scale
-        height *= scale
-    }
-    return width to height
-}
+/** Sources smaller than the frame are shown at 192 dp instead of being upscaled to fill it. */
+internal const val SMALL_SOURCE_DISPLAY_EXTENT_DP = 192f
 
 /** Sizing modifier for the optimistic and confirmed single-image or video frame. */
 @Composable
@@ -98,12 +80,8 @@ internal fun imageBubbleSizing(
     return Modifier.width(width.dp).height(height.dp)
 }
 
-/** The shorter pixel side from an imeta `dim` ("WxH"), for the small-source rule. */
-internal fun sourceShortSideFromDim(dim: String?): Int? {
-    val parts = dim?.split('x', 'X', ignoreCase = true)?.takeIf { it.size == 2 } ?: return null
-    val sides = parts.mapNotNull { part -> part.trim().toIntOrNull()?.takeIf { it > 0 } }
-    return if (sides.size == 2) sides.min() else null
-}
+/** The prototype dims an album's overflow tile this far before drawing its "+N" label. */
+private const val ALBUM_OVERFLOW_SCRIM_ALPHA = 0.58f
 
 /**
  * Decode an imeta `thumbhash` field into a tiny ARGB ImageBitmap, cached
@@ -132,21 +110,6 @@ internal fun rememberThumbhashImage(thumbhash: String?): ImageBitmap? {
                 }
         }
     return state.value
-}
-
-/**
- * Parse the imeta `dim` field ("WxH") into a width/height aspect ratio.
- * Returns null when [dim] is null, blank, malformed, or non-positive on
- * either axis. Caller falls back to [MediaBubbleHeight] in that case.
- */
-internal fun aspectRatioFromDim(dim: String?): Float? {
-    if (dim.isNullOrBlank()) return null
-    val parts = dim.split('x', 'X', ignoreCase = true)
-    if (parts.size != 2) return null
-    val w = parts[0].trim().toIntOrNull() ?: return null
-    val h = parts[1].trim().toIntOrNull() ?: return null
-    if (w <= 0 || h <= 0) return null
-    return w.toFloat() / h.toFloat()
 }
 
 internal fun initialMediaBubbleAspectRatio(dim: String?): Float? = aspectRatioFromDim(dim)
@@ -318,6 +281,9 @@ internal fun MediaImageBubble(
         dispatchOpen = ::dispatchViewerOpen,
     )
 
+    // A GIF is framed by the prototype's fixed banner instead of its own aspect ratio.
+    val gifFrame =
+        isGifAttachmentMediaType(reference.mediaType) || presentation is DecodedAttachmentPresentation.Animated
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = ConversationRichContentShape,
@@ -326,7 +292,14 @@ internal fun MediaImageBubble(
         // width. Used by both the confirmed bubble and the optimistic
         // upload-phase bubble so the optimistic → confirmed swap is a
         // visual no-op.
-        modifier = imageBubbleSizing(bubbleAspectRatio),
+        modifier =
+            if (gifFrame) {
+                Modifier
+                    .width(ConversationMessageMetrics.RichContentCanvasWidth)
+                    .height(ConversationMessageMetrics.GifHeight)
+            } else {
+                imageBubbleSizing(bubbleAspectRatio, sourceShortSideFromDim(reference.dim))
+            },
     ) {
         Box(contentAlignment = Alignment.Center) {
             val downloadLabel = stringResource(R.string.media_tap_to_download)
@@ -793,13 +766,13 @@ internal fun MediaImageGridTile(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = ScrimAlpha.TILE)),
+                        .background(Color.Black.copy(alpha = ALBUM_OVERFLOW_SCRIM_ALPHA)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = "+$overflowCount",
                     color = Color.White,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
             }

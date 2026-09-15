@@ -105,6 +105,7 @@ class PersonProfileScreenshotTest {
                         scroll = rememberScrollState(),
                         follow = follow,
                         busy = busy,
+                        fromGroup = false,
                         canPromote = true,
                         showSharedGroups = true,
                         copied = false,

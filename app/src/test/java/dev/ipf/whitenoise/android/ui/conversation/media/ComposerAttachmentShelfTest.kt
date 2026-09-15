@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertWidthIsEqualTo
@@ -146,7 +147,7 @@ class ComposerAttachmentShelfTest {
             WhiteNoiseTheme {
                 ComposerAttachmentShelfCard(
                     label = "A.pdf",
-                    visual = false,
+                    kind = ComposerAttachmentCardKind.File,
                     video = false,
                     bitmap = null,
                     onPreview = { previews++ },
@@ -156,11 +157,60 @@ class ComposerAttachmentShelfTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("pending.card").assertIsNotEnabled()
+        composeRule.onNodeWithTag("pending.card").assertHasNoClickAction()
         composeRule
             .onNodeWithContentDescription(context.getString(R.string.media_attachment_remove) + ": A.pdf")
             .assertIsNotEnabled()
         assertEquals(0, previews)
         assertEquals(0, removals)
+    }
+
+    /** Only visual cards open the preview; file and contact cards carry no click action at all. */
+    @Test
+    fun onlyVisualCardsOpenThePreview() {
+        var previews = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(Modifier.width(360.dp)) {
+                    androidx.compose.foundation.layout.Row {
+                        ComposerAttachmentShelfCard(
+                            label = "photo.jpg",
+                            kind = ComposerAttachmentCardKind.Visual,
+                            video = false,
+                            bitmap = null,
+                            onPreview = { previews++ },
+                            onRemove = {},
+                            modifier = Modifier.testTag("visual.card"),
+                        )
+                        ComposerAttachmentShelfCard(
+                            label = "card.vcf",
+                            kind = ComposerAttachmentCardKind.Contact,
+                            video = false,
+                            bitmap = null,
+                            onPreview = { previews++ },
+                            onRemove = {},
+                            modifier = Modifier.testTag("contact.card"),
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.onNodeWithTag("contact.card").assertHasNoClickAction()
+        composeRule
+            .onNodeWithTag("contact.card")
+            .assertHeightIsEqualTo(72.dp)
+            .assertWidthIsEqualTo(104.dp)
+        composeRule.onNodeWithTag("visual.card").performClick()
+        assertEquals(1, previews)
+    }
+
+    /** Card geometry and the shelf height follow the prototype table for every kind. */
+    @Test
+    fun cardGeometryFollowsThePrototypeTable() {
+        assertEquals(149 to 112, composerAttachmentCardSize(ComposerAttachmentCardKind.Visual))
+        assertEquals(104 to 72, composerAttachmentCardSize(ComposerAttachmentCardKind.Contact))
+        assertEquals(160 to 72, composerAttachmentCardSize(ComposerAttachmentCardKind.File))
+        assertEquals(128, composerShelfHeight(hasVisualAttachment = true))
+        assertEquals(88, composerShelfHeight(hasVisualAttachment = false))
     }
 }

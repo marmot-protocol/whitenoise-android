@@ -214,6 +214,7 @@ internal fun MediaVideoGridTile(
         mutableStateOf(controller.thumbnailFor(messageIdHex, attachmentIndex)?.asImageBitmap())
     }
     var failed by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(false) }
+    var tileDurationMs by remember(messageIdHex, attachmentIndex, epoch) { mutableLongStateOf(0L) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
     val policyAllowsMaterialization =
@@ -308,26 +309,39 @@ internal fun MediaVideoGridTile(
 
     LaunchedEffect(localFile) {
         val f = localFile ?: return@LaunchedEffect
-        if (posterBitmap != null) return@LaunchedEffect
-        val frame =
+        if (posterBitmap != null && tileDurationMs > 0L) return@LaunchedEffect
+        val needsPoster = posterBitmap == null
+        val (frame, duration) =
             withContext(Dispatchers.IO) {
                 val mmr = android.media.MediaMetadataRetriever()
                 try {
                     mmr.setDataSource(f.absolutePath)
                     val edge = MediaPipeline.THUMBNAIL_MAX_EDGE_PX
-                    mmr.getScaledFrameAtTime(
-                        0L,
-                        android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                        edge,
-                        edge,
-                    )
+                    val bitmap =
+                        if (needsPoster) {
+                            mmr.getScaledFrameAtTime(
+                                0L,
+                                android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                                edge,
+                                edge,
+                            )
+                        } else {
+                            null
+                        }
+                    bitmap to
+                        (
+                            mmr
+                                .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                ?.toLongOrNull() ?: 0L
+                        )
                 } catch (t: Throwable) {
-                    null
+                    null to 0L
                 } finally {
                     runCatching { mmr.release() }
                 }
             }
-        if (frame != null) {
+        if (duration > 0L) tileDurationMs = duration
+        if (frame != null && posterBitmap == null) {
             // Cache under the epoch-independent slot so a later sourceEpoch
             // upgrade re-seeds the poster instead of flashing the thumbhash.
             controller.cacheThumbnail(messageIdHex, attachmentIndex, frame)
@@ -401,12 +415,44 @@ internal fun MediaVideoGridTile(
                 }
             }
         }
+        // The prototype's duration chip sits bottom-end, once the duration is known.
+        if (tileDurationMs > 0L) {
+            Surface(
+                color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = VIDEO_DURATION_CHIP_ALPHA),
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                shape = MaterialTheme.shapes.extraSmall,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(VIDEO_DURATION_CHIP_INSET),
+            ) {
+                Text(
+                    formatVoiceTime(tileDurationMs.toInt()),
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                )
+            }
+        }
+        // An unplayable clip is dimmed and badged rather than left looking merely slow.
+        if (failed) {
+            Box(
+                modifier =
+                    Modifier
+                        .matchParentSize()
+                        .background(Color.Black.copy(alpha = VIDEO_UNAVAILABLE_SCRIM_ALPHA)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_warning),
+                    contentDescription = stringResource(R.string.voice_message_failed),
+                    modifier = Modifier.size(VIDEO_UNAVAILABLE_GLYPH),
+                    tint = MaterialTheme.colorScheme.inverseOnSurface,
+                )
+            }
+        }
         if (overflowCount > 0) {
             Box(
                 modifier =
                     Modifier
                         .matchParentSize()
-                        .background(Color.Black.copy(alpha = ScrimAlpha.CONTROLS)),
+                        .background(Color.Black.copy(alpha = ALBUM_OVERFLOW_SCRIM_ALPHA)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -1299,3 +1345,11 @@ private fun VideoViewerUnavailable(
 private val VIDEO_PLAY_DISC_SIZE = 44.dp
 private const val VIDEO_PLAY_DISC_ALPHA = 0.88f
 private const val VIDEO_DURATION_CHIP_ALPHA = 0.8f
+private val VIDEO_DURATION_CHIP_INSET = 6.dp
+
+/** Album overflow tiles share one dim across photos and videos. */
+private const val ALBUM_OVERFLOW_SCRIM_ALPHA = 0.58f
+
+/** An unavailable clip keeps its poster readable under a light dim and a warning glyph. */
+private const val VIDEO_UNAVAILABLE_SCRIM_ALPHA = 0.28f
+private val VIDEO_UNAVAILABLE_GLYPH = 28.dp

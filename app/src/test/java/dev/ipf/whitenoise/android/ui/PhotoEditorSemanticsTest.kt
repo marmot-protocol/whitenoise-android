@@ -150,7 +150,7 @@ class PhotoEditorSemanticsTest {
         composeRule.onNodeWithContentDescription(string(R.string.photo_editor_crop)).performClick()
         composeRule.onNodeWithContentDescription(string(R.string.photo_editor_rotate_clockwise)).performClick()
 
-        composeRule.onNodeWithContentDescription(string(R.string.cancel)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.close)).performClick()
         composeRule.onNodeWithText(string(R.string.photo_editor_discard_title)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.photo_editor_discard)).performClick()
 
@@ -181,7 +181,7 @@ class PhotoEditorSemanticsTest {
     fun largeTextKeepsPrimaryActionsAndToolEscapeVisible() {
         render(fontScale = 2f)
 
-        composeRule.onNodeWithContentDescription(string(R.string.cancel)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.close)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.save)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.photo_editor_crop)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.photo_editor_draw)).assertIsDisplayed()

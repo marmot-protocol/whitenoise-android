@@ -37,7 +37,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -105,7 +104,6 @@ import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
-import dev.ipf.whitenoise.android.ui.chats.newchat.FlowQuickActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
@@ -573,7 +571,7 @@ internal fun GroupDetailsScreen(
     if (showMuteDurationDialog) {
         MuteDurationDialog(
             onDismiss = { showMuteDurationDialog = false },
-            onConfirm = { target ->
+            onSelect = { target ->
                 showMuteDurationDialog = false
                 when (target) {
                     is MuteTarget.After ->
@@ -932,8 +930,8 @@ internal fun GroupDetailsScreen(
     val memberContent: @Composable () -> Unit = {
         if (!isDm) {
             // Keep the member header, add action, identities and technical
-            // info in one contiguous list section. ContactRow/FlowQuickActionRow
-            // already provide Material touch heights and internal padding.
+            // info in one contiguous list section. ContactRow already provides
+            // Material touch heights and internal padding.
             Column {
                 if (!rosterReady) {
                     GroupRosterLoadStatus(
@@ -976,16 +974,6 @@ internal fun GroupDetailsScreen(
                                 Modifier
                                     .padding(horizontal = Dimens.spaceLg)
                                     .padding(bottom = Dimens.spaceSm),
-                        )
-                    }
-                    if (membersExpanded && canEdit) {
-                        FlowQuickActionRow(
-                            icon = Icons.Default.PersonAdd,
-                            title = stringResource(R.string.add_member),
-                            enabled = !mutationsBlocked,
-                            onClick = {
-                                showAddMember = true
-                            },
                         )
                     }
                     // #612: render members in a deterministic order — you first,
@@ -1053,6 +1041,11 @@ internal fun GroupDetailsScreen(
                         val rowMutationPending =
                             controller.isMemberMutationPending(member.memberIdHex) ||
                                 activeMutation?.target == member.memberIdHex
+                        // Only another member with a presentable identity has a profile to
+                        // open, so self and unresolved rows stay inert and chevron-free.
+                        val profileNpub =
+                            if (isSelfRow) "" else appState.npubForDisplay(member.memberIdHex)
+                        val opensProfile = profileNpub.isNotBlank()
                         ChatInfoMemberCard(
                             index = index,
                             count = visibleMembers.size,
@@ -1065,8 +1058,7 @@ internal fun GroupDetailsScreen(
                                     } else {
                                         controller.memberDisplayName(member)
                                     },
-                                subtitle =
-                                    stringResource(if (controller.isAdmin(member)) R.string.admin else R.string.member),
+                                subtitle = memberRoleLabel(controller.isAdmin(member), rowMutationPending),
                                 avatarSeed = member.memberIdHex,
                                 avatarUrl = controller.memberAvatarUrl(member),
                                 modifier =
@@ -1075,10 +1067,15 @@ internal fun GroupDetailsScreen(
                                     } else {
                                         Modifier
                                     },
-                                onClick = { appState.presentProfile(appState.npub(member.memberIdHex)) },
+                                onClick =
+                                    if (opensProfile) {
+                                        { appState.presentProfile(profileNpub) }
+                                    } else {
+                                        null
+                                    },
                                 trailing =
-                                    if (rowMutationPending) {
-                                        { GroupMemberMutationStatus(isAdmin = false, inProgress = true) }
+                                    if (opensProfile) {
+                                        { ChatInfoRowChevron() }
                                     } else {
                                         null
                                     },
@@ -1097,7 +1094,7 @@ internal fun GroupDetailsScreen(
                                     .testTag("chat_info.all_members"),
                         ) {
                             row("all_members") { rowContext ->
-                                SettingsAction(
+                                SettingsLink(
                                     context = rowContext,
                                     title = stringResource(R.string.see_all_members),
                                     onClick = { membersExpanded = true },
@@ -1469,7 +1466,7 @@ internal fun GroupDetailsScreen(
             /** Add to Folder row. */
             fun SettingsGroupScope.folderRow() {
                 row("folders") { rowContext ->
-                    SettingsAction(
+                    SettingsLink(
                         context = rowContext,
                         title = stringResource(R.string.chat_add_folder),
                         onClick = { showFolderPicker = true },
