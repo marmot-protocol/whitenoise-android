@@ -30,6 +30,7 @@ private val DarkPrimaryContainer = Color(0xFF404040)
 private val AmoledPrimary = Color.White
 private val AmoledPrimaryContainer = Color.Black
 
+/** The colour scheme WhiteNoiseTheme resolves for light, dark, AMOLED, dynamic and accented configurations. */
 class WhiteNoiseThemeTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -67,6 +68,7 @@ class WhiteNoiseThemeTest {
         }
     }
 
+    /** A custom accent over dynamic colour drives every primary role and the surface tint. */
     @Test
     fun customAccentDrivesPrimaryRolesAndSurfaceTint() {
         var scheme: ColorScheme? = null
@@ -94,6 +96,7 @@ class WhiteNoiseThemeTest {
         }
     }
 
+    /** Dynamic colour without an accent keeps the platform's primary roles untouched. */
     @Test
     @SdkSuppress(minSdkVersion = Build.VERSION_CODES.S)
     fun dynamicPrimaryRolesArePreservedWithoutCustomAccent() {
@@ -256,6 +259,7 @@ class WhiteNoiseThemeTest {
         }
     }
 
+    /** Captures the accent in every theme and checks inversePrimary stays readable on inverseSurface. */
     private fun assertInversePrimaryContrast(
         accent: Color,
         expectedAmoledAccent: Color,
@@ -288,6 +292,7 @@ private data class CapturedSchemes(
     var amoled: ColorScheme? = null,
 )
 
+/** Composes the light, dark and AMOLED themes with one accent and records their schemes. */
 @Composable
 private fun CaptureAccentSchemes(
     accent: Color,
@@ -308,4 +313,5 @@ private fun CaptureAccentSchemes(
     }
 }
 
+/** Opaque ARGB value of a colour. */
 private fun Color.toOpaqueArgb(): Long = toArgb().toLong() and OPAQUE_ARGB_MASK

@@ -43,6 +43,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
+/** Shell navigation on a real device: avatar entry, startup and loading surfaces, and conversation routing. */
 class AppNavigationTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -73,6 +74,7 @@ class AppNavigationTest {
         composeRule.runOnIdle { assertEquals(1, settingsClicks) }
     }
 
+    /** Without unread, the avatar description names only the settings action and the account. */
     @Test
     fun avatarWithoutUnreadDoesNotAnnounceUnread() {
         composeRule.setContent {
@@ -94,6 +96,7 @@ class AppNavigationTest {
             .assertDoesNotExist()
     }
 
+    /** With unread, the avatar description announces that this account has unread messages. */
     @Test
     fun avatarWithUnreadAnnouncesThisAccountUnread() {
         composeRule.setContent {
@@ -133,6 +136,7 @@ class AppNavigationTest {
         composeRule.runOnIdle { assertEquals(1, backClicks) }
     }
 
+    /** The bare loading screen carries no branding copy or logo. */
     @Test
     fun loadingScreenHasNoBrandingText() {
         // LoadingScreen is a bare centered spinner — no branding text. Its visual
@@ -243,6 +247,7 @@ class AppNavigationTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    /** One running local account with no engine behind it, enough for the shell to compose. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -262,6 +267,7 @@ class AppNavigationTest {
             activeAccountRef = ACCOUNT_REF,
         )
 
+    /** Waits until the shell has bound a chats controller to the test account and it has finished loading. */
     private fun awaitAttachedChatsController(appState: WhiteNoiseAppState): ChatsController {
         var controller: ChatsController? = null
         composeRule.waitUntil(timeoutMillis = 5_000) {
@@ -271,6 +277,7 @@ class AppNavigationTest {
         return requireNotNull(controller)
     }
 
+    /** Reads the shell's private chats controller reflectively; null until the shell attaches one. */
     private fun attachedChatsController(appState: WhiteNoiseAppState): ChatsController? {
         val field = WhiteNoiseAppState::class.java.getDeclaredField("chatsController").apply { isAccessible = true }
         return field.get(appState) as? ChatsController
@@ -307,6 +314,7 @@ class AppNavigationTest {
         return headers.isNotEmpty()
     }
 
+    /** Applies one synthetic chat-list row so the list shows a group without an engine. */
     private fun seedGroup(
         controller: ChatsController,
         groupId: String,
@@ -314,6 +322,7 @@ class AppNavigationTest {
         activity: ULong,
     ) = controller.applyChatListRow(chatRow(groupId, name, activity))
 
+    /** A stable member group row with the given activity time and no messages. */
     private fun chatRow(
         groupId: String,
         name: String,
@@ -351,9 +360,12 @@ class AppNavigationTest {
         disbandRequest = null,
     )
 
+    /** Draft persistence that keeps nothing, so the test never touches real storage. */
     private object DiscardedDrafts : DraftPersistence {
+        /** No drafts are ever restored. */
         override fun read(): Map<String, String> = emptyMap()
 
+        /** Writes are dropped. */
         override fun write(
             key: String,
             value: String?,
