@@ -24,6 +24,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+@PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class WarmResumeFirstUsefulFrameTest {
     @get:Rule

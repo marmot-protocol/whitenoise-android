@@ -31,6 +31,7 @@ import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MarkdownListItemFfi
 import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
@@ -69,6 +70,7 @@ import java.util.Locale
  * Offsets are taken from the projection the app itself built, which is exactly
  * the coordinate space engine callbacks arrive in.
  */
+@PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class TtsRichLeafPlacementAndroidTest {
     @get:Rule

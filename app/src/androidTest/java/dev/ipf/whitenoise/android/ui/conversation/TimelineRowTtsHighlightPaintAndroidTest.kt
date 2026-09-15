@@ -32,6 +32,7 @@ import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MarkdownListItemFfi
 import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
@@ -69,6 +70,7 @@ import java.util.Locale
  * row and compares rendered pixels, so a highlight that never reaches the
  * screen fails here.
  */
+@PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class TimelineRowTtsHighlightPaintAndroidTest {
     @get:Rule

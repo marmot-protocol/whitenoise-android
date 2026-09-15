@@ -29,6 +29,7 @@ import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -61,6 +62,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * docs/notification-haptic-visual-timing.md. The #2453 scenarios additionally
  * verify callback payload order and silent same-key correction semantics.
  */
+@PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class NotificationHapticVisualTimingDeviceTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
