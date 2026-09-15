@@ -167,7 +167,11 @@ internal fun DevicePrivacyScreen(
                             busy = auditLogsBusy,
                             icon = Icons.Filled.Article,
                             onCheckedChange = { enabled ->
-                                if (enabled) confirmAuditUpload = true else runAuditMutation { appState.setAuditLogsEnabled(false) }
+                                if (enabled) {
+                                    confirmAuditUpload = true
+                                } else {
+                                    runAuditMutation { appState.setAuditLogsEnabled(false) }
+                                }
                             },
                         )
                     }

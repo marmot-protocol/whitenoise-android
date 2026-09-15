@@ -30,11 +30,16 @@ internal class AuditUploadConsent(
         requiresChoice = false
     }
 
-    /** Runs before native startup, including background startup; an old local-log choice cannot authorize uploads. */
+    /**
+     * Runs before native startup, including background startup.
+     * An old local-log choice cannot authorize uploads.
+     */
     suspend fun prepare(runtime: MarmotInterface) {
         runtime.configureAuditRuntime(uploadConsentGranted = false)
         if (!granted && runtime.auditLogSettings().enabled) {
-            check(preferences.edit().putBoolean(renewalKey, true).commit()) { "Could not save audit disclosure renewal" }
+            check(preferences.edit().putBoolean(renewalKey, true).commit()) {
+                "Could not save audit disclosure renewal"
+            }
             requiresChoice = true
             runtime.setAuditLogSettings(runtime.auditLogSettings().copy(enabled = false))
         }

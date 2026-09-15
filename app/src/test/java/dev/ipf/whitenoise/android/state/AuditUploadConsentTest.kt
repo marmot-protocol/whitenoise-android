@@ -19,7 +19,10 @@ import java.lang.reflect.Proxy
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class AuditUploadConsentTest {
-    private val preferences = ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("audit-consent-test", Context.MODE_PRIVATE)
+    private val preferences =
+        ApplicationProvider
+            .getApplicationContext<Context>()
+            .getSharedPreferences("audit-consent-test", Context.MODE_PRIVATE)
 
     @Test
     fun oldLocalLoggingChoiceIsDisabledBeforeStartupAndRenewalSurvivesRestart() =
@@ -87,7 +90,10 @@ class AuditUploadConsentTest {
     ) {
         val mutations = mutableListOf<String>()
         val runtime =
-            Proxy.newProxyInstance(MarmotInterface::class.java.classLoader, arrayOf(MarmotInterface::class.java)) { _, method, args ->
+            Proxy.newProxyInstance(
+                MarmotInterface::class.java.classLoader,
+                arrayOf(MarmotInterface::class.java),
+            ) { _, method, args ->
                 when (method.name) {
                     "setAuditLogTrackerConfig" ->
                         (args!![0] as AuditLogTrackerConfigV4Ffi).also {

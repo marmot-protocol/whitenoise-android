@@ -40,7 +40,8 @@ class PendingSetupStartupReadinessTest {
             try {
                 fixture.bootstrap()
                 assertEquals(AppPhase.Onboarding, fixture.appState.phase)
-                phaseAtPrivacyRead.set(null) // Observe the first read during setup completion, before later reconfiguration.
+                // Observe setup completion before later runtime reconfiguration.
+                phaseAtPrivacyRead.set(null)
                 val controller = requireNotNull(fixture.appState.accountSetup.controller)
                 fixture.runWithMainLooperPumping {
                     withTimeout(5_000L) {

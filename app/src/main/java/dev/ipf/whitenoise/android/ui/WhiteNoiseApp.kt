@@ -343,7 +343,9 @@ internal fun WhiteNoiseApp(
         appState.auditUploadConsentRequired,
         appState.diagnostics.snapshot,
     ) {
-        if (diagnosticsPromptOpen || appState.diagnostics.requiresChoice || appState.auditUploadConsentRequired) return@LaunchedEffect
+        if (diagnosticsPromptOpen || appState.diagnostics.requiresChoice || appState.auditUploadConsentRequired) {
+            return@LaunchedEffect
+        }
         if (appState.diagnostics.snapshot == null) return@LaunchedEffect
         if (appState.phase != AppPhase.Ready || appState.appLockScreenVisible) return@LaunchedEffect
         appState.refreshLocalNotificationPermission()

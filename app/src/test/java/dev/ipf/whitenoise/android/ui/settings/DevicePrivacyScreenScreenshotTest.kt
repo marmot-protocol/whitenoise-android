@@ -104,6 +104,7 @@ class DevicePrivacyScreenScreenshotTest {
         composeRule.onAllNodes(isToggleable())[1].assertIsOff()
         assertTrue(state.auditUploadConsentRequired)
         composeRule.onNodeWithText("Done").performClick()
+        composeRule.waitUntil(5_000L) { !state.auditUploadConsentRequired }
         composeRule.waitForIdle()
         assertFalse(state.auditUploadConsentRequired)
         assertEquals(UsageDiagnosticsDecisionFfi.GRANTED, state.usageDiagnosticsSettings?.decision)

@@ -42,7 +42,10 @@ class AuditUploadConsentScreenshotTest {
         var confirmations = 0
         var cancellations = 0
         composeRule.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(1f, fontScale), LocalLayoutDirection provides direction) {
+            CompositionLocalProvider(
+                LocalDensity provides Density(1f, fontScale),
+                LocalLayoutDirection provides direction,
+            ) {
                 WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
                     AuditUploadConsentContent(onDismiss = { cancellations++ }, onConfirm = { confirmations++ })
                 }

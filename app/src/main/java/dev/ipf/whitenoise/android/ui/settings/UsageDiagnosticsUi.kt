@@ -183,7 +183,9 @@ internal fun UsageDiagnosticsPrompt(
                     appState.launchMutation {
                         if (state.busy || state.failed) return@launchMutation
                         if (state.snapshot == null) return@launchMutation
-                        if (appState.auditUploadConsentRequired && !appState.setAuditLogsEnabled(false)) return@launchMutation
+                        if (appState.auditUploadConsentRequired && !appState.setAuditLogsEnabled(false)) {
+                            return@launchMutation
+                        }
                         if (!state.requiresChoice || appState.setTelemetryEnabled(false)) onDone()
                     }
                 },
@@ -271,7 +273,9 @@ internal fun AuditUploadConsentContent(
             TextButton(modifier = Modifier.fillMaxWidth(), onClick = onConfirm) {
                 Text(stringResource(R.string.audit_upload_confirm))
             }
-            TextButton(modifier = Modifier.fillMaxWidth(), onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(modifier = Modifier.fillMaxWidth(), onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
         }
     }
 }

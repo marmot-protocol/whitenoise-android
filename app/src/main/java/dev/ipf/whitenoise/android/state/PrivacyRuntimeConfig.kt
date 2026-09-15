@@ -17,7 +17,8 @@ internal suspend fun MarmotInterface.configureTelemetryRuntime() {
                 RelayTelemetryResourceFfi(
                     serviceVersion = telemetryServiceVersion(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
                     serviceInstanceId = installId,
-                    deploymentEnvironment = telemetryDeploymentEnvironment(BuildConfig.WHITENOISE_DEPLOYMENT_ENVIRONMENT),
+                    deploymentEnvironment =
+                        telemetryDeploymentEnvironment(BuildConfig.WHITENOISE_DEPLOYMENT_ENVIRONMENT),
                     tenant = BuildConfig.WHITENOISE_TELEMETRY_TENANT.ifBlank { "whitenoise-android" },
                     osType = "linux",
                     osVersion = Build.VERSION.RELEASE.ifBlank { Build.VERSION.SDK_INT.toString() },
