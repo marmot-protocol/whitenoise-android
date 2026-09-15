@@ -418,30 +418,88 @@ class ConversationDictationControllerTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun authoritativeValidationFailureRetainsPasteAndSendResults() =
+    fun authoritativeRemovalAndIndeterminateValidationRetainPasteAndSendResults() =
         runTest {
-            listOf<(ConversationDictationController) -> Unit>(
-                { it.paste() },
-                { it.send() },
-            ).forEach { finish ->
+            listOf(
+                ConversationDictationTargetValidation.DefinitelyRemoved,
+                ConversationDictationTargetValidation.Indeterminate,
+            ).forEach { validation ->
+                listOf<(ConversationDictationController) -> Unit>(
+                    { it.paste() },
+                    { it.send() },
+                ).forEach { finish ->
+                    val fixture =
+                        fixture(
+                            draft = TextFieldValue("Keep", TextRange(4)),
+                            targetValidator = { _, _ -> validation },
+                            targetValidationScope = this,
+                        )
+                    fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+                    fixture.platform.listener.onReady()
+
+                    finish(fixture.controller)
+                    fixture.platform.listener.onResult("recover me")
+                    advanceUntilIdle()
+
+                    assertEquals("Keep", fixture.drafts.getValue(key()).text)
+                    assertEquals(0, fixture.writes)
+                    val review = fixture.controller.state as ConversationDictationState.ReviewRequired
+                    assertEquals("recover me", review.transcript)
+                }
+            }
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun authoritativeValidationExceptionAndTimeoutRetainCompletedResults() =
+        runTest {
+            val validators =
+                listOf<suspend (String, String) -> ConversationDictationTargetValidation>(
+                    { _, _ -> error("MDK validation failed") },
+                    { _, _ -> CompletableDeferred<ConversationDictationTargetValidation>().await() },
+                )
+            validators.forEach { validator ->
                 val fixture =
                     fixture(
                         draft = TextFieldValue("Keep", TextRange(4)),
-                        targetValidator = { _, _ -> false },
+                        targetValidator = validator,
                         targetValidationScope = this,
                     )
                 fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
-                fixture.platform.listener.onReady()
-
-                finish(fixture.controller)
+                fixture.controller.send()
                 fixture.platform.listener.onResult("recover me")
                 advanceUntilIdle()
 
                 assertEquals("Keep", fixture.drafts.getValue(key()).text)
-                assertEquals(0, fixture.writes)
                 val review = fixture.controller.state as ConversationDictationState.ReviewRequired
                 assertEquals("recover me", review.transcript)
             }
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun interruptedProviderActivityValidationRetainsResultAndFencesLateSuccess() =
+        runTest {
+            val validation = CompletableDeferred<ConversationDictationTargetValidation>()
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Keep", TextRange(4)),
+                    targetValidator = { _, _ -> validation.await() },
+                    targetValidationScope = this,
+                )
+            fixture.controller.requestProviderActivityStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.controller.beginProviderActivityLaunch(fixture.controller.providerActivityRequestId)
+            fixture.controller.onProviderActivityResult("recover me")
+            runCurrent()
+
+            fixture.controller.onAppBackgrounded()
+            validation.complete(ConversationDictationTargetValidation.Available)
+            advanceUntilIdle()
+
+            assertEquals("Keep", fixture.drafts.getValue(key()).text)
+            assertEquals(0, fixture.writes)
+            val review = fixture.controller.state as ConversationDictationState.ReviewRequired
+            assertEquals("recover me", review.transcript)
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -452,7 +510,13 @@ class ConversationDictationControllerTest {
             val fixture =
                 fixture(
                     draft = TextFieldValue("Original anchor", TextRange(8)),
-                    targetValidator = { _, _ -> targetExists },
+                    targetValidator = { _, _ ->
+                        if (targetExists) {
+                            ConversationDictationTargetValidation.Available
+                        } else {
+                            ConversationDictationTargetValidation.DefinitelyRemoved
+                        }
+                    },
                     targetValidationScope = this,
                 )
             fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
@@ -512,7 +576,7 @@ class ConversationDictationControllerTest {
                     platform = platform,
                     targetValidator = { _, _ ->
                         events += "validate"
-                        true
+                        ConversationDictationTargetValidation.Available
                     },
                     targetValidationScope = this,
                     onBeforeRecognition = { events += "pause" },
@@ -632,7 +696,7 @@ class ConversationDictationControllerTest {
                         platform = platform,
                         targetValidator = { _, _ ->
                             events += "validate"
-                            true
+                            ConversationDictationTargetValidation.Available
                         },
                         targetValidationScope = this,
                         onAfterAudioCapture = { events += "resume" },
@@ -892,7 +956,7 @@ class ConversationDictationControllerTest {
             val fixture =
                 fixture(
                     draft = TextFieldValue("Keep", TextRange(4)),
-                    targetValidator = { _, _ -> false },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.DefinitelyRemoved },
                     targetValidationScope = this,
                 )
             fixture.controller.requestProviderActivityStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
@@ -1828,7 +1892,7 @@ class ConversationDictationControllerTest {
             val fixture =
                 fixture(
                     draft = TextFieldValue("Draft", TextRange(5)),
-                    targetValidator = { _, _ -> true },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
                     deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     sendTranscriptIfOriginUnchanged = { request ->
@@ -1860,7 +1924,7 @@ class ConversationDictationControllerTest {
             val fixture =
                 fixture(
                     draft = TextFieldValue("Draft", TextRange(5)),
-                    targetValidator = { _, _ -> true },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
                     deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     sendTranscriptIfOriginUnchanged = { request ->
@@ -1888,7 +1952,7 @@ class ConversationDictationControllerTest {
             val fixture =
                 fixture(
                     draft = TextFieldValue("Draft", TextRange(5)),
-                    targetValidator = { _, _ -> true },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
                     deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     sendTranscriptIfOriginUnchanged = { request ->
@@ -1965,7 +2029,7 @@ class ConversationDictationControllerTest {
             val fixture =
                 fixture(
                     draft = TextFieldValue("Draft", TextRange(5)),
-                    targetValidator = { _, _ -> true },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
                     deliveryMode = { ConversationDictationDeliveryMode.PasteIntoDraft },
                     sendTranscriptIfOriginUnchanged = { request ->
@@ -2125,7 +2189,7 @@ class ConversationDictationControllerTest {
             val fixture =
                 fixture(
                     draft = TextFieldValue("Draft", TextRange(5)),
-                    targetValidator = { _, _ -> true },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
                     deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     stopDurableSession = { durableStops += 1 },
@@ -2162,7 +2226,7 @@ class ConversationDictationControllerTest {
             val rejected =
                 fixture(
                     draft = TextFieldValue("Draft", TextRange(5)),
-                    targetValidator = { _, _ -> true },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
                     deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     sendTranscriptIfOriginUnchanged = {
@@ -2182,7 +2246,7 @@ class ConversationDictationControllerTest {
             val edited =
                 fixture(
                     draft = TextFieldValue("Draft", TextRange(5)),
-                    targetValidator = { _, _ -> true },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
                     deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     sendTranscriptIfOriginUnchanged = {
@@ -2389,7 +2453,10 @@ class ConversationDictationControllerTest {
         removed.platform.listener.onResult("retained")
         targetPresent = false
         removed.scheduler.advanceBy(250L)
-        assertTrue(removed.controller.state is ConversationDictationState.Idle)
+        assertEquals(
+            "retained",
+            (removed.controller.state as ConversationDictationState.ReviewRequired).transcript,
+        )
         assertEquals(1, removed.platform.sessions.size)
 
         val revoked = fixture(draft = TextFieldValue(""))
@@ -2429,7 +2496,7 @@ class ConversationDictationControllerTest {
             )
         }
         replaced.scheduler.advanceBy(250L)
-        assertTrue(replaced.controller.isOwnedBy(OTHER_ACCOUNT, OTHER_GROUP))
+        assertTrue(replaced.controller.isOwnedBy(ACCOUNT, GROUP))
         assertEquals(2, replaced.platform.sessions.size)
     }
 
@@ -2870,6 +2937,42 @@ class ConversationDictationControllerTest {
     }
 
     @Test
+    fun differentTargetCannotReplaceRecognizedOrReviewText() {
+        val accumulated = fixture(draft = TextFieldValue("Source", TextRange(6)))
+        accumulated.drafts[OTHER_ACCOUNT to OTHER_GROUP] = TextFieldValue("Other", TextRange(5))
+        accumulated.controller.requestStart(ACCOUNT, GROUP, accumulated.drafts.getValue(key()))
+        accumulated.platform.listener.onResult("recover me")
+
+        assertFalse(
+            accumulated.controller.requestStart(
+                OTHER_ACCOUNT,
+                OTHER_GROUP,
+                accumulated.drafts.getValue(OTHER_ACCOUNT to OTHER_GROUP),
+            ),
+        )
+        assertTrue(accumulated.controller.isOwnedBy(ACCOUNT, GROUP))
+
+        val review = fixture(draft = TextFieldValue("Source", TextRange(6)))
+        review.drafts[OTHER_ACCOUNT to OTHER_GROUP] = TextFieldValue("Other", TextRange(5))
+        review.controller.requestStart(ACCOUNT, GROUP, review.drafts.getValue(key()))
+        review.edit(key(), TextFieldValue("Changed", TextRange(7)))
+        review.controller.stop()
+        review.platform.listener.onResult("recover me")
+
+        assertFalse(
+            review.controller.requestStart(
+                OTHER_ACCOUNT,
+                OTHER_GROUP,
+                review.drafts.getValue(OTHER_ACCOUNT to OTHER_GROUP),
+            ),
+        )
+        assertEquals(
+            "recover me",
+            (review.controller.state as ConversationDictationState.ReviewRequired).transcript,
+        )
+    }
+
+    @Test
     fun targetRemovalProactivelyReleasesRecognitionAndIgnoresLateResult() {
         val fixture = fixture(draft = TextFieldValue("Keep", TextRange(4)))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
@@ -2883,6 +2986,35 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         assertEquals(1, fixture.platform.session.cancelCalls)
         assertEquals(1, fixture.platform.session.destroyCalls)
+    }
+
+    @Test
+    fun targetRemovalRetainsAlreadyRecognizedTextForCopy() {
+        val fixture = fixture(draft = TextFieldValue("Keep", TextRange(4)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("recover me")
+
+        fixture.controller.onTargetRemoved(ACCOUNT, GROUP)
+
+        assertEquals("Keep", fixture.drafts.getValue(key()).text)
+        assertEquals(0, fixture.writes)
+        val review = fixture.controller.state as ConversationDictationState.ReviewRequired
+        assertEquals("recover me", review.transcript)
+        assertEquals(1, fixture.platform.session.destroyCalls)
+    }
+
+    @Test
+    fun targetRemovalDoesNotDiscardTextAlreadyAwaitingReview() {
+        val fixture = fixture(draft = TextFieldValue("Keep", TextRange(4)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.edit(key(), TextFieldValue("Changed", TextRange(7)))
+        fixture.controller.stop()
+        fixture.platform.listener.onResult("recover me")
+
+        fixture.controller.onTargetRemoved(ACCOUNT, GROUP)
+
+        val review = fixture.controller.state as ConversationDictationState.ReviewRequired
+        assertEquals("recover me", review.transcript)
     }
 
     @Test
@@ -3187,7 +3319,7 @@ class ConversationDictationControllerTest {
         draft: TextFieldValue,
         targetAvailable: () -> Boolean = { true },
         targetReplyAvailable: (String?) -> Boolean = { true },
-        targetValidator: (suspend (String, String) -> Boolean)? = null,
+        targetValidator: (suspend (String, String) -> ConversationDictationTargetValidation)? = null,
         targetValidationScope: CoroutineScope? = null,
         onBeforeRecognition: () -> Unit = {},
         onAfterAudioCapture: () -> Unit = {},

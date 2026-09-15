@@ -82,6 +82,13 @@ internal enum class ConversationDictationDeliveryMode {
     SendOnFinish,
 }
 
+/** Separates an authoritative removal from a probe that could not establish membership. */
+internal enum class ConversationDictationTargetValidation {
+    Available,
+    DefinitelyRemoved,
+    Indeterminate,
+}
+
 internal data class ConversationDictationDraftSnapshot(
     val value: TextFieldValue,
     val revision: Long,
@@ -400,7 +407,9 @@ internal class ConversationDictationController internal constructor(
         groupIdHex: String,
         replyToMessageIdHex: String?,
     ) -> Boolean = { _, _, _ -> true },
-    private val targetValidator: (suspend (accountRef: String, groupIdHex: String) -> Boolean)? = null,
+    private val targetValidator: (
+        suspend (accountRef: String, groupIdHex: String) -> ConversationDictationTargetValidation
+    )? = null,
     private val targetValidationScope: CoroutineScope? = null,
     private val onBeforeRecognition: () -> Unit = {},
     private val onAfterAudioCapture: () -> Unit = {},
@@ -435,7 +444,7 @@ internal class ConversationDictationController internal constructor(
         targetAvailable: (accountRef: String, groupIdHex: String) -> Boolean,
         targetReplyAvailable: (accountRef: String, groupIdHex: String, replyToMessageIdHex: String?) -> Boolean =
             { _, _, _ -> true },
-        targetValidator: suspend (accountRef: String, groupIdHex: String) -> Boolean,
+        targetValidator: suspend (accountRef: String, groupIdHex: String) -> ConversationDictationTargetValidation,
         targetValidationScope: CoroutineScope,
         onBeforeRecognition: () -> Unit,
         onAfterAudioCapture: () -> Unit,
@@ -505,6 +514,7 @@ internal class ConversationDictationController internal constructor(
     private var promotionTimeoutHandle: ConversationDictationTimeoutHandle? = null
     private var validatingSessionId: Long? = null
     private var accumulatedTranscript = ""
+    private var pendingCompletedTranscript = ""
     private var finishRequested by mutableStateOf(false)
     private var dispatchedSessionId by mutableStateOf<Long?>(null)
     private var sendJob: Job? = null
@@ -622,7 +632,15 @@ internal class ConversationDictationController internal constructor(
         // ActivityResult owner stable until the provider returns, so a result
         // can never be misattributed to a replacement target.
         if (state is ConversationDictationState.ProviderActivityActive) return false
-        if (blocksNewRequest && hasSameTarget(accountRef, groupIdHex, mode)) {
+        val retainsTranscript =
+            accumulatedTranscript.isNotBlank() ||
+                pendingCompletedTranscript.isNotBlank() ||
+                state is ConversationDictationState.ReviewRequired ||
+                state is ConversationDictationState.DeliveryUnknown
+        if (blocksNewRequest && (hasSameTarget(accountRef, groupIdHex, mode) || retainsTranscript)) {
+            if (retainsTranscript) {
+                conversationDictationDiagnostic("event=request_start accepted=false reason=transcript_pending")
+            }
             return false
         }
 
@@ -673,6 +691,18 @@ internal class ConversationDictationController internal constructor(
     private fun targetAvailable(target: ConversationDictationTarget): Boolean =
         targetAvailable(target.accountRef, target.groupIdHex) &&
             targetReplyAvailable(target.accountRef, target.groupIdHex, target.replyToMessageIdHex)
+
+    /** A completed transcript treats a failed local check as indeterminate, never as permission to erase text. */
+    private fun completedTargetValidation(target: ConversationDictationTarget): ConversationDictationTargetValidation =
+        try {
+            if (targetAvailable(target)) {
+                ConversationDictationTargetValidation.Available
+            } else {
+                ConversationDictationTargetValidation.DefinitelyRemoved
+            }
+        } catch (_: RuntimeException) {
+            ConversationDictationTargetValidation.Indeterminate
+        }
 
     /** The choice applies on the next gesture, never as a side effect of selecting a row. */
     fun onProviderSelected() {
@@ -748,14 +778,20 @@ internal class ConversationDictationController internal constructor(
     @Suppress("CyclomaticComplexMethod", "LongMethod")
     private fun stopWithDeliveryMode(deliveryMode: ConversationDictationDeliveryMode?) {
         val current = state
-        if (finishRequested) return
+        val action = deliveryMode?.name ?: "Done"
+        if (finishRequested) {
+            conversationDictationDiagnostic("event=completion_action action=$action accepted=false reason=already_finishing")
+            return
+        }
         if (
             current !is ConversationDictationState.Starting &&
             current !is ConversationDictationState.Listening &&
             current !is ConversationDictationState.Processing
         ) {
+            conversationDictationDiagnostic("event=completion_action action=$action accepted=false reason=state")
             return
         }
+        conversationDictationDiagnostic("event=completion_action action=$action accepted=true")
         if (platform.callerAudioHasPending()) {
             armCallerAudioDrainTimeout(requireNotNull(current.sessionId), requireNotNull(current.target))
         }
@@ -863,7 +899,13 @@ internal class ConversationDictationController internal constructor(
     /** Discards process-memory transcript state and releases every resource held by the session. */
     fun cancel() {
         // Once MDK dispatch starts, cancellation cannot recall the message. Retain ownership until its outcome.
-        if (deliveryInProgress) return
+        if (deliveryInProgress) {
+            conversationDictationDiagnostic("event=completion_action action=Cancel accepted=false reason=delivery_in_progress")
+            return
+        }
+        conversationDictationDiagnostic(
+            "event=completion_action action=Cancel accepted=true has_text=${accumulatedTranscript.isNotBlank()}",
+        )
         cancelSession()
     }
 
@@ -874,6 +916,23 @@ internal class ConversationDictationController internal constructor(
         clearRecognitionSession(cancel = true)
         resetTranscriptSession()
         state = ConversationDictationState.Idle
+    }
+
+    /** Handles involuntary teardown without routing already recognized text through cancellation. */
+    private fun abortSessionPreservingTranscript() {
+        val current = state
+        val sessionId = current.sessionId
+        val target = current.target
+        val transcript = accumulatedTranscript.trim().ifBlank { pendingCompletedTranscript.trim() }
+        if (transcript.isNotBlank() && sessionId != null && target != null) {
+            if (dispatchedSessionId == sessionId) {
+                retainUndeliveredTranscript(sessionId, target, transcript)
+            } else {
+                retainTranscriptForReview(sessionId, target, transcript)
+            }
+        } else {
+            cancelSession()
+        }
     }
 
     /** Claims the queued provider-Activity request exactly once before Android launches it. */
@@ -910,7 +969,9 @@ internal class ConversationDictationController internal constructor(
             fail(active.sessionId, active.target, ConversationDictationFailure.NoSpeech)
             return
         }
-        if (!targetAvailable(active.target)) {
+        val localValidation = completedTargetValidation(active.target)
+        conversationDictationDiagnostic("event=target_validation phase=provider_result result=${localValidation.name}")
+        if (localValidation != ConversationDictationTargetValidation.Available) {
             retainTranscriptForReview(active.sessionId, active.target, recognized)
             return
         }
@@ -956,25 +1017,46 @@ internal class ConversationDictationController internal constructor(
     /** Revalidates the origin and appends a conflicted transcript at the current draft end. */
     fun insertReviewAtEnd() {
         val review = state as? ConversationDictationState.ReviewRequired ?: return
-        if (!targetAvailable(review.target)) return
+        val localValidation = completedTargetValidation(review.target)
+        if (localValidation != ConversationDictationTargetValidation.Available) {
+            conversationDictationDiagnostic(
+                "event=target_validation phase=review result=${localValidation.name} source=local",
+            )
+            return
+        }
         val validator = targetValidator
         val validationScope = targetValidationScope
         if (validator == null || validationScope == null) {
+            conversationDictationDiagnostic(
+                "event=target_validation phase=review result=${ConversationDictationTargetValidation.Available.name} source=local",
+            )
             insertReviewAtEndValidated(review)
             return
         }
         if (validatingSessionId == review.sessionId) return
         validatingSessionId = review.sessionId
         validationScope.launch {
-            val available =
+            val validation =
                 try {
                     validateTargetAuthoritatively(validator, review.target)
                 } finally {
                     if (validatingSessionId == review.sessionId) validatingSessionId = null
                 }
+            conversationDictationDiagnostic("event=target_validation phase=review result=${validation.name}")
             val current = state as? ConversationDictationState.ReviewRequired
             if (current?.sessionId != review.sessionId) return@launch
-            if (!available || !targetAvailable(review.target)) return@launch
+            val currentLocalValidation = completedTargetValidation(review.target)
+            if (
+                validation != ConversationDictationTargetValidation.Available ||
+                currentLocalValidation != ConversationDictationTargetValidation.Available
+            ) {
+                if (validation == ConversationDictationTargetValidation.Available) {
+                    conversationDictationDiagnostic(
+                        "event=target_validation phase=review result=${currentLocalValidation.name} source=local",
+                    )
+                }
+                return@launch
+            }
             insertReviewAtEndValidated(review)
         }
     }
@@ -992,19 +1074,27 @@ internal class ConversationDictationController internal constructor(
                     merged,
                 )
             ) {
+                conversationDictationDiagnostic("event=paste_write outcome=accepted source=review")
                 complete(review.target)
                 return
             }
         }
+        conversationDictationDiagnostic("event=paste_write outcome=retained reason=write_rejected source=review")
     }
 
     /** Explicitly discards transcript text retained for conflict review. */
     fun dismissReview() {
-        if (state is ConversationDictationState.ReviewRequired) state = ConversationDictationState.Idle
+        if (state is ConversationDictationState.ReviewRequired) {
+            conversationDictationDiagnostic("event=transcript_discard source=review")
+            state = ConversationDictationState.Idle
+        }
     }
 
     fun dismissDeliveryUnknown() {
-        if (state is ConversationDictationState.DeliveryUnknown) state = ConversationDictationState.Idle
+        if (state is ConversationDictationState.DeliveryUnknown) {
+            conversationDictationDiagnostic("event=transcript_discard source=delivery_unknown")
+            state = ConversationDictationState.Idle
+        }
     }
 
     /** Cancels the session if its exact origin conversation was removed. */
@@ -1012,7 +1102,20 @@ internal class ConversationDictationController internal constructor(
         accountRef: String,
         groupIdHex: String,
     ) {
-        if (isOwnedBy(accountRef, groupIdHex)) cancelSession()
+        if (!isOwnedBy(accountRef, groupIdHex)) return
+        when (val current = state) {
+            is ConversationDictationState.ReviewRequired,
+            is ConversationDictationState.DeliveryUnknown,
+            -> conversationDictationDiagnostic("event=target_removed outcome=transcript_retained")
+            else -> {
+                if (accumulatedTranscript.isNotBlank() || pendingCompletedTranscript.isNotBlank()) {
+                    conversationDictationDiagnostic("event=target_removed outcome=transcript_retained")
+                } else {
+                    conversationDictationDiagnostic("event=target_removed outcome=session_cancelled")
+                }
+                abortSessionPreservingTranscript()
+            }
+        }
     }
 
     /** Cancels only when the target account is signed out or removed, not when it becomes inactive. */
@@ -1027,11 +1130,11 @@ internal class ConversationDictationController internal constructor(
             is ConversationDictationState.DisclosureRequired,
             is ConversationDictationState.PermissionRequired,
             is ConversationDictationState.CheckingProvider,
-            -> cancel()
+            -> abortSessionPreservingTranscript()
             is ConversationDictationState.Starting,
             is ConversationDictationState.Listening,
             is ConversationDictationState.Processing,
-            -> if (!durableSession) cancel()
+            -> if (!durableSession) abortSessionPreservingTranscript()
             // Launching the provider Activity necessarily backgrounds White
             // Noise. Its registered ActivityResult callback remains the owner
             // across that transition and across Activity recreation.
@@ -1044,14 +1147,14 @@ internal class ConversationDictationController internal constructor(
 
     /** Keeps service-backed capture alive when the UI task is removed from recents. */
     fun onTaskRemoved() {
-        if (!durableSession) cancel()
+        if (!durableSession) abortSessionPreservingTranscript()
     }
 
     /** Cancels capture if Android destroys the service that makes background ownership explicit. */
     fun onDurableServiceDestroyed(sessionToken: String) {
         if (!durableSession || notificationSessionToken != sessionToken) return
         durableSession = false
-        cancel()
+        abortSessionPreservingTranscript()
     }
 
     /** Starts capture only after this session's foreground promotion and enqueue are both confirmed. */
@@ -1607,7 +1710,7 @@ internal class ConversationDictationController internal constructor(
             }
         if (state.sessionId != sessionId || finishRequested) return
         if (!targetStillAvailable) {
-            cancel()
+            abortSessionPreservingTranscript()
             return
         }
         val retryFailure =
@@ -1716,7 +1819,7 @@ internal class ConversationDictationController internal constructor(
             }
         if (state.sessionId != sessionId || finishRequested) return
         if (!targetStillAvailable) {
-            cancel()
+            abortSessionPreservingTranscript()
             return
         }
         val failure =
@@ -1967,8 +2070,13 @@ internal class ConversationDictationController internal constructor(
             return
         }
         repeat(MAX_CONDITIONAL_WRITE_ATTEMPTS) {
-            if (state.sessionId != sessionId || !targetAvailable(target)) {
-                cancel()
+            if (state.sessionId != sessionId) return
+            val localValidation = completedTargetValidation(target)
+            if (localValidation != ConversationDictationTargetValidation.Available) {
+                conversationDictationDiagnostic(
+                    "event=paste_write outcome=retained reason=target_${localValidation.name}",
+                )
+                retainTranscriptForReview(sessionId, target, transcript)
                 return
             }
             val current = readDraft(target.accountRef, target.groupIdHex)
@@ -1991,17 +2099,21 @@ internal class ConversationDictationController internal constructor(
                             )
                         }.getOrDefault(false)
                     if (accepted) {
+                        conversationDictationDiagnostic("event=paste_write outcome=accepted")
                         complete(target)
                         return
                     }
+                    conversationDictationDiagnostic("event=paste_write outcome=retry reason=write_rejected")
                 }
                 ConversationDictationMerge.NeedsReview -> {
+                    conversationDictationDiagnostic("event=paste_write outcome=retained reason=draft_conflict")
                     clearRecognitionSession(cancel = false)
                     state = ConversationDictationState.ReviewRequired(sessionId, target, transcript)
                     return
                 }
             }
         }
+        conversationDictationDiagnostic("event=paste_write outcome=retained reason=write_retries_exhausted")
         clearRecognitionSession(cancel = false)
         state = ConversationDictationState.ReviewRequired(sessionId, target, transcript)
     }
@@ -2017,6 +2129,7 @@ internal class ConversationDictationController internal constructor(
             current.revision != target.capturedDraftRevision ||
             current.value.text != target.capturedDraft.text
         ) {
+            conversationDictationDiagnostic("event=send_outcome outcome=retained reason=draft_conflict")
             clearRecognitionSession(cancel = false)
             resetTranscriptSession()
             state = ConversationDictationState.ReviewRequired(sessionId, target, transcript)
@@ -2025,6 +2138,7 @@ internal class ConversationDictationController internal constructor(
         val sendRequest = conversationDictationSendRequest(target, transcript)
         val scope = targetValidationScope
         if (sendRequest == null || scope == null) {
+            conversationDictationDiagnostic("event=send_outcome outcome=retained reason=dispatch_unavailable")
             clearRecognitionSession(cancel = false)
             resetTranscriptSession()
             state = ConversationDictationState.ReviewRequired(sessionId, target, transcript)
@@ -2063,14 +2177,19 @@ internal class ConversationDictationController internal constructor(
                     val accepted = dispatchTranscript(guardedRequest)
                     if (state.sessionId != sessionId) return@launch
                     if (accepted == true) {
+                        conversationDictationDiagnostic("event=send_outcome outcome=accepted")
                         if (emptiedRevision == null) emptyDraftForDispatch(target)
                         complete(target)
                     } else {
+                        conversationDictationDiagnostic(
+                            "event=send_outcome outcome=retained reason=${if (accepted == null) "timeout" else "rejected"}",
+                        )
                         restoreDraftAfterFailedDispatch(target, emptiedRevision)
                         retainUndeliveredTranscript(sessionId, target, transcript)
                     }
                 } finally {
                     if (state.sessionId == sessionId && state is ConversationDictationState.Processing) {
+                        conversationDictationDiagnostic("event=send_outcome outcome=retained reason=interrupted")
                         restoreDraftAfterFailedDispatch(target, emptiedRevision)
                         retainUndeliveredTranscript(sessionId, target, transcript)
                     }
@@ -2139,9 +2258,13 @@ internal class ConversationDictationController internal constructor(
         target: ConversationDictationTarget,
         transcript: String,
     ) {
+        pendingCompletedTranscript = transcript
         val validator = targetValidator
         val validationScope = targetValidationScope
         if (validator == null || validationScope == null) {
+            conversationDictationDiagnostic(
+                "event=target_validation phase=delivery result=${ConversationDictationTargetValidation.Available.name} source=local",
+            )
             deliverTranscript(sessionId, target, transcript)
             return
         }
@@ -2153,14 +2276,24 @@ internal class ConversationDictationController internal constructor(
         state = ConversationDictationState.Processing(sessionId, target)
         validatingSessionId = sessionId
         validationScope.launch {
-            val available =
+            val validation =
                 try {
                     validateTargetAuthoritatively(validator, target)
                 } finally {
                     if (validatingSessionId == sessionId) validatingSessionId = null
                 }
-            if (state.sessionId != sessionId) return@launch
-            if (!available || !targetAvailable(target)) {
+            conversationDictationDiagnostic("event=target_validation phase=delivery result=${validation.name}")
+            if (state.sessionId != sessionId || state !is ConversationDictationState.Processing) return@launch
+            val localValidation = completedTargetValidation(target)
+            if (
+                validation != ConversationDictationTargetValidation.Available ||
+                localValidation != ConversationDictationTargetValidation.Available
+            ) {
+                if (validation == ConversationDictationTargetValidation.Available) {
+                    conversationDictationDiagnostic(
+                        "event=target_validation phase=delivery result=${localValidation.name} source=local",
+                    )
+                }
                 retainTranscriptForReview(sessionId, target, transcript)
                 return@launch
             }
@@ -2168,19 +2301,19 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
-    /** Bounds the authoritative origin-membership probe and treats provider failures as unavailable. */
+    /** Bounds the authoritative origin-membership probe without misreporting failures as removal. */
     private suspend fun validateTargetAuthoritatively(
-        validator: suspend (String, String) -> Boolean,
+        validator: suspend (String, String) -> ConversationDictationTargetValidation,
         target: ConversationDictationTarget,
-    ): Boolean =
+    ): ConversationDictationTargetValidation =
         try {
             withTimeoutOrNull(PROCESSING_TIMEOUT_MILLIS) {
                 validator(target.accountRef, target.groupIdHex)
-            } ?: false
+            } ?: ConversationDictationTargetValidation.Indeterminate
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Throwable) {
-            false
+            ConversationDictationTargetValidation.Indeterminate
         }
 
     /** Releases durable ownership and publishes a completion revision for the origin composer. */
@@ -2233,6 +2366,7 @@ internal class ConversationDictationController internal constructor(
     /** Clears all process-memory transcript state after terminal delivery, discard, or failure. */
     private fun resetTranscriptSession() {
         accumulatedTranscript = ""
+        pendingCompletedTranscript = ""
         finishRequested = false
         dispatchedSessionId = null
         requestedDeliveryMode = null

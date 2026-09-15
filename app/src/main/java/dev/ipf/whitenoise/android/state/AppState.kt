@@ -64,6 +64,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationProvider
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
+import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
 import dev.ipf.whitenoise.android.audio.discoverConversationDictationProviders
 import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
@@ -1173,13 +1174,18 @@ class WhiteNoiseAppState private constructor(
             targetReplyAvailable = ::conversationDictationReplyTargetAvailable,
             targetValidator = { accountRef, groupIdHex ->
                 if (accounts.none { it.label == accountRef && it.signedOut != true }) {
-                    false
+                    ConversationDictationTargetValidation.DefinitelyRemoved
                 } else {
                     runCatchingCancellable {
                         marmotIo {
-                            groupDetails(accountRef, groupIdHex).group.selfMembership == SelfMembershipFfi.MEMBER
+                            when (groupDetails(accountRef, groupIdHex).group.selfMembership) {
+                                SelfMembershipFfi.MEMBER -> ConversationDictationTargetValidation.Available
+                                SelfMembershipFfi.LEFT,
+                                SelfMembershipFfi.REMOVED,
+                                -> ConversationDictationTargetValidation.DefinitelyRemoved
+                            }
                         }
-                    }.getOrDefault(false)
+                    }.getOrDefault(ConversationDictationTargetValidation.Indeterminate)
                 }
             },
             targetValidationScope = mutationsScope,
