@@ -49,6 +49,9 @@ class QuickProfileCycleTopBarNativeTest {
                         AccountSummaryFfi("b", "bb".repeat(32), true, false, false, true),
                     ),
                 emitStartupNotification = false,
+                // Keep each hydrated name equal to its account-label fallback so the toast
+                // assertion tests destination fencing, independently of profile-read timing.
+                onDisplayName = { _, accountId -> if (accountId == "bb".repeat(32)) "b" else "a" },
                 onPresentedChatList = { account ->
                     if (account == "b") {
                         reads.incrementAndGet()
@@ -97,7 +100,7 @@ class QuickProfileCycleTopBarNativeTest {
                 app.activeAccountRef == "b" && ShadowToast.shownToastCount() == 1
             }
             assertEquals(
-                context.getString(R.string.quick_account_switched, app.accountDisplayNameCached("bb".repeat(32))),
+                context.getString(R.string.quick_account_switched, "b"),
                 ShadowToast.getTextOfLatestToast(),
             )
         } finally {
