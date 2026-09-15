@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -161,8 +162,20 @@ class DetailsSurfacePolishScreenshotTest {
             }
         }
         composeRule.waitForIdle()
+        awaitSharedContentCounts()
         assertUnavailableCallsAreAbsent()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshot")
+    }
+
+    /**
+     * The Shared in Chat counts load off the main thread, and an idle pass does not wait for them;
+     * on CI's Play runner the capture landed while every row still read "Loading shared content…".
+     */
+    private fun awaitSharedContentCounts() {
+        val loading = app.getString(R.string.shared_content_loading)
+        composeRule.waitUntil(timeoutMillis = SHARED_CONTENT_TIMEOUT_MS) {
+            composeRule.onAllNodesWithText(loading).fetchSemanticsNodes().isEmpty()
+        }
     }
 
     /** Captures profile. */
@@ -346,6 +359,7 @@ class DetailsSurfacePolishScreenshotTest {
     }
 
     private companion object {
+        const val SHARED_CONTENT_TIMEOUT_MS = 5_000L
         const val ACCOUNT_REF = "account-a"
         const val SELF_HEX = "1111111111111111111111111111111111111111111111111111111111111111"
         const val SELF_NPUB = "npub1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygse4sl3h"
