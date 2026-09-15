@@ -409,8 +409,8 @@
     <string name="allow_chat_screenshots_subtitle">Blocca gli screenshot e nasconde le anteprime nelle recenti</string>
     <string name="audit_logs">Log di audit</string>
     <string name="audit_logs_settings_subtitle">Crea e invia file di log di audit di sicurezza.</string>
-    <string name="delete_audit_logs">Elimina log di audit</string>
-    <string name="delete_audit_logs_subtitle">Rimuove tutti i file di audit locali. Se l’audit è attivo, continua su un nuovo file.</string>
+    <string name="delete_audit_logs">Cancella i log diagnostici</string>
+    <string name="delete_audit_logs_subtitle">La cancellazione dei log diagnostici elimina i log solo da questo dispositivo. Non elimina le copie già caricate sui server di White Noise e non disattiva la registrazione né i caricamenti automatici.</string>
     <string name="device_protection">Protezione del dispositivo</string>
     <string name="incognito_keyboard_detail">Chiedi alla tastiera di non imparare da ciò che scrivi in White Noise. La tastiera potrebbe ignorare la richiesta.</string>
     <string name="require_device_authentication">Richiedi l’autenticazione del dispositivo</string>
@@ -420,7 +420,7 @@
     <string name="auto_lock">Blocco automatico</string>
     <string name="diagnostics_improvements">Diagnostica e miglioramenti</string>
     <string name="diagnostics_controls_detail">Controlla la condivisione facoltativa dell’utilizzo e i registri tecnici di questo dispositivo.</string>
-    <string name="stored_audit_logs">Registri di audit archiviati</string>
+    <string name="stored_audit_logs">Log diagnostici memorizzati</string>
     <string name="diagnostics_summary_on">Attivo</string>
     <string name="diagnostics_summary_usage">Utilizzo</string>
     <string name="diagnostics_summary_logs">Registri</string>
@@ -541,10 +541,6 @@
     <string name="name">Nome</string>
     <string name="support_white_noise">Sostieni White Noise</string>
     <string name="support_white_noise_detail">White Noise è gratuito e open source. Le donazioni ci aiutano a migliorarlo e a tenerlo disponibile per tutti.</string>
-    <string name="donation_address">Indirizzo per donazioni %1$s</string>
-    <string name="donation_qr_code">Codice QR per donazioni %1$s</string>
-    <string name="donation_copy_address">Copia indirizzo %1$s</string>
-    <string name="donation_address_copied">Indirizzo %1$s copiato</string>
     <string name="error_invalid_relay_url">Inserisci un URL relay sicuro e valido che inizi con wss://.</string>
     <string name="nip_65">Dove pubblico</string>
     <string name="inbox">Dove ricevo</string>
@@ -806,10 +802,6 @@
     <string name="notification_background_off">La connessione in background è disattivata.</string>
     <string name="notification_categories_detail">Android controlla suono, vibrazione e importanza di ogni categoria.</string>
     <string name="chat_with_support">Chatta con l\'assistenza</string>
-    <string name="donate_lightning_address">Indirizzo Lightning</string>
-    <string name="donate_bitcoin_silent_payment">Pagamento silenzioso Bitcoin</string>
-    <string name="donate_method_lightning">Lightning</string>
-    <string name="donate_method_bitcoin">Bitcoin</string>
     <string name="theme">Tema</string>
     <string name="theme_system">Sistema</string>
     <string name="theme_light">Chiaro</string>
@@ -1751,10 +1743,10 @@
     <string name="group_rejoin_decline">Rifiuta invito</string>
     <string name="group_rejoin_success">Sei rientrato nel gruppo.</string>
     <string name="group_rejoin_failed">Impossibile applicare questo invito</string>
-    <string name="usage_diagnostics_title">Condividi dati di utilizzo e diagnostica</string>
-    <string name="usage_diagnostics_subtitle">Attività delle funzionalità e metriche di affidabilità.</string>
+    <string name="usage_diagnostics_title">Condividi utilizzo e telemetria</string>
+    <string name="usage_diagnostics_subtitle">Raccoglie e carica automaticamente l’attività delle funzionalità e le metriche di telemetria per tutti i profili su questo dispositivo.</string>
     <string name="usage_diagnostics_prompt_title">Aiuta a migliorare White Noise</string>
-    <string name="usage_diagnostics_disclosure">I dati di utilizzo includono attività consentite raggruppate per categorie e identificatori temporanei di sessione, senza contenuti dei messaggi né identificatori di account e gruppi. La diagnostica include un identificatore casuale dell’installazione che cambia dopo la disattivazione della condivisione.</string>
+    <string name="usage_diagnostics_disclosure">I dati sull’attività delle funzionalità e sulla telemetria includono conteggi di utilizzo delle funzionalità e metriche delle prestazioni dell’app. I dati di utilizzo usano identificatori di sessione temporanei e la telemetria usa un identificatore di installazione reimpostabile. Nessuno dei due include identificatori di account o gruppi.</string>
     <string name="usage_diagnostics_operator">Gestito da %1$s.</string>
     <string name="usage_diagnostics_retention_unknown">La politica di conservazione non è ancora stata verificata per questa versione.</string>
     <string name="usage_diagnostics_logs_separate">Log tecnici ripuliti di tutti i profili su questo dispositivo, condivisi separatamente.</string>
@@ -1952,10 +1944,19 @@
     <string name="video_seek_forward">Avanti di 10 secondi</string>
     <string name="video_mute">Disattiva audio</string>
     <string name="video_unmute">Riattiva audio</string>
-    <string name="audit_upload_title">Condividi log tecnici</string>
-    <string name="audit_upload_subtitle">Invia automaticamente i log diagnostici a White Noise, separatamente dalla condivisione dei dati di utilizzo.</string>
+    <string name="audit_upload_title">Condividi i log diagnostici dei gruppi</string>
+    <string name="audit_upload_subtitle">Raccoglie e carica automaticamente i log tecnici relativi ai gruppi per tutti i profili su questo dispositivo.</string>
     <string name="audit_upload_confirm_title">Condividere i log tecnici con White Noise?</string>
     <string name="audit_upload_disclosure">Quando questa opzione è attiva, i log di audit diagnostici di tutti i profili su questo dispositivo vengono registrati localmente e caricati automaticamente su Goggles, gestito da Internet Privacy Foundation. Possono essere caricati anche i log registrati in precedenza. I log possono includere identificatori di gruppi e messaggi, indirizzi dei relay, date e orari, riferimenti pseudonimi agli account, identificatori di installazione, modello del dispositivo e versione dell’app. Sono esclusi il contenuto dei messaggi e le chiavi private. Questi log sono sensibili e vengono conservati per indagare sui problemi di affidabilità. Questa scelta è separata dalla condivisione dei dati di utilizzo e diagnostici. Disattivare la condivisione interrompe le nuove registrazioni e impedisce nuovi lotti di caricamento. Un lotto già in corso può completare il caricamento dei suoi file. Questo non elimina i log già salvati localmente o caricati. Annulla lascia la condivisione disattivata.</string>
     <string name="audit_upload_confirm">Attiva condivisione automatica</string>
     <string name="audit_upload_renew">La condivisione dei log tecnici è disattivata finché non leggi l’informativa sul caricamento automatico ed esprimi una nuova scelta.</string>
+    <string name="diagnostics_group_disclosure">I log diagnostici dei gruppi aiutano a esaminare l’affidabilità e la coerenza dei gruppi. Includono identificatori tecnici, marcature temporali e modifiche all’appartenenza ai gruppi, usando riferimenti hash al posto delle identità dei membri. Non contengono mai contenuti dei messaggi, nomi dei profili, nomi dei gruppi o chiavi private.</string>
+    <string name="diagnostics_existing_logs">L’attivazione della condivisione dei log diagnostici dei gruppi potrebbe caricare log già memorizzati su questo dispositivo.</string>
+    <string name="diagnostics_retention">I log diagnostici dei gruppi vengono eliminati dai nostri server dopo 30 giorni, i dati di telemetria dopo 90 giorni e i dati di analisi del prodotto dopo 180 giorni.</string>
+    <string name="diagnostics_disable_disclosure">Disattivando queste opzioni si interrompono le nuove registrazioni e si impediscono nuovi caricamenti automatici. Un caricamento automatico di un insieme di log già in corso potrebbe completarsi. La disattivazione non elimina i dati già memorizzati su questo dispositivo o sui nostri server.</string>
+    <string name="diagnostics_storage_device">Su questo dispositivo</string>
+    <string name="diagnostics_clear_confirm_title">Cancellare i log diagnostici?</string>
+    <string name="diagnostics_clear_confirm_body">Questa operazione rimuove definitivamente da questo dispositivo l’attività diagnostica registrata per tutti i profili. La tua preferenza di registrazione dei log non cambierà.</string>
+    <string name="diagnostics_clear_confirm_action">Cancella i log</string>
+    <string name="usage_diagnostics_prompt_intro">Aiutaci a capire come viene usato White Noise e a rendere la messaggistica più affidabile.</string>
 </resources>

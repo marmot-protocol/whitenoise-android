@@ -120,12 +120,20 @@ internal fun DiagnosticsImprovementsScreen(
                             context = rowContext,
                             title = stringResource(R.string.delete_audit_logs),
                             onClick = { deleteConfirmOpen = true },
-                            subtitle = stringResource(R.string.delete_audit_logs_subtitle),
+                            subtitle = stringResource(R.string.diagnostics_storage_device),
                             enabled = !auditLogsBusy,
                             destructive = true,
                         )
                     }
                 }
+            }
+            item {
+                Text(
+                    stringResource(R.string.delete_audit_logs_subtitle),
+                    modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -148,15 +156,20 @@ internal fun DiagnosticsImprovementsScreen(
     if (deleteConfirmOpen) {
         WhiteNoiseAlertDialog(
             onDismissRequest = { deleteConfirmOpen = false },
-            title = { Text(stringResource(R.string.delete_audit_logs)) },
-            text = { Text(stringResource(R.string.delete_audit_logs_subtitle)) },
+            title = { Text(stringResource(R.string.diagnostics_clear_confirm_title)) },
+            text = { Text(stringResource(R.string.diagnostics_clear_confirm_body)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         deleteConfirmOpen = false
                         runAuditMutation { appState.deleteAuditLogs() }
                     },
-                ) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
+                ) {
+                    Text(
+                        stringResource(R.string.diagnostics_clear_confirm_action),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             },
             dismissButton = {
                 TextButton(onClick = { deleteConfirmOpen = false }) { Text(stringResource(R.string.cancel)) }

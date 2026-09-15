@@ -12,7 +12,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** Donate with Lightning selected: selector, heart and pitch, QR, copy capsule and caption. */
+/** Donate with a prominent website action below the heart and support copy. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h900dp-mdpi")
@@ -28,18 +28,24 @@ class DonateScreenScreenshotTest {
     @Test
     fun donateDark() = capture("donate_dark", darkTheme = true)
 
-    /** AMOLED: black canvas with outlined QR surface and capsule. */
+    /** AMOLED: the donation action stays visible on the black canvas. */
     @Test
     fun donateAmoled() = capture("donate_amoled", darkTheme = true, amoled = true)
+
+    /** Long translated text and enlarged fonts retain a reachable call to action. */
+    @Test
+    @Config(qualifiers = "de-w360dp-h900dp-mdpi")
+    fun donateGermanLarge() = capture("donate_german_large", darkTheme = false, fontScale = 2f)
 
     /** Renders the screen and records the window. */
     private fun capture(
         name: String,
         darkTheme: Boolean,
         amoled: Boolean = false,
+        fontScale: Float = 1f,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) { DonateScreen(onBack = {}) }
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = fontScale) { DonateScreen(onBack = {}) }
         }
         composeRule.waitForIdle()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")

@@ -398,8 +398,8 @@
     <string name="allow_chat_screenshots_subtitle">阻止截图并在最近任务中隐藏预览</string>
     <string name="audit_logs">审计日志</string>
     <string name="audit_logs_settings_subtitle">创建并发送安全审计日志文件。</string>
-    <string name="delete_audit_logs">删除审计日志</string>
-    <string name="delete_audit_logs_subtitle">移除所有本地审计文件。如果审计仍开启，会在新文件中继续记录。</string>
+    <string name="delete_audit_logs">清除诊断日志</string>
+    <string name="delete_audit_logs_subtitle">清除诊断日志仅会删除此设备上的日志，不会删除已上传至 White Noise 服务器的副本，也不会关闭记录和自动上传。</string>
     <string name="device_protection">设备保护</string>
     <string name="incognito_keyboard_detail">要求键盘不要学习你在 White Noise 中输入的内容。键盘可能会忽略此请求。</string>
     <string name="require_device_authentication">需要设备身份验证</string>
@@ -409,7 +409,7 @@
     <string name="auto_lock">自动锁定</string>
     <string name="diagnostics_improvements">诊断与改进</string>
     <string name="diagnostics_controls_detail">管理此设备的可选使用情况共享和技术日志。</string>
-    <string name="stored_audit_logs">已存储的审计日志</string>
+    <string name="stored_audit_logs">已存储的诊断日志</string>
     <string name="diagnostics_summary_on">开</string>
     <string name="diagnostics_summary_usage">使用情况</string>
     <string name="diagnostics_summary_logs">日志</string>
@@ -530,10 +530,6 @@
     <string name="name">名称</string>
     <string name="support_white_noise">支持 White Noise</string>
     <string name="support_white_noise_detail">White Noise 免费且开源。捐赠帮助我们改进它并让所有人都能使用。</string>
-    <string name="donation_address">%1$s 捐赠地址</string>
-    <string name="donation_qr_code">%1$s 捐赠二维码</string>
-    <string name="donation_copy_address">复制 %1$s 地址</string>
-    <string name="donation_address_copied">%1$s 地址已复制</string>
     <string name="error_invalid_relay_url">请输入以 wss:// 开头的有效安全中继 URL。</string>
     <string name="nip_65">我发布到哪里</string>
     <string name="inbox">我在哪里接收</string>
@@ -795,10 +791,6 @@
     <string name="notification_background_off">后台连接已关闭。</string>
     <string name="notification_categories_detail">Android 控制每个类别的声音、振动和重要性。</string>
     <string name="chat_with_support">与支持团队聊天</string>
-    <string name="donate_lightning_address">Lightning 地址</string>
-    <string name="donate_bitcoin_silent_payment">Bitcoin 静默支付</string>
-    <string name="donate_method_lightning">Lightning</string>
-    <string name="donate_method_bitcoin">Bitcoin</string>
     <string name="theme">主题</string>
     <string name="theme_system">跟随系统</string>
     <string name="theme_light">浅色</string>
@@ -1727,10 +1719,10 @@
     <string name="group_rejoin_decline">拒绝邀请</string>
     <string name="group_rejoin_success">已重新加入群组。</string>
     <string name="group_rejoin_failed">无法应用此邀请</string>
-    <string name="usage_diagnostics_title">分享使用情况和诊断数据</string>
-    <string name="usage_diagnostics_subtitle">功能使用活动和可靠性指标。</string>
+    <string name="usage_diagnostics_title">分享使用情况和遥测数据</string>
+    <string name="usage_diagnostics_subtitle">自动收集并上传此设备上所有个人资料的功能活动和遥测指标。</string>
     <string name="usage_diagnostics_prompt_title">帮助改进 White Noise</string>
-    <string name="usage_diagnostics_disclosure">使用数据包含按类别汇总的获准活动和临时会话标识符，不包含消息内容、账户或群组标识符。诊断数据包含随机生成的安装标识符，关闭分享后该标识符会更改。</string>
+    <string name="usage_diagnostics_disclosure">功能活动和遥测数据包括功能使用次数和应用性能指标。使用情况数据采用临时会话标识符，遥测数据采用可重置的安装标识符。两者均不包含账号或群组标识符。</string>
     <string name="usage_diagnostics_operator">由 %1$s 运营。</string>
     <string name="usage_diagnostics_retention_unknown">此版本的数据保留政策尚未经过验证。</string>
     <string name="usage_diagnostics_logs_separate">此设备上所有个人资料的已清理技术日志，单独分享。</string>
@@ -1925,10 +1917,19 @@
     <string name="video_seek_forward">快进 10 秒</string>
     <string name="video_mute">静音</string>
     <string name="video_unmute">取消静音</string>
-    <string name="audit_upload_title">分享技术日志</string>
-    <string name="audit_upload_subtitle">自动向 White Noise 发送诊断审计日志，与使用情况分享分开控制。</string>
+    <string name="audit_upload_title">分享群组诊断日志</string>
+    <string name="audit_upload_subtitle">自动收集并上传此设备上所有个人资料的群组技术日志。</string>
     <string name="audit_upload_confirm_title">与 White Noise 分享技术日志？</string>
     <string name="audit_upload_disclosure">启用后，此设备上所有身份的诊断审计日志都会保存在本地，并自动上传到由 Internet Privacy Foundation 运营的 Goggles。以前记录的日志也可能上传。日志可能包含群组和消息标识符、中继地址、时间戳、假名化的账户引用、安装标识符、设备型号和应用版本，但不包含消息内容或私钥。这些日志属于敏感数据，会保留用于调查可靠性问题。此选项与使用情况和诊断分享相互独立。关闭分享会停止新的记录并阻止启动新的上传批次。已在进行的批次可能会继续完成其中所有文件的上传。这不会删除已保存在本地或已上传的日志。取消会使分享保持关闭。</string>
     <string name="audit_upload_confirm">启用自动分享</string>
     <string name="audit_upload_renew">技术日志分享将保持关闭，直到你阅读自动上传说明并重新作出选择。</string>
+    <string name="diagnostics_group_disclosure">群组诊断日志有助于调查群组的可靠性和一致性。日志包含技术标识符、时间戳和成员变动，并使用哈希引用代替成员身份。日志绝不包含消息内容、个人资料名称、群组名称或私钥。</string>
+    <string name="diagnostics_existing_logs">启用群组诊断日志分享后，可能会上传已存储在此设备上的日志。</string>
+    <string name="diagnostics_retention">群组诊断日志将在 30 天后从我们的服务器删除，遥测数据在 90 天后删除，产品分析数据在 180 天后删除。</string>
+    <string name="diagnostics_disable_disclosure">关闭这些选项会停止新的记录，并阻止新的自动上传。已在进行中的自动日志上传批次可能仍会完成。关闭这些选项不会删除已存储在此设备或我们服务器上的数据。</string>
+    <string name="diagnostics_storage_device">在此设备上</string>
+    <string name="diagnostics_clear_confirm_title">清除诊断日志？</string>
+    <string name="diagnostics_clear_confirm_body">这将从此设备永久移除所有个人资料已记录的诊断活动。您的日志记录偏好不会改变。</string>
+    <string name="diagnostics_clear_confirm_action">清除日志</string>
+    <string name="usage_diagnostics_prompt_intro">帮助我们了解 White Noise 的使用情况，并提高消息传递的可靠性。</string>
 </resources>

@@ -409,8 +409,8 @@
     <string name="allow_chat_screenshots_subtitle">Blockiert Screenshots und verbirgt Vorschauen in den letzten Apps</string>
     <string name="audit_logs">Prüfprotokolle</string>
     <string name="audit_logs_settings_subtitle">Sicherheitsprüfprotokolle erstellen und senden.</string>
-    <string name="delete_audit_logs">Prüfprotokolle löschen</string>
-    <string name="delete_audit_logs_subtitle">Entferne alle lokalen Prüfprotokoll-Dateien. Wenn die Aufzeichnung an ist, läuft sie in einer neuen Datei weiter.</string>
+    <string name="delete_audit_logs">Diagnoseprotokolle löschen</string>
+    <string name="delete_audit_logs_subtitle">Das Löschen von Diagnoseprotokollen entfernt nur Protokolle von diesem Gerät. Bereits auf White Noise-Server hochgeladene Kopien werden nicht gelöscht. Aufzeichnung und automatische Uploads werden nicht deaktiviert.</string>
     <string name="device_protection">Geräteschutz</string>
     <string name="incognito_keyboard_detail">Bitte deine Tastatur, nicht aus deinen Eingaben in White Noise zu lernen. Deine Tastatur kann diese Bitte ignorieren.</string>
     <string name="require_device_authentication">Geräteauthentifizierung verlangen</string>
@@ -420,7 +420,7 @@
     <string name="auto_lock">Automatisch sperren</string>
     <string name="diagnostics_improvements">Diagnose &amp; Verbesserungen</string>
     <string name="diagnostics_controls_detail">Steuere die optionale Nutzungsfreigabe und technische Protokolle für dieses Gerät.</string>
-    <string name="stored_audit_logs">Gespeicherte Audit-Protokolle</string>
+    <string name="stored_audit_logs">Gespeicherte Diagnoseprotokolle</string>
     <string name="diagnostics_summary_on">An</string>
     <string name="diagnostics_summary_usage">Nutzung</string>
     <string name="diagnostics_summary_logs">Protokolle</string>
@@ -541,10 +541,6 @@
     <string name="name">Name</string>
     <string name="support_white_noise">White Noise unterstützen</string>
     <string name="support_white_noise_detail">White Noise ist kostenlos und quelloffen. Spenden helfen uns, es zu verbessern und für alle verfügbar zu halten.</string>
-    <string name="donation_address">%1$s-Spendenadresse</string>
-    <string name="donation_qr_code">%1$s-Spenden-QR-Code</string>
-    <string name="donation_copy_address">%1$s-Adresse kopieren</string>
-    <string name="donation_address_copied">%1$s-Adresse kopiert</string>
     <string name="error_invalid_relay_url">Gib eine gültige sichere Relay-URL ein, die mit wss:// beginnt.</string>
     <string name="nip_65">Wo ich poste</string>
     <string name="inbox">Wo ich empfange</string>
@@ -806,10 +802,6 @@
     <string name="notification_background_off">Die Hintergrundverbindung ist aus.</string>
     <string name="notification_categories_detail">Android steuert Ton, Vibration und Wichtigkeit für jede Kategorie.</string>
     <string name="chat_with_support">Mit dem Support chatten</string>
-    <string name="donate_lightning_address">Lightning-Adresse</string>
-    <string name="donate_bitcoin_silent_payment">Stille Bitcoin-Zahlung</string>
-    <string name="donate_method_lightning">Lightning</string>
-    <string name="donate_method_bitcoin">Bitcoin</string>
     <string name="theme">Design</string>
     <string name="theme_system">System</string>
     <string name="theme_light">Hell</string>
@@ -1765,10 +1757,10 @@
     <string name="group_rejoin_decline">Einladung ablehnen</string>
     <string name="group_rejoin_success">Gruppe erneut beigetreten.</string>
     <string name="group_rejoin_failed">Einladung konnte nicht angewendet werden</string>
-    <string name="usage_diagnostics_title">Nutzungs- und Diagnosedaten teilen</string>
-    <string name="usage_diagnostics_subtitle">Funktionsnutzung und Zuverlässigkeitskennzahlen.</string>
+    <string name="usage_diagnostics_title">Nutzungs- und Telemetriedaten teilen</string>
+    <string name="usage_diagnostics_subtitle">Erfasst automatisch Funktionsaktivitäten und Telemetriemetriken für alle Profile auf diesem Gerät und lädt sie hoch.</string>
     <string name="usage_diagnostics_prompt_title">Hilf, White Noise zu verbessern</string>
-    <string name="usage_diagnostics_disclosure">Die Nutzungsdaten enthalten freigegebene, in Kategorien zusammengefasste Aktivitäten und temporäre Sitzungskennungen, jedoch keine Nachrichteninhalte oder Konto- und Gruppenkennungen. Die Diagnosedaten enthalten eine zufällige Installationskennung, die sich nach dem Ausschalten der Datenfreigabe ändert.</string>
+    <string name="usage_diagnostics_disclosure">Funktionsaktivitäts- und Telemetriedaten umfassen die Anzahl der Funktionsnutzungen und Messwerte zur App-Leistung. Nutzungsdaten verwenden vorübergehende Sitzungskennungen, Telemetriedaten eine zurücksetzbare Installationskennung. Beide enthalten keine Konto- oder Gruppenkennungen.</string>
     <string name="usage_diagnostics_operator">Betrieben von %1$s.</string>
     <string name="usage_diagnostics_retention_unknown">Die Aufbewahrungsrichtlinie wurde für diese Version noch nicht überprüft.</string>
     <string name="usage_diagnostics_logs_separate">Bereinigte technische Protokolle aller Profile auf diesem Gerät, die separat geteilt werden.</string>
@@ -1966,10 +1958,19 @@
     <string name="video_seek_forward">10 Sekunden vor</string>
     <string name="video_mute">Stummschalten</string>
     <string name="video_unmute">Stummschaltung aufheben</string>
-    <string name="audit_upload_title">Technische Protokolle teilen</string>
-    <string name="audit_upload_subtitle">Diagnostische Audit-Protokolle automatisch an White Noise senden, getrennt von der Nutzungsfreigabe.</string>
+    <string name="audit_upload_title">Gruppendiagnoseprotokolle teilen</string>
+    <string name="audit_upload_subtitle">Erfasst automatisch technische Protokolle zu Gruppen für alle Profile auf diesem Gerät und lädt sie hoch.</string>
     <string name="audit_upload_confirm_title">Technische Protokolle mit White Noise teilen?</string>
     <string name="audit_upload_disclosure">Wenn aktiviert, werden diagnostische Audit-Protokolle aller Profile auf diesem Gerät lokal aufgezeichnet und automatisch an Goggles hochgeladen, das von der Internet Privacy Foundation betrieben wird. Bereits aufgezeichnete Protokolle können ebenfalls hochgeladen werden. Protokolle können Gruppen- und Nachrichtenkennungen, Relay-Adressen, Zeitstempel, pseudonyme Kontoreferenzen, Installationskennungen sowie Gerätemodell und App-Version enthalten. Nachrichteninhalte und private Schlüssel sind ausgeschlossen. Diese Protokolle sind sensibel und werden zur Untersuchung von Zuverlässigkeitsproblemen aufbewahrt. Dies ist unabhängig von der Freigabe von Nutzungs- und Diagnosedaten. Das Ausschalten der Freigabe stoppt neue Aufzeichnungen und verhindert neue Upload-Durchläufe. Ein bereits laufender Durchlauf kann seine Dateien noch vollständig hochladen. Bereits lokal gespeicherte oder hochgeladene Protokolle werden dadurch nicht gelöscht. Abbrechen lässt die Freigabe ausgeschaltet.</string>
     <string name="audit_upload_confirm">Automatisches Teilen aktivieren</string>
     <string name="audit_upload_renew">Die Freigabe technischer Protokolle bleibt aus, bis Sie den Hinweis zum automatischen Upload gelesen und erneut entschieden haben.</string>
+    <string name="diagnostics_group_disclosure">Gruppendiagnoseprotokolle helfen, die Zuverlässigkeit und Konsistenz von Gruppen zu untersuchen. Sie enthalten technische Kennungen, Zeitstempel und Änderungen der Mitgliedschaft und verwenden gehashte Referenzen anstelle der Identitäten von Mitgliedern. Sie enthalten niemals Nachrichteninhalte, Profilnamen, Gruppennamen oder private Schlüssel.</string>
+    <string name="diagnostics_existing_logs">Wenn du das Teilen von Gruppendiagnoseprotokollen aktivierst, werden möglicherweise bereits auf diesem Gerät gespeicherte Protokolle hochgeladen.</string>
+    <string name="diagnostics_retention">Gruppendiagnoseprotokolle werden nach 30 Tagen von unseren Servern gelöscht, Telemetriedaten nach 90 Tagen und Produktanalysedaten nach 180 Tagen.</string>
+    <string name="diagnostics_disable_disclosure">Wenn du diese Optionen deaktivierst, werden keine neuen Daten aufgezeichnet und keine neuen automatischen Uploads gestartet. Ein bereits laufender automatischer Protokoll-Upload kann noch abgeschlossen werden. Das Deaktivieren löscht keine Daten, die bereits auf diesem Gerät oder unseren Servern gespeichert sind.</string>
+    <string name="diagnostics_storage_device">Auf diesem Gerät</string>
+    <string name="diagnostics_clear_confirm_title">Diagnoseprotokolle löschen?</string>
+    <string name="diagnostics_clear_confirm_body">Dadurch werden aufgezeichnete Diagnoseaktivitäten für alle Profile dauerhaft von diesem Gerät entfernt. Deine Protokollierungseinstellung bleibt unverändert.</string>
+    <string name="diagnostics_clear_confirm_action">Protokolle löschen</string>
+    <string name="usage_diagnostics_prompt_intro">Hilf uns zu verstehen, wie White Noise genutzt wird, und das Messaging zuverlässiger zu machen.</string>
 </resources>
