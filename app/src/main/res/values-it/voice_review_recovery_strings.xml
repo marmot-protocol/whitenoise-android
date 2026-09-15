@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_review_unavailable_title">Registrazione non disponibile</string>
+    <string name="voice_review_unavailable_message">Impossibile ripristinare questa registrazione. Registra una nuova versione.</string>
+</resources>

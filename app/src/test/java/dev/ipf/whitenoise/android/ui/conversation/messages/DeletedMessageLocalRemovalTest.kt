@@ -79,13 +79,11 @@ class DeletedMessageLocalRemovalTest {
         val surface = render(failCommits = false)
 
         placeholder().assertIsDisplayed()
-        deleteAction().assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.delete_for_me)).assertDoesNotExist()
 
         placeholder().performTouchInput { longClick() }
 
-        assertDeleteOnlyMenu()
-        deleteAction().performClick()
-        composeRule.onNodeWithText(string(R.string.delete_for_me)).assertIsDisplayed()
+        assertDeleteConfirmationWithoutMenu()
         composeRule.onNodeWithText(string(R.string.delete_for_everyone)).assertDoesNotExist()
         composeRule.onNodeWithText(string(R.string.delete_for_me)).performClick()
         composeRule.waitUntil(timeoutMillis = ASYNC_TIMEOUT_MILLIS) {
@@ -115,14 +113,14 @@ class DeletedMessageLocalRemovalTest {
             .onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick))
             .performSemanticsAction(SemanticsActions.OnLongClick)
 
-        assertDeleteOnlyMenu()
+        assertDeleteConfirmationWithoutMenu()
     }
 
     @Test
     fun remoteDeletionClosesAnAlreadyOpenMessageInfoSheet() {
         val surface = renderLive()
         liveMessage().performTouchInput { longClick() }
-        composeRule.onNodeWithText(string(R.string.message_info), substring = false).performClick()
+        composeRule.onNodeWithText(string(R.string.info), substring = false).performClick()
         composeRule.onNodeWithText(string(R.string.message_info_message_id), substring = false).assertIsDisplayed()
 
         surface.markDeleted()
@@ -154,15 +152,16 @@ class DeletedMessageLocalRemovalTest {
         placeholder().assertIsDisplayed()
     }
 
+    /** Remote deletion makes retained reaction summary inert and closes details sheet. */
     @Test
     fun remoteDeletionMakesRetainedReactionSummaryInertAndClosesDetailsSheet() {
         val surface = renderLive(reactions = reactedSummary())
         val viewReactorsAction =
             SemanticsMatcher("has view reactors action") {
-                it.config.contains(SemanticsActions.OnClick) &&
-                    it.config[SemanticsActions.OnClick].label == string(R.string.view_reactors)
+                it.config.contains(SemanticsActions.OnLongClick) &&
+                    it.config[SemanticsActions.OnLongClick].label == string(R.string.view_reactors)
             }
-        composeRule.onNode(viewReactorsAction, useUnmergedTree = true).performClick()
+        composeRule.onNode(viewReactorsAction, useUnmergedTree = true).performTouchInput { longClick() }
         val reactionFilterAll = "${string(R.string.reaction_filter_all)} · 1"
         composeRule.onNodeWithText(reactionFilterAll, substring = false).assertIsDisplayed()
 
@@ -182,7 +181,6 @@ class DeletedMessageLocalRemovalTest {
     fun cancelKeepsTheTombstoneVisible() {
         val surface = render(failCommits = false)
         placeholder().performTouchInput { longClick() }
-        deleteAction().performClick()
 
         composeRule.onNodeWithText(string(R.string.cancel)).performClick()
 
@@ -196,7 +194,6 @@ class DeletedMessageLocalRemovalTest {
     fun failedLocalPersistenceKeepsTheTombstoneAndDialogRetryable() {
         val surface = render(failCommits = true)
         placeholder().performTouchInput { longClick() }
-        deleteAction().performClick()
 
         val deleteForMe = composeRule.onNodeWithText(string(R.string.delete_for_me))
         deleteForMe.performClick()
@@ -256,31 +253,39 @@ class DeletedMessageLocalRemovalTest {
             assertEquals(0, runtimeOpens.get())
         }
 
-    private fun assertDeleteOnlyMenu() {
-        deleteAction().assertIsDisplayed()
+    /**
+     * A tombstone has exactly one action, so long-press opens its confirmation
+     * directly: the actions menu — Delete row included — never appears.
+     */
+    private fun assertDeleteConfirmationWithoutMenu() {
+        composeRule.onNodeWithText(string(R.string.delete_message_title), substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.delete_message_local_only), substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.delete_for_me), substring = false).assertIsDisplayed()
         listOf(
+            R.string.delete,
             R.string.reply,
             R.string.edit,
             R.string.select,
             R.string.select_text,
-            R.string.copy_text,
-            R.string.speak_aloud,
+            R.string.copy,
+            R.string.read_aloud,
             R.string.forward,
-            R.string.shared_media_save,
-            R.string.message_info,
+            R.string.save_attachments,
+            R.string.floating_keep,
+            R.string.info,
         ).forEach { label ->
             composeRule.onNodeWithText(string(label), substring = false).assertDoesNotExist()
         }
     }
 
-    private fun placeholder() = composeRule.onNodeWithText(string(R.string.message_deleted), substring = false)
+    private fun placeholder() = composeRule.onNodeWithText(string(R.string.message_deleted_by_other), substring = false)
 
     private fun liveMessage() = composeRule.onNodeWithText(LIVE_BODY, substring = false)
 
-    private fun deleteAction() = composeRule.onNodeWithText(string(R.string.delete), substring = false)
-
+    /** Resolves a string resource in the test context. */
     private fun string(resource: Int): String = app.getString(resource)
 
+    /** Composes the surface under test with the given fixture. */
     @Suppress("LongMethod")
     private fun render(failCommits: Boolean): TestSurface {
         val preferences = CommitControllablePreferences(backingPreferences, failCommits)
@@ -328,7 +333,6 @@ class DeletedMessageLocalRemovalTest {
                             isActionMenuOpen = actionMenuOpen,
                             onActionMenuOpenChange = { actionMenuOpen = it },
                             onQuickReactionsSave = {},
-                            onQuickReactionsReset = {},
                             onReplyPreviewClick = {},
                             composerGate = ComposerGate.COMPOSER,
                             onBack = {},
@@ -349,6 +353,7 @@ class DeletedMessageLocalRemovalTest {
         }
     }
 
+    /** Composes the live surface bound to the fake controller. */
     @Suppress("LongMethod")
     private fun renderLive(
         body: String = LIVE_BODY,
@@ -408,7 +413,6 @@ class DeletedMessageLocalRemovalTest {
                         isActionMenuOpen = actionMenuOpen,
                         onActionMenuOpenChange = { actionMenuOpen = it },
                         onQuickReactionsSave = {},
-                        onQuickReactionsReset = {},
                         onReplyPreviewClick = {},
                         composerGate = ComposerGate.COMPOSER,
                         onBack = {},

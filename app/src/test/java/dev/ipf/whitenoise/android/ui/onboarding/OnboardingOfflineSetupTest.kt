@@ -90,6 +90,7 @@ class OnboardingOfflineSetupTest {
         }
     }
 
+    /** Valid nsec reaches identity acceptance even while offline. */
     @Test
     fun validNsecReachesIdentityAcceptanceEvenWhileOffline() {
         val engine = RecordingIdentityLoginCalls(loginFails = { MarmotKitException.Runtime("expected") })
@@ -98,14 +99,15 @@ class OnboardingOfflineSetupTest {
             WhiteNoiseTheme { OnboardingScreen(appState = appState, hasValidatedInternet = { false }) }
         }
         composeRule.onNodeWithText(context.getString(R.string.onboarding_login)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.nostr_nsec)).performTextInput(nsec)
-        composeRule.onNodeWithText(context.getString(R.string.sign_in)).performClick()
+        composeRule.onNodeWithTag("onboarding.sign_in.private_key").performTextInput(nsec)
+        composeRule.onNodeWithTag("onboarding.sign_in.action").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(ONBOARDING_OFFLINE_NOTICE_TAG).assertDoesNotExist()
         assertEquals(1, engine.logins.size)
         assertEquals(nsec, engine.logins.single().nsec)
     }
 
+    /** Locally invalid key keeps its specific error while offline. */
     @Test
     fun locallyInvalidKeyKeepsItsSpecificErrorWhileOffline() {
         val engine = RecordingIdentityLoginCalls(loginFails = { MarmotKitException.Runtime("unexpected") })
@@ -117,8 +119,8 @@ class OnboardingOfflineSetupTest {
         }
 
         composeRule.onNodeWithText(context.getString(R.string.onboarding_login)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.nostr_nsec)).performTextInput("not-a-key")
-        composeRule.onNodeWithText(context.getString(R.string.sign_in)).performClick()
+        composeRule.onNodeWithTag("onboarding.sign_in.private_key").performTextInput("not-a-key")
+        composeRule.onNodeWithTag("onboarding.sign_in.action").performClick()
 
         composeRule.onNodeWithText(context.getString(R.string.identity_entry_error_invalid_key)).assertExists()
         composeRule.onNodeWithTag(ONBOARDING_OFFLINE_NOTICE_TAG).assertDoesNotExist()

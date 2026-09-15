@@ -30,13 +30,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -94,6 +90,7 @@ import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.conversation.CompactViableComposerHeight
 import dev.ipf.whitenoise.android.ui.conversation.composerMultilineControlsSuppressed
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.resolveAutomaticComposerCeiling
@@ -370,6 +367,7 @@ internal fun ComposerBar(
     onShareContact: (() -> Unit)? = null,
     onPasteImageUris: ((List<Uri>) -> Unit)? = null,
     voiceRecordingController: dev.ipf.whitenoise.android.audio.VoiceRecordingController? = null,
+    voiceReview: VoiceRecordingReview? = null,
     dictationController: ConversationDictationController? = null,
     dictationAccountRef: String? = null,
     dictationGroupIdHex: String? = null,
@@ -407,7 +405,11 @@ internal fun ComposerBar(
     // resume observer can tell whether the keyboard was up when we were paused.
     onComposerFocusChanged: (Boolean) -> Unit = {},
     onComposerPreImeBack: (() -> Unit)? = null,
+    // True from the moment Back asks the keyboard to hide until focus clears. The
+    // composer collapses in that same frame so height and IME animate together.
+    composerDismissInProgress: Boolean = false,
     onBottomInputChanged: () -> Unit = {},
+    onTimelineComposerMeasured: (foregroundHeightPx: Int, compactHeightPx: Int) -> Unit = { _, _ -> },
     onKeyboardRestoreFromCustomInput: () -> Unit = {},
     onKeyboardRestoreFromCustomInputFailed: () -> Unit = {},
     recentEmojis: List<String> = emptyList(),
@@ -419,6 +421,10 @@ internal fun ComposerBar(
     // Hoisted so the conversation screen can dismiss the sheet on an outside
     // tap; defaults to a private instance for other call sites.
     attachmentSheetState: ComposerAttachmentSheetState = rememberComposerAttachmentSheetState(),
+    attachmentContent: (@Composable () -> Unit)? = null,
+    hasPendingAttachments: Boolean = false,
+    attachmentsPreparing: Boolean = false,
+    onSendAttachments: ((String, (Boolean) -> Unit) -> Unit)? = null,
     // Injectable only for deterministic pre-IME Back behavior tests; production
     // uses the view's platform dispatcher.
     overlayBackRegistrar: ComposerOverlayBackRegistrar? = null,
@@ -703,11 +709,11 @@ internal fun ComposerBar(
             rememberedImeHeight = rememberedImePaneHeight,
         )
     val attachmentPaneAlpha by animateFloatAsState(
-        targetValue = if (attachmentSheetState.isOpen) 1f else 0f,
+        targetValue = if (attachmentSheetState.recentMediaOpen) 1f else 0f,
         animationSpec = tween(durationMillis = 120),
         label = "composerAttachmentPaneAlpha",
     )
-    val showAttachmentPane = attachmentSheetState.isOpen || attachmentPaneAlpha > 0.01f
+    val showAttachmentPane = attachmentSheetState.recentMediaOpen || attachmentPaneAlpha > 0.01f
     val attachmentPaneMinimumHeight =
         composerAttachmentPaneMinimumHeight(
             showAttachmentPane = showAttachmentPane,
@@ -856,8 +862,27 @@ internal fun ComposerBar(
     // death during the FFI call can erase a send MDK never accepted (#1216).
     // For an in-place edit the controller short-circuits and never calls
     // onAccepted, so the pre-edit composer is restored instead.
+    var attachmentSendInFlight by remember(draftKey) { mutableStateOf(false) }
     val submitMessage: () -> Unit = {
-        if (text.isNotBlank()) {
+        if (hasPendingAttachments && editingMessageId == null) {
+            if (!attachmentsPreparing && !attachmentSendInFlight && onSendAttachments != null) {
+                val acceptanceToken = textState.acceptanceToken()
+                attachmentSendInFlight = true
+                var dispatched = false
+                try {
+                    onSendAttachments(acceptanceToken.text) { accepted ->
+                        attachmentSendInFlight = false
+                        if (accepted) {
+                            textState.clearAccepted(acceptanceToken)
+                            onAfterSend()
+                        }
+                    }
+                    dispatched = true
+                } finally {
+                    if (!dispatched) attachmentSendInFlight = false
+                }
+            }
+        } else if (text.isNotBlank()) {
             val sendingEdit = editingMessageId != null
             val acceptanceToken = textState.acceptanceToken()
             onSend(acceptanceToken.text) {
@@ -919,7 +944,13 @@ internal fun ComposerBar(
         restoreKeyboardFromEmojiPane()
     }
 
+    /** Opens the attachment sheet. */
     fun openComposerAttachmentSheet() {
+        attachmentSheetState.open()
+    }
+
+    /** Opens the recent-media pane, dismissing the emoji picker and any pending keyboard restore. */
+    fun openRecentMediaPane() {
         composerKeyboardRestorePending = false
         composerEmojiPickerRequested = false
         composerEmojiPickerOpen = false
@@ -929,7 +960,7 @@ internal fun ComposerBar(
                 targetImeHeight = targetImePaneHeight,
                 rememberedImeHeight = rememberedImePaneHeight,
             )
-        attachmentSheetState.open()
+        attachmentSheetState.openRecentMedia()
         onBottomInputChanged()
         focusManager.clearFocus(force = true)
         keyboardController?.hide()
@@ -977,9 +1008,12 @@ internal fun ComposerBar(
                 maxHeight
             }
         val customInputPaneHeight = with(density) { customInputPaneHeightPx.toDp() }
-        val maximumComposerHeight =
-            (boundedHeight - statusBarTop - topInteractionClearance - bottomInset - customInputPaneHeight)
-                .coerceAtLeast(44.dp)
+        // The 6dp outer padding completes the prototype surface top gap of 24dp. A compact remainder
+        // (landscape with the IME open) keeps that 18dp for the editor, mirroring the ceiling's compact allowance.
+        val composerRemainder =
+            boundedHeight - statusBarTop - topInteractionClearance - bottomInset - customInputPaneHeight
+        val prototypeTopGap = if (composerRemainder - 18.dp >= CompactViableComposerHeight) 18.dp else 0.dp
+        val maximumComposerHeight = (composerRemainder - prototypeTopGap).coerceAtLeast(44.dp)
         val automaticComposerCeiling = resolveAutomaticComposerCeiling(maximumComposerHeight)
         val maximumComposerHeightPx = with(density) { maximumComposerHeight.toPx() }
         val minimumManualComposerHeightPx =
@@ -992,34 +1026,26 @@ internal fun ComposerBar(
         val resolvedAutomaticHeightPx =
             (automaticComposerHeightPx.takeIf { it > 0f } ?: with(density) { 44.dp.toPx() })
                 .coerceAtMost(automaticComposerCeilingPx)
+        val minimumRenderedComposerHeightPx =
+            if (composerHeightDragActive) resolvedAutomaticHeightPx else minimumManualComposerHeightPx
         val resolvedComposerHeight =
             with(density) {
                 composerHeightPx(
                     state = composerExpansion,
                     automaticHeightPx = resolvedAutomaticHeightPx,
-                    minimumManualHeightPx = minimumManualComposerHeightPx,
+                    minimumManualHeightPx = minimumRenderedComposerHeightPx,
                     maximumHeightPx = maximumComposerHeightPx,
                 ).toDp()
             }
         val expandedControlLayout =
             composerUsesMultilineControls || composerExpansion.mode != ComposerExpansionMode.Automatic
-        val expandedActionInsetProgress =
-            animateFloatAsState(
-                targetValue = if (expandedControlLayout) 1f else 0f,
-                animationSpec =
-                    tween(
-                        durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
-                        easing = FastOutSlowInEasing,
-                    ),
-                label = "expanded composer action inset",
-            )
         val composerHeightTransitionActive =
             composerHeightTransitionEpoch != completedComposerHeightTransitionEpoch
         val transitionTargetHeightPx =
             composerHeightPx(
                 state = composerExpansion,
                 automaticHeightPx = resolvedAutomaticHeightPx,
-                minimumManualHeightPx = minimumManualComposerHeightPx,
+                minimumManualHeightPx = minimumRenderedComposerHeightPx,
                 maximumHeightPx = maximumComposerHeightPx,
             )
         val composerHeightAnimation =
@@ -1079,12 +1105,6 @@ internal fun ComposerBar(
                                 Modifier.heightIn(max = automaticComposerCeiling)
                             else -> Modifier.height(resolvedComposerHeight)
                         },
-                    ).then(
-                        if (composerExpansion.mode == ComposerExpansionMode.Automatic) {
-                            Modifier
-                        } else {
-                            Modifier.background(MaterialTheme.colorScheme.background)
-                        },
                     ).onSizeChanged { size ->
                         visibleComposerHeightPx = size.height.toFloat()
                         if (
@@ -1093,76 +1113,119 @@ internal fun ComposerBar(
                         ) {
                             automaticComposerHeightPx = size.height.toFloat()
                         }
-                    }.padding(horizontal = 12.dp, vertical = 10.dp),
+                        onTimelineComposerMeasured(size.height, automaticComposerHeightPx.toInt().coerceAtLeast(0))
+                    }.padding(horizontal = 16.dp, vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (editingMessageId != null) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            stringResource(R.string.editing_message),
-                            modifier = Modifier.weight(1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        IconButton(onClick = onCancelEdit, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel_edit), modifier = Modifier.size(18.dp))
+                val voiceReviewClip = voiceReview?.clip?.takeUnless { voiceRecordingController?.isRecording == true }
+                val accessoryContent: (@Composable () -> Unit)? =
+                    if (editingMessageId != null || replyingTo != null || attachmentContent != null) {
+                        {
+                            Column {
+                                if (editingMessageId == null) attachmentContent?.invoke()
+                                if (editingMessageId != null || replyingTo != null) {
+                                    Box(
+                                        Modifier.padding(8.dp).clip(MaterialTheme.shapes.large),
+                                    ) {
+                                        if (editingMessageId != null) {
+                                            Row(
+                                                Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(MaterialTheme.shapes.large)
+                                                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                                                    .padding(10.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Edit,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp),
+                                                )
+                                                Spacer(Modifier.width(8.dp))
+                                                Text(
+                                                    stringResource(R.string.editing_message),
+                                                    modifier = Modifier.weight(1f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                                ComposerAccessoryRemoveButton(
+                                                    onClick = onCancelEdit,
+                                                    description = stringResource(R.string.cancel_edit),
+                                                )
+                                            }
+                                        } else if (replyingTo != null) {
+                                            val mediaFallback =
+                                                remember(replyingToMedia) { typedReplyMediaFallback(replyingToMedia) }
+                                            val mediaKind =
+                                                replyingToDisplay?.mediaKind
+                                                    ?: remember(
+                                                        mediaFallback,
+                                                        replyingTo.tags,
+                                                        replyingTo.sourceEpoch,
+                                                    ) {
+                                                        composerReplyMediaKind(
+                                                            mediaFallback,
+                                                            replyingTo.tags,
+                                                            replyingTo.sourceEpoch,
+                                                        )
+                                                    }
+                                            val profileRevision = appState?.profileRevisionForCompose
+                                            val replyMentionDisplayName =
+                                                remember(appState, profileRevision) {
+                                                    appState?.let { state ->
+                                                        { bech32: String -> state.mentionDisplayName(bech32) }
+                                                    }
+                                                }
+                                            val projectedReplyBody =
+                                                remember(replyingTo, messageTextCopy) {
+                                                    MessageProjector.displayBody(replyingTo, messageTextCopy)
+                                                }
+                                            val replyBody =
+                                                replyingToDisplay?.body
+                                                    ?: remember(
+                                                        replyingTo,
+                                                        projectedReplyBody,
+                                                        mediaFallback,
+                                                        messageTextCopy,
+                                                    ) {
+                                                        replyBodyWithTypedMediaFallback(
+                                                            plaintext = replyingTo.plaintext,
+                                                            projectedBody = projectedReplyBody,
+                                                            mediaFallback = mediaFallback,
+                                                            copy = messageTextCopy,
+                                                        )
+                                                    }
+                                            ReplyPreviewCard(
+                                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                                secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                accentColor = MaterialTheme.colorScheme.primary,
+                                                senderTitle =
+                                                    if (replyingTo.direction == "sent") {
+                                                        stringResource(R.string.reply_you)
+                                                    } else {
+                                                        appState?.displayName(replyingTo.sender)
+                                                            ?: replyingTo.sender.take(8)
+                                                    },
+                                                isOwn = replyingTo.direction == "sent",
+                                                body = replyBody,
+                                                mediaKind = mediaKind,
+                                                mediaFileName =
+                                                    replyingToDisplay?.mediaFileName ?: mediaFallback?.filename,
+                                                mediaType = replyingToDisplay?.mediaType ?: mediaFallback?.mediaType,
+                                                warning = replyingToDisplay?.warning,
+                                                onClick = null,
+                                                onDismiss = onCancelReply,
+                                                mentionDisplayName = replyMentionDisplayName,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
+                    } else {
+                        null
                     }
-                } else if (replyingTo != null) {
-                    val mediaFallback = remember(replyingToMedia) { typedReplyMediaFallback(replyingToMedia) }
-                    val mediaKind =
-                        replyingToDisplay?.mediaKind
-                            ?: remember(mediaFallback, replyingTo.tags, replyingTo.sourceEpoch) {
-                                composerReplyMediaKind(mediaFallback, replyingTo.tags, replyingTo.sourceEpoch)
-                            }
-                    val profileRevision = appState?.profileRevisionForCompose
-                    val replyMentionDisplayName =
-                        remember(appState, profileRevision) {
-                            appState?.let { state ->
-                                { bech32: String -> state.mentionDisplayName(bech32) }
-                            }
-                        }
-                    val projectedReplyBody =
-                        remember(replyingTo, messageTextCopy) {
-                            MessageProjector.displayBody(replyingTo, messageTextCopy)
-                        }
-                    val replyBody =
-                        replyingToDisplay?.body
-                            ?: remember(replyingTo, projectedReplyBody, mediaFallback, messageTextCopy) {
-                                replyBodyWithTypedMediaFallback(
-                                    plaintext = replyingTo.plaintext,
-                                    projectedBody = projectedReplyBody,
-                                    mediaFallback = mediaFallback,
-                                    copy = messageTextCopy,
-                                )
-                            }
-                    ReplyPreviewCard(
-                        senderTitle =
-                            if (replyingTo.direction == "sent") {
-                                stringResource(R.string.reply_you)
-                            } else {
-                                appState?.displayName(replyingTo.sender) ?: replyingTo.sender.take(8)
-                            },
-                        isOwn = replyingTo.direction == "sent",
-                        body = replyBody,
-                        mediaKind = mediaKind,
-                        mediaFileName = replyingToDisplay?.mediaFileName ?: mediaFallback?.filename,
-                        mediaType = replyingToDisplay?.mediaType ?: mediaFallback?.mediaType,
-                        warning = replyingToDisplay?.warning,
-                        onClick = null,
-                        onDismiss = onCancelReply,
-                        mentionDisplayName = replyMentionDisplayName,
-                    )
-                }
                 // #414: live @-mention picker. Compute the open query from the current
                 // caret; suppressed entirely in DMs or with no roster. Edit mode
                 // intentionally shares this exact query/insertion contract so
@@ -1189,8 +1252,14 @@ internal fun ComposerBar(
                             MentionComposer.filter(mentionQuery.query, mentionCandidates)
                         }
                     }
-                if (mentionQuery != null && mentionMatches.isNotEmpty()) {
-                    val openQuery = mentionQuery
+                // The box is a sibling of the composer surface, so a manually
+                // expanded composer owns the whole area and suppresses it.
+                val openQuery =
+                    mentionQuery?.takeIf {
+                        mentionMatches.isNotEmpty() &&
+                            composerExpansion.mode == ComposerExpansionMode.Automatic
+                    }
+                if (openQuery != null) {
                     MentionPicker(
                         candidates = mentionMatches,
                         onPick = { candidate ->
@@ -1220,12 +1289,13 @@ internal fun ComposerBar(
                         dictationState !is ConversationDictationState.Idle
                 val activeDictationController = dictationController?.takeIf { dictationActiveInComposer }
                 val showMicButton =
-                    (text.isBlank() || isRecordingVoice) &&
+                    ((text.isBlank() && !hasPendingAttachments) || isRecordingVoice) &&
                         editingMessageId == null &&
                         voiceRecordingController != null &&
                         !dictationActiveInComposer
                 val showPrimaryTrailingAction =
-                    !dictationActiveInComposer &&
+                    voiceReviewClip == null &&
+                        !dictationActiveInComposer &&
                         !dictationOriginHidden &&
                         !(showMicButton && dictationPendingElsewhere)
                 val primaryTrailingActionWidth =
@@ -1234,7 +1304,7 @@ internal fun ComposerBar(
                     } else if (showMicButton && voiceRecordingController.locked) {
                         84.dp
                     } else {
-                        44.dp
+                        40.dp
                     }
                 val trailingControlsWidth = primaryTrailingActionWidth
                 BoxWithConstraints(
@@ -1253,6 +1323,17 @@ internal fun ComposerBar(
                     // app-owned controls replace only the waveform slot, so an open IME
                     // stays open and a closed IME is never raised implicitly.
                     ComposerPill(
+                        accessoryContent = accessoryContent.takeIf { voiceReviewClip == null },
+                        voiceReviewContent =
+                            voiceReviewClip?.let { reviewedClip ->
+                                {
+                                    VoiceReviewComposer(
+                                        checkNotNull(voiceReview),
+                                        reviewedClip,
+                                        voiceRecordingController,
+                                    )
+                                }
+                            },
                         textFieldValue = textFieldValue,
                         composerFocus = composerFocus,
                         emojiPickerOpen = composerEmojiPickerRequested,
@@ -1261,11 +1342,11 @@ internal fun ComposerBar(
                             // for the keyboard; the restore functions' pending
                             // guard drops the echo of their own focus request.
                             if (focused && composerEmojiPickerOpen) restoreKeyboardFromEmojiPane()
-                            if (focused && attachmentSheetState.isOpen) restoreKeyboardFromAttachmentSheet()
+                            if (focused && attachmentSheetState.recentMediaOpen) restoreKeyboardFromAttachmentSheet()
                             onComposerFocusChanged(focused)
                         },
                         onValueChange = { value ->
-                            if (!isRecordingVoice) {
+                            if (!isRecordingVoice && voiceReviewClip == null) {
                                 val applied = repairComposerMentionEdit(textFieldValue, value, mentionPickerEnabled)
                                 applyComposerFieldValue(applied)
                             }
@@ -1284,7 +1365,21 @@ internal fun ComposerBar(
                                 openComposerAttachmentSheet()
                             }
                         },
-                        attachmentSheetOpen = attachmentSheetState.isOpen,
+                        attachmentSheetOpen = attachmentSheetState.recentMediaOpen,
+                        attachmentMenu = { bounds ->
+                            ComposerAttachmentMenu(
+                                anchorBounds = bounds,
+                                expanded = attachmentSheetState.isOpen && !attachmentSheetState.recentMediaOpen,
+                                onDismiss = attachmentSheetState::dismiss,
+                                onCamera = onCaptureFromCamera,
+                                onGallery = onPickFromGallery,
+                                onFiles = onPickDocument,
+                                onLocation = onShareLocation,
+                                onUser = onShareUser,
+                                onContact = onShareContact,
+                                onRecentMedia = onPickRecentMedia?.let { { openRecentMediaPane() } },
+                            )
+                        },
                         preImeBackEnabled = !composerEmojiPickerOpen && !attachmentSheetState.isOpen,
                         onPreImeBack = {
                             if (onComposerPreImeBack != null) {
@@ -1300,15 +1395,19 @@ internal fun ComposerBar(
                         hasContactShare = onShareContact != null,
                         onPickFromGallery = onPickFromGallery,
                         onPickDocument = onPickDocument,
-                        onPasteImageUris = onPasteImageUris?.takeIf { editingMessageId == null && !isRecordingVoice },
+                        onPasteImageUris =
+                            onPasteImageUris?.takeIf {
+                                editingMessageId == null && !isRecordingVoice && voiceReviewClip == null
+                            },
                         onDictation =
                             startAppOwnedDictation?.takeIf {
                                 dictationState is ConversationDictationState.Idle &&
                                     !dictationPendingElsewhere &&
-                                    !isRecordingVoice
+                                    !isRecordingVoice &&
+                                    voiceReviewClip == null
                             },
                         dictationControls =
-                            activeDictationController?.let { activeController ->
+                            activeDictationController?.takeIf { voiceReviewClip == null }?.let { activeController ->
                                 {
                                     ConversationDictationCompactActions(
                                         state = dictationState,
@@ -1319,7 +1418,10 @@ internal fun ComposerBar(
                         highlightMentionChips = mentionPickerEnabled,
                         mentionCandidates = mentionCandidates,
                         enterKeyBehavior = enterKeyBehavior,
-                        onImeSend = submitMessage,
+                        onImeSend = {
+                            val reviewedClip = voiceReviewClip
+                            if (reviewedClip != null) voiceReview?.send(reviewedClip) else submitMessage()
+                        },
                         expansionMode = composerExpansion.mode,
                         onExpansionToggle = {
                             composerHeightDragActive = false
@@ -1337,35 +1439,42 @@ internal fun ComposerBar(
                                     state = composerHeightDragState ?: currentComposerExpansion(),
                                     dragDeltaYPx = dragAmount,
                                     automaticHeightPx = resolvedAutomaticHeightPx,
-                                    minimumManualHeightPx = minimumManualComposerHeightPx,
+                                    minimumManualHeightPx = resolvedAutomaticHeightPx,
                                     maximumHeightPx = maximumComposerHeightPx,
                                 )
                         },
-                        onHeightDragStopped = {
+                        onHeightDragSettled = { velocityY ->
                             val settledExpansion =
-                                settleComposerHeight(
+                                settleComposerEndpoint(
                                     state = composerHeightDragState ?: currentComposerExpansion(),
                                     automaticHeightPx = resolvedAutomaticHeightPx,
-                                    minimumManualHeightPx = minimumManualComposerHeightPx,
                                     maximumHeightPx = maximumComposerHeightPx,
-                                    deadbandPx = with(density) { 20.dp.toPx() },
+                                    projectedTravelPx = velocityY * 0.5f,
+                                    velocityThresholdPx = with(density) { 48.dp.toPx() },
                                 )
                             composerHeightDragActive = false
                             composerHeightDragState = null
                             transitionComposerExpansion(settledExpansion)
                             onBottomInputChanged()
                         },
+                        onHeightDragCancelled = {
+                            composerHeightDragActive = false
+                            composerHeightDragState = null
+                        },
                         overlayBackRegistrar = overlayBackRegistrar,
-                        inputContentVisible = !isRecordingVoice,
-                        inputFocusEnabled = true,
+                        inputContentVisible = !isRecordingVoice && voiceReviewClip == null,
+                        inputFocusEnabled = voiceReviewClip == null,
                         expandedTrailingActionInset = trailingControlsWidth,
-                        compactMeasurementWidth =
-                            (maxWidth - trailingControlsWidth - 8.dp)
-                                .coerceAtLeast(1.dp),
+                        compactMeasurementWidth = maxWidth,
                         compactMeasurementReservesTrailingAction = false,
-                        compactOuterEndInset = trailingControlsWidth + 8.dp,
+                        forceEditingLayout =
+                            editingMessageId != null ||
+                                replyingTo != null ||
+                                dictationActiveInComposer ||
+                                hasPendingAttachments,
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
                         multilineControlsSuppressed = composerMultilineControlsSuppressed(automaticComposerCeiling),
+                        dismissInProgress = composerDismissInProgress,
                         modifier =
                             Modifier
                                 .fillMaxWidth()
@@ -1383,7 +1492,7 @@ internal fun ComposerBar(
                         modifier =
                             Modifier
                                 .align(Alignment.BottomEnd)
-                                .expandedComposerActionRow { expandedActionInsetProgress.value },
+                                .expandedComposerActionRow(),
                     ) {
                         // This call site stays shared by idle and recording states;
                         // moving it would break the active hold gesture's identity.
@@ -1398,36 +1507,26 @@ internal fun ComposerBar(
                                     tint = MaterialTheme.colorScheme.error,
                                 )
                             }
-                            FloatingActionButton(
+                            ComposerActionDisc(
                                 onClick = { voiceRecordingController.stop() },
-                                modifier = Modifier.composerActionSize { expandedActionInsetProgress.value },
                                 containerColor = actionColors.container,
                                 contentColor = actionColors.content,
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = stringResource(R.string.send),
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
+                                description = stringResource(R.string.voice_recording_stop),
+                                icon = R.drawable.ic_stop,
+                            )
                         } else if (showPrimaryTrailingAction && showMicButton) {
                             Box(contentAlignment = Alignment.BottomCenter) {
                                 LockHintAbove(controller = voiceRecordingController)
                                 MicHoldButton(controller = voiceRecordingController)
                             }
                         } else if (showPrimaryTrailingAction) {
-                            FloatingActionButton(
+                            ComposerActionDisc(
                                 onClick = { submitMessage() },
-                                modifier = Modifier.composerActionSize { expandedActionInsetProgress.value },
                                 containerColor = actionColors.container,
                                 contentColor = actionColors.content,
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = stringResource(R.string.send),
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
+                                description = stringResource(R.string.send),
+                                icon = R.drawable.ic_arrow_upward,
+                            )
                         }
                     }
                     if (activeRecordingController != null) {
@@ -1484,6 +1583,7 @@ internal fun ComposerBar(
                     }
                     if (showAttachmentPane) {
                         ComposerAttachmentSheetPane(
+                            recentMediaOnly = true,
                             alpha = attachmentPaneAlpha,
                             minimumHeight = attachmentPaneMinimumHeight,
                             onPickRecentMedia =

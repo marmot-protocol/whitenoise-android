@@ -1,13 +1,16 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.app.Application
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -26,7 +29,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
-import dev.ipf.whitenoise.android.ui.profile.PROFILE_QUICK_ACTIONS_TAG
+import dev.ipf.whitenoise.android.ui.profile.PROFILE_MESSAGE_ACTION_TAG
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -159,10 +162,23 @@ class DetailsSurfacePolishScreenshotTest {
             }
         }
         composeRule.waitForIdle()
+        awaitSharedContentCounts()
         assertUnavailableCallsAreAbsent()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshot")
     }
 
+    /**
+     * The Shared in Chat counts load off the main thread, and an idle pass does not wait for them;
+     * on CI's Play runner the capture landed while every row still read "Loading shared content…".
+     */
+    private fun awaitSharedContentCounts() {
+        val loading = app.getString(R.string.shared_content_loading)
+        composeRule.waitUntil(timeoutMillis = SHARED_CONTENT_TIMEOUT_MS) {
+            composeRule.onAllNodesWithText(loading).fetchSemanticsNodes().isEmpty()
+        }
+    }
+
+    /** Captures profile. */
     private fun captureProfile(
         snapshot: String,
         targetHex: String?,
@@ -176,25 +192,25 @@ class DetailsSurfacePolishScreenshotTest {
         appState.presentDiscoveredProfile(npub, profile)
 
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
-                val density = LocalDensity.current
-                CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
-                    ProfileSheet(
-                        appState = appState,
-                        npub = npub,
-                        onOpenGroup = { _, _ -> },
-                        onStartGroup = {},
-                        onDismiss = {},
-                    )
-                }
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = fontScale) {
+                ProfileSheet(
+                    appState = appState,
+                    npub = npub,
+                    onOpenGroup = { _, _ -> },
+                    onStartGroup = {},
+                    onDismiss = {},
+                )
             }
         }
         composeRule.waitForIdle()
         assertUnavailableCallsAreAbsent()
         if (targetHex == null || targetHex == SELF_HEX) {
-            composeRule.onNodeWithTag(PROFILE_QUICK_ACTIONS_TAG).assertDoesNotExist()
+            composeRule.onNodeWithTag(PROFILE_MESSAGE_ACTION_TAG).assertDoesNotExist()
         } else {
-            composeRule.onNodeWithTag(PROFILE_QUICK_ACTIONS_TAG).assertExists()
+            composeRule.onNodeWithTag(PROFILE_MESSAGE_ACTION_TAG).assertIsDisplayed()
+            composeRule
+                .onNode(hasClickAction() and hasAnyAncestor(hasTestTag(PROFILE_MESSAGE_ACTION_TAG)))
+                .assertIsEnabled()
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshot")
     }
@@ -343,6 +359,7 @@ class DetailsSurfacePolishScreenshotTest {
     }
 
     private companion object {
+        const val SHARED_CONTENT_TIMEOUT_MS = 5_000L
         const val ACCOUNT_REF = "account-a"
         const val SELF_HEX = "1111111111111111111111111111111111111111111111111111111111111111"
         const val SELF_NPUB = "npub1zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygse4sl3h"

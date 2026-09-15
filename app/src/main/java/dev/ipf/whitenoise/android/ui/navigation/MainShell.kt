@@ -75,9 +75,11 @@ import dev.ipf.whitenoise.android.state.newAttachmentOpenNavigationGeneration
 import dev.ipf.whitenoise.android.state.nextNavAccountRef
 import dev.ipf.whitenoise.android.state.observeTtsConversationDestination
 import dev.ipf.whitenoise.android.state.reconcileProvisionalOpenChat
+import dev.ipf.whitenoise.android.state.requestQuickProfileCycle
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
+import dev.ipf.whitenoise.android.ui.account.rememberQuickProfileCycleNotice
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
@@ -391,7 +393,10 @@ internal fun MainShell(
     }
 
     /** Starts a generation-owned home-screen quick switch without delaying account activation. */
-    fun requestQuickAccountSwitch(targetAccountRef: String) {
+    fun requestQuickAccountSwitch(
+        targetAccountRef: String,
+        onActivated: () -> Unit = {},
+    ) {
         val sourceAccountRef = appState.activeAccountRef ?: return
         when (
             quickAccountSwitchRequestDisposition(
@@ -430,6 +435,7 @@ internal fun MainShell(
                 appState.setActiveAccount(
                     label = targetAccountRef,
                     preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
+                    onActivated = onActivated,
                     shouldActivate = {
                         quickAccountSwitchRequestIsCurrent(
                             transition = quickAccountSwitchTransition,
@@ -639,6 +645,7 @@ internal fun MainShell(
         mutableStateOf<NotificationMessagePreload<ChatListItem>?>(null)
     }
     val context = LocalContext.current
+    val cycleNotice = rememberQuickProfileCycleNotice()
     val currentInboundNotificationTarget by rememberUpdatedState(inboundNotificationTarget)
     val currentInboundNotificationRequestId by rememberUpdatedState(inboundNotificationRequestId)
     val currentRuntimeGeneration by rememberUpdatedState(appState.runtimeGeneration)
@@ -2255,10 +2262,6 @@ internal fun MainShell(
                                     transitionRunning = routeTransition.isRunning,
                                 ),
                             restoredScrollSnapshot = conversationScrollSnapshots[scrollKey],
-                            onOpenConversation = openGroupFromProfile,
-                            onGroupCreateSubmitted = onGroupCreateSubmitted,
-                            onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
-                            onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
                             onTtsTransportBodyClick = requestTtsDestinationOpen,
                             onSaveScrollSnapshot = { snapshot ->
                                 if (snapshot == null) {
@@ -2339,7 +2342,15 @@ internal fun MainShell(
                                     selectedFolderId = selectedChatListFolderId,
                                     onSelectFolder = { selectedChatListFolderId = it },
                                     onTtsTransportBodyClick = requestTtsDestinationOpen,
-                                    onQuickSwitchAccount = ::requestQuickAccountSwitch,
+                                    onQuickSwitchAccount = { requestQuickAccountSwitch(it) },
+                                    onQuickCycleAccount = {
+                                        appState.requestQuickProfileCycle(
+                                            requestSwitch = { target, activated ->
+                                                requestQuickAccountSwitch(target, activated)
+                                            },
+                                            onSwitched = cycleNotice::show,
+                                        )
+                                    },
                                     onGroupCreateSubmitted = onGroupCreateSubmitted,
                                     onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
                                     onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,

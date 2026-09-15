@@ -26,12 +26,11 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isForConversation
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
-import dev.ipf.whitenoise.android.ui.account.SettingsAccountHeader
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_TOP_BAR_TAG
 import dev.ipf.whitenoise.android.ui.navigation.MainShell
-import dev.ipf.whitenoise.android.ui.settings.SettingsTopBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
@@ -108,13 +107,14 @@ class AppNavigationTest {
             .assertIsDisplayed()
     }
 
+    /** Settings top bar returns to chat list with back link. */
     @Test
     fun settingsTopBarReturnsToChatListWithBackLink() {
         var backClicks = 0
 
         composeRule.setContent {
             WhiteNoiseTheme {
-                SettingsTopBar(onBackToChats = { backClicks += 1 })
+                WhiteNoiseTopBar(title = "Settings", onBack = { backClicks += 1 })
             }
         }
 
@@ -122,7 +122,7 @@ class AppNavigationTest {
         composeRule.onNodeWithText("Chats").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Open navigation").assertDoesNotExist()
 
-        composeRule.onNodeWithContentDescription("Back to chats").performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         composeRule.runOnIdle { assertEquals(1, backClicks) }
     }
 
@@ -208,6 +208,7 @@ class AppNavigationTest {
         assertEquals(headerBefore, headerAfter)
     }
 
+    /** Global confirmation stays clear of settings account actions during navigation. */
     @Test
     fun globalConfirmationStaysClearOfSettingsAccountActionsDuringNavigation() {
         val appState = appState()
@@ -224,55 +225,15 @@ class AppNavigationTest {
         composeRule.onNodeWithContentDescription("Open settings", substring = true).performClick()
 
         composeRule.onNodeWithText("Settings").assertIsDisplayed()
-        val selector =
+        val profile =
             composeRule
-                .onNodeWithContentDescription("Switch Account")
-                .assertIsDisplayed()
-                .assertHasClickAction()
-        val qr =
-            composeRule
-                .onNodeWithContentDescription("My QR code")
+                .onNodeWithTag("settings.active_profile")
                 .assertIsDisplayed()
                 .assertHasClickAction()
         val notice = composeRule.onNodeWithTag(GLOBAL_TRANSIENT_NOTICE_TAG).assertIsDisplayed()
 
         val noticeBounds = notice.fetchSemanticsNode().boundsInRoot
-        assertTrue(selector.fetchSemanticsNode().boundsInRoot.bottom <= noticeBounds.top)
-        assertTrue(qr.fetchSemanticsNode().boundsInRoot.bottom <= noticeBounds.top)
-    }
-
-    @Test
-    fun accountHeaderSeparatesSelectorFromQrAction() {
-        var selectorClicks = 0
-        var qrClicks = 0
-
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                SettingsAccountHeader(
-                    title = "Main Identity",
-                    subtitle = "npub1abc...xyz",
-                    seed = "main-identity",
-                    pictureUrl = null,
-                    onOpenAccountSelector = { selectorClicks += 1 },
-                    onOpenQr = { qrClicks += 1 },
-                )
-            }
-        }
-
-        composeRule.onNodeWithContentDescription("Switch Account").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("My QR code").assertIsDisplayed()
-
-        composeRule.onNodeWithContentDescription("Switch Account").performClick()
-        composeRule.runOnIdle {
-            assertEquals(1, selectorClicks)
-            assertEquals(0, qrClicks)
-        }
-
-        composeRule.onNodeWithContentDescription("My QR code").performClick()
-        composeRule.runOnIdle {
-            assertEquals(1, selectorClicks)
-            assertEquals(1, qrClicks)
-        }
+        assertTrue(profile.fetchSemanticsNode().boundsInRoot.bottom <= noticeBounds.top)
     }
 
     private val context = ApplicationProvider.getApplicationContext<Context>()

@@ -1,113 +1,50 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
-import android.provider.Settings
-import androidx.annotation.StringRes
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Backspace
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.EmojiEmotions
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Pets
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Restaurant
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SportsSoccer
-import androidx.compose.material.icons.filled.Tag
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.EmojiData
-import dev.ipf.whitenoise.android.ui.EmojiEntry
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 internal enum class EmojiPickerPurpose {
     USE,
     CONFIGURE_QUICK_REACTION,
 }
 
+internal const val EMOJI_PICKER_TEST_TAG = "emoji.picker"
+
+/** The sheet opens straight to this share of the screen; there is no half detent. */
+internal const val EMOJI_PICKER_EXPANDED_HEIGHT_FRACTION = 0.88f
+
+internal val EmojiPickerMaximumWidth = 600.dp
+
+private val ComposerEmojiPaneTopInset = 8.dp
+
+/**
+ * Full-height emoji sheet: search field on top, adaptive grid, category bar along the bottom.
+ * [onConfigure] adds the settings action that leads to the quick-reaction configuration sheet.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun EmojiPickerSheet(
@@ -116,72 +53,34 @@ internal fun EmojiPickerSheet(
     purpose: EmojiPickerPurpose = EmojiPickerPurpose.USE,
     recentEmojis: List<String> = emptyList(),
     onEmojiUsed: (String) -> Unit = {},
-    restoreExpanded: Boolean = false,
-    messageReactionEmojis: List<String> = emptyList(),
-    onCustomizeReactions: ((Boolean) -> Unit)? = null,
+    onConfigure: (() -> Unit)? = null,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-    val scope = rememberCoroutineScope()
-    LaunchedEffect(restoreExpanded, sheetState) {
-        if (restoreExpanded) {
-            runCatching { sheetState.expand() }
-        }
-    }
-    val contentExpanded =
-        sheetState.currentValue == SheetValue.Expanded || sheetState.targetValue == SheetValue.Expanded
-    val visibleContentFraction = emojiPickerSheetVisibleContentFraction(expanded = contentExpanded)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
-        containerColor = amoledSheetContainerColor(),
         onDismissRequest = onDismissRequest,
-        // Start at the partial detent, but keep the sheet composed under the
-        // customize screen so an expanded picker returns expanded without a
-        // visible collapse/re-expand.
         sheetState = sheetState,
+        containerColor = amoledSheetContainerColor(),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(EmojiPickerSheetMaxHeightFraction)
-                    .navigationBarsPadding()
-                    .imePadding()
-                    .padding(horizontal = 18.dp, vertical = 8.dp),
-        ) {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             EmojiPickerContent(
                 onEmojiPicked = onEmojiPicked,
                 purpose = purpose,
                 recentEmojis = recentEmojis,
                 onEmojiUsed = onEmojiUsed,
-                messageReactionEmojis = messageReactionEmojis,
-                onCustomizeReactions =
-                    onCustomizeReactions?.let { customize ->
-                        { customize(sheetState.currentValue == SheetValue.Expanded) }
-                    },
-                searchFieldAlwaysVisible = true,
-                searchStartsOpen = false,
-                // Material3 measures the sheet at its full requested height, then
-                // exposes only the top half at the partial detent. Keep the outer
-                // shell tall enough for expansion, but lay out the picker controls
-                // inside the actually visible partial viewport so the rail is not
-                // hidden below the fold.
-                // Focusing the search field expands the sheet to full screen;
-                // imePadding then lifts the whole picker (grid + category rail)
-                // above the keyboard so nothing hides behind the IME (#1104).
-                onSearchActiveChange = { active ->
-                    if (active) {
-                        scope.launch { runCatching { sheetState.expand() } }
-                    }
-                },
+                onConfigure = onConfigure,
                 modifier =
                     Modifier
-                        .align(Alignment.TopCenter)
                         .fillMaxWidth()
-                        .fillMaxHeight(visibleContentFraction),
+                        .fillMaxHeight(EMOJI_PICKER_EXPANDED_HEIGHT_FRACTION)
+                        .widthIn(max = EmojiPickerMaximumWidth)
+                        .imePadding()
+                        .testTag(EMOJI_PICKER_TEST_TAG),
             )
         }
     }
 }
 
+/** The composer's inline emoji pane: the same picker content in place of the keyboard, with a backspace action. */
 @Composable
 internal fun ComposerEmojiPickerPane(
     height: Dp,
@@ -210,37 +109,17 @@ internal fun ComposerEmojiPickerPane(
             recentEmojis = recentEmojis,
             onEmojiUsed = onEmojiUsed,
             onBackspace = onBackspace,
-            searchStartsOpen = false,
             onSearchActiveChange = onSearchActiveChange,
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxSize().padding(top = ComposerEmojiPaneTopInset),
         )
     }
 }
 
-internal const val EmojiPickerSheetMaxHeightFraction = 0.86f
-
-private const val EmojiPickerSheetPartialDetentFraction = 0.48f
-
-internal fun emojiPickerSheetVisibleContentFraction(expanded: Boolean): Float =
-    if (expanded) {
-        1f
-    } else {
-        (EmojiPickerSheetPartialDetentFraction / EmojiPickerSheetMaxHeightFraction).coerceIn(0f, 1f)
-    }
-
 internal val ComposerEmojiPickerFallbackHeight = 320.dp
-
-private const val EMOJI_PICKER_COLUMN_COUNT = 10
-
-private val EmojiPickerGridRowSpacing = 2.dp
-
-private val EmojiSectionHeaderVerticalPadding = 4.dp
 
 internal const val EMOJI_PICKER_CELL_GLYPH_FILL_FRACTION = 0.85f
 
+/** Font and line metrics that keep a system emoji glyph inside a [cellSizeDp] square at any font scale. */
 internal fun emojiPickerCellTextMetrics(
     cellSizeDp: Dp,
     baseStyle: TextStyle,
@@ -255,11 +134,6 @@ internal fun emojiPickerCellTextMetrics(
 }
 
 internal val ComposerEmojiPickerSearchExtraHeight = 112.dp
-
-private data class EmojiSearchSnapshot(
-    val query: String,
-    val results: List<EmojiEntry>,
-)
 
 internal fun composerEmojiPaneTargetHeight(
     currentImeHeight: Dp,
@@ -369,525 +243,3 @@ internal fun composerEmojiPaneRestoreStep(
  * focus and imePadding simply takes over at the keyboard's real height.
  */
 internal fun composerKeyboardRestoreTimeoutClearsFocus(currentImeHeight: Dp): Boolean = currentImeHeight == 0.dp
-
-@Composable
-internal fun EmojiPickerContent(
-    onEmojiPicked: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    purpose: EmojiPickerPurpose = EmojiPickerPurpose.USE,
-    recentEmojis: List<String> = emptyList(),
-    onEmojiUsed: (String) -> Unit = {},
-    messageReactionEmojis: List<String> = emptyList(),
-    onBackspace: (() -> Unit)? = null,
-    onCustomizeReactions: (() -> Unit)? = null,
-    searchStartsOpen: Boolean = false,
-    searchFieldAlwaysVisible: Boolean = false,
-    onSearchActiveChange: (Boolean) -> Unit = {},
-    selectionEnabled: Boolean = true,
-) {
-    val context = LocalContext.current
-    var searchQuery by rememberSaveable { mutableStateOf("") }
-    var searchOpen by rememberSaveable { mutableStateOf(searchStartsOpen) }
-    val searchFocusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val browseEmoji by produceState(initialValue = emptyList<EmojiEntry>(), context) {
-        value = withContext(Dispatchers.IO) { EmojiData.load(context) }
-    }
-    val searchSnapshot by
-        produceState(
-            initialValue = EmojiSearchSnapshot(query = "", results = emptyList()),
-            searchQuery,
-            browseEmoji,
-        ) {
-            val query = searchQuery
-            val results =
-                if (query.isBlank()) emptyList() else withContext(Dispatchers.Default) { EmojiData.search(browseEmoji, query) }
-            value = EmojiSearchSnapshot(query = query, results = results)
-        }
-    val searchResults = searchSnapshot.results.takeIf { searchSnapshot.query == searchQuery }.orEmpty()
-    val grouped = remember(browseEmoji) { browseEmoji.groupBy { it.group } }
-    val messageReactions =
-        remember(messageReactionEmojis) {
-            messageReactionEmojis.filter { it.isNotBlank() }.distinct()
-        }
-    val recents = remember(recentEmojis) { recentEmojis.filter { it.isNotBlank() } }
-    val gridState = rememberLazyGridState()
-    val scope = rememberCoroutineScope()
-    var activeCategory by remember(recents.isNotEmpty()) { mutableIntStateOf(if (recents.isNotEmpty()) -1 else 0) }
-    // Grid item index of each section's header, so a bottom category tab scrolls
-    // straight to it. Layout: recents (header + cells) then each group (header +
-    // cells); every header and every emoji counts as one grid item.
-    val sectionHeaderIndex =
-        remember(grouped, messageReactions, recents) {
-            IntArray(EmojiData.GroupCount).also { arr ->
-                var index = if (messageReactions.isEmpty()) 0 else 1 + messageReactions.size
-                if (recents.isNotEmpty()) index += 1 + recents.size
-                for (group in 0 until EmojiData.GroupCount) {
-                    arr[group] = index
-                    val count = grouped[group]?.size ?: 0
-                    if (count > 0) index += 1 + count
-                }
-            }
-        }
-    LaunchedEffect(searchOpen) {
-        onSearchActiveChange(searchOpen)
-        if (searchOpen) {
-            withFrameNanos { }
-            runCatching { searchFocusRequester.requestFocus() }
-            keyboardController?.show()
-        } else {
-            searchQuery = ""
-        }
-    }
-    LaunchedEffect(gridState, sectionHeaderIndex, messageReactions.size, recents.size) {
-        snapshotFlow { gridState.firstVisibleItemIndex }
-            .collect { index ->
-                val recentsHeaderIndex = if (messageReactions.isEmpty()) 0 else 1 + messageReactions.size
-                activeCategory =
-                    if (recents.isNotEmpty() && index >= recentsHeaderIndex && index < (sectionHeaderIndex.firstOrNull() ?: 0)) {
-                        -1
-                    } else {
-                        sectionHeaderIndex
-                            .withIndex()
-                            .lastOrNull { (_, headerIndex) -> index >= headerIndex }
-                            ?.index
-                            ?: 0
-                    }
-            }
-    }
-
-    fun pick(emoji: String) {
-        if (!selectionEnabled) return
-        if (purpose == EmojiPickerPurpose.USE) {
-            onEmojiUsed(emoji)
-        }
-        onEmojiPicked(emoji)
-    }
-
-    // Keep the rail out of the weighted grid column so the partial sheet detent
-    // reserves it before the emoji grid takes the remaining height.
-    Scaffold(
-        modifier = modifier,
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets(0.dp),
-        bottomBar = {
-            EmojiCategoryRail(
-                onCustomizeReactions = onCustomizeReactions,
-                showSearch = !searchFieldAlwaysVisible,
-                searchSelected = searchOpen,
-                onSearch = { searchOpen = true },
-                showRecents = recents.isNotEmpty(),
-                recentsSelected = activeCategory == -1,
-                onRecents = {
-                    searchOpen = false
-                    keyboardController?.hide()
-                    activeCategory = -1
-                    scope.launch {
-                        gridState.scrollToItem(if (messageReactions.isEmpty()) 0 else 1 + messageReactions.size)
-                    }
-                },
-                selectedGroup = activeCategory,
-                onGroup = { group ->
-                    searchOpen = false
-                    keyboardController?.hide()
-                    activeCategory = group
-                    scope.launch { gridState.scrollToItem(sectionHeaderIndex[group]) }
-                },
-                onBackspace = onBackspace,
-                modifier = Modifier.fillMaxWidth().height(54.dp),
-            )
-        },
-    ) { contentPadding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(contentPadding),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (searchFieldAlwaysVisible || searchOpen) {
-                EmojiSearchField(
-                    value = searchQuery,
-                    onValueChange = {
-                        if (searchFieldAlwaysVisible) searchOpen = true
-                        searchQuery = it
-                    },
-                    onClose = {
-                        searchOpen = false
-                        keyboardController?.hide()
-                    },
-                    onSearchIntent = { searchOpen = true },
-                    focusRequester = searchFocusRequester,
-                    showBackButton = !searchFieldAlwaysVisible,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            if (!searchOpen || searchQuery.isBlank()) {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(EMOJI_PICKER_COLUMN_COUNT),
-                    state = gridState,
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(EmojiPickerGridRowSpacing),
-                ) {
-                    if (messageReactions.isNotEmpty()) {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            EmojiSectionHeader(stringResource(R.string.emoji_category_this_message))
-                        }
-                        items(messageReactions, key = { "message-reaction:$it" }) { emoji ->
-                            EmojiSearchResultCell(
-                                emoji = emoji,
-                                enabled = selectionEnabled,
-                                onClick = { pick(emoji) },
-                            )
-                        }
-                    }
-                    if (recents.isNotEmpty()) {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            EmojiSectionHeader(stringResource(R.string.emoji_category_recent))
-                        }
-                        items(recents, key = { "recent:$it" }) { emoji ->
-                            EmojiSearchResultCell(
-                                emoji = emoji,
-                                enabled = selectionEnabled,
-                                onClick = { pick(emoji) },
-                            )
-                        }
-                    }
-                    for (group in 0 until EmojiData.GroupCount) {
-                        val groupEmoji = grouped[group].orEmpty()
-                        if (groupEmoji.isEmpty()) continue
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            EmojiSectionHeader(stringResource(emojiGroupTitleRes(group)))
-                        }
-                        items(groupEmoji, key = { it.emoji }) { entry ->
-                            EmojiSearchResultCell(
-                                emoji = entry.emoji,
-                                enabled = selectionEnabled,
-                                onClick = { pick(entry.emoji) },
-                            )
-                        }
-                    }
-                }
-            } else {
-                EmojiSearchResultsGrid(
-                    results = searchResults,
-                    onEmojiPicked = { pick(it) },
-                    selectionEnabled = selectionEnabled,
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmojiSearchField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    onClose: () -> Unit,
-    onSearchIntent: () -> Unit,
-    focusRequester: FocusRequester,
-    showBackButton: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier.height(64.dp).padding(top = 14.dp, bottom = 6.dp),
-        // Transparent so the search row blends with the picker surface in both
-        // light and AMOLED themes, instead of a hardcoded dark box that reads
-        // as black in light mode.
-        color = Color.Transparent,
-        shape = RoundedCornerShape(22.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            IconButton(
-                onClick = if (showBackButton) onClose else onSearchIntent,
-                modifier = Modifier.size(32.dp),
-            ) {
-                Icon(
-                    if (showBackButton) Icons.AutoMirrored.Filled.ArrowBack else Icons.Default.Search,
-                    contentDescription =
-                        if (showBackButton) {
-                            stringResource(R.string.back)
-                        } else {
-                            stringResource(R.string.emoji_search_hint)
-                        },
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),
-                    modifier = Modifier.size(26.dp),
-                )
-            }
-            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                BasicTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    singleLine = true,
-                    textStyle =
-                        LocalTextStyle.current.copy(
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Medium,
-                        ),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .focusRequester(focusRequester)
-                            .onFocusChanged { if (it.isFocused) onSearchIntent() },
-                )
-                if (value.isEmpty()) {
-                    Text(
-                        stringResource(R.string.emoji_search_hint),
-                        style =
-                            LocalTextStyle.current.copy(
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Medium,
-                            ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                    )
-                }
-            }
-            if (value.isNotEmpty()) {
-                IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = stringResource(R.string.emoji_search_clear),
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmojiSearchResultsGrid(
-    results: List<EmojiEntry>,
-    onEmojiPicked: (String) -> Unit,
-    selectionEnabled: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    if (results.isEmpty()) {
-        Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            Text(
-                text = stringResource(R.string.emoji_search_no_results),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        return
-    }
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(EMOJI_PICKER_COLUMN_COUNT),
-        modifier = modifier,
-        contentPadding = PaddingValues(vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(EmojiPickerGridRowSpacing),
-    ) {
-        items(results, key = { it.emoji }) { entry ->
-            EmojiSearchResultCell(
-                emoji = entry.emoji,
-                enabled = selectionEnabled,
-                onClick = { onEmojiPicked(entry.emoji) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun EmojiSearchResultCell(
-    emoji: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    BoxWithConstraints(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .clip(CircleShape)
-                .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        val fontScale = LocalDensity.current.fontScale
-        val baseStyle = MaterialTheme.typography.headlineMedium
-        val (fittedFontSize, fittedLineHeight) =
-            emojiPickerCellTextMetrics(
-                cellSizeDp = maxWidth,
-                baseStyle = baseStyle,
-                densityFontScale = fontScale,
-            )
-        Text(
-            emoji,
-            style = baseStyle,
-            fontSize = fittedFontSize,
-            lineHeight = fittedLineHeight,
-            maxLines = 1,
-        )
-    }
-}
-
-@Composable
-private fun EmojiCategoryRail(
-    onCustomizeReactions: (() -> Unit)?,
-    showSearch: Boolean,
-    searchSelected: Boolean,
-    onSearch: () -> Unit,
-    showRecents: Boolean,
-    recentsSelected: Boolean,
-    onRecents: () -> Unit,
-    selectedGroup: Int,
-    onGroup: (Int) -> Unit,
-    onBackspace: (() -> Unit)?,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        // No fill and no vertical padding of its own: the rail reads as part
-        // of the picker surface, not a separate bar. Each entry is an equal
-        // weighted slot so search stays leading and backspace stays trailing.
-        modifier = modifier.padding(horizontal = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (onCustomizeReactions != null) {
-            EmojiRailIconButton(
-                onClick = onCustomizeReactions,
-                selected = false,
-                icon = Icons.Default.Settings,
-                contentDescription = stringResource(R.string.customize_reactions),
-                modifier = Modifier.weight(1f),
-            )
-        }
-        if (showSearch) {
-            EmojiRailIconButton(
-                onClick = onSearch,
-                selected = searchSelected,
-                icon = Icons.Default.Search,
-                contentDescription = stringResource(R.string.emoji_search_hint),
-                modifier = Modifier.weight(1f),
-            )
-        }
-        if (showRecents) {
-            EmojiRailIconButton(
-                onClick = onRecents,
-                selected = recentsSelected,
-                icon = Icons.Default.History,
-                contentDescription = stringResource(R.string.emoji_category_recent),
-                modifier = Modifier.weight(1f),
-            )
-        }
-        for (group in 0 until EmojiData.GroupCount) {
-            EmojiRailIconButton(
-                onClick = { onGroup(group) },
-                selected = selectedGroup == group,
-                icon = emojiGroupIcon(group),
-                contentDescription = stringResource(emojiGroupTitleRes(group)),
-                modifier = Modifier.weight(1f),
-            )
-        }
-        if (onBackspace != null) {
-            EmojiRailIconButton(
-                onClick = onBackspace,
-                selected = false,
-                icon = Icons.AutoMirrored.Filled.Backspace,
-                contentDescription = stringResource(R.string.emoji_backspace),
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-// Compact circular chip the selected-category highlight paints; small enough
-// to fit the narrowest weighted slot when all twelve rail entries are shown.
-internal val EmojiRailHighlightSize = 34.dp
-
-internal val EmojiRailIconSize = 22.dp
-
-/**
- * The selected fill is an onSurface overlay rather than a container role or a
- * fixed color: surface-container tokens are all pure black in the AMOLED
- * scheme (so a chip painted with them would vanish), and a hardcoded fill only
- * reads correctly in one theme. A translucent onSurface wash adapts to light,
- * dark, and AMOLED alike.
- */
-@Composable
-private fun EmojiRailIconButton(
-    onClick: () -> Unit,
-    selected: Boolean,
-    icon: ImageVector,
-    contentDescription: String,
-    modifier: Modifier = Modifier,
-) {
-    // The chip is a fixed-size circle centered in the weighted slot, so the
-    // highlight never stretches into a slot-wide pill. The clickable Surface
-    // keeps Material's minimum interactive size, so the touch target stays
-    // larger than the visual circle.
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Surface(
-            onClick = onClick,
-            shape = CircleShape,
-            color =
-                if (selected) {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
-                } else {
-                    Color.Transparent
-                },
-            contentColor =
-                if (selected) {
-                    MaterialTheme.colorScheme.onSurface
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
-                },
-            modifier = Modifier.size(EmojiRailHighlightSize),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    icon,
-                    contentDescription = contentDescription,
-                    modifier = Modifier.size(EmojiRailIconSize),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmojiSectionHeader(title: String) {
-    Text(
-        text = title,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(
-                    top = EmojiSectionHeaderVerticalPadding,
-                    bottom = EmojiSectionHeaderVerticalPadding,
-                ),
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f),
-    )
-}
-
-private fun emojiGroupIcon(group: Int): ImageVector =
-    when (group) {
-        0 -> Icons.Default.EmojiEmotions
-        1 -> Icons.Default.Person
-        2 -> Icons.Default.Pets
-        3 -> Icons.Default.Restaurant
-        4 -> Icons.Default.DirectionsCar
-        5 -> Icons.Default.SportsSoccer
-        6 -> Icons.Default.Favorite
-        7 -> Icons.Default.Tag
-        else -> Icons.Default.Public
-    }
-
-@StringRes
-private fun emojiGroupTitleRes(group: Int): Int =
-    when (group) {
-        0 -> R.string.emoji_category_smileys
-        1 -> R.string.emoji_category_people
-        2 -> R.string.emoji_category_animals
-        3 -> R.string.emoji_category_food
-        4 -> R.string.emoji_category_travel
-        5 -> R.string.emoji_category_activities
-        6 -> R.string.emoji_category_objects
-        7 -> R.string.emoji_category_symbols
-        else -> R.string.emoji_category_flags
-    }

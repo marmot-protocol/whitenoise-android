@@ -103,6 +103,8 @@ internal fun ConversationImeReanchorEffect(
 @Suppress("FunctionNaming", "LongMethod") // Jetpack Compose functions use UpperCamelCase, and this
 // is the conversation screen's pause/resume wiring moved out verbatim — splitting it further would
 // scatter one lifecycle across files.
+
+/** Restores the timeline anchor and viewport when the conversation returns to the foreground. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ConversationForegroundRestoreEffects(
@@ -119,6 +121,7 @@ internal fun ConversationForegroundRestoreEffects(
     currentScrollAnchor: () -> ConversationScrollAnchor,
     resolveScrollAnchorIndex: (ConversationScrollAnchor) -> Int?,
     currentTailIndex: () -> Int,
+    timelineViewport: ConversationTimelineViewport? = null,
 ) {
     val foregroundPreDrawSignals = remember(controller) { Channel<Unit>(capacity = Channel.CONFLATED) }
     var foregroundRestoreToken by remember(controller) { mutableStateOf<ConversationForegroundRestoreToken?>(null) }
@@ -138,7 +141,8 @@ internal fun ConversationForegroundRestoreEffects(
         rememberUpdatedState(
             newValue = {
                 ConversationForegroundGeometry(
-                    viewportHeightPx = listState.layoutInfo.viewportSize.height,
+                    viewportHeightPx =
+                        (timelineViewport?.readingLayoutInfo() ?: listState.layoutInfo).viewportSize.height,
                     imeBottomPx = imeInsets.getBottom(density),
                     bottomChromeHeightPx = bottomChromeHeightObserver.currentHeightPx,
                 )

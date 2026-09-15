@@ -245,7 +245,7 @@ class FreshSweepCoverageTest {
     fun retainedMediaFilesAreRevalidatedBeforePlayback() {
         val voice = source("ui/conversation/media/MediaVoice.kt")
         val video = source("ui/conversation/media/MediaVideo.kt")
-        val voiceBubble = voice.section("internal fun MediaVoiceBubble(", "private fun VoiceSpeedPill(")
+        val voiceBubble = voice.section("internal fun MediaVoiceBubble(", "internal fun VoiceAttachmentContent(")
         val videoBubble = video.section("internal fun MediaVideoBubble(", "internal fun cachedVideoAttachmentFile(")
         val videoGridTile = video.section("internal fun MediaVideoGridTile(", "internal fun MediaVideoBubble(")
 

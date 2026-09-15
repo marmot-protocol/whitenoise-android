@@ -114,6 +114,7 @@ internal fun SeededConversationAnchorBaselineEffect(
     timelineStructure: ConversationTimelineStructure,
     onTailAlignmentCommitted: () -> Unit,
     onTailAlignmentExhausted: () -> Unit,
+    timelineViewport: ConversationTimelineViewport? = null,
 ) {
     val currentTailIndexProvider = rememberUpdatedState(currentTailIndex)
     val currentTimelineStructure = rememberUpdatedState(timelineStructure)
@@ -143,7 +144,7 @@ internal fun SeededConversationAnchorBaselineEffect(
         }
         postInitialReanchorGate.commit(
             structure = currentTimelineStructure.value,
-            viewportHeight = listState.layoutInfo.viewportSize.height,
+            viewportHeight = (timelineViewport?.readingLayoutInfo() ?: listState.layoutInfo).viewportSize.height,
         )
         currentAlignmentCallback.value()
     }

@@ -51,13 +51,19 @@ class ConversationDictationPersistentControlTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** Verifies listening and processing keep the three explicit session outcomes visible and accessible. */
+    /**
+     * Verifies listening and processing keep the three explicit session outcomes visible and accessible,
+     * and that starting, listening and transcribing each show a distinct phase indicator.
+     */
     @Test
     fun listeningAndProcessingExposeCancelPasteAndSendActions() {
         val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         render(fixture)
-        composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertIsDisplayed()
+        // Starting: the spinner alone, no hairline and no recording indicator.
+        composeRule.onNodeWithTag(DICTATION_SPINNER_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(DICTATION_LISTENING_INDICATOR_TAG).assertDoesNotExist()
         fixture.platform.listener.onReady()
 
         composeRule
@@ -73,7 +79,10 @@ class ConversationDictationPersistentControlTest {
             assertTrue(bounds.bottom - bounds.top >= 48.dp)
         }
         composeRule.onNodeWithContentDescription("Record voice message").assertDoesNotExist()
+        // Listening: the live recording indicator, with neither spinner nor hairline.
         composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(DICTATION_SPINNER_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(DICTATION_LISTENING_INDICATOR_TAG).assertIsDisplayed()
 
         fixture.platform.listener.onEndOfSpeech()
 
@@ -83,6 +92,7 @@ class ConversationDictationPersistentControlTest {
         listOf("Cancel", "Paste", "Send").forEach { label ->
             composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
         }
+        // Transcribing: the indeterminate hairline plus the spinner, recording indicator gone.
         composeRule
             .onNodeWithTag(DICTATION_PROGRESS_TAG)
             .assertIsDisplayed()
@@ -92,6 +102,28 @@ class ConversationDictationPersistentControlTest {
                     ProgressBarRangeInfo.Indeterminate,
                 ),
             )
+        composeRule.onNodeWithTag(DICTATION_SPINNER_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(DICTATION_LISTENING_INDICATOR_TAG).assertDoesNotExist()
+    }
+
+    /** Real Pause and Resume preserve the draft while keeping Cancel/Paste/Send independently reachable. */
+    @Test
+    fun pauseAndResumeAreExplicitActionsWithoutTerminalDelivery() {
+        val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        render(fixture)
+        composeRule.onNodeWithContentDescription("Pause dictation").assertIsDisplayed().performClick()
+        fixture.platform.listener.onResult("first")
+        composeRule.onNodeWithContentDescription("Resume dictation").assertIsDisplayed()
+        assertEquals("Draft", fixture.draft.text)
+        listOf("Cancel", "Paste", "Send").forEach { label ->
+            composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
+        }
+        composeRule.onNodeWithContentDescription("Resume dictation").performClick()
+        fixture.platform.listener.onBeginningOfSpeech()
+        composeRule.onNodeWithContentDescription("Paste").performClick()
+        fixture.platform.listener.onResult("second")
+        assertEquals("Draft first second", fixture.draft.text)
     }
 
     /** Verifies an ambiguous merge retains explicit copy, insert, and discard choices. */

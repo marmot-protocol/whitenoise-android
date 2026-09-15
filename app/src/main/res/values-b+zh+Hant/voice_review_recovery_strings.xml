@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_review_unavailable_title">錄音無法使用</string>
+    <string name="voice_review_unavailable_message">無法還原此錄音。請重新錄製。</string>
+</resources>

@@ -41,6 +41,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
@@ -111,6 +112,7 @@ internal fun visualMediaOwnsFooter(
     hasCaption: Boolean,
 ): Boolean = !deleted && !hasInvalidationWarning && visualCount > 0 && fileCount == 0 && !hasCaption
 
+/** Footer frame for visual media: time and status at the trailing edge. */
 @Composable
 @Suppress("FunctionNaming") // Compose UI entry point.
 internal fun VisualMediaFooterFrame(
@@ -120,9 +122,10 @@ internal fun VisualMediaFooterFrame(
     status: MessageStatus,
     retention: RetentionIndicatorInput?,
     reserveRetentionSpace: Boolean,
+    focusedPreview: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    Box {
+    Box(modifier = focusedVisualCanvasModifier(focusedPreview)) {
         content()
         if (showFooter) {
             MediaFooterOverlay(
@@ -162,7 +165,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
     showPendingPlaceholder: Boolean,
     fileFooterWarning: String?,
     onMediaLongPress: () -> Unit,
-    attachedToCaption: Boolean,
+    focusedPreview: Boolean = false,
 ) {
     val retentionInput =
         record.retentionIndicatorInput(
@@ -219,6 +222,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 status = item.status,
                 retention = retentionInput,
                 reserveRetentionSpace = reserveRetentionSpace,
+                focusedPreview = focusedPreview,
             ) {
                 if (MediaReferenceSupport.isVideoMedia(entry.value)) {
                     MediaVideoBubble(
@@ -230,7 +234,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         appState = appState,
                         onOpenConversationMedia = onOpenConversationMedia,
                         onLongPress = onMediaLongPress,
-                        attachedToCaption = attachedToCaption,
                     )
                 } else {
                     MediaImageBubble(
@@ -242,7 +245,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         onOpenConversationMedia = onOpenConversationMedia,
                         mine = mine,
                         onLongPress = onMediaLongPress,
-                        attachedToCaption = attachedToCaption,
                     )
                 }
             }
@@ -254,6 +256,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 status = item.status,
                 retention = retentionInput,
                 reserveRetentionSpace = reserveRetentionSpace,
+                focusedPreview = focusedPreview,
             ) {
                 MediaVisualGridBubble(
                     item = item,
@@ -263,7 +266,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                     onOpenConversationMedia = onOpenConversationMedia,
                     mine = mine,
                     onLongPress = onMediaLongPress,
-                    attachedToCaption = attachedToCaption,
                 )
             }
         }
@@ -283,7 +285,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                     appState = appState,
                     presentationOwner = presentationOwner,
                     onLongPress = onMediaLongPress,
-                    attachedToCaption = attachedToCaption,
                 )
             }
         }
@@ -308,7 +309,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 senderKey = record.sender,
                 senderDisplayName = appState.displayName(record.sender),
                 onLongPress = onMediaLongPress,
-                attachedToCaption = attachedToCaption,
                 timestampText = fileTimestamp.takeIf { isFooterOwner },
                 showStatus = isFooterOwner && showStatus,
                 status = item.status,
@@ -346,7 +346,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                     appState = appState,
                     presentationOwner = presentationOwner,
                     onLongPress = onMediaLongPress,
-                    attachedToCaption = attachedToCaption,
                 )
             }
         }
@@ -365,6 +364,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 status = item.status,
                 retention = retentionInput,
                 reserveRetentionSpace = reserveRetentionSpace,
+                focusedPreview = focusedPreview,
             ) {
                 if (MediaReferenceSupport.isVideoMedia(entry.value)) {
                     MediaVideoBubble(
@@ -379,7 +379,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         uploading = !uploadFailed,
                         uploadFailed = uploadFailed,
                         onRetryUpload = if (uploadFailed) retryUpload else null,
-                        attachedToCaption = attachedToCaption,
                     )
                 } else {
                     MediaImageBubble(
@@ -392,7 +391,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         mine = true,
                         onLongPress = onMediaLongPress,
                         uploading = !uploadFailed,
-                        attachedToCaption = attachedToCaption,
                     )
                 }
             }
@@ -404,6 +402,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 status = item.status,
                 retention = retentionInput,
                 reserveRetentionSpace = reserveRetentionSpace,
+                focusedPreview = focusedPreview,
             ) {
                 MediaVisualGridBubble(
                     item = item,
@@ -414,7 +413,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                     mine = true,
                     onLongPress = onMediaLongPress,
                     uploading = !uploadFailed,
-                    attachedToCaption = attachedToCaption,
                 )
             }
         }
@@ -429,7 +427,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
         MediaPendingPlaceholder(
             pendingAttachments = controller.pendingAttachmentsList(record.messageIdHex),
             failed = item.status == MessageStatus.Failed,
-            attachedToCaption = attachedToCaption,
             timestampText = rememberedMessageBubbleTime(record.recordedAt).takeIf { pendingFileOwnsFooter },
             showStatus = pendingFileOwnsFooter && showStatus,
             status = item.status,
@@ -445,6 +442,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
     }
 }
 
+/** Body, inline footer and the retry affordance of a bubble. */
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 internal fun ColumnScope.BubbleBodyFooterAndRetry(
@@ -486,6 +484,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     invalidationWarning: String?,
     mine: Boolean,
     onExpand: () -> Unit,
+    statusContainerColor: Color? = null,
 ) {
     val retentionInput =
         record
@@ -516,6 +515,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             editedLabel = editedLabel,
             onEditedClick = onEditedClick,
             showTime = showTimestamp,
+            statusContainerColor = statusContainerColor,
         )
     }
     val hasInlineFooter =
@@ -663,6 +663,9 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                         Text(
                             bodyText,
                             style = MaterialTheme.typography.bodyLarge,
+                            // A tombstone is narration, not authored content, and
+                            // the prototype italicises it to say so.
+                            fontStyle = if (deleted) FontStyle.Italic else null,
                             modifier =
                                 plainTextSelectionModifier
                                     .semantics { customActions = sentenceActions }
@@ -786,7 +789,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             }
         }
     } else if (!footerOnVisualMedia && !footerOnPendingVisual && hasInlineFooter) {
-        Box(modifier = Modifier.align(if (mine) Alignment.End else Alignment.Start)) {
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
             inlineFooter()
         }
     }

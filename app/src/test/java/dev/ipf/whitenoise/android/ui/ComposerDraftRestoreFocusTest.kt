@@ -8,13 +8,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.SoftwareKeyboardController
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.state.ComposerDraftSnapshot
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
@@ -32,6 +35,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.util.ReflectionHelpers
+import org.robolectric.util.ReflectionHelpers.ClassParameter
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -158,15 +163,22 @@ class ComposerDraftRestoreFocusTest {
         composeRule.runOnIdle { assertEquals(1, fixture.focusGainCount) }
     }
 
+    /** Restored draft focus survives composer remount with same draft key. */
+    @Suppress("LongMethod") // Keeps the focus transition and remount assertions in one fixture.
     @Test
     fun restoredDraftFocusSurvivesComposerRemountWithSameDraftKey() {
         var showComposer by mutableStateOf(true)
         val draftKey = "conversation-1"
         lateinit var focusManager: FocusManager
+        lateinit var hostView: android.view.View
         var focusGainCount = 0
+        var phase = "initial"
+        val focusEvents = mutableListOf<String>()
+        val keyboard = RecordingSoftwareKeyboardController()
 
         composeRule.setContent {
             focusManager = LocalFocusManager.current
+            hostView = LocalView.current
             val autoFocusConsumed = remember(draftKey) { mutableStateOf(false) }
             val snapshot = ComposerDraftSnapshot(TextFieldValue("saved draft"), focusOnRestore = true)
             WhiteNoiseTheme {
@@ -186,7 +198,9 @@ class ComposerDraftRestoreFocusTest {
                                     currentDictationRevision = 0,
                                 ),
                             autoFocusConsumedState = autoFocusConsumed,
+                            softwareKeyboardController = keyboard,
                             onComposerFocusChanged = { focused ->
+                                focusEvents += "$phase focused=$focused consumed=${autoFocusConsumed.value}"
                                 if (focused) focusGainCount += 1
                             },
                         )
@@ -196,15 +210,51 @@ class ComposerDraftRestoreFocusTest {
         }
 
         composeRule.waitForIdle()
-        composeRule.runOnIdle {
-            assertEquals(1, focusGainCount)
-            focusManager.clearFocus(force = true)
+        val previousTouchMode = hostView.isInTouchMode
+        try {
+            composeRule.runOnIdle { setHostTouchMode(hostView, true) }
+            composeRule.waitForIdle()
+            assertTrue("The remount fixture models touchscreen focus clearing", hostView.isInTouchMode)
+            composeRule.runOnIdle {
+                assertEquals(1, focusGainCount)
+                phase = "clear"
+                focusManager.clearFocus(force = true)
+            }
+            composeRule.waitForIdle()
+            composeRule.onNodeWithText("saved draft").assertIsNotFocused()
+            composeRule.runOnIdle {
+                phase = "unmount"
+                showComposer = false
+            }
+            composeRule.waitForIdle()
+            composeRule.runOnIdle {
+                phase = "remount"
+                showComposer = true
+            }
+            composeRule.waitForIdle()
+            composeRule.runOnIdle {
+                assertEquals("focus=$focusEvents keyboardShows=${keyboard.showRequests}", 1, focusGainCount)
+            }
+        } finally {
+            composeRule.runOnIdle { setHostTouchMode(hostView, previousTouchMode) }
         }
-        composeRule.runOnIdle { showComposer = false }
-        composeRule.waitForIdle()
-        composeRule.runOnIdle { showComposer = true }
-        composeRule.waitForIdle()
-        composeRule.runOnIdle { assertEquals(1, focusGainCount) }
+    }
+
+    /**
+     * Robolectric's Instrumentation changes only its window-session flag. Deliver the matching real
+     * ViewRoot callback too, so clearFocus cannot immediately select the first editor in keyboard mode.
+     */
+    private fun setHostTouchMode(
+        view: android.view.View,
+        inTouchMode: Boolean,
+    ) {
+        InstrumentationRegistry.getInstrumentation().setInTouchMode(inTouchMode)
+        val viewRoot = ReflectionHelpers.callInstanceMethod<Any>(view, "getViewRootImpl")
+        ReflectionHelpers.callInstanceMethod<Void>(
+            viewRoot,
+            "touchModeChanged",
+            ClassParameter.from(Boolean::class.javaPrimitiveType!!, inTouchMode),
+        )
     }
 
     @Test

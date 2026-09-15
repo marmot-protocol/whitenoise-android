@@ -32,7 +32,7 @@ class MessageAttachmentSaveTest {
         var saveClicks = 0
         renderActionMenu(canSave = true, onSave = { saveClicks++ })
 
-        composeRule.onNodeWithText(string(R.string.shared_media_save)).assertIsDisplayed().performClick()
+        composeRule.onNodeWithText(string(R.string.save_attachments)).assertIsDisplayed().performClick()
 
         assertEquals(1, saveClicks)
     }
@@ -41,7 +41,7 @@ class MessageAttachmentSaveTest {
     fun saveActionIsHiddenWithoutAttachment() {
         renderActionMenu(canSave = false)
 
-        composeRule.onNodeWithText(string(R.string.shared_media_save)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.save_attachments)).assertDoesNotExist()
     }
 
     @Test

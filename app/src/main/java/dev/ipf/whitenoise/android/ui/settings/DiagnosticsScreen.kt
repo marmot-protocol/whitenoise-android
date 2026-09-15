@@ -3,35 +3,27 @@ package dev.ipf.whitenoise.android.ui.settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.MonitorHeart
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,15 +34,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -62,8 +55,13 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnosticStatus
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.SettingsGroup
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
+import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -305,9 +303,9 @@ internal fun DiagnosticsScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Presents real diagnostic events in the prototype's card; operational data stays in Health. */
 @Composable
-@Suppress("FunctionNaming", "LongMethod", "MaxLineLength")
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 internal fun DiagnosticsContent(
     state: DiagnosticsState,
     entries: List<DiagnosticLogEntry>,
@@ -317,131 +315,117 @@ internal fun DiagnosticsContent(
     onClear: () -> Unit,
     onPerformanceEnabledChange: (Boolean) -> Unit,
 ) {
-    Scaffold(
+    var showActions by remember { mutableStateOf(false) }
+    var showHealth by remember { mutableStateOf(false) }
+    if (showHealth) {
+        DiagnosticsHealthSheet(
+            state = state,
+            onDismiss = { showHealth = false },
+            onRefresh = onRefresh,
+            onSendToSelf = onSendToSelf,
+            onPerformanceEnabledChange = onPerformanceEnabledChange,
+        )
+    }
+    SettingsScaffold(
+        title = stringResource(R.string.diagnostics),
+        onBack = onBack,
         modifier = Modifier.testTag(DIAGNOSTICS_CONTENT_TAG),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.diagnostics)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onRefresh) {
-                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
-                    }
-                },
-            )
+        topBarActions = {
+            Box {
+                IconButton(onClick = { showActions = true }, modifier = Modifier.testTag("diagnostics.actions")) {
+                    Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.actions))
+                }
+                WhiteNoiseDropdownMenu(
+                    expanded = showActions,
+                    onDismissRequest = { showActions = false },
+                    modifier = Modifier.testTag("diagnostics.actions.menu"),
+                    items =
+                        listOf(
+                            WhiteNoiseMenuItem(
+                                label = stringResource(R.string.diagnostics_health),
+                                icon = R.drawable.ic_bug_report,
+                                onClick = { showHealth = true },
+                                modifier = Modifier.testTag("diagnostics.action.health"),
+                            ),
+                            WhiteNoiseMenuItem(
+                                label = stringResource(R.string.send_to_self),
+                                icon = R.drawable.ic_check,
+                                onClick = onSendToSelf,
+                                enabled = state.sendToSelfEnabled,
+                                modifier = Modifier.testTag("diagnostics.action.test"),
+                            ),
+                            WhiteNoiseMenuItem(
+                                label = stringResource(R.string.clear),
+                                icon = R.drawable.ic_delete,
+                                onClick = onClear,
+                                enabled = entries.isNotEmpty(),
+                                modifier = Modifier.testTag("diagnostics.action.clear"),
+                            ),
+                        ),
+                )
+            }
         },
-    ) { padding ->
-        LazyColumn(
-            Modifier.fillMaxSize().padding(padding).padding(16.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            state.sections.forEach { section ->
-                when (section) {
-                    DiagnosticsSection.Actions -> {
-                        item {
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                OutlinedButton(onClick = onSendToSelf, enabled = state.sendToSelfEnabled) {
-                                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(stringResource(R.string.send_to_self))
-                                }
-                                OutlinedButton(onClick = onClear) {
-                                    Icon(Icons.Default.Delete, contentDescription = null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(stringResource(R.string.clear))
-                                }
-                                Spacer(Modifier.weight(1f))
-                                Text(
-                                    stringResource(
-                                        if (state.streamStatus == DiagnosticsStreamStatus.Live) R.string.live else R.string.idle,
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.diagnostics_events),
+                    modifier = Modifier.weight(1f).testTag("diagnostics.events_title").semantics { heading() },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                DiagnosticsStreamIndicator(state.streamStatus)
+            }
+            Surface(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                shape = MaterialTheme.shapes.large,
+                border = amoledOutlineBorder(),
+            ) {
+                if (state.showEventLogEmptyState) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        WhiteNoiseEmptyState(
+                            title = stringResource(R.string.diagnostics_no_events),
+                            detail = stringResource(R.string.waiting_for_events),
+                            modifier = Modifier.testTag("diagnostics.empty"),
+                        )
                     }
-
-                    DiagnosticsSection.RelayHealth -> {
-                        item {
-                            SettingsGroup(title = stringResource(R.string.relay_health), icon = Icons.Filled.MonitorHeart) {
-                                item {
-                                    Column(
-                                        Modifier.fillMaxWidth().padding(16.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    ) {
-                                        RelayHealthBody(state = state, onRefresh = onRefresh)
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize().testTag("diagnostics.events"),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        // Each of the bounded 500 entries remains individually virtualized and keyed.
+                        itemsIndexed(entries, key = { _, entry -> entry.id }) { index, entry ->
+                            Column(Modifier.fillMaxWidth().testTag("diagnostics.event.$index")) {
+                                Column(
+                                    Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    val time = rememberedRelativeTime(entry.timestamp)
+                                    if (time.isNotEmpty()) {
+                                        Text(
+                                            time,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontFamily = FontFamily.Monospace,
+                                        )
                                     }
-                                }
-                            }
-                        }
-                    }
-
-                    DiagnosticsSection.Performance -> {
-                        item {
-                            PerformanceDiagnosticsGroup(
-                                status = state.performanceStatus,
-                                onEnabledChange = onPerformanceEnabledChange,
-                            )
-                        }
-                    }
-
-                    DiagnosticsSection.Runtime -> {
-                        item {
-                            SettingsGroup(title = stringResource(R.string.runtime), icon = Icons.Filled.Memory) {
-                                item {
-                                    Column(
-                                        Modifier.fillMaxWidth().padding(16.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    ) {
-                                        state.runtimeValues.forEach { value ->
-                                            DiagnosticRow(
-                                                label = diagnosticValueLabel(value.key),
-                                                value = value.value ?: stringResource(R.string.none),
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    DiagnosticsSection.EventLog -> {
-                        // Emit log entries as top-level lazy items so the up-to-500 rows
-                        // remain virtualized instead of composing inside one item.
-                        item {
-                            Text(
-                                stringResource(R.string.event_log),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(start = 16.dp),
-                            )
-                        }
-                        if (state.showEventLogEmptyState) {
-                            item {
-                                Text(
-                                    stringResource(R.string.waiting_for_events),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        } else {
-                            items(entries, key = { it.id }) { entry ->
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                     Text(
-                                        rememberedRelativeTime(entry.timestamp),
-                                        style = MaterialTheme.typography.labelSmall,
+                                        entry.text,
+                                        style = MaterialTheme.typography.bodySmall,
                                         fontFamily = FontFamily.Monospace,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
-                                    Text(entry.text, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                                }
+                                if (index < entries.lastIndex) {
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerLow)
                                 }
                             }
                         }
@@ -452,66 +436,132 @@ internal fun DiagnosticsContent(
     }
 }
 
+/** Reports the actual subscription state without a perpetual UI animation or simulated connectivity. */
+@Composable
+@Suppress("FunctionNaming")
+private fun DiagnosticsStreamIndicator(status: DiagnosticsStreamStatus) {
+    Row(
+        modifier = Modifier.testTag("diagnostics.stream"),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val color =
+            if (status == DiagnosticsStreamStatus.Live) {
+                Color(0xFF188038)
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        Icon(
+            painterResource(R.drawable.ic_settings_cell_tower),
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            stringResource(if (status == DiagnosticsStreamStatus.Live) R.string.live else R.string.idle),
+            style = MaterialTheme.typography.labelMedium,
+            color = color,
+        )
+    }
+}
+
+/** Keeps refresh, all native counters, runtime identity and opt-in logging reachable in one scrollable sheet. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+@Suppress("FunctionNaming", "LongMethod")
+private fun DiagnosticsHealthSheet(
+    state: DiagnosticsState,
+    onDismiss: () -> Unit,
+    onRefresh: () -> Unit,
+    onSendToSelf: () -> Unit,
+    onPerformanceEnabledChange: (Boolean) -> Unit,
+) {
+    WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .testTag("diagnostics.health")
+                .padding(bottom = 24.dp),
+        ) {
+            WhiteNoiseSheetHeader(stringResource(R.string.diagnostics_health), onClose = onDismiss)
+            SettingsGroup {
+                row("refresh") { context ->
+                    SettingsAction(
+                        context,
+                        stringResource(R.string.refresh),
+                        onRefresh,
+                        Modifier.testTag("diagnostics.health.refresh"),
+                    )
+                }
+                row("send") { context ->
+                    SettingsAction(
+                        context,
+                        stringResource(R.string.send_to_self),
+                        onSendToSelf,
+                        modifier = Modifier.testTag("diagnostics.health.test"),
+                        enabled = state.sendToSelfEnabled,
+                    )
+                }
+            }
+            if (DiagnosticsSection.Performance in state.sections) {
+                PerformanceDiagnosticsGroup(state.performanceStatus, onPerformanceEnabledChange)
+            }
+            SettingsSection(stringResource(R.string.relay_health))
+            if (state.showRelayHealthEmptyState) {
+                SettingsExplainer(stringResource(R.string.no_relay_snapshot_yet))
+            } else {
+                SettingsGroup {
+                    state.relayHealthValues.forEach { value ->
+                        row(value.key.name) { context ->
+                            SettingsValue(context, diagnosticValueLabel(value.key), value.value.orEmpty())
+                        }
+                    }
+                }
+            }
+            SettingsSection(stringResource(R.string.runtime))
+            SettingsGroup {
+                state.runtimeValues.forEach { value ->
+                    row(value.key.name) { context ->
+                        SettingsValue(
+                            context,
+                            diagnosticValueLabel(value.key),
+                            value.value ?: stringResource(R.string.none),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Retains the caller-owned logging switch, bounded-session status and privacy explanation. */
 @Composable
 @Suppress("FunctionNaming")
 private fun PerformanceDiagnosticsGroup(
     status: PerformanceDiagnosticStatus,
     onEnabledChange: (Boolean) -> Unit,
 ) {
-    val performanceLogsLabel = stringResource(R.string.performance_logs)
-    SettingsGroup(title = performanceLogsLabel, icon = Icons.Filled.Speed) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.performance_logs_description))
-                    Text(
-                        if (status.active) {
-                            val remainingMinutes = ((status.remainingMillis + 59_999L) / 60_000L).coerceAtLeast(1L)
-                            stringResource(R.string.performance_logs_active, remainingMinutes)
-                        } else {
-                            stringResource(R.string.performance_logs_inactive)
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(
-                    checked = status.active,
-                    onCheckedChange = onEnabledChange,
-                    modifier = Modifier.semantics { contentDescription = performanceLogsLabel },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RelayHealthBody(
-    state: DiagnosticsState,
-    onRefresh: () -> Unit,
-) {
-    if (state.showRelayHealthEmptyState) {
-        Text(
-            stringResource(R.string.no_relay_snapshot_yet),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Button(onClick = onRefresh) {
-            Icon(Icons.Default.Refresh, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.refresh))
-        }
-    } else {
-        state.relayHealthValues.forEach { value ->
-            DiagnosticRow(
-                label = diagnosticValueLabel(value.key),
-                value = value.value.orEmpty(),
+    SettingsSection(stringResource(R.string.performance_logs))
+    SettingsGroup {
+        row("performance") { context ->
+            SettingsSwitch(
+                context = context,
+                title = stringResource(R.string.performance_logs),
+                checked = status.active,
+                onCheckedChange = onEnabledChange,
+                modifier = Modifier.testTag("diagnostics.performance"),
+                subtitle =
+                    if (status.active) {
+                        val remainingMinutes = ((status.remainingMillis + 59_999L) / 60_000L).coerceAtLeast(1L)
+                        stringResource(R.string.performance_logs_active, remainingMinutes)
+                    } else {
+                        stringResource(R.string.performance_logs_inactive)
+                    },
             )
         }
     }
+    SettingsExplainer(stringResource(R.string.performance_logs_description))
 }
 
 @Composable

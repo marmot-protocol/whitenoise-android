@@ -54,11 +54,11 @@ import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
-import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineConfirmationNotice
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
+import dev.ipf.whitenoise.android.ui.common.StartupFailureScreen
 import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.WarmResumeUsefulSurface
@@ -102,6 +102,7 @@ internal fun shouldShowConversationDictationPersistentControl(
             is ConversationDictationState.CheckingProvider,
             is ConversationDictationState.Listening,
             is ConversationDictationState.Processing,
+            is ConversationDictationState.Paused,
             is ConversationDictationState.ProviderActivityRequired,
             is ConversationDictationState.ProviderActivityActive,
             is ConversationDictationState.Failed,
@@ -174,6 +175,7 @@ internal fun ShellTransientNoticeLayout(
 }
 
 /** Owns top-level privacy gates and records the first app-rendered useful surface. */
+
 @Composable
 @Suppress(
     "CyclomaticComplexMethod",
@@ -471,6 +473,7 @@ internal fun WhiteNoiseApp(
                                 AppLockScreen(
                                     error = appState.appUnlockError,
                                     onRetry = { appState.requestAppUnlock() },
+                                    evaluating = appState.appUnlockEvaluationPending,
                                 )
                             }
                         }
@@ -480,6 +483,14 @@ internal fun WhiteNoiseApp(
                         if (setupController != null) {
                             AccountSetupScreen(setupController) {
                                 appState.launchMutation { appState.accountSetup.later() }
+                            }
+                        } else if (appState.profileSignUpForPresentation != null) {
+                            WarmResumeUsefulSurface {
+                                dev.ipf.whitenoise.android.ui.onboarding.SignUpScreen(
+                                    controller = checkNotNull(appState.profileSignUpForPresentation),
+                                    hasValidatedInternet = appState::hasValidatedInternet,
+                                    onBack = { appState.dismissProfileSignUp() },
+                                )
                             }
                         } else {
                             when (val phase = appState.phase) {
@@ -623,7 +634,7 @@ internal fun WhiteNoiseApp(
                                         surface = WarmResumeRenderedSurface.Error,
                                     ) {
                                         WarmResumeUsefulSurface {
-                                            ErrorContent(
+                                            StartupFailureScreen(
                                                 title = stringResource(R.string.white_noise_couldnt_start),
                                                 error = phase.error,
                                                 onRetry = { scope.launch { appState.retryBootstrap() } },
@@ -697,6 +708,12 @@ private fun WarmResumeFrameSurface(
                 }
             }
         observer.addOnDrawListener(listener)
+        // Registering a draw listener schedules nothing by itself. When this epoch's
+        // composition lands after the resume redraw (or before onStart on a recreate
+        // that preserves the DecorView), the view is already clean and the listener
+        // would wait for an unrelated repaint — request one frame so the rendered
+        // surface is recorded promptly.
+        view.invalidate()
         onDispose(::detachListener)
     }
     content()

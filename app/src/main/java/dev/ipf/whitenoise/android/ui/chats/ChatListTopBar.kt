@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.ui.chats
 
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,57 +7,68 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.SystemFolderKind
+import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.chatsAvatarOpensSelector
+import dev.ipf.whitenoise.android.state.quickProfileCycleTarget
+import dev.ipf.whitenoise.android.state.requestQuickProfileCycle
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
-import dev.ipf.whitenoise.android.ui.account.OtherAccountAvatarsRow
+import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
+import dev.ipf.whitenoise.android.ui.account.QuickProfileCycleButton
+import dev.ipf.whitenoise.android.ui.account.rememberQuickProfileCycleNotice
+import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import dev.ipf.whitenoise.android.ui.updates.AppUpdateIconButton
+import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 
-internal const val CHAT_LIST_FILTER_CHIP_ALL_TAG = "chat-list-filter-chip-all"
+internal const val CHAT_LIST_FILTER_CHIP_ALL_TAG = "chats.scope.chats"
 internal const val CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG = "chat-list-other-account-avatars"
 
-private val CHAT_LIST_AVATAR_CONNECTIVITY_SPACING = 12.dp
+/** Stable test tag for a folder pill. */
+internal fun chatListFilterChipTag(folderId: String): String = "chats.folder.$folderId"
 
-internal fun chatListFilterChipTag(folderId: String): String = "chat-list-filter-chip-$folderId"
-
+/** Chat list header: account avatar and quick switch, or the search field with its filter action. */
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod", "UnusedParameter", "FunctionNaming")
 @Composable
 internal fun ChatListTopBar(
     appState: WhiteNoiseAppState,
@@ -73,7 +82,48 @@ internal fun ChatListTopBar(
     onOpenSettings: () -> Unit,
     onSwitchAccount: (String) -> Unit,
     connectivityState: ConnectivityBannerState = ConnectivityBannerState.Hidden,
+    onCycleAccount: (() -> Unit)? = null,
+    updateInfo: AppUpdateInfo = appState.appUpdateInfo,
+    selfUpdateEnabled: Boolean = BuildConfig.SELF_UPDATE_ENABLED,
+    searchFilterState: GlobalSearchState = GlobalSearchState(),
+    onSearchFilterCategory: ((GlobalSearchFilterCategory) -> Unit)? = null,
+    onClearSearchFilters: () -> Unit = {},
 ) {
+    var showSelector by remember(appState.runtimeGeneration) { mutableStateOf(false) }
+    var showAddIdentity by remember(appState.runtimeGeneration) { mutableStateOf(false) }
+    val cycleNotice = rememberQuickProfileCycleNotice()
+    LaunchedEffect(appState.signOutInProgress, appState.wipeInProgress) {
+        if (appState.signOutInProgress || appState.wipeInProgress) {
+            showSelector = false
+            showAddIdentity = false
+        }
+    }
+
+    /** Opens the account selector unless sign-out or a wipe is in progress. */
+    fun openSelector() {
+        if (!appState.signOutInProgress && !appState.wipeInProgress) showSelector = true
+    }
+
+    /** Switches to the next quick-cycle account through the caller's handler or the app state. */
+    fun cycle() {
+        if (appState.quickProfileCycleTarget() == null) return
+        if (onCycleAccount != null) {
+            onCycleAccount()
+        } else {
+            appState.requestQuickProfileCycle(
+                requestSwitch = { target, activated ->
+                    appState.launchMutation {
+                        appState.setActiveAccount(
+                            label = target,
+                            preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
+                            onActivated = activated,
+                        )
+                    }
+                },
+                onSwitched = cycleNotice::show,
+            )
+        }
+    }
     LaunchedEffect(appState.accounts, appState.runtimeGeneration) {
         appState.requestProfiles(appState.accounts.map { it.accountIdHex })
     }
@@ -81,60 +131,38 @@ internal fun ChatListTopBar(
         title = {
             when {
                 searchOpen ->
-                    OutlinedTextField(
+                    dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField(
                         value = searchQuery,
+                        clearDescription = stringResource(R.string.chat_list_search_clear),
+                        outlined = true,
                         onValueChange = onSearchQueryChange,
+                        placeholder = stringResource(R.string.chat_list_search_hint),
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .focusRequester(searchFocusRequester),
-                        singleLine = true,
-                        placeholder = { Text(stringResource(R.string.chat_list_search_hint)) },
-                        colors =
-                            OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent,
-                            ),
-                        // Keep Clear inside the field so the query retains usable
-                        // width on narrow screens; Mic remains the sole top-bar action.
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { onSearchQueryChange("") }) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = stringResource(R.string.chat_list_search_clear),
-                                    )
-                                }
-                            }
-                        },
+                                .focusRequester(searchFocusRequester)
+                                .testTag("chats.searchField"),
                         keyboardOptions =
                             KeyboardOptions(
                                 capitalization = KeyboardCapitalization.Sentences,
                                 imeAction = ImeAction.Search,
                             ),
+                        emptyTrailingIcon = {
+                            IconButton(onClick = onMic) {
+                                Icon(
+                                    painter =
+                                        androidx.compose.ui.res
+                                            .painterResource(R.drawable.ic_mic),
+                                    contentDescription = stringResource(R.string.chat_list_search_voice),
+                                )
+                            }
+                        },
                     )
-                // Keep every account avatar together: the active avatar is the
-                // navigation icon, then the other signed-in accounts render here,
-                // and Connecting / JustConnected follows the complete avatar
-                // cluster. Search mode hides this inline chrome so it cannot
-                // overlap the field.
                 else ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(CHAT_LIST_AVATAR_CONNECTIVITY_SPACING),
-                    ) {
-                        Box(modifier = Modifier.testTag(CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG)) {
-                            OtherAccountAvatarsRow(
-                                appState = appState,
-                                onSwitchAccount = onSwitchAccount,
-                                onOpenSwitcher = onOpenSettings,
-                            )
-                        }
-                        ChatListInlineConnectivityIndicator(state = connectivityState)
-                    }
+                    ChatListInlineConnectivityIndicator(
+                        state = connectivityState,
+                        modifier = Modifier.padding(start = 12.dp),
+                    )
             }
         },
         navigationIcon = {
@@ -148,41 +176,123 @@ internal fun ChatListTopBar(
                     }
                 else -> {
                     val active = appState.activeAccount
-                    AccountAvatarButton(
-                        title =
-                            active?.let { appState.accountDisplayNameCached(it.accountIdHex) }
-                                ?: stringResource(R.string.app_name),
-                        seed = active?.accountIdHex ?: "whitenoise",
-                        pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
-                        size = 44.dp,
-                        onClick = onOpenSettings,
-                        // Per-account dot: light only when the active account
-                        // itself has unread, same shared decision the other
-                        // avatars use — not "some other account has unread" (#805).
-                        showUnreadDot = appState.accountShowsUnreadDot(active?.label),
-                        unreadDotColor = accountActionColors(appState, active?.label).container,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AccountAvatarButton(
+                            title =
+                                active?.let { appState.accountDisplayNameCached(it.accountIdHex) }
+                                    ?: stringResource(R.string.app_name),
+                            seed = active?.accountIdHex ?: "whitenoise",
+                            pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
+                            size = 40.dp,
+                            touchTargetSize = 48.dp,
+                            actionDescription =
+                                stringResource(
+                                    if (appState.chatsAvatarOpensSelector()) {
+                                        R.string.switch_profile
+                                    } else {
+                                        R.string.open_settings
+                                    },
+                                ),
+                            onClick = {
+                                if (!appState.signOutInProgress && !appState.wipeInProgress) {
+                                    if (appState.chatsAvatarOpensSelector()) openSelector() else onOpenSettings()
+                                }
+                            },
+                            modifier = Modifier.padding(start = 8.dp).testTag("chats.switchProfile"),
+                            // Per-account dot: light only when the active account
+                            // itself has unread, same shared decision the other
+                            // avatars use — not "some other account has unread" (#805).
+                            showUnreadDot = appState.accountShowsUnreadDot(active?.label),
+                            unreadDotColor = accountActionColors(appState, active?.label).container,
+                        )
+                        appState.quickProfileCycleTarget()?.let { next ->
+                            QuickProfileCycleButton(
+                                nextTitle = appState.accountDisplayNameCached(next.accountIdHex),
+                                onClick = ::cycle,
+                            )
+                        }
+                    }
                 }
             }
         },
         actions = {
             if (searchOpen) {
-                IconButton(onClick = onMic) {
-                    Icon(
-                        Icons.Default.Mic,
-                        contentDescription = stringResource(R.string.chat_list_search_voice),
+                if (onSearchFilterCategory != null) {
+                    ChatListSearchFilterAction(
+                        state = searchFilterState,
+                        onCategory = onSearchFilterCategory,
+                        onClearAll = onClearSearchFilters,
                     )
                 }
             } else {
+                AppUpdateIconButton(
+                    info = updateInfo,
+                    selfUpdateEnabled = selfUpdateEnabled,
+                    onOpenSettings = onOpenSettings,
+                )
                 IconButton(onClick = onSearchOpen) {
                     Icon(
-                        Icons.Default.Search,
+                        painterResource(R.drawable.ic_search),
                         contentDescription = stringResource(R.string.chat_list_search_open),
                     )
                 }
             }
         },
+        scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
+        colors =
+            TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ),
     )
+    if (showSelector) {
+        AccountSelectorSheet(
+            appState = appState,
+            onDismiss = { showSelector = false },
+            onAddAccount = {
+                showSelector = false
+                showAddIdentity = true
+            },
+            onAccountSwitched = { showSelector = false },
+            onSettings = {
+                showSelector = false
+                onOpenSettings()
+            },
+        )
+    }
+    if (showAddIdentity) {
+        AddIdentitySheet(appState = appState, onDismiss = { showAddIdentity = false })
+    }
+}
+
+/** The prototype's filter entry beside the search field: the menu opens with the keyboard dismissed. */
+@Suppress("FunctionNaming")
+@Composable
+private fun ChatListSearchFilterAction(
+    state: GlobalSearchState,
+    onCategory: (GlobalSearchFilterCategory) -> Unit,
+    onClearAll: () -> Unit,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    Box {
+        GlobalSearchFilterIconButton(
+            state = state,
+            onClick = {
+                focusManager.clearFocus()
+                keyboardController?.hide()
+                menuOpen = true
+            },
+        )
+        GlobalSearchFilterMenu(
+            expanded = menuOpen,
+            state = state,
+            onDismiss = { menuOpen = false },
+            onCategory = onCategory,
+            onClearAll = onClearAll,
+        )
+    }
 }
 
 /**
@@ -202,37 +312,21 @@ internal fun ConversationSearchTopBar(
     onSearchAction: () -> Unit,
     focusRequester: FocusRequester,
 ) {
-    val hasQuery = query.isNotBlank()
+    val searchDescription = stringResource(R.string.conversation_search_hint)
     TopAppBar(
         title = {
-            OutlinedTextField(
+            dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField(
                 value = query,
                 onValueChange = onQueryChange,
+                placeholder = stringResource(R.string.conversation_search_messages),
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .focusRequester(focusRequester),
-                singleLine = true,
-                placeholder = { Text(stringResource(R.string.conversation_search_hint)) },
-                colors =
-                    OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                    ),
-                // Clear sits inline in the field; match navigation and the
-                // result count live on the bottom bar above the keyboard.
-                trailingIcon = {
-                    if (hasQuery) {
-                        IconButton(onClick = onClear) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = stringResource(R.string.conversation_search_clear),
-                            )
-                        }
-                    }
-                },
+                        .focusRequester(focusRequester)
+                        .testTag("conversation.searchField")
+                        .semantics { contentDescription = searchDescription },
+                clearDescription = stringResource(R.string.conversation_search_clear),
+                onClear = onClear,
                 keyboardOptions =
                     KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
@@ -244,11 +338,19 @@ internal fun ConversationSearchTopBar(
         navigationIcon = {
             IconButton(onClick = onClose) {
                 Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
+                    painterResource(R.drawable.ic_arrow_back),
                     contentDescription = stringResource(R.string.conversation_search_close),
                 )
             }
         },
+        actions = {
+            // Date-jump has no native owner yet (M128); expose the prototype affordance truthfully as disabled.
+            IconButton(onClick = {}, enabled = false, modifier = Modifier.testTag("conversation.search.calendar")) {
+                Icon(painterResource(R.drawable.ic_calendar_month), stringResource(R.string.conversation_jump_to_date))
+            }
+        },
+        scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
     )
 }
 
@@ -314,48 +416,15 @@ internal fun ConversationSearchNavBar(
     }
 }
 
+/** Keeps native caller state stable while the visual row follows the shared folder-pill composition. */
+@Suppress("LongParameterList", "FunctionNaming")
 @Composable
 internal fun ChatListFilterChips(
     chips: List<ChatFolderChipModel>,
     selectedFolderId: String?,
     onSelect: (String?) -> Unit,
     onEditFolder: (String) -> Unit = {},
+    onManageFolders: (() -> Unit)? = null,
 ) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        // `All` is the permanent reset state, not a real folder: always
-        // visible, never orderable, selected when nothing else is.
-        ChatFolderChip(
-            state = if (selectedFolderId == null) ToggleableState.On else ToggleableState.Off,
-            label = stringResource(R.string.chat_list_filter_all),
-            onClick = { onSelect(null) },
-            modifier = Modifier.testTag(CHAT_LIST_FILTER_CHIP_ALL_TAG),
-        )
-        chips.forEach { chip ->
-            ChatFolderChip(
-                state = if (selectedFolderId == chip.folderId) ToggleableState.On else ToggleableState.Off,
-                // A renamed default shows its stored name; the localized
-                // default label is only the un-renamed fallback.
-                label =
-                    chip.customLabel.ifEmpty {
-                        when (chip.systemKind) {
-                            SystemFolderKind.UNREAD -> stringResource(R.string.chat_list_filter_unread)
-                            SystemFolderKind.GROUPS -> stringResource(R.string.chat_list_filter_groups)
-                            SystemFolderKind.ARCHIVED -> stringResource(R.string.archived)
-                            null -> ""
-                        }
-                    },
-                onClick = { onSelect(chip.folderId) },
-                onLongClick = { onEditFolder(chip.folderId) },
-                trailingCount = chip.trailingCount,
-                modifier = Modifier.testTag(chatListFilterChipTag(chip.folderId)),
-            )
-        }
-    }
+    ChatFolderPills(chips, selectedFolderId, onSelect, onEditFolder, onManageFolders)
 }

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_review_title">Sprachnachricht prüfen</string>
+    <string name="voice_record_again">Erneut aufnehmen</string>
+    <string name="voice_message_release_to_review">Zum Prüfen loslassen · zum Abbrechen wegwischen</string>
+    <string name="voice_recording_stop">Aufnahme stoppen</string>
+</resources>

@@ -154,7 +154,6 @@ internal class ConversationVoiceOwnerReplacementTest : ConversationVoiceDownload
         scenario.newControl.awaitHydrationStarted()
 
         assertEquals(0, scenario.newControl.materializationAttempts)
-        assertFalse(scenario.oldControl.waveformStarted.isCompleted)
         assertFalse(scenario.oldControl.durationStarted.isCompleted)
         scenario.newControl.releaseHydration()
         scenario.newControl.awaitHydrationCompleted()

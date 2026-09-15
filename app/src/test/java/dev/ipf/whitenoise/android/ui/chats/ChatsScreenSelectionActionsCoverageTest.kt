@@ -5,13 +5,14 @@ import org.junit.Test
 import java.io.File
 
 class ChatsScreenSelectionActionsCoverageTest {
+    /** Single selection overflow wires mark read. */
     @Test
     fun singleSelectionOverflowWiresMarkRead() {
         val source = chatsScreenSource().readText()
         val selectionBar =
             source.requiredSection(
-                start = "ChatListSelectionBar(",
-                end = "\n                    )\n                } else {",
+                start = "ChatListSelectionControls(",
+                end = "\n                    )\n                }\n            }\n        },",
             )
         val markReadHandler =
             selectionBar.requiredSection(
@@ -53,13 +54,14 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
     }
 
+    /** Single selection overflow wires mute. */
     @Test
     fun singleSelectionOverflowWiresMute() {
         val source = chatsScreenSource().readText()
         val selectionBar =
             source.requiredSection(
-                start = "ChatListSelectionBar(",
-                end = "\n                    )\n                } else {",
+                start = "ChatListSelectionControls(",
+                end = "\n                    )\n                }\n            }\n        },",
             )
         val muteHandler =
             selectionBar.requiredSection(
@@ -84,13 +86,14 @@ class ChatsScreenSelectionActionsCoverageTest {
         assertTrue("mute overflow must exit selection mode", "clearSelection()" in muteHelper)
     }
 
+    /** Single selection overflow wires pin and manual order. */
     @Test
     fun singleSelectionOverflowWiresPinAndManualOrder() {
         val source = chatsScreenSource().readText()
         val selectionBar =
             source.requiredSection(
-                start = "ChatListSelectionBar(",
-                end = "\n                    )\n                } else {",
+                start = "ChatListSelectionControls(",
+                end = "\n                    )\n                }\n            }\n        },",
             )
         val pinHandler =
             selectionBar.requiredSection(
@@ -141,14 +144,15 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
     }
 
+    /** Long press sheet reuses pin and manual order mutations. */
     @Test
     fun longPressSheetReusesPinAndManualOrderMutations() {
         val source = chatsScreenSource().readText()
 
         val actionSheet =
             source.requiredSection(
-                start = "ChatActionSheet(",
-                end = "\n            )\n        }",
+                start = "ChatContextMenu(",
+                end = "\n                        )\n                    }",
             )
         assertTrue(
             "the long-press sheet must expose the same unarchived pin toggle",
@@ -163,13 +167,14 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
     }
 
+    /** Selection bar wires add to folder picker and create handoff. */
     @Test
     fun selectionBarWiresAddToFolderPickerAndCreateHandoff() {
         val source = chatsScreenSource().readText()
         val selectionBar =
             source.requiredSection(
-                start = "ChatListSelectionBar(",
-                end = "\n                    )\n                } else {",
+                start = "ChatListSelectionControls(",
+                end = "\n                    )\n                }\n            }\n        },",
             )
         val addToFolderHandler =
             selectionBar.requiredSection(

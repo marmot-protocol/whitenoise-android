@@ -3,7 +3,7 @@ package dev.ipf.whitenoise.android.ui
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -53,63 +53,82 @@ class AddAccountSheetContentTest {
         }
     }
 
+    /** The prototype Sign Up entry invokes its form-opening callback once and never invokes import. */
+    @Test fun signUpInvokesItsFormOpeningCallback() {
+        var creates = 0
+        var imports = 0
+        setContent(amberSignerAvailable = true, onCreate = { creates++ }, onImport = { imports++ })
+        composeRule.onNodeWithTag("onboarding.welcome.sign_up").performClick()
+        assertEquals(1, creates)
+        assertEquals(0, imports)
+    }
+
+    /** Amber row only offers when signer installed. */
     @Test
     fun amberRowOnlyOffersWhenSignerInstalled() {
         setContent(amberSignerAvailable = false)
+        composeRule.onNodeWithTag("onboarding.welcome.sign_in").performClick()
         composeRule.onNodeWithText(string(R.string.onboarding_login_with_amber)).assertDoesNotExist()
     }
 
+    /** Amber row fires login. */
     @Test
     fun amberRowFiresLogin() {
         var amberTaps = 0
         setContent(amberSignerAvailable = true, onLoginWithAmber = { amberTaps++ })
+        composeRule.onNodeWithTag("onboarding.welcome.sign_in").performClick()
         composeRule.onNodeWithText(string(R.string.onboarding_login_with_amber)).performClick()
         assertEquals(1, amberTaps)
     }
 
+    /** Secret key form hidden until disclosed. */
     @Test
     fun secretKeyFormHiddenUntilDisclosed() {
         setContent(amberSignerAvailable = true)
-        composeRule.onNodeWithText(string(R.string.sign_in_secret_key_help)).assertDoesNotExist()
-        composeRule.onNodeWithText(string(R.string.import_existing_identity)).performClick()
-        composeRule.onNodeWithText(string(R.string.sign_in_secret_key_help)).assertExists()
+        composeRule.onNodeWithTag("onboarding.sign_in.private_key").assertDoesNotExist()
+        composeRule.onNodeWithTag("onboarding.welcome.sign_in").performClick()
+        composeRule.onNodeWithTag("onboarding.sign_in.private_key").assertExists()
     }
 
+    /** Import button gates on identity text. */
     @Test
     fun importButtonGatesOnIdentityText() {
         setContent(amberSignerAvailable = false, identity = "")
-        composeRule.onNodeWithText(string(R.string.import_existing_identity)).performClick()
-        // Row label and confirm button share the label; the button is the enabled-gated one.
+        composeRule.onNodeWithTag("onboarding.welcome.sign_in").performClick()
+        // Opening Sign In does not grant import while the secure field is empty.
         composeRule
-            .onAllNodesWithText(string(R.string.import_existing_identity))[1]
+            .onNodeWithTag("onboarding.sign_in.action")
             .assertIsNotEnabled()
     }
 
+    /** Import button enabled with identity and fires import. */
     @Test
     fun importButtonEnabledWithIdentityAndFiresImport() {
         var imports = 0
-        setContent(amberSignerAvailable = false, identity = "nsec1example", onImport = { imports++ })
-        composeRule.onNodeWithText(string(R.string.import_existing_identity)).performClick()
+        setContent(amberSignerAvailable = false, identity = "nsec1" + "q".repeat(58), onImport = { imports++ })
+        composeRule.onNodeWithTag("onboarding.welcome.sign_in").performClick()
         composeRule
-            .onAllNodesWithText(string(R.string.import_existing_identity))[1]
+            .onNodeWithTag("onboarding.sign_in.action")
             .assertIsEnabled()
-        composeRule.onAllNodesWithText(string(R.string.import_existing_identity))[1].performClick()
+        composeRule.onNodeWithTag("onboarding.sign_in.action").performClick()
         assertEquals(1, imports)
     }
 
+    /** All rows disabled while busy. */
     @Test
     fun allRowsDisabledWhileBusy() {
         setContent(amberSignerAvailable = true, inFlightAction = OnboardingAction.Creating)
-        composeRule.onNodeWithText(string(R.string.onboarding_login_with_amber)).assertIsNotEnabled()
-        composeRule.onNodeWithText(string(R.string.import_existing_identity)).assertIsNotEnabled()
+        composeRule.onNodeWithTag("onboarding.welcome.sign_in").assertIsNotEnabled()
+        composeRule.onNodeWithTag("onboarding.welcome.sign_up").assertIsNotEnabled()
     }
 
+    /** Public key import failure shows dedicated error. */
     @Test
     fun publicKeyImportFailureShowsDedicatedError() {
         val npub = "npub1" + "a".repeat(58)
         val errorRes = importIdentityErrorRes(npub)
         setContent(amberSignerAvailable = false, identity = npub, importErrorRes = errorRes)
-        composeRule.onNodeWithText(string(R.string.import_existing_identity)).performClick()
+        composeRule.onNodeWithTag("onboarding.welcome.sign_in").performClick()
         composeRule.onNodeWithText(string(R.string.sign_in_error_public_key)).assertExists()
     }
 }

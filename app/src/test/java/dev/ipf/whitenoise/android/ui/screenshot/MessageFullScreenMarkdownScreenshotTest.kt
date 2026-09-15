@@ -8,8 +8,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -81,11 +83,26 @@ class MessageFullScreenMarkdownScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_full_screen_markdown_selection.png")
     }
 
+    /** Prototype menu chrome keeps the reader's exact native capabilities and callback dispatch. */
+    @Test
+    fun readerActionsRetainNativeCapabilities() {
+        val callbacks = mutableListOf<String>()
+        render(false, 1f, LayoutDirection.Ltr, callbacks)
+        listOf("Reply" to "reply", "React" to "react", "Copy text" to "copy").forEach { (label, expected) ->
+            composeRule.onNodeWithContentDescription("Message actions").performClick()
+            composeRule.onNodeWithText("Delete").assertDoesNotExist()
+            composeRule.onNodeWithText(label).performClick()
+            assertEquals(expected, callbacks.last())
+        }
+        assertEquals(listOf("reply", "react", "copy"), callbacks)
+    }
+
     /** Renders the production full-screen Markdown reader under a chosen environment. */
     private fun render(
         darkTheme: Boolean,
         fontScale: Float,
         layoutDirection: LayoutDirection,
+        callbacks: MutableList<String>? = null,
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -113,10 +130,10 @@ class MessageFullScreenMarkdownScreenshotTest {
                         canReply = true,
                         canReact = true,
                         canDelete = false,
-                        onReply = {},
-                        onReact = {},
-                        onCopy = {},
-                        onDelete = {},
+                        onReply = { callbacks?.add("reply") },
+                        onReact = { callbacks?.add("react") },
+                        onCopy = { callbacks?.add("copy") },
+                        onDelete = { callbacks?.add("delete") },
                         onDismiss = {},
                         bottomBar = {},
                         selectionController = controller,

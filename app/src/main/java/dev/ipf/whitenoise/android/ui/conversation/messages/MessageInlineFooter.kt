@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
@@ -57,6 +59,7 @@ internal fun BoxScope.MediaFooterOverlay(
             onEditedClick = null,
             retention = retention,
             reserveRetentionSpace = reserveRetentionSpace,
+            statusContainerColor = Color.Black,
         )
     }
 }
@@ -75,11 +78,12 @@ internal fun MessageInlineFooter(
     reserveRetentionSpace: Boolean = false,
     showTime: Boolean = true,
     modifier: Modifier = Modifier,
+    statusContainerColor: Color? = null,
 ) {
     val retentionPresentation = rememberRetentionIndicatorPresentation(retention, retentionClockMillis)
     val showRetention =
         reserveRetentionSpace || retentionPresentation !is RetentionIndicatorPresentation.Hidden
-    val baselineIndex = footerBaselineIndex(showTime, editedLabel != null, showRetention)
+    val baselineIndex = footerBaselineIndex(showTime, editedLabel != null, showRetention, showStatus)
     Layout(
         modifier = modifier,
         content = {
@@ -93,12 +97,13 @@ internal fun MessageInlineFooter(
                 retentionPresentation = retentionPresentation,
                 reserveRetentionSpace = reserveRetentionSpace,
                 showTime = showTime,
+                statusContainerColor = statusContainerColor,
             )
         },
     ) { measurables, constraints ->
         val placeables = measurables.map { it.measure(constraints.copy(minWidth = 0, minHeight = 0)) }
-        val gap = FooterItemSpacing.roundToPx()
-        val contentWidth = placeables.sumOf { it.width } + gap * (placeables.size - 1).coerceAtLeast(0)
+        val gaps = footerItemGaps(placeables.size, showRetention, FooterItemSpacing, FooterRetentionSpacing)
+        val contentWidth = placeables.sumOf { it.width } + gaps.sum()
         val width = contentWidth.coerceIn(constraints.minWidth, constraints.maxWidth)
         val height = (placeables.maxOfOrNull { it.height } ?: 0).coerceIn(constraints.minHeight, constraints.maxHeight)
         val baselinePlaceable = baselineIndex?.let(placeables::get)
@@ -112,14 +117,18 @@ internal fun MessageInlineFooter(
             }
         layout(width, height, alignmentLines) {
             var x = 0
-            placeables.forEach { placeable ->
+            placeables.forEachIndexed { index, placeable ->
                 placeable.placeRelative(x, (height - placeable.height) / 2)
-                x += placeable.width + gap
+                x += placeable.width + gaps.getOrElse(index) { 0 }
             }
         }
     }
 }
 
+/**
+ * Footer items in prototype order: the disappearing-message clock leads the
+ * row, then the edited label, the outgoing delivery glyph, and the timestamp.
+ */
 @Suppress("FunctionNaming")
 @Composable
 private fun MessageInlineFooterItems(
@@ -132,7 +141,11 @@ private fun MessageInlineFooterItems(
     retentionPresentation: RetentionIndicatorPresentation,
     reserveRetentionSpace: Boolean,
     showTime: Boolean,
+    statusContainerColor: Color?,
 ) {
+    if (reserveRetentionSpace || retentionPresentation !is RetentionIndicatorPresentation.Hidden) {
+        MessageRetentionIndicatorSlot(retentionPresentation, color, reserveRetentionSpace)
+    }
     editedLabel?.let {
         Text(
             text = it,
@@ -141,26 +154,44 @@ private fun MessageInlineFooterItems(
             modifier = if (onEditedClick != null) Modifier.clickable(onClick = onEditedClick) else Modifier,
         )
     }
-    if (reserveRetentionSpace || retentionPresentation !is RetentionIndicatorPresentation.Hidden) {
-        MessageRetentionIndicatorSlot(retentionPresentation, color, reserveRetentionSpace)
+    if (showStatus) {
+        OutgoingMessageStatusIcon(status, tint = color, containerColor = statusContainerColor)
     }
     if (showTime) {
         Text(timeText, style = MaterialTheme.typography.labelSmall, color = color)
     }
-    if (showStatus) {
-        OutgoingMessageStatusIcon(status, tint = color)
-    }
 }
 
+/** The time carries the baseline; it follows the retention slot, the edited label and the delivery glyph. */
 private fun footerBaselineIndex(
     showTime: Boolean,
     hasEditedLabel: Boolean,
     showRetention: Boolean,
+    showStatus: Boolean,
 ): Int? =
     when {
-        showTime -> (if (hasEditedLabel) 1 else 0) + (if (showRetention) 1 else 0)
-        hasEditedLabel -> 0
+        showTime -> (if (hasEditedLabel) 1 else 0) + (if (showRetention) 1 else 0) + (if (showStatus) 1 else 0)
+        hasEditedLabel -> if (showRetention) 1 else 0
         else -> null
     }
 
+/**
+ * The gap that follows each footer item. The leading disappearing-message clock
+ * keeps the prototype's wider [FooterRetentionSpacing] from the timestamp group;
+ * everything else is separated by [FooterItemSpacing].
+ */
+private fun Density.footerItemGaps(
+    itemCount: Int,
+    retentionLeads: Boolean,
+    itemSpacing: Dp,
+    retentionSpacing: Dp,
+): List<Int> {
+    val defaultGap = itemSpacing.roundToPx()
+    val leadingGap = retentionSpacing.roundToPx()
+    return List((itemCount - 1).coerceAtLeast(0)) { index ->
+        if (retentionLeads && index == 0) leadingGap else defaultGap
+    }
+}
+
 private val FooterItemSpacing = 3.dp
+private val FooterRetentionSpacing = 4.dp

@@ -4,6 +4,7 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +33,8 @@ import dev.ipf.marmotkit.DiagnosticsExporterStatusFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 /** Shows the actual collection scope wherever a user can grant the expanded MDK receipt. */
@@ -72,31 +74,6 @@ internal fun diagnosticsStatusLabel(status: DiagnosticsExporterStatusFfi?): Int 
         null -> R.string.usage_diagnostics_unknown
     }
 
-/** Reusable opt-in control; failed reads and saves expose Retry rather than a stale checked switch. */
-@Composable
-internal fun UsageDiagnosticsSettings(appState: WhiteNoiseAppState) {
-    val state = appState.diagnostics
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        UsageDiagnosticsChoice(appState)
-        Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            UsageDiagnosticsDisclosure()
-            if (state.requiresChoice && state.snapshot?.settings?.previouslyEnabled == true) {
-                Text(stringResource(R.string.usage_diagnostics_renew), style = MaterialTheme.typography.bodySmall)
-            }
-            Text(
-                stringResource(
-                    R.string.usage_diagnostics_status,
-                    stringResource(diagnosticsStatusLabel(state.snapshot?.status?.productAnalytics)),
-                    stringResource(diagnosticsStatusLabel(state.snapshot?.status?.telemetry)),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                minLines = 2,
-            )
-            UsageDiagnosticsFeedback(appState)
-        }
-    }
-}
-
 /** Presents the pending choice immediately while the native receipt remains the collection authority. */
 @Composable
 private fun UsageDiagnosticsChoice(appState: WhiteNoiseAppState) {
@@ -127,7 +104,12 @@ private fun UsageDiagnosticsFeedback(appState: WhiteNoiseAppState) {
     }
 }
 
-/** Keeps the explicit receipt choice in a bottom sheet with scrollable details and a pinned action. */
+/**
+ * The prototype's consent sheet: a title with a close glyph, the choices, then the
+ * disclosure. It carries no confirm button, so closing the sheet — by the glyph, a drag,
+ * the scrim or back — is what records the receipt, and the sheet refuses to close while a
+ * choice is still being written so no dismissal can lose one.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun UsageDiagnosticsPrompt(
@@ -136,60 +118,72 @@ internal fun UsageDiagnosticsPrompt(
 ) {
     val state = appState.diagnostics
     var loggingBusy by remember { mutableStateOf(false) }
+    val settled = !state.busy && !state.failed && state.snapshot != null && !loggingBusy
+    val finish = {
+        appState.launchMutation {
+            if (!state.busy && !state.failed && state.snapshot != null) {
+                // Closing without enabling uploads records the declined audit choice, as Done did.
+                val auditSettled =
+                    !appState.auditUploadConsentRequired || appState.setAuditLogsEnabled(false)
+                if (auditSettled && (!state.requiresChoice || appState.setTelemetryEnabled(false))) onDone()
+            }
+        }
+        Unit
+    }
     ModalBottomSheet(
-        onDismissRequest = {},
+        onDismissRequest = { if (settled) finish() },
         containerColor = amoledSheetContainerColor(),
-        dragHandle = null,
         sheetState =
             rememberModalBottomSheetState(
                 skipPartiallyExpanded = true,
-                confirmValueChange = { it != SheetValue.Hidden },
+                confirmValueChange = { it != SheetValue.Hidden || settled },
             ),
     ) {
-        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            Text(
-                stringResource(R.string.usage_diagnostics_prompt_title),
-                style = MaterialTheme.typography.titleLarge,
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Section)) {
+            WhiteNoiseSheetHeader(
+                title = stringResource(R.string.usage_diagnostics_prompt_title),
+                onClose = finish,
+                closeEnabled = settled,
             )
-            Column(
-                Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Surface(
-                    shape = MaterialTheme.shapes.extraLarge,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ) {
-                    Column {
-                        UsageDiagnosticsChoice(appState)
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant,
-                        )
-                        IndependentAuditLogChoice(appState, loggingBusy) { loggingBusy = it }
-                    }
-                }
-                Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    UsageDiagnosticsDisclosure()
-                    if (appState.auditUploadConsentRequired) {
-                        Text(stringResource(R.string.audit_upload_renew), style = MaterialTheme.typography.bodySmall)
-                    }
-                    UsageDiagnosticsFeedback(appState)
-                }
+            UsageDiagnosticsPromptBody(appState, loggingBusy) { loggingBusy = it }
+        }
+    }
+}
+
+/** The scrolling part of the consent sheet: both choices in one card, then the disclosure and feedback. */
+@Composable
+private fun ColumnScope.UsageDiagnosticsPromptBody(
+    appState: WhiteNoiseAppState,
+    loggingBusy: Boolean,
+    onLoggingBusyChange: (Boolean) -> Unit,
+) {
+    Column(
+        Modifier
+            .weight(1f, fill = false)
+            .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+            .padding(bottom = WhiteNoiseSpacing.Section)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.ConversationCluster),
+    ) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) {
+            Column {
+                UsageDiagnosticsChoice(appState)
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+                IndependentAuditLogChoice(appState, loggingBusy, onLoggingBusyChange)
             }
-            Button(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                enabled = !state.busy && !state.failed && state.snapshot != null && !loggingBusy,
-                onClick = {
-                    appState.launchMutation {
-                        if (state.busy || state.failed) return@launchMutation
-                        if (state.snapshot == null) return@launchMutation
-                        if (appState.auditUploadConsentRequired && !appState.setAuditLogsEnabled(false)) {
-                            return@launchMutation
-                        }
-                        if (!state.requiresChoice || appState.setTelemetryEnabled(false)) onDone()
-                    }
-                },
-            ) { Text(stringResource(R.string.usage_diagnostics_done)) }
+        }
+        Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            UsageDiagnosticsDisclosure()
+            if (appState.auditUploadConsentRequired) {
+                Text(stringResource(R.string.audit_upload_renew), style = MaterialTheme.typography.bodySmall)
+            }
+            UsageDiagnosticsFeedback(appState)
         }
     }
 }

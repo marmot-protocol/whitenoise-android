@@ -20,18 +20,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * Baseline for the real onboarding entry screen ([OnboardingContent]) in its
- * idle state, light theme only. The composable fills its parent, so the
- * Robolectric window is pinned to a fixed compact-phone frame via
- * `@Config(qualifiers=...)` — `onRoot()` captures the whole window, so the
- * device size (not a child Surface size) controls the committed PNG. mdpi keeps
- * 1dp == 1px so the frame is exactly 360x780 and stays small/deterministic. The
- * frame is tall enough to show the whole lockup — plain WN mark, "White Noise"
- * wordmark, the rotating slogan (captured at its first frame, "Decentralized",
- * since the test doesn't advance the clock), and the bottom slate with the
- * Sign In and Sign Up actions — in one shot.
- */
+/** Existing baseline names now capture Welcome, retained accounts and secure Sign In with offline recovery. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")

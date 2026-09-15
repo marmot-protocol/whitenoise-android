@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material3.Badge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.MutableState
@@ -25,6 +24,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.InvitationBadge
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
 import org.junit.Assert.assertSame
 import org.junit.Rule
@@ -41,7 +41,7 @@ class ChatRowSelectionIndicatorCoverageTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val nowText by lazy { context.getString(R.string.relative_time_now) }
-    private val invitedText by lazy { context.getString(R.string.invited) }
+    private val invitedText by lazy { context.getString(R.string.invitation_pending) }
     private val mentionDescription by lazy { context.getString(R.string.chat_list_mention_badge) }
     private val selectDescription by lazy { context.getString(R.string.select) }
     private val selectedDescription by lazy { context.getString(R.string.selected) }
@@ -90,6 +90,7 @@ class ChatRowSelectionIndicatorCoverageTest {
         composeRule.onNodeWithContentDescription(mentionDescription).assertExists()
     }
 
+    /** Selection mode replaces invited timestamp and badge. */
     @Test
     fun selectionModeReplacesInvitedTimestampAndBadge() {
         val selectionMode = mutableStateOf(false)
@@ -97,13 +98,13 @@ class ChatRowSelectionIndicatorCoverageTest {
         render(selectionMode, selected, pendingConfirmation = true)
 
         composeRule.onNodeWithText(nowText).assertExists()
-        composeRule.onNodeWithText(invitedText).assertExists()
+        composeRule.onNodeWithContentDescription(invitedText).assertExists()
 
         selectionMode.value = true
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText(nowText).assertDoesNotExist()
-        composeRule.onNodeWithText(invitedText).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(invitedText).assertDoesNotExist()
         composeRule.onNode(hasClickAction()).assertIsNotSelected()
     }
 
@@ -130,6 +131,7 @@ class ChatRowSelectionIndicatorCoverageTest {
         composeRule.onAllNodesWithContentDescription(selectedDescription).assertCountEquals(0)
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         selectionMode: MutableState<Boolean>,
         selected: MutableState<Boolean>,
@@ -140,12 +142,8 @@ class ChatRowSelectionIndicatorCoverageTest {
         val timestampAt = (System.currentTimeMillis() / 1_000L).toULong()
         composeRule.setContent {
             MaterialTheme {
-                Box(
-                    Modifier.chatListSelectionRow(
-                        selected = selected.value,
-                        onClick = {},
-                    ),
-                ) {
+                // ChatRowLayout now owns the native click/toggle semantics; no duplicate wrapper action.
+                Box {
                     ChatRowLayout(
                         title = "Conversation",
                         selectionMode = selectionMode.value,
@@ -162,7 +160,7 @@ class ChatRowSelectionIndicatorCoverageTest {
                             when {
                                 pendingConfirmation -> {
                                     {
-                                        Badge { Text(invitedText) }
+                                        InvitationBadge()
                                     }
                                 }
                                 unreadCount > 0uL -> {

@@ -69,11 +69,12 @@ class ChatRowEvictedStatusTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.chat_pinned_badge)).assertExists()
     }
 
+    /** A pending invite keeps the invited badge and no eviction status. */
     @Test
     fun aPendingInviteKeepsTheInvitedBadgeAndNoEvictionStatus() {
         render(evicted = true, pendingConfirmation = true)
 
-        composeRule.onNodeWithText(context.getString(R.string.invited)).assertExists()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.invitation_pending)).assertExists()
         composeRule.onNodeWithText(removedLabel).assertDoesNotExist()
     }
 

@@ -41,26 +41,26 @@ class ComposeHotPathCoverageTest {
         )
     }
 
+    /** Emoji search runs outside composition and off the main thread. */
     @Test
     fun emojiSearchRunsOutsideCompositionAndOffTheMainThread() {
-        val source = source("conversation/composer/EmojiPicker.kt").readText()
+        val source = source("conversation/composer/EmojiPickerContent.kt").readText()
 
         assertTrue(
             "emoji search must be produced asynchronously",
-            "initialValue = EmojiSearchSnapshot(query = \"\", results = emptyList())" in source,
+            "LaunchedEffect(query, entries)" in source,
         )
         assertTrue(
             "emoji filtering must run on the Default dispatcher",
-            "withContext(Dispatchers.Default) { EmojiData.search(browseEmoji, query) }" in source,
+            "withContext(Dispatchers.Default) { emojiSearchSections(EmojiData.search(entries, query)) }" in source,
         )
         assertFalse(
             "emoji filtering must not run synchronously from remember during composition",
-            Regex("""remember\(searchQuery,\s*browseEmoji\)\s*\{\s*EmojiData\.search""")
-                .containsMatchIn(source),
+            Regex("""remember\([^)]*\)\s*\{\s*(emojiSearchSections\()?EmojiData\.search""").containsMatchIn(source),
         )
         assertTrue(
-            "results from a superseded query must not remain selectable",
-            "searchSnapshot.results.takeIf { searchSnapshot.query == searchQuery }.orEmpty()" in source,
+            "results from a superseded query must not present an empty state",
+            "model.searchedQuery == query" in source,
         )
     }
 
@@ -94,12 +94,13 @@ class ComposeHotPathCoverageTest {
         )
     }
 
+    /** Chat list scroll and row search work are isolated from screen composition. */
     @Test
     fun chatListScrollAndRowSearchWorkAreIsolatedFromScreenComposition() {
         val source = source("chats/ChatsScreen.kt").readText()
         val searchProjectionRemember =
-            "remember\\(sourceList, normalizedSearchQuery, selectedFolderChatIds, " +
-                "groupTitleCopy, profileRev, bodyMatches\\)"
+            "remember\\(\\s*scopedSourceList,\\s*normalizedSearchQuery,\\s*effectiveFolderChatIds,\\s*" +
+                "groupTitleCopy,\\s*profileRev,\\s*bodyMatches,\\s*messageSearchConstraints,?\\s*\\)"
 
         assertTrue(
             "scroll index must be observed from snapshotFlow",

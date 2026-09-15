@@ -1,27 +1,20 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,14 +24,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.group.GroupRosterLoadStatus
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 @Composable
 internal fun InvitePreviewPlaceholder(inviterName: String?) {
@@ -63,60 +60,66 @@ internal fun InvitePreviewPlaceholder(inviterName: String?) {
     }
 }
 
+/** Prototype invitation pane: who invited you, Decline beside Accept, on the low container above the nav bar. */
+@Suppress("FunctionNaming")
 @Composable
-internal fun InvitePreviewActionBar(
+internal fun InvitationActions(
+    inviterName: String?,
     mutationInFlight: Boolean,
-    onJoin: () -> Unit,
+    onAccept: () -> Unit,
     onDecline: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .navigationBarsPadding(),
-        color = MaterialTheme.colorScheme.surface,
-        border = amoledSurfaceBorderStroke(),
-        tonalElevation = 3.dp,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    val acceptLabel = stringResource(R.string.accept)
+    Surface(modifier = modifier, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(WhiteNoiseSpacing.CompactScreenMargin),
+            contentAlignment = Alignment.Center,
         ) {
-            OutlinedButton(
-                onClick = onDecline,
-                modifier = Modifier.weight(1f),
-                enabled = !mutationInFlight,
+            Column(
+                modifier = Modifier.fillMaxWidth().widthIn(max = InvitationActionsMaximumWidth),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
             ) {
-                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.decline))
-            }
-            Button(
-                onClick = onJoin,
-                modifier = Modifier.weight(1f).performanceTestTag(PerformanceTestTags.JOIN_INVITE),
-                enabled = !mutationInFlight,
-            ) {
-                if (mutationInFlight) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                } else {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
+                Text(
+                    stringResource(
+                        R.string.invited_to_chat_by,
+                        inviterName?.takeIf { it.isNotBlank() } ?: stringResource(R.string.someone),
+                    ),
+                    modifier = Modifier.semantics { heading() },
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+                ) {
+                    WhiteNoiseOutlinedButton(
+                        onClick = onDecline,
+                        modifier = Modifier.weight(1f),
+                        enabled = !mutationInFlight,
+                    ) {
+                        Text(stringResource(R.string.decline), color = MaterialTheme.colorScheme.error)
+                    }
+                    WhiteNoiseButton(
+                        onClick = onAccept,
+                        modifier = Modifier.weight(1f).performanceTestTag(PerformanceTestTags.JOIN_INVITE),
+                        loading = mutationInFlight,
+                        loadingLabel = acceptLabel,
+                    ) {
+                        Text(acceptLabel)
+                    }
                 }
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.join_group))
             }
         }
     }
 }
+
+private val InvitationActionsMaximumWidth = 520.dp
 
 /**
  * Shows progress or the existing localized roster retry when a stale Join was

@@ -9,6 +9,7 @@ import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
@@ -187,11 +188,9 @@ class DisappearingMessagesPickerTest {
         }
     }
 
+    /** Opens custom dialog. */
     private fun openCustomDialog() {
-        composeRule
-            .onAllNodesWithText(context.getString(R.string.disappearing_custom))
-            .filterToOne(hasClickAction())
-            .performClick()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).performClick()
         composeRule.waitForIdle()
     }
 

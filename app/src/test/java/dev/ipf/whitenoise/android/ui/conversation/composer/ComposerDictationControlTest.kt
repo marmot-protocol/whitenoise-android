@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -59,8 +60,9 @@ class ComposerDictationControlTest {
         assertEquals(REPLY_MESSAGE_ID, controller.state.target?.replyToMessageIdHex)
     }
 
+    /** Focusing unfolds the editor without displacing emoji from its action row. */
     @Test
-    fun availableDictationDoesNotDisplaceOrMoveTheEmojiAction() {
+    fun focusingUnfoldsTheEditorWithoutDisplacingEmojiFromItsActionRow() {
         render()
 
         composeRule.onNodeWithContentDescription("Dictate text").assertIsDisplayed()
@@ -81,10 +83,19 @@ class ComposerDictationControlTest {
                 .getUnclippedBoundsInRoot()
 
         assertEquals(before.left, after.left)
-        assertEquals(before.top, after.top)
         assertEquals(before.right, after.right)
-        assertEquals(before.bottom, after.bottom)
-        composeRule.onNodeWithContentDescription("Dictate text").assertIsDisplayed()
+        assertEquals(before.bottom - before.top, after.bottom - after.top)
+        val dictation =
+            composeRule
+                .onNodeWithContentDescription("Dictate text")
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+        assertEquals(after.top, dictation.top)
+        assertEquals(after.bottom, dictation.bottom)
+        // Focusing opens the 32 dp editing row above the action row, and the collapsed emoji sat
+        // centred 6 dp above its bottom-aligned editing position, so it travels the sum.
+        assertEquals(38.dp, after.top - before.top)
+        composeRule.onNode(hasSetTextAction()).assertIsFocused()
     }
 
     @Test
@@ -163,6 +174,7 @@ class ComposerDictationControlTest {
         assertFalse(controller.ownsMicrophone)
     }
 
+    /** Compact large font rtl layout keeps the emoji action reachable without clipping. */
     @Test
     fun compactLargeFontRtlLayoutKeepsTheEmojiActionReachableWithoutClipping() {
         render(fontScale = 2f, rtl = true)
@@ -182,14 +194,49 @@ class ComposerDictationControlTest {
 
         assertTrue(action.left >= root.left && action.right <= root.right)
         assertTrue(action.top >= root.top && action.bottom <= root.bottom)
-        assertTrue(action.right - action.left >= 48.dp)
-        assertTrue(action.bottom - action.top >= 48.dp)
+        val minimumTouchTarget = with(composeRule.density) { 48.dp.toPx() }
+        val emojiTouch =
+            composeRule.onNodeWithContentDescription("Open emoji picker").fetchSemanticsNode().touchBoundsInRoot
+        assertTrue(emojiTouch.width >= minimumTouchTarget && emojiTouch.height >= minimumTouchTarget)
         assertTrue(dictation.left >= root.left && dictation.right <= root.right)
         assertTrue(dictation.top >= root.top && dictation.bottom <= root.bottom)
-        assertTrue(dictation.right - dictation.left >= 48.dp)
-        assertTrue(dictation.bottom - dictation.top >= 48.dp)
+        val dictationTouch =
+            composeRule.onNodeWithContentDescription("Dictate text").fetchSemanticsNode().touchBoundsInRoot
+        assertTrue(dictationTouch.width >= minimumTouchTarget && dictationTouch.height >= minimumTouchTarget)
         assertTrue("RTL emoji action must remain on the leading side", action.left >= field.left)
         assertTrue("RTL dictation action must not overlap the text field", dictation.right <= field.left)
+    }
+
+    /** All four native commands remain independently reachable inside the actual narrow RTL composer. */
+    @Test
+    @Config(qualifiers = "w240dp-h780dp-mdpi")
+    fun narrowLargeRtlDictationActionsScrollWithoutOverlappingTheLeadingTools() {
+        val controller = render(fontScale = 2f, rtl = true, withAttachments = true)
+        composeRule.onNodeWithContentDescription("Dictate text").performClick()
+
+        /** Records the dispatched action. */
+        fun action(label: String) {
+            val node = composeRule.onNodeWithContentDescription(label).performScrollTo().assertIsDisplayed()
+            val bounds = node.fetchSemanticsNode().boundsInRoot
+            val root = composeRule.onNodeWithTag(ROOT_TAG).fetchSemanticsNode().boundsInRoot
+            val emoji = composeRule.onNodeWithContentDescription("Open emoji picker").fetchSemanticsNode().boundsInRoot
+            assertTrue(bounds.left >= root.left && bounds.right <= root.right)
+            assertTrue("RTL actions must stay clear of leading tools", bounds.right <= emoji.left)
+            node.performClick()
+        }
+        action("Pause dictation")
+        FakeDictationPlatform.listener.onResult("first")
+        action("Resume dictation")
+        FakeDictationPlatform.listener.onBeginningOfSpeech()
+        action("Paste")
+        FakeDictationPlatform.listener.onResult("second")
+        assertTrue(controller.state is ConversationDictationState.Idle)
+        composeRule.onNodeWithContentDescription("Dictate text").performClick()
+        action("Send")
+        val late = FakeDictationPlatform.listener
+        action("Cancel")
+        late.onResult("must not deliver")
+        assertTrue(controller.state is ConversationDictationState.Idle)
     }
 
     private fun render(
@@ -240,6 +287,7 @@ class ComposerDictationControlTest {
         )
     }
 
+    /** Builds an idle dictation controller fixture. */
     private fun idleDictationController(draft: TextFieldValue): ConversationDictationController =
         ConversationDictationController(
             platform = FakeDictationPlatform,
@@ -251,21 +299,30 @@ class ComposerDictationControlTest {
         )
 
     private data object FakeDictationPlatform : ConversationDictationPlatform {
+        lateinit var listener: ConversationDictationRecognitionListener
+
+        /** Has record audio permission. */
         override fun hasRecordAudioPermission() = true
 
+        /** Recognition available. */
         override fun recognitionAvailable() = true
 
+        /** Fake recognizer: creates a session. */
         @Suppress("MaxLineLength")
-        override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession =
-            object : ConversationDictationRecognitionSession {
+        override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
+            this.listener = listener
+            return object : ConversationDictationRecognitionSession {
                 override fun start() = Unit
 
+                /** Fake playback: stops. */
                 override fun stop() = Unit
 
+                /** Fake operation: cancels. */
                 override fun cancel() = Unit
 
                 override fun destroy() = Unit
             }
+        }
     }
 
     private companion object {

@@ -14,7 +14,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -23,7 +22,6 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -78,9 +76,18 @@ class ChatListTtsTransportLayoutTest {
             .captureRoboImage("src/test/snapshots/chat_list_tts_transport_dark.png")
     }
 
+    /** Active transport and newest row remain usable at large text in rtl. */
     @Test
     fun activeTransportAndNewestRowRemainUsableAtLargeTextInRtl() {
-        render(fontScale = 1.5f, layoutDirection = LayoutDirection.Rtl)
+        var opened = 0
+        render(fontScale = 1.5f, layoutDirection = LayoutDirection.Rtl, onFirstRowClick = { opened++ })
+        val transport = composeRule.onNodeWithTag(TRANSPORT_TAG).getUnclippedBoundsInRoot()
+        val firstRow = composeRule.onNodeWithTag(FIRST_ROW_TAG)
+        val rowBounds = firstRow.getUnclippedBoundsInRoot()
+        assertTrue(transport.bottom <= rowBounds.top)
+        assertTrue(rowBounds.bottom <= composeRule.onNodeWithTag(ROOT_TAG).getUnclippedBoundsInRoot().bottom)
+        firstRow.assertIsDisplayed().performClick()
+        assertEquals(1, opened)
 
         composeRule
             .onNodeWithTag(ROOT_TAG)
@@ -112,6 +119,7 @@ class ChatListTtsTransportLayoutTest {
         capture("chat_list_tts_transport_error_dark.png")
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         state: ChatListFixtureState = ChatListFixtureState.Loaded,
         darkTheme: Boolean = false,
@@ -120,12 +128,10 @@ class ChatListTtsTransportLayoutTest {
         onFirstRowClick: () -> Unit = {},
     ) {
         composeRule.setContent {
-            val density = LocalDensity.current
             CompositionLocalProvider(
-                LocalDensity provides Density(density.density, fontScale),
                 LocalLayoutDirection provides layoutDirection,
             ) {
-                WhiteNoiseTheme(darkTheme = darkTheme) {
+                WhiteNoiseTheme(darkTheme = darkTheme, fontScale = fontScale) {
                     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
                         ChatListFixture(state, onFirstRowClick)
                     }

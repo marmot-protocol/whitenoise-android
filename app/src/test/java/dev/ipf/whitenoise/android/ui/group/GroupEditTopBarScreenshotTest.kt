@@ -20,12 +20,13 @@ class GroupEditTopBarScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Descriptive title light. */
     @Test
     fun descriptiveTitleLight() {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
                 Surface {
-                    GroupEditTopBar(onBack = {})
+                    GroupEditScaffold(onBack = {})
                 }
             }
         }

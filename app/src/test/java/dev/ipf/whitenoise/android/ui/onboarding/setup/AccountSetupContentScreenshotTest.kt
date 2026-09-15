@@ -1,13 +1,12 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.OnboardingActionFfi
@@ -234,16 +233,19 @@ class AccountSetupContentScreenshotTest {
     ) {
         composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
-            val density = LocalDensity.current
             CompositionLocalProvider(
-                LocalDensity provides Density(density.density, fontScale),
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = dark) {
+                WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
                     AccountSetupContent(state, {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {})
                 }
             }
         }
+        composeRule.mainClock.autoAdvance = true
+        state.checklistInspectionStep?.takeIf { state.editor == null }?.let {
+            composeRule.onNodeWithTag("setup-step-${it.name}").performScrollTo().performClick()
+        }
+        composeRule.mainClock.autoAdvance = false
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/account_setup_$name.png")
         if (name == "large_rtl") {

@@ -66,10 +66,37 @@ class MessageBubbleSwipeReactionTranslationTest {
         assertSharedSwipeTranslation(mine = false, media = true)
     }
 
-    /** RTL keeps the reaction summary attached to the translated bubble. */
+    /**
+     * RTL keeps the reaction summary attached to the translated bubble, and the
+     * gesture reads the mirrored direction: the reply swipe runs leading-edge
+     * first, which is leftward once the layout direction flips.
+     */
     @Test
     fun rtlReactedTextTranslatesBubbleAndChipTogether() {
         assertSharedSwipeTranslation(mine = false, rtl = true)
+    }
+
+    /** A swipe against the reading direction is inert: RTL ignores a rightward drag. */
+    @Test
+    fun rtlIgnoresADragAgainstTheReadingDirection() {
+        renderBubble(reacted = true, mine = false, media = false, rtl = true)
+        val host = composeRule.onNodeWithTag(SWIPE_TEST_HOST_TAG)
+        val visual = composeRule.onNode(hasText(SWIPE_TEST_MESSAGE_BODY, substring = true), useUnmergedTree = true)
+        val visualAtRest = visual.left()
+
+        host.performTouchInput {
+            down(centerLeft)
+            moveBy(Offset(DRAG_PX, 0f))
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(
+            "a reversed drag must not translate the bubble",
+            visualAtRest,
+            visual.left(),
+            POSITION_TOLERANCE_PX,
+        )
+        host.performTouchInput { cancel() }
     }
 
     /** A sub-threshold release drives onDragEnd and settles bubble and chip together. */
@@ -146,8 +173,8 @@ class MessageBubbleSwipeReactionTranslationTest {
         val chipAtRest = chip.left()
 
         host.performTouchInput {
-            down(centerLeft)
-            moveBy(Offset(DRAG_PX, 0f))
+            down(if (rtl) centerRight else centerLeft)
+            moveBy(Offset(if (rtl) -DRAG_PX else DRAG_PX, 0f))
         }
         composeRule.waitForIdle()
 

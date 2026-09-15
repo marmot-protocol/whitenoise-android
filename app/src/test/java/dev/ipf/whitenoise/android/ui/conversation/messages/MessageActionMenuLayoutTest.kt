@@ -1,16 +1,20 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.unit.Density
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
@@ -45,19 +49,21 @@ class MessageActionMenuLayoutTest {
         assertEquals(listOf("literalCode"), callbacks)
     }
 
+    /** The model emits the prototype's action order, not the capability-argument order. */
     @Test
     fun actionModelPreservesCapabilityOrder() {
         assertEquals(
             listOf(
-                MessageActionKind.Reply,
                 MessageActionKind.Edit,
-                MessageActionKind.Select,
                 MessageActionKind.SelectText,
-                MessageActionKind.CopyText,
-                MessageActionKind.Speak,
+                MessageActionKind.Reply,
                 MessageActionKind.Forward,
+                MessageActionKind.KeepOnScreen,
                 MessageActionKind.Share,
                 MessageActionKind.Save,
+                MessageActionKind.CopyText,
+                MessageActionKind.Speak,
+                MessageActionKind.Select,
                 MessageActionKind.Info,
             ),
             messageActionKinds(
@@ -68,10 +74,31 @@ class MessageActionMenuLayoutTest {
                 canCopyText = true,
                 canSpeak = true,
                 canForward = true,
+                canKeepOnScreen = true,
                 canShare = true,
                 canSave = true,
             ),
         )
+    }
+
+    /** Literal-code reading is a production-only action that trails Read Aloud. */
+    @Test
+    fun literalCodeReadingFollowsReadAloud() {
+        val kinds =
+            messageActionKinds(
+                canReply = false,
+                canEdit = false,
+                canSelect = false,
+                canSelectText = false,
+                canCopyText = false,
+                canSpeak = true,
+                canSpeakCodeLiterally = true,
+                canForward = false,
+                canSave = false,
+                canInfo = false,
+            )
+
+        assertEquals(listOf(MessageActionKind.Speak, MessageActionKind.SpeakCodeLiterally), kinds)
     }
 
     @Test
@@ -121,10 +148,10 @@ class MessageActionMenuLayoutTest {
             assertEquals(
                 buildList {
                     add(MessageActionKind.Reply)
-                    add(MessageActionKind.Select)
-                    add(MessageActionKind.CopyText)
                     add(MessageActionKind.Share)
                     if (canSave) add(MessageActionKind.Save)
+                    add(MessageActionKind.CopyText)
+                    add(MessageActionKind.Select)
                     add(MessageActionKind.Info)
                 },
                 actionKinds,
@@ -312,8 +339,9 @@ class MessageActionMenuLayoutTest {
         assertEquals(163, position.y)
     }
 
+    /** Maximum menu uses prototype single column with delete last. */
     @Test
-    fun maximumMenuUsesRowMajorTwoColumnGridWithDeleteLast() {
+    fun maximumMenuUsesPrototypeSingleColumnWithDeleteLast() {
         renderMenu(fontScale = 1f)
 
         val reply = bounds("Reply")
@@ -322,15 +350,44 @@ class MessageActionMenuLayoutTest {
         val selectText = bounds("Select text")
         val delete = bounds("Delete")
 
-        assertEquals(reply.top, edit.top, 0.5f)
-        assertTrue(reply.left < edit.left)
-        assertEquals(select.top, selectText.top, 0.5f)
+        assertTrue(selectText.top > edit.top)
+        assertEquals(reply.left, edit.left, 0.5f)
+        assertTrue(reply.top > selectText.top)
         assertTrue(select.top > reply.top)
-        val save = bounds("Save")
-        val info = bounds("Message info")
-        assertEquals(save.top, info.top, 0.5f)
+        val save = bounds("Save attachments")
+        val info = bounds("Info")
+        assertTrue(info.top > save.top)
         assertTrue(delete.top > info.top)
         assertEquals(reply.width, delete.width, 0.5f)
+    }
+
+    /** A tap on the stack's empty padding dismisses the actions like the scrim does. */
+    @Test
+    fun tapOutsideEveryActionTargetDismisses() {
+        var dismissals = 0
+        renderMenu(fontScale = 1f, onDismiss = { dismissals++ })
+
+        // The 8 dp gap between the preview and the menu is the column's own surface: a tap there
+        // touches neither a reaction, the inert preview nor a menu item, so it must dismiss.
+        val column = composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).fetchSemanticsNode().boundsInRoot
+        val preview = composeRule.onNodeWithTag("message-actions-preview").fetchSemanticsNode().boundsInRoot
+        val gapY = preview.bottom - column.top + with(composeRule.density) { 4.dp.toPx() }
+        composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).performTouchInput { click(Offset(1f, gapY)) }
+
+        assertEquals(1, dismissals)
+    }
+
+    /** The inert preview neither dismisses nor acts when tapped. */
+    @Test
+    fun tapOnThePreviewStaysInert() {
+        var dismissals = 0
+        val callbacks = mutableListOf<String>()
+        renderMenu(fontScale = 1f, callbacks = callbacks, onDismiss = { dismissals++ })
+
+        composeRule.onNodeWithTag("message-actions-preview").performTouchInput { click() }
+
+        assertEquals(0, dismissals)
+        assertTrue(callbacks.isEmpty())
     }
 
     @Test
@@ -342,53 +399,75 @@ class MessageActionMenuLayoutTest {
             .captureRoboImage("src/test/snapshots/message_action_menu_share_light.png")
     }
 
+    /** Large font falls back to one readable column. */
     @Test
     fun largeFontFallsBackToOneReadableColumn() {
-        renderMenu(fontScale = 2f)
+        renderMenu(fontScale = 2f, literalCode = true)
 
-        assertTrue(bounds("Edit").top > bounds("Reply").top)
-        assertTrue(bounds("Select text").top > bounds("Select").top)
+        assertTrue(bounds("Select text").top > bounds("Edit").top)
+        // At this font the column scrolls, so a row further down the list is composed but
+        // unmeasured until it is scrolled to. Reachability is the claim worth pinning.
+        composeRule.onNodeWithText("Select", substring = false).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Delete", substring = false).performScrollTo().assertIsDisplayed()
+        val layouts = mutableListOf<TextLayoutResult>()
+        composeRule
+            .onNodeWithText("Read code literally")
+            .performScrollTo()
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertTrue(layouts.isNotEmpty())
+        assertTrue(
+            "The popup must render the requested 200% typography",
+            layouts.all { it.layoutInput.style.fontSize.value >= 32f },
+        )
+        assertTrue(
+            "literal-code label must fit: " +
+                layouts.joinToString { "size=${it.size}, lines=${it.lineCount}, height=${it.multiParagraph.height}" },
+            layouts.none { it.hasVisualOverflow },
+        )
     }
 
+    /** Rtl keeps single column command order. */
     @Test
-    fun rtlKeepsRowMajorOrderFromTheStartEdge() {
+    fun rtlKeepsSingleColumnCommandOrder() {
         renderMenu(fontScale = 1f, layoutDirection = LayoutDirection.Rtl)
 
-        assertEquals(bounds("Reply").top, bounds("Edit").top, 0.5f)
-        assertTrue(bounds("Reply").left > bounds("Edit").left)
+        assertTrue(bounds("Reply").top > bounds("Edit").top)
+        assertEquals(bounds("Reply").right, bounds("Edit").right, 0.5f)
     }
 
+    /** Every maximum variant action invokes its original callback. */
     @Test
     fun everyMaximumVariantActionInvokesItsOriginalCallback() {
         val callbacks = mutableListOf<String>()
         renderMenu(fontScale = 1f, callbacks = callbacks)
 
         listOf(
-            "Reply",
             "Edit",
-            "Select",
             "Select text",
-            "Copy text",
-            "Speak aloud",
+            "Reply",
             "Forward",
+            "Keep on screen",
             "Share",
-            "Save",
-            "Message info",
+            "Save attachments",
+            "Copy",
+            "Read Aloud",
+            "Select",
+            "Info",
             "Delete",
-        ).forEach { composeRule.onNodeWithText(it, substring = false).performClick() }
+        ).forEach { composeRule.onNodeWithText(it, substring = false).performScrollTo().performClick() }
 
         assertEquals(
             listOf(
-                "reply",
                 "edit",
-                "select",
                 "selectText",
-                "copy",
-                "speak",
+                "reply",
                 "forward",
+                "keepOnScreen",
                 "share",
                 "save",
+                "copy",
+                "speak",
+                "select",
                 "info",
                 "delete",
             ),
@@ -446,19 +525,19 @@ class MessageActionMenuLayoutTest {
         assertTrue(picker.right <= menu.right)
     }
 
+    /** Composes the menu under test with the given fixture. */
     private fun renderMenu(
         fontScale: Float,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
         callbacks: MutableList<String> = mutableListOf(),
         canReact: Boolean = false,
         literalCode: Boolean = false,
+        onDismiss: () -> Unit = {},
         quickReactionEmojis: List<String> = if (canReact) listOf("👍") else emptyList(),
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme {
-                val density = LocalDensity.current
+            WhiteNoiseTheme(fontScale = fontScale) {
                 CompositionLocalProvider(
-                    LocalDensity provides Density(density.density, fontScale),
                     LocalLayoutDirection provides layoutDirection,
                 ) {
                     MessageActionMenu(
@@ -475,10 +554,11 @@ class MessageActionMenuLayoutTest {
                         canSpeak = true,
                         canSpeakCodeLiterally = literalCode,
                         canSelectText = true,
+                        canKeepOnScreen = true,
                         canShare = true,
                         canSave = true,
                         quickReactionEmojis = quickReactionEmojis,
-                        onDismissRequest = {},
+                        onDismissRequest = onDismiss,
                         onReact = {},
                         onOpenEmojiPicker = {},
                         onReply = { callbacks += "reply" },
@@ -489,10 +569,23 @@ class MessageActionMenuLayoutTest {
                         onCopyText = { callbacks += "copy" },
                         onSpeak = { callbacks += "speak" },
                         onSpeakCodeLiterally = { callbacks += "literalCode" },
+                        onKeepOnScreen = { callbacks += "keepOnScreen" },
                         onShare = { callbacks += "share" },
                         onSave = { callbacks += "save" },
                         onInfo = { callbacks += "info" },
                         onDelete = { callbacks += "delete" },
+                        previewDescription = "A real presentation-only message preview",
+                        preview = {
+                            FocusedTextMessagePreview(
+                                presentation = messageBubblePresentation(deleted = false, mine = false),
+                                mine = false,
+                                text = "A real presentation-only message preview",
+                                document = null,
+                                time = "12:34",
+                                status = dev.ipf.whitenoise.android.state.MessageStatus.Received,
+                                showStatus = false,
+                            )
+                        },
                     )
                 }
             }

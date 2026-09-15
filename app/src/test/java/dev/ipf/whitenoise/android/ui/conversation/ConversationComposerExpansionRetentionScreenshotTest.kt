@@ -26,7 +26,6 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -34,7 +33,6 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipe
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.SavedStateHandle
@@ -60,6 +58,7 @@ import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_INDICATOR_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOverlayBackRegistrar
@@ -87,6 +86,53 @@ class ConversationComposerExpansionRetentionScreenshotTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val controllers = mutableListOf<ConversationController>()
 
+    /** A live drag uses its compact minimum; cancellation keeps the original retained owner unchanged. */
+    @Test
+    fun heldDragCanCrossTheLegacyManualMinimumWithoutPublishingIt() {
+        val owner = appState()
+        val full = RetainedComposerExpansion(RetainedComposerExpansionMode.FullScreen, null)
+        owner.composerExpansionStateRetention.update(
+            ACCOUNT_A,
+            GROUP_A,
+            full,
+            draftGeneration = owner.composerDraftGeneration(ACCOUNT_A, GROUP_A),
+        )
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(Modifier.width(360.dp).height(720.dp)) {
+                    Box(contentAlignment = Alignment.BottomCenter) {
+                        ComposerBar(
+                            replyingTo = null,
+                            messageTextCopy = MessageTextCopy.Default,
+                            onCancelReply = {},
+                            onSend = { _, _ -> },
+                            initialDraft = TextFieldValue("Short draft"),
+                            draftKey = GROUP_A,
+                            draftAccountRef = ACCOUNT_A,
+                            draftGroupIdHex = GROUP_A,
+                            appState = owner,
+                            modifier = Modifier.testTag(COMPOSER),
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val fullHeight = composerHeight()
+        composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true).performTouchInput {
+            down(center)
+            moveBy(Offset(0f, fullHeight - 60f), delayMillis = 1_000)
+        }
+        composeRule.waitForIdle()
+        assertTrue("held drag must not plateau at the legacy144dp minimum", composerHeight() < 144f)
+        assertEquals(full, owner.composerExpansionStateRetention.preferenceFor(ACCOUNT_A, GROUP_A))
+        composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true).performTouchInput { cancel() }
+        composeRule.waitForIdle()
+        assertEquals(fullHeight, composerHeight(), 1f)
+        assertEquals(full, owner.composerExpansionStateRetention.preferenceFor(ACCOUNT_A, GROUP_A))
+        composeRule.onNodeWithText("Short draft").assertExists()
+    }
+
     /** Releases all production fixture owners after the test, including failed assertion paths. */
     @After
     fun releaseControllers() {
@@ -101,6 +147,12 @@ class ConversationComposerExpansionRetentionScreenshotTest {
     @Test
     fun expandedDraftSurvivesReentryAndRemainsIsolatedByConversationAndAccount() {
         val appState = appState()
+        appState.composerExpansionStateRetention.update(
+            ACCOUNT_A,
+            GROUP_A,
+            manualPreference(240f),
+            draftGeneration = appState.composerDraftGeneration(ACCOUNT_A, GROUP_A),
+        )
         var route by mutableStateOf(Route(ACCOUNT_A, GROUP_A))
         var overlayCallback: OnBackInvokedCallback? = null
         val overlayRegistrar =
@@ -148,13 +200,8 @@ class ConversationComposerExpansionRetentionScreenshotTest {
             }
         }
 
-        val automaticHeight = composerHeight()
-        resizeHandle().performTouchInput {
-            swipe(center, Offset(center.x, center.y + 160f), durationMillis = 320)
-        }
-        composeRule.waitForIdle()
         val manualHeight = composerHeight()
-        assertTrue("downward drag should select a shorter manual height", manualHeight < automaticHeight - 64f)
+        assertEquals("legacy manual geometry restores before the first interaction", 240f, manualHeight, 1f)
 
         val editor = composeRule.onNode(hasSetTextAction())
         editor.performClick()
@@ -180,7 +227,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         assertTrue("another account should stay automatic", composerHeight() > manualHeight + 64f)
 
         composeRule.runOnIdle { route = Route(ACCOUNT_A, GROUP_A) }
-        resizeHandle().performClick()
+        resizeGesture().performClick()
         assertResizeHandleToggleLabel(R.string.composer_collapse)
         composeRule.onNode(hasSetTextAction()).performClick()
         composeRule.runOnIdle { checkNotNull(overlayCallback).onBackInvoked() }
@@ -298,9 +345,10 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         awaitResizeHandleAfterReentry()
         composeRule.onNodeWithText(restoredDraft).assertExists()
         val restoredPillHeight = productionComposerPillContentHeight()
-        val expectedPillHeight = 240f - (2f * 10f) - 24f
+        // The composer bar keeps a 6dp vertical inset above and below the pill.
+        val expectedPillHeight = 240f - (2f * 6f)
         assertTrue(
-            "the restored 240dp owner must leave exact content below its outer and border insets",
+            "the restored 240dp owner must leave exact content below its outer insets",
             kotlin.math.abs(restoredPillHeight - expectedPillHeight) <= 2f,
         )
         assertEquals(
@@ -391,7 +439,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         composeRule.waitUntil(timeoutMillis = 5_000) { publisherStarted.isCompleted }
         composeRule.onNode(hasSetTextAction()).performTextReplacement(newerDraft)
         composeRule.waitForIdle()
-        resizeHandle().performClick()
+        resizeGesture().performClick()
         assertResizeHandleToggleLabel(R.string.composer_collapse)
 
         releaseSuccess.complete(Unit)
@@ -417,6 +465,9 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         composeRule.waitForIdle()
     }
 
+    /** Pointer input targets the border so taps never reposition the editor caret. */
+    private fun resizeGesture() = composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true)
+
     /** Returns the accessible resize action exposed by the composer pill. */
     private fun resizeHandle() = composeRule.onNodeWithContentDescription(context.getString(R.string.composer_resize))
 
@@ -426,29 +477,28 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         assertEquals(context.getString(labelRes), label)
     }
 
-    /** Waits for the delayed re-entry handle and verifies its visible indicator geometry. */
+    /** Re-entry restores the accessible surface and border drag target without a visible handle. */
     private fun awaitResizeHandleAfterReentry() {
         val description = context.getString(R.string.composer_resize)
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithContentDescription(description).fetchSemanticsNodes().size == 1 &&
-                composeRule
-                    .onAllNodesWithTag(COMPOSER_RESIZE_INDICATOR_TAG, useUnmergedTree = true)
-                    .fetchSemanticsNodes()
-                    .size == 1
+            composeRule.onAllNodesWithContentDescription(description).fetchSemanticsNodes().size == 1
         }
-        val handle = resizeHandle().assertIsDisplayed()
-        val indicator =
+        val target =
             composeRule
-                .onNodeWithTag(COMPOSER_RESIZE_INDICATOR_TAG, useUnmergedTree = true)
+                .onNodeWithContentDescription(description)
                 .assertIsDisplayed()
-        val handleBounds = handle.getUnclippedBoundsInRoot()
-        val indicatorBounds = indicator.getUnclippedBoundsInRoot()
-        assertEquals(96.dp, handleBounds.right - handleBounds.left)
-        assertEquals(48.dp, handleBounds.bottom - handleBounds.top)
-        assertEquals(36.dp, indicatorBounds.right - indicatorBounds.left)
-        assertEquals(4.dp, indicatorBounds.bottom - indicatorBounds.top)
-        assertEquals(handleBounds.left + handleBounds.right, indicatorBounds.left + indicatorBounds.right)
-        assertTrue(indicatorBounds.top >= handleBounds.top && indicatorBounds.bottom <= handleBounds.bottom)
+                .getUnclippedBoundsInRoot()
+        val strip =
+            composeRule
+                .onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true)
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+        assertTrue(target.bottom - target.top >= 48.dp)
+        assertEquals(target.left, strip.left)
+        assertEquals(target.right, strip.right)
+        assertEquals(target.top, strip.top)
+        assertEquals(8.dp, strip.bottom - strip.top)
+        composeRule.onNodeWithTag(COMPOSER_RESIZE_INDICATOR_TAG, useUnmergedTree = true).assertDoesNotExist()
     }
 
     /** Measures the low-level fixture wrapper used by the isolation matrix. */

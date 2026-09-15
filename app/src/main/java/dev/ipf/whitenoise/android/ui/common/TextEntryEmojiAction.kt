@@ -10,11 +10,14 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 
@@ -31,6 +34,8 @@ internal fun TextEntryEmojiAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     togglesKeyboard: Boolean = false,
+    iconSize: Dp = TextEntryEmojiIconSize,
+    emojiIcon: Painter? = null,
 ) {
     val showKeyboard = pickerOpen && togglesKeyboard
     val containerColor =
@@ -63,12 +68,17 @@ internal fun TextEntryEmojiAction(
                 },
     ) {
         Icon(
-            imageVector = if (showKeyboard) Icons.Default.Keyboard else Icons.Outlined.EmojiEmotions,
+            painter =
+                if (!showKeyboard && emojiIcon != null) {
+                    emojiIcon
+                } else {
+                    rememberVectorPainter(if (showKeyboard) Icons.Default.Keyboard else Icons.Outlined.EmojiEmotions)
+                },
             contentDescription =
                 stringResource(
                     if (showKeyboard) R.string.show_keyboard else R.string.open_emoji_picker,
                 ),
-            modifier = Modifier.size(TextEntryEmojiIconSize),
+            modifier = Modifier.size(iconSize),
         )
     }
 }

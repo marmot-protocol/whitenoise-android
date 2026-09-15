@@ -422,12 +422,17 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue("profile warming must stay outside the target first-frame path", profile > staleGuard)
     }
 
+    /** Interactive selectors load only authoritative rows before activation. */
     @Test
     fun interactiveSelectorsLoadOnlyAuthoritativeRowsBeforeActivation() {
         val setActiveAccount = setActiveAccountSection()
-        val selector = accountSelectorSource().readText().kotlinFunctionBody("AccountSelectorSheet")
+        val selector = source("ui/account/ProfileSwitcherSelection.kt").readText().kotlinFunctionBody("select")
         val mainShell = source("ui/navigation/MainShell.kt").readText()
-        val quickSwitchStart = mainShell.indexOf("fun requestQuickAccountSwitch(targetAccountRef: String)")
+        val quickSwitchStart =
+            Regex("""fun requestQuickAccountSwitch\(\s*targetAccountRef: String""")
+                .find(mainShell)
+                ?.range
+                ?.first ?: -1
         val quickSwitchEnd = mainShell.indexOf("shellStateHolder.restoreConversationIfReady", quickSwitchStart)
         check(quickSwitchStart >= 0 && quickSwitchEnd > quickSwitchStart) {
             "Missing requestQuickAccountSwitch section"
@@ -520,21 +525,26 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue(full.includePresentationSeeds)
     }
 
+    /** Selector dismisses at activation boundary instead of awaiting post switch work. */
     @Test
     fun selectorDismissesAtActivationBoundaryInsteadOfAwaitingPostSwitchWork() {
-        val body = accountSelectorSource().readText().kotlinFunctionBody("AccountSelectorSheet")
+        val selection = source("ui/account/ProfileSwitcherSelection.kt").readText().kotlinFunctionBody("select")
+        val sheet = accountSelectorSource().readText().kotlinFunctionBody("AccountSelectorSheet")
 
-        val switchCall =
-            body
-                .substringAfter("appState.setActiveAccount(")
-                .substringBefore("\n                    )")
+        val switchCall = selection.substringAfter("appState.setActiveAccount(")
         val activation = switchCall.indexOf("onActivated = {")
-        val dismiss = switchCall.indexOf("onDismiss()")
-        val reset = switchCall.indexOf("onAccountSwitched()")
+        val completion = switchCall.indexOf("onActivated()", startIndex = maxOf(activation, 0))
+        val selectCall = sheet.substringAfter("selection.select(appState, label)")
+        val dismiss = selectCall.indexOf("close()")
+        val reset = selectCall.indexOf("switched()")
 
         assertTrue(
-            "dismiss/reset must be passed into setActiveAccount's activation boundary",
-            activation >= 0 && dismiss > activation && reset > dismiss,
+            "the selection owner must complete inside setActiveAccount's activation boundary",
+            activation >= 0 && completion > activation,
+        )
+        assertTrue(
+            "the sheet must dismiss at activation before reporting the switch",
+            dismiss >= 0 && reset > dismiss,
         )
     }
 

@@ -34,6 +34,9 @@ data class TranscriptSenderDecoration(
 object GroupProjector {
     private const val TranscriptSenderRunWindowSeconds = 180uL
 
+    /** A two-person roster is the only shape that borrows a member's avatar. */
+    private const val DIRECT_CHAT_MEMBER_COUNT = 2
+
     fun displayTitle(
         group: AppGroupRecordFfi,
         otherMemberAccount: String?,
@@ -119,6 +122,20 @@ object GroupProjector {
     ): String? =
         inviteAccount(group, otherMemberAccount)
             ?: otherMemberAccount?.takeIf { isUnnamed(group.name) && memberCount == 2 }
+
+    /**
+     * Whether a member's own picture may stand in for this conversation's
+     * avatar. MDK selects a peer profile image for two-person conversations,
+     * but a named group must keep its own avatar (or its monogram) exactly as
+     * the conversation header does, so a group created with a single
+     * avatar-bearing contact never wears that contact's face in the chat list.
+     * An unresolved roster counts as at most a pair so an unnamed direct chat
+     * still shows the peer while its members load.
+     */
+    fun lendsPeerAvatar(
+        group: AppGroupRecordFfi,
+        memberCount: Int,
+    ): Boolean = group.pendingConfirmation || (isUnnamed(group.name) && memberCount <= DIRECT_CHAT_MEMBER_COUNT)
 
     fun otherMemberAccount(
         members: List<AppGroupMemberRecordFfi>,

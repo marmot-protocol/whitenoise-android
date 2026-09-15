@@ -282,6 +282,7 @@ class ComposerCaretVisibilityTest {
         assertEquals(0, composerCaretScrollTarget(110, 50, 200, reversedOversized))
     }
 
+    /** Reply appearance and expansion toggle reanchor without losing the caret. */
     @Test
     fun replyAppearanceAndExpansionToggleReanchorWithoutLosingTheCaret() {
         val draft = longDraft()
@@ -325,7 +326,7 @@ class ComposerCaretVisibilityTest {
 
         composeRule
             .onNodeWithContentDescription(app.getString(R.string.composer_resize))
-            .performClick()
+            .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitForIdle()
 
         assertEquals(initialChangeCount + 2, bottomInputChanges)

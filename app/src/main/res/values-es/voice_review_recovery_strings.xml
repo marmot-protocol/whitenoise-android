@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_review_unavailable_title">Grabación no disponible</string>
+    <string name="voice_review_unavailable_message">No se pudo restaurar esta grabación. Vuelve a grabar para crear una nueva toma.</string>
+</resources>

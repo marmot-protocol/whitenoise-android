@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_review_title">Review voice message</string>
+    <string name="voice_record_again">Record again</string>
+    <string name="voice_message_release_to_review">Release to review · slide off to cancel</string>
+    <string name="voice_recording_stop">Stop recording</string>
+</resources>

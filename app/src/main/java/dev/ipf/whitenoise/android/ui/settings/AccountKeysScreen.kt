@@ -1,67 +1,64 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import android.content.ClipData
 import android.content.ClipDescription
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.PersistableBundle
+import android.os.SystemClock
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -70,37 +67,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.isTraversalGroup
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.ENCRYPTED_BACKUP_MIN_PASSPHRASE_LENGTH
 import dev.ipf.whitenoise.android.core.EncryptedBackupPassphraseStrength
-import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.encryptedBackupPassphraseInputsValid
 import dev.ipf.whitenoise.android.core.encryptedBackupPassphraseStrength
 import dev.ipf.whitenoise.android.core.groupedEncryptedBackup
@@ -110,15 +98,12 @@ import dev.ipf.whitenoise.android.state.WipeReport
 import dev.ipf.whitenoise.android.state.WipeStage
 import dev.ipf.whitenoise.android.state.WipeStageReport
 import dev.ipf.whitenoise.android.state.wipeReport
-import dev.ipf.whitenoise.android.ui.common.CopyableValueRow
-import dev.ipf.whitenoise.android.ui.common.SectionCard
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
-import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * Whether the destructive "Sign Out & Wipe" path is wired to Marmot's
@@ -126,54 +111,97 @@ import kotlinx.coroutines.launch
  */
 private const val WIPE_ENGINE_FFI_AVAILABLE = true
 
-internal enum class IdentitySecretExportAction {
-    Request,
-    ToggleReveal,
-    Cancel,
-}
+internal const val WIPE_ACTION_TAG = "wipe-action"
 
-internal data class IdentitySecretExportState(
-    val confirmationVisible: Boolean = false,
-    val revealed: Boolean = false,
+/** The key the copy glyph last acknowledged; it shows a check for two seconds. */
+private enum class CopiedProfileKey { Public, Private, Encrypted }
+
+/** Explicit user-selected delivery of an account-bound native export. */
+private enum class KeyExportDestination { File, Preview, Share }
+
+/** A confirmed native result held temporarily for preview or document delivery, with one original expiry. */
+private data class PendingKeyExport(
+    val encrypted: Boolean,
+    val content: String,
+    val createdAtMillis: Long,
 )
 
-internal fun identitySecretExportState(
-    state: IdentitySecretExportState,
-    action: IdentitySecretExportAction,
-): IdentitySecretExportState =
-    when (action) {
-        IdentitySecretExportAction.Request -> IdentitySecretExportState(confirmationVisible = true)
-        IdentitySecretExportAction.ToggleReveal ->
-            if (state.confirmationVisible) state.copy(revealed = !state.revealed) else state
-        IdentitySecretExportAction.Cancel -> IdentitySecretExportState()
+/** Timing and geometry the prototype fixes for Profile Keys. */
+private object ProfileKeysDefaults {
+    const val EXPIRY_MILLIS = 30_000L
+    const val COPIED_MILLIS = 2_000L
+    const val MASK = "••••••••••••••••••••••••••••••••"
+    const val FILE_STEM_LENGTH = 16
+    val ValueRowMinHeight = 64.dp
+    val ValueRowEndInset = 4.dp
+    val IconSize = 24.dp
+}
+
+/** Transient screen state; everything sensitive clears on stop and on dispose. */
+private class ProfileKeysUiState {
+    var privateKey by mutableStateOf<String?>(null)
+    var revealRequested by mutableStateOf(false)
+    var copiedKey by mutableStateOf<CopiedProfileKey?>(null)
+    var pendingExport by mutableStateOf<PendingKeyExport?>(null)
+    var encryptedBackup by mutableStateOf<PendingKeyExport?>(null)
+    var shareErrorDialog by mutableStateOf(false)
+    var nativeExportError by mutableStateOf<Int?>(null)
+    var passwordDialog by mutableStateOf(false)
+    var rawExportDialog by mutableStateOf(false)
+    var saveErrorDialog by mutableStateOf(false)
+    var expiredExportDialog by mutableStateOf(false)
+    var exportBusy by mutableStateOf(false)
+    var wipeSheet by mutableStateOf(false)
+    var wipeConfirm by mutableStateOf(false)
+    var wipeConfirmInput by mutableStateOf("")
+    val exportOperation = ProfileKeyOperation()
+    val copyOperation = ProfileKeyOperation()
+    val revealOperation = ProfileKeyOperation()
+    val password = TextFieldState()
+    val confirmation = TextFieldState()
+
+    /** Hides the revealed key. */
+    fun hidePrivateKey() {
+        revealOperation.cancel()
+        revealRequested = false
+        privateKey = null
     }
 
-internal fun maskedIdentitySecret(
-    secret: String,
-    revealed: Boolean,
-): String = if (revealed) secret else "•".repeat(MASKED_IDENTITY_SECRET_LENGTH)
+    /** Cancels a dismissed confirmation before its suspended native export can open the file picker. */
+    fun cancelExport() {
+        exportOperation.cancel()
+        exportBusy = false
+        rawExportDialog = false
+        passwordDialog = false
+        encryptedBackup = null
+        clearPasswords()
+    }
 
-internal const val IDENTITY_SECRET_EXPORT_CONTENT_TAG = "identity-secret-export-content"
-internal const val ACCOUNT_ACTIONS_GROUP_TAG = "account-actions-group"
-internal const val SIGN_OUT_ACTION_TAG = "sign-out-action"
-internal const val WIPE_ACTION_TAG = "wipe-action"
-private const val MASKED_IDENTITY_SECRET_LENGTH = 24
+    /** Prevents delayed exports, clipboard writes and reveals after backgrounding or leaving this account. */
+    fun stopSensitiveOperations() {
+        cancelExport()
+        copyOperation.cancel()
+        hidePrivateKey()
+        copiedKey = null
+    }
 
-internal suspend fun exportIdentitySecretForSession(
-    sessionId: Long,
-    exporter: suspend () -> String?,
-    isSessionActive: (Long) -> Boolean,
-    onExported: (String) -> Unit,
-): Boolean {
-    val exported = exporter()
-    return if (exported != null && isSessionActive(sessionId)) {
-        onExported(exported)
-        true
-    } else {
-        false
+    /** Clears both export password fields. */
+    fun clearPasswords() {
+        password.edit { replace(0, length, "") }
+        confirmation.edit { replace(0, length, "") }
+    }
+
+    /** Closes the export dialogs and hides the key; used before handing off to the file picker and on stop. */
+    fun hideSensitive() {
+        hidePrivateKey()
+        rawExportDialog = false
+        passwordDialog = false
+        encryptedBackup = null
+        clearPasswords()
     }
 }
 
+/** Presents account-bound key operations whose results are discarded after dismissal or lifecycle invalidation. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun AccountKeysScreen(
@@ -185,358 +213,771 @@ internal fun AccountKeysScreen(
     // screenshots, matching the encrypted-backup sheet's posture.
     WindowSecureFlag()
     val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val active = appState.activeAccount
-    var showSignOutSheet by remember { mutableStateOf(false) }
-    var showWipeSheet by remember { mutableStateOf(false) }
-    var showWipeConfirm by remember { mutableStateOf(false) }
-    var showEncryptedBackupSheet by remember { mutableStateOf(false) }
-    var secretExportState by remember { mutableStateOf(IdentitySecretExportState()) }
-    var secretForExport by remember { mutableStateOf<String?>(null) }
-    var secretExportSessionId by remember { mutableLongStateOf(0L) }
-    var secretExportJob by remember { mutableStateOf<Job?>(null) }
-    var secretExportInProgress by remember { mutableStateOf(false) }
-    // Type-to-confirm input for the destructive wipe (#348). Reset whenever the
-    // confirm dialog is dismissed so a previous match can't carry over into a
-    // later open.
-    var wipeConfirmInput by remember { mutableStateOf("") }
-    val shareSecretKeyTitle = stringResource(R.string.share_secret_key)
+    val accountIdHex = active?.accountIdHex
+    val npub = accountIdHex?.let(appState::npubForDisplay).orEmpty()
+    val hasLocalKey = active?.localSigning == true
+    val publicKeyLabel = stringResource(R.string.public_key)
+    val privateKeyLabel = stringResource(R.string.private_key)
+    val encryptedBackupLabel = stringResource(R.string.encrypted_backup_result_title)
+    val shareTitle = stringResource(R.string.share_secret_key)
+    val accountRef = appState.activeAccountRef
+    val runtimeGeneration = appState.runtimeGeneration
+    val ui = remember(accountIdHex, accountRef, runtimeGeneration) { ProfileKeysUiState() }
 
-    fun dismissSecretExport() {
-        secretExportSessionId++
-        secretExportJob?.cancel()
-        secretExportJob = null
-        secretExportInProgress = false
-        secretForExport = null
-        secretExportState = IdentitySecretExportState()
-    }
+    /** True while the screen still shows the active account. */
+    fun ownsAccount(): Boolean =
+        accountIdHex != null &&
+            appState.activeAccount?.accountIdHex == accountIdHex &&
+            appState.activeAccountRef == accountRef &&
+            appState.runtimeGeneration == runtimeGeneration
 
-    fun beginSecretExport() {
-        dismissSecretExport()
-        secretExportState =
-            identitySecretExportState(
-                IdentitySecretExportState(),
-                IdentitySecretExportAction.Request,
-            )
-    }
+    /** Secrets are delivered only to the owning account while started and signing locally. */
+    fun canDeliverSecret(): Boolean =
+        ownsAccount() &&
+            lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&
+            appState.activeAccount?.localSigning == true &&
+            !appState.signOutInProgress &&
+            !appState.wipeInProgress
 
-    fun shareSecretKey(text: String) {
-        val sendIntent =
-            Intent(Intent.ACTION_SEND)
-                .setType("text/plain")
-                .putExtra(Intent.EXTRA_TEXT, text)
-                // Marks the payload as private so the share sheet and clipboard
-                // keep the raw nsec out of previews, history, and logs.
-                .putExtra(ClipDescription.EXTRA_IS_SENSITIVE, true)
-        context.startActivity(
-            Intent.createChooser(sendIntent, shareSecretKeyTitle),
-        )
-    }
-
-    Scaffold(
-        contentWindowInsets = contentWindowInsets,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.account_and_keys)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            item {
-                SectionCard(title = stringResource(R.string.identity)) {
-                    if (active == null) {
-                        Text(stringResource(R.string.no_active_account_period), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    } else {
-                        DiagnosticRow(stringResource(R.string.display_name), appState.displayName(active.accountIdHex))
-                        val npub = appState.npubForDisplay(active.accountIdHex)
-                        if (npub.isNotBlank()) {
-                            CopyableValueRow(
-                                label = stringResource(R.string.public_key),
-                                value = npub,
-                                displayValue = IdentityFormatter.short(npub, prefix = 10, suffix = 8),
-                                clipboard = clipboard,
-                            )
-                        }
-                        DiagnosticRow(stringResource(R.string.local_signing), stringResource(if (active.localSigning) R.string.yes else R.string.no))
-                        DiagnosticRow(stringResource(R.string.status), stringResource(if (active.running) R.string.online else R.string.idle))
-                    }
-                }
+    val exportLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+            val request = ui.pendingExport
+            ui.pendingExport = null
+            when {
+                uri == null || !canDeliverSecret() -> Unit
+                request == null || request.isExpired() -> ui.expiredExportDialog = true
+                else -> ui.saveErrorDialog = !writeExport(context, uri, request.content)
             }
-            if (active?.localSigning == true) {
-                item {
-                    SectionCard(title = stringResource(R.string.secret_key_backup)) {
-                        Text(
-                            stringResource(R.string.secret_key_backup_help),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        OutlinedButton(
-                            onClick = {
-                                beginSecretExport()
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(Icons.Default.Key, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.export_nsec))
-                        }
-                        OutlinedButton(
-                            onClick = { showEncryptedBackupSheet = true },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(Icons.Default.Lock, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.encrypted_backup_create))
-                        }
-                    }
-                }
-            }
-            item {
-                SectionCard(title = stringResource(R.string.account_session)) {
-                    Column(
-                        modifier =
-                            Modifier.fillMaxWidth().testTag(ACCOUNT_ACTIONS_GROUP_TAG).semantics {
-                                isTraversalGroup = true
-                            },
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Text(
-                            stringResource(R.string.sign_out_session_help),
-                            modifier = Modifier.semantics { traversalIndex = 0f },
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        // Primary, non-destructive sign-out. Opens an explanatory
-                        // sheet; the sheet's button performs the actual sign-out so
-                        // the user reads what stays vs. changes before committing.
-                        Button(
-                            onClick = { showSignOutSheet = true },
-                            enabled = active != null,
-                            modifier =
-                                Modifier.fillMaxWidth().testTag(SIGN_OUT_ACTION_TAG).semantics {
-                                    traversalIndex = 1f
-                                },
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.sign_out))
-                        }
-                        // A neutral divider creates a distinct terminal danger area
-                        // without making the whole section look like an error state.
-                        if (WIPE_ENGINE_FFI_AVAILABLE) {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                            OutlinedButton(
-                                onClick = { showWipeSheet = true },
-                                enabled = active != null,
-                                modifier =
-                                    Modifier.fillMaxWidth().testTag(WIPE_ACTION_TAG).semantics {
-                                        traversalIndex = 2f
-                                    },
-                                colors =
-                                    ButtonDefaults.outlinedButtonColors(
-                                        contentColor = MaterialTheme.colorScheme.error,
-                                    ),
-                            ) {
-                                Icon(Icons.Default.Delete, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(stringResource(R.string.sign_out_and_wipe))
-                            }
-                        }
-                    }
-                }
-            }
+        }
+
+    /** Launches the export share with the prepared content. */
+    fun launchExport(
+        encrypted: Boolean,
+        content: String,
+        createdAtMillis: Long = SystemClock.elapsedRealtime(),
+    ) {
+        ui.pendingExport = PendingKeyExport(encrypted, content, createdAtMillis)
+        ui.hideSensitive()
+        val stem = npub.take(ProfileKeysDefaults.FILE_STEM_LENGTH)
+        val filename = if (encrypted) "$stem-white-noise-key.wnkey.txt" else "$stem-white-noise-key.txt"
+        if (runCatching { exportLauncher.launch(filename) }.isFailure) {
+            ui.pendingExport = null
+            ui.saveErrorDialog = true
         }
     }
 
-    if (showEncryptedBackupSheet) {
-        EncryptedBackupSheet(
-            appState = appState,
-            onDismiss = { showEncryptedBackupSheet = false },
+    /** Begins an export to the chosen destination. */
+    fun beginExport(
+        encrypted: Boolean,
+        destination: KeyExportDestination,
+    ) {
+        val exportIdle = !ui.exportBusy && ui.pendingExport == null
+        if (!hasLocalKey || !exportIdle || !canDeliverSecret()) return
+        if (encrypted &&
+            !encryptedBackupPassphraseInputsValid(
+                ui.password.text.toString(),
+                ui.confirmation.text.toString(),
+            )
+        ) {
+            return
+        }
+        val passphrase = if (encrypted) ui.password.text.toString() else ""
+        ui.clearPasswords()
+        ui.exportBusy = true
+        ui.exportOperation.start(
+            scope = scope,
+            canDeliver = ::canDeliverSecret,
+            load = {
+                if (encrypted) {
+                    appState.exportEncryptedSecretKeyBackup(passphrase)
+                } else {
+                    appState.exportActiveAccountNsec()
+                }
+            },
+            onResult = { content ->
+                if (content == null) {
+                    ui.nativeExportError =
+                        if (encrypted) {
+                            R.string.toast_couldnt_create_encrypted_backup
+                        } else {
+                            R.string.toast_couldnt_export_nsec
+                        }
+                } else {
+                    when (destination) {
+                        KeyExportDestination.File -> launchExport(encrypted, content)
+                        KeyExportDestination.Preview -> {
+                            ui.hideSensitive()
+                            ui.copiedKey = null
+                            ui.encryptedBackup = PendingKeyExport(true, content, SystemClock.elapsedRealtime())
+                        }
+                        KeyExportDestination.Share -> {
+                            ui.hideSensitive()
+                            ui.shareErrorDialog = !sharePrivateKey(context, shareTitle, content)
+                        }
+                    }
+                }
+            },
+            onFinished = { ui.exportBusy = false },
         )
     }
 
-    if (secretExportState.confirmationVisible) {
-        val secret = secretForExport.orEmpty()
-        AlertDialog(
-            onDismissRequest = {
-                dismissSecretExport()
+    ProfileKeysEffects(ui = ui, lifecycle = lifecycle)
+    LaunchedEffect(hasLocalKey, appState.signOutInProgress, appState.wipeInProgress) {
+        if (!hasLocalKey || appState.signOutInProgress || appState.wipeInProgress) {
+            ui.stopSensitiveOperations()
+            ui.pendingExport = null
+        }
+    }
+
+    SettingsScaffold(
+        title = stringResource(R.string.settings_profile_keys),
+        onBack = onBack,
+        contentWindowInsets = contentWindowInsets,
+    ) {
+        ProfileKeysList(
+            npub = npub,
+            hasLocalKey = hasLocalKey,
+            showWipe = WIPE_ENGINE_FFI_AVAILABLE && active != null,
+            ui = ui,
+            onCopyPublic = {
+                copyToClipboard(context, publicKeyLabel, npub)
+                ui.copiedKey = CopiedProfileKey.Public
             },
-            title = { Text(stringResource(R.string.share_secret_key)) },
-            text = {
-                IdentitySecretExportContent(
-                    state = secretExportState,
-                    secret = secret,
-                    onToggleReveal = {
-                        if (secretExportState.revealed) {
-                            secretForExport = null
-                            secretExportState =
-                                identitySecretExportState(
-                                    secretExportState,
-                                    IdentitySecretExportAction.ToggleReveal,
-                                )
-                        } else {
-                            if (secretExportInProgress) return@IdentitySecretExportContent
-                            val sessionId = secretExportSessionId
-                            secretExportInProgress = true
-                            secretExportJob =
-                                scope.launch {
-                                    try {
-                                        exportIdentitySecretForSession(
-                                            sessionId = sessionId,
-                                            exporter = { appState.exportActiveAccountNsec() },
-                                            isSessionActive = {
-                                                it == secretExportSessionId && secretExportState.confirmationVisible
-                                            },
-                                            onExported = { exported ->
-                                                secretForExport = exported
-                                                secretExportState = secretExportState.copy(revealed = true)
-                                            },
-                                        )
-                                    } finally {
-                                        if (sessionId == secretExportSessionId) {
-                                            secretExportInProgress = false
-                                            secretExportJob = null
-                                        }
-                                    }
-                                }
+            onToggleReveal = {
+                if (ui.revealRequested) {
+                    ui.hidePrivateKey()
+                } else if (canDeliverSecret()) {
+                    ui.revealRequested = true
+                    ui.revealOperation.start(
+                        scope = scope,
+                        canDeliver = { ui.revealRequested && canDeliverSecret() },
+                        load = { appState.exportActiveAccountNsec() },
+                        onResult = { secret ->
+                            ui.privateKey = secret
+                            if (secret == null) ui.revealRequested = false
+                        },
+                    )
+                }
+            },
+            onCopyPrivate = {
+                ui.copyOperation.start(
+                    scope = scope,
+                    canDeliver = ::canDeliverSecret,
+                    load = { ui.privateKey ?: appState.exportActiveAccountNsec() },
+                    onResult = { secret ->
+                        if (secret != null) {
+                            copyToClipboard(context, privateKeyLabel, secret, sensitive = true)
+                            ui.copiedKey = CopiedProfileKey.Private
                         }
                     },
                 )
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val cachedSecret = secretForExport
-                        if (cachedSecret != null) {
-                            dismissSecretExport()
-                            shareSecretKey(cachedSecret)
-                        } else if (!secretExportInProgress) {
-                            val sessionId = secretExportSessionId
-                            secretExportInProgress = true
-                            secretExportJob =
-                                scope.launch {
-                                    try {
-                                        exportIdentitySecretForSession(
-                                            sessionId = sessionId,
-                                            exporter = { appState.exportActiveAccountNsec() },
-                                            isSessionActive = {
-                                                it == secretExportSessionId && secretExportState.confirmationVisible
-                                            },
-                                            onExported = { exported ->
-                                                secretForExport = null
-                                                secretExportState = IdentitySecretExportState()
-                                                secretExportSessionId++
-                                                secretExportJob = null
-                                                secretExportInProgress = false
-                                                shareSecretKey(exported)
-                                            },
-                                        )
-                                    } finally {
-                                        if (sessionId == secretExportSessionId) {
-                                            secretExportInProgress = false
-                                            secretExportJob = null
-                                        }
-                                    }
-                                }
-                        }
-                    },
-                    enabled = !secretExportInProgress,
-                ) {
-                    Text(stringResource(R.string.share))
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        dismissSecretExport()
-                    },
-                ) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
+            onExportEncrypted = { ui.passwordDialog = true },
+            onExportRaw = { ui.rawExportDialog = true },
+            onWipe = { ui.wipeSheet = true },
         )
     }
+    ProfileKeysDialogs(
+        ui = ui,
+        canExport = hasLocalKey,
+        onExport = ::beginExport,
+        onCopyBackup = {
+            val backup = ui.encryptedBackup
+            if (backup != null && !backup.isExpired() && canDeliverSecret()) {
+                copyToClipboard(context, encryptedBackupLabel, backup.content, sensitive = true)
+                ui.copiedKey = CopiedProfileKey.Encrypted
+            } else {
+                ui.encryptedBackup = null
+            }
+        },
+        onExportBackup = {
+            val backup = ui.encryptedBackup
+            if (backup != null && !backup.isExpired() && canDeliverSecret()) {
+                launchExport(true, backup.content, backup.createdAtMillis)
+            } else {
+                ui.encryptedBackup = null
+                if (canDeliverSecret()) ui.expiredExportDialog = true
+            }
+        },
+    )
+    AccountWipeFlow(appState = appState, ui = ui)
+}
 
-    if (showSignOutSheet) {
-        SignOutSheet(
-            onConfirm = { deleteKeyPackages ->
-                showSignOutSheet = false
-                appState.signOutInProgress = true
-                // Mutation scope, not the screen scope: signOutActiveAccount()
-                // flips activeAccountRef before its disk-media wipe finishes,
-                // and the account-change nav reset pops this screen — a
-                // screen-scoped job would be cancelled mid-teardown.
-                appState.launchMutation {
-                    try {
-                        when (appState.signOutActiveAccount(deleteKeyPackages)) {
-                            SignOutCompletion.Complete -> appState.presentTransient(R.string.toast_signed_out)
-                            // Local sign-out completed but the engine call
-                            // failed or reported relay cleanup failures. This
-                            // is informational and not copyable (#966); MDK
-                            // does not retain a retry queue for the deletions.
-                            SignOutCompletion.RelayCleanupIncomplete ->
-                                appState.present(R.string.toast_signed_out_relay_cleanup_incomplete)
-                            // MDK kept the account active, so the screen and
-                            // all account-scoped state remain intact.
-                            SignOutCompletion.AccountCleanupIncomplete ->
-                                appState.present(R.string.toast_couldnt_sign_out)
-                            null -> Unit
+/** Reveal loading and expiry, pending-export expiry, copied-glyph reset, and hiding everything sensitive on stop. */
+@Suppress("FunctionNaming")
+@Composable
+private fun ProfileKeysEffects(
+    ui: ProfileKeysUiState,
+    lifecycle: Lifecycle,
+) {
+    LaunchedEffect(ui.privateKey) {
+        if (ui.privateKey != null) {
+            delay(ProfileKeysDefaults.EXPIRY_MILLIS)
+            ui.hidePrivateKey()
+        }
+    }
+    LaunchedEffect(ui.pendingExport) {
+        val request = ui.pendingExport ?: return@LaunchedEffect
+        delay(request.remainingMillis())
+        if (ui.pendingExport === request) {
+            ui.pendingExport = null
+            ui.expiredExportDialog = true
+        }
+    }
+    LaunchedEffect(ui.encryptedBackup) {
+        val backup = ui.encryptedBackup ?: return@LaunchedEffect
+        delay(backup.remainingMillis())
+        if (ui.encryptedBackup === backup) ui.encryptedBackup = null
+    }
+    LaunchedEffect(ui.copiedKey) {
+        if (ui.copiedKey != null) {
+            delay(ProfileKeysDefaults.COPIED_MILLIS)
+            ui.copiedKey = null
+        }
+    }
+    DisposableEffect(lifecycle, ui) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_STOP) ui.stopSensitiveOperations()
+            }
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+            ui.stopSensitiveOperations()
+            ui.pendingExport = null
+        }
+    }
+}
+
+/** The three prototype groups: public key, private key (local signing only) and export, then the wipe action. */
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
+@Composable
+private fun ProfileKeysList(
+    npub: String,
+    hasLocalKey: Boolean,
+    showWipe: Boolean,
+    ui: ProfileKeysUiState,
+    onCopyPublic: () -> Unit,
+    onToggleReveal: () -> Unit,
+    onCopyPrivate: () -> Unit,
+    onExportEncrypted: () -> Unit,
+    onExportRaw: () -> Unit,
+    onWipe: () -> Unit,
+) {
+    val revealed = ui.privateKey != null
+    val exportsEnabled = ui.pendingExport == null && !ui.exportBusy
+    SettingsList {
+        item { SettingsSection(stringResource(R.string.public_key)) }
+        item {
+            SettingsGroup {
+                row("public_key") { context ->
+                    ProfileKeyValueRow(
+                        context = context,
+                        value = npub,
+                        valueModifier = Modifier.testTag("profile_keys.public_key_value"),
+                    ) {
+                        val copied = ui.copiedKey == CopiedProfileKey.Public
+                        IconButton(onClick = onCopyPublic) {
+                            Icon(
+                                painter = painterResource(copyGlyph(copied)),
+                                contentDescription =
+                                    stringResource(
+                                        if (copied) R.string.public_key_copied else R.string.copy_public_key,
+                                    ),
+                            )
                         }
-                    } finally {
-                        appState.signOutInProgress = false
                     }
                 }
-            },
-            onDismiss = { showSignOutSheet = false },
-        )
-    }
-
-    // Block the screen with a spinner while a sign-out / wipe teardown runs, so
-    // the confirm doesn't leave the user staring at an unchanged screen until
-    // navigation resets. Non-dismissible — the teardown can't be cancelled.
-    if (appState.signOutInProgress) {
-        Dialog(
-            onDismissRequest = {},
-            properties =
-                DialogProperties(
-                    dismissOnBackPress = false,
-                    dismissOnClickOutside = false,
-                    usePlatformDefaultWidth = false,
-                ),
-        ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                LoadingIndicator()
+            }
+        }
+        item { ProfileKeySupportingText(stringResource(R.string.profile_public_key_help)) }
+        if (!hasLocalKey) {
+            item {
+                SettingsCallout(
+                    title = stringResource(R.string.access_amber_signed_in),
+                    text = stringResource(R.string.access_amber_owns_key),
+                    modifier = Modifier.testTag("profile_keys.amber_info"),
+                )
+            }
+        } else {
+            item { SettingsSection(stringResource(R.string.private_key)) }
+            item {
+                SettingsGroup {
+                    row("private_key") { context ->
+                        PrivateKeyValueRow(context, ui.privateKey, revealed, onToggleReveal)
+                    }
+                    row("copy_private_key") { context ->
+                        val copied = ui.copiedKey == CopiedProfileKey.Private
+                        SettingsAction(
+                            context = context,
+                            title = stringResource(R.string.copy_private_key),
+                            onClick = onCopyPrivate,
+                            leading = {
+                                Icon(
+                                    painter = painterResource(copyGlyph(copied)),
+                                    contentDescription = null,
+                                )
+                            },
+                        )
+                    }
+                }
+            }
+            item { ProfileKeySupportingText(stringResource(R.string.profile_private_key_help)) }
+            item { SettingsSection(stringResource(R.string.export)) }
+            item {
+                SettingsGroup {
+                    row("export_encrypted") { context ->
+                        SettingsAction(
+                            context = context,
+                            title = stringResource(R.string.export_encrypted_private_key),
+                            onClick = onExportEncrypted,
+                            enabled = exportsEnabled,
+                            leading = { Icon(painterResource(R.drawable.ic_lock), contentDescription = null) },
+                        )
+                    }
+                    row("export_raw") { context ->
+                        SettingsAction(
+                            context = context,
+                            title = stringResource(R.string.export_nsec),
+                            onClick = onExportRaw,
+                            modifier = Modifier.testTag("profile_keys.export_raw"),
+                            enabled = exportsEnabled,
+                            leading = { Icon(painterResource(R.drawable.ic_download), contentDescription = null) },
+                        )
+                    }
+                }
+            }
+        }
+        if (showWipe) {
+            item {
+                SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section)) {
+                    row("wipe") { context ->
+                        SettingsAction(
+                            context = context,
+                            title = stringResource(R.string.sign_out_and_wipe),
+                            onClick = onWipe,
+                            modifier = Modifier.testTag(WIPE_ACTION_TAG),
+                            destructive = true,
+                            leading = {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_delete),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
+                            },
+                        )
+                    }
+                }
             }
         }
     }
+}
 
-    if (WIPE_ENGINE_FFI_AVAILABLE && showWipeSheet) {
+/** Masked or revealed private key with the visibility toggle; the value's semantics say which state it is in. */
+@Suppress("FunctionNaming")
+@Composable
+private fun PrivateKeyValueRow(
+    context: SettingsRowContext,
+    privateKey: String?,
+    revealed: Boolean,
+    onToggleReveal: () -> Unit,
+) {
+    val stateDescription =
+        stringResource(if (revealed) R.string.private_key_revealed else R.string.private_key_hidden)
+    ProfileKeyValueRow(
+        context = context,
+        value = privateKey ?: ProfileKeysDefaults.MASK,
+        overflow = if (revealed) TextOverflow.MiddleEllipsis else TextOverflow.Clip,
+        valueModifier =
+            Modifier
+                .testTag("profile_keys.private_key_value")
+                .clearAndSetSemantics { contentDescription = stateDescription },
+    ) {
+        IconButton(onClick = onToggleReveal) {
+            Icon(
+                painter = painterResource(if (revealed) R.drawable.ic_visibility_off else R.drawable.ic_visibility),
+                contentDescription =
+                    stringResource(if (revealed) R.string.hide_private_key else R.string.show_private_key),
+            )
+        }
+    }
+}
+
+/** 64 dp row with a monospace, middle-ellipsized key value and one trailing icon action at the 4 dp edge. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Suppress("FunctionNaming", "LongParameterList")
+@Composable
+private fun ProfileKeyValueRow(
+    context: SettingsRowContext,
+    value: String,
+    valueModifier: Modifier = Modifier,
+    overflow: TextOverflow = TextOverflow.MiddleEllipsis,
+    trailingAction: @Composable () -> Unit,
+) {
+    Surface(
+        color = context.containerColor,
+        shape = context.shapes.shape,
+        modifier = Modifier.fillMaxWidth().settingsRowBorder(context, editable = true),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = ProfileKeysDefaults.ValueRowMinHeight)
+                    .padding(start = WhiteNoiseSpacing.CompactScreenMargin, end = ProfileKeysDefaults.ValueRowEndInset),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = value,
+                modifier = valueModifier.weight(1f),
+                maxLines = 1,
+                overflow = overflow,
+                fontFamily = FontFamily.Monospace,
+            )
+            trailingAction()
+        }
+    }
+}
+
+/** Helper copy under a key group at the 32 dp content line. */
+@Suppress("FunctionNaming")
+@Composable
+private fun ProfileKeySupportingText(text: String) {
+    Text(
+        text = text,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = WhiteNoiseSpacing.SettingsSectionInset,
+                    end = WhiteNoiseSpacing.SettingsSectionInset,
+                    top = WhiteNoiseSpacing.Related,
+                ),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodySmall,
+    )
+}
+
+/** The export dialogs: raw consequence, encrypted password/result, delivery failure and expiry. */
+@Suppress("FunctionNaming", "LongMethod")
+@Composable
+private fun ProfileKeysDialogs(
+    ui: ProfileKeysUiState,
+    canExport: Boolean,
+    onExport: (encrypted: Boolean, destination: KeyExportDestination) -> Unit,
+    onCopyBackup: () -> Unit,
+    onExportBackup: () -> Unit,
+) {
+    if (ui.rawExportDialog && canExport) {
+        WhiteNoiseAlertDialog(
+            onDismissRequest = ui::cancelExport,
+            title = { Text(stringResource(R.string.keep_your_private_key_safe)) },
+            text = {
+                Text(
+                    stringResource(R.string.export_private_key_consequence),
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                )
+            },
+            confirmButton = {
+                FlowRow(horizontalArrangement = Arrangement.End) {
+                    TextButton(enabled = !ui.exportBusy, onClick = { onExport(false, KeyExportDestination.Share) }) {
+                        Text(stringResource(R.string.share), color = MaterialTheme.colorScheme.error)
+                    }
+                    TextButton(enabled = !ui.exportBusy, onClick = { onExport(false, KeyExportDestination.File) }) {
+                        Text(stringResource(R.string.export_nsec), color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = ui::cancelExport) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+    if (ui.passwordDialog && canExport) {
+        ExportPasswordDialog(
+            password = ui.password,
+            confirmation = ui.confirmation,
+            busy = ui.exportBusy,
+            onConfirm = { onExport(true, KeyExportDestination.File) },
+            onViewBackup = { onExport(true, KeyExportDestination.Preview) },
+            onDismiss = ui::cancelExport,
+        )
+    }
+    ui.encryptedBackup?.let { backup ->
+        EncryptedBackupResultDialog(
+            backup = backup.content,
+            copied = ui.copiedKey == CopiedProfileKey.Encrypted,
+            onCopy = onCopyBackup,
+            onExport = onExportBackup,
+            onHide = ui::cancelExport,
+        )
+    }
+    ui.nativeExportError?.let { title ->
+        WhiteNoiseAlertDialog(
+            onDismissRequest = { ui.nativeExportError = null },
+            title = { Text(stringResource(title)) },
+            confirmButton = {
+                TextButton(onClick = { ui.nativeExportError = null }) { Text(stringResource(R.string.ok)) }
+            },
+        )
+    }
+    if (ui.shareErrorDialog) {
+        WhiteNoiseAlertDialog(
+            onDismissRequest = { ui.shareErrorDialog = false },
+            title = { Text(stringResource(R.string.outbound_share_failed)) },
+            confirmButton = {
+                TextButton(onClick = { ui.shareErrorDialog = false }) { Text(stringResource(R.string.ok)) }
+            },
+        )
+    }
+    if (ui.saveErrorDialog) {
+        WhiteNoiseAlertDialog(
+            onDismissRequest = { ui.saveErrorDialog = false },
+            title = { Text(stringResource(R.string.couldnt_save_file)) },
+            text = { Text(stringResource(R.string.choose_another_location_and_try_again)) },
+            confirmButton = {
+                TextButton(onClick = { ui.saveErrorDialog = false }) { Text(stringResource(R.string.ok)) }
+            },
+        )
+    }
+    if (ui.expiredExportDialog) {
+        WhiteNoiseAlertDialog(
+            onDismissRequest = { ui.expiredExportDialog = false },
+            title = { Text(stringResource(R.string.key_export_expired_title)) },
+            text = { Text(stringResource(R.string.key_export_expired_body)) },
+            confirmButton = {
+                TextButton(onClick = { ui.expiredExportDialog = false }) { Text(stringResource(R.string.close)) }
+            },
+        )
+    }
+}
+
+/** Two secure fields, the mismatch/help line and strength meter; matching fields unlock both destinations. */
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
+@Composable
+private fun ExportPasswordDialog(
+    password: TextFieldState,
+    confirmation: TextFieldState,
+    busy: Boolean,
+    onConfirm: () -> Unit,
+    onViewBackup: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val passwordValue = password.text.toString()
+    val confirmationValue = confirmation.text.toString()
+    val mismatch = confirmationValue.isNotEmpty() && passwordValue != confirmationValue
+    WhiteNoiseAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.encrypted_private_key)) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+            ) {
+                WhiteNoiseSecureTextField(
+                    state = password,
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth().testTag("profile_keys.export_password"),
+                    label = { Text(stringResource(R.string.password)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
+                )
+                WhiteNoiseSecureTextField(
+                    state = confirmation,
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth().testTag("profile_keys.export_confirmation"),
+                    label = { Text(stringResource(R.string.confirm_password)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                    errorMessage = if (mismatch) stringResource(R.string.passwords_mismatch) else null,
+                )
+                Text(
+                    text =
+                        stringResource(
+                            if (mismatch) R.string.passwords_mismatch else R.string.export_password_help,
+                        ),
+                    color =
+                        if (mismatch) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                if (passwordValue.isNotEmpty()) {
+                    ExportPasswordStrengthIndicator(encryptedBackupPassphraseStrength(passwordValue))
+                }
+            }
+        },
+        confirmButton = {
+            FlowRow(horizontalArrangement = Arrangement.End) {
+                TextButton(
+                    enabled = !busy && encryptedBackupPassphraseInputsValid(passwordValue, confirmationValue),
+                    onClick = onViewBackup,
+                ) { Text(stringResource(R.string.key_export_view_backup)) }
+                TextButton(
+                    enabled = !busy && encryptedBackupPassphraseInputsValid(passwordValue, confirmationValue),
+                    onClick = onConfirm,
+                ) { Text(stringResource(R.string.export)) }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+/** Temporary account-owned encrypted result; copying and file export are separate deliberate actions. */
+@Suppress("FunctionNaming", "LongParameterList")
+@Composable
+private fun EncryptedBackupResultDialog(
+    backup: String,
+    copied: Boolean,
+    onCopy: () -> Unit,
+    onExport: () -> Unit,
+    onHide: () -> Unit,
+) {
+    WhiteNoiseAlertDialog(
+        onDismissRequest = onHide,
+        title = { Text(stringResource(R.string.encrypted_backup_result_title)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+            ) {
+                Text(stringResource(R.string.key_export_preview_help))
+                Text(
+                    text = groupedEncryptedBackup(backup),
+                    fontFamily = FontFamily.Monospace,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.testTag("profile_keys.encrypted_backup"),
+                )
+            }
+        },
+        confirmButton = {
+            FlowRow(horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onCopy) { Text(stringResource(if (copied) R.string.copied else R.string.copy)) }
+                TextButton(onClick = onExport) { Text(stringResource(R.string.export)) }
+            }
+        },
+        dismissButton = { TextButton(onClick = onHide) { Text(stringResource(R.string.hide)) } },
+    )
+}
+
+/** Strength label and a linear meter in the strength colour, without the stop indicator. */
+@Suppress("FunctionNaming")
+@Composable
+private fun ExportPasswordStrengthIndicator(strength: EncryptedBackupPassphraseStrength) {
+    val color = strength.color()
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("profile_keys.password_strength"),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(stringResource(R.string.password_strength), style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(strength.labelRes()), color = color, style = MaterialTheme.typography.labelLarge)
+        }
+        LinearProgressIndicator(
+            progress = { strength.progress() },
+            modifier = Modifier.fillMaxWidth(),
+            color = color,
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            drawStopIndicator = {},
+        )
+    }
+}
+
+/** The copy action's glyph: a check while the last copy is still fresh. */
+@DrawableRes
+private fun copyGlyph(copied: Boolean): Int = if (copied) R.drawable.ic_check else R.drawable.ic_content_copy
+
+/** Whether a pending export has outlived the prototype's 30 s window. */
+private fun PendingKeyExport.isExpired(): Boolean {
+    val age = SystemClock.elapsedRealtime() - createdAtMillis
+    return age >= ProfileKeysDefaults.EXPIRY_MILLIS
+}
+
+/** Remaining lifetime follows the native result when a preview is handed to the document picker. */
+private fun PendingKeyExport.remainingMillis(): Long {
+    val age = SystemClock.elapsedRealtime() - createdAtMillis
+    return (ProfileKeysDefaults.EXPIRY_MILLIS - age).coerceAtLeast(0L)
+}
+
+/** Restores the deliberate raw-key share transport, marking both intent and clipboard payload sensitive. */
+private fun sharePrivateKey(
+    context: Context,
+    title: String,
+    content: String,
+): Boolean =
+    runCatching {
+        val clip =
+            ClipData.newPlainText(title, content).apply {
+                description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
+            }
+        val intent =
+            Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, content)
+                putExtra(ClipDescription.EXTRA_IS_SENSITIVE, true)
+                clipData = clip
+            }
+        context.startActivity(Intent.createChooser(intent, title))
+    }.isSuccess
+
+/** Writes an export to the document the user picked; false when the stream could not be written. */
+private fun writeExport(
+    context: Context,
+    uri: Uri,
+    content: String,
+): Boolean =
+    runCatching {
+        checkNotNull(context.contentResolver.openOutputStream(uri)).bufferedWriter().use { it.write(content) }
+    }.isSuccess
+
+/** Copies [text] to the clipboard; sensitive clips stay out of the clipboard preview and history. */
+private fun copyToClipboard(
+    context: Context,
+    label: String,
+    text: String,
+    sensitive: Boolean = false,
+) {
+    val clip = ClipData.newPlainText(label, text)
+    if (sensitive) {
+        clip.description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
+    }
+    (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(clip)
+}
+
+/** Sign out and wipe: teardown spinner, explanatory sheet and the typed confirmation, unchanged from before. */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Suppress("FunctionNaming", "LongMethod")
+@Composable
+private fun AccountWipeFlow(
+    appState: WhiteNoiseAppState,
+    ui: ProfileKeysUiState,
+) {
+    if (appState.signOutInProgress) {
+        SignOutProgressDialog()
+    }
+
+    if (WIPE_ENGINE_FFI_AVAILABLE && ui.wipeSheet) {
         SignOutAndWipeSheet(
             onConfirm = {
-                showWipeSheet = false
-                wipeConfirmInput = ""
-                showWipeConfirm = true
+                ui.wipeSheet = false
+                ui.wipeConfirmInput = ""
+                ui.wipeConfirm = true
             },
-            onDismiss = { showWipeSheet = false },
+            onDismiss = { ui.wipeSheet = false },
         )
     }
 
-    if (WIPE_ENGINE_FFI_AVAILABLE && showWipeConfirm) {
+    if (WIPE_ENGINE_FFI_AVAILABLE && ui.wipeConfirm) {
         // Type-to-confirm gate (#348): the destructive confirm button stays
         // disabled until the user types the confirmation keyword. The match is
         // case-insensitive and ignores surrounding whitespace. This is the last
         // stop before the engine destroys the local DB, MLS state, keychain
         // entry, and relay key packages, so a single tap must not be enough.
         val confirmKeyword = stringResource(R.string.sign_out_and_wipe_confirm_keyword)
-        val wipeConfirmed = wipeConfirmInput.trim().equals(confirmKeyword, ignoreCase = true)
-        AlertDialog(
+        val wipeConfirmed = ui.wipeConfirmInput.trim().equals(confirmKeyword, ignoreCase = true)
+        WhiteNoiseAlertDialog(
             onDismissRequest = {
-                showWipeConfirm = false
-                wipeConfirmInput = ""
+                ui.wipeConfirm = false
+                ui.wipeConfirmInput = ""
             },
             title = { Text(stringResource(R.string.sign_out_and_wipe_confirm_title)) },
             text = {
@@ -548,8 +989,8 @@ internal fun AccountKeysScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     OutlinedTextField(
-                        value = wipeConfirmInput,
-                        onValueChange = { wipeConfirmInput = it },
+                        value = ui.wipeConfirmInput,
+                        onValueChange = { ui.wipeConfirmInput = it },
                         label = { Text(stringResource(R.string.sign_out_and_wipe_confirm_field_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -564,8 +1005,8 @@ internal fun AccountKeysScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        showWipeConfirm = false
-                        wipeConfirmInput = ""
+                        ui.wipeConfirm = false
+                        ui.wipeConfirmInput = ""
                         // Run on the process-lifetime mutation scope, not this
                         // screen's rememberCoroutineScope. signOutAndWipeActiveAccount
                         // flips activeAccountRef partway through and keeps suspending
@@ -619,291 +1060,13 @@ internal fun AccountKeysScreen(
             dismissButton = {
                 TextButton(
                     onClick = {
-                        showWipeConfirm = false
-                        wipeConfirmInput = ""
+                        ui.wipeConfirm = false
+                        ui.wipeConfirmInput = ""
                     },
                 ) {
                     Text(stringResource(R.string.cancel))
                 }
             },
-        )
-    }
-}
-
-@Composable
-@Suppress("FunctionNaming")
-internal fun IdentitySecretExportContent(
-    state: IdentitySecretExportState,
-    secret: String,
-    onToggleReveal: () -> Unit,
-) {
-    val semanticLabel = stringResource(R.string.export_nsec)
-    Column(
-        modifier = Modifier.testTag(IDENTITY_SECRET_EXPORT_CONTENT_TAG),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            stringResource(R.string.secret_key_backup_help),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = maskedIdentitySecret(secret, state.revealed),
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.clearAndSetSemantics { contentDescription = semanticLabel },
-        )
-        OutlinedButton(onClick = onToggleReveal) {
-            Text(stringResource(if (state.revealed) R.string.hide else R.string.show))
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EncryptedBackupSheet(
-    appState: WhiteNoiseAppState,
-    onDismiss: () -> Unit,
-) {
-    WindowSecureFlag()
-    val context = LocalContext.current
-    val lifecycleOwner = context.lifecycleOwner()
-    val scope = rememberCoroutineScope()
-    var passphrase by remember { mutableStateOf("") }
-    var confirmation by remember { mutableStateOf("") }
-    var revealPassphrase by remember { mutableStateOf(false) }
-    var backup by remember { mutableStateOf<String?>(null) }
-    var busy by remember { mutableStateOf(false) }
-
-    fun clearSensitiveState() {
-        passphrase = ""
-        confirmation = ""
-        backup = null
-        busy = false
-    }
-
-    fun dismissAndClear() {
-        clearSensitiveState()
-        onDismiss()
-    }
-
-    DisposableEffect(lifecycleOwner) {
-        if (lifecycleOwner == null) {
-            onDispose { }
-        } else {
-            val observer =
-                LifecycleEventObserver { _, event ->
-                    if (event == Lifecycle.Event.ON_STOP) {
-                        dismissAndClear()
-                    }
-                }
-            lifecycleOwner.lifecycle.addObserver(observer)
-            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-        }
-    }
-
-    LaunchedEffect(backup) {
-        if (backup != null) {
-            delay(60_000)
-            backup = null
-        }
-    }
-
-    ModalBottomSheet(
-        containerColor = amoledSheetContainerColor(),
-        onDismissRequest = { dismissAndClear() },
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        properties = ModalBottomSheetProperties(securePolicy = SecureFlagPolicy.SecureOn),
-    ) {
-        Column(
-            Modifier.fillMaxWidth().padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(stringResource(R.string.encrypted_backup_title), style = MaterialTheme.typography.titleLarge)
-            Text(
-                stringResource(R.string.encrypted_backup_explainer),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            val encryptedBackup = backup
-            if (encryptedBackup == null) {
-                EncryptedBackupPassphraseFields(
-                    passphrase = passphrase,
-                    confirmation = confirmation,
-                    revealPassphrase = revealPassphrase,
-                    onPassphraseChange = { passphrase = it },
-                    onConfirmationChange = { confirmation = it },
-                    onRevealToggle = { revealPassphrase = !revealPassphrase },
-                )
-                Text(
-                    stringResource(R.string.encrypted_backup_short_warning),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Button(
-                    onClick = {
-                        val chosenPassphrase = passphrase
-                        busy = true
-                        scope.launch {
-                            val exported = appState.exportEncryptedSecretKeyBackup(chosenPassphrase)
-                            if (exported != null) {
-                                passphrase = ""
-                                confirmation = ""
-                                backup = exported
-                            }
-                            busy = false
-                        }
-                    },
-                    enabled = !busy && encryptedBackupPassphraseInputsValid(passphrase, confirmation),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (busy) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(8.dp))
-                    } else {
-                        Icon(Icons.Default.Lock, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    Text(stringResource(R.string.encrypted_backup_create))
-                }
-            } else {
-                Text(
-                    stringResource(R.string.encrypted_backup_result_title),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    stringResource(R.string.encrypted_backup_result_help),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    border = amoledSurfaceBorderStroke(),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        groupedEncryptedBackup(encryptedBackup),
-                        modifier = Modifier.padding(16.dp),
-                        fontFamily = FontFamily.Monospace,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(
-                        onClick = {
-                            // Flag the clip sensitive so Android 13+ doesn't render
-                            // the passphrase-protected backup in the clipboard preview.
-                            val clip = android.content.ClipData.newPlainText("encrypted backup", encryptedBackup)
-                            clip.description.extras =
-                                android.os.PersistableBundle().apply {
-                                    putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
-                                }
-                            (context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
-                                .setPrimaryClip(clip)
-                        },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.copy))
-                    }
-                    OutlinedButton(
-                        onClick = { backup = null },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.hide))
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun EncryptedBackupPassphraseFields(
-    passphrase: String,
-    confirmation: String,
-    revealPassphrase: Boolean,
-    onPassphraseChange: (String) -> Unit,
-    onConfirmationChange: (String) -> Unit,
-    onRevealToggle: () -> Unit,
-) {
-    val strength = encryptedBackupPassphraseStrength(passphrase)
-    val mismatch = confirmation.isNotEmpty() && passphrase != confirmation
-    val visualTransformation = if (revealPassphrase) VisualTransformation.None else PasswordVisualTransformation()
-    val focusManager = LocalFocusManager.current
-    val keyboardOptions =
-        KeyboardOptions(
-            capitalization = KeyboardCapitalization.None,
-            autoCorrectEnabled = false,
-            keyboardType = KeyboardType.Password,
-        )
-
-    OutlinedTextField(
-        value = passphrase,
-        onValueChange = onPassphraseChange,
-        label = { Text(stringResource(R.string.encrypted_backup_passphrase_label)) },
-        singleLine = true,
-        visualTransformation = visualTransformation,
-        // Enter advances to the Confirm field with the keyboard up, instead of
-        // dismissing it and stranding the user on field one.
-        keyboardOptions = keyboardOptions.copy(imeAction = ImeAction.Next),
-        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-        trailingIcon = {
-            TextButton(onClick = onRevealToggle) {
-                Text(stringResource(if (revealPassphrase) R.string.hide else R.string.show))
-            }
-        },
-        supportingText = {
-            Text(
-                stringResource(
-                    R.string.encrypted_backup_minimum_hint,
-                    ENCRYPTED_BACKUP_MIN_PASSPHRASE_LENGTH,
-                ),
-            )
-        },
-        modifier = Modifier.fillMaxWidth(),
-    )
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        EncryptedBackupStrengthMeter(strength)
-        Text(
-            stringResource(strength.labelRes()),
-            style = MaterialTheme.typography.bodySmall,
-            color = strength.color(),
-        )
-    }
-    OutlinedTextField(
-        value = confirmation,
-        onValueChange = onConfirmationChange,
-        label = { Text(stringResource(R.string.encrypted_backup_confirm_label)) },
-        singleLine = true,
-        isError = mismatch,
-        visualTransformation = visualTransformation,
-        keyboardOptions = keyboardOptions.copy(imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-        supportingText = {
-            if (mismatch) {
-                Text(stringResource(R.string.encrypted_backup_mismatch))
-            }
-        },
-        modifier = Modifier.fillMaxWidth(),
-    )
-}
-
-@Composable
-private fun EncryptedBackupStrengthMeter(strength: EncryptedBackupPassphraseStrength) {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(999.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth(strength.progress())
-                    .fillMaxHeight()
-                    .background(strength.color()),
         )
     }
 }
@@ -917,6 +1080,7 @@ internal fun EncryptedBackupPassphraseStrength.labelRes(): Int =
         EncryptedBackupPassphraseStrength.Strong -> R.string.encrypted_backup_strength_strong
     }
 
+/** Progress fraction for a passphrase strength level. */
 internal fun EncryptedBackupPassphraseStrength.progress(): Float =
     when (this) {
         EncryptedBackupPassphraseStrength.TooShort -> 0.15f
@@ -925,6 +1089,7 @@ internal fun EncryptedBackupPassphraseStrength.progress(): Float =
         EncryptedBackupPassphraseStrength.Strong -> 1f
     }
 
+/** Colour for a passphrase strength level. */
 @Composable
 internal fun EncryptedBackupPassphraseStrength.color(): Color =
     when (this) {
@@ -934,6 +1099,63 @@ internal fun EncryptedBackupPassphraseStrength.color(): Color =
         EncryptedBackupPassphraseStrength.Strong -> MaterialTheme.colorScheme.primary
     }
 
+/** Blocks Back and outside interaction while the non-cancellable account teardown finishes. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Suppress("FunctionNaming")
+@Composable
+internal fun SignOutProgressDialog() {
+    Dialog(
+        onDismissRequest = {},
+        properties =
+            DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
+                usePlatformDefaultWidth = false,
+            ),
+    ) {
+        Box(Modifier.fillMaxSize().testTag("settings.sign_out_progress"), contentAlignment = Alignment.Center) {
+            // The full-window dim layer can cover either theme; white stays visible against that scrim.
+            LoadingIndicator(color = Color.White)
+        }
+    }
+}
+
+/**
+ * Runs the confirmed sign-out on the mutation scope and reports its outcome. The Settings hub and
+ * the keys screen share this so both entry points tear the account down identically.
+ */
+internal fun signOutActiveAccount(
+    appState: WhiteNoiseAppState,
+    deleteKeyPackages: Boolean,
+) {
+    if (appState.signOutInProgress || appState.wipeInProgress) return
+    appState.signOutInProgress = true
+    // Mutation scope, not the screen scope: signOutActiveAccount()
+    // flips activeAccountRef before its disk-media wipe finishes,
+    // and the account-change nav reset pops this screen — a
+    // screen-scoped job would be cancelled mid-teardown.
+    appState.launchMutation {
+        try {
+            when (appState.signOutActiveAccount(deleteKeyPackages)) {
+                SignOutCompletion.Complete -> appState.presentTransient(R.string.toast_signed_out)
+                // Local sign-out completed but the engine call
+                // failed or reported relay cleanup failures. This
+                // is informational and not copyable (#966); MDK
+                // does not retain a retry queue for the deletions.
+                SignOutCompletion.RelayCleanupIncomplete ->
+                    appState.present(R.string.toast_signed_out_relay_cleanup_incomplete)
+                // MDK kept the account active, so the screen and
+                // all account-scoped state remain intact.
+                SignOutCompletion.AccountCleanupIncomplete ->
+                    appState.present(R.string.toast_couldnt_sign_out)
+                null -> Unit
+            }
+        } finally {
+            appState.signOutInProgress = false
+        }
+    }
+}
+
 /**
  * Non-destructive sign-out sheet (#348, #349). Explains what stays on device
  * and what changes, offers the "Delete key packages from relays" toggle
@@ -942,7 +1164,8 @@ internal fun EncryptedBackupPassphraseStrength.color(): Color =
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SignOutSheet(
+@Suppress("FunctionNaming", "LongMethod")
+internal fun SignOutSheet(
     onConfirm: (deleteKeyPackages: Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {

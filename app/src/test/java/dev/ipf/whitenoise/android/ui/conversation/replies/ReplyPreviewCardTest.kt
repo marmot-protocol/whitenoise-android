@@ -2,13 +2,27 @@ package dev.ipf.whitenoise.android.ui.conversation.replies
 
 import android.content.Context
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
@@ -21,10 +35,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Regression coverage for unavailable and typed-attachment reply cards. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class ReplyPreviewCardTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -141,6 +157,63 @@ class ReplyPreviewCardTest {
             )
         assertEquals("report.apk", hostile)
         assertFalse(hostile.orEmpty().contains(".."))
+    }
+
+    /** Reply dismissal uses a48dp target while drawing the20dp inset control. */
+    @Test
+    fun replyAccessoryLightGeometryAndDismissal() = renderAccessory("reply_accessory_light")
+
+    /** Dark quote geometry uses the same paired native colors and target size. */
+    @Test
+    fun replyAccessoryDark() = renderAccessory("reply_accessory_dark", dark = true)
+
+    /** Long unavailable/warning text and logical trailing dismissal remain reachable in RTL. */
+    @Test
+    fun replyAccessoryLargeRtl() = renderAccessory("reply_accessory_large_rtl", rtl = true, scale = 2f)
+
+    /** Captures the real shared quote and checks its excerpt limit and native cancellation. */
+    private fun renderAccessory(
+        name: String,
+        dark: Boolean = false,
+        rtl: Boolean = false,
+        scale: Float = 1f,
+    ) {
+        var cancellations = 0
+        val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+        val excerpt = "A reply excerpt with enough words to occupy two lines without losing the original content."
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = dark, fontScale = scale) {
+                CompositionLocalProvider(LocalLayoutDirection provides direction) {
+                    Column(Modifier.width(300.dp).testTag("reply-fixture")) {
+                        ReplyPreviewCard(
+                            senderTitle = "Alice",
+                            isOwn = false,
+                            body = excerpt,
+                            warning = "The original message may have changed.",
+                            mediaKind = ReplyMediaKind.None,
+                            onClick = null,
+                            onDismiss = { cancellations++ },
+                        )
+                    }
+                }
+            }
+        }
+        composeRule
+            .onNodeWithTag("conversation.composer.remove.target")
+            .assertWidthIsEqualTo(48.dp)
+            .assertHeightIsEqualTo(48.dp)
+        composeRule
+            .onNodeWithTag("conversation.composer.remove.visual", useUnmergedTree = true)
+            .assertWidthIsEqualTo(20.dp)
+            .assertHeightIsEqualTo(20.dp)
+        val layouts = mutableListOf<TextLayoutResult>()
+        composeRule
+            .onNodeWithText(excerpt, useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals(2, layouts.single().lineCount)
+        composeRule.onNodeWithTag("reply-fixture").captureRoboImage("src/test/snapshots/$name.png")
+        composeRule.onNodeWithTag("conversation.composer.remove.target").performClick()
+        composeRule.runOnIdle { assertEquals(1, cancellations) }
     }
 
     /** Renders a production reply card with overridable attachment metadata. */

@@ -6,12 +6,13 @@ import org.junit.Test
 import java.io.File
 
 class NewMessageEntryRouteCoverageTest {
+    /** Empty and non empty chat entry points use the same new message host transition. */
     @Test
     fun emptyAndNonEmptyChatEntryPointsUseTheSameNewMessageHostTransition() {
         val source = sourceFile().readText()
 
         assertTrue("the shared transition must open NewChatFlowHost", "if (showNewChatFlow)" in source)
-        assertEquals(1, occurrences(source, "onClick = openNewMessageFlow"))
+        assertEquals(1, occurrences(source, "ChatsNewMessageFab(appState, openNewMessageFlow)"))
         assertEquals(1, occurrences(source, "EmptyChats(onCreate = openNewMessageFlow)"))
     }
 

@@ -12,6 +12,7 @@ import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
@@ -329,6 +330,7 @@ class ChatListFilterChipsTest {
         return count
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(
         chips: List<ChatFolderChipModel>,
         selectedFolderId: String? = null,
@@ -348,6 +350,8 @@ class ChatListFilterChipsTest {
             }
         }
         composeRule.waitForIdle()
+        // Gesture-only cases reveal the reset pill; selected-item autoscroll has its own regression suite.
+        composeRule.onNodeWithTag("chats.folders").performScrollToIndex(0)
         composeRule.onNodeWithTag(CHAT_LIST_FILTER_CHIP_ALL_TAG).assertIsDisplayed()
     }
 

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="disappearing">消失消息</string>
+    <string name="advanced">高级</string>
+    <string name="save_conversation_transcript">保存聊天记录</string>
+</resources>

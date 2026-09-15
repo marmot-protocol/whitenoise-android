@@ -22,6 +22,7 @@ class GlobalSearchStateTest {
         assertTrue(opened.isOpen)
     }
 
+    /** Close search resets transient ui. */
     @Test
     fun closeSearchResetsTransientUi() {
         val scopeToken = accountScope("personal", 2).encodeToken()
@@ -29,7 +30,7 @@ class GlobalSearchStateTest {
             GlobalSearchState(
                 isOpen = true,
                 query = "hello",
-                filterSheetOpen = true,
+                openFilterCategory = GlobalSearchFilterCategory.Date,
                 accountScopeToken = scopeToken,
                 chatFilters = setOf(GlobalSearchChatFilter("abc", "Chat A")),
                 senderFilters = setOf(GlobalSearchSenderFilter("npub1", "Sender B")),
@@ -54,10 +55,16 @@ class GlobalSearchStateTest {
         assertEquals("  hello  ", updated.query)
     }
 
+    /** Filter sheet open and dismiss. */
     @Test
     fun filterSheetOpenAndDismiss() {
-        val open = GlobalSearchTransitions.openFilterSheet(GlobalSearchState(isOpen = true))
+        val open =
+            GlobalSearchTransitions.openFilterCategory(
+                GlobalSearchState(isOpen = true),
+                GlobalSearchFilterCategory.Date,
+            )
         assertTrue(open.filterSheetOpen)
+        assertEquals(GlobalSearchFilterCategory.Date, open.openFilterCategory)
         val dismissed = GlobalSearchTransitions.dismissFilterSheet(open)
         assertFalse(dismissed.filterSheetOpen)
     }
@@ -275,6 +282,7 @@ class GlobalSearchStateTest {
         assertEquals(state, reconciled)
     }
 
+    /** Reconcile account scope clears scoped filters when generation changes. */
     @Test
     fun reconcileAccountScopeClearsScopedFiltersWhenGenerationChanges() {
         val previousScope = accountScope("personal", 1)
@@ -300,6 +308,45 @@ class GlobalSearchStateTest {
         assertEquals(setOf(GlobalSearchContentKind.TEXT), reconciled.contentFilterSelection.selectedKinds)
     }
 
+    /** Folder and chat type filters toggle and chip in category order. */
+    @Test
+    fun folderAndChatTypeFiltersToggleAndChipInCategoryOrder() {
+        var state = GlobalSearchState(isOpen = true)
+        state = GlobalSearchTransitions.toggleFolderFilter(state, "f1")
+        state = GlobalSearchTransitions.toggleChatTypeFilter(state, GlobalSearchChatType.DIRECT)
+        state = GlobalSearchTransitions.applyChatFilter(state, GlobalSearchChatFilter("g1", "Alice"))
+        state = GlobalSearchTransitions.applyDateFilter(state, GlobalSearchDateFilterSelection.Today)
+        assertEquals(
+            listOf("folder:f1", "type:DIRECT", "chat:g1", "date:today"),
+            GlobalSearchActiveChips.from(state).items.map { it.chipId },
+        )
+        assertTrue(state.hasActiveFilters)
+        assertTrue(state.messageFiltersActive)
+
+        state = GlobalSearchTransitions.removeFilter(state, "type:DIRECT")
+        assertTrue(state.chatTypeFilters.isEmpty())
+        state = GlobalSearchTransitions.toggleFolderFilter(state, "f1")
+        assertTrue(state.folderFilters.isEmpty())
+        val cleared = GlobalSearchTransitions.clearAllFilters(state)
+        assertFalse(cleared.hasActiveFilters)
+    }
+
+    /** Reconcile available drops vanished folders and out of scope chats. */
+    @Test
+    fun reconcileAvailableDropsVanishedFoldersAndOutOfScopeChats() {
+        val state =
+            GlobalSearchState(
+                isOpen = true,
+                folderFilters = setOf("keep", "gone"),
+                chatFilters = setOf(GlobalSearchChatFilter("in", "In"), GlobalSearchChatFilter("out", "Out")),
+            )
+        val reconciled = GlobalSearchTransitions.reconcileAvailable(state, setOf("keep"), setOf("in"))
+        assertEquals(setOf("keep"), reconciled.folderFilters)
+        assertEquals(setOf(GlobalSearchChatFilter("in", "In")), reconciled.chatFilters)
+        assertEquals(state, GlobalSearchTransitions.reconcileAvailable(state, null, null))
+    }
+
+    /** Encode decode round trip. */
     @Test
     fun encodeDecodeRoundTrip() {
         val scopeToken = accountScope("personal", 3).encodeToken()
@@ -313,8 +360,10 @@ class GlobalSearchStateTest {
             GlobalSearchState(
                 isOpen = true,
                 query = "hello\u001fworld \uD83D\uDE00 \u0627\u0644\u0639\u0631\u0628\u064A\u0629",
-                filterSheetOpen = true,
+                openFilterCategory = GlobalSearchFilterCategory.Date,
                 accountScopeToken = scopeToken,
+                folderFilters = setOf("folder\u001e1", "folder-2"),
+                chatTypeFilters = setOf(GlobalSearchChatType.GROUPS),
                 chatFilters = setOf(GlobalSearchChatFilter("group\u001e1\u001dpart", "Alice\u001f\u001dlabel")),
                 senderFilters = setOf(GlobalSearchSenderFilter("npub1", "Bob")),
                 dateFilterSelection = customDate,
@@ -371,5 +420,44 @@ class GlobalSearchStateTest {
             GlobalSearchState(),
             decodeGlobalSearchState("2\u001ftrue\u001f%%%\u001ffalse\u001f\u001f\u001f\u001f\u001f"),
         )
+    }
+
+    /** A library mode writes the content filter, so the Filters menu shows Content selected. */
+    @Test
+    fun attachmentModeMarksTheContentCategoryActive() {
+        val browsing =
+            GlobalSearchTransitions.setContentFilterSelection(
+                GlobalSearchState(isOpen = true),
+                GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.IMAGES_VIDEO)),
+            )
+
+        assertTrue(browsing.isCategoryActive(GlobalSearchFilterCategory.Content))
+        assertTrue(browsing.isBrowsingAttachments())
+    }
+
+    /** Clearing the mode leaves the category inactive and the search back on messages. */
+    @Test
+    fun clearingTheModeLeavesTheContentCategoryInactive() {
+        val cleared =
+            GlobalSearchTransitions.setContentFilterSelection(
+                GlobalSearchState(isOpen = true),
+                GlobalSearchContentFilterSelection(emptySet()),
+            )
+
+        assertFalse(cleared.isCategoryActive(GlobalSearchFilterCategory.Content))
+        assertFalse(cleared.isBrowsingAttachments())
+    }
+
+    /** Text and link kinds are message filters, not library modes. */
+    @Test
+    fun textAndLinkContentIsNotAttachmentBrowsing() {
+        val textOnly =
+            GlobalSearchTransitions.setContentFilterSelection(
+                GlobalSearchState(isOpen = true),
+                GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.TEXT)),
+            )
+
+        assertTrue(textOnly.isCategoryActive(GlobalSearchFilterCategory.Content))
+        assertFalse(textOnly.isBrowsingAttachments())
     }
 }

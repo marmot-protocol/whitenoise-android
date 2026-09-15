@@ -76,10 +76,11 @@ internal fun Avatar(
                 contentScale = ContentScale.Crop,
             )
         } else {
-            // Derive the font size from the avatar diameter so wide letter
-            // pairs (e.g. "MW", "WW") fit inside the circle (#312). The 0.4
-            // ratio keeps the worst-case 2-letter pair clear of the bounds at
-            // every render size used in the app (36dp..96dp).
+            // Derive the font size from the avatar diameter so the single
+            // monogram glyph (the prototype rule) fills the circle without
+            // touching its bounds at every render size used in the app
+            // (24dp..120dp); the cap keeps the large profile avatars at the
+            // prototype's headline size.
             //
             // The avatar's outer Modifier.size(...) is in dp and therefore
             // does NOT scale with the user's accessibility font scale, but a
@@ -92,9 +93,9 @@ internal fun Avatar(
             // taken in the same dp-constant space, so it also resists font
             // scale.
             val fontScale = LocalDensity.current.fontScale
-            val titleMediumSp = MaterialTheme.typography.titleMedium.fontSize
+            val headlineSp = MaterialTheme.typography.headlineMedium.fontSize
             val fittedFontSize =
-                minOf(size.value * 0.4f, titleMediumSp.value * fontScale).sp / fontScale
+                minOf(size.value * MONOGRAM_DIAMETER_RATIO, headlineSp.value * fontScale).sp / fontScale
             Text(
                 IdentityFormatter.initials(title),
                 color = Color.White,
@@ -106,6 +107,8 @@ internal fun Avatar(
         }
     }
 }
+
+private const val MONOGRAM_DIAMETER_RATIO = 0.48f
 
 internal fun avatarPaletteIndex(
     seedHash: Int,

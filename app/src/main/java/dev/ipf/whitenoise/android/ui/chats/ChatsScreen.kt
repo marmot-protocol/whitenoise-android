@@ -19,34 +19,28 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material3.Button
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -76,19 +70,17 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
-import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.core.GlobalAttachmentItem
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
+import dev.ipf.whitenoise.android.core.MessageSearchConstraints
 import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.canonicalChatListBodyMatches
 import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
@@ -99,8 +91,8 @@ import dev.ipf.whitenoise.android.core.projectChatListSearchSections
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.collectGlobalAttachments
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
-import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
@@ -108,24 +100,22 @@ import dev.ipf.whitenoise.android.ui.common.LoadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
-import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
 import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
-import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
-import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
-import dev.ipf.whitenoise.android.ui.theme.Dimens
-import dev.ipf.whitenoise.android.updates.AppUpdateInfo
+import dev.ipf.whitenoise.android.ui.settings.ChatFoldersScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Locale
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold as Scaffold
 
 /** Keeps the process-wide TTS transport in normal flow above every chat-list state. */
 @Suppress("FunctionNaming")
@@ -150,6 +140,7 @@ internal fun ChatListBodyFrame(
 /** Renders the active account's authoritative chat-list projection and actions. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("ReturnCount", "FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
 internal fun ChatsScreen(
     appState: WhiteNoiseAppState,
     controller: ChatsController,
@@ -163,6 +154,7 @@ internal fun ChatsScreen(
     // MainShell supplies the request-owned presentation handoff for the
     // home-screen quick toggle. Isolated screens keep the legacy direct path.
     onQuickSwitchAccount: ((String) -> Unit)? = null,
+    onQuickCycleAccount: (() -> Unit)? = null,
     // Head row id captured when the shell opened a conversation from this list.
     // Compared once on re-entry so a background reorder while away can snap to
     // item 0 without yanking an active on-list reader (issue #1313).
@@ -197,27 +189,33 @@ internal fun ChatsScreen(
     var pendingBulkDelete by remember { mutableStateOf<List<ChatListItem>?>(null) }
     var actionSheetChatId by
         remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
+    val actionMenuOwner = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatContextMenuOwner() }
+    DisposableEffect(actionMenuOwner) {
+        onDispose { actionMenuOwner.dispose() }
+    }
     // Folder-assignment sheet targets for the current selection, and the
     // create form pre-populated with them when New folder is picked there.
     val folderHandoff = rememberFolderHandoff(appState.activeAccountRef)
+    val folderManagerAccount = appState.activeAccountRef
+    val folderManagerRuntime = appState.runtimeGeneration
+    var folderManagerOpen by remember(folderManagerAccount, folderManagerRuntime) { mutableStateOf(false) }
+    LaunchedEffect(appState.signOutInProgress, appState.wipeInProgress) {
+        if (appState.signOutInProgress || appState.wipeInProgress) folderManagerOpen = false
+    }
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     val selectionMode = selectedChatIds.isNotEmpty()
-    // Typed Date and Content filters cannot be exposed until the MDK search
-    // contract executes them. Keeping this false prevents the UI from claiming
-    // that results are filtered when only the ordinary text query is applied.
-    val interactiveGlobalSearchFilterSectionsAvailable = false
     val searchOpen = globalSearchState.isOpen
     val searchQuery = globalSearchState.query
     val globalSearchPresentationState =
         reconcileGlobalSearchFilterSheet(
             searchState = globalSearchState,
-            interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
             selectionMode = selectionMode,
         )
     // Async message-body results retain their exact query/account/list key.
     // A superseding key therefore hides stale matches synchronously, before
     // the replacement effect gets its first post-composition frame (#2202).
     var bodySearchResult by remember { mutableStateOf<ChatListBodySearchResult?>(null) }
+    var libraryResult by remember { mutableStateOf<ChatListAttachmentLibraryResult?>(null) }
     // Resolution state for a pasted Nostr identifier in the search field (#344).
     // An npub resolves synchronously; a NIP-05 address resolves over the network
     // (loading → resolved/failed). Plain-text queries stay [None] and the list
@@ -318,16 +316,11 @@ internal fun ChatsScreen(
             searchFocusRequester.requestFocus()
         }
     }
-    LaunchedEffect(
-        selectionMode,
-        globalSearchState.filterSheetOpen,
-        interactiveGlobalSearchFilterSectionsAvailable,
-    ) {
+    LaunchedEffect(selectionMode, globalSearchState.filterSheetOpen) {
         if (globalSearchPresentationState != globalSearchState) {
             onGlobalSearchStateChange { currentState ->
                 reconcileGlobalSearchFilterSheet(
                     searchState = currentState,
-                    interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
                     selectionMode = selectionMode,
                 )
             }
@@ -377,7 +370,11 @@ internal fun ChatsScreen(
             }
         }
 
-    val sourceList = if (showArchived) controller.archivedItems else controller.items
+    // Archived-only folder rules swap the source list; every other view reads the active native rows.
+    val sourceList =
+        remember(controller.items, controller.archivedItems, showArchived) {
+            if (showArchived) controller.archivedItems else controller.items
+        }
     LaunchedEffect(controller, controller.recoveryProjectionGeneration, sourceList) {
         val generation = controller.recoveryProjectionGeneration
         if (generation > 0L) {
@@ -386,6 +383,61 @@ internal fun ChatsScreen(
         }
     }
     val loadFailurePlacement = loadFailurePlacement(controller.error != null, sourceList.isNotEmpty())
+    // Prototype search filters. Folders and chat types scope the chat list before
+    // the query runs, named chats narrow it further, and senders / date / content
+    // constrain the per-chat message search while hiding plain chat rows.
+    val searchFolderChatIds =
+        remember(globalSearchState.folderFilters, resolveFolderChatIds) {
+            globalSearchState.folderFilters
+                .takeIf { it.isNotEmpty() }
+                ?.flatMapTo(mutableSetOf()) { resolveFolderChatIds(it) }
+        }
+    val effectiveFolderChatIds =
+        remember(selectedFolderChatIds, searchFolderChatIds) {
+            intersectChatScopes(selectedFolderChatIds, searchFolderChatIds)
+        }
+    val folderTypeScopedList =
+        remember(sourceList, globalSearchState.chatTypeFilters, effectiveFolderChatIds) {
+            restrictToChatIds(
+                applyGlobalSearchChatScope(sourceList, globalSearchState.chatTypeFilters, emptySet()),
+                effectiveFolderChatIds,
+            )
+        }
+    val scopedSourceList =
+        remember(sourceList, globalSearchState.chatTypeFilters, globalSearchState.chatFilters) {
+            applyGlobalSearchChatScope(
+                sourceList,
+                globalSearchState.chatTypeFilters,
+                globalSearchState.chatFilters.mapTo(mutableSetOf()) { it.stableId },
+            )
+        }
+    val messageSearchConstraints =
+        remember(
+            globalSearchState.senderFilters,
+            globalSearchState.dateFilterSelection,
+            globalSearchState.contentFilterSelection,
+        ) {
+            messageSearchConstraintsFor(globalSearchState)
+        }
+    val globalSearchFolderOptions = accountFolders.map { GlobalSearchFolderOption(it.id, chatFolderDisplayName(it)) }
+    val globalSearchFolderNames =
+        remember(globalSearchFolderOptions) { globalSearchFolderOptions.associate { it.id to it.name } }
+    val globalSearchFilterOptions =
+        remember(globalSearchFolderOptions, folderTypeScopedList, groupTitleCopy, appState.profileRevisionForCompose) {
+            globalSearchFilterOptions(appState, globalSearchFolderOptions, folderTypeScopedList, groupTitleCopy)
+        }
+    // Deleted folders and chats outside the folder / type scope leave the filters (prototype `reconcile`).
+    LaunchedEffect(globalSearchState.isOpen, accountFolders, folderTypeScopedList) {
+        if (!globalSearchState.isOpen) return@LaunchedEffect
+        val folderIds = if (appState.activeAccountRef == null) null else accountFolders.mapTo(mutableSetOf()) { it.id }
+        val chatIds =
+            if (sourceList.isEmpty()) {
+                null
+            } else {
+                folderTypeScopedList.mapTo(mutableSetOf()) { canonicalChatListGroupId(it.group.groupIdHex) }
+            }
+        onGlobalSearchStateChange { GlobalSearchTransitions.reconcileAvailable(it, folderIds, chatIds) }
+    }
     // Subscribing read of the profile-cache revision so the filter
     // re-runs when a DM peer's display name resolves — the title
     // projection inside `projectChatListSearchSections` reads
@@ -400,18 +452,26 @@ internal fun ChatsScreen(
     // full-corpus body search while the user is typing (#1201).
     val trimmedQuery = searchQuery.trim()
     val normalizedSearchQuery = remember(trimmedQuery) { localeInvariantFold(trimmedQuery) }
-    val searchActive = trimmedQuery.isNotEmpty()
+    val filtersActive = searchOpen && globalSearchState.hasActiveFilters
+    val searchActive = trimmedQuery.isNotEmpty() || filtersActive
     val bodySearchGroupIds =
-        remember(sourceList) {
-            sourceList.map { canonicalChatListGroupId(it.id) }.distinct().sorted()
+        remember(scopedSourceList) {
+            scopedSourceList.map { canonicalChatListGroupId(it.id) }.distinct().sorted()
         }
     val bodySearchKey =
-        remember(normalizedSearchQuery, controller.boundAccountRef, showArchived, bodySearchGroupIds) {
+        remember(
+            normalizedSearchQuery,
+            controller.boundAccountRef,
+            showArchived,
+            bodySearchGroupIds,
+            messageSearchConstraints,
+        ) {
             ChatListBodySearchKey(
                 query = normalizedSearchQuery,
                 accountRef = controller.boundAccountRef,
                 showArchived = showArchived,
                 canonicalGroupIds = bodySearchGroupIds,
+                constraints = messageSearchConstraints,
             )
         }
     // Use a request identity as well as the structural cache key. If a user
@@ -424,14 +484,51 @@ internal fun ChatsScreen(
             ?.matches
             .orEmpty()
     LaunchedEffect(bodySearchRequest) {
-        if (!searchActive) {
+        // Folder / type / chat scopes alone need no body search; a needle or a
+        // message-level filter does.
+        if (!searchActive || (trimmedQuery.isEmpty() && messageSearchConstraints == null)) {
             return@LaunchedEffect
         }
         delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
         bodySearchResult =
             ChatListBodySearchResult(
                 request = bodySearchRequest,
-                matches = canonicalChatListBodyMatches(controller.searchMessageBodies(sourceList, trimmedQuery)),
+                matches =
+                    canonicalChatListBodyMatches(
+                        controller.searchMessageBodies(scopedSourceList, trimmedQuery, messageSearchConstraints),
+                    ),
+            )
+    }
+    // Files-and-media browsing replaces the result list while a mode chip narrows the
+    // search to attachments. It pages the plain timeline, so it runs on its own request
+    // token rather than sharing the body search's.
+    val browsingAttachments = searchOpen && globalSearchState.isBrowsingAttachments()
+    val libraryKinds = globalSearchState.contentFilterSelection.selectedKinds
+    val librarySources =
+        remember(scopedSourceList, groupTitleCopy, profileRev) {
+            globalAttachmentSources(appState, scopedSourceList, groupTitleCopy)
+        }
+    val libraryRequest =
+        remember(browsingAttachments, bodySearchKey, libraryKinds) { ChatListBodySearchRequest() }
+    val libraryItems =
+        libraryResult?.takeIf { it.request === libraryRequest }?.items.orEmpty()
+    val libraryLoading = browsingAttachments && libraryResult?.request !== libraryRequest
+    LaunchedEffect(libraryRequest) {
+        if (!browsingAttachments) return@LaunchedEffect
+        delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
+        val account = controller.boundAccountRef ?: return@LaunchedEffect
+        libraryResult =
+            ChatListAttachmentLibraryResult(
+                request = libraryRequest,
+                items =
+                    collectGlobalAttachments(
+                        appState = appState,
+                        accountRef = account,
+                        sources = librarySources,
+                        rawQuery = trimmedQuery,
+                        constraints = messageSearchConstraints,
+                        kinds = libraryKinds,
+                    ),
             )
     }
     // Resolve a pasted Nostr identifier in the search field (#344). An npub is
@@ -477,19 +574,45 @@ internal fun ChatsScreen(
     }
     val chatListState = key(showArchived) { rememberLazyListState() }
     val userGestureGeneration = rememberChatListUserGestureGeneration(chatListState)
+    LaunchedEffect(chatListState, actionSheetChatId, actionMenuOwner.token, actionMenuOwner.pointerHeld) {
+        val anchorId = actionSheetChatId ?: return@LaunchedEffect
+        val opening = actionMenuOwner.token
+        // Lazy reuse can retain a composed anchor after it leaves the viewport.
+        snapshotFlow {
+            chatListState.layoutInfo.visibleItemsInfo.any { visible ->
+                visible.key == anchorId &&
+                    visible.offset + visible.size > chatListState.layoutInfo.viewportStartOffset &&
+                    visible.offset < chatListState.layoutInfo.viewportEndOffset
+            }
+        }.collect { anchorVisible ->
+            if (!anchorVisible && !actionMenuOwner.pointerHeld && actionMenuOwner.isCurrent(opening)) {
+                actionSheetChatId = null
+                actionMenuOwner.dismiss(opening)
+            }
+        }
+    }
     var programmaticViewportGeneration by remember(chatListState) { mutableLongStateOf(0L) }
     val viewportGeneration = userGestureGeneration + programmaticViewportGeneration
     val searchSections =
         // Keyed on the normalized query: whitespace and case-only edits change
         // nothing the filter can see, so they must not re-run the O(n) pass.
-        remember(sourceList, normalizedSearchQuery, selectedFolderChatIds, groupTitleCopy, profileRev, bodyMatches) {
+        remember(
+            scopedSourceList,
+            normalizedSearchQuery,
+            effectiveFolderChatIds,
+            groupTitleCopy,
+            profileRev,
+            bodyMatches,
+            messageSearchConstraints,
+        ) {
             projectChatListSearchSections(
-                source = sourceList,
+                source = scopedSourceList,
                 rawQuery = trimmedQuery,
                 appState = appState,
                 titleCopy = groupTitleCopy,
                 bodyMatchGroupIds = bodyMatches.keys,
-                folderChatIds = selectedFolderChatIds,
+                folderChatIds = effectiveFolderChatIds,
+                messageOnly = messageSearchConstraints != null,
             )
         }
     val visibleItems = remember(searchSections) { searchSections.orderedItems() }
@@ -556,17 +679,33 @@ internal fun ChatsScreen(
                 )
             }
 
+    /** Opens a chat from the visible list, remembering the list head for the return scroll. */
     fun openGroupFromVisibleList(
         item: ChatListItem,
         focusMessageId: String?,
         justCreated: Boolean,
     ) {
-        val visibleHeadId = if (showArchived) null else visibleItems.firstOrNull()?.id
+        val visibleHeadId =
+            if (showArchived) null else visibleItems.firstOrNull()?.id
         onOpenGroup(item, focusMessageId, justCreated, visibleHeadId)
     }
 
+    /** Opens the chat a search result came from, focused on that result's message. */
+    fun openSearchMessage(
+        groupIdHex: String,
+        messageIdHex: String,
+    ) {
+        val canonical = canonicalChatListGroupId(groupIdHex)
+        val item =
+            sourceList.firstOrNull { canonicalChatListGroupId(it.group.groupIdHex) == canonical }
+                ?: return
+        openGroupFromVisibleList(item, messageIdHex, false)
+    }
+
+    /** Presents a profile from the visible list, remembering the list head for the return scroll. */
     fun presentProfileFromVisibleList(npub: String) {
-        val visibleHeadId = if (showArchived) null else visibleItems.firstOrNull()?.id
+        val visibleHeadId =
+            if (showArchived) null else visibleItems.firstOrNull()?.id
         onPresentProfile(npub, visibleHeadId)
     }
     LaunchedEffect(visibleChatIds, selectionMode) {
@@ -998,6 +1137,11 @@ internal fun ChatsScreen(
     // Folder editor handoff: create-from-selection (folderId = null) or
     // long-press edit on a chip (folderId set). Same in-place swap as the
     // new-chat flow so filter/search/list state survives close/save.
+    val folderManagerAvailable = folderManagerAccount != null && !appState.signOutInProgress && !appState.wipeInProgress
+    if (folderManagerOpen && folderManagerAvailable) {
+        ChatFoldersScreen(appState, onBack = { folderManagerOpen = false })
+        return
+    }
     val folderEditorTargets = folderHandoff.editorChatIds
     val folderEditorAccountRef = appState.activeAccountRef
     val folderEditId = folderHandoff.editingFolderId
@@ -1036,6 +1180,36 @@ internal fun ChatsScreen(
                         chatListRowMotion(targetIndex, rowPlacementDurationMillis)
                     },
             ) {
+                val menuAccount = appState.activeAccountRef
+                val menuRuntime = appState.runtimeGeneration
+                val menuToken = actionMenuOwner.token
+                val heldMenuToken = remember(actionMenuOwner, rowId) { arrayOfNulls<Any>(2) }
+                val menuAnchorActive = remember(actionMenuOwner, rowId) { mutableStateOf(true) }
+                DisposableEffect(actionMenuOwner, rowId) {
+                    onDispose {
+                        menuAnchorActive.value = false
+                        heldMenuToken[0] = null
+                        heldMenuToken[1] = null
+                    }
+                }
+
+                /** True while the row menu still belongs to the account and runtime that opened it. */
+                fun menuActionsCurrent(): Boolean {
+                    val ownsAccount =
+                        menuAccount != null &&
+                            appState.activeAccountRef == menuAccount &&
+                            appState.runtimeGeneration == menuRuntime
+                    val available = ownsAccount && !appState.signOutInProgress && !appState.wipeInProgress
+                    return actionMenuOwner.isActive && menuAnchorActive.value && available
+                }
+                DisposableEffect(actionMenuOwner, menuToken, rowId) {
+                    onDispose {
+                        if (actionMenuOwner.isCurrent(menuToken) && actionSheetChatId == rowId) {
+                            actionSheetChatId = null
+                            actionMenuOwner.dismiss(menuToken)
+                        }
+                    }
+                }
                 ChatListRow(
                     item = item,
                     appState = appState,
@@ -1044,25 +1218,58 @@ internal fun ChatsScreen(
                     interactionsEnabled = chatListInteractionsEnabled,
                     selectionMode = selectionMode,
                     selected = rowId in selectedChatIds,
+                    menuHighlighted = actionSheetChatId == rowId,
+                    onActionsHeldChange = { held ->
+                        if (held && menuActionsCurrent()) {
+                            heldMenuToken[0] = actionMenuOwner.open(held = true)
+                            heldMenuToken[1] = heldMenuToken[0]
+                            actionSheetChatId = rowId
+                        } else {
+                            actionMenuOwner.release(heldMenuToken[0])
+                            heldMenuToken[0] = null
+                        }
+                    },
                     bodyMatch = bodyMatch,
                     onOpen = { openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false) },
                     onOpenProfile = { npub -> presentProfileFromVisibleList(npub) },
                     onOpenActions = {
-                        actionSheetChatId = rowId
+                        if (menuActionsCurrent()) {
+                            val continuingHold =
+                                actionMenuOwner.isCurrent(heldMenuToken[0]) &&
+                                    actionSheetChatId == rowId
+                            if (!continuingHold) actionMenuOwner.open(held = false)
+                            actionSheetChatId = rowId
+                        }
                     },
                     onDragSelectionStart = { pointerWindowY ->
-                        actionSheetChatId = null
-                        dragAnchorChatId = rowId
-                        dragPointerWindowY = pointerWindowY
+                        if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
+                            actionSheetChatId = null
+                            actionMenuOwner.dismiss(heldMenuToken[1])
+                            dragAnchorChatId = rowId
+                            dragPointerWindowY = pointerWindowY
+                        }
                     },
                     onDragSelection = { pointerWindowY ->
-                        dragPointerWindowY = pointerWindowY
-                        updateChatDragSelection(pointerWindowY)
+                        if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
+                            dragPointerWindowY = pointerWindowY
+                            updateChatDragSelection(pointerWindowY)
+                        } else {
+                            false
+                        }
                     },
-                    onDragSelectionEnd = { finishChatDrag(clearSelection = false) },
+                    onDragSelectionEnd = {
+                        if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
+                            finishChatDrag(clearSelection = false)
+                        }
+                        heldMenuToken[1] = null
+                    },
                     onDragSelectionCancel = {
-                        actionSheetChatId = null
-                        finishChatDrag(clearSelection = true)
+                        if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
+                            actionSheetChatId = null
+                            actionMenuOwner.dismiss(heldMenuToken[1])
+                            finishChatDrag(clearSelection = true)
+                        }
+                        heldMenuToken[1] = null
                     },
                     rangeDragActive = dragAnchorChatId == rowId,
                     onToggleSelection = {
@@ -1071,6 +1278,48 @@ internal fun ChatsScreen(
                         selectedChatIds.addAll(updated)
                     },
                 )
+                Box(Modifier.matchParentSize().padding(horizontal = 8.dp)) {
+                    val hasUnread = item.effectiveHasUnread(appState.activeAccount?.accountIdHex)
+                    val muted = item.engineMuted()
+                    val pinnedIndex = pinnedIndex(item)
+                    key(menuToken) {
+                        ChatContextMenu(
+                            hasUnread = hasUnread,
+                            canMarkUnread = !item.removedFromGroup(appState.activeAccount?.accountIdHex),
+                            archived = item.group.archived,
+                            muted = muted,
+                            pinned = item.pinned(),
+                            showPinToggle = !item.group.archived,
+                            showMovePinnedUp = (pinnedIndex ?: 0) > 0,
+                            showMovePinnedDown = pinnedIndex != null && pinnedIndex < pinnedOrderedIds.lastIndex,
+                            onMarkRead = { markChatRead(item, unread = false) },
+                            onMarkUnread = { markChatRead(item, unread = true) },
+                            onAddToFolder = { openFolderPicker(listOf(item)) },
+                            onArchiveToggle = { archiveChats(listOf(item), archive = !item.group.archived) },
+                            onMuteToggle = { toggleChatMute(item, muted) },
+                            onPinToggle = { toggleChatPin(item) },
+                            onMovePinned = { delta -> movePinnedChat(item, delta) },
+                            onSelect = {
+                                selectedChatIds.clear()
+                                selectedChatIds.addAll(enterChatListSelection(visibleRowId(item)))
+                            },
+                            onDelete = { pendingBulkDelete = listOf(item) },
+                            onDismiss = {
+                                if (actionMenuOwner.isCurrent(menuToken) && actionSheetChatId == rowId) {
+                                    actionSheetChatId = null
+                                    actionMenuOwner.dismiss(menuToken)
+                                }
+                            },
+                            expanded = actionSheetChatId == rowId,
+                            focusable = !actionMenuOwner.pointerHeld,
+                            modifier = Modifier.testTag("chat.menu.$rowId"),
+                            canRunAction = {
+                                val ownsMenu = actionSheetChatId == rowId && rowId in visibleChatIds
+                                ownsMenu && actionMenuOwner.isCurrent(menuToken) && menuActionsCurrent()
+                            },
+                        )
+                    }
+                }
             }
         }
 
@@ -1079,63 +1328,7 @@ internal fun ChatsScreen(
             val connectivityState = rememberChatListConnectivityState(appState, controller)
             Column {
                 if (selectionMode) {
-                    ChatListSelectionBar(
-                        count = selectedChatIds.size,
-                        archiveAction = bulkArchiveAction,
-                        actionsEnabled = selectedChatIds.isNotEmpty(),
-                        allVisibleSelected = visibleChatIds.isNotEmpty() && selectedChatIds.containsAll(visibleChatIds),
-                        showMarkRead =
-                            singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) == true,
-                        showMarkUnread =
-                            singleSelectedItem?.removedFromGroup(appState.activeAccount?.accountIdHex) == false &&
-                                singleSelectedItem.effectiveHasUnread(appState.activeAccount?.accountIdHex) != true,
-                        showMuteToggle = singleSelectedItem != null,
-                        muted = singleSelectionMuted,
-                        // The engine only pins unarchived chats, so an archived
-                        // selection gets no pin affordance instead of a
-                        // silently failing one.
-                        showPinToggle = singleSelectedItem?.group?.archived == false,
-                        pinned = singleSelectedItem?.pinned() == true,
-                        showMovePinnedUp = (singleSelectedPinnedIndex ?: 0) > 0,
-                        showMovePinnedDown =
-                            singleSelectedPinnedIndex != null &&
-                                singleSelectedPinnedIndex < pinnedOrderedIds.lastIndex,
-                        onClose = ::clearSelection,
-                        onArchive = {
-                            val selected = selectedVisibleItems
-                            if (selected.isEmpty()) return@ChatListSelectionBar
-                            val archive = bulkArchiveAction == ChatListBulkArchiveAction.Archive
-                            archiveChats(selected, archive)
-                        },
-                        onDelete = {
-                            pendingBulkDelete = selectedVisibleItems.takeIf { it.isNotEmpty() }
-                        },
-                        onAddToFolder = {
-                            openFolderPicker(selectedVisibleItems)
-                        },
-                        onMarkRead = {
-                            val item = singleSelectedItem ?: return@ChatListSelectionBar
-                            markChatRead(item, unread = false)
-                        },
-                        onMarkUnread = {
-                            val item = singleSelectedItem ?: return@ChatListSelectionBar
-                            markChatRead(item, unread = true)
-                        },
-                        onMuteToggle = {
-                            val item = singleSelectedItem ?: return@ChatListSelectionBar
-                            toggleChatMute(item, singleSelectionMuted)
-                        },
-                        onPinToggle = {
-                            val item = singleSelectedItem ?: return@ChatListSelectionBar
-                            toggleChatPin(item)
-                        },
-                        onMovePinned = { delta ->
-                            val item = singleSelectedItem ?: return@ChatListSelectionBar
-                            movePinnedChat(item, delta)
-                        },
-                        onSelectAll = { selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds)) },
-                        onDeselectAll = { selectedChatIds.clear() },
-                    )
+                    ChatListSelectionBar(onClose = ::clearSelection)
                 } else {
                     ChatListTopBar(
                         appState = appState,
@@ -1152,6 +1345,7 @@ internal fun ChatsScreen(
                             onGlobalSearchStateChange(GlobalSearchTransitions::closeSearch)
                         },
                         onSwitchAccount = switchAccount,
+                        onCycleAccount = onQuickCycleAccount,
                         onMic = {
                             val intent =
                                 android.content
@@ -1173,75 +1367,149 @@ internal fun ChatsScreen(
                         },
                         onOpenSettings = onOpenSettings,
                         connectivityState = connectivityState,
+                        searchFilterState = globalSearchState,
+                        onSearchFilterCategory = { category ->
+                            onGlobalSearchStateChange { state ->
+                                GlobalSearchTransitions.openFilterCategory(state, category)
+                            }
+                        },
+                        onClearSearchFilters = {
+                            onGlobalSearchStateChange(GlobalSearchTransitions::clearAllFilters)
+                        },
+                    )
+                    if (searchOpen) {
+                        GlobalSearchAttachmentModes(
+                            state = globalSearchState,
+                            onSelectionChange = { selection ->
+                                onGlobalSearchStateChange { state ->
+                                    GlobalSearchTransitions.setContentFilterSelection(state, selection)
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+        },
+        bottomBar = {
+            if (selectionMode) {
+                val selectionAccount = appState.activeAccountRef
+                val selectionRuntime = appState.runtimeGeneration
+                val selectionIds = selectedChatIds.toSet()
+                dev.ipf.whitenoise.android.ui.common.AdaptiveContent(
+                    Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
+                ) {
+                    ChatListSelectionControls(
+                        count = selectedChatIds.size,
+                        archiveAction = bulkArchiveAction,
+                        actionsEnabled = selectedChatIds.isNotEmpty(),
+                        allVisibleSelected = visibleChatIds.isNotEmpty() && selectedChatIds.containsAll(visibleChatIds),
+                        showMarkRead =
+                            singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) == true,
+                        showMarkUnread =
+                            singleSelectedItem?.removedFromGroup(appState.activeAccount?.accountIdHex) == false &&
+                                singleSelectedItem.effectiveHasUnread(appState.activeAccount?.accountIdHex) != true,
+                        showMuteToggle = singleSelectedItem != null,
+                        muted = singleSelectionMuted,
+                        // The engine only pins unarchived chats, so an archived
+                        // selection gets no pin affordance instead of a
+                        // silently failing one.
+                        showPinToggle = singleSelectedItem?.group?.archived == false,
+                        pinned = singleSelectedItem?.pinned() == true,
+                        showMovePinnedUp = (singleSelectedPinnedIndex ?: 0) > 0,
+                        showMovePinnedDown =
+                            singleSelectedPinnedIndex != null &&
+                                singleSelectedPinnedIndex < pinnedOrderedIds.lastIndex,
+                        onArchive = {
+                            val selected = selectedVisibleItems
+                            if (selected.isEmpty()) return@ChatListSelectionControls
+                            val archive = bulkArchiveAction == ChatListBulkArchiveAction.Archive
+                            archiveChats(selected, archive)
+                        },
+                        onDelete = {
+                            pendingBulkDelete = selectedVisibleItems.takeIf { it.isNotEmpty() }
+                        },
+                        onAddToFolder = {
+                            openFolderPicker(selectedVisibleItems)
+                        },
+                        onMarkRead = {
+                            val item = singleSelectedItem ?: return@ChatListSelectionControls
+                            markChatRead(item, unread = false)
+                        },
+                        onMarkUnread = {
+                            val item = singleSelectedItem ?: return@ChatListSelectionControls
+                            markChatRead(item, unread = true)
+                        },
+                        onMuteToggle = {
+                            val item = singleSelectedItem ?: return@ChatListSelectionControls
+                            toggleChatMute(item, singleSelectionMuted)
+                        },
+                        onPinToggle = {
+                            val item = singleSelectedItem ?: return@ChatListSelectionControls
+                            toggleChatPin(item)
+                        },
+                        onMovePinned = { delta ->
+                            val item = singleSelectedItem ?: return@ChatListSelectionControls
+                            movePinnedChat(item, delta)
+                        },
+                        onSelectAll = { selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds)) },
+                        onDeselectAll = { selectedChatIds.clear() },
+                        isCurrent = {
+                            val sameOwner =
+                                selectionAccount != null &&
+                                    appState.activeAccountRef == selectionAccount &&
+                                    appState.runtimeGeneration == selectionRuntime
+                            val available =
+                                !appState.signOutInProgress &&
+                                    !appState.wipeInProgress &&
+                                    appState.retainedAccountReactivationRef == null
+                            val sameSelection = selectionIds.isNotEmpty() && selectedChatIds.toSet() == selectionIds
+                            sameOwner && available && sameSelection
+                        },
                     )
                 }
             }
         },
         floatingActionButton = {
             if (!searchOpen && !selectionMode) {
-                val actionColors = accountActionColors(appState)
-                FloatingActionButton(
-                    onClick = openNewMessageFlow,
-                    modifier = Modifier.performanceTestTag(PerformanceTestTags.NEW_MESSAGE),
-                    containerColor = actionColors.container,
-                    contentColor = actionColors.content,
-                ) {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = stringResource(R.string.new_message),
-                    )
-                }
+                ChatsNewMessageFab(appState, openNewMessageFlow)
             }
         },
     ) { padding ->
-        GlobalSearchFilterSheet(
-            visible =
-                shouldPresentGlobalSearchFilterSheet(
-                    searchState = globalSearchState,
-                    interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
-                    selectionMode = selectionMode,
-                ),
-            onDismiss = {
-                onGlobalSearchStateChange(GlobalSearchTransitions::dismissFilterSheet)
-            },
-        )
+        if (shouldPresentGlobalSearchFilterSheet(searchState = globalSearchState, selectionMode = selectionMode)) {
+            GlobalSearchFilterPicker(
+                state = globalSearchState,
+                options = globalSearchFilterOptions,
+                onStateChange = onGlobalSearchStateChange,
+            )
+        }
         Column(Modifier.fillMaxSize().padding(padding)) {
-            if (appState.appUpdateInfo.shouldShowBanner) {
-                AppUpdateBanner(
-                    info = appState.appUpdateInfo,
-                    onUpdateNow = { appState.handleAppUpdateAction(context) },
-                    onDismiss = { appState.dismissAppUpdateBanner() },
-                )
+            // Chats reset and folder management remain available with an empty list.
+            // Native folder models still own visibility/counts; this row stays above list/empty-state swaps.
+            // The prototype swaps the whole top column for the search bar and its mode chips, so the
+            // folder pills leave with it and come back when search closes.
+            if (appState.activeAccountRef != null && !searchOpen) {
+                key(appState.activeAccountRef, appState.runtimeGeneration) {
+                    ChatListFilterChips(
+                        chips = folderChipModels,
+                        selectedFolderId = selectedFolderId,
+                        onSelect = onSelectFolder,
+                        onEditFolder = { folderHandoff.editingFolderId = it },
+                        onManageFolders = {
+                            val sameOwner =
+                                appState.activeAccountRef == folderManagerAccount &&
+                                    appState.runtimeGeneration == folderManagerRuntime
+                            val available = !appState.signOutInProgress && !appState.wipeInProgress
+                            if (sameOwner && available) {
+                                folderManagerOpen = true
+                            }
+                        },
+                    )
+                }
             }
-            // Filter chips visible whenever there's content to filter — both
-            // in the active and archived lists. They're sticky above the
-            // list rather than sticky inside the LazyColumn so they survive
-            // an empty-state swap without flicker.
-            if (controller.items.isNotEmpty() || controller.archivedItems.isNotEmpty()) {
-                ChatListFilterChips(
-                    chips = folderChipModels,
-                    selectedFolderId = selectedFolderId,
-                    onSelect = onSelectFolder,
-                    onEditFolder = { folderHandoff.editingFolderId = it },
-                )
-            }
-            if (
-                shouldShowGlobalSearchFilterControls(
-                    searchState = globalSearchState,
-                    interactiveSectionsAvailable = interactiveGlobalSearchFilterSectionsAvailable,
-                    selectionMode = selectionMode,
-                )
-            ) {
+            if (shouldShowGlobalSearchFilterControls(searchState = globalSearchState, selectionMode = selectionMode)) {
                 GlobalSearchFilterControlsRow(
                     state = globalSearchState,
-                    onOpenFilters =
-                        if (interactiveGlobalSearchFilterSectionsAvailable) {
-                            {
-                                onGlobalSearchStateChange(GlobalSearchTransitions::openFilterSheet)
-                            }
-                        } else {
-                            null
-                        },
+                    folderNames = globalSearchFolderNames,
                     onRemoveFilter = { chipId ->
                         onGlobalSearchStateChange { state -> GlobalSearchTransitions.removeFilter(state, chipId) }
                     },
@@ -1280,6 +1548,17 @@ internal fun ChatsScreen(
                 },
             ) {
                 when {
+                    browsingAttachments ->
+                        GlobalAttachmentBrowser(
+                            items = libraryItems,
+                            kinds = libraryKinds,
+                            loading = libraryLoading,
+                            bottomPadding = snackbarContentInset.value,
+                            onOpenMessage = { groupIdHex, messageIdHex ->
+                                openSearchMessage(groupIdHex, messageIdHex)
+                            },
+                            thumbnail = { item -> libraryThumbnail(appState, controller.boundAccountRef, item) },
+                        )
                     controller.isLoading && sourceList.isEmpty() -> LoadingScreen()
                     loadFailurePlacement == LoadFailurePlacement.FullScreen ->
                         ErrorContent(
@@ -1287,13 +1566,7 @@ internal fun ChatsScreen(
                             requireNotNull(controller.error),
                             onRetry = controller::retryLoad,
                         )
-                    sourceList.isEmpty() && showArchived ->
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                stringResource(R.string.no_archived_chats),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                    sourceList.isEmpty() && showArchived -> EmptyArchivedChats()
                     sourceList.isEmpty() ->
                         EmptyChats(onCreate = openNewMessageFlow)
                     visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
@@ -1320,6 +1593,7 @@ internal fun ChatsScreen(
                                 ChatListNoResults(
                                     query = searchQuery.trim(),
                                     unreadFolderSelected = selectedFolderRule?.unreadOnly == true,
+                                    filtersActive = filtersActive,
                                 )
                             }
                         }
@@ -1328,6 +1602,7 @@ internal fun ChatsScreen(
                             modifier =
                                 Modifier
                                     .fillMaxSize()
+                                    .trackWhiteNoiseHeader(chatListState)
                                     .clipToBounds()
                                     .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
                                     .onGloballyPositioned { coordinates ->
@@ -1474,37 +1749,6 @@ internal fun ChatsScreen(
         }
     }
 
-    actionSheetChatId
-        ?.let { id -> visibleItems.firstOrNull { visibleRowId(it) == id } }
-        ?.let { item ->
-            val hasUnread = item.effectiveHasUnread(appState.activeAccount?.accountIdHex)
-            val muted = item.engineMuted()
-            val pinnedIndex = pinnedIndex(item)
-            ChatActionSheet(
-                hasUnread = hasUnread,
-                canMarkUnread = !item.removedFromGroup(appState.activeAccount?.accountIdHex),
-                archived = item.group.archived,
-                muted = muted,
-                pinned = item.pinned(),
-                showPinToggle = !item.group.archived,
-                showMovePinnedUp = (pinnedIndex ?: 0) > 0,
-                showMovePinnedDown = pinnedIndex != null && pinnedIndex < pinnedOrderedIds.lastIndex,
-                onMarkRead = { markChatRead(item, unread = false) },
-                onMarkUnread = { markChatRead(item, unread = true) },
-                onAddToFolder = { openFolderPicker(listOf(item)) },
-                onArchiveToggle = { archiveChats(listOf(item), archive = !item.group.archived) },
-                onMuteToggle = { toggleChatMute(item, muted) },
-                onPinToggle = { toggleChatPin(item) },
-                onMovePinned = { delta -> movePinnedChat(item, delta) },
-                onSelect = {
-                    selectedChatIds.clear()
-                    selectedChatIds.addAll(enterChatListSelection(visibleRowId(item)))
-                },
-                onDelete = { pendingBulkDelete = listOf(item) },
-                onDismiss = { actionSheetChatId = null },
-            )
-        }
-
     folderHandoff.pickerChatIds?.let { targets ->
         ChatFolderPickerSheet(
             appState = appState,
@@ -1629,34 +1873,9 @@ private fun ChatListIdentifierResult(
                     onOpenProfile = onOpenProfile,
                 )
             } else {
-                ListItem(
-                    modifier =
-                        Modifier.clickable(role = Role.Button) { onOpenProfile(resolution.npub) },
-                    leadingContent = {
-                        Avatar(
-                            title = IdentityFormatter.short(resolution.npub),
-                            seed = resolution.npub,
-                            size = 40.dp,
-                            pictureUrl = null,
-                        )
-                    },
-                    headlineContent = {
-                        Text(
-                            stringResource(R.string.chat_list_search_open_profile),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    supportingContent = {
-                        Text(
-                            IdentityFormatter.short(resolution.npub, prefix = 12, suffix = 8),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
-                    },
+                dev.ipf.whitenoise.android.ui.search.GlobalPersonRow(
+                    npub = resolution.npub,
+                    onOpen = onOpenProfile,
                 )
             }
         }
@@ -1719,6 +1938,7 @@ private data class ChatListBodySearchKey(
     val accountRef: String?,
     val showArchived: Boolean,
     val canonicalGroupIds: List<String>,
+    val constraints: MessageSearchConstraints? = null,
 )
 
 private class ChatListBodySearchRequest
@@ -1728,11 +1948,18 @@ private data class ChatListBodySearchResult(
     val matches: Map<String, MessageBodyMatch>,
 )
 
+/** One library scan's results, held against the token that asked for them. */
+private data class ChatListAttachmentLibraryResult(
+    val request: ChatListBodySearchRequest,
+    val items: List<GlobalAttachmentItem>,
+)
+
 // Debounce before the chat-list message-body search fires its per-chat FFI
 // queries (issue #290). Sits inside the existing 250–300 ms chat-list input
 // debounce band so a fast typist doesn't trigger a query per keystroke.
 internal const val CHAT_LIST_SEARCH_DEBOUNCE_MS: Long = 275L
 
+/** Section header above the search result groups. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun ChatListSearchSectionHeader(
@@ -1740,73 +1967,14 @@ internal fun ChatListSearchSectionHeader(
     testTag: String,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Text(
-            text = title,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .semantics { heading() }
-                    .testTag(testTag)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
-@Composable
-private fun AppUpdateBanner(
-    info: AppUpdateInfo,
-    onUpdateNow: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val latest = info.latestVersion ?: return
-    val description = stringResource(R.string.app_update_available_description, latest)
-    val releasesBehind = info.releasesBehind
-    ElevatedCard(
+    Text(
+        text = title,
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
-                .padding(horizontal = Dimens.spaceMd, vertical = Dimens.spaceSm),
-        colors =
-            CardDefaults.elevatedCardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            ),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(Dimens.spaceMd),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
-        ) {
-            Icon(Icons.Default.Download, contentDescription = null)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    stringResource(if (info.isFarBehind) R.string.app_update_persistent_title else R.string.app_update_available_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(description, style = MaterialTheme.typography.bodyMedium)
-                if (releasesBehind != null && releasesBehind > 0) {
-                    Text(
-                        pluralStringResource(R.plurals.app_update_releases_behind, releasesBehind, releasesBehind),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Button(onClick = onUpdateNow) {
-                    Text(stringResource(R.string.app_update_now))
-                }
-            }
-            if (!info.isFarBehind) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
-                }
-            }
-        }
-    }
+                .semantics { heading() }
+                .testTag(testTag)
+                .padding(16.dp),
+        style = MaterialTheme.typography.titleSmall,
+    )
 }

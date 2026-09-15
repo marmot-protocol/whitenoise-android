@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -36,6 +37,8 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.emptyGroupRecord
+import dev.ipf.whitenoise.android.state.quickProfileCycleTarget
+import dev.ipf.whitenoise.android.state.updateQuickProfileCycling
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -85,7 +88,7 @@ class AccountSwitchFirstFrameTest {
         composeRule.onNodeWithText(CACHED_TITLE).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.connectivity_connecting)).assertDoesNotExist()
         composeRule.onNodeWithText(context.getString(R.string.connectivity_connected)).assertDoesNotExist()
-        composeRule.onNodeWithText(context.getString(R.string.no_chats_yet)).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.chat_rows_no_chats_title)).assertDoesNotExist()
         composeRule
             .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
             .assertCountEquals(0)
@@ -194,10 +197,10 @@ class AccountSwitchFirstFrameTest {
 
             composeRule.onNodeWithText(TARGET_NAMED_TITLE).assertIsDisplayed()
             composeRule.onNodeWithText(PEER_NAME).assertIsDisplayed()
+            composeRule.onNodeWithTag("chats.switchProfile").assertIsDisplayed()
             composeRule.onNodeWithContentDescription(ACCOUNT_A_NAME, substring = true).assertIsDisplayed()
-            composeRule.onNodeWithContentDescription(WORK_ACCOUNT_NAME, substring = true).assertIsDisplayed()
             composeRule.onNodeWithText(OLD_ACCOUNT_CHAT_TITLE).assertDoesNotExist()
-            composeRule.onNodeWithText(context.getString(R.string.no_chats_yet)).assertDoesNotExist()
+            composeRule.onNodeWithText(context.getString(R.string.chat_rows_no_chats_title)).assertDoesNotExist()
 
             controller.onCleared()
         }
@@ -229,7 +232,7 @@ class AccountSwitchFirstFrameTest {
         composeRule
             .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
             .assertCountEquals(1)
-        composeRule.onNodeWithText(context.getString(R.string.no_chats_yet)).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.chat_rows_no_chats_title)).assertDoesNotExist()
 
         composeRule.runOnIdle {
             controller.publishInitialLoadFailureForTest(
@@ -245,7 +248,7 @@ class AccountSwitchFirstFrameTest {
         composeRule
             .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
             .assertCountEquals(0)
-        composeRule.onNodeWithText(context.getString(R.string.no_chats_yet)).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.chat_rows_no_chats_title)).assertDoesNotExist()
 
         controller.onCleared()
     }
@@ -285,7 +288,7 @@ class AccountSwitchFirstFrameTest {
             }
         }
 
-        composeRule.onNodeWithText(context.getString(R.string.no_chats_yet)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.chat_rows_no_chats_title)).assertIsDisplayed()
         composeRule.onNodeWithText(OLD_ACCOUNT_CHAT_TITLE).assertDoesNotExist()
         composeRule
             .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
@@ -324,15 +327,15 @@ class AccountSwitchFirstFrameTest {
                             controller = controller,
                             onOpenSettings = {},
                             onOpenGroup = { _, _, _, _ -> },
-                            onQuickSwitchAccount = { requestedAccount = it },
+                            onQuickCycleAccount = { requestedAccount = appState.quickProfileCycleTarget()?.label },
                         )
                     }
                 }
             }
 
-            composeRule.onNodeWithContentDescription(WORK_ACCOUNT_NAME, substring = true).performClick()
+            composeRule.onNodeWithContentDescription(ACCOUNT_A_NAME, substring = true).performClick()
             composeRule.runOnIdle {
-                assertEquals(WORK_ACCOUNT, requestedAccount)
+                assertEquals(ACCOUNT_A, requestedAccount)
                 assertEquals(TARGET_ACCOUNT, appState.activeAccountRef)
             }
 
@@ -394,6 +397,7 @@ class AccountSwitchFirstFrameTest {
         )
     }
 
+    /** Builds the app state fixture with the given number of accounts. */
     private fun testAppState(): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
@@ -403,6 +407,7 @@ class AccountSwitchFirstFrameTest {
             activeAccountRef = TARGET_ACCOUNT,
         )
 
+    /** Builds an app state with one signed-in identity. */
     private fun identityAppState() =
         WhiteNoiseAppState(
             context = context,
@@ -416,7 +421,7 @@ class AccountSwitchFirstFrameTest {
                 ),
             activeAccountRef = TARGET_ACCOUNT,
             profileRefreshRequest = {},
-        )
+        ).also { it.updateQuickProfileCycling(true) }
 
     private fun activeAccount() =
         AccountSummaryFfi(

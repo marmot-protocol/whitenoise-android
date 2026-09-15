@@ -1,8 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
 import android.content.Context
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -23,12 +21,12 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -41,6 +39,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupSetupScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.newGroupDetailsEditable
 import dev.ipf.whitenoise.android.ui.chats.newchat.submittedNewGroupName
+import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
 import dev.ipf.whitenoise.android.ui.group.GROUP_EMOJI_IMAGE_PICKER_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -63,6 +62,7 @@ class NewGroupNameEmojiPickerTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 
+    /** Emoji action is accessible and opens shared picker. */
     @Test
     fun emojiActionIsAccessibleAndOpensSharedPicker() {
         renderScreen()
@@ -70,7 +70,7 @@ class NewGroupNameEmojiPickerTest {
         val action = composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker))
         action.assertIsDisplayed().assertHasClickAction()
         val bounds = action.getUnclippedBoundsInRoot()
-        val fieldBounds = composeRule.onNode(hasSetTextAction()).getUnclippedBoundsInRoot()
+        val fieldBounds = composeRule.onNodeWithTag("group_setup.name").getUnclippedBoundsInRoot()
         assertTrue(
             "Emoji action must use the leading half of the field",
             bounds.left + bounds.right < fieldBounds.left + fieldBounds.right,
@@ -82,16 +82,17 @@ class NewGroupNameEmojiPickerTest {
 
         action.performClick()
 
-        composeRule.onNodeWithContentDescription(string(R.string.emoji_search_hint)).assertIsDisplayed()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsDisplayed()
     }
 
+    /** Compact viewport and large font keep the name field and emoji action visible. */
     @Test
     @Config(qualifiers = "w320dp-h640dp-mdpi")
     fun compactViewportAndLargeFontKeepTheNameFieldAndEmojiActionVisible() {
         renderScreen(fontScale = 2f)
 
         val rootBounds = composeRule.onRoot().getUnclippedBoundsInRoot()
-        val nameField = composeRule.onNode(hasSetTextAction())
+        val nameField = composeRule.onNodeWithTag("group_setup.name").performScrollTo()
         val emojiAction = composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker))
 
         listOf(nameField, emojiAction).forEach { node ->
@@ -111,10 +112,11 @@ class NewGroupNameEmojiPickerTest {
         assertTrue("Emoji action height must be at least 48dp", actionBounds.bottom - actionBounds.top >= 48.dp)
     }
 
+    /** Picks replace the selection move the caret and keep the picker open. */
     @Test
     fun picksReplaceTheSelectionMoveTheCaretAndKeepThePickerOpen() {
         renderScreen()
-        val field = composeRule.onNode(hasSetTextAction())
+        val field = composeRule.onNodeWithTag("group_setup.name")
         field.performTextReplacement("hello world")
         field.performTextInputSelection(TextRange(6, 11))
         composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker)).performClick()
@@ -124,7 +126,7 @@ class NewGroupNameEmojiPickerTest {
 
         val firstUpdate = composeRule.onNode(hasSetTextAction() and hasText("hello 😀"))
         assertSelection(firstUpdate, TextRange("hello 😀".length))
-        composeRule.onNodeWithContentDescription(string(R.string.emoji_search_hint)).assertIsDisplayed()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsDisplayed()
 
         composeRule.onAllNodesWithText("😀")[0].performClick()
         val secondUpdate = composeRule.onNode(hasSetTextAction() and hasText("hello 😀😀"))
@@ -189,6 +191,7 @@ class NewGroupNameEmojiPickerTest {
         assertEquals("😀", recents.firstOrNull())
     }
 
+    /** Dismiss and saved state restoration preserve the draft selection and picker. */
     @Test
     fun dismissAndSavedStateRestorationPreserveTheDraftSelectionAndPicker() {
         val restorationTester = StateRestorationTester(composeRule)
@@ -203,25 +206,26 @@ class NewGroupNameEmojiPickerTest {
                 )
             }
         }
-        val field = composeRule.onNode(hasSetTextAction())
+        val field = composeRule.onNodeWithTag("group_setup.name")
         field.performTextReplacement("Team 😀 name")
         field.performTextInputSelection(TextRange(5, 7))
         composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker)).performClick()
-        composeRule.onNodeWithContentDescription(string(R.string.emoji_search_hint)).assertIsDisplayed()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsDisplayed()
 
         restorationTester.emulateSavedInstanceStateRestore()
 
         val restored = composeRule.onNode(hasSetTextAction() and hasText("Team 😀 name"))
         assertSelection(restored, TextRange(5, 7))
-        composeRule.onNodeWithContentDescription(string(R.string.emoji_search_hint)).assertIsDisplayed()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsDisplayed()
 
         composeRule
             .onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Dismiss))
             .performSemanticsAction(SemanticsActions.Dismiss)
-        composeRule.onNodeWithContentDescription(string(R.string.emoji_search_hint)).assertDoesNotExist()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
         composeRule.onNode(hasSetTextAction() and hasText("Team 😀 name")).assertExists()
     }
 
+    /** Locked retry state disables the emoji action and cannot open the picker. */
     @Test
     fun lockedRetryStateDisablesTheEmojiActionAndCannotOpenThePicker() {
         renderScreen(initialRetryGroupIdHex = "created-group")
@@ -229,7 +233,7 @@ class NewGroupNameEmojiPickerTest {
         val action = composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker))
         action.assertIsNotEnabled().performClick()
 
-        composeRule.onNodeWithContentDescription(string(R.string.emoji_search_hint)).assertDoesNotExist()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
     }
 
     @Test
@@ -240,17 +244,17 @@ class NewGroupNameEmojiPickerTest {
         assertFalse(newGroupDetailsEditable(retryGroupIdHex = null, busy = false, imagePreparing = true))
     }
 
+    /** Actual new group image entry opens emoji builder and dismiss preserves name. */
     @Test
     fun actualNewGroupImageEntryOpensEmojiBuilderAndDismissPreservesName() {
         renderScreen()
         val draftName = "Team launch"
-        composeRule.onNode(hasSetTextAction()).performTextReplacement(draftName)
+        composeRule.onNodeWithTag("group_setup.name").performTextReplacement(draftName)
 
-        composeRule.onNode(hasOnClickLabel(string(R.string.group_image_search_set))).performClick()
-        composeRule.onNodeWithText(string(R.string.group_image_source_emoji)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(string(R.string.group_image_choose_emoji)).assertIsDisplayed()
+        composeRule.onNodeWithTag("group_setup.photoAction").performClick()
+        composeRule.onNodeWithText(string(R.string.group_photo_emoji)).assertIsDisplayed()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/new_group_emoji_image_entry_light.png")
-        composeRule.onNodeWithText(string(R.string.group_image_source_emoji)).performClick()
+        composeRule.onNodeWithText(string(R.string.group_photo_emoji)).performClick()
         composeRule.onNodeWithTag(GROUP_EMOJI_IMAGE_PICKER_TAG).assertIsDisplayed()
 
         composeRule
@@ -274,34 +278,27 @@ class NewGroupNameEmojiPickerTest {
         assertEquals(expected, actual)
     }
 
+    /** Composes the screen under test with the given fixture. */
     private fun renderScreen(
         initialRetryGroupIdHex: String? = null,
         fontScale: Float = 1f,
     ) {
         val state = appState()
         composeRule.setContent {
-            WhiteNoiseTheme {
-                val density = LocalDensity.current
-                CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
-                    NewGroupSetupScreen(
-                        appState = state,
-                        members = emptyList(),
-                        onBack = {},
-                        onCreateCompletedOpen = { _, _ -> },
-                        initialRetryGroupIdHex = initialRetryGroupIdHex,
-                    )
-                }
+            WhiteNoiseTheme(fontScale = fontScale) {
+                NewGroupSetupScreen(
+                    appState = state,
+                    members = emptyList(),
+                    onBack = {},
+                    onCreateCompletedOpen = { _, _ -> },
+                    initialRetryGroupIdHex = initialRetryGroupIdHex,
+                )
             }
         }
     }
 
+    /** Resolves a string resource in the test context. */
     private fun string(res: Int): String = context.getString(res)
-
-    private fun hasOnClickLabel(label: String): SemanticsMatcher =
-        SemanticsMatcher("has click label '$label'") {
-            it.config.contains(SemanticsActions.OnClick) &&
-                it.config[SemanticsActions.OnClick].label == label
-        }
 
     private fun appState(): WhiteNoiseAppState =
         WhiteNoiseAppState(

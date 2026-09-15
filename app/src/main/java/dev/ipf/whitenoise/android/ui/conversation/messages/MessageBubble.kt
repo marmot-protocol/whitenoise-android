@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -32,7 +31,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,19 +40,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.LookaheadScope
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -62,9 +68,11 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -94,24 +102,24 @@ import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
+import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.isBlueFreeAccentVisible
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
-import dev.ipf.whitenoise.android.state.withoutBlueChannel
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
+import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsFollowTarget
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutReport
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutSink
+import dev.ipf.whitenoise.android.ui.conversation.InvitationActions
 import dev.ipf.whitenoise.android.ui.conversation.InviteAcceptanceResolutionStatus
-import dev.ipf.whitenoise.android.ui.conversation.InvitePreviewActionBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
@@ -128,7 +136,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOut
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.shareMessageExternally
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
-import dev.ipf.whitenoise.android.ui.conversation.reactions.CustomizeReactionsDialog
+import dev.ipf.whitenoise.android.ui.conversation.reactions.ConfigureReactionsSheet
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionDetailsSheet
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.replies.isOwnReplySender
@@ -140,6 +148,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.markdownHasLinkAnnotationAt
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
+import dev.ipf.whitenoise.android.ui.theme.LocalMessageBubbleBaseColorScheme
 import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.Job
@@ -149,28 +158,23 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+/** Draws semantic highlight or monochrome directional borders; saved colours only affect non-AMOLED fills. */
 @Composable
 internal fun messageBubbleBorder(
     highlighted: Boolean,
     mine: Boolean,
-    customArgb: Long? = null,
     persistedFailure: Boolean = false,
 ): BorderStroke? {
     val amoledAccent = amoledDirectionalAccentColor(mine)
-    val blueFreeCustomAccent =
-        customArgb
-            ?.withoutBlueChannel()
-            ?.takeIf(Long::isBlueFreeAccentVisible)
     return when {
         persistedFailure -> null
-        amoledAccent != null && customArgb != null ->
-            BorderStroke(2.dp, blueFreeCustomAccent?.let(::colorFromArgb) ?: amoledAccent)
         highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
         amoledAccent != null -> BorderStroke(2.dp, amoledAccent)
         else -> null
     }
 }
 
+/** Accent for a reply preview, inside or beside the bubble, honouring custom bubble colours. */
 internal fun replyPreviewAccentArgb(
     insideBubble: Boolean,
     customBubbleColorActive: Boolean,
@@ -182,6 +186,7 @@ internal fun replyPreviewAccentArgb(
         null
     }
 
+/** Bubble colours and shape for the direction, deletion state and custom colour. */
 @Composable
 internal fun messageBubblePresentation(
     deleted: Boolean,
@@ -190,6 +195,16 @@ internal fun messageBubblePresentation(
     persistedFailure: Boolean = false,
 ): BubblePresentation {
     val colorScheme = MaterialTheme.colorScheme
+    val bubbleScheme = LocalMessageBubbleBaseColorScheme.current ?: colorScheme
+    // Keep tombstone and AMOLED foregrounds stable; live bubbles use the prototype's paired roles.
+    val preserveSemanticSurface = deleted || isAmoledSurfaceTheme()
+    val surfaceBackground =
+        if (preserveSemanticSurface) {
+            colorScheme.surfaceVariant
+        } else {
+            bubbleScheme.surfaceContainerHigh
+        }
+    val surfaceContent = if (preserveSemanticSurface) colorScheme.onSurfaceVariant else bubbleScheme.onSurface
     return resolveBubblePresentationArgb(
         deleted = deleted,
         amoled = isAmoledSurfaceTheme(),
@@ -199,16 +214,17 @@ internal fun messageBubblePresentation(
             BubblePresentationTokens(
                 errorBackgroundArgb = colorScheme.errorContainer.toArgb().toLong() and 0xFFFFFFFFL,
                 errorContentArgb = colorScheme.onErrorContainer.toArgb().toLong() and 0xFFFFFFFFL,
-                surfaceBackgroundArgb = colorScheme.surfaceVariant.toArgb().toLong() and 0xFFFFFFFFL,
-                surfaceContentArgb = colorScheme.onSurfaceVariant.toArgb().toLong() and 0xFFFFFFFFL,
-                mineBackgroundArgb = colorScheme.primaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
-                mineContentArgb = colorScheme.onPrimaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
+                surfaceBackgroundArgb = surfaceBackground.toArgb().toLong() and 0xFFFFFFFFL,
+                surfaceContentArgb = surfaceContent.toArgb().toLong() and 0xFFFFFFFFL,
+                mineBackgroundArgb = bubbleScheme.primary.toArgb().toLong() and 0xFFFFFFFFL,
+                mineContentArgb = bubbleScheme.onPrimary.toArgb().toLong() and 0xFFFFFFFFL,
                 mentionAccentArgb = colorScheme.primary.toArgb().toLong() and 0xFFFFFFFFL,
             ),
         persistedFailure = persistedFailure,
     )
 }
 
+/** Fill colour of a bubble for the direction, deletion state and custom colour. */
 @Composable
 internal fun messageBubbleFillColor(
     deleted: Boolean,
@@ -216,6 +232,7 @@ internal fun messageBubbleFillColor(
     persistedFailure: Boolean = false,
 ): Color = colorFromArgb(messageBubblePresentation(deleted, mine, persistedFailure = persistedFailure).backgroundArgb)
 
+/** Footer time colour for the direction and state. */
 @Composable
 internal fun messageBubbleTimestampColor(
     mine: Boolean,
@@ -227,8 +244,8 @@ internal fun messageBubbleTimestampColor(
     return when {
         persistedFailure -> colorScheme.onErrorContainer
         amoledAccent != null -> amoledAccent
-        mine && !deleted -> colorScheme.onPrimaryContainer
-        else -> colorScheme.onSurfaceVariant
+        deleted -> colorScheme.onSurfaceVariant
+        else -> colorFromArgb(messageBubblePresentation(deleted = false, mine = mine).contentArgb)
     }
 }
 
@@ -310,7 +327,6 @@ internal fun MessageBubble(
     isActionMenuOpen: Boolean,
     onActionMenuOpenChange: (Boolean) -> Unit,
     onQuickReactionsSave: (List<String>) -> Unit,
-    onQuickReactionsReset: () -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
     composerGate: ComposerGate,
     groupDisbanded: Boolean = false,
@@ -340,6 +356,19 @@ internal fun MessageBubble(
             sourceEpoch = record.sourceEpoch,
             projectedMedia = item.projected?.media,
         )
+    val keptMessages = LocalKeptMessages.current
+    // Null until the controller has bound an account, which is also the only
+    // state in which a kept reference could not be scoped to one identity.
+    val keptMessageKey =
+        remember(controller.boundAccountRef, controller.group.groupIdHex, record.messageIdHex) {
+            controller.boundAccountRef?.takeIf { record.messageIdHex.isNotBlank() }?.let { accountRef ->
+                KeptMessageKey(
+                    accountRef = accountRef,
+                    groupIdHex = controller.group.groupIdHex,
+                    messageIdHex = record.messageIdHex,
+                )
+            }
+        }
     val mine = controller.isMessageMine(record)
     val deleted = item.projected?.deleted == true || MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
     // The same capability model the controller re-validates on the mutation
@@ -372,7 +401,8 @@ internal fun MessageBubble(
             groupIdHex = controller.group.groupIdHex,
         )
     val colorScheme = MaterialTheme.colorScheme
-    val customBubbleColorActive = customBubbleArgb != null && !deleted && !persistedFailure
+    val customBubbleColorActive =
+        bubbleTheme != BubbleTheme.Amoled && customBubbleArgb != null && !deleted && !persistedFailure
     val bubblePresentation =
         messageBubblePresentation(
             deleted = deleted,
@@ -382,6 +412,19 @@ internal fun MessageBubble(
         )
     val bubbleBackgroundColor = colorFromArgb(bubblePresentation.backgroundArgb)
     val bubbleContentColor = colorFromArgb(bubblePresentation.contentArgb)
+    val outgoingReply = mine && bubbleTheme != BubbleTheme.Amoled
+    val replyFillColor =
+        when {
+            customBubbleColorActive -> Color.Transparent
+            outgoingReply -> bubbleContentColor.copy(alpha = REPLY_QUOTE_FILL_ALPHA)
+            else -> colorScheme.surface
+        }
+    val replySecondaryColor =
+        if (outgoingReply || customBubbleColorActive) {
+            bubbleContentColor.copy(alpha = REPLY_QUOTE_SECONDARY_ALPHA)
+        } else {
+            colorScheme.onSurfaceVariant
+        }
     // #414: "you were mentioned" treatment. A received (not mine), live
     // message whose markdown body @-mentions the current
     // account gets a logical-start outer-frame accent so a self-mention is
@@ -411,6 +454,34 @@ internal fun MessageBubble(
     var actionMenuAnchorBounds by remember(record.messageIdHex) { mutableStateOf<IntRect?>(null) }
     val rowCoordinates = remember(record.messageIdHex) { arrayOfNulls<LayoutCoordinates>(1) }
     val messageBoundsInWindow = remember(record.messageIdHex) { arrayOfNulls<IntRect>(1) }
+    val focusedMessageLayer = if (isActionMenuOpen) rememberGraphicsLayer() else null
+    var focusedMediaReady by remember(record.messageIdHex, focusedMessageLayer) { mutableStateOf(false) }
+    var focusedMediaSize by remember(record.messageIdHex) {
+        mutableStateOf(androidx.compose.ui.unit.IntSize.Zero)
+    }
+    val focusedWindowWidth =
+        LocalWindowInfo.current.containerSize.width
+            .takeIf { it > 0 } ?: Int.MAX_VALUE
+    val focusedMediaWidthLimit =
+        with(LocalDensity.current) {
+            (minOf(focusedWindowWidth, 560.dp.roundToPx()) - 32.dp.roundToPx()).coerceAtLeast(1)
+        }
+    val focusedMediaCaptureModifier =
+        Modifier
+            .focusedMediaFootprint(
+                focused = isActionMenuOpen,
+                maximumPreviewWidth = focusedMediaWidthLimit,
+                mine = mine,
+            ).onSizeChanged { focusedMediaSize = it }
+            .drawWithContent {
+                if (focusedMessageLayer != null) {
+                    focusedMessageLayer.record { this@drawWithContent.drawContent() }
+                    focusedMediaReady = true
+                    drawLayer(focusedMessageLayer)
+                } else {
+                    drawContent()
+                }
+            }
     val actionAnchorBoundsModifier =
         Modifier.onGloballyPositioned { coordinates ->
             val bounds = coordinates.boundsInWindow()
@@ -422,13 +493,15 @@ internal fun MessageBubble(
                     bottom = bounds.bottom.roundToInt(),
                 )
         }
-    var swipeDrag by remember(record.messageIdHex) { mutableFloatStateOf(0f) }
-    val animatedSwipeOffset by animateFloatAsState(targetValue = swipeDrag, label = "replySwipeOffset")
+    val replySwipe = rememberMessageReplySwipeState(record.messageIdHex)
+    // Physical drag deltas run right-to-left in an RTL layout, so they are
+    // folded onto the gesture's semantic "forward" axis before measurement. The
+    // bubble's own translation stays unsigned because `Modifier.offset {}`
+    // mirrors placement for the layout direction on its own.
+    val replySwipeDirection = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1f else -1f
     val clipboard = LocalClipboardManager.current
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
-    val replySwipeThresholdPx = with(density) { 64.dp.toPx() }
-    val maxSwipeOffsetPx = with(density) { 72.dp.toPx() }
     val messageTextCopy = rememberMessageTextCopy()
     val messageTextSelectionState = rememberSelectionState()
     val selectableTextLayouts =
@@ -504,7 +577,12 @@ internal fun MessageBubble(
         } else {
             Modifier
         }
-    val deletedBodyText = stringResource(R.string.message_deleted)
+    // The prototype speaks in the first person whenever this account is
+    // responsible for the removal — because it authored the message, or because
+    // it hid the message locally — and in the passive voice otherwise.
+    val deletedByMe = mine || MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
+    val deletedBodyText =
+        stringResource(if (deletedByMe) R.string.message_deleted_by_you else R.string.message_deleted_by_other)
     val invalidatedBodyText = stringResource(R.string.message_invalidated)
     val messageActionsLabel = stringResource(R.string.message_actions)
     val invalidationWarning =
@@ -780,10 +858,6 @@ internal fun MessageBubble(
         }
     reactionVisibilityState.targetState = showReactionSummary
     val reactionHostPresent = reactionVisibilityState.currentState || reactionVisibilityState.targetState
-    // Match the timestamp to the bubble's visual cue. AMOLED uses the same
-    // directional accent as the border; other themes keep their paired M3
-    // on-color tokens.
-    val timestampColor = messageBubbleTimestampColor(mine, deleted, persistedFailure)
     var emojiPickerOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     // A long body clips to a few lines with an inline Read More; opening it
     // routes through a full-screen view rather than expanding in place, so the
@@ -795,7 +869,8 @@ internal fun MessageBubble(
     var editHistoryOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var reactionSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var customizeReactionsOpen by remember(record.messageIdHex) { mutableStateOf(false) }
-    var restoreReactionPickerExpanded by remember(record.messageIdHex) { mutableStateOf(false) }
+    var configureReactionsDraft by remember(record.messageIdHex) { mutableStateOf<List<String>>(emptyList()) }
+    var configureReactionSlot by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
     var deleteDialogOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var deleteInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     var attachmentSaveInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
@@ -853,7 +928,7 @@ internal fun MessageBubble(
             editHistoryOpen = false
             reactionSheetOpen = false
             customizeReactionsOpen = false
-            restoreReactionPickerExpanded = false
+            configureReactionSlot = null
             deleteDialogOpen = false
             messageShareInFlight = false
         }
@@ -1278,7 +1353,13 @@ internal fun MessageBubble(
         }
     }
 
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            .onGloballyPositioned {
+                if (replySwipe.atRest) replySwipe.rowBoundsInRoot = it.boundsInRoot()
+            },
+    ) {
         val selectionGutterWidth = if (selectionMode) messageBubbleSelectionGutterWidth else 0.dp
         val senderAvatarSlotWidth = if (reserveSenderAvatarSlot) MessageBubbleSenderAvatarSlotWidth else 0.dp
         val bubbleColumnMaxWidth =
@@ -1294,6 +1375,11 @@ internal fun MessageBubble(
             )
         val longPressBlockedBySelection = selectionMode && !rangeDragActive
         val replySwipeUnavailable = deleted || readOnly || textSelectionMode
+
+        // Drawn under the row so the bubble uncovers it as it slides away.
+        if (!replySwipeUnavailable) {
+            MessageReplySwipeGlyph(state = replySwipe, messageIdHex = record.messageIdHex)
+        }
 
         Row(
             // Both reply-swipe and long-press hitboxes cover the ENTIRE row,
@@ -1334,32 +1420,30 @@ internal fun MessageBubble(
                         if (replySwipeUnavailable || longPressBlockedBySelection) {
                             Modifier
                         } else {
-                            Modifier.pointerInput(record.messageIdHex, replySwipeThresholdPx, maxSwipeOffsetPx) {
+                            Modifier.pointerInput(record.messageIdHex, replySwipeDirection) {
                                 var gesture = ReplySwipeGesture()
                                 detectHorizontalDragGestures(
                                     onDragStart = {
                                         gesture = ReplySwipeGesture()
                                     },
                                     onHorizontalDrag = { change, dragAmount ->
+                                        val forward = dragAmount * replySwipeDirection
                                         gesture =
                                             gesture.dragBy(
-                                                deltaX = dragAmount,
+                                                deltaX = forward,
                                                 deltaY = change.position.y - change.previousPosition.y,
                                             )
-                                        val next = gesture.visualOffset(maxSwipeOffsetPx)
-                                        if (next != swipeDrag || dragAmount > 0f) change.consume()
-                                        swipeDrag = next
+                                        val raw = gesture.forwardReplySwipeDistance()
+                                        if (forward > 0f || raw > 0f) change.consume()
+                                        replySwipe.dragTo(raw)
                                     },
                                     onDragEnd = {
-                                        if (gesture.shouldTriggerReply(threshold = replySwipeThresholdPx)) {
-                                            beginReply()
-                                        }
+                                        replySwipe.release { beginReply() }
                                         gesture = ReplySwipeGesture()
-                                        swipeDrag = 0f
                                     },
                                     onDragCancel = {
+                                        replySwipe.cancel()
                                         gesture = ReplySwipeGesture()
-                                        swipeDrag = 0f
                                     },
                                 )
                             }
@@ -1412,6 +1496,12 @@ internal fun MessageBubble(
                                         androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
                                     )
                                     pendingLongPressLinkDestination[0] = null
+                                    // A tombstone has exactly one action, so it skips
+                                    // the menu and opens its confirmation directly.
+                                    if (deleted) {
+                                        requestDelete()
+                                        return@longPressOrVerticalDrag
+                                    }
                                     val windowPosition =
                                         rowCoordinates[0]?.let {
                                             messageBubbleLongPressPositionInWindow(it, position)
@@ -1502,7 +1592,7 @@ internal fun MessageBubble(
                                     selectionSeedVisibleOffset = null
                                     longPressWindowY = null
                                     actionMenuAnchorBounds = messageBoundsInWindow[0]
-                                    onActionMenuOpenChange(true)
+                                    if (deleted) requestDelete() else onActionMenuOpenChange(true)
                                     true
                                 }
                             }
@@ -1554,7 +1644,10 @@ internal fun MessageBubble(
                             } else {
                                 Modifier
                             },
-                        ).offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) },
+                        ).offset { IntOffset(replySwipe.displayedDistance.roundToInt(), 0) }
+                        .onGloballyPositioned {
+                            if (replySwipe.atRest) replySwipe.bubbleBoundsInRoot = it.boundsInRoot()
+                        },
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
             ) {
                 // Resolved before the content column so its presence can pick
@@ -1569,7 +1662,11 @@ internal fun MessageBubble(
                 // resolve outside the cache either way so a late profile
                 // load still updates them. See #131.
                 val replyPreview =
-                    if (item.projected != null) {
+                    if (deleted) {
+                        // A tombstone keeps only its body, reactions and footer;
+                        // the quoted target is part of the removed content.
+                        null
+                    } else if (item.projected != null) {
                         remember(item, messageTextCopy) {
                             controller.replyPreview(item, messageTextCopy)
                         }
@@ -1641,14 +1738,8 @@ internal fun MessageBubble(
                 // An uncaptioned visual-only message carries the footer over the
                 // bottom-right media tile. For an album that is the last visible
                 // image/video; a file card or caption owns the footer instead.
-                val footerOnVisualMedia =
-                    visualMediaOwnsFooter(
-                        deleted = deleted,
-                        hasInvalidationWarning = invalidationWarning != null,
-                        visualCount = visualAttachments.size,
-                        fileCount = fileAttachments.size,
-                        hasCaption = mediaCaption != null,
-                    )
+                // The prototype keeps time and status below the media, inside the bubble, never overlaid on it.
+                val footerOnVisualMedia = false
                 val confirmedFileFooterInCard =
                     fileCardOwnsFooter(
                         deleted = deleted,
@@ -1697,15 +1788,7 @@ internal fun MessageBubble(
                             null
                         }
                     }
-                val footerOnPendingVisual =
-                    !anyConfirmedMedia &&
-                        visualMediaOwnsFooter(
-                            deleted = deleted,
-                            hasInvalidationWarning = invalidationWarning != null,
-                            visualCount = pendingVisualRefs.size,
-                            fileCount = 0,
-                            hasCaption = mediaCaption != null,
-                        )
+                val footerOnPendingVisual = false
                 val pendingFileFooterInCard =
                     fileCardOwnsFooter(
                         deleted = deleted,
@@ -1797,11 +1880,17 @@ internal fun MessageBubble(
                     )
                 val bodyOrWarningInsideBubble =
                     shouldFrameMessageBubbleSupplement(bodyTextToRender, outerInvalidationWarning)
-                // Captions/plain bodies sit on the resolved bubble background and therefore use
-                // its paired WCAG-safe content color. Footer-only media rows are
-                // outside the bubble and retain the page's surface foreground.
+                // The footer's time and delivery glyph are secondary metadata: a quiet
+                // gray against the resolved bubble fill, the error pairing for a
+                // persisted failure, and the AMOLED directional accent. Media scrim
+                // footers stay white on black and do not route through here.
                 val timestampColor =
-                    if (bodyOrWarningInsideBubble) bubbleContentColor else colorScheme.onSurfaceVariant
+                    messageBubbleFooterColor(
+                        mine = mine,
+                        persistedFailure = persistedFailure,
+                        bubbleBackgroundColor = bubbleBackgroundColor,
+                        bubbleContentColor = bubbleContentColor,
+                    )
                 LaunchedEffect(textSelectionMode, bodyTextToRender) {
                     if (textSelectionMode && bodyTextToRender.isNullOrBlank()) {
                         onTextSelectionModeChange(false)
@@ -1833,11 +1922,12 @@ internal fun MessageBubble(
                         Text(
                             appState.displayName(record.sender),
                             style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
                             color =
-                                if (insideBubble && customBubbleColorActive) {
+                                if (insideBubble) {
                                     bubbleContentColor
                                 } else {
-                                    colorScheme.onSurfaceVariant
+                                    groupAuthorColor(record.sender)
                                 },
                             modifier =
                                 Modifier.combinedClickable(
@@ -1861,7 +1951,7 @@ internal fun MessageBubble(
                 // standalone above the media card.
                 val replyPreviewCard: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
                     replyPreview?.let { preview ->
-                        val useCustomFillColors = insideBubble && customBubbleColorActive
+                        val pairedReplyAccent = bubbleContentColor.takeIf { insideBubble }
                         val replyAccentArgb =
                             replyPreviewAccentArgb(
                                 insideBubble = insideBubble,
@@ -1903,9 +1993,10 @@ internal fun MessageBubble(
                                 remember(appState, appState.profileRevisionForCompose) {
                                     { bech32: String -> appState.mentionDisplayName(bech32) }
                                 },
-                            containerColor = if (useCustomFillColors) Color.Transparent else null,
-                            contentColor = if (useCustomFillColors) bubbleContentColor else null,
-                            accentColor = replyAccentArgb?.let(::colorFromArgb),
+                            containerColor = replyFillColor.takeIf { insideBubble },
+                            contentColor = bubbleContentColor.takeIf { insideBubble },
+                            accentColor = replyAccentArgb?.let(::colorFromArgb) ?: pairedReplyAccent,
+                            secondaryColor = replySecondaryColor.takeIf { insideBubble },
                         )
                     }
                 }
@@ -1969,26 +2060,34 @@ internal fun MessageBubble(
                                 alignEnd = mine,
                                 contentModifier = textSelectionBoundsModifier,
                                 media = {
-                                    BubbleMediaBlocks(
-                                        item = item,
-                                        record = record,
-                                        controller = controller,
-                                        appState = appState,
-                                        onOpenConversationMedia = onOpenConversationMedia,
-                                        bubbleMedia = bubbleMedia,
-                                        sharedLocation = sharedLocation,
-                                        sharedContact = sharedContact,
-                                        sharedUser = sharedUser,
-                                        deleted = deleted,
-                                        mine = mine,
-                                        showStatus = showOutgoingStatus,
-                                        footerOnVisualMedia = footerOnVisualMedia,
-                                        footerOnPendingVisual = footerOnPendingVisual,
-                                        showPendingPlaceholder = showPendingPlaceholder,
-                                        fileFooterWarning = fileFooterWarning,
-                                        onMediaLongPress = onMediaLongPress,
-                                        attachedToCaption = true,
-                                    )
+                                    LookaheadScope {
+                                        Column(
+                                            modifier = focusedMediaCaptureModifier,
+                                            horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
+                                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                                        ) {
+                                            BubbleMediaBlocks(
+                                                item = item,
+                                                record = record,
+                                                controller = controller,
+                                                appState = appState,
+                                                onOpenConversationMedia = onOpenConversationMedia,
+                                                bubbleMedia = bubbleMedia,
+                                                sharedLocation = sharedLocation,
+                                                sharedContact = sharedContact,
+                                                sharedUser = sharedUser,
+                                                deleted = deleted,
+                                                mine = mine,
+                                                showStatus = showOutgoingStatus,
+                                                footerOnVisualMedia = footerOnVisualMedia,
+                                                footerOnPendingVisual = footerOnPendingVisual,
+                                                showPendingPlaceholder = showPendingPlaceholder,
+                                                fileFooterWarning = fileFooterWarning,
+                                                onMediaLongPress = onMediaLongPress,
+                                                focusedPreview = isActionMenuOpen,
+                                            )
+                                        }
+                                    }
                                 },
                             ) {
                                 BubbleBodyFooterAndRetry(
@@ -2020,6 +2119,7 @@ internal fun MessageBubble(
                                     bubbleBackgroundColor = bubbleBackgroundColor,
                                     bubbleContentColor = bubbleContentColor,
                                     timestampColor = timestampColor,
+                                    statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
                                     showStatus = showOutgoingStatus && !fileFooterInCard,
                                     retentionOwnedByFileCard = fileFooterInCard,
                                     editedLabel = editedLabel,
@@ -2033,30 +2133,43 @@ internal fun MessageBubble(
                                 )
                             }
                         } else {
-                            MediaSupplementEnvelope(
+                            MediaCaptionFrame(
                                 modifier = actionAnchorBoundsModifier,
+                                presentation = bubblePresentation,
+                                highlighted = highlighted,
+                                mine = mine,
+                                mentionedSelf = mentionedSelf,
+                                mentionedYouLabel = mentionedYouLabel,
                                 alignEnd = mine,
                                 media = {
-                                    BubbleMediaBlocks(
-                                        item = item,
-                                        record = record,
-                                        controller = controller,
-                                        appState = appState,
-                                        onOpenConversationMedia = onOpenConversationMedia,
-                                        bubbleMedia = bubbleMedia,
-                                        sharedLocation = sharedLocation,
-                                        sharedContact = sharedContact,
-                                        sharedUser = sharedUser,
-                                        deleted = deleted,
-                                        mine = mine,
-                                        showStatus = showOutgoingStatus,
-                                        footerOnVisualMedia = footerOnVisualMedia,
-                                        footerOnPendingVisual = footerOnPendingVisual,
-                                        showPendingPlaceholder = showPendingPlaceholder,
-                                        fileFooterWarning = fileFooterWarning,
-                                        onMediaLongPress = onMediaLongPress,
-                                        attachedToCaption = false,
-                                    )
+                                    LookaheadScope {
+                                        Column(
+                                            modifier = focusedMediaCaptureModifier,
+                                            horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
+                                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                                        ) {
+                                            BubbleMediaBlocks(
+                                                item = item,
+                                                record = record,
+                                                controller = controller,
+                                                appState = appState,
+                                                onOpenConversationMedia = onOpenConversationMedia,
+                                                bubbleMedia = bubbleMedia,
+                                                sharedLocation = sharedLocation,
+                                                sharedContact = sharedContact,
+                                                sharedUser = sharedUser,
+                                                deleted = deleted,
+                                                mine = mine,
+                                                showStatus = showOutgoingStatus,
+                                                footerOnVisualMedia = footerOnVisualMedia,
+                                                footerOnPendingVisual = footerOnPendingVisual,
+                                                showPendingPlaceholder = showPendingPlaceholder,
+                                                fileFooterWarning = fileFooterWarning,
+                                                onMediaLongPress = onMediaLongPress,
+                                                focusedPreview = isActionMenuOpen,
+                                            )
+                                        }
+                                    }
                                 },
                             ) {
                                 // No caption: the footer (time/status) for audio,
@@ -2091,6 +2204,7 @@ internal fun MessageBubble(
                                     bubbleBackgroundColor = bubbleBackgroundColor,
                                     bubbleContentColor = bubbleContentColor,
                                     timestampColor = timestampColor,
+                                    statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
                                     showStatus = showOutgoingStatus && !fileFooterInCard,
                                     retentionOwnedByFileCard = fileFooterInCard,
                                     editedLabel = editedLabel,
@@ -2160,6 +2274,7 @@ internal fun MessageBubble(
                             bubbleBackgroundColor = bubbleBackgroundColor,
                             bubbleContentColor = bubbleContentColor,
                             timestampColor = timestampColor,
+                            statusContainerColor = bubbleBackgroundColor,
                             showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
                             retentionOwnedByFileCard = false,
                             editedLabel = editedLabel,
@@ -2178,7 +2293,6 @@ internal fun MessageBubble(
                     expanded = isActionMenuOpen && !selectionMode && !textSelectionMode,
                     anchorBoundsInWindow = actionMenuAnchorBounds,
                     anchorWindowYPx = longPressWindowY,
-                    centerOverAnchor = hasMedia,
                     canReply = !deleted && !readOnly,
                     canReact = !deleted && !readOnly,
                     canDelete = deleteCapability.canDeleteAtAll,
@@ -2202,6 +2316,11 @@ internal fun MessageBubble(
                     canSpeak = !deleted && canSpeakAloud,
                     canSpeakCodeLiterally = speakableProjection?.speechRoles?.isNotEmpty() == true,
                     canSelectText = !deleted && !bodyTextToRender.isNullOrBlank(),
+                    canKeepOnScreen =
+                        keptMessages != null &&
+                            keptMessageKey != null &&
+                            !deleted &&
+                            !keptMessages.isKept(keptMessageKey),
                     canShare = canShareMessage,
                     canSave = !deleted && mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
                     canInfo = !deleted,
@@ -2213,6 +2332,10 @@ internal fun MessageBubble(
                             onEmojiUsed(emoji)
                             reactWithEmoji(emoji)
                         }
+                    },
+                    onKeepOnScreen = {
+                        onActionMenuOpenChange(false)
+                        if (keptMessageKey != null) keptMessages?.keep(keptMessageKey)
                     },
                     onOpenEmojiPicker = {
                         if (!deleted && !readOnly) {
@@ -2252,6 +2375,204 @@ internal fun MessageBubble(
                     },
                     onInfo = ::openInfoSheet,
                     onDelete = ::requestDelete,
+                    mine = mine,
+                    selectedReactionEmojis = reactionTallies.filter { it.mine }.mapTo(mutableSetOf()) { it.emoji },
+                    previewDescription =
+                        if (isActionMenuOpen) {
+                            focusedMessagePreviewDescription(
+                                author = appState.displayName(record.sender),
+                                body =
+                                    focusedMessagePreviewText(
+                                        displayedBody,
+                                        displayedMarkdownDocument,
+                                        appState::mentionDisplayName,
+                                    ).text,
+                                mediaLabels =
+                                    if (hasMedia) {
+                                        mediaReferences.map { it.fileName }.filter(String::isNotBlank).ifEmpty {
+                                            listOf(
+                                                mediaPendingName?.takeIf(String::isNotBlank)
+                                                    ?: stringResource(R.string.media_attachment),
+                                            )
+                                        }
+                                    } else {
+                                        emptyList()
+                                    },
+                                time = rememberedMessageBubbleTime(record.recordedAt),
+                                status =
+                                    if (showOutgoingStatus) {
+                                        when (item.status) {
+                                            MessageStatus.Pending -> stringResource(R.string.sending)
+                                            MessageStatus.Sent -> stringResource(R.string.sent)
+                                            MessageStatus.Failed -> stringResource(R.string.send_failed)
+                                            else -> null
+                                        }
+                                    } else {
+                                        null
+                                    },
+                                warning = invalidationWarning,
+                            )
+                        } else {
+                            ""
+                        },
+                    previewReady = !hasMedia || focusedMediaReady,
+                    preview = {
+                        val previewRetention =
+                            record
+                                .retentionIndicatorInput(
+                                    controllerKey = controller,
+                                    accountRef = controller.boundAccountRef,
+                                    deleted = deleted,
+                                    retentionAtSendSeconds = item.retentionAtSendSeconds,
+                                ).takeUnless { fileFooterInCard }
+                        val previewReserveRetention =
+                            !fileFooterInCard &&
+                                !deleted &&
+                                shouldReserveRetentionIndicatorSpace(
+                                    input = previewRetention,
+                                    projectedRetentionSeconds = record.retentionSeconds,
+                                    mine = mine,
+                                    status = item.status,
+                                    groupRetentionSeconds = controller.group.disappearingMessageSecs,
+                                )
+                        val previewFooter: @Composable () -> Unit = {
+                            MessageInlineFooter(
+                                timeText = rememberedMessageBubbleTime(record.recordedAt),
+                                color = timestampColor,
+                                showStatus = showOutgoingStatus && !fileFooterInCard,
+                                status = item.status,
+                                editedLabel = editedLabel,
+                                onEditedClick = null,
+                                retention = previewRetention,
+                                reserveRetentionSpace = previewReserveRetention,
+                                showTime = !fileFooterInCard,
+                                statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
+                            )
+                        }
+                        val mediaPreview: (@Composable () -> Unit)? =
+                            if (hasMedia) {
+                                {
+                                    FocusedRenderedMessagePreview(
+                                        layer = checkNotNull(focusedMessageLayer),
+                                        sourceSize = focusedMediaSize,
+                                    )
+                                }
+                            } else {
+                                null
+                            }
+                        if (hasMedia && !bodyOrWarningInsideBubble) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                replyPreview?.let { preview ->
+                                    ReplyPreviewCard(
+                                        senderTitle =
+                                            if (preview.originalUnavailable) {
+                                                ""
+                                            } else {
+                                                senderTitleForReply(preview.sender, appState)
+                                            },
+                                        isOwn =
+                                            if (preview.originalUnavailable) {
+                                                mine
+                                            } else {
+                                                isOwnReplySender(preview.sender, appState)
+                                            },
+                                        body = preview.body,
+                                        mediaKind = preview.mediaKind,
+                                        mediaFileName = preview.mediaFileName,
+                                        mediaType = preview.mediaType,
+                                        originalUnavailable = preview.originalUnavailable,
+                                        warning = preview.warning,
+                                        onClick = null,
+                                        onDismiss = null,
+                                        fillWidth = true,
+                                        mentionDisplayName = appState::mentionDisplayName,
+                                        containerColor = null,
+                                        contentColor = null,
+                                        accentColor =
+                                            replyPreviewAccentArgb(
+                                                insideBubble = false,
+                                                customBubbleColorActive = customBubbleColorActive,
+                                                presentation = bubblePresentation,
+                                            )?.let(::colorFromArgb),
+                                    )
+                                }
+                                mediaPreview?.invoke()
+                                if (!footerOnVisualMedia && !footerOnPendingVisual) {
+                                    previewFooter()
+                                }
+                            }
+                        } else {
+                            FocusedTextMessagePreview(
+                                presentation = bubblePresentation,
+                                mine = mine,
+                                text = bodyTextToRender ?: displayedBody.takeUnless { hasMedia }.orEmpty(),
+                                document = displayedMarkdownDocument,
+                                time = rememberedMessageBubbleTime(record.recordedAt),
+                                status = item.status,
+                                showStatus = showOutgoingStatus,
+                                senderName = appState.displayName(record.sender).takeIf { showSenderName },
+                                mentionDisplayName = appState::mentionDisplayName,
+                                isGroupMember =
+                                    if (controller.membersLoaded) {
+                                        { bech32 -> appState.isRosterMember(bech32, controller.members) }
+                                    } else {
+                                        null
+                                    },
+                                media = mediaPreview,
+                                footerContent = previewFooter,
+                                warning = outerInvalidationWarning,
+                                editedLabel = editedLabel,
+                                retention =
+                                    record.retentionIndicatorInput(
+                                        controllerKey = controller,
+                                        accountRef = controller.boundAccountRef,
+                                        deleted = deleted,
+                                        retentionAtSendSeconds = item.retentionAtSendSeconds,
+                                    ),
+                                mentionedSelf = mentionedSelf,
+                                mentionedYouLabel = mentionedYouLabel,
+                                reply =
+                                    replyPreview?.let { preview ->
+                                        {
+                                            ReplyPreviewCard(
+                                                senderTitle =
+                                                    if (preview.originalUnavailable) {
+                                                        ""
+                                                    } else {
+                                                        senderTitleForReply(preview.sender, appState)
+                                                    },
+                                                isOwn =
+                                                    if (preview.originalUnavailable) {
+                                                        mine
+                                                    } else {
+                                                        isOwnReplySender(preview.sender, appState)
+                                                    },
+                                                body = preview.body,
+                                                mediaKind = preview.mediaKind,
+                                                mediaFileName = preview.mediaFileName,
+                                                mediaType = preview.mediaType,
+                                                originalUnavailable = preview.originalUnavailable,
+                                                warning = preview.warning,
+                                                onClick = null,
+                                                onDismiss = null,
+                                                fillWidth = true,
+                                                mentionDisplayName = appState::mentionDisplayName,
+                                                containerColor = replyFillColor.takeUnless { hasMedia },
+                                                contentColor = bubbleContentColor.takeUnless { hasMedia },
+                                                accentColor =
+                                                    replyPreviewAccentArgb(
+                                                        insideBubble = !hasMedia,
+                                                        customBubbleColorActive = customBubbleColorActive,
+                                                        presentation = bubblePresentation,
+                                                    )?.let(::colorFromArgb)
+                                                        ?: bubbleContentColor.takeUnless { hasMedia },
+                                                secondaryColor = replySecondaryColor.takeUnless { hasMedia },
+                                            )
+                                        }
+                                    },
+                            )
+                        }
+                    },
                 )
                 if (expandedFullView && !deleted) {
                     val groupIdHex = controller.group.groupIdHex
@@ -2336,9 +2657,10 @@ internal fun MessageBubble(
                                 ComposerGate.FROZEN -> FrozenGroupComposerNotice()
                                 ComposerGate.DISBANDED -> DisbandedGroupComposerNotice(disbanded = groupDisbanded)
                                 ComposerGate.INVITE ->
-                                    InvitePreviewActionBar(
+                                    InvitationActions(
+                                        inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
                                         mutationInFlight = inviteMutationInFlight,
-                                        onJoin = onJoinInvite,
+                                        onAccept = onJoinInvite,
                                         onDecline = onDeclineInvite,
                                     )
                                 ComposerGate.COMPOSER ->
@@ -2387,49 +2709,63 @@ internal fun MessageBubble(
                     )
                 }
                 if (emojiPickerOpen && !deleted && !readOnly) {
+                    val pickingSlot = configureReactionSlot
                     EmojiPickerSheet(
-                        restoreExpanded = restoreReactionPickerExpanded,
-                        purpose = EmojiPickerPurpose.USE,
+                        purpose =
+                            if (pickingSlot == null) {
+                                EmojiPickerPurpose.USE
+                            } else {
+                                EmojiPickerPurpose.CONFIGURE_QUICK_REACTION
+                            },
                         recentEmojis = recentEmojis,
                         onEmojiUsed = onEmojiUsed,
-                        messageReactionEmojis =
-                            item.projected
-                                ?.reactions
-                                ?.byEmoji
-                                .orEmpty()
-                                .map { it.emoji },
                         onDismissRequest = {
-                            restoreReactionPickerExpanded = false
                             emojiPickerOpen = false
+                            configureReactionSlot = null
                         },
                         onEmojiPicked = { emoji ->
-                            restoreReactionPickerExpanded = false
                             emojiPickerOpen = false
-                            reactWithEmoji(emoji)
+                            if (pickingSlot == null) {
+                                reactWithEmoji(emoji)
+                            } else {
+                                configureReactionsDraft =
+                                    configureReactionsDraft.mapIndexed { index, current ->
+                                        if (index == pickingSlot) emoji else current
+                                    }
+                                configureReactionSlot = null
+                                customizeReactionsOpen = true
+                            }
                         },
-                        onCustomizeReactions = { wasExpanded ->
-                            restoreReactionPickerExpanded = wasExpanded
-                            customizeReactionsOpen = true
-                        },
+                        onConfigure =
+                            if (pickingSlot != null) {
+                                null
+                            } else {
+                                {
+                                    configureReactionsDraft = quickReactionEmojis
+                                    emojiPickerOpen = false
+                                    customizeReactionsOpen = true
+                                }
+                            },
                     )
                 }
                 if (customizeReactionsOpen && !deleted) {
-                    fun closeCustomizeToReactionSheet() {
-                        customizeReactionsOpen = false
-                    }
-                    CustomizeReactionsDialog(
-                        quickReactionEmojis = quickReactionEmojis,
-                        recentEmojis = recentEmojis,
-                        onDismiss = ::closeCustomizeToReactionSheet,
-                        onSave = { choices ->
+                    ConfigureReactionsSheet(
+                        current = configureReactionsDraft,
+                        onDismiss = { customizeReactionsOpen = false },
+                        onApply = { choices ->
                             onQuickReactionsSave(choices)
-                            closeCustomizeToReactionSheet()
+                            customizeReactionsOpen = false
                         },
-                        onReset = onQuickReactionsReset,
+                        onPickSlot = { index, draft ->
+                            configureReactionsDraft = draft
+                            configureReactionSlot = index
+                            customizeReactionsOpen = false
+                            emojiPickerOpen = true
+                        },
                     )
                 }
                 if (editHistoryOpen && !deleted && editState != null) {
-                    EditHistorySheet(
+                    EditHistoryDialog(
                         original = record.plaintext,
                         originalTimestamp = record.recordedAt,
                         editState = editState,
@@ -2437,12 +2773,16 @@ internal fun MessageBubble(
                     )
                 }
                 if (infoSheetOpen && !deleted) {
-                    MessageInfoSheet(
+                    MessageDetailsScreen(
                         record = record,
                         status = item.status,
                         mine = mine,
                         senderDisplayName = appState.displayName(record.sender),
                         senderNpub = appState.npubForDisplay(record.sender),
+                        senderAvatarUrl = appState.avatarUrl(record.sender),
+                        reactions = controller.reactions[record.messageIdHex].orEmpty(),
+                        recipients = messageDetailsRecipients(controller, appState, mine),
+                        attachmentLabels = mediaReferences.map { it.fileName.ifBlank { it.mediaType } },
                         onDismissRequest = { infoSheetOpen = false },
                         onCopy = { value ->
                             clipboard.setText(AnnotatedString(value))
@@ -2474,9 +2814,11 @@ internal fun MessageBubble(
                 MessageReactionSummary(
                     tallies = reactionTallies,
                     mine = mine,
-                    bubbleBorderOverrideArgb = bubblePresentation.borderOverrideArgb,
                     visibilityState = reactionVisibilityState,
                     enabled = !deleted,
+                    onToggle = { emoji ->
+                        if (!deleted) appState.launchMutation { controller.toggleReaction(emoji, record) }
+                    },
                     onClick = { if (!deleted) reactionSheetOpen = true },
                 )
                 if (reactionSheetOpen && !deleted) {
@@ -2525,3 +2867,6 @@ internal fun MessageBubble(
 // A body longer than this many rendered lines collapses to a Read More that
 // opens the full-screen view rather than spilling down the transcript (#325).
 internal const val MESSAGE_COLLAPSE_LINE_LIMIT = 52
+
+private const val REPLY_QUOTE_FILL_ALPHA = 0.16f
+private const val REPLY_QUOTE_SECONDARY_ALPHA = 0.78f

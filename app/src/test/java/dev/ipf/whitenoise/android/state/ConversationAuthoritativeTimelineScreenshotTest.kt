@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performScrollTo
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
+import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_BOTTOM_BAR_TAG
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_TIMELINE_TAIL_GAP
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
@@ -139,11 +140,11 @@ class ConversationAuthoritativeTimelineScreenshotTest {
         val appTop = appRow.fetchSemanticsNode().boundsInRoot.top
         assertTrue("old unconfirmed row must not occupy the live head", unconfirmedTop < systemTop)
         assertTrue("membership row must render above the authorized app message", systemTop < appTop)
-        val transcriptBottom =
+        val composerTop =
             composeRule
-                .onNodeWithTag(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE)
+                .onNodeWithTag(CONVERSATION_BOTTOM_BAR_TAG)
                 .fetchSemanticsNode()
-                .boundsInRoot.bottom
+                .boundsInRoot.top
         val tailBottom =
             composeRule
                 .onNodeWithTag(messageBubbleRowTestTag(APP_MESSAGE_ID), useUnmergedTree = true)
@@ -152,7 +153,7 @@ class ConversationAuthoritativeTimelineScreenshotTest {
         assertEquals(
             "the final message must have exactly one 8dp interval above the composer",
             with(composeRule.density) { CONVERSATION_TIMELINE_TAIL_GAP.toPx() },
-            transcriptBottom - tailBottom,
+            composerTop - tailBottom,
             1f,
         )
         composeRule

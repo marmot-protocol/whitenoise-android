@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_review_title">Rivedi il messaggio vocale</string>
+    <string name="voice_record_again">Registra di nuovo</string>
+    <string name="voice_message_release_to_review">Rilascia per rivedere · scorri per annullare</string>
+    <string name="voice_recording_stop">Interrompi registrazione</string>
+</resources>

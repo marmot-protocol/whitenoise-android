@@ -5,7 +5,6 @@ import android.util.Log
 import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -13,14 +12,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,6 +42,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
@@ -65,8 +64,8 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.evictCachedAttachment
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -215,6 +214,7 @@ internal fun MediaVideoGridTile(
         mutableStateOf(controller.thumbnailFor(messageIdHex, attachmentIndex)?.asImageBitmap())
     }
     var failed by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(false) }
+    var tileDurationMs by remember(messageIdHex, attachmentIndex, epoch) { mutableLongStateOf(0L) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
     val policyAllowsMaterialization =
@@ -309,26 +309,39 @@ internal fun MediaVideoGridTile(
 
     LaunchedEffect(localFile) {
         val f = localFile ?: return@LaunchedEffect
-        if (posterBitmap != null) return@LaunchedEffect
-        val frame =
+        if (posterBitmap != null && tileDurationMs > 0L) return@LaunchedEffect
+        val needsPoster = posterBitmap == null
+        val (frame, duration) =
             withContext(Dispatchers.IO) {
                 val mmr = android.media.MediaMetadataRetriever()
                 try {
                     mmr.setDataSource(f.absolutePath)
                     val edge = MediaPipeline.THUMBNAIL_MAX_EDGE_PX
-                    mmr.getScaledFrameAtTime(
-                        0L,
-                        android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                        edge,
-                        edge,
-                    )
+                    val bitmap =
+                        if (needsPoster) {
+                            mmr.getScaledFrameAtTime(
+                                0L,
+                                android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                                edge,
+                                edge,
+                            )
+                        } else {
+                            null
+                        }
+                    bitmap to
+                        (
+                            mmr
+                                .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                ?.toLongOrNull() ?: 0L
+                        )
                 } catch (t: Throwable) {
-                    null
+                    null to 0L
                 } finally {
                     runCatching { mmr.release() }
                 }
             }
-        if (frame != null) {
+        if (duration > 0L) tileDurationMs = duration
+        if (frame != null && posterBitmap == null) {
             // Cache under the epoch-independent slot so a later sourceEpoch
             // upgrade re-seeds the poster instead of flashing the thumbhash.
             controller.cacheThumbnail(messageIdHex, attachmentIndex, frame)
@@ -365,12 +378,13 @@ internal fun MediaVideoGridTile(
                 Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface))
         }
         Surface(
-            color = Color.Black.copy(alpha = ScrimAlpha.AFFORDANCE),
+            color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = VIDEO_PLAY_DISC_ALPHA),
+            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
             shape = CircleShape,
             modifier =
                 Modifier
                     .align(Alignment.Center)
-                    .size(40.dp),
+                    .size(VIDEO_PLAY_DISC_SIZE),
         ) {
             Box(contentAlignment = Alignment.Center) {
                 when {
@@ -378,30 +392,59 @@ internal fun MediaVideoGridTile(
                         Icon(
                             Icons.Default.Refresh,
                             contentDescription = stringResource(R.string.voice_message_failed),
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(24.dp),
                         )
                     !startDownload && localFile == null ->
                         Icon(
                             Icons.Default.Download,
                             contentDescription = stringResource(R.string.media_open),
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(24.dp),
                         )
                     localFile == null ->
                         CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(24.dp),
                             strokeWidth = 2.dp,
-                            color = Color.White,
+                            color = LocalContentColor.current,
                         )
                     else ->
                         Icon(
-                            Icons.Default.PlayArrow,
+                            painter = painterResource(R.drawable.ic_play_arrow),
                             contentDescription = stringResource(R.string.reply_media_video),
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(24.dp),
                         )
                 }
+            }
+        }
+        // The prototype's duration chip sits bottom-end, once the duration is known.
+        if (tileDurationMs > 0L) {
+            Surface(
+                color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = VIDEO_DURATION_CHIP_ALPHA),
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                shape = MaterialTheme.shapes.extraSmall,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(VIDEO_DURATION_CHIP_INSET),
+            ) {
+                Text(
+                    formatVoiceTime(tileDurationMs.toInt()),
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                )
+            }
+        }
+        // An unplayable clip is dimmed and badged rather than left looking merely slow.
+        if (failed) {
+            Box(
+                modifier =
+                    Modifier
+                        .matchParentSize()
+                        .background(Color.Black.copy(alpha = VIDEO_UNAVAILABLE_SCRIM_ALPHA)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_warning),
+                    contentDescription = stringResource(R.string.voice_message_failed),
+                    modifier = Modifier.size(VIDEO_UNAVAILABLE_GLYPH),
+                    tint = MaterialTheme.colorScheme.inverseOnSurface,
+                )
             }
         }
         if (overflowCount > 0) {
@@ -409,7 +452,7 @@ internal fun MediaVideoGridTile(
                 modifier =
                     Modifier
                         .matchParentSize()
-                        .background(Color.Black.copy(alpha = ScrimAlpha.CONTROLS)),
+                        .background(Color.Black.copy(alpha = ALBUM_OVERFLOW_SCRIM_ALPHA)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -449,7 +492,6 @@ internal fun MediaVideoBubble(
     uploading: Boolean = false,
     uploadFailed: Boolean = false,
     onRetryUpload: (() -> Unit)? = null,
-    attachedToCaption: Boolean = false,
 ) {
     val record = item.record
     val messageIdHex = record.messageIdHex
@@ -655,9 +697,8 @@ internal fun MediaVideoBubble(
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = visualMediaBubbleShape(attachedToCaption),
-        border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
-        modifier = imageBubbleSizing(bubbleAspectRatio),
+        shape = ConversationRichContentShape,
+        modifier = imageBubbleSizing(bubbleAspectRatio, sourceShortSideFromDim(reference.dim)),
     ) {
         Box(contentAlignment = Alignment.Center) {
             val poster = posterBitmap
@@ -686,11 +727,12 @@ internal fun MediaVideoBubble(
             // When startDownload is gated off (policy says no auto-fetch), the
             // triangle becomes a download icon and tap consents to the fetch.
             Surface(
-                color = Color.Black.copy(alpha = ScrimAlpha.AFFORDANCE),
+                color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = VIDEO_PLAY_DISC_ALPHA),
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
                 shape = CircleShape,
                 modifier =
                     Modifier
-                        .size(56.dp)
+                        .size(VIDEO_PLAY_DISC_SIZE)
                         .testTag(videoAttachmentOpenTestTag(messageIdHex, attachmentIndex))
                         .combinedClickable(
                             onLongClick = onLongPress,
@@ -709,7 +751,6 @@ internal fun MediaVideoBubble(
                             Icon(
                                 Icons.Default.Refresh,
                                 contentDescription = stringResource(R.string.voice_message_failed),
-                                tint = Color.White,
                                 modifier =
                                     Modifier
                                         .size(28.dp)
@@ -717,28 +758,26 @@ internal fun MediaVideoBubble(
                             )
                         uploading ->
                             CircularProgressIndicator(
-                                modifier = Modifier.size(28.dp),
+                                modifier = Modifier.size(24.dp),
                                 strokeWidth = 2.5.dp,
-                                color = Color.White,
+                                color = LocalContentColor.current,
                             )
                         !startDownload && localFile == null ->
                             Icon(
                                 Icons.Default.Download,
                                 contentDescription = stringResource(R.string.media_open),
-                                tint = Color.White,
-                                modifier = Modifier.size(28.dp),
+                                modifier = Modifier.size(24.dp),
                             )
                         loading ->
                             CircularProgressIndicator(
                                 modifier = Modifier.size(24.dp),
                                 strokeWidth = 2.dp,
-                                color = Color.White,
+                                color = LocalContentColor.current,
                             )
                         failed ->
                             Icon(
                                 Icons.Default.Refresh,
                                 contentDescription = stringResource(R.string.voice_message_failed),
-                                tint = Color.White,
                                 modifier =
                                     Modifier
                                         .size(28.dp)
@@ -769,30 +808,29 @@ internal fun MediaVideoBubble(
                             )
                         else ->
                             Icon(
-                                Icons.Default.PlayArrow,
+                                painter = painterResource(R.drawable.ic_play_arrow),
                                 contentDescription = stringResource(R.string.reply_media_video),
-                                tint = Color.White,
-                                modifier = Modifier.size(32.dp),
+                                modifier = Modifier.size(24.dp),
                             )
                     }
                 }
             }
 
-            // Duration pill bottom-start. Only shown once duration is known.
+            // The prototype's duration chip sits bottom-end, once the duration is known.
             if (durationMs > 0L) {
                 Surface(
-                    color = Color.Black.copy(alpha = ScrimAlpha.AFFORDANCE),
-                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = VIDEO_DURATION_CHIP_ALPHA),
+                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                    shape = MaterialTheme.shapes.extraSmall,
                     modifier =
                         Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(8.dp),
+                            .align(Alignment.BottomEnd)
+                            .padding(6.dp),
                 ) {
                     Text(
                         formatVoiceTime(durationMs.toInt()),
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
                     )
                 }
             }
@@ -1274,6 +1312,7 @@ internal fun VideoViewerPage(
     )
 }
 
+/** Placeholder when a video cannot play: invalidated cache, invalidated playback or load failure. */
 @Composable
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 private fun VideoViewerUnavailable(
@@ -1296,8 +1335,21 @@ private fun VideoViewerUnavailable(
                     tint = Color.White,
                     modifier = Modifier.size(48.dp).clickable(onClick = onPlaybackRetry),
                 )
-            loadFailed -> MediaViewerLoadFailed(onRetry = onLoadRetry)
+            loadFailed -> MediaViewerLoadFailed(onRetry = onLoadRetry, contentColor = Color.White)
             else -> CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
         }
     }
 }
+
+// The prototype's video affordances: a 44dp inverse-surface disc with a 24dp glyph, and a duration chip.
+private val VIDEO_PLAY_DISC_SIZE = 44.dp
+private const val VIDEO_PLAY_DISC_ALPHA = 0.88f
+private const val VIDEO_DURATION_CHIP_ALPHA = 0.8f
+private val VIDEO_DURATION_CHIP_INSET = 6.dp
+
+/** Album overflow tiles share one dim across photos and videos. */
+private const val ALBUM_OVERFLOW_SCRIM_ALPHA = 0.58f
+
+/** An unavailable clip keeps its poster readable under a light dim and a warning glyph. */
+private const val VIDEO_UNAVAILABLE_SCRIM_ALPHA = 0.28f
+private val VIDEO_UNAVAILABLE_GLYPH = 28.dp

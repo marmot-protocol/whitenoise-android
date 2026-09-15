@@ -59,13 +59,13 @@ class ComposerEditMentionPickerTest {
 
         editor.performClick()
         editor.performTextInput(" @al")
-        pickerTitle().assertExists()
+        pickerRow().assertExists()
         composeRule.onNodeWithText(candidate.displayName).performClick()
 
         val insertedCanonical = "Hello @$ALICE_NPUB "
         val insertedVisual = "Hello @${candidate.displayName} "
         assertEditorValue(editor, insertedVisual, TextRange(insertedCanonical.length))
-        pickerTitle().assertDoesNotExist()
+        pickerRow().assertDoesNotExist()
 
         val chipStart = "Hello ".length
         editor.performTextInputSelection(TextRange(chipStart + 2))
@@ -76,12 +76,12 @@ class ComposerEditMentionPickerTest {
         val canonical = insertedCanonical + "again"
         val visual = insertedVisual + "again"
         assertEditorValue(editor, visual, TextRange(canonical.length))
-        pickerTitle().assertDoesNotExist()
+        pickerRow().assertDoesNotExist()
 
         composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertEquals(canonical, savedText) }
-        pickerTitle().assertDoesNotExist()
+        pickerRow().assertDoesNotExist()
 
         composeRule.runOnIdle {
             editingInitialText = checkNotNull(savedText)
@@ -91,7 +91,7 @@ class ComposerEditMentionPickerTest {
 
         assertEditorValue(editor, visual, TextRange(canonical.length))
         assertEquals(1, checkNotNull(savedText).windowed(ALICE_NPUB.length).count { it == ALICE_NPUB })
-        pickerTitle().assertDoesNotExist()
+        pickerRow().assertDoesNotExist()
     }
 
     @Test
@@ -106,20 +106,20 @@ class ComposerEditMentionPickerTest {
         val editor = composeRule.onNode(hasSetTextAction())
 
         editor.performTextInput(" @")
-        pickerTitle().assertExists()
+        pickerRow().assertExists()
         composeRule.onNodeWithContentDescription(context.getString(R.string.cancel_edit)).performClick()
         composeRule.waitForIdle()
-        pickerTitle().assertDoesNotExist()
+        pickerRow().assertDoesNotExist()
 
         composeRule.runOnIdle {
             editingInitialText = "Second"
             editingMessageId = "message-2"
         }
         composeRule.waitForIdle()
-        pickerTitle().assertDoesNotExist()
+        pickerRow().assertDoesNotExist()
 
         editor.performTextInput(" @al")
-        pickerTitle().assertExists()
+        pickerRow().assertExists()
         composeRule.runOnIdle {
             editingInitialText = "Third"
             editingMessageId = "message-3"
@@ -127,7 +127,7 @@ class ComposerEditMentionPickerTest {
         composeRule.waitForIdle()
 
         assertEditorValue(editor, "Third", TextRange("Third".length))
-        pickerTitle().assertDoesNotExist()
+        pickerRow().assertDoesNotExist()
     }
 
     @Test
@@ -140,16 +140,16 @@ class ComposerEditMentionPickerTest {
         )
         val editor = composeRule.onNode(hasSetTextAction())
 
-        pickerTitle().assertExists()
+        pickerRow().assertExists()
         editor.performTextInputSelection(TextRange(6, 9))
-        pickerTitle().assertDoesNotExist()
+        pickerRow().assertDoesNotExist()
     }
 
     @Test
     fun editPickerKeepsDmSuppression() {
         renderDmEdit()
         composeRule.onNode(hasSetTextAction()).performTextInput(" @")
-        pickerTitle().assertDoesNotExist()
+        pickerRow().assertDoesNotExist()
     }
 
     private fun render(
@@ -200,7 +200,11 @@ class ComposerEditMentionPickerTest {
         composeRule.waitForIdle()
     }
 
-    private fun pickerTitle() = composeRule.onNodeWithText(context.getString(R.string.mention_picker_title))
+    /** The box has no heading; one candidate row standing in for the whole picker. */
+    private fun pickerRow() =
+        composeRule.onNodeWithContentDescription(
+            context.getString(R.string.mention_picker_member, candidate.displayName),
+        )
 
     private fun assertEditorValue(
         editor: androidx.compose.ui.test.SemanticsNodeInteraction,

@@ -28,6 +28,7 @@ class ProfileEditCachedFirstFrameScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Cached profile owns the first rendered frame. */
     @Test
     fun cachedProfileOwnsTheFirstRenderedFrame() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -66,11 +67,13 @@ class ProfileEditCachedFirstFrameScreenshotTest {
                     onBack = {},
                     cachedProfile = { cached },
                     loadProfile = { awaitCancellation() },
+                    resolveAddress = { null },
+                    resolveLightning = { true },
                 )
             }
         }
 
-        composeRule.onNodeWithTag(PROFILE_HEADER_NAME_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag("profile.name_field").assertIsDisplayed()
         composeRule.onNodeWithTag(PROFILE_HERO_LOADING_TAG).assertDoesNotExist()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/profile_edit_cached_first_frame_light.png")
     }

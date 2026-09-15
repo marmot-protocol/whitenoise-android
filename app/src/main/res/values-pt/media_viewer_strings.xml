@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="media_viewer_metadata">%1$s · %2$d de %3$d</string>
+</resources>

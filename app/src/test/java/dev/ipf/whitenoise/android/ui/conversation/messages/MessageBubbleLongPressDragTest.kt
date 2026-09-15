@@ -84,6 +84,7 @@ class MessageBubbleLongPressDragTest {
             .assertCountEquals(1)
     }
 
+    /** Stationary long press opens actions at threshold before pointer up. */
     @Test
     @Suppress("LongMethod") // The real MessageBubble host requires its full interaction contract.
     fun stationaryLongPressOpensActionsAtThresholdBeforePointerUp() {
@@ -126,7 +127,6 @@ class MessageBubbleLongPressDragTest {
                                 actionMenuOpen = open
                             },
                             onQuickReactionsSave = {},
-                            onQuickReactionsReset = {},
                             onReplyPreviewClick = {},
                             composerGate = ComposerGate.COMPOSER,
                             inviteMutationInFlight = false,
@@ -166,6 +166,7 @@ class MessageBubbleLongPressDragTest {
         composeRule.runOnIdle { assertEquals(false, actionMenuOpen) }
     }
 
+    /** Long press drag dismisses threshold actions and enters range. */
     @Test
     @Suppress("LongMethod") // The real MessageBubble host requires its full interaction contract.
     fun longPressDragDismissesThresholdActionsAndEntersRange() {
@@ -221,7 +222,6 @@ class MessageBubbleLongPressDragTest {
                             actionMenuOpen = open
                         },
                         onQuickReactionsSave = {},
-                        onQuickReactionsReset = {},
                         onReplyPreviewClick = {},
                         composerGate = ComposerGate.COMPOSER,
                         inviteMutationInFlight = false,
@@ -258,6 +258,7 @@ class MessageBubbleLongPressDragTest {
         assertEquals(1, dragEnds)
     }
 
+    /** Long press drag selects four message rows without lifting. */
     @Test
     @Suppress("LongMethod") // Exercises four real MessageBubble rows through their public gesture contract.
     fun longPressDragSelectsFourMessageRowsWithoutLifting() {
@@ -325,7 +326,6 @@ class MessageBubbleLongPressDragTest {
                                 isActionMenuOpen = false,
                                 onActionMenuOpenChange = {},
                                 onQuickReactionsSave = {},
-                                onQuickReactionsReset = {},
                                 onReplyPreviewClick = {},
                                 composerGate = ComposerGate.COMPOSER,
                                 inviteMutationInFlight = false,
@@ -374,6 +374,7 @@ class MessageBubbleLongPressDragTest {
         }
     }
 
+    /** App state. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -393,6 +394,7 @@ class MessageBubbleLongPressDragTest {
             activeAccountRef = ACCOUNT_REF,
         )
 
+    /** Composes a file message bubble for the given attachment. */
     @Suppress("LongMethod") // The real MessageBubble host requires its full interaction contract.
     private fun renderFileMessage(item: TimelineMessage): String {
         val appState = appState()
@@ -427,7 +429,6 @@ class MessageBubbleLongPressDragTest {
                     isActionMenuOpen = false,
                     onActionMenuOpenChange = {},
                     onQuickReactionsSave = {},
-                    onQuickReactionsReset = {},
                     onReplyPreviewClick = {},
                     composerGate = ComposerGate.COMPOSER,
                     inviteMutationInFlight = false,

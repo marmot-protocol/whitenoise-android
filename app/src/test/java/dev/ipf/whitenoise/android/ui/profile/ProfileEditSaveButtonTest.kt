@@ -1,28 +1,29 @@
 package dev.ipf.whitenoise.android.ui.profile
 
+import android.content.Context
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
-import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -30,20 +31,22 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeUnit
 
+/** Exercises the real profile owner under the read/Edit/Save contract without native publication or network calls. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], qualifiers = "en")
+@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
 class ProfileEditSaveButtonTest {
     @get:Rule
     val composeRule = createComposeRule()
+    private val app = ApplicationProvider.getApplicationContext<Context>()
+    private val owner = mutableStateOf(profilePortTestState(app, "alice", ACCOUNT_A))
+    private var backs = 0
 
-    private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-
+    /** The standalone Save control continues to respect the authoritative load/submission baseline. */
     @Test
     fun renderedSaveTracksLoadEditsRevertsAndPublishCompletion() {
         val state = ProfileEditSaveState()
-        val loaded = metadata(displayName = "Alice")
+        val loaded = profilePortTestMetadata("Alice")
         val current = mutableStateOf(loaded)
         val busy = mutableStateOf(false)
         state.beginLoad(ACCOUNT_A)
@@ -56,7 +59,7 @@ class ProfileEditSaveButtonTest {
                 )
             }
         }
-        val saveButton = composeRule.onNodeWithText(context.getString(R.string.save))
+        val saveButton = composeRule.onNodeWithText(app.getString(R.string.save))
 
         saveButton.assertIsNotEnabled()
         composeRule.runOnIdle { state.completeLoad(ACCOUNT_A, loaded) }
@@ -103,312 +106,268 @@ class ProfileEditSaveButtonTest {
         saveButton.assertIsEnabled()
     }
 
+    /** Initial content is read-only; Back from an edit discards it before a second Back leaves the destination. */
     @Test
-    fun screenUsesControlledLoadAndSubmittedPublishSnapshot() {
-        val loaded = metadata(displayName = "Alice")
-        val loadCompletion = CompletableDeferred<UserProfileMetadataFfi?>()
-        val publishCalls = LinkedBlockingQueue<PublishCall>()
-        val screenAppState = appState()
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                ProfileEditScreen(
-                    appState = screenAppState,
-                    onBack = {},
-                    loadProfile = { loadCompletion.await() },
-                    publishProfile = { submitted ->
-                        val call = PublishCall(submitted)
-                        publishCalls.put(call)
-                        call.completion.await()
-                    },
-                )
-            }
-        }
-        val saveButton = composeRule.onNodeWithText(context.getString(R.string.save))
-        val displayNameMatcher = hasSetTextAction() and hasText(context.getString(R.string.display_name))
-        val displayNameField = composeRule.onNode(displayNameMatcher)
-
-        saveButton.assertIsNotEnabled()
-        loadCompletion.complete(loaded)
-        composeRule.waitForIdle()
-        saveButton.assertIsNotEnabled()
-        composeRule.onNode(hasScrollAction()).performScrollToNode(displayNameMatcher)
-
-        displayNameField.performTextReplacement("Bob")
-        saveButton.assertIsEnabled()
-        displayNameField.performTextReplacement("Alice")
-        saveButton.assertIsNotEnabled()
-        displayNameField.performTextReplacement("Bob")
-        saveButton.assertIsEnabled().performClick()
-        val publish = requireNotNull(publishCalls.poll(5, TimeUnit.SECONDS))
-        saveButton.assertIsNotEnabled()
-
-        displayNameField.performTextReplacement("Carol")
-        publish.completion.complete(true)
-        composeRule.waitForIdle()
-
-        assertEquals("Bob", publish.metadata.displayName)
-        saveButton.assertIsEnabled().performClick()
-        val failedPublish = requireNotNull(publishCalls.poll(5, TimeUnit.SECONDS))
-        failedPublish.completion.complete(false)
-        composeRule.waitForIdle()
-
-        assertEquals("Carol", failedPublish.metadata.displayName)
-        saveButton.assertIsEnabled()
+    fun readModeAndEditBackPreserveTheSavedProfile() {
+        show()
+        composeRule.onNodeWithTag("profile.save").assertDoesNotExist()
+        composeRule.onNodeWithTag("profile.name_field").assert(hasSetTextAction().not())
+        editName("Draft")
+        composeRule.onNodeWithTag("profile.save").assertIsEnabled()
+        back()
+        composeRule.onNodeWithTag("profile.name_field").performScrollTo().assertTextContains("Alice")
+        composeRule.onNodeWithTag("profile.save").assertDoesNotExist()
+        assertEquals(0, backs)
+        back()
+        assertEquals(1, backs)
     }
 
+    /** Save publishes one captured snapshot, freezes field edits during publication, then returns to read mode. */
     @Test
-    fun cachedProfilePaintsBeforeBlockedLoadAndSurvivesFailure() {
-        val cached = fullMetadata("Cached")
-        val loadCompletion = CompletableDeferred<UserProfileMetadataFfi?>()
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                ProfileEditScreen(
-                    appState = appState(),
-                    onBack = {},
-                    cachedProfile = { cached },
-                    loadProfile = { loadCompletion.await() },
-                )
-            }
-        }
-        val saveButton = composeRule.onNodeWithText(context.getString(R.string.save))
-        val displayNameMatcher = hasSetTextAction() and hasText(context.getString(R.string.display_name))
+    fun successfulSaveUsesOneSnapshotAndReturnsToReadMode() {
+        val submitted = LinkedBlockingQueue<UserProfileMetadataFfi>()
+        val complete = CompletableDeferred<Boolean>()
+        show(publish = {
+            submitted.add(it)
+            complete.await()
+        })
+        editName("Bob")
+        composeRule.onNodeWithTag("profile.save").performClick()
+        composeRule.waitUntil { submitted.isNotEmpty() }
+        composeRule.onNodeWithTag("profile.name_field").assertIsNotEnabled()
+        assertEquals("Bob", submitted.peek().displayName)
+        complete.complete(true)
+        composeRule.waitUntil { composeRule.onAllNodesWithTag("profile.save").fetchSemanticsNodes().isEmpty() }
+        composeRule.onNodeWithTag("profile.name_field").assertTextContains("Bob")
+        composeRule.onNodeWithTag("profile.edit").performClick()
+        composeRule.onNodeWithTag("profile.save").assertIsNotEnabled()
+        assertEquals(1, submitted.size)
+    }
 
-        composeRule.onNodeWithTag(PROFILE_HEADER_NAME_TAG).assertTextContains("Cached name")
+    /** Failed publication leaves the complete draft available for retry instead of accepting it as a baseline. */
+    @Test
+    fun failedSaveRetainsTheDraftForRetry() {
+        val submitted = LinkedBlockingQueue<UserProfileMetadataFfi>()
+        show(publish = {
+            submitted.add(it)
+            false
+        })
+        editName("Retry draft")
+        composeRule.onNodeWithTag("profile.save").performClick()
+        composeRule.waitUntil { submitted.isNotEmpty() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("profile.save").assertIsEnabled()
+        composeRule.onNodeWithTag("profile.name_field").assertTextContains("Retry draft")
+    }
+
+    /** Cached fields paint without waiting for refresh and remain authoritative when the refresh fails. */
+    @Test
+    fun cachedProfileSurvivesBlockedAndFailedRefresh() {
+        val refresh = CompletableDeferred<UserProfileMetadataFfi?>()
+        show(load = { refresh.await() })
+        composeRule.onNodeWithTag("profile.name_field").assertTextContains("Alice")
         composeRule.onNodeWithTag(PROFILE_HERO_LOADING_TAG).assertDoesNotExist()
-        saveButton.assertIsNotEnabled()
-        composeRule.onNode(hasScrollAction()).performScrollToNode(displayNameMatcher)
-        composeRule.onNode(displayNameMatcher).assertTextContains("Cached name")
-
-        loadCompletion.completeExceptionally(IllegalStateException("offline"))
+        refresh.completeExceptionally(IllegalStateException("offline"))
         composeRule.waitForIdle()
-
-        composeRule.onNode(displayNameMatcher).assertTextContains("Cached name")
-        saveButton.assertIsNotEnabled()
-        composeRule.onNode(displayNameMatcher).performTextReplacement("Edited")
-        saveButton.assertIsEnabled()
+        composeRule.onNodeWithTag("profile.name_field").assertTextContains("Alice")
+        editName("Local edit")
+        composeRule.onNodeWithTag("profile.save").assertIsEnabled()
     }
 
+    /** An async refresh replaces untouched fields while preserving text the user changed after loading began. */
     @Test
-    fun asyncRefreshMergesUntouchedFieldsWithoutClobberingEdit() {
-        val loadCompletion = CompletableDeferred<UserProfileMetadataFfi?>()
+    fun asyncRefreshMergesUntouchedFieldsWithoutClobberingEdits() {
+        val refresh = CompletableDeferred<UserProfileMetadataFfi?>()
+        show(load = { refresh.await() })
+        editName("Local name")
+        refresh.complete(profilePortTestMetadata("Fresh", "Fresh biography"))
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("profile.name_field").assertTextContains("Local name")
+        composeRule.onNodeWithTag("profile.about_field").performScrollTo().assertTextContains("Fresh biography")
+        back()
+        composeRule.onNodeWithTag("profile.name_field").performScrollTo().assertTextContains("Fresh")
+    }
+
+    /** A pre-save refresh cannot reset the accepted baseline used by the next Edit session. */
+    @Test
+    fun slowRefreshAfterAcceptedSaveKeepsThePublishedBaseline() {
+        val refresh = CompletableDeferred<UserProfileMetadataFfi?>()
+        show(load = { refresh.await() }, publish = { true })
+        editName("Published Bob")
+        composeRule.onNodeWithTag("profile.save").performClick()
+        composeRule.waitUntil { composeRule.onAllNodesWithTag("profile.save").fetchSemanticsNodes().isEmpty() }
+        refresh.complete(profilePortTestMetadata("Stale Alice", "Stale biography"))
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("profile.name_field").assertTextContains("Published Bob")
+        composeRule.onNodeWithTag("profile.edit").performClick()
+        composeRule.onNodeWithTag("profile.name_field").assertTextContains("Published Bob")
+        composeRule.onNodeWithTag("profile.save").assertIsNotEnabled()
+        back()
+        composeRule.onNodeWithTag("profile.name_field").assertTextContains("Published Bob")
+    }
+
+    /** Failure without any trusted baseline may show the editor but cannot publish an invented replacement. */
+    @Test
+    fun cacheMissFailureKeepsSaveUnqualified() {
+        val refresh = CompletableDeferred<UserProfileMetadataFfi?>()
+        show(cached = null, load = { refresh.await() })
+        composeRule.onNodeWithTag(PROFILE_HERO_LOADING_TAG).assertExists()
+        composeRule.onNodeWithTag("profile.edit").assertIsNotEnabled()
+        refresh.completeExceptionally(IllegalStateException("offline"))
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("profile.edit").performClick()
+        composeRule.onNodeWithTag("profile.name_field").performScrollTo().performTextReplacement("Untrusted")
+        composeRule.onNodeWithTag("profile.save").assertIsNotEnabled()
+    }
+
+    /** Replacing the account clears the old edit session; a late old load cannot overwrite the new cached profile. */
+    @Test
+    fun accountSwitchClearsDraftAndIgnoresLateOldRefresh() {
+        val oldRefresh = CompletableDeferred<UserProfileMetadataFfi?>()
         composeRule.setContent {
             WhiteNoiseTheme {
                 ProfileEditScreen(
-                    appState = appState(),
+                    appState = owner.value,
                     onBack = {},
-                    cachedProfile = { fullMetadata("Cached") },
-                    loadProfile = { loadCompletion.await() },
+                    cachedProfile = { profilePortTestMetadata(if (it == ACCOUNT_A) "Alice" else "Bob") },
+                    loadProfile = { if (it == ACCOUNT_A) oldRefresh.await() else awaitCancellation() },
+                    resolveAddress = { null },
+                    resolveLightning = { true },
                 )
             }
         }
-        val displayNameMatcher = hasSetTextAction() and hasText(context.getString(R.string.display_name))
-        val aboutMatcher = hasSetTextAction() and hasText(context.getString(R.string.about))
-        composeRule.onNode(hasScrollAction()).performScrollToNode(displayNameMatcher)
-        composeRule.onNode(displayNameMatcher).performTextReplacement("User edit")
-
-        loadCompletion.complete(fullMetadata("Fresh"))
+        editName("Old draft")
+        composeRule.runOnIdle { owner.value = profilePortTestState(app, "bob", ACCOUNT_B) }
+        oldRefresh.complete(profilePortTestMetadata("Late Alice"))
         composeRule.waitForIdle()
-
-        composeRule.onNode(displayNameMatcher).assertTextContains("User edit")
-        composeRule.onNode(hasScrollAction()).performScrollToNode(aboutMatcher)
-        composeRule.onNode(aboutMatcher).assertTextContains("Fresh about")
-        composeRule.onNodeWithText(context.getString(R.string.save)).assertIsEnabled()
+        composeRule.onNodeWithTag("profile.save").assertDoesNotExist()
+        composeRule.onNodeWithTag("profile.name_field").performScrollTo().assertTextContains("Bob")
     }
 
+    /** A completion owned by the old account cannot close or replace the new account's edit session. */
     @Test
-    fun cacheMissTransitionsToBoundedFailureButKeepsSaveDisabled() {
-        val loadCompletion = CompletableDeferred<UserProfileMetadataFfi?>()
+    fun stalePublicationDoesNotChangeNewAccountDraft() {
+        val complete = CompletableDeferred<Boolean>()
+        val started = CompletableDeferred<Unit>()
         composeRule.setContent {
             WhiteNoiseTheme {
                 ProfileEditScreen(
-                    appState = appState(),
+                    appState = owner.value,
                     onBack = {},
-                    cachedProfile = { null },
-                    loadProfile = { loadCompletion.await() },
+                    cachedProfile = { profilePortTestMetadata(if (it == ACCOUNT_A) "Alice" else "Bob") },
+                    loadProfile = { awaitCancellation() },
+                    publishProfile = {
+                        started.complete(Unit)
+                        complete.await()
+                    },
+                    resolveAddress = { null },
+                    resolveLightning = { true },
                 )
             }
         }
-
-        composeRule.onNodeWithTag(PROFILE_HERO_LOADING_TAG).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.save)).assertIsNotEnabled()
-        loadCompletion.completeExceptionally(IllegalStateException("offline"))
+        editName("Submitted Alice")
+        composeRule.onNodeWithTag("profile.save").performClick()
+        composeRule.waitUntil { started.isCompleted }
+        composeRule.runOnIdle { owner.value = profilePortTestState(app, "bob", ACCOUNT_B) }
+        editName("Bob draft")
+        complete.complete(true)
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag(PROFILE_HERO_LOADING_TAG).assertDoesNotExist()
-        composeRule.onNodeWithText(context.getString(R.string.save)).assertIsNotEnabled()
-        val displayNameMatcher = hasSetTextAction() and hasText(context.getString(R.string.display_name))
-        composeRule.onNode(hasScrollAction()).performScrollToNode(displayNameMatcher)
-        composeRule.onNode(displayNameMatcher).performTextReplacement("Untrusted edit")
-        composeRule.onNodeWithText(context.getString(R.string.save)).assertIsNotEnabled()
+        composeRule.onNodeWithTag("profile.name_field").assertTextContains("Bob draft")
+        composeRule.onNodeWithTag("profile.save").assertIsEnabled()
     }
 
+    /** Back during Lightning preflight invalidates that attempt before any irreversible publication begins. */
     @Test
-    fun accountSwitchPaintsNewCacheImmediatelyAndIgnoresLateOldLoad() {
-        val currentAppState = mutableStateOf(appState(ACCOUNT_A_REF, ACCOUNT_A_ID))
-        val loadCalls = LinkedBlockingQueue<LoadCall>()
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                ProfileEditScreen(
-                    appState = currentAppState.value,
-                    onBack = {},
-                    cachedProfile = { accountId ->
-                        when (accountId) {
-                            ACCOUNT_A_ID -> fullMetadata("Cached A")
-                            ACCOUNT_B_ID -> fullMetadata("Cached B")
-                            else -> null
-                        }
-                    },
-                    loadProfile = { accountId ->
-                        val call = LoadCall(accountId)
-                        loadCalls.put(call)
-                        call.completion.await()
-                    },
-                )
-            }
-        }
-
-        val accountALoad = requireNotNull(loadCalls.poll(5, TimeUnit.SECONDS))
-        composeRule.onNodeWithTag(PROFILE_HEADER_NAME_TAG).assertTextContains("Cached A name")
-        composeRule.runOnIdle {
-            currentAppState.value = appState(ACCOUNT_B_REF, ACCOUNT_B_ID)
-        }
-        composeRule.waitForIdle()
-
-        composeRule.onNodeWithTag(PROFILE_HEADER_NAME_TAG).assertTextContains("Cached B name")
-        composeRule.onNodeWithTag(PROFILE_HERO_LOADING_TAG).assertDoesNotExist()
-        val accountBLoad = requireNotNull(loadCalls.poll(5, TimeUnit.SECONDS))
-        assertEquals(ACCOUNT_B_ID, accountBLoad.accountId)
-
-        accountALoad.completion.complete(fullMetadata("Late A"))
-        accountBLoad.completion.complete(null)
-        composeRule.waitForIdle()
-
-        composeRule.onNodeWithTag(PROFILE_HEADER_NAME_TAG).assertTextContains("Cached B name")
-        composeRule.onNodeWithText(context.getString(R.string.save)).assertIsNotEnabled()
-    }
-
-    @Test
-    fun screenIgnoresStalePublishCompletionAfterAccountSwitch() {
-        val currentAppState = mutableStateOf(appState(ACCOUNT_A_REF, ACCOUNT_A_ID))
-        val loadCalls = LinkedBlockingQueue<LoadCall>()
-        val publishCalls = LinkedBlockingQueue<PublishCall>()
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                ProfileEditScreen(
-                    appState = currentAppState.value,
-                    onBack = {},
-                    loadProfile = { accountId ->
-                        val call = LoadCall(accountId)
-                        loadCalls.put(call)
-                        call.completion.await()
-                    },
-                    publishProfile = { submitted ->
-                        val call = PublishCall(submitted)
-                        publishCalls.put(call)
-                        call.completion.await()
-                    },
-                )
-            }
-        }
-        val saveButton = composeRule.onNodeWithText(context.getString(R.string.save))
-        val displayNameMatcher = hasSetTextAction() and hasText(context.getString(R.string.display_name))
-        val displayNameField = composeRule.onNode(displayNameMatcher)
-
-        val accountALoad = requireNotNull(loadCalls.poll(5, TimeUnit.SECONDS))
-        assertEquals(ACCOUNT_A_ID, accountALoad.accountId)
-        accountALoad.completion.complete(metadata(displayName = "Alice"))
-        composeRule.waitForIdle()
-        composeRule.onNode(hasScrollAction()).performScrollToNode(displayNameMatcher)
-        displayNameField.performTextReplacement("Alicia")
-        saveButton.assertIsEnabled().performClick()
-        val accountAPublish = requireNotNull(publishCalls.poll(5, TimeUnit.SECONDS))
-
-        composeRule.runOnIdle {
-            currentAppState.value = appState(ACCOUNT_B_REF, ACCOUNT_B_ID)
-        }
-        composeRule.waitForIdle()
-        val accountBLoad = requireNotNull(loadCalls.poll(5, TimeUnit.SECONDS))
-        assertEquals(ACCOUNT_B_ID, accountBLoad.accountId)
-        accountBLoad.completion.complete(metadata(displayName = "Bob"))
-        composeRule.waitForIdle()
-        saveButton.assertIsNotEnabled()
-
-        composeRule.onNode(hasScrollAction()).performScrollToNode(displayNameMatcher)
-        displayNameField.performTextReplacement("Bobby")
-        saveButton.assertIsEnabled()
-        accountAPublish.completion.complete(true)
-        composeRule.waitForIdle()
-
-        saveButton.assertIsEnabled()
-        displayNameField.performTextReplacement("Bob")
-        saveButton.assertIsNotEnabled()
-    }
-
-    private fun metadata(displayName: String): UserProfileMetadataFfi =
-        profileEditMetadata(
-            displayName = displayName,
-            about = "",
-            picture = "",
-            banner = "",
-            nip05 = "",
-            lud16 = "",
+    fun backDuringLightningPreflightPreventsPublication() {
+        val lightning = CompletableDeferred<Boolean>()
+        val started = CompletableDeferred<Unit>()
+        var publications = 0
+        show(
+            cached = profilePortTestMetadata("Alice").copy(lud16 = "alice@example.com"),
+            resolveLightning = {
+                started.complete(Unit)
+                lightning.await()
+            },
+            publish = {
+                publications++
+                true
+            },
         )
+        editName("Cancelled")
+        composeRule.onNodeWithTag("profile.save").performClick()
+        composeRule.waitUntil { started.isCompleted }
+        back()
+        lightning.complete(true)
+        composeRule.waitForIdle()
+        assertEquals(0, publications)
+        composeRule.onNodeWithTag("profile.name_field").performScrollTo().assertTextContains("Alice")
+    }
 
-    private fun fullMetadata(value: String): UserProfileMetadataFfi =
-        profileEditMetadata(
-            displayName = "$value name",
-            about = "$value about",
-            picture = "https://example.com/$value-picture.jpg",
-            banner = "https://example.com/$value-banner.jpg",
-            nip05 = "$value@example.com",
-            lud16 = "$value@getalby.com",
-        )
+    /** Render the production owner with controlled remote boundaries. */
+    private fun show(
+        cached: UserProfileMetadataFfi? = profilePortTestMetadata("Alice"),
+        load: suspend (String) -> UserProfileMetadataFfi? = { awaitCancellation() },
+        publish: suspend (UserProfileMetadataFfi) -> Boolean = { true },
+        resolveLightning: suspend (String) -> Boolean = { true },
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileEditScreen(
+                    owner.value,
+                    { backs++ },
+                    { cached },
+                    load,
+                    publish,
+                    resolveAddress = { null },
+                    resolveLightning = resolveLightning,
+                )
+            }
+        }
+    }
 
-    private fun appState(
-        accountRef: String = ACCOUNT_A_REF,
-        accountId: String = ACCOUNT_A_ID,
-    ): WhiteNoiseAppState =
-        WhiteNoiseAppState(
-            context = context,
-            draftStore = DraftStore(ProfileEditDraftPersistence()),
-            accountIdHexResolver = { null },
-            accounts =
-                listOf(
-                    AccountSummaryFfi(
-                        label = accountRef,
-                        accountIdHex = accountId,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                    ),
-                ),
-            activeAccountRef = accountRef,
-        )
+    /** Start an edit through the public action before entering text. */
+    private fun editName(value: String) {
+        composeRule.onNodeWithTag("profile.edit").performClick()
+        composeRule.onNodeWithTag("profile.name_field").performScrollTo().performTextReplacement(value)
+    }
 
-    private data class LoadCall(
-        val accountId: String,
-        val completion: CompletableDeferred<UserProfileMetadataFfi?> = CompletableDeferred(),
-    )
-
-    private data class PublishCall(
-        val metadata: UserProfileMetadataFfi,
-        val completion: CompletableDeferred<Boolean> = CompletableDeferred(),
-    )
+    /** Uses the same app-bar Back action as a user. */
+    private fun back() {
+        composeRule.onNodeWithContentDescription("Back").performClick()
+    }
 
     private companion object {
-        const val ACCOUNT_A = "account-a"
-        const val ACCOUNT_A_REF = "alice"
-        const val ACCOUNT_A_ID = "0101010101010101010101010101010101010101010101010101010101010101"
-        const val ACCOUNT_B_REF = "bob"
-        const val ACCOUNT_B_ID = "0202020202020202020202020202020202020202020202020202020202020202"
+        const val ACCOUNT_A = "0101010101010101010101010101010101010101010101010101010101010101"
+        const val ACCOUNT_B = "0202020202020202020202020202020202020202020202020202020202020202"
     }
 }
 
-private class ProfileEditDraftPersistence : DraftPersistence {
-    override fun read(): Map<String, String> = emptyMap()
+/** Local account model only; this fixture never creates an identity or contacts a native runtime. */
+internal fun profilePortTestState(
+    context: Context,
+    label: String,
+    account: String,
+): WhiteNoiseAppState =
+    WhiteNoiseAppState(
+        context = context,
+        draftStore = DraftStore.forContext(context),
+        accountIdHexResolver = { null },
+        accounts =
+            listOf(
+                AccountSummaryFfi(
+                    label = label,
+                    accountIdHex = account,
+                    localSigning = true,
+                    externalSigning = false,
+                    signedOut = false,
+                    running = true,
+                ),
+            ),
+        activeAccountRef = label,
+    )
 
-    override fun write(
-        key: String,
-        value: String?,
-    ) = Unit
-}
+/** Complete metadata used to distinguish untouched loaded fields from user edits. */
+internal fun profilePortTestMetadata(
+    name: String,
+    about: String = "A public biography",
+): UserProfileMetadataFfi = profileEditMetadata(name, about, "", "", "", "")

@@ -2,14 +2,11 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import android.app.Application
 import androidx.compose.foundation.layout.width
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -28,8 +25,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
@@ -63,8 +60,10 @@ class TtsTransportBarTest {
 
     private val app: Application = ApplicationProvider.getApplicationContext()
 
+    /** Label. */
     private fun label(resId: Int): String = app.getString(resId)
 
+    /** Four distinct navigation actions invoke their own callbacks. */
     @Test
     fun fourDistinctNavigationActionsInvokeTheirOwnCallbacks() {
         val clicks = mutableListOf<String>()
@@ -76,10 +75,10 @@ class TtsTransportBarTest {
             onNextMessage = { clicks += "nextMessage" },
         )
 
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).performClick()
+        composeRule.onNodeWithText(label(R.string.tts_bar_previous_message)).performClick()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_previous)).performClick()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_next)).performClick()
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_next_message)).performClick()
+        composeRule.onNodeWithText(label(R.string.tts_bar_next_message)).performClick()
 
         assertEquals(
             listOf("previousMessage", "previousSentence", "nextSentence", "nextMessage"),
@@ -141,6 +140,7 @@ class TtsTransportBarTest {
             .assertIsDisplayed()
     }
 
+    /** Paused state offers play without losing navigation. */
     @Test
     fun pausedStateOffersPlayWithoutLosingNavigation() {
         var resumed = false
@@ -149,14 +149,15 @@ class TtsTransportBarTest {
             onResume = { resumed = true },
         )
 
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).assertIsEnabled()
+        composeRule.onNodeWithText(label(R.string.tts_bar_previous_message)).assertIsEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_previous)).assertIsEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_next)).assertIsEnabled()
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_next_message)).assertIsEnabled()
+        composeRule.onNodeWithText(label(R.string.tts_bar_next_message)).assertIsEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_play)).performClick()
         assertEquals(true, resumed)
     }
 
+    /** Error state disables navigation but keeps stop. */
     @Test
     fun errorStateDisablesNavigationButKeepsStop() {
         var stopped = false
@@ -165,10 +166,10 @@ class TtsTransportBarTest {
             onStop = { stopped = true },
         )
 
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).assertIsNotEnabled()
+        composeRule.onNodeWithText(label(R.string.tts_bar_previous_message)).assertIsNotEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_previous)).assertIsNotEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_next)).assertIsNotEnabled()
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_next_message)).assertIsNotEnabled()
+        composeRule.onNodeWithText(label(R.string.tts_bar_next_message)).assertIsNotEnabled()
         // Error clears the queue, so no play or pause control may exist —
         // a permanently disabled resume slot would lie to accessibility focus.
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_play)).assertDoesNotExist()
@@ -234,6 +235,7 @@ class TtsTransportBarTest {
         assertTrue(selections.isEmpty())
     }
 
+    /** Applied custom rate updates the visible control immediately. */
     @Test
     fun appliedCustomRateUpdatesTheVisibleControlImmediately() {
         composeRule.setContent {
@@ -264,8 +266,9 @@ class TtsTransportBarTest {
         composeRule.onNodeWithContentDescription(description).assertIsDisplayed()
     }
 
+    /** Narrow width and large font keep every action reachable. */
     @Test
-    fun narrowWidthAndLargeFontKeepEveryActionVisible() {
+    fun narrowWidthAndLargeFontKeepEveryActionReachable() {
         renderBar(
             state = speakingTts(4, 20, 1, 12, "A long preview", sentenceIndex = 2, sentenceCount = 8),
             barWidth = 320,
@@ -281,8 +284,13 @@ class TtsTransportBarTest {
             R.string.tts_bar_next_message,
             R.string.tts_bar_stop,
         ).forEach { resId ->
-            val action = composeRule.onNodeWithContentDescription(label(resId))
-            action.assertIsDisplayed()
+            val action =
+                if (resId == R.string.tts_bar_previous_message || resId == R.string.tts_bar_next_message) {
+                    composeRule.onNodeWithText(label(resId))
+                } else {
+                    composeRule.onNodeWithContentDescription(label(resId))
+                }
+            action.performScrollTo().assertIsDisplayed()
             // Unclipped bounds inside the bar prove the action is fully
             // visible — assertIsDisplayed alone passes on partial clipping.
             val bounds = action.getUnclippedBoundsInRoot()
@@ -296,6 +304,7 @@ class TtsTransportBarTest {
         }
     }
 
+    /** Pending edge load disables navigation and announces the loading state. */
     @Test
     fun pendingEdgeLoadDisablesNavigationAndAnnouncesTheLoadingState() {
         renderBar(
@@ -303,10 +312,10 @@ class TtsTransportBarTest {
             historyEdge = TtsHistoryEdgeState.Loading(TtsHistoryDirection.Older),
         )
 
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).assertIsNotEnabled()
+        composeRule.onNodeWithText(label(R.string.tts_bar_previous_message)).assertIsNotEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_previous)).assertIsNotEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_next)).assertIsNotEnabled()
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_next_message)).assertIsNotEnabled()
+        composeRule.onNodeWithText(label(R.string.tts_bar_next_message)).assertIsNotEnabled()
         composeRule.onNodeWithText(label(R.string.tts_bar_history_loading)).assertIsDisplayed()
         // The status text must be a polite live region, or TalkBack never
         // narrates the state change to a listener who cannot see the bar.
@@ -318,6 +327,7 @@ class TtsTransportBarTest {
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_stop)).assertIsEnabled()
     }
 
+    /** One chunk no range completion animates progress before dismissal. */
     @Test
     fun oneChunkNoRangeCompletionAnimatesProgressBeforeDismissal() {
         composeRule.mainClock.autoAdvance = false
@@ -353,8 +363,8 @@ class TtsTransportBarTest {
         composeRule.onNodeWithTag(BAR_TAG).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_pause)).assertDoesNotExist()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_play)).assertDoesNotExist()
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).assertIsNotEnabled()
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_next_message)).assertIsNotEnabled()
+        composeRule.onNodeWithText(label(R.string.tts_bar_previous_message)).assertIsNotEnabled()
+        composeRule.onNodeWithText(label(R.string.tts_bar_next_message)).assertIsNotEnabled()
 
         composeRule.mainClock.advanceTimeBy(201)
         composeRule.waitForIdle()
@@ -363,6 +373,45 @@ class TtsTransportBarTest {
         composeRule.mainClock.advanceTimeBy(50)
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(BAR_TAG).assertDoesNotExist()
+    }
+
+    /** Short window caps transport and scrolls to every native action. */
+    @Test
+    @Config(sdk = [36], qualifiers = "w320dp-h240dp-mdpi")
+    fun shortWindowCapsTransportAndScrollsToEveryNativeAction() {
+        val clicks = mutableListOf<String>()
+        renderBar(
+            state = speakingTts(4, 20, 1, 12, "A long preview for a short window", 2, 8),
+            barWidth = 320,
+            fontScale = 2f,
+            onPreviousMessage = { clicks += "previous" },
+            onNextMessage = { clicks += "next" },
+            onPause = { clicks += "pause" },
+            onStop = { clicks += "stop" },
+        )
+        val bar = composeRule.onNodeWithTag(BAR_TAG).getUnclippedBoundsInRoot()
+        assertTrue("Transport must reserve at least 55% of the short window", bar.bottom - bar.top <= 108.dp)
+        composeRule
+            .onNodeWithText(label(R.string.tts_bar_previous_message))
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        composeRule
+            .onNodeWithText(label(R.string.tts_bar_next_message))
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        composeRule
+            .onNodeWithContentDescription(label(R.string.tts_bar_pause))
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        composeRule
+            .onNodeWithContentDescription(label(R.string.tts_bar_stop))
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        assertEquals(listOf("previous", "next", "pause", "stop"), clicks)
     }
 
     private fun singleSentenceSpeakingState() =
@@ -378,6 +427,7 @@ class TtsTransportBarTest {
             messageProgressGeneration = 1L,
         )
 
+    /** Single sentence terminal state. */
     private fun singleSentenceTerminalState() =
         idleTts(
             chunkIndex = 1,
@@ -391,6 +441,7 @@ class TtsTransportBarTest {
             messageProgressGeneration = 1L,
         )
 
+    /** Failed edge load keeps navigation enabled for retry and shows the error. */
     @Test
     fun failedEdgeLoadKeepsNavigationEnabledForRetryAndShowsTheError() {
         var previousTaps = 0
@@ -401,11 +452,12 @@ class TtsTransportBarTest {
         )
 
         composeRule.onNodeWithText(label(R.string.tts_bar_history_error)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).assertIsEnabled()
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).performClick()
+        composeRule.onNodeWithText(label(R.string.tts_bar_previous_message)).assertIsEnabled()
+        composeRule.onNodeWithText(label(R.string.tts_bar_previous_message)).performClick()
         assertEquals(1, previousTaps)
     }
 
+    /** Composes the bar under test with the given fixture. */
     @Suppress("LongParameterList")
     private fun renderBar(
         state: TtsState,
@@ -423,29 +475,28 @@ class TtsTransportBarTest {
         onBodyClick: (() -> Unit)? = null,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false) {
-                WithFontScale(fontScale) {
-                    TtsTransportBarContent(
-                        state = state,
-                        rateOverride = 1.0f,
-                        activeRate = 1.0f,
-                        onPause = onPause,
-                        onResume = onResume,
-                        onPreviousSentence = onPreviousSentence,
-                        onNextSentence = onNextSentence,
-                        onPreviousMessage = onPreviousMessage,
-                        onNextMessage = onNextMessage,
-                        onRateSelected = onRateSelected,
-                        onStop = onStop,
-                        modifier = Modifier.width(barWidth.dp).testTag(BAR_TAG),
-                        historyEdge = historyEdge,
-                        onBodyClick = onBodyClick,
-                    )
-                }
+            WhiteNoiseTheme(darkTheme = false, fontScale = fontScale) {
+                TtsTransportBarContent(
+                    state = state,
+                    rateOverride = 1.0f,
+                    activeRate = 1.0f,
+                    onPause = onPause,
+                    onResume = onResume,
+                    onPreviousSentence = onPreviousSentence,
+                    onNextSentence = onNextSentence,
+                    onPreviousMessage = onPreviousMessage,
+                    onNextMessage = onNextMessage,
+                    onRateSelected = onRateSelected,
+                    onStop = onStop,
+                    modifier = Modifier.width(barWidth.dp).testTag(BAR_TAG),
+                    historyEdge = historyEdge,
+                    onBodyClick = onBodyClick,
+                )
             }
         }
     }
 
+    /** Rate control description. */
     private fun rateControlDescription(): String {
         val rateLabel = ttsRateLabel(1.0f, Locale.US)
         return app.getString(R.string.tts_bar_rate_control, rateLabel)
@@ -454,19 +505,6 @@ class TtsTransportBarTest {
     private fun openCustomRateEditor() {
         composeRule.onNodeWithContentDescription(rateControlDescription()).performClick()
         composeRule.onNode(hasText(label(R.string.tts_rate_custom)) and isSelectable()).performClick()
-    }
-
-    @Suppress("FunctionNaming")
-    @Composable
-    private fun WithFontScale(
-        fontScale: Float,
-        content: @Composable () -> Unit,
-    ) {
-        val current = LocalDensity.current
-        CompositionLocalProvider(
-            LocalDensity provides Density(density = current.density, fontScale = fontScale),
-            content = content,
-        )
     }
 
     private companion object {

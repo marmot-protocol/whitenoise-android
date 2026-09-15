@@ -7,25 +7,27 @@ import android.window.OnBackInvokedDispatcher
 import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.content.MediaType
 import androidx.compose.foundation.content.ReceiveContentListener
 import androidx.compose.foundation.content.TransferableContent
 import androidx.compose.foundation.content.consume
 import androidx.compose.foundation.content.contentReceiver
 import androidx.compose.foundation.content.hasMediaType
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -41,15 +43,10 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -74,7 +71,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -83,15 +79,22 @@ import androidx.compose.ui.input.key.onPreInterceptKeyBeforeSoftKeyboard
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.scrollBy
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -110,8 +113,10 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
@@ -120,22 +125,47 @@ import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.roundToInt
 
+private const val COMPOSER_TEXT_HEIGHT_ANIMATION_MILLIS = 160
+
+internal const val COMPOSER_RESIZE_GESTURE_TAG = "composer-resize-gesture"
 internal const val COMPOSER_RESIZE_INDICATOR_TAG = "composer-resize-indicator"
 internal const val COMPOSER_PILL_SURFACE_TAG = "composer-pill-surface"
 
-private val ExpandedBorderHeaderInset = 24.dp
-private val CompactEditorStartInset = 52.dp
-private val ExpandedEditorEndInset = 12.dp
+private val CompactEditorStartInset = 72.dp
+private val EditingEditorStartInset = 14.dp
+private val ExpandedEditorEndInset = 14.dp
 private val CompactEditorTopInset = 12.dp
-private val ExpandedEditorTopInset = 24.dp
-private val CompactEditorBottomInset = 8.dp
-private val ExpandedEditorBottomInset = 48.dp
+private val CompactEditorBottomInset = 12.dp
+private val ExpandedEditorBottomInset = 44.dp
+
+private const val COMPOSER_ACTION_CENTER_BIAS = 0.5f
+
+/**
+ * Vertical placement for the composer's inline action clusters: centred in the compact one-line row
+ * and pinned to the bottom of the editing row, blending between the two with the animated editing
+ * progress. The progress is read during placement so the text field never recomposes per frame.
+ */
+private class ComposerActionRowAlignment(
+    private val horizontal: Alignment.Horizontal,
+    private val editingProgress: () -> Float,
+) : Alignment {
+    /** Places the cluster at the horizontal edge and at the progress-weighted vertical bias. */
+    override fun align(
+        size: IntSize,
+        space: IntSize,
+        layoutDirection: LayoutDirection,
+    ): IntOffset {
+        val x = horizontal.align(size.width, space.width, layoutDirection)
+        val slack = (space.height - size.height).coerceAtLeast(0)
+        val bias = COMPOSER_ACTION_CENTER_BIAS + (1f - COMPOSER_ACTION_CENTER_BIAS) * editingProgress().coerceIn(0f, 1f)
+        return IntOffset(x, (slack * bias).roundToInt())
+    }
+}
 
 /** Interpolates one layout-space distance without allocating an animation object. */
 private fun interpolateDp(
@@ -335,6 +365,7 @@ internal fun ComposerPill(
     onEmojiPickerToggle: () -> Unit,
     onAttachmentsToggle: () -> Unit,
     attachmentSheetOpen: Boolean,
+    attachmentMenu: (@Composable (androidx.compose.ui.unit.IntRect) -> Unit)? = null,
     onPickFromGallery: (() -> Unit)?,
     onPickDocument: (() -> Unit)?,
     modifier: Modifier = Modifier,
@@ -363,6 +394,8 @@ internal fun ComposerPill(
     onHeightDragStarted: () -> Unit = {},
     onHeightDrag: (Float) -> Unit = {},
     onHeightDragStopped: () -> Unit = {},
+    onHeightDragSettled: ((Float) -> Unit)? = null,
+    onHeightDragCancelled: (() -> Unit)? = null,
     trailingAction: (@Composable RowScope.() -> Unit)? = null,
     expandedTrailingActionInset: Dp = 0.dp,
     // Automatic expansion changes both this pill's padding and ComposerBar's
@@ -371,6 +404,9 @@ internal fun ComposerPill(
     compactMeasurementWidth: Dp? = null,
     compactMeasurementReservesTrailingAction: Boolean = trailingAction != null,
     compactOuterEndInset: Dp = 0.dp,
+    forceEditingLayout: Boolean = false,
+    accessoryContent: (@Composable () -> Unit)? = null,
+    voiceReviewContent: (@Composable () -> Unit)? = null,
     inputContentVisible: Boolean = true,
     inputFocusEnabled: Boolean = true,
     onMultilineControlsChanged: (Boolean) -> Unit = {},
@@ -379,6 +415,9 @@ internal fun ComposerPill(
     // ceiling and squeezes the editor viewport to zero, so they pin the inline
     // single-row controls regardless of the measured line count.
     multilineControlsSuppressed: Boolean = false,
+    // Back has asked the keyboard to hide: the editing row collapses now, in the
+    // same frame, instead of waiting for focus to clear once the IME inset lands.
+    dismissInProgress: Boolean = false,
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -536,6 +575,7 @@ internal fun ComposerPill(
             selectionLayout?.let { composerScrollState.keepComposerSelectionVisible(it) }
         }
     }
+    var attachmentAnchorBounds by remember { mutableStateOf(androidx.compose.ui.unit.IntRect.Zero) }
     val hasAttachmentAction =
         onPickFromGallery != null ||
             onPickDocument != null ||
@@ -544,10 +584,18 @@ internal fun ComposerPill(
             hasUserShare ||
             hasContactShare
     var multilineControls by remember { mutableStateOf(false) }
+    val leadingControlsWidth = if (hasAttachmentAction) 80.dp else 40.dp
+    val reservedTrailingWidth =
+        (if (expandedTrailingActionInset > 0.dp) expandedTrailingActionInset + 4.dp else 0.dp) +
+            (if (trailingAction != null) 40.dp else 0.dp)
+    val availableDictationWidth =
+        compactMeasurementWidth?.let { width ->
+            (width - leadingControlsWidth - reservedTrailingWidth).coerceAtLeast(0.dp)
+        } ?: DICTATION_ACTIVE_ACTIONS_WIDTH
     val targetDictationControlWidth =
         when {
-            dictationControls != null -> 96.dp
-            onDictation != null -> 48.dp
+            dictationControls != null -> minOf(DICTATION_ACTIVE_ACTIONS_WIDTH, availableDictationWidth)
+            onDictation != null -> 40.dp
             else -> 0.dp
         }
     val dictationControlWidth by
@@ -557,29 +605,38 @@ internal fun ComposerPill(
             label = "composer dictation control morph",
         )
     val compactTrailingReserve =
-        4.dp +
-            dictationControlWidth +
-            (if (hasAttachmentAction) 36.dp else 0.dp) +
-            (if (trailingAction != null) 44.dp else 0.dp)
+        4.dp + dictationControlWidth + expandedTrailingActionInset +
+            (if (trailingAction != null) 40.dp else 0.dp)
     val compactMeasurementTrailingReserve =
         4.dp +
             dictationControlWidth +
-            (if (hasAttachmentAction) 36.dp else 0.dp) +
-            (if (compactMeasurementReservesTrailingAction) 44.dp else 0.dp)
+            expandedTrailingActionInset +
+            (if (compactMeasurementReservesTrailingAction) 40.dp else 0.dp)
     val composerTextStyle =
-        LocalTextStyle.current.copy(
+        MaterialTheme.typography.bodyLarge.copy(
             color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 16.sp,
             textDirection = TextDirection.ContentOrLtr,
         )
     val textMeasurer = rememberTextMeasurer()
-    val compactLineCount =
+    val editingRequested =
+        composerEditingRequested(
+            focused = composerFocused,
+            hasText = textFieldValue.text.isNotEmpty(),
+            forceEditingLayout = forceEditingLayout,
+            mode = expansionMode,
+            dismissInProgress = dismissInProgress,
+        )
+    val compactTextLayout =
         compactMeasurementWidth?.let { measurementWidth ->
             val maxTextWidthPx =
                 with(density) {
-                    (measurementWidth - CompactEditorStartInset - compactMeasurementTrailingReserve)
-                        .coerceAtLeast(1.dp)
-                        .roundToPx()
+                    val editorInsets =
+                        if (editingRequested && !multilineControlsSuppressed) {
+                            EditingEditorStartInset + ExpandedEditorEndInset
+                        } else {
+                            CompactEditorStartInset + compactMeasurementTrailingReserve
+                        }
+                    (measurementWidth - editorInsets).coerceAtLeast(1.dp).roundToPx()
                 }
             remember(
                 transformedText.text,
@@ -592,8 +649,30 @@ internal fun ComposerPill(
                         text = transformedText.text,
                         style = composerTextStyle,
                         constraints = Constraints(maxWidth = maxTextWidthPx),
-                    ).lineCount
+                    )
             }
+        }
+    val compactLineCount = compactTextLayout?.lineCount
+    // The prototype animates the measured text row independently of discrete full-screen resizing.
+    // Read frames in measurement so the field and its selection owner are never replaced.
+    val animatedTextHeight =
+        animateIntAsState(
+            targetValue = compactTextLayout?.size?.height ?: 0,
+            animationSpec = tween(COMPOSER_TEXT_HEIGHT_ANIMATION_MILLIS, easing = LinearEasing),
+            label = "composer text height",
+        )
+    val automaticTextHeight =
+        if (compactTextLayout != null &&
+            expansionMode == ComposerExpansionMode.Automatic &&
+            !multilineControlsSuppressed
+        ) {
+            Modifier.layout { measurable, constraints ->
+                val height = animatedTextHeight.value.coerceIn(constraints.minHeight, constraints.maxHeight)
+                val child = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
+                layout(child.width, child.height) { child.placeRelative(0, 0) }
+            }
+        } else {
+            Modifier
         }
     val visualMultilineControls =
         when {
@@ -608,10 +687,24 @@ internal fun ComposerPill(
                 } ?: multilineControls
         }
     val expandedLayout = visualMultilineControls || expansionMode != ComposerExpansionMode.Automatic
-    // One progress value owns the moving editor and action edges. The handle's
-    // 24dp border reservation is installed atomically when expansion starts;
-    // animating that constraint made the already-expanded pill lose 24dp of
-    // viewport height while a bulk replacement was settling.
+    // Keep the editor instance and selection owner stable while empty reading
+    // mode unfolds into the full-width editing row above the native controls.
+    val editingLayout =
+        !multilineControlsSuppressed &&
+            (editingRequested || expandedLayout)
+    val editingProgress =
+        animateFloatAsState(
+            targetValue = if (editingLayout) 1f else 0f,
+            animationSpec = tween(COMPOSER_EXPANSION_ANIMATION_MILLIS, easing = FastOutSlowInEasing),
+            label = "composer editing row",
+        )
+    // The compact one-line row centres its inline actions; as the editing row
+    // unfolds they slide down to the bottom action row. Read during placement.
+    val leadingActionsAlignment =
+        remember(editingProgress) { ComposerActionRowAlignment(Alignment.Start) { editingProgress.value } }
+    val trailingActionsAlignment =
+        remember(editingProgress) { ComposerActionRowAlignment(Alignment.End) { editingProgress.value } }
+    // The editor and action edges animate without reserving space above the surface.
     val expansionProgress =
         animateFloatAsState(
             targetValue = if (expandedLayout) 1f else 0f,
@@ -622,14 +715,15 @@ internal fun ComposerPill(
                 ),
             label = "composer layout progress",
         )
-    var resizeTargetReady by remember { mutableStateOf(false) }
-    LaunchedEffect(expandedLayout) {
-        resizeTargetReady = false
-        if (expandedLayout) {
-            delay(COMPOSER_EXPANSION_ANIMATION_MILLIS.toLong())
-            resizeTargetReady = true
-        }
-    }
+    val toggleDescription =
+        stringResource(
+            if (expansionMode != ComposerExpansionMode.Automatic) {
+                R.string.composer_collapse
+            } else {
+                R.string.composer_expand_full_screen
+            },
+        )
+    val latestOnExpansionToggle by rememberUpdatedState(onExpansionToggle)
     val expandedHeightModifier =
         if (expansionMode == ComposerExpansionMode.Automatic) {
             Modifier
@@ -672,432 +766,470 @@ internal fun ComposerPill(
             ),
     ) {
         Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            shape = RoundedCornerShape(22.dp),
-            border = amoledSurfaceBorderStroke(),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier =
                 Modifier
-                    .deferredPadding(
-                        top = {
-                            if (expandedLayout || expansionProgress.value > 0f) {
-                                ExpandedBorderHeaderInset
-                            } else {
-                                0.dp
-                            }
-                        },
-                    ).fillMaxWidth()
+                    .fillMaxWidth()
                     .then(expandedHeightModifier)
-                    .testTag(COMPOSER_PILL_SURFACE_TAG),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .heightIn(min = 44.dp)
-                        .then(expandedHeightModifier),
-            ) {
-                Box(
-                    contentAlignment = Alignment.TopStart,
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopStart)
-                            .fillMaxWidth()
-                            .then(expandedHeightModifier)
-                            // The text field's internal handlers consume plain
-                            // drags without ever scrolling this height-capped
-                            // viewport, so the editor's one explicit scroll owner
-                            // lives here, covering the whole editor viewport:
-                            // early vertical drags and wheel/trackpad ticks drive
-                            // composerScrollState directly and arm reading
-                            // intent, while taps and long-press selection pass
-                            // through untouched.
-                            .pointerInput(Unit) {
-                                composerEditorReadingScrollGestures(
-                                    scrollBy = { delta ->
-                                        val before = composerScrollState.value
-                                        composerScrollState.dispatchRawDelta(delta)
-                                        composerScrollState.value != before
-                                    },
-                                    onReadingScroll = {
-                                        // A non-overflowing editor has nothing to
-                                        // read toward; arming would only suspend
-                                        // caret-following for no scroll intent.
-                                        if (composerScrollState.maxValue > 0) {
-                                            readingScrollAnchor = ComposerReadingAnchor.of(latestTextFieldValue)
-                                        }
+                    .semantics {
+                        if (inputContentVisible && !multilineControlsSuppressed) {
+                            customActions =
+                                listOf(
+                                    CustomAccessibilityAction(toggleDescription) {
+                                        latestOnExpansionToggle()
+                                        true
                                     },
                                 )
-                            }.deferredPadding(
-                                // Keep the editable text on one stable leading
-                                // axis while the pill widens. Animating this
-                                // inset made the live draft slide ~40dp during
-                                // reflow, which read as a zoom/jitter on device.
-                                start = { CompactEditorStartInset },
-                                top = {
-                                    interpolateDp(
-                                        CompactEditorTopInset,
-                                        ExpandedEditorTopInset,
-                                        expansionProgress.value,
-                                    )
-                                },
-                                end = {
-                                    interpolateDp(
-                                        compactTrailingReserve,
-                                        ExpandedEditorEndInset,
-                                        expansionProgress.value,
-                                    )
-                                },
-                                bottom = {
-                                    interpolateDp(
-                                        CompactEditorBottomInset,
-                                        ExpandedEditorBottomInset,
-                                        expansionProgress.value,
-                                    )
-                                },
-                            ).alpha(if (inputContentVisible) 1f else 0f)
-                            .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                            if (expandedLayout) {
+                                contentDescription = resizeComposerDescription
+                                onClick(toggleDescription) {
+                                    latestOnExpansionToggle()
+                                    true
+                                }
+                            }
+                        }
+                    }.testTag(COMPOSER_PILL_SURFACE_TAG),
+        ) {
+            Column(modifier = Modifier.then(expandedHeightModifier)) {
+                if (accessoryContent != null) {
+                    Box(
+                        Modifier.boundedComposerAccessory().verticalScroll(rememberScrollState()),
+                    ) {
+                        accessoryContent()
+                    }
+                }
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(1f, fill = expansionMode != ComposerExpansionMode.Automatic)
+                            .heightIn(min = if (voiceReviewContent == null) 48.dp else 96.dp)
+                            .then(expandedHeightModifier),
                 ) {
-                    val editorOverflowColor = composerResizeHandleColor()
-                    BasicTextField(
-                        value = textFieldValue,
-                        onValueChange = onValueChange,
+                    Box(
+                        contentAlignment = Alignment.TopStart,
                         modifier =
                             Modifier
+                                .align(Alignment.TopStart)
                                 .fillMaxWidth()
                                 .then(expandedHeightModifier)
-                                // Drawn outside the scroll modifier so the thumb
-                                // paints in viewport coordinates over the clipped
-                                // editor, only while the draft overflows it.
-                                .drawWithContent {
-                                    drawContent()
-                                    drawComposerEditorOverflowAffordance(
-                                        scrollValue = composerScrollState.value,
-                                        maxScroll = composerScrollState.maxValue,
-                                        color = editorOverflowColor,
+                                // The text field's internal handlers consume plain
+                                // drags without ever scrolling this height-capped
+                                // viewport, so the editor's one explicit scroll owner
+                                // lives here, covering the whole editor viewport:
+                                // early vertical drags and wheel/trackpad ticks drive
+                                // composerScrollState directly and arm reading
+                                // intent, while taps and long-press selection pass
+                                // through untouched.
+                                .pointerInput(Unit) {
+                                    composerEditorReadingScrollGestures(
+                                        scrollBy = { delta ->
+                                            val before = composerScrollState.value
+                                            composerScrollState.dispatchRawDelta(delta)
+                                            composerScrollState.value != before
+                                        },
+                                        onReadingScroll = {
+                                            // A non-overflowing editor has nothing to
+                                            // read toward; arming would only suspend
+                                            // caret-following for no scroll intent.
+                                            if (composerScrollState.maxValue > 0) {
+                                                readingScrollAnchor = ComposerReadingAnchor.of(latestTextFieldValue)
+                                            }
+                                        },
                                     )
-                                }.keepComposerSelectionVisibleDuringLayout(composerScrollState, layoutCorrectionGate) {
-                                    if (readingScrollAnchor?.matches(textFieldValue) == true) {
-                                        return@keepComposerSelectionVisibleDuringLayout null
-                                    }
-                                    textLayoutSnapshot
-                                        ?.takeIf {
-                                            it.sourceText == textFieldValue.text &&
-                                                it.transformedText == transformedText
-                                        }?.let { snapshot ->
-                                            composerSelectionLayout(
-                                                layout = snapshot.result,
-                                                value = textFieldValue,
-                                                transformedText = snapshot.transformedText,
-                                            )
-                                        }
-                                }.semantics {
-                                    // Accessibility scrolls are reading intent too:
-                                    // arm the anchor before moving the shared state,
-                                    // overriding verticalScroll's un-anchored action.
-                                    scrollBy { _, y ->
-                                        // Report success and arm reading intent
-                                        // only when the viewport actually moved:
-                                        // a boundary or zero-delta action must
-                                        // let the service announce the edge or
-                                        // move to another scroll container.
-                                        val before = composerScrollState.value
-                                        composerScrollState.dispatchRawDelta(y)
-                                        val moved = composerScrollState.value != before
-                                        if (moved) {
-                                            readingScrollAnchor = ComposerReadingAnchor.of(textFieldValue)
-                                        }
-                                        moved
-                                    }
-                                }
-                                // The automatic composer has a hard viewport ceiling.
-                                // Measure the editor at its natural height and own the
-                                // resulting scroll state here so programmatic bulk
-                                // commits can follow the real selection, not merely
-                                // the final text line or the conversation tail.
-                                .verticalScroll(composerScrollState)
-                                .focusProperties { canFocus = inputFocusEnabled }
-                                .contentReceiver(pasteImageReceiver)
-                                .onPreInterceptKeyBeforeSoftKeyboard { event ->
-                                    when (
-                                        composerPreImeBackAction(
-                                            enabled = preImeBackEnabled,
-                                            isBackKey = event.key == Key.Back,
-                                            isKeyDown = event.type == KeyEventType.KeyDown,
+                                }.deferredPadding(
+                                    start = {
+                                        interpolateDp(
+                                            if (hasAttachmentAction) CompactEditorStartInset else 40.dp,
+                                            EditingEditorStartInset,
+                                            editingProgress.value,
                                         )
+                                    },
+                                    top = {
+                                        CompactEditorTopInset
+                                    },
+                                    end = {
+                                        interpolateDp(
+                                            compactTrailingReserve,
+                                            ExpandedEditorEndInset,
+                                            editingProgress.value,
+                                        )
+                                    },
+                                    bottom = {
+                                        interpolateDp(
+                                            CompactEditorBottomInset,
+                                            ExpandedEditorBottomInset,
+                                            editingProgress.value,
+                                        )
+                                    },
+                                ).alpha(if (inputContentVisible) 1f else 0f)
+                                .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                    ) {
+                        val editorOverflowColor = composerOverflowIndicatorColor()
+                        BasicTextField(
+                            value = textFieldValue,
+                            onValueChange = onValueChange,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .then(expandedHeightModifier)
+                                    .then(automaticTextHeight)
+                                    // Drawn outside the scroll modifier so the thumb
+                                    // paints in viewport coordinates over the clipped
+                                    // editor, only while the draft overflows it.
+                                    .drawWithContent {
+                                        drawContent()
+                                        drawComposerEditorOverflowAffordance(
+                                            scrollValue = composerScrollState.value,
+                                            maxScroll = composerScrollState.maxValue,
+                                            color = editorOverflowColor,
+                                        )
+                                    }.keepComposerSelectionVisibleDuringLayout(
+                                        composerScrollState,
+                                        layoutCorrectionGate,
                                     ) {
-                                        ComposerPreImeBackAction.IGNORE -> false
-                                        ComposerPreImeBackAction.CONSUME -> true
-                                        ComposerPreImeBackAction.DISMISS -> {
-                                            onPreImeBack()
-                                            true
+                                        if (readingScrollAnchor?.matches(textFieldValue) == true) {
+                                            return@keepComposerSelectionVisibleDuringLayout null
+                                        }
+                                        textLayoutSnapshot
+                                            ?.takeIf {
+                                                it.sourceText == textFieldValue.text &&
+                                                    it.transformedText == transformedText
+                                            }?.let { snapshot ->
+                                                composerSelectionLayout(
+                                                    layout = snapshot.result,
+                                                    value = textFieldValue,
+                                                    transformedText = snapshot.transformedText,
+                                                )
+                                            }
+                                    }.semantics {
+                                        // Accessibility scrolls are reading intent too:
+                                        // arm the anchor before moving the shared state,
+                                        // overriding verticalScroll's un-anchored action.
+                                        scrollBy { _, y ->
+                                            // Report success and arm reading intent
+                                            // only when the viewport actually moved:
+                                            // a boundary or zero-delta action must
+                                            // let the service announce the edge or
+                                            // move to another scroll container.
+                                            val before = composerScrollState.value
+                                            composerScrollState.dispatchRawDelta(y)
+                                            val moved = composerScrollState.value != before
+                                            if (moved) {
+                                                readingScrollAnchor = ComposerReadingAnchor.of(textFieldValue)
+                                            }
+                                            moved
                                         }
                                     }
-                                }.focusRequester(composerFocus)
-                                // #589: track focus so the conversation screen's
-                                // resume observer knows whether the keyboard was up
-                                // when the app was backgrounded (Case B gate).
-                                .onFocusChanged {
-                                    composerFocused = it.isFocused
-                                    onComposerFocusChanged(it.isFocused)
-                                }
-                                // #404: honor the Enter-key toggle for hardware
-                                // keyboards (Bluetooth/foldable/ChromeOS). Shift+Enter
-                                // always inserts a line break as an escape hatch; in
-                                // NewLine mode a bare Enter falls through to the normal
-                                // newline insertion.
-                                .onPreviewKeyEvent { event ->
-                                    if (event.type == KeyEventType.KeyDown &&
-                                        (event.key == Key.Enter || event.key == Key.NumPadEnter)
-                                    ) {
-                                        when {
-                                            event.isShiftPressed -> false
-                                            enterKeyBehavior == EnterKeyBehavior.SendMessage -> {
-                                                onImeSend()
+                                    // The automatic composer has a hard viewport ceiling.
+                                    // Measure the editor at its natural height and own the
+                                    // resulting scroll state here so programmatic bulk
+                                    // commits can follow the real selection, not merely
+                                    // the final text line or the conversation tail.
+                                    .verticalScroll(composerScrollState)
+                                    .focusProperties { canFocus = inputFocusEnabled }
+                                    .contentReceiver(pasteImageReceiver)
+                                    .onPreInterceptKeyBeforeSoftKeyboard { event ->
+                                        when (
+                                            composerPreImeBackAction(
+                                                enabled = preImeBackEnabled,
+                                                isBackKey = event.key == Key.Back,
+                                                isKeyDown = event.type == KeyEventType.KeyDown,
+                                            )
+                                        ) {
+                                            ComposerPreImeBackAction.IGNORE -> false
+                                            ComposerPreImeBackAction.CONSUME -> true
+                                            ComposerPreImeBackAction.DISMISS -> {
+                                                onPreImeBack()
                                                 true
                                             }
-                                            else -> false
                                         }
-                                    } else {
-                                        false
+                                    }.focusRequester(composerFocus)
+                                    // #589: track focus so the conversation screen's
+                                    // resume observer knows whether the keyboard was up
+                                    // when the app was backgrounded (Case B gate).
+                                    .onFocusChanged {
+                                        composerFocused = it.isFocused
+                                        onComposerFocusChanged(it.isFocused)
                                     }
-                                },
-                        textStyle = composerTextStyle,
-                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                        visualTransformation = mentionVisualTransformation,
-                        // #404: in SendMessage mode the soft-keyboard action sends;
-                        // in NewLine mode the IME shows an Enter/newline key that
-                        // inserts `\n`.
-                        keyboardOptions =
-                            KeyboardOptions(
-                                capitalization = KeyboardCapitalization.Sentences,
-                                keyboardType = KeyboardType.Text,
-                                imeAction =
-                                    if (enterKeyBehavior == EnterKeyBehavior.SendMessage) {
-                                        ImeAction.Send
-                                    } else {
-                                        ImeAction.Default
+                                    // #404: honor the Enter-key toggle for hardware
+                                    // keyboards (Bluetooth/foldable/ChromeOS). Shift+Enter
+                                    // always inserts a line break as an escape hatch; in
+                                    // NewLine mode a bare Enter falls through to the normal
+                                    // newline insertion.
+                                    .onPreviewKeyEvent { event ->
+                                        if (event.type == KeyEventType.KeyDown &&
+                                            (event.key == Key.Enter || event.key == Key.NumPadEnter)
+                                        ) {
+                                            when {
+                                                event.isShiftPressed -> false
+                                                enterKeyBehavior == EnterKeyBehavior.SendMessage -> {
+                                                    onImeSend()
+                                                    true
+                                                }
+                                                else -> false
+                                            }
+                                        } else {
+                                            false
+                                        }
                                     },
-                            ),
-                        keyboardActions = KeyboardActions(onSend = { onImeSend() }),
-                        maxLines = Int.MAX_VALUE,
-                        onTextLayout = { layout ->
-                            if (compactLineCount == null) updateMultilineControls(layout.lineCount)
-                            val nextSnapshot =
-                                ComposerTextLayoutSnapshot(
-                                    sourceText = textFieldValue.text,
-                                    transformedText = transformedText,
-                                    result = layout,
-                                )
-                            if (textLayoutSnapshot != nextSnapshot) textLayoutSnapshot = nextSnapshot
-                        },
-                    )
-                    if (textFieldValue.text.isEmpty()) {
-                        Text(
-                            stringResource(R.string.message),
-                            style = LocalTextStyle.current.copy(fontSize = 16.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            textStyle = composerTextStyle,
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            visualTransformation = mentionVisualTransformation,
+                            // #404: in SendMessage mode the soft-keyboard action sends;
+                            // in NewLine mode the IME shows an Enter/newline key that
+                            // inserts `\n`.
+                            keyboardOptions =
+                                KeyboardOptions(
+                                    capitalization = KeyboardCapitalization.Sentences,
+                                    keyboardType = KeyboardType.Text,
+                                    imeAction =
+                                        if (enterKeyBehavior == EnterKeyBehavior.SendMessage) {
+                                            ImeAction.Send
+                                        } else {
+                                            ImeAction.Default
+                                        },
+                                ),
+                            keyboardActions = KeyboardActions(onSend = { onImeSend() }),
+                            maxLines = Int.MAX_VALUE,
+                            onTextLayout = { layout ->
+                                if (compactLineCount == null) updateMultilineControls(layout.lineCount)
+                                val nextSnapshot =
+                                    ComposerTextLayoutSnapshot(
+                                        sourceText = textFieldValue.text,
+                                        transformedText = transformedText,
+                                        result = layout,
+                                    )
+                                if (textLayoutSnapshot != nextSnapshot) textLayoutSnapshot = nextSnapshot
+                            },
                         )
+                        if (textFieldValue.text.isEmpty()) {
+                            Text(
+                                stringResource(R.string.message),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
-                }
 
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomStart)
-                            .deferredPadding(
-                                start = { 4.dp },
-                                bottom = {
-                                    interpolateDp(
-                                        0.dp,
-                                        4.dp,
-                                        expansionProgress.value,
-                                    )
-                                },
-                            ).alpha(if (inputContentVisible) 1f else 0f)
-                            .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
-                ) {
-                    TextEntryEmojiAction(
-                        pickerOpen = emojiPickerOpen,
-                        enabled = inputContentVisible,
-                        onClick = onEmojiPickerToggle,
-                        togglesKeyboard = true,
-                    )
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomEnd)
-                            .height(if (onDictation != null || dictationControls != null) 48.dp else 44.dp),
-                ) {
-                    if (dictationControls != null) {
-                        dictationControls()
-                    } else if (onDictation != null) {
-                        IconButton(
-                            onClick = onDictation,
-                            enabled = inputContentVisible,
-                            modifier =
-                                Modifier
-                                    .size(48.dp)
-                                    .alpha(if (inputContentVisible) 1f else 0f)
-                                    .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
-                        ) {
-                            // A waveform keeps text dictation visually distinct from
-                            // the plain microphone used by hold-to-record voice notes.
-                            Icon(
-                                Icons.Default.GraphicEq,
-                                contentDescription = stringResource(R.string.dictate_text),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(21.dp),
+                    Box(
+                        modifier =
+                            Modifier
+                                .align(leadingActionsAlignment)
+                                .deferredPadding(
+                                    start = { 0.dp },
+                                ).alpha(if (inputContentVisible) 1f else 0f)
+                                .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (hasAttachmentAction) {
+                                Box(
+                                    modifier =
+                                        Modifier.width(40.dp).height(48.dp).onGloballyPositioned { coordinates ->
+                                            val position = coordinates.positionInWindow()
+                                            attachmentAnchorBounds =
+                                                androidx.compose.ui.unit.IntRect(
+                                                    position.x.roundToInt(),
+                                                    position.y.roundToInt(),
+                                                    position.x.roundToInt() + coordinates.size.width,
+                                                    position.y.roundToInt() + coordinates.size.height,
+                                                )
+                                        },
+                                    contentAlignment = Alignment.CenterEnd,
+                                ) {
+                                    IconButton(
+                                        onClick = onAttachmentsToggle,
+                                        enabled = inputContentVisible,
+                                        modifier =
+                                            Modifier
+                                                .width(32.dp)
+                                                .height(48.dp)
+                                                .alpha(if (inputContentVisible) 1f else 0f)
+                                                .then(
+                                                    if (inputContentVisible) {
+                                                        Modifier
+                                                    } else {
+                                                        Modifier.clearAndSetSemantics {}
+                                                    },
+                                                ),
+                                    ) {
+                                        // Swap the glyph on open (X) the way the emoji toggle swaps
+                                        // to a keyboard, so sighted users get a visual cue, not just
+                                        // a changed content description.
+                                        Icon(
+                                            painter =
+                                                painterResource(
+                                                    if (attachmentSheetOpen) R.drawable.ic_close else R.drawable.ic_add,
+                                                ),
+                                            contentDescription =
+                                                stringResource(
+                                                    if (attachmentSheetOpen) {
+                                                        R.string.close
+                                                    } else {
+                                                        R.string.attach_options
+                                                    },
+                                                ),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(24.dp),
+                                        )
+                                    }
+                                    attachmentMenu?.invoke(attachmentAnchorBounds)
+                                }
+                            }
+                            TextEntryEmojiAction(
+                                pickerOpen = emojiPickerOpen,
+                                enabled = inputContentVisible,
+                                onClick = onEmojiPickerToggle,
+                                togglesKeyboard = true,
+                                modifier = Modifier.width(32.dp).height(48.dp),
+                                iconSize = 24.dp,
+                                emojiIcon = painterResource(R.drawable.ic_emoji_smileys),
                             )
                         }
                     }
-                    if (hasAttachmentAction) {
-                        IconButton(
-                            onClick = onAttachmentsToggle,
-                            enabled = inputContentVisible,
-                            modifier =
-                                Modifier
-                                    .size(36.dp)
-                                    .alpha(if (inputContentVisible) 1f else 0f)
-                                    .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
-                        ) {
-                            // Swap the glyph on open (X) the way the emoji toggle swaps
-                            // to a keyboard, so sighted users get a visual cue, not just
-                            // a changed content description.
-                            Icon(
-                                if (attachmentSheetOpen) Icons.Default.Close else Icons.Default.AttachFile,
-                                contentDescription =
-                                    stringResource(
-                                        if (attachmentSheetOpen) R.string.close else R.string.attach_options,
-                                    ),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(22.dp),
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier =
+                            Modifier
+                                .align(
+                                    if (voiceReviewContent == null) trailingActionsAlignment else Alignment.BottomEnd,
+                                ).height(48.dp),
+                    ) {
+                        if (dictationControls != null) {
+                            Row(
+                                Modifier.layout { measurable, constraints ->
+                                    val reserved = (leadingControlsWidth + reservedTrailingWidth).roundToPx()
+                                    val available = (constraints.maxWidth - reserved).coerceAtLeast(0)
+                                    val maximum = minOf(DICTATION_ACTIVE_ACTIONS_WIDTH.roundToPx(), available)
+                                    val child = measurable.measure(constraints.copy(minWidth = 0, maxWidth = maximum))
+                                    layout(child.width, child.height) { child.placeRelative(0, 0) }
+                                },
+                            ) { dictationControls() }
+                        } else if (onDictation != null) {
+                            IconButton(
+                                onClick = onDictation,
+                                enabled = inputContentVisible,
+                                modifier =
+                                    Modifier
+                                        .width(40.dp)
+                                        .height(48.dp)
+                                        .alpha(if (inputContentVisible) 1f else 0f)
+                                        .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                            ) {
+                                // The prototype's microphone is dictation; voice notes use the waveform glyph.
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_mic),
+                                    contentDescription = stringResource(R.string.dictate_text),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                        }
+                        if (expandedTrailingActionInset > 0.dp) {
+                            Spacer(
+                                Modifier.width(expandedTrailingActionInset + 4.dp),
                             )
                         }
+                        trailingAction?.invoke(this)
                     }
-                    if (expandedTrailingActionInset > 0.dp) {
-                        Spacer(
-                            Modifier.deferredPadding(
-                                end = {
-                                    interpolateDp(
-                                        0.dp,
-                                        expandedTrailingActionInset,
-                                        expansionProgress.value,
-                                    )
-                                },
-                            ),
-                        )
+                    if (voiceReviewContent != null) {
+                        Box(Modifier.matchParentSize()) { voiceReviewContent() }
                     }
-                    trailingAction?.invoke(this)
                 }
             }
         }
 
-        if (expandedLayout && resizeTargetReady && inputContentVisible) {
-            // Keep a transparent 96x48dp gesture target for accessibility, but
-            // draw feedback only on the visible handle. The surface starts at
-            // 24dp so the accessible target straddles the border evenly. The
-            // first editable line starts exactly at the target's lower edge;
-            // no decorative header space sits between the two.
-            val toggleDescription =
-                stringResource(
-                    if (expansionMode == ComposerExpansionMode.FullScreen) {
-                        R.string.composer_collapse
-                    } else {
-                        R.string.composer_expand_full_screen
-                    },
-                )
-            ComposerResizeHandle(
-                toggleDescription = toggleDescription,
-                contentDescription = resizeComposerDescription,
+        if (inputContentVisible && !multilineControlsSuppressed) {
+            // This existing padding contains no editor or accessory content. A
+            // border-only pointer owner leaves reading drags and selection to
+            // BasicTextField; the full surface exposes the accessible action.
+            ComposerResizeGestureStrip(
                 onExpansionToggle = onExpansionToggle,
                 onHeightDragStarted = { latestOnHeightDragStarted() },
                 onHeightDrag = { latestOnHeightDrag(it) },
                 onHeightDragStopped = { latestOnHeightDragStopped() },
+                onHeightDragSettled = onHeightDragSettled,
+                onHeightDragCancelled = onHeightDragCancelled,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         }
     }
 }
 
-/** Renders the accessible resize gesture target and its border-mounted visual handle. */
+/** Keeps accessory overflow scrollable while reserving at least half the finite viewport for input. */
+private fun Modifier.boundedComposerAccessory(): Modifier =
+    layout { measurable, constraints ->
+        val limit = if (constraints.hasBoundedHeight) constraints.maxHeight / 2 else constraints.maxHeight
+        val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = limit))
+        layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
+    }
+
+/** Resizes from the existing top border without covering editable or accessory content. */
 @Composable
-@Suppress("FunctionNaming")
-private fun ComposerResizeHandle(
-    toggleDescription: String,
-    contentDescription: String,
+@Suppress("FunctionNaming", "LongMethod")
+private fun ComposerResizeGestureStrip(
     onExpansionToggle: () -> Unit,
     onHeightDragStarted: () -> Unit,
     onHeightDrag: (Float) -> Unit,
     onHeightDragStopped: () -> Unit,
+    onHeightDragSettled: ((Float) -> Unit)?,
+    onHeightDragCancelled: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val latestOnHeightDragStarted by rememberUpdatedState(onHeightDragStarted)
     val latestOnHeightDrag by rememberUpdatedState(onHeightDrag)
     val latestOnHeightDragStopped by rememberUpdatedState(onHeightDragStopped)
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    var dragging by remember { mutableStateOf(false) }
-    val handleScale =
-        animateFloatAsState(
-            targetValue = if (pressed || dragging) 1.22f else 1f,
-            animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing),
-            label = "composer resize handle scale",
-        )
-    val handleColor = composerResizeHandleColor()
+    val latestOnHeightDragSettled by rememberUpdatedState(onHeightDragSettled)
+    val latestOnHeightDragCancelled by rememberUpdatedState(onHeightDragCancelled)
+    var gestureCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val latestOnExpansionToggle by rememberUpdatedState(onExpansionToggle)
 
     Box(
-        contentAlignment = Alignment.Center,
         modifier =
             modifier
-                .width(96.dp)
-                .height(48.dp)
+                .fillMaxWidth()
+                .height(8.dp)
+                .testTag(COMPOSER_RESIZE_GESTURE_TAG)
+                .onGloballyPositioned { gestureCoordinates = it }
                 .pointerInput(Unit) {
+                    val velocityTracker = VelocityTracker()
                     detectVerticalDragGestures(
                         onDragStart = {
-                            dragging = true
+                            velocityTracker.resetTracking()
                             latestOnHeightDragStarted()
                         },
                         onVerticalDrag = { change, dragAmount ->
+                            val rootPosition = gestureCoordinates?.localToRoot(change.position) ?: change.position
+                            velocityTracker.addPosition(change.uptimeMillis, rootPosition)
                             change.consume()
                             latestOnHeightDrag(dragAmount)
                         },
                         onDragEnd = {
-                            dragging = false
-                            latestOnHeightDragStopped()
+                            val settle = latestOnHeightDragSettled
+                            if (settle != null) {
+                                settle(velocityTracker.calculateVelocity().y)
+                            } else {
+                                latestOnHeightDragStopped()
+                            }
                         },
                         onDragCancel = {
-                            dragging = false
-                            latestOnHeightDragStopped()
+                            val cancel = latestOnHeightDragCancelled
+                            if (cancel != null) cancel() else latestOnHeightDragStopped()
                         },
                     )
-                }.clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClickLabel = toggleDescription,
-                    role = Role.Button,
-                    onClick = onExpansionToggle,
-                ).semantics {
-                    this.contentDescription = contentDescription
+                }.pointerInput(Unit) {
+                    detectTapGestures(onTap = { latestOnExpansionToggle() })
                 },
-    ) {
-        Box(
-            Modifier
-                .width(36.dp)
-                .height(4.dp)
-                .testTag(COMPOSER_RESIZE_INDICATOR_TAG)
-                .graphicsLayer { scaleX = handleScale.value }
-                .background(handleColor, RoundedCornerShape(2.dp)),
-        )
-    }
+    )
 }
 
-/** Resolves an opaque handle color against the current composer surface. */
+/** Resolves an opaque editor overflow indicator against the current composer surface. */
 @Composable
-private fun composerResizeHandleColor(): Color =
+private fun composerOverflowIndicatorColor(): Color =
     MaterialTheme.colorScheme.onSurfaceVariant
         .copy(alpha = 0.45f)
-        .compositeOver(MaterialTheme.colorScheme.surfaceVariant)
+        .compositeOver(MaterialTheme.colorScheme.surfaceContainerHigh)
         .copy(alpha = 1f)
 
 /** Registers the focused composer ahead of the IME for Android predictive/system Back. */

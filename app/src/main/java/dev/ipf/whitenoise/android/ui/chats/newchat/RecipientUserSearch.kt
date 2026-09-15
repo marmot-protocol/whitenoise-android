@@ -48,6 +48,7 @@ internal data class RecipientSearchRequestKey(
     val activeAccountRef: String?,
     val activeAccountIdHex: String?,
     val relationshipRevision: Long,
+    val retryKey: Int = 0,
 )
 
 internal data class RecipientSearchProgress(
@@ -165,6 +166,7 @@ internal fun UserSearchStatusRow(
 internal fun rememberRecipientUserSearchState(
     query: String,
     appState: WhiteNoiseAppState,
+    retryKey: Int = 0,
 ): State<RecipientUserSearchState> {
     val trimmed = query.trim()
     val activeAccountRef = appState.activeAccountRef
@@ -177,6 +179,7 @@ internal fun rememberRecipientUserSearchState(
                 activeAccountRef = activeAccountRef,
                 activeAccountIdHex = activeAccountIdHex,
                 relationshipRevision = appState.relationshipRevision,
+                retryKey = retryKey,
             ),
     ) {
         if (trimmed.isEmpty() || !isPlainNameQuery(trimmed)) {
@@ -200,25 +203,7 @@ internal fun rememberRecipientUserSearchState(
                     }
                 }
             value = value.copy(followedAccountIds = followedIds)
-            withClosedRecipientSearchSubscription(
-                open = {
-                    appState.marmotIo {
-                        searchUsers(
-                            accountIdHex = activeAccountIdHex,
-                            query = trimmed,
-                            radiusStart = USER_SEARCH_RADIUS_START,
-                            radiusEnd = USER_SEARCH_RADIUS_END,
-                        )
-                    }
-                },
-                consume = { activeSubscription ->
-                    aggregateRecipientSearchUpdates(
-                        nextUpdate = { appState.marmotIo { activeSubscription.nextUpdate() } },
-                        followedAccountIds = followedIds,
-                        emit = { value = it },
-                    )
-                },
-            )
+            consumeRecipientSearch(appState, activeAccountIdHex, trimmed, followedIds) { value = it }
             currentCoroutineContext().ensureActive()
             if (value.isSearching) value = value.copy(isSearching = false)
         } catch (cancelled: CancellationException) {
@@ -227,6 +212,35 @@ internal fun rememberRecipientUserSearchState(
             value = value.copy(isSearching = false, failed = true)
         }
     }
+}
+
+/** Open and close one native search subscription while forwarding its ordered aggregate updates. */
+private suspend fun consumeRecipientSearch(
+    appState: WhiteNoiseAppState,
+    activeAccountIdHex: String,
+    query: String,
+    followedIds: Set<String>,
+    emit: (RecipientUserSearchState) -> Unit,
+) {
+    withClosedRecipientSearchSubscription(
+        open = {
+            appState.marmotIo {
+                searchUsers(
+                    accountIdHex = activeAccountIdHex,
+                    query = query,
+                    radiusStart = USER_SEARCH_RADIUS_START,
+                    radiusEnd = USER_SEARCH_RADIUS_END,
+                )
+            }
+        },
+        consume = { activeSubscription ->
+            aggregateRecipientSearchUpdates(
+                nextUpdate = { appState.marmotIo { activeSubscription.nextUpdate() } },
+                followedAccountIds = followedIds,
+                emit = emit,
+            )
+        },
+    )
 }
 
 private const val USER_SEARCH_DEBOUNCE_MILLIS = 300L

@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -23,6 +26,7 @@ class MessageSelectionBarTest {
 
     private fun string(res: Int): String = ApplicationProvider.getApplicationContext<android.content.Context>().getString(res)
 
+    /** Plural. */
     private fun plural(
         res: Int,
         quantity: Int,
@@ -33,8 +37,9 @@ class MessageSelectionBarTest {
             .resources
             .getQuantityString(res, quantity, *args)
 
+    /** Shows prototype title and retains selected count state. */
     @Test
-    fun showsCountAndCloseOnly() {
+    fun showsPrototypeTitleAndRetainsSelectedCountState() {
         var closes = 0
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -45,11 +50,15 @@ class MessageSelectionBarTest {
             }
         }
 
-        composeRule.onNodeWithText("3").assertIsDisplayed()
         composeRule
-            .onNodeWithContentDescription(
-                plural(R.plurals.message_selected_count, 3, 3),
-            ).assertIsDisplayed()
+            .onNodeWithText(string(R.string.conversation_select_messages))
+            .assertIsDisplayed()
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    plural(R.plurals.message_selected_count, 3, 3),
+                ),
+            )
         composeRule.onNodeWithContentDescription(string(R.string.close)).performClick()
 
         assertEquals(1, closes)

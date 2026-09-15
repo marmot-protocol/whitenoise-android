@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -34,32 +35,38 @@ import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+@Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class UnreadMessagesDividerScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Unread divider has prototype gaps in light ltr. */
     @Test
-    fun unreadDividerHasBalancedCompactGapsInLightLtr() {
+    fun unreadDividerHasPrototypeGapsInLightLtr() {
         render(darkTheme = false, rtl = false, fontScale = 1f)
-        assertBalancedGaps()
+        assertPrototypeGaps()
         composeRule.onNodeWithTag(ROOT_TAG).captureRoboImage("src/test/snapshots/unread_divider_light_ltr.png")
     }
 
+    /** Unread divider has prototype gaps in dark large rtl. */
     @Test
-    fun unreadDividerHasBalancedCompactGapsInDarkLargeRtl() {
+    fun unreadDividerHasPrototypeGapsInDarkLargeRtl() {
         render(darkTheme = true, rtl = true, fontScale = 1.6f)
-        assertBalancedGaps()
+        assertPrototypeGaps()
         composeRule.onNodeWithTag(ROOT_TAG).captureRoboImage("src/test/snapshots/unread_divider_dark_large_rtl.png")
     }
 
-    private fun assertBalancedGaps() {
+    /** Separate prototype slots yield 26dp above and 18dp below the actual outline/count content. */
+    private fun assertPrototypeGaps() {
         val older = composeRule.onNodeWithTag(OLDER_TAG).fetchSemanticsNode().boundsInRoot
         val divider = composeRule.onNodeWithTag(UNREAD_MESSAGES_DIVIDER_CONTENT_TAG).fetchSemanticsNode().boundsInRoot
         val unread = composeRule.onNodeWithTag(UNREAD_TAG).fetchSemanticsNode().boundsInRoot
-        assertEquals(divider.top - older.bottom, unread.top - divider.bottom, 1f)
+        assertEquals(26f, divider.top - older.bottom, 1f)
+        assertEquals(18f, unread.top - divider.bottom, 1f)
+        composeRule.onNodeWithText("5 unread messages").assertExists()
     }
 
+    /** Mounts the native embedded divider with its real preceding 8dp slot spacing. */
     private fun render(
         darkTheme: Boolean,
         rtl: Boolean,

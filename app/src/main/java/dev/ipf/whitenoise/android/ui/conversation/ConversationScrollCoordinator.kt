@@ -87,13 +87,14 @@ internal fun conversationScrollAnchor(
     renderedMessageIds: List<String>,
     hasOlderHeader: Boolean,
     hasInlineTopError: Boolean = false,
+    timelineViewport: ConversationTimelineViewport? = null,
 ): ConversationScrollAnchor {
     val firstTimelineListIndex =
         1 +
             (if (hasInlineTopError) 1 else 0) +
             (if (hasOlderHeader) 1 else 0)
     val visibleTimelineRow =
-        listState.layoutInfo.visibleItemsInfo.firstOrNull { visible ->
+        (timelineViewport?.readingLayoutInfo() ?: listState.layoutInfo).visibleItemsInfo.firstOrNull { visible ->
             val timelineIndex = visible.index - firstTimelineListIndex
             timelineIndex in renderedItemIds.indices && timelineIndex in renderedMessageIds.indices
         }

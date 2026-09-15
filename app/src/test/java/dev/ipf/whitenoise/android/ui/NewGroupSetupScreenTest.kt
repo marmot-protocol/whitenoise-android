@@ -27,6 +27,7 @@ class NewGroupSetupScreenTest {
     val composeRule = createComposeRule()
     private val context: Context = ApplicationProvider.getApplicationContext()
 
+    /** Canonical success read failure renders retry open surface with locked details. */
     @Test
     fun canonicalSuccessReadFailureRendersRetryOpenSurfaceWithLockedDetails() {
         composeRule.setContent {
@@ -42,7 +43,7 @@ class NewGroupSetupScreenTest {
         }
 
         composeRule.onNodeWithText(string(R.string.error_chat_created_not_loaded)).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.retry)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.new_message_open_chat)).assertIsDisplayed()
         composeRule.onAllNodes(hasSetTextAction()).assertCountEquals(0)
     }
 

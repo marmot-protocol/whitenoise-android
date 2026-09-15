@@ -35,13 +35,13 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
 import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleFillColor
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleTimestampColor
 import dev.ipf.whitenoise.android.ui.conversation.messages.replyPreviewAccentArgb
-import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionSummaryChip
+import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillRow
 import dev.ipf.whitenoise.android.ui.conversation.reactions.reactionSummaryAttachment
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
-import dev.ipf.whitenoise.android.ui.settings.FontSizePreviewBubble
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -359,6 +359,7 @@ class MessageBubbleChromeScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_reply_attachments_large_rtl.png")
     }
 
+    /** Composes the surface under test with the given fixture. */
     private fun render(darkTheme: Boolean) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme) {
@@ -366,6 +367,8 @@ class MessageBubbleChromeScreenshotTest {
                     Column(modifier = Modifier.width(360.dp).padding(8.dp).testTag(TAG)) {
                         FontSizePreviewBubble(text = "Incoming message bubble", mine = false)
                         FontSizePreviewBubble(text = "Outgoing message bubble", mine = true)
+                        DirectionalBubble(text = "Incoming conversation bubble", time = "12:34", mine = false)
+                        DirectionalBubble(text = "Outgoing conversation bubble", time = "12:35", mine = true)
                         MessageInlineFooter(
                             timeText = "12:34",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -412,7 +415,7 @@ class MessageBubbleChromeScreenshotTest {
     }
 }
 
-/** Screenshot fixture for production reply-quote combinations. */
+/** Screenshots fixture for production reply-quote combinations. */
 @Composable
 private fun ReplyQuoteBubble(
     mine: Boolean,
@@ -520,19 +523,21 @@ private fun CustomAmoledReplyBubble(highlighted: Boolean) {
     }
 }
 
+/** Directional bubble. */
 @Composable
 private fun DirectionalBubble(
     text: String,
     time: String,
     mine: Boolean,
 ) {
-    Surface(
-        color = Color.Black,
-        contentColor = Color.White,
-        shape = RoundedCornerShape(18.dp),
-        border = messageBubbleBorder(highlighted = false, mine = mine),
+    MessageBubbleFrame(
+        presentation = messageBubblePresentation(deleted = false, mine = mine),
+        highlighted = false,
+        mine = mine,
+        mentionedSelf = false,
+        mentionedYouLabel = "Mentioned you",
     ) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+        Column {
             Text(text)
             MessageInlineFooter(
                 timeText = time,
@@ -549,6 +554,7 @@ private fun DirectionalBubble(
     }
 }
 
+/** Amoled reaction bubble. */
 @Composable
 private fun AmoledReactionBubble(
     text: String,
@@ -585,16 +591,18 @@ private fun AmoledReactionBubble(
             }
         }
         Box(modifier = Modifier.reactionSummaryAttachment(outgoing = outgoing)) {
-            ReactionSummaryChip(
+            ReactionPillRow(
                 tallies = tallies,
-                outgoing = outgoing,
-                customAmoledBorderColor = presentation.borderOverrideArgb?.let(::colorFromArgb),
-                onClick = {},
+                enabled = true,
+                onToggle = {},
+                onOverflow = {},
+                onLongPress = null,
             )
         }
     }
 }
 
+/** Retention input. */
 private fun retentionInput(
     messageIdHex: String,
     expiresAtEpochSeconds: ULong?,
@@ -612,3 +620,27 @@ private fun retentionInput(
 private const val CUSTOM_AMOLED_ARGB = 0xFFFFC107L
 private const val OUTGOING_CUSTOM_AMOLED_ARGB = 0xFF9C27B0L
 private val screenshotControllerKey = Any()
+
+/** The Appearance font-size preview bubble, kept here for the message-chrome baselines it anchors. */
+@Composable
+private fun FontSizePreviewBubble(
+    text: String,
+    mine: Boolean,
+) {
+    val bubbleColor = messageBubbleFillColor(deleted = false, mine = mine)
+    Box(Modifier.fillMaxWidth()) {
+        Surface(
+            modifier = Modifier.align(if (mine) Alignment.CenterEnd else Alignment.CenterStart),
+            color = bubbleColor,
+            shape = RoundedCornerShape(18.dp),
+            border = messageBubbleBorder(highlighted = false, mine = mine),
+            tonalElevation = if (mine) 1.dp else 0.dp,
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            )
+        }
+    }
+}

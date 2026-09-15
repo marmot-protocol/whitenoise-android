@@ -111,6 +111,26 @@ class ChatListSearchProjectionTest {
         }
     }
 
+    /** Message only keeps body matches as messages and drops title matches. */
+    @Test
+    fun messageOnlyKeepsBodyMatchesAsMessagesAndDropsTitleMatches() {
+        val sections =
+            projectChatListSearchCandidates(
+                candidates =
+                    listOf(
+                        candidate("body", "01"),
+                        candidate("title-with-body", "02", title = "Marmot"),
+                        candidate("title-only", "03", title = "Marmot Z"),
+                    ),
+                rawQuery = "",
+                bodyMatchGroupIds = setOf("01", "02"),
+                messageOnly = true,
+            )
+
+        assertTrue(sections.groups.isEmpty())
+        assertEquals(listOf("body", "title-with-body"), sections.messages)
+    }
+
     private fun candidate(
         value: String,
         groupId: String,

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dictation_pause">Diktat pausieren</string>
+    <string name="dictation_resume">Diktat fortsetzen</string>
+    <string name="dictation_paused">Diktat pausiert</string>
+</resources>

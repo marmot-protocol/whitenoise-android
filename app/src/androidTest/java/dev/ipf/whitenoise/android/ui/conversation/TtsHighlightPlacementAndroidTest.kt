@@ -640,7 +640,6 @@ class TtsHighlightPlacementAndroidTest {
             isActionMenuOpen = false,
             onActionMenuOpenChange = {},
             onQuickReactionsSave = {},
-            onQuickReactionsReset = {},
             onReplyPreviewClick = {},
             composerGate = ComposerGate.COMPOSER,
             onBack = {},

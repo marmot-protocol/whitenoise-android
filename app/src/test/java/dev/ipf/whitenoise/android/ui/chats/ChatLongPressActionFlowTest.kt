@@ -50,9 +50,11 @@ class ChatLongPressActionFlowTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
+    /** Long press opens actions and select dismisses into existing selection mode. */
     @Test
     fun longPressOpensActionsAndSelectDismissesIntoExistingSelectionMode() {
         var sheetOpen by mutableStateOf(false)
+        var pointerHeld by mutableStateOf(false)
         var selected by mutableStateOf(false)
         var opens = 0
         val item = chatItem()
@@ -67,6 +69,7 @@ class ChatLongPressActionFlowTest {
                     selected = selected,
                     onOpen = { opens++ },
                     onOpenProfile = {},
+                    onActionsHeldChange = { pointerHeld = it },
                     onOpenActions = { sheetOpen = true },
                     onDragSelectionStart = {},
                     onDragSelection = { false },
@@ -76,7 +79,8 @@ class ChatLongPressActionFlowTest {
                     onToggleSelection = { selected = !selected },
                 )
                 if (sheetOpen) {
-                    ChatActionSheet(
+                    ChatContextMenu(
+                        focusable = !pointerHeld,
                         hasUnread = false,
                         canMarkUnread = true,
                         archived = false,
@@ -110,10 +114,12 @@ class ChatLongPressActionFlowTest {
         }
     }
 
+    /** Action sheet opens at long press threshold before pointer up. */
     @Test
     @Suppress("LongMethod") // Full pointer lifecycle and visible sheet belong in one regression test.
     fun actionSheetOpensAtLongPressThresholdBeforePointerUp() {
         var sheetOpen by mutableStateOf(false)
+        var pointerHeld by mutableStateOf(false)
         var actionOpens = 0
         var chatOpens = 0
         val item = chatItem()
@@ -129,6 +135,7 @@ class ChatLongPressActionFlowTest {
                         selected = false,
                         onOpen = { chatOpens++ },
                         onOpenProfile = {},
+                        onActionsHeldChange = { pointerHeld = it },
                         onOpenActions = {
                             actionOpens++
                             sheetOpen = true
@@ -142,7 +149,8 @@ class ChatLongPressActionFlowTest {
                     )
                 }
                 if (sheetOpen) {
-                    ChatActionSheet(
+                    ChatContextMenu(
+                        focusable = !pointerHeld,
                         hasUnread = false,
                         canMarkUnread = true,
                         archived = false,
@@ -179,7 +187,7 @@ class ChatLongPressActionFlowTest {
             assertEquals(0, chatOpens)
         }
 
-        composeRule.onAllNodes(isRoot())[0].performTouchInput { up() }
+        composeRule.onNodeWithTag(CHAT_HOLD_HOST_TAG).performTouchInput { up() }
         composeRule.waitForIdle()
         composeRule.runOnIdle {
             assertEquals(1, actionOpens)
@@ -302,6 +310,7 @@ class ChatLongPressActionFlowTest {
         assertEquals(1, dragEnds)
     }
 
+    /** Delete dismisses the sheet and requires destructive confirmation. */
     @Test
     fun deleteDismissesTheSheetAndRequiresDestructiveConfirmation() {
         var sheetOpen by mutableStateOf(true)
@@ -310,7 +319,7 @@ class ChatLongPressActionFlowTest {
         composeRule.setContent {
             WhiteNoiseTheme {
                 if (sheetOpen) {
-                    ChatActionSheet(
+                    ChatContextMenu(
                         hasUnread = false,
                         canMarkUnread = true,
                         archived = false,

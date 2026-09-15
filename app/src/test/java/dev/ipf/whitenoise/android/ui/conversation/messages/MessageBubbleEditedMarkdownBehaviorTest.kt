@@ -62,6 +62,7 @@ class MessageBubbleEditedMarkdownBehaviorTest {
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val app = ApplicationProvider.getApplicationContext<android.app.Application>()
 
+    /** Edited markdown transitions playback selection and stop in one composition. */
     @Test
     @Suppress("LongMethod")
     fun editedMarkdownTransitionsPlaybackSelectionAndStopInOneComposition() {
@@ -109,7 +110,6 @@ class MessageBubbleEditedMarkdownBehaviorTest {
                     isActionMenuOpen = false,
                     onActionMenuOpenChange = {},
                     onQuickReactionsSave = {},
-                    onQuickReactionsReset = {},
                     onReplyPreviewClick = {},
                     composerGate = ComposerGate.COMPOSER,
                     onBack = {},
@@ -164,6 +164,7 @@ class MessageBubbleEditedMarkdownBehaviorTest {
         composeRule.onNodeWithText("Edited value").assertExists()
     }
 
+    /** Superseded edit parse completing late does not revert display. */
     @Test
     @Suppress("LongMethod")
     fun supersededEditParseCompletingLateDoesNotRevertDisplay() {
@@ -210,7 +211,6 @@ class MessageBubbleEditedMarkdownBehaviorTest {
                     isActionMenuOpen = false,
                     onActionMenuOpenChange = {},
                     onQuickReactionsSave = {},
-                    onQuickReactionsReset = {},
                     onReplyPreviewClick = {},
                     composerGate = ComposerGate.COMPOSER,
                     onBack = {},

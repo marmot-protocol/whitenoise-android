@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Image
@@ -34,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -45,18 +42,21 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** The optimistic tile dims exactly as far as the confirmed album overflow tile does. */
+private const val PENDING_OVERFLOW_SCRIM_ALPHA = 0.58f
+
+/** Placeholder for attachments still uploading, with retry on failure. */
 @Composable
 internal fun MediaPendingPlaceholder(
     pendingAttachments: List<PendingAttachment>,
     failed: Boolean,
     onRetry: (() -> Unit)? = null,
-    attachedToCaption: Boolean = false,
     timestampText: String? = null,
     showStatus: Boolean = false,
     status: MessageStatus = MessageStatus.Pending,
@@ -82,7 +82,6 @@ internal fun MediaPendingPlaceholder(
                     failed = failed,
                     statusLabel = statusLabel,
                     onRetry = onRetry,
-                    attachedToCaption = attachedToCaption,
                     timestampText = timestampText.takeIf { ownsFooter },
                     showStatus = ownsFooter && showStatus,
                     status = status,
@@ -96,8 +95,7 @@ internal fun MediaPendingPlaceholder(
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = if (attachedToCaption) RectangleShape else RoundedCornerShape(12.dp),
-        border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
+        shape = ConversationRichContentShape,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -110,7 +108,7 @@ internal fun MediaPendingPlaceholder(
                 val preview = rememberSampledBitmap(attachment?.plaintextBytes)
                 val ratio = aspectRatioFromDim(attachment?.dim)
                 Box(
-                    imageBubbleSizing(ratio),
+                    imageBubbleSizing(ratio, sourceShortSideFromDim(attachment?.dim)),
                     contentAlignment = Alignment.Center,
                 ) {
                     preview?.let {
@@ -140,7 +138,7 @@ internal fun MediaPendingPlaceholder(
                 // into the "+N" chip on the fourth tile, matching the
                 // confirmed grid bubbles (MasonryImageLayout renders four
                 // tiles max) (#527).
-                val visible = pendingAttachments.take(4)
+                val visible = pendingAttachments.take(MAX_VISIBLE_GALLERY_FRAMES)
                 val overflow = (pendingAttachments.size - visible.size).coerceAtLeast(0)
                 Box(Modifier.fillMaxWidth()) {
                     MasonryImageLayout(visibleCount = visible.size) { index, tileModifier ->
@@ -241,13 +239,13 @@ private fun PendingGridTile(
         }
         if (overflowCount > 0 && preview != null) {
             Box(
-                Modifier.fillMaxSize().background(Color.Black.copy(alpha = ScrimAlpha.TILE)),
+                Modifier.fillMaxSize().background(Color.Black.copy(alpha = PENDING_OVERFLOW_SCRIM_ALPHA)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     "+$overflowCount",
                     color = Color.White,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
             }

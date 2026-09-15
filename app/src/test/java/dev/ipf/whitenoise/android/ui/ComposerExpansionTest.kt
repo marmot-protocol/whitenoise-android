@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerExpansionStat
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerHeightAnimationDurationMillis
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerHeightPx
 import dev.ipf.whitenoise.android.ui.conversation.composer.dragComposerHeight
+import dev.ipf.whitenoise.android.ui.conversation.composer.settleComposerEndpoint
 import dev.ipf.whitenoise.android.ui.conversation.composer.settleComposerHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.toComposerExpansionState
 import dev.ipf.whitenoise.android.ui.conversation.composer.toRetainedPreference
@@ -17,6 +18,18 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ComposerExpansionTest {
+    /** Velocity chooses an endpoint; slow drags use the midpoint, never a new retained manual height. */
+    @Test
+    fun newGesturesSettleAtPrototypeEndpoints() {
+        val belowMiddle = ComposerExpansionState(ComposerExpansionMode.Manual, 399f)
+        val aboveMiddle = ComposerExpansionState(ComposerExpansionMode.Manual, 401f)
+        assertEquals(ComposerExpansionMode.Automatic, settleComposerEndpoint(belowMiddle, 200f, 600f, 0f, 48f).mode)
+        assertEquals(ComposerExpansionMode.FullScreen, settleComposerEndpoint(aboveMiddle, 200f, 600f, 0f, 48f).mode)
+        assertEquals(ComposerExpansionMode.FullScreen, settleComposerEndpoint(belowMiddle, 200f, 600f, -48f, 48f).mode)
+        assertEquals(ComposerExpansionMode.Automatic, settleComposerEndpoint(aboveMiddle, 200f, 600f, 48f, 48f).mode)
+        assertEquals(ComposerExpansionMode.Automatic, settleComposerEndpoint(aboveMiddle, 600f, 600f, -96f, 48f).mode)
+    }
+
     @Test
     fun onlyDiscreteHeightChangesAnimateOutsideThePill() {
         assertEquals(
