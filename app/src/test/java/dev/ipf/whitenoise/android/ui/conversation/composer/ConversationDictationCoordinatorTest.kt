@@ -232,9 +232,9 @@ class ConversationDictationCoordinatorTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 
-    /** Verifies navigation retains the immutable origin while actual origin removal cancels delivery. */
+    /** Verifies navigation retains the immutable origin while actual origin loss keeps completed text recoverable. */
     @Test
-    fun navigationKeepsImmutableOriginWhileTargetDisappearanceCancelsDelivery() {
+    fun navigationKeepsImmutableOriginWhileTargetDisappearanceRetainsCompletedResult() {
         val navigation = fixture()
         navigation.controller.requestStart(ACCOUNT, GROUP, navigation.draft)
         val listener = navigation.platform.listener
@@ -256,7 +256,8 @@ class ConversationDictationCoordinatorTest {
         targetAvailable = false
         lateListener.onResult("must not write")
 
-        assertTrue(disappeared.controller.state is ConversationDictationState.Idle)
+        val review = disappeared.controller.state as ConversationDictationState.ReviewRequired
+        assertEquals("must not write", review.transcript)
         assertEquals("Keep", disappeared.draft.text)
         assertEquals(0, disappeared.writes)
         assertEquals(1, disappeared.releases)

@@ -911,7 +911,7 @@ internal class ConversationDictationController internal constructor(
             return
         }
         if (!targetAvailable(active.target)) {
-            cancel()
+            retainTranscriptForReview(active.sessionId, active.target, recognized)
             return
         }
         validateAndDeliverTranscript(active.sessionId, active.target, recognized)
@@ -956,10 +956,7 @@ internal class ConversationDictationController internal constructor(
     /** Revalidates the origin and appends a conflicted transcript at the current draft end. */
     fun insertReviewAtEnd() {
         val review = state as? ConversationDictationState.ReviewRequired ?: return
-        if (!targetAvailable(review.target)) {
-            cancel()
-            return
-        }
+        if (!targetAvailable(review.target)) return
         val validator = targetValidator
         val validationScope = targetValidationScope
         if (validator == null || validationScope == null) {
@@ -977,10 +974,7 @@ internal class ConversationDictationController internal constructor(
                 }
             val current = state as? ConversationDictationState.ReviewRequired
             if (current?.sessionId != review.sessionId) return@launch
-            if (!available || !targetAvailable(review.target)) {
-                cancel()
-                return@launch
-            }
+            if (!available || !targetAvailable(review.target)) return@launch
             insertReviewAtEndValidated(review)
         }
     }
@@ -1493,13 +1487,13 @@ internal class ConversationDictationController internal constructor(
                         }
                         return
                     }
-                    val targetStillAvailable = runCatching { targetAvailable(target) }.getOrDefault(false)
-                    if (!targetStillAvailable) {
-                        if (state.sessionId == sessionId) cancel()
-                        return
-                    }
                     clearRecognitionGeneration(cancel = false)
                     commitSegment(recognized)
+                    val targetStillAvailable = runCatching { targetAvailable(target) }.getOrDefault(false)
+                    if (!targetStillAvailable) {
+                        retainAccumulatedTranscriptForReview(sessionId, target)
+                        return
+                    }
                     if (finishRequested) {
                         continueOrFinalizeCallerAudioDrain(sessionId, target)
                     } else {
@@ -1836,11 +1830,18 @@ internal class ConversationDictationController internal constructor(
     private fun retainAccumulatedTranscriptForReview(
         sessionId: Long,
         target: ConversationDictationTarget,
+    ) = retainTranscriptForReview(sessionId, target, accumulatedTranscript)
+
+    /** Releases capture while keeping completed text recoverable until an explicit terminal action. */
+    private fun retainTranscriptForReview(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        transcript: String,
     ) {
-        val transcript = accumulatedTranscript.trim()
+        val retainedTranscript = transcript.trim()
         clearRecognitionSession(cancel = true)
         resetTranscriptSession()
-        state = ConversationDictationState.ReviewRequired(sessionId, target, transcript)
+        state = ConversationDictationState.ReviewRequired(sessionId, target, retainedTranscript)
     }
 
     /** Preserves useful dictated text when a recognition watchdog or provider operation fails. */
@@ -2160,7 +2161,7 @@ internal class ConversationDictationController internal constructor(
                 }
             if (state.sessionId != sessionId) return@launch
             if (!available || !targetAvailable(target)) {
-                cancel()
+                retainTranscriptForReview(sessionId, target, transcript)
                 return@launch
             }
             deliverTranscript(sessionId, target, transcript)
