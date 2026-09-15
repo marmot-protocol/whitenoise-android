@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -168,6 +170,9 @@ internal fun UsageDiagnosticsPrompt(
                 }
                 Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     UsageDiagnosticsDisclosure()
+                    if (appState.auditUploadConsentRequired) {
+                        Text(stringResource(R.string.audit_upload_renew), style = MaterialTheme.typography.bodySmall)
+                    }
                     UsageDiagnosticsFeedback(appState)
                 }
             }
@@ -178,6 +183,9 @@ internal fun UsageDiagnosticsPrompt(
                     appState.launchMutation {
                         if (state.busy || state.failed) return@launchMutation
                         if (state.snapshot == null) return@launchMutation
+                        if (appState.auditUploadConsentRequired && !appState.setAuditLogsEnabled(false)) {
+                            return@launchMutation
+                        }
                         if (!state.requiresChoice || appState.setTelemetryEnabled(false)) onDone()
                     }
                 },
@@ -195,26 +203,79 @@ private fun IndependentAuditLogChoice(
 ) {
     var failed by remember { mutableStateOf(false) }
     var pendingChoice by remember { mutableStateOf<Boolean?>(null) }
+    var confirmUpload by remember { mutableStateOf(false) }
+
+    fun saveChoice(enabled: Boolean) {
+        pendingChoice = enabled
+        onBusyChange(true)
+        appState.launchMutation {
+            try {
+                failed = !appState.setAuditLogsEnabled(enabled)
+            } finally {
+                pendingChoice = null
+                onBusyChange(false)
+            }
+        }
+    }
     ConsentSwitchRow(
-        title = stringResource(R.string.audit_logs),
-        subtitle = stringResource(R.string.usage_diagnostics_logs_separate),
+        title = stringResource(R.string.audit_upload_title),
+        subtitle = stringResource(R.string.audit_upload_subtitle),
         checked = pendingChoice ?: (appState.auditLogSettings?.enabled == true),
         enabled = appState.auditLogSettings != null,
         saving = busy,
         onCheckedChange = { enabled ->
-            pendingChoice = enabled
-            onBusyChange(true)
-            appState.launchMutation {
-                try {
-                    failed = !appState.setAuditLogsEnabled(enabled)
-                } finally {
-                    pendingChoice = null
-                    onBusyChange(false)
-                }
-            }
+            if (enabled) confirmUpload = true else saveChoice(false)
         },
     )
+    if (confirmUpload) {
+        AuditUploadConsentDialog(
+            onDismiss = { confirmUpload = false },
+            onConfirm = {
+                confirmUpload = false
+                saveChoice(true)
+            },
+        )
+    }
     if (failed) {
         Text(stringResource(R.string.usage_diagnostics_error), color = MaterialTheme.colorScheme.error)
+    }
+}
+
+/** Prominent disclosure shared by both audit opt-in entry points. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun AuditUploadConsentDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    BasicAlertDialog(onDismissRequest = onDismiss) {
+        AuditUploadConsentContent(onDismiss, onConfirm)
+    }
+}
+
+/** Scrolls the sensitive-data explanation while keeping both decisions reachable. */
+@Composable
+internal fun AuditUploadConsentContent(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Column(
+            Modifier.widthIn(max = 360.dp).heightIn(max = 640.dp).padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(stringResource(R.string.audit_upload_confirm_title), style = MaterialTheme.typography.headlineSmall)
+            Text(
+                stringResource(R.string.audit_upload_disclosure),
+                modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            TextButton(modifier = Modifier.fillMaxWidth(), onClick = onConfirm) {
+                Text(stringResource(R.string.audit_upload_confirm))
+            }
+            TextButton(modifier = Modifier.fillMaxWidth(), onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
     }
 }

@@ -1801,4 +1801,10 @@
     <string name="usage_diagnostics_unknown">Sin cargar</string>
     <string name="usage_diagnostics_done">Listo</string>
     <string name="usage_diagnostics_loading">Cargando la configuración de uso compartido…</string>
+    <string name="audit_upload_title">Compartir registros técnicos</string>
+    <string name="audit_upload_subtitle">Enviar automáticamente registros de diagnóstico a White Noise, por separado del uso compartido de datos de uso.</string>
+    <string name="audit_upload_confirm_title">¿Compartir registros técnicos con White Noise?</string>
+    <string name="audit_upload_disclosure">Al activar esta opción, se registran localmente los registros de auditoría de diagnóstico de todos los perfiles de este dispositivo y se suben automáticamente a Goggles, operado por Internet Privacy Foundation. También pueden subirse registros anteriores. Los registros pueden incluir identificadores de grupos y mensajes, direcciones de relays, marcas de tiempo, referencias seudónimas de cuentas, identificadores de instalación y el modelo del dispositivo y la versión de la app. Se excluyen el contenido de los mensajes y las claves privadas. Estos registros son sensibles y se conservan para investigar problemas de fiabilidad. Esta opción es independiente del envío de datos de uso y diagnóstico. Desactivar el envío detiene las nuevas grabaciones e impide nuevos lotes de subida. Un lote ya en curso puede terminar de subir sus archivos. Esto no elimina los registros ya guardados localmente o subidos. Cancelar mantiene desactivado el envío.</string>
+    <string name="audit_upload_confirm">Activar envío automático</string>
+    <string name="audit_upload_renew">El envío de registros técnicos está desactivado hasta que revises la información sobre la subida automática y vuelvas a elegir.</string>
 </resources>

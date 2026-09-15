@@ -51,8 +51,8 @@ class AuditLogExportScreenshotTest {
                         SettingsGroup {
                             item {
                                 GroupSwitchRow(
-                                    title = stringResource(R.string.audit_logs),
-                                    subtitle = stringResource(R.string.audit_logs_settings_subtitle),
+                                    title = stringResource(R.string.audit_upload_title),
+                                    subtitle = stringResource(R.string.audit_upload_subtitle),
                                     checked = true,
                                     icon = Icons.Filled.Article,
                                     onCheckedChange = {},

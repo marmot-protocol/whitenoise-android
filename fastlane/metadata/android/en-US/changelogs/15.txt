@@ -1,0 +1,1 @@
+Technical log sharing now clearly explains automatic uploads and asks for fresh consent. Older logging choices stay off until you approve. Includes recent dictation, reliability, and interface improvements.
