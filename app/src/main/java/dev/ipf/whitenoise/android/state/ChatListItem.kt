@@ -31,6 +31,9 @@ data class ChatListAvatarSeed(
     val image: ImageBitmap,
 )
 
+/** A peer projection stands for a two-person conversation. */
+private const val DIRECT_CHAT_MEMBER_COUNT = 2
+
 /**
  * Builds a chat-list item from the engine projection and its selected presentation.
  * [members] remains the only authoritative source for membership-sensitive fields;
@@ -49,7 +52,6 @@ internal fun chatListItemFromProjection(
     activitySequence: ULong = 0uL,
 ): ChatListItem {
     val baseGroup = group ?: emptyGroupRecord(row)
-    val displayGroup = chatListDisplayGroup(row, baseGroup, selectedPresentation)
     val presentation = members?.let { chatListMemberPresentation(it, activeAccountIdHex) } ?: presentationMembers
     val selectedPeer = selectedPresentation?.peerId?.takeIf(String::isNotBlank)
     val selectedMemberCount =
@@ -57,6 +59,10 @@ internal fun chatListItemFromProjection(
             ?.memberCount
             ?.coerceAtMost(Int.MAX_VALUE.toULong())
             ?.toInt()
+    val resolvedMemberCount =
+        selectedMemberCount
+            ?: if (selectedPeer != null) DIRECT_CHAT_MEMBER_COUNT else presentation?.memberCount ?: 0
+    val displayGroup = chatListDisplayGroup(row, baseGroup, selectedPresentation, resolvedMemberCount)
     return ChatListItem(
         group = displayGroup,
         latest =
@@ -81,9 +87,7 @@ internal fun chatListItemFromProjection(
         memberCount = members?.let(GroupProjector::uniqueMemberCount) ?: 0,
         memberSnapshot = members?.let(::GroupMemberSnapshot),
         presentationOtherMemberAccount = selectedPeer ?: presentation?.otherMemberAccount,
-        presentationMemberCount =
-            selectedMemberCount
-                ?: if (selectedPeer != null) 2 else presentation?.memberCount ?: 0,
+        presentationMemberCount = resolvedMemberCount,
         presentationActiveAccountIsSoleMember = presentation?.activeAccountIsSoleMember == true,
         projection = row,
         inviteConfirmationUnresolved =

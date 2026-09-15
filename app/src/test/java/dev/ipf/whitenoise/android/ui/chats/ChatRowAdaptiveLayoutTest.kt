@@ -39,7 +39,10 @@ class ChatRowAdaptiveLayoutTest {
     private val nowText by lazy { context.getString(R.string.relative_time_now) }
     private val timestampAt = (System.currentTimeMillis() / 1_000L).toULong()
 
-    /** Normal density uses compact row height. */
+    /**
+     * Normal density uses the prototype's compact row height: Material's 72 dp one-line
+     * minimum less its own 20 dp list spacing, plus this row's 16 dp outer inset.
+     */
     @Test
     fun normalDensityUsesCompactRowHeight() {
         render()
@@ -60,7 +63,7 @@ class ChatRowAdaptiveLayoutTest {
                 .onNodeWithTag(PREVIEW_TAG, useUnmergedTree = true)
                 .fetchSemanticsNode()
                 .boundsInRoot.height
-        assertEquals("Compact row: title=$titleHeight preview=$previewHeight", 72f, rowBounds.height, 0.5f)
+        assertEquals("Compact row: title=$titleHeight preview=$previewHeight", 68f, rowBounds.height, 0.5f)
     }
 
     @Test

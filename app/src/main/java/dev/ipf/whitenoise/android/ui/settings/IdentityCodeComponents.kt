@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import android.graphics.Bitmap
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.indication
@@ -9,6 +8,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,10 +25,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -79,30 +78,25 @@ private fun IdentityQrCode(
     contentDescription: String,
     modifier: Modifier = Modifier,
 ) {
-    val image = remember(content) { qrImage(content) }
-    Box(
-        modifier = modifier.semantics { this.contentDescription = contentDescription },
-        contentAlignment = Alignment.Center,
+    val matrix = remember(content) { QrCodeEncoder.moduleMatrix(content, marginModules = 0) }
+    // Drawn module by module across the whole box. A pre-rendered bitmap lays out at its own
+    // pixel count, which left the code marooned in the middle of the white card.
+    Canvas(
+        modifier = modifier.aspectRatio(1f).semantics { this.contentDescription = contentDescription },
     ) {
-        Image(bitmap = image, contentDescription = null, contentScale = ContentScale.Fit)
+        drawRect(Color.White)
+        val cell = size.minDimension / matrix.width
+        for (row in 0 until matrix.height) {
+            for (column in 0 until matrix.width) {
+                if (!matrix[column, row]) continue
+                drawRect(
+                    color = Color.Black,
+                    topLeft = Offset(column * cell, row * cell),
+                    size = Size(cell, cell),
+                )
+            }
+        }
     }
-}
-
-/** Renders the QR matrix for [content] into a square bitmap at the encoder's fixed pixel size. */
-private fun qrImage(content: String): ImageBitmap {
-    val size = IdentityCodeDefaults.QR_PIXELS
-    val pixels =
-        QrCodeEncoder.pixels(
-            content = content,
-            size = size,
-            onColor = android.graphics.Color.BLACK,
-            offColor = android.graphics.Color.WHITE,
-            marginModules = 0,
-        )
-    return Bitmap
-        .createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        .also { it.setPixels(pixels, 0, size, 0, 0, size, size) }
-        .asImageBitmap()
 }
 
 /**

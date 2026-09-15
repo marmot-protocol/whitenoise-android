@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
+import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 
@@ -37,6 +38,7 @@ internal fun chatListDisplayGroup(
     row: ChatListRowFfi,
     baseGroup: AppGroupRecordFfi,
     selectedPresentation: ConversationPresentationFfi? = null,
+    presentationMemberCount: Int = 0,
 ): AppGroupRecordFfi {
     val rowHasAvatarSignal = row.avatarUrl != null || row.avatar != null
     val avatarUrl = if (rowHasAvatarSignal) row.avatarUrl else baseGroup.avatarUrl
@@ -55,7 +57,7 @@ internal fun chatListDisplayGroup(
                 ),
             previous = baseGroup,
         )
-    return when (val avatar = selectedPresentation?.avatar) {
+    return when (val avatar = adoptableSelectedAvatar(selectedPresentation, projected, presentationMemberCount)) {
         is SelectedAvatarFfi.RemoteImage -> projected.copy(avatarUrl = avatar.url, imageHashHex = null)
         is SelectedAvatarFfi.EncryptedGroupImage ->
             projected.copy(
@@ -84,3 +86,28 @@ internal fun ChatsController?.applyLocalGroupUpdateForAccount(
         ?.takeIf { accountRef == null || it.boundAccountRef == accountRef }
         ?.applyLocalGroupUpdate(record)
 }
+
+/**
+ * The selected avatar this row may actually wear. MDK resolves a member's
+ * profile picture for two-person conversations; adopting it unconditionally
+ * puts a contact's face on a named group in the chat list while the
+ * conversation header, which asks the projector, still draws the group
+ * monogram. Peer-sourced avatars are therefore adopted only where the
+ * projector would lend that member's picture anyway.
+ */
+private fun adoptableSelectedAvatar(
+    selectedPresentation: ConversationPresentationFfi?,
+    projected: AppGroupRecordFfi,
+    presentationMemberCount: Int,
+): SelectedAvatarFfi? {
+    val presentation = selectedPresentation ?: return null
+    val adoptable =
+        !presentation.avatarSource.isPeerSourced() ||
+            GroupProjector.lendsPeerAvatar(projected, presentationMemberCount)
+    return presentation.avatar.takeIf { adoptable }
+}
+
+/** True for the two presentation sources that resolve to a member rather than the group itself. */
+private fun PresentationSourceFfi.isPeerSourced(): Boolean =
+    this == PresentationSourceFfi.PEER_PROFILE ||
+        this == PresentationSourceFfi.PEER_FALLBACK

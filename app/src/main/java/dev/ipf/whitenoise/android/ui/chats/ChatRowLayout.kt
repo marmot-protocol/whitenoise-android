@@ -144,7 +144,10 @@ private fun ChatRowTextLayout(
     status: @Composable () -> Unit,
 ) {
     val verticalAlignment = ListItemDefaults.verticalAlignment()
-    val padding = ChatRowContentPadding
+    // Material's own list spacing, not this row's outer inset, sets the inner text minimum,
+    // exactly as the prototype does. Subtracting the tighter outer inset instead made every
+    // row 4 dp taller and cost the list the partly-visible row at the fold.
+    val padding = ListItemDefaults.ContentPadding
     Layout(
         contents =
             listOf(
