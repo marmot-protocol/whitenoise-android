@@ -780,7 +780,10 @@ internal class ConversationDictationController internal constructor(
         val current = state
         val action = deliveryMode?.name ?: "Done"
         if (finishRequested) {
-            conversationDictationDiagnostic("event=completion_action action=$action accepted=false reason=already_finishing")
+            conversationDictationDiagnostic(
+                "event=completion_action action=$action accepted=false " +
+                    "reason=already_finishing",
+            )
             return
         }
         if (
@@ -900,7 +903,10 @@ internal class ConversationDictationController internal constructor(
     fun cancel() {
         // Once MDK dispatch starts, cancellation cannot recall the message. Retain ownership until its outcome.
         if (deliveryInProgress) {
-            conversationDictationDiagnostic("event=completion_action action=Cancel accepted=false reason=delivery_in_progress")
+            conversationDictationDiagnostic(
+                "event=completion_action action=Cancel accepted=false " +
+                    "reason=delivery_in_progress",
+            )
             return
         }
         conversationDictationDiagnostic(
@@ -1028,7 +1034,8 @@ internal class ConversationDictationController internal constructor(
         val validationScope = targetValidationScope
         if (validator == null || validationScope == null) {
             conversationDictationDiagnostic(
-                "event=target_validation phase=review result=${ConversationDictationTargetValidation.Available.name} source=local",
+                "event=target_validation phase=review result=" +
+                    "${ConversationDictationTargetValidation.Available.name} source=local",
             )
             insertReviewAtEndValidated(review)
             return
@@ -2181,8 +2188,9 @@ internal class ConversationDictationController internal constructor(
                         if (emptiedRevision == null) emptyDraftForDispatch(target)
                         complete(target)
                     } else {
+                        val reason = if (accepted == null) "timeout" else "rejected"
                         conversationDictationDiagnostic(
-                            "event=send_outcome outcome=retained reason=${if (accepted == null) "timeout" else "rejected"}",
+                            "event=send_outcome outcome=retained reason=$reason",
                         )
                         restoreDraftAfterFailedDispatch(target, emptiedRevision)
                         retainUndeliveredTranscript(sessionId, target, transcript)
@@ -2263,7 +2271,8 @@ internal class ConversationDictationController internal constructor(
         val validationScope = targetValidationScope
         if (validator == null || validationScope == null) {
             conversationDictationDiagnostic(
-                "event=target_validation phase=delivery result=${ConversationDictationTargetValidation.Available.name} source=local",
+                "event=target_validation phase=delivery result=" +
+                    "${ConversationDictationTargetValidation.Available.name} source=local",
             )
             deliverTranscript(sessionId, target, transcript)
             return
