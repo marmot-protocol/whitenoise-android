@@ -1173,16 +1173,21 @@ class WhiteNoiseAppState private constructor(
             targetValidator = { accountRef, groupIdHex ->
                 val cached =
                     synchronized(conversationControllerLock) {
-                        newestMatchingController(conversationControllers) { it.matchesConversation(accountRef, groupIdHex) }
+                        newestMatchingController(conversationControllers) {
+                            it.matchesConversation(accountRef, groupIdHex)
+                        }
                     }
                 when {
-                    accounts.none { it.label == accountRef && it.signedOut != true } -> TargetValidation.DefinitelyRemoved
+                    accounts.none { it.label == accountRef && it.signedOut != true } ->
+                        TargetValidation.DefinitelyRemoved
                     cached?.membersVerified == true && cached.isSelfMember -> TargetValidation.Available
                     cached?.membersVerified == true -> TargetValidation.DefinitelyRemoved
                     else ->
                         runCatchingCancellable {
                             marmotIo {
-                                val member = groupDetails(accountRef, groupIdHex).group.selfMembership == SelfMembershipFfi.MEMBER
+                                val member =
+                                    groupDetails(accountRef, groupIdHex).group.selfMembership ==
+                                        SelfMembershipFfi.MEMBER
                                 if (member) TargetValidation.Available else TargetValidation.DefinitelyRemoved
                             }
                         }.getOrDefault(TargetValidation.Indeterminate)
