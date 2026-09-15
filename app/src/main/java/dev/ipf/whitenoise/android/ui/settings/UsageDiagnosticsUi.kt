@@ -4,7 +4,9 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -143,35 +145,45 @@ internal fun UsageDiagnosticsPrompt(
                 onClose = finish,
                 closeEnabled = settled,
             )
-            Column(
-                Modifier
-                    .weight(1f, fill = false)
-                    .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
-                    .padding(bottom = WhiteNoiseSpacing.Section)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.ConversationCluster),
-            ) {
-                Surface(
-                    shape = MaterialTheme.shapes.extraLarge,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ) {
-                    Column {
-                        UsageDiagnosticsChoice(appState)
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant,
-                        )
-                        IndependentAuditLogChoice(appState, loggingBusy) { loggingBusy = it }
-                    }
-                }
-                Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    UsageDiagnosticsDisclosure()
-                    if (appState.auditUploadConsentRequired) {
-                        Text(stringResource(R.string.audit_upload_renew), style = MaterialTheme.typography.bodySmall)
-                    }
-                    UsageDiagnosticsFeedback(appState)
-                }
+            UsageDiagnosticsPromptBody(appState, loggingBusy) { loggingBusy = it }
+        }
+    }
+}
+
+/** The scrolling part of the consent sheet: both choices in one card, then the disclosure and feedback. */
+@Composable
+private fun ColumnScope.UsageDiagnosticsPromptBody(
+    appState: WhiteNoiseAppState,
+    loggingBusy: Boolean,
+    onLoggingBusyChange: (Boolean) -> Unit,
+) {
+    Column(
+        Modifier
+            .weight(1f, fill = false)
+            .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+            .padding(bottom = WhiteNoiseSpacing.Section)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.ConversationCluster),
+    ) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) {
+            Column {
+                UsageDiagnosticsChoice(appState)
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+                IndependentAuditLogChoice(appState, loggingBusy, onLoggingBusyChange)
             }
+        }
+        Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            UsageDiagnosticsDisclosure()
+            if (appState.auditUploadConsentRequired) {
+                Text(stringResource(R.string.audit_upload_renew), style = MaterialTheme.typography.bodySmall)
+            }
+            UsageDiagnosticsFeedback(appState)
         }
     }
 }

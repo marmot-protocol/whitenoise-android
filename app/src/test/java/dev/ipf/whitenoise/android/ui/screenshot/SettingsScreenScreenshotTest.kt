@@ -88,8 +88,8 @@ class SettingsScreenScreenshotTest {
     /** Available Settings update row uses the requested green emblem and real release-version wording. */
     @Test
     fun settingsScreenAvailableUpdateLight() {
-        render(darkTheme = false, latestVersion = "2026.9.13")
-        composeRule.onNodeWithText("Version 2026.9.13 is available on Zapstore.").assertIsDisplayed()
+        render(darkTheme = false, latestVersion = "2026.9.17")
+        composeRule.onNodeWithText("Version 2026.9.17 is available on Zapstore.").assertIsDisplayed()
         capture("settings_screen_available_update_light")
     }
 

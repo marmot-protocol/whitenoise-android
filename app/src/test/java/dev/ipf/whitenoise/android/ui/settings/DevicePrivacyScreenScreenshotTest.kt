@@ -251,7 +251,7 @@ class DevicePrivacyScreenScreenshotTest {
                 .fetchSemanticsNodes()
                 .maxBy { it.boundsInRoot.height }
                 .boundsInRoot
-        val disclosure = composeRule.onNodeWithText("Audit logs").fetchSemanticsNode().boundsInRoot
+        val disclosure = composeRule.onNodeWithText("Share technical logs").fetchSemanticsNode().boundsInRoot
         assertTrue("Choices $disclosure must fit inside $viewport", disclosure.bottom <= viewport.bottom)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
