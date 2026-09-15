@@ -7894,6 +7894,51 @@
         "test_ids": [
           "DIC-001"
         ]
+      },
+      {
+        "surface": "audit_upload:audit_upload_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.audit_upload_confirm",
+        "test_ids": [
+          "SEC-008",
+          "SEC-012"
+        ]
+      },
+      {
+        "surface": "audit_upload:audit_upload_confirm_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.audit_upload_confirm_title",
+        "test_ids": [
+          "SEC-008",
+          "SEC-012"
+        ]
+      },
+      {
+        "surface": "audit_upload:audit_upload_disclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.audit_upload_disclosure",
+        "test_ids": [
+          "SEC-008",
+          "SEC-012"
+        ]
+      },
+      {
+        "surface": "audit_upload:audit_upload_renew",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.audit_upload_renew",
+        "test_ids": [
+          "SEC-008",
+          "SEC-012"
+        ]
+      },
+      {
+        "surface": "audit_upload:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SEC-008",
+          "SEC-012"
+        ]
       }
     ],
     "manifest_permissions": [
