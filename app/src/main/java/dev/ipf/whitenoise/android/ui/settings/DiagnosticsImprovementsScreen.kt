@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -139,7 +140,10 @@ internal fun DiagnosticsImprovementsScreen(
             item {
                 Text(
                     stringResource(R.string.delete_audit_logs_subtitle),
-                    modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset),
+                    modifier =
+                        Modifier
+                            .padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset)
+                            .semantics { hideFromAccessibility() },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

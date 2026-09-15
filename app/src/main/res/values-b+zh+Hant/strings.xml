@@ -1918,7 +1918,7 @@
     <string name="audit_upload_title">分享群組診斷日誌</string>
     <string name="audit_upload_subtitle">自動收集並上傳此裝置上所有個人檔案的群組技術日誌。</string>
     <string name="audit_upload_confirm_title">與 White Noise 分享群組診斷日誌？</string>
-    <string name="audit_upload_disclosure">啟用後，此裝置上所有身分的診斷稽核記錄都會儲存在本機，並自動上傳至由 Internet Privacy Foundation 營運的 Goggles。先前記錄的日誌也可能上傳。記錄可能包含群組與訊息識別碼、中繼位址、時間戳記、化名帳戶參照、安裝識別碼、裝置型號及應用程式版本，但不包含訊息內容或私密金鑰。這些記錄屬於敏感資料，會保留用於調查可靠性問題。此選項與使用情況和診斷分享相互獨立。關閉分享會停止新的記錄並阻止啟動新的上傳批次。已在進行的批次可能會繼續完成其中所有檔案的上傳。這不會刪除已儲存在本機或已上傳的記錄。取消會讓分享保持關閉。</string>
+    <string name="audit_upload_disclosure">啟用後，此裝置上所有身分的群組診斷日誌都會儲存在本機，並自動上傳至由 Internet Privacy Foundation 營運的 Goggles。先前記錄的日誌也可能上傳。記錄可能包含群組與訊息識別碼、中繼位址、時間戳記、化名帳戶參照、安裝識別碼、裝置型號及應用程式版本，但不包含訊息內容或私密金鑰。這些記錄屬於敏感資料，會保留用於調查可靠性問題。此選項與使用情況和遙測分享相互獨立。關閉分享會停止新的記錄並阻止啟動新的上傳批次。已在進行的批次可能會繼續完成其中所有檔案的上傳。這不會刪除已儲存在本機或已上傳的記錄。取消會讓分享保持關閉。</string>
     <string name="audit_upload_confirm">啟用自動分享</string>
     <string name="audit_upload_renew">群組診斷日誌分享將保持關閉，直到你閱讀自動上傳說明並重新作出選擇。</string>
     <string name="diagnostics_group_disclosure">群組診斷日誌有助於調查群組的可靠性和一致性。日誌包含技術識別碼、時間戳記和成員變動，並使用雜湊參照代替成員身分。日誌絕不包含訊息內容、個人檔案名稱、群組名稱或私密金鑰。</string>

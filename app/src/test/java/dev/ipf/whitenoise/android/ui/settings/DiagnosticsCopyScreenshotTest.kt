@@ -3,6 +3,9 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
@@ -92,6 +95,9 @@ class DiagnosticsCopyScreenshotTest {
                 context.getString(R.string.diagnostics_storage_device),
                 context.getString(R.string.delete_audit_logs_subtitle),
             ).joinToString(". "),
+        )
+        composeRule.onNodeWithText(context.getString(R.string.delete_audit_logs_subtitle)).assert(
+            SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility),
         )
         if (export) {
             composeRule.onNodeWithText(context.getString(R.string.export_audit_logs)).performScrollTo().performClick()
