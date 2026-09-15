@@ -6857,24 +6857,6 @@
         ]
       },
       {
-        "surface": "FocusedActionCell",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
-        "anchor": "fun FocusedActionCell(",
-        "test_ids": [
-          "MSG-004",
-          "MSG-005"
-        ]
-      },
-      {
-        "surface": "FocusedActionLabel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
-        "anchor": "fun FocusedActionLabel(",
-        "test_ids": [
-          "MSG-004",
-          "MSG-005"
-        ]
-      },
-      {
         "surface": "FocusedRenderedMessagePreview",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
         "anchor": "fun FocusedRenderedMessagePreview(",
