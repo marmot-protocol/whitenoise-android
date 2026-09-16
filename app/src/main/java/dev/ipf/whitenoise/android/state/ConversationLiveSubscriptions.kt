@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.ConversationOpenModeFfi
 import dev.ipf.marmotkit.GroupStateSubscription
 import dev.ipf.marmotkit.TimelineMessagesSubscription
 import dev.ipf.marmotkit.TimelinePageFfi
@@ -25,6 +26,21 @@ internal interface ConversationTimelineSubscriptionHandle {
 
     /** Releases the underlying MDK subscription. */
     fun close()
+
+    /** Sidecar of the newest installed window replacement; null on seams without a window. */
+    fun latestWindowFrame(): ConversationWindowFrame? = null
+
+    /** Reports the row the reader sees; null when the seam has no window or nothing newer was installed. */
+    suspend fun setVisibleAnchor(messageIdHex: String): TimelinePageFfi? = null
+
+    /** Recenters on a retained message; throws `ConversationWindowMessageNotRetained` when MDK dropped it. */
+    suspend fun jumpToMessage(messageIdHex: String): TimelinePageFfi? = null
+
+    /** Resumes following the tail; null when the seam has no window or nothing newer was installed. */
+    suspend fun returnToLatest(): TimelinePageFfi? = null
+
+    /** Wakes pending window operations before [close]; a no-op on seams without a window. */
+    suspend fun cancel() = Unit
 }
 
 internal interface ConversationGroupStateSubscriptionHandle {
@@ -81,9 +97,16 @@ internal class ConversationLiveSubscriptions(
             ConversationLiveSubscriptions(
                 openTimeline = { account, groupIdHex, limit ->
                     appState.marmotIo {
-                        FfiConversationTimelineSubscriptionHandle(
-                            subscribeTimelineMessages(account, groupIdHex, limit),
-                        )
+                        val window =
+                            openConversationWindow(
+                                accountRef = account,
+                                groupIdHex = groupIdHex,
+                                mode = ConversationOpenModeFfi.AUTOMATIC,
+                                messageIdHex = null,
+                                initialRows = limit.coerceIn(1u, CONVERSATION_WINDOW_MAX_ROWS),
+                                timeoutMs = CONVERSATION_WINDOW_DEFAULT_DEADLINE,
+                            )
+                        FfiConversationWindowHandle(window, release = window::close)
                     }
                 },
                 openGroupState = { account, groupIdHex ->

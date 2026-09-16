@@ -6724,7 +6724,11 @@ class ConversationController(
     // the returned page directly instead of merging against a hand-rolled
     // cursor.
     @Volatile
-    private var timelineSubscription: ConversationTimelineSubscriptionHandle? = null
+    internal var timelineSubscription: ConversationTimelineSubscriptionHandle? = null
+        private set
+
+    /** Newest installed conversation-window sidecar: header, capabilities, draft and reaction references. */
+    internal val window = ConversationWindowState()
     private val liveSubscriptionLock = Any()
     private val timelineSubscriptionActiveCallMutex = Mutex()
     private var groupStateSubscription: ConversationGroupStateSubscriptionHandle? = null
@@ -6906,7 +6910,13 @@ class ConversationController(
     val canSendMessages: Boolean
         // The engine gates all ordinary outbound work while a disband
         // converges and forever after it lands; mirror that on the composer.
-        get() = membersVerified && isSelfMember && !group.unrecoverable && !group.disbanding && !group.disbanded
+        get() =
+            membersVerified &&
+                isSelfMember &&
+                !group.unrecoverable &&
+                !group.disbanding &&
+                !group.disbanded &&
+                window.allowsSend
 
     val canLeaveGroup: Boolean
         get() = GroupProjector.canLeaveGroup(group, conversationAccountIdHex, memberCount)
@@ -7582,6 +7592,7 @@ class ConversationController(
                     }
                 }
                 withContext(Dispatchers.IO) {
+                    runCatching { timelineStream.cancel() }
                     runCatching { timelineStream.close() }
                 }
             }
@@ -10681,6 +10692,7 @@ class ConversationController(
         messageIdHex: String,
         maxOlderPages: Int = ReplyNavigation.MaxOlderPages,
     ): Boolean {
+        if (jumpWindowToMessage(messageIdHex)) return true
         var loadedPageCount = 0
         while (
             ReplyNavigation.shouldLoadOlder(
@@ -10693,6 +10705,14 @@ class ConversationController(
             if (!loadOlderPage()) break
             loadedPageCount += 1
         }
+        return timelineRecords.containsKey(messageIdHex)
+    }
+
+    /** Recenters the live window on a retained message; false when MDK no longer retains it or there is no window. */
+    private suspend fun jumpWindowToMessage(messageIdHex: String): Boolean {
+        val jump = runCatchingCancellable { timelineSubscription?.jumpToMessage(messageIdHex) }
+        val page = jump.getOrNull() ?: return false
+        applyTimelinePage(page, replaceWindow = true, updatePagination = true)
         return timelineRecords.containsKey(messageIdHex)
     }
 
@@ -11032,7 +11052,7 @@ class ConversationController(
     }
 
     /** Applies one timeline page and invalidates suspended whole-window refreshes. */
-    private suspend fun applyTimelinePage(
+    internal suspend fun applyTimelinePage(
         page: TimelinePageFfi,
         replaceWindow: Boolean,
         updatePagination: Boolean,
@@ -11081,6 +11101,7 @@ class ConversationController(
         pruneRetentionAtSendToWindow()
         pruneConfirmedOptimisticReactions()
         pruneMessageOverlaysToWindow()
+        installWindowFrame()
         recomputeReactions()
         // A non-replaceWindow page (older-history load once hasLoadedOlderPages
         // is set) skips the replaceWindow trim above, so prune messageById to the
@@ -12160,25 +12181,7 @@ class ConversationController(
             }
         }
         val computed =
-            sendersByTarget
-                .mapValues { (_, byEmoji) ->
-                    byEmoji
-                        .mapNotNull { (emoji, senders) ->
-                            if (senders.isEmpty()) {
-                                null
-                            } else {
-                                ReactionTally(
-                                    emoji = emoji,
-                                    count = senders.size,
-                                    mine = mine != null && senders.contains(mine),
-                                )
-                            }
-                        }.sortedWith(
-                            compareByDescending<ReactionTally> { it.count }
-                                .thenByDescending { it.mine }
-                                .thenBy { it.emoji },
-                        )
-                }.filterValues { it.isNotEmpty() }
+            reactionTalliesForWindow(sendersByTarget, window.frame?.references, optimisticReactionChanges.values, mine)
         reactionsState.keys.retainAll(computed.keys)
         reactionsState.putAll(computed)
     }
@@ -12195,7 +12198,10 @@ class ConversationController(
         }
     }
 
+    /** Chips for one message: window references when retained, otherwise confirmed senders plus optimistic changes. */
     private fun reactionTalliesFor(targetMessageId: String): List<ReactionTally> {
+        val changes = optimisticReactionChanges.values.filter { it.targetMessageId == targetMessageId }
+        window.references(targetMessageId)?.let { return windowReactionTallies(it.reactions, changes) }
         val confirmed = linkedMapOf<String, MutableSet<String>>()
         timelineRecords[targetMessageId]?.reactions?.byEmoji.orEmpty().forEach { summary ->
             confirmed.getOrPut(summary.emoji) { linkedSetOf() }.addAll(summary.senders)
@@ -12207,8 +12213,11 @@ class ConversationController(
         )
     }
 
+    /** Who reacted to one message; window mode lists MDK's bounded reactor preview plus the viewer's pending changes. */
     fun reactionParticipantsFor(targetMessageId: String): List<ReactionParticipant> {
         val mine = conversationAccountIdHex
+        val changes = optimisticReactionChanges.values.filter { it.targetMessageId == targetMessageId }
+        window.references(targetMessageId)?.let { return windowReactionParticipants(it.reactions, mine, changes) }
         val participants =
             timelineRecords[targetMessageId]
                 ?.reactions

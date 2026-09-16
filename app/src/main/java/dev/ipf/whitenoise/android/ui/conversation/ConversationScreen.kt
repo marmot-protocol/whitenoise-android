@@ -130,6 +130,8 @@ import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
+import dev.ipf.whitenoise.android.state.reportVisibleMessage
+import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
@@ -3005,6 +3007,7 @@ internal fun ConversationScreen(
             .collect { messageId ->
                 if (messageId.isNotBlank()) {
                     controller.markReadUpTo(messageId)
+                    controller.reportVisibleMessage(messageId)
                 }
             }
     }
@@ -3952,6 +3955,7 @@ internal fun ConversationScreen(
                                                         }
                                                         ConversationJumpToNewestOutcome.Tail -> {
                                                             unreadJumpState = unreadJumpState.suppressCurrentStack()
+                                                            controller.returnToLatestWindow()
                                                         }
                                                         ConversationJumpToNewestOutcome.Cancelled -> Unit
                                                     }
