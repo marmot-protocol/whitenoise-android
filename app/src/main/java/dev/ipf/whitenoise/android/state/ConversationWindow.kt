@@ -27,6 +27,12 @@ internal const val CONVERSATION_WINDOW_MAX_ROWS: UInt = 200u
 /** `timeoutMs = 0` selects MDK's 30-second deadline for opening and every window command. */
 internal const val CONVERSATION_WINDOW_DEFAULT_DEADLINE: UInt = 0u
 
+/**
+ * Deadline for opening a window. MDK's default is 30 seconds, which is how long a reader would stare at a
+ * spinner before the timeline fallback engages; eight seconds is ample for a healthy open of 50 rows.
+ */
+internal const val CONVERSATION_WINDOW_OPEN_DEADLINE_MS: UInt = 8_000u
+
 /** Pause before receiving again while MDK reports the window not ready, so a repair cannot spin the loop. */
 internal const val CONVERSATION_WINDOW_NOT_READY_RETRY_MS = 250L
 

@@ -210,7 +210,7 @@ private class FakeWindow(
     )
 }
 
-private fun presentedRow(groupIdHex: String) =
+internal fun presentedRow(groupIdHex: String) =
     PresentedChatRowFfi(
         row = chatRow(groupIdHex),
         presentation =
@@ -224,7 +224,7 @@ private fun presentedRow(groupIdHex: String) =
             ),
     )
 
-private fun chatRow(groupIdHex: String) =
+internal fun chatRow(groupIdHex: String) =
     ChatListRowFfi(
         groupIdHex = groupIdHex,
         pinned = false,

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.util.Log
 import dev.ipf.whitenoise.android.BuildConfig
+import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupCoordinator
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.withTimeoutOrNull
@@ -16,7 +17,7 @@ internal inline fun appStateDebug(message: () -> String) {
     if (BuildConfig.DEBUG) Log.i("DMAppState", message())
 }
 
-/** Emits a debug throwable while retaining only a generic release-build failure marker. */
+/** Emits a debug throwable while retaining only a release-safe failure marker in release builds. */
 internal inline fun appStateDebug(
     error: Throwable,
     message: () -> String,
@@ -24,9 +25,57 @@ internal inline fun appStateDebug(
     if (BuildConfig.DEBUG) {
         Log.e("DMAppState", message(), error)
     } else {
-        Log.e("DMAppState", "operation_failed")
+        Log.e("DMAppState", releaseFailureMarker("APP_STATE", error, message()))
     }
 }
+
+/** Deployment environments whose release logs may carry a redacted note beside the failure marker. */
+private val VERBOSE_RELEASE_LOG_ENVIRONMENTS = setOf("dev", "preview", "staging")
+
+/** Longest redacted note a release log line carries. */
+private const val RELEASE_LOG_NOTE_LIMIT = 200
+
+/**
+ * The failure line a release build logs: the operation, the stable error category and the MarmotKit
+ * error variant, never exception text. Non-production environments (dev, preview, staging) also carry the
+ * caller's note after [redactForReleaseLog], so their logcat can explain a failure without identifiers.
+ * The shapes this must never emit are enforced by `scripts/verify-release-runtime.sh`.
+ */
+internal fun releaseFailureMarker(
+    operation: String,
+    error: Throwable,
+    note: String? = null,
+): String =
+    buildString {
+        append("operation_failed op=").append(operation)
+        append(" code=").append(DiagnosticFormatter.errorCode(error))
+        DiagnosticFormatter.marmotVariant(error)?.let { append(" mdk=").append(it) }
+        if (note != null && BuildConfig.WHITENOISE_DEPLOYMENT_ENVIRONMENT in VERBOSE_RELEASE_LOG_ENVIRONMENTS) {
+            append(" note=").append(redactForReleaseLog(note))
+        }
+    }
+
+private val HEX_IDENTIFIER = Regex("[0-9a-fA-F]{64}")
+private val BECH32_IDENTIFIER = Regex("\\b(npub1|nsec1|nprofile1|note1|nevent1)[0-9a-z]+")
+private val URL_OR_PATH = Regex("https?://\\S+|/data/\\S*")
+private val FIELD_TOKENS = Regex("\\b(details?|group|message|filename|path|report|error|reason)=")
+
+/**
+ * Strips every identifier and error-text shape release logs must never carry: 64-hex ids, bech32 keys,
+ * URLs and data paths, the `field=` tokens the runtime verifier rejects, and exception wording. What
+ * remains is operational prose such as which step failed.
+ */
+internal fun redactForReleaseLog(text: String): String =
+    text
+        .replace(HEX_IDENTIFIER, "<hex>")
+        .replace(BECH32_IDENTIFIER, "<bech32>")
+        .replace(URL_OR_PATH, "<url>")
+        .replace(FIELD_TOKENS) { "${it.groupValues[1]}:" }
+        .replace("Caused by:", "cause:")
+        .replace("Exception", "Exc")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+        .take(RELEASE_LOG_NOTE_LIMIT)
 
 /** Waits for one bootstrap attempt without propagating an actionable-shell timeout. */
 internal suspend fun awaitBootstrapAttempt(

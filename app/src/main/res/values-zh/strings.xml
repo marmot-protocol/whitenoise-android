@@ -6,6 +6,8 @@
     <string name="startup_taking_too_long">启动时间超出预期。请重试。</string>
     <string name="error_try_again">出现问题。请重试；如果问题仍然存在，请复制错误报告。</string>
     <string name="error_restart_app_before_retry">本地对话仍在加载中。请重启 White Noise 后再试。</string>
+    <string name="error_not_ready">White Noise 仍在为此账号完成更新。通常不到一分钟，并会自动重试。</string>
+    <string name="error_window_timed_out">此聊天打开的时间比平常长。正在继续重试；您的消息是安全的。</string>
     <string name="error_loaded_content_may_be_out_of_date">已加载的内容仍然可用，但可能不是最新的。正在重试…</string>
     <string name="error_loaded_content_kept">无法加载更多内容。你的消息仍然可用；请在方便时重试。</string>
     <string name="error_conversation_membership_unavailable">无法验证此对话的成员。请重试以显示你的消息。</string>

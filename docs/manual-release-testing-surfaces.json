@@ -7985,6 +7985,50 @@
         "test_ids": [
           "ACC-016"
         ]
+      },
+      {
+        "surface": "Chat list or conversation still finishing the MarmotKit update",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.error_not_ready",
+        "test_ids": [
+          "INT-010",
+          "CHL-015",
+          "CON-015"
+        ]
+      },
+      {
+        "surface": "Conversation window open exceeded its deadline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.error_window_timed_out",
+        "test_ids": [
+          "CON-015"
+        ]
+      },
+      {
+        "surface": "Loaded chats or messages kept while a refresh failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.error_loaded_content_may_be_out_of_date",
+        "test_ids": [
+          "CHL-015",
+          "CON-015"
+        ]
+      },
+      {
+        "surface": "Conversation open exceeded the local read budget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.error_restart_app_before_retry",
+        "test_ids": [
+          "CON-015"
+        ]
+      },
+      {
+        "surface": "Generic retry copy for a failed chat list or conversation load",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "CHL-015",
+          "CON-015"
+        ]
       }
     ],
     "settings_controls": [
