@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from urllib.parse import urlsplit
 
-FIELDS = ("EVENTS_ENDPOINT", "APP_KEY", "OPERATOR", "RETENTION")
+FIELDS = ("EVENTS_ENDPOINT", "APP_KEY", "OPERATOR")
 
 
 def read_config(source: str) -> dict[str, str]:

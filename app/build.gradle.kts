@@ -550,7 +550,7 @@ android {
         // Each environment has its own product destination/key; previews receive neither.
         listOf("dev", "preview", "staging", "production").forEach { environment ->
             named(environment) {
-                listOf("PRODUCT_EVENTS_ENDPOINT", "PRODUCT_APP_KEY", "PRODUCT_OPERATOR", "PRODUCT_RETENTION").forEach { suffix ->
+                listOf("PRODUCT_EVENTS_ENDPOINT", "PRODUCT_APP_KEY", "PRODUCT_OPERATOR").forEach { suffix ->
                     buildConfigField(
                         "String",
                         "WHITENOISE_$suffix",

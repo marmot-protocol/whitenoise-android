@@ -30,7 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.DiagnosticsExporterStatusFfi
-import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
@@ -40,25 +39,16 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 /** Shows the actual collection scope wherever a user can grant the expanded MDK receipt. */
 @Composable
 internal fun UsageDiagnosticsDisclosure() {
-    val operator =
-        BuildConfig.WHITENOISE_PRODUCT_OPERATOR
-            .takeUnless { it.isBlank() || it == "white_noise" } ?: "White Noise"
-    val retention =
-        BuildConfig.WHITENOISE_PRODUCT_RETENTION
-            .ifBlank { stringResource(R.string.usage_diagnostics_retention_unknown) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.usage_diagnostics_disclosure), style = MaterialTheme.typography.bodySmall)
-        Text(
-            stringResource(
-                R.string.usage_diagnostics_operator,
-                operator,
-            ),
-            style = MaterialTheme.typography.bodySmall,
-        )
-        Text(
-            retention,
-            style = MaterialTheme.typography.bodySmall,
-        )
+        listOf(
+            R.string.usage_diagnostics_disclosure,
+            R.string.diagnostics_group_disclosure,
+            R.string.diagnostics_existing_logs,
+            R.string.diagnostics_retention,
+            R.string.diagnostics_disable_disclosure,
+        ).forEach { text ->
+            Text(stringResource(text), style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
 
@@ -165,6 +155,7 @@ private fun ColumnScope.UsageDiagnosticsPromptBody(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.ConversationCluster),
     ) {
+        Text(stringResource(R.string.usage_diagnostics_prompt_intro), style = MaterialTheme.typography.bodyMedium)
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,

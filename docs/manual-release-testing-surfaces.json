@@ -5860,18 +5860,12 @@
       },
       {
         "surface": "DonateScreen",
+        "note": "Donate opens the Android-attributed foundation URL and reports browser refusal with a retryable action.",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
         "anchor": "fun DonateScreen(",
         "test_ids": [
-          "SET-022"
-        ]
-      },
-      {
-        "surface": "DonationMethodSelector",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
-        "anchor": "fun DonationMethodSelector(",
-        "test_ids": [
-          "SET-022"
+          "SET-022",
+          "SET-026"
         ]
       },
       {
@@ -11418,16 +11412,6 @@
         ]
       },
       {
-        "surface": "usage_diagnostics_operator",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
-        "anchor": "R.string.usage_diagnostics_operator",
-        "test_ids": [
-          "SEC-007",
-          "SEC-012",
-          "SEC-013"
-        ]
-      },
-      {
         "surface": "usage_diagnostics_permission_needed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
         "anchor": "R.string.usage_diagnostics_permission_needed",
@@ -11461,16 +11445,6 @@
         "surface": "usage_diagnostics_rejected",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
         "anchor": "R.string.usage_diagnostics_rejected",
-        "test_ids": [
-          "SEC-007",
-          "SEC-012",
-          "SEC-013"
-        ]
-      },
-      {
-        "surface": "usage_diagnostics_retention_unknown",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
-        "anchor": "R.string.usage_diagnostics_retention_unknown",
         "test_ids": [
           "SEC-007",
           "SEC-012",
@@ -12806,102 +12780,6 @@
         "surface": "string:back",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
         "anchor": "R.string.back",
-        "test_ids": [
-          "SET-022"
-        ]
-      },
-      {
-        "surface": "string:copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
-        "anchor": "R.string.copied",
-        "test_ids": [
-          "SET-022"
-        ]
-      },
-      {
-        "surface": "string:donate_bitcoin_silent_payment",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
-        "anchor": "R.string.donate_bitcoin_silent_payment",
-        "test_ids": [
-          "SET-022"
-        ]
-      },
-      {
-        "surface": "string:donate_bitcoin_silent_payment_value",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
-        "anchor": "R.string.donate_bitcoin_silent_payment_value",
-        "test_ids": [
-          "SET-022"
-        ]
-      },
-      {
-        "surface": "string:donate_lightning_address",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
-        "anchor": "R.string.donate_lightning_address",
-        "test_ids": [
-          "SET-022"
-        ]
-      },
-      {
-        "surface": "string:donate_lightning_value",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
-        "anchor": "R.string.donate_lightning_value",
-        "test_ids": [
-          "SET-022"
-        ]
-      },
-      {
-        "surface": "string:donate_method_bitcoin",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
-        "anchor": "R.string.donate_method_bitcoin",
-        "test_ids": [
-          "SET-022"
-        ]
-      },
-      {
-        "surface": "string:donate_method_lightning",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
-        "anchor": "R.string.donate_method_lightning",
-        "test_ids": [
-          "SET-022"
-        ]
-      },
-      {
-        "surface": "string:donation_address",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
-        "anchor": "R.string.donation_address",
-        "test_ids": [
-          "SET-022"
-        ]
-      },
-      {
-        "surface": "string:donation_address_copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
-        "anchor": "R.string.donation_address_copied",
-        "test_ids": [
-          "SET-022"
-        ]
-      },
-      {
-        "surface": "string:donation_copy_address",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
-        "anchor": "R.string.donation_copy_address",
-        "test_ids": [
-          "SET-022"
-        ]
-      },
-      {
-        "surface": "string:donation_qr_code",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
-        "anchor": "R.string.donation_qr_code",
-        "test_ids": [
-          "SET-022"
-        ]
-      },
-      {
-        "surface": "string:not_copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
-        "anchor": "R.string.not_copied",
         "test_ids": [
           "SET-022"
         ]
@@ -21034,6 +20912,99 @@
         "test_ids": [
           "SEC-008",
           "SEC-012"
+        ]
+      },
+      {
+        "surface": "string:settings_donate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
+        "anchor": "R.string.settings_donate",
+        "test_ids": [
+          "SET-022"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_disable_disclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.diagnostics_disable_disclosure",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_existing_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.diagnostics_existing_logs",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_group_disclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.diagnostics_group_disclosure",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_retention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.diagnostics_retention",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012"
+        ]
+      },
+      {
+        "surface": "string:usage_diagnostics_prompt_intro",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.usage_diagnostics_prompt_intro",
+        "test_ids": [
+          "SEC-007",
+          "SEC-012"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_clear_confirm_action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.diagnostics_clear_confirm_action",
+        "test_ids": [
+          "SEC-010"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_clear_confirm_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.diagnostics_clear_confirm_body",
+        "test_ids": [
+          "SEC-010"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_clear_confirm_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.diagnostics_clear_confirm_title",
+        "test_ids": [
+          "SEC-010"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_storage_device",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.diagnostics_storage_device",
+        "test_ids": [
+          "SEC-010"
+        ]
+      },
+      {
+        "surface": "string:donate_open_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
+        "anchor": "R.string.donate_open_failed",
+        "test_ids": [
+          "SET-026"
         ]
       }
     ],

@@ -20,6 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.auditLogShareChooserIntent
@@ -37,6 +40,12 @@ internal fun DiagnosticsImprovementsScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val clearLogsDescription =
+        listOf(
+            stringResource(R.string.delete_audit_logs),
+            stringResource(R.string.diagnostics_storage_device),
+            stringResource(R.string.delete_audit_logs_subtitle),
+        ).joinToString(". ")
     val state = appState.diagnostics
     var auditLogsBusy by remember { mutableStateOf(false) }
     var confirmAuditUpload by remember { mutableStateOf(false) }
@@ -119,13 +128,25 @@ internal fun DiagnosticsImprovementsScreen(
                         SettingsAction(
                             context = rowContext,
                             title = stringResource(R.string.delete_audit_logs),
+                            modifier = Modifier.semantics { contentDescription = clearLogsDescription },
                             onClick = { deleteConfirmOpen = true },
-                            subtitle = stringResource(R.string.delete_audit_logs_subtitle),
+                            subtitle = stringResource(R.string.diagnostics_storage_device),
                             enabled = !auditLogsBusy,
                             destructive = true,
                         )
                     }
                 }
+            }
+            item {
+                Text(
+                    stringResource(R.string.delete_audit_logs_subtitle),
+                    modifier =
+                        Modifier
+                            .padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset)
+                            .semantics { hideFromAccessibility() },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -148,15 +169,20 @@ internal fun DiagnosticsImprovementsScreen(
     if (deleteConfirmOpen) {
         WhiteNoiseAlertDialog(
             onDismissRequest = { deleteConfirmOpen = false },
-            title = { Text(stringResource(R.string.delete_audit_logs)) },
-            text = { Text(stringResource(R.string.delete_audit_logs_subtitle)) },
+            title = { Text(stringResource(R.string.diagnostics_clear_confirm_title)) },
+            text = { Text(stringResource(R.string.diagnostics_clear_confirm_body)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         deleteConfirmOpen = false
                         runAuditMutation { appState.deleteAuditLogs() }
                     },
-                ) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
+                ) {
+                    Text(
+                        stringResource(R.string.diagnostics_clear_confirm_action),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             },
             dismissButton = {
                 TextButton(onClick = { deleteConfirmOpen = false }) { Text(stringResource(R.string.cancel)) }
@@ -201,7 +227,7 @@ private fun DiagnosticsDisclosure(appState: WhiteNoiseAppState) {
     }
 }
 
-/** Export waits for an explicit acknowledgement that audit files may hold message content and identities. */
+/** Export requires an explicit acknowledgement that technical diagnostic data is sensitive. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun AuditLogExportConsentDialog(

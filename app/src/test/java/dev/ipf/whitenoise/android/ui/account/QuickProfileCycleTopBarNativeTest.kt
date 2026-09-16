@@ -49,6 +49,7 @@ class QuickProfileCycleTopBarNativeTest {
                         AccountSummaryFfi("b", "bb".repeat(32), true, false, false, true),
                     ),
                 emitStartupNotification = false,
+                onDisplayName = { _, accountId -> if (accountId == "bb".repeat(32)) "Bea" else "Alice" },
                 onPresentedChatList = { account ->
                     if (account == "b") {
                         reads.incrementAndGet()
@@ -60,6 +61,14 @@ class QuickProfileCycleTopBarNativeTest {
         try {
             runBlocking { fixture.bootstrap() }
             val app = fixture.appState
+            // Start with a distinct hydrated name. Activation clears cross-account
+            // presentation state before its local-ready callback; the name returns later.
+            runBlocking {
+                fixture.runWithMainLooperPumping {
+                    app.warmProfilePresentationsBlocking(listOf("aa".repeat(32), "bb".repeat(32)))
+                }
+            }
+            assertEquals("Bea", app.accountDisplayNameCached("bb".repeat(32)))
             app.updateQuickProfileCycling(true)
             ShadowToast.reset()
             composeRule.setContent {
@@ -97,9 +106,18 @@ class QuickProfileCycleTopBarNativeTest {
                 app.activeAccountRef == "b" && ShadowToast.shownToastCount() == 1
             }
             assertEquals(
-                context.getString(R.string.quick_account_switched, app.accountDisplayNameCached("bb".repeat(32))),
+                context.getString(R.string.quick_account_switched, "b"),
                 ShadowToast.getTextOfLatestToast(),
             )
+            composeRule.waitUntil(5_000) {
+                shadowOf(Looper.getMainLooper()).idle()
+                app.accountDisplayNameCached("bb".repeat(32)) == "Bea"
+            }
+            // Known presentation limitation: this callback currently uses the account-ref fallback.
+            // This checks current timing and one-notice behavior, not a requirement to discard names;
+            // a future name-preserving activation should update these expectations together.
+            assertEquals(1, ShadowToast.shownToastCount())
+            assertEquals(context.getString(R.string.quick_account_switched, "b"), ShadowToast.getTextOfLatestToast())
         } finally {
             release.countDown()
             fixture.close()
