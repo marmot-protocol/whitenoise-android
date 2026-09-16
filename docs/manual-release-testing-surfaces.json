@@ -7961,6 +7961,14 @@
           "CHL-010",
           "GRP-010"
         ]
+      },
+      {
+        "surface": "Key package relay history load failure toast",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateKeyPackages.kt",
+        "anchor": "R.string.toast_couldnt_load_key_packages",
+        "test_ids": [
+          "ACC-016"
+        ]
       }
     ],
     "settings_controls": [
