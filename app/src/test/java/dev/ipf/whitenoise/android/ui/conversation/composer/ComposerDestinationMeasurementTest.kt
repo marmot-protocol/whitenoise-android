@@ -1,101 +1,64 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.ExperimentalTextApi
-import androidx.compose.ui.text.TextMeasurer
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.createFontFamilyResolver
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.sp
-import androidx.test.core.app.ApplicationProvider
-import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
-
-private const val EDITING_WIDTH_PX = 600
-private const val COMPACT_WIDTH_PX = 300
 
 /**
- * A bulk insert must be measured at the width the composer settles at. Measuring at the width it is
- * leaving produced a taller first target, which the wider editing inset then contradicted mid-animation.
+ * Which width the composer measures its draft at. Measuring at the width the draft is leaving made a
+ * bulk insert grow in steps: the compact measurement produced a tall target, the extra lines then
+ * adopted the editing layout, and its wider inset re-wrapped the text shorter mid-animation.
+ *
+ * The branch is asserted here rather than through a rendered draft because the unit-test text layout
+ * does not wrap — it reports one line at every width — so a line-count fixture could never cross.
  */
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class ComposerDestinationMeasurementTest {
-    @OptIn(ExperimentalTextApi::class)
-    private val measurer =
-        TextMeasurer(
-            defaultFontFamilyResolver = createFontFamilyResolver(ApplicationProvider.getApplicationContext()),
-            defaultDensity = Density(1f),
-            defaultLayoutDirection = LayoutDirection.Ltr,
+    /** A draft whose compact wrap reaches the crossover is measured at the editing width. */
+    @Test
+    fun draftCrossingTheLineThresholdMeasuresAtTheEditingWidth() {
+        assertTrue(
+            measuresAtEditingWidth(compactLineCount = COMPOSER_MULTILINE_CONTROL_LINES),
         )
-    private val style = TextStyle(fontSize = 16.sp)
-
-    /** A draft that will cross into the editing layout is measured at the editing width straight away. */
-    @Test
-    fun draftCrossingIntoEditingIsMeasuredAtTheEditingWidth() {
-        val text = AnnotatedString((1..8).joinToString(" ") { "word$it wraps here" })
-        val destination = layoutFor(text, startsEditing = false)
-        val atEditingWidth = measure(text, EDITING_WIDTH_PX)
-
-        assertTrue("the draft must reach the editing layout for this case", atEditingWidth.lineCount >= 1)
-        assertEquals(atEditingWidth.lineCount, destination.lineCount)
-        assertEquals(atEditingWidth.size.height, destination.size.height)
-    }
-
-    /** A draft already in the editing layout skips the compact pass entirely. */
-    @Test
-    fun draftAlreadyEditingIsMeasuredAtTheEditingWidth() {
-        val text = AnnotatedString("short draft")
-        assertEquals(
-            measure(text, EDITING_WIDTH_PX).size.height,
-            layoutFor(text, startsEditing = true).size.height,
+        assertTrue(
+            measuresAtEditingWidth(compactLineCount = COMPOSER_MULTILINE_CONTROL_LINES + 4),
         )
     }
 
-    /** A one-line draft that stays compact keeps the compact measurement. */
+    /** A draft still short of the crossover keeps the compact width it is rendered at. */
     @Test
-    fun shortCompactDraftKeepsTheCompactWidth() {
-        val text = AnnotatedString("hi")
-        val destination = layoutFor(text, startsEditing = false)
-        assertEquals(measure(text, COMPACT_WIDTH_PX).size.height, destination.size.height)
-        assertEquals(1, destination.lineCount)
+    fun draftBelowTheLineThresholdKeepsTheCompactWidth() {
+        for (lines in 0 until COMPOSER_MULTILINE_CONTROL_LINES) {
+            assertFalse("a $lines-line draft must stay compact", measuresAtEditingWidth(compactLineCount = lines))
+        }
     }
 
-    /** With the multiline controls suppressed the composer never crosses over, so it stays compact. */
+    /** A draft already in the editing layout is measured there whatever its compact wrap would be. */
     @Test
-    fun suppressedMultilineControlsKeepTheCompactWidth() {
-        val text = AnnotatedString((1..8).joinToString(" ") { "word$it wraps here" })
-        val destination = layoutFor(text, startsEditing = false, multilineControlsSuppressed = true)
-        assertEquals(measure(text, COMPACT_WIDTH_PX).size.height, destination.size.height)
+    fun draftAlreadyEditingMeasuresAtTheEditingWidth() {
+        assertTrue(measuresAtEditingWidth(compactLineCount = 1, startsEditing = true))
+        assertTrue(
+            measuresAtEditingWidth(compactLineCount = 1, startsEditing = true, multilineControlsSuppressed = true),
+        )
     }
 
-    private fun layoutFor(
-        text: AnnotatedString,
-        startsEditing: Boolean,
+    /** With the multiline controls suppressed the composer never crosses over, however long the draft. */
+    @Test
+    fun suppressedMultilineControlsNeverCrossOver() {
+        assertFalse(
+            measuresAtEditingWidth(
+                compactLineCount = COMPOSER_MULTILINE_CONTROL_LINES + 10,
+                multilineControlsSuppressed = true,
+            ),
+        )
+    }
+
+    private fun measuresAtEditingWidth(
+        compactLineCount: Int,
+        startsEditing: Boolean = false,
         multilineControlsSuppressed: Boolean = false,
-    ) = composerDestinationTextLayout(
-        measurer = measurer,
-        text = text,
-        style = style,
-        editingWidthPx = EDITING_WIDTH_PX,
-        compactWidthPx = COMPACT_WIDTH_PX,
+    ) = composerMeasuresAtEditingWidth(
         startsEditing = startsEditing,
+        compactLineCount = compactLineCount,
         multilineControlsSuppressed = multilineControlsSuppressed,
-    )
-
-    private fun measure(
-        text: AnnotatedString,
-        widthPx: Int,
-    ) = measurer.measure(
-        text = text,
-        style = style,
-        constraints =
-            androidx.compose.ui.unit
-                .Constraints(maxWidth = widthPx),
     )
 }

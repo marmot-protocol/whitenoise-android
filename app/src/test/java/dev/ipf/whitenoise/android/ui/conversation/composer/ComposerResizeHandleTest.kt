@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -39,10 +40,13 @@ class ComposerResizeHandleTest {
         assertTrue("the grip must be wide enough to read as one", handle.width >= 24f)
     }
 
-    /** The one-line composer has nothing to resize, so it draws no grip. */
+    /**
+     * The one-line composer has nothing to resize, so it draws no grip. The draft is non-empty because
+     * that is what a real one-line composer holds, and non-empty text is itself an editing request.
+     */
     @Test
     fun oneLineComposerDrawsNoResizeHandle() {
-        render(ComposerExpansionMode.Automatic, draft = "")
+        render(ComposerExpansionMode.Automatic, draft = "Line one")
         composeRule.onNodeWithTag(COMPOSER_RESIZE_HANDLE_TAG).assertDoesNotExist()
     }
 
@@ -62,11 +66,12 @@ class ComposerResizeHandleTest {
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface {
-                    var value by mutableStateOf(TextFieldValue(draft, TextRange(draft.length)))
+                    var value by remember { mutableStateOf(TextFieldValue(draft, TextRange(draft.length))) }
+                    val focusRequester = remember { FocusRequester() }
                     Box(Modifier.width(300.dp).height(140.dp)) {
                         ComposerPill(
                             textFieldValue = value,
-                            composerFocus = FocusRequester(),
+                            composerFocus = focusRequester,
                             emojiPickerOpen = false,
                             onValueChange = { value = it },
                             onEmojiPickerToggle = {},

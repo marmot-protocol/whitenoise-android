@@ -634,7 +634,7 @@ internal fun ComposerPill(
             mode = expansionMode,
             dismissInProgress = dismissInProgress,
         )
-    val compactTextLayout =
+    val compactDraftMeasurement =
         compactMeasurementWidth?.let { measurementWidth ->
             val editingWidthPx =
                 with(density) {
@@ -669,7 +669,10 @@ internal fun ComposerPill(
                 )
             }
         }
-    val compactLineCount = compactTextLayout?.lineCount
+    val compactTextLayout = compactDraftMeasurement?.layout
+    // The crossover is decided by the width the draft is leaving, even when the height targets the
+    // width it is arriving at: the destination's own count can be lower and would suppress the change.
+    val compactLineCount = compactDraftMeasurement?.crossoverLineCount
     // The prototype animates the measured text row independently of discrete full-screen resizing.
     // Read frames in measurement so the field and its selection owner are never replaced.
     val animatedTextHeight =
