@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
+import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.SnippetHighlight
 
 /** Adapts an engine timeline row to the client-side search predicate, media types and labels included. */
@@ -13,8 +14,9 @@ internal fun searchableTimelineRecord(record: TimelineMessageRecordFfi): ChatLis
         override val messageIdHex = record.messageIdHex
         override val timelineAt = record.timelineAt
         override val sender = record.sender
-        override val mediaTypes = record.media.map { it.mediaType }
-        override val mediaLabels = record.media.map { it.fileName.ifBlank { it.mediaType } }
+        private val accepted = MessageAttachments.acceptedReferences(record.media)
+        override val mediaTypes = accepted.map { it.mediaType }
+        override val mediaLabels = accepted.map { it.fileName.ifBlank { it.mediaType } }
     }
 
 /** Needle searches highlight the hit; filter-only searches show the leading body or attachment label. */

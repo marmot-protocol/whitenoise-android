@@ -1579,6 +1579,9 @@
     <string name="text_attachment_preview_truncated">Questa anteprima Markdown è stata troncata per sicurezza. Apri il file in un’altra app per vedere il resto.</string>
     <string name="text_attachment_empty">Questo file di testo è vuoto.</string>
     <string name="text_attachment_download_failed">Impossibile scaricare questo file. Riprova o aprilo in un’altra app.</string>
+    <string name="media_attachment_rejected_title">Allegato non disponibile</string>
+    <string name="media_attachment_rejected_unsupported">Questo allegato usa un formato che questa versione di White Noise non può aprire.</string>
+    <string name="media_attachment_rejected_malformed">I dati dell’allegato sono malformati, quindi non può essere mostrato né scaricato.</string>
     <string name="text_attachment_preview_too_large">Questo file è troppo grande per un’anteprima sicura. Aprilo in un’altra app.</string>
     <string name="text_attachment_preview_invalid_encoding">Questo file non usa una codifica di testo supportata. Aprilo in un’altra app.</string>
     <string name="text_attachment_preview_binary">Questo file non sembra contenere testo sicuro. Aprilo in un’altra app.</string>

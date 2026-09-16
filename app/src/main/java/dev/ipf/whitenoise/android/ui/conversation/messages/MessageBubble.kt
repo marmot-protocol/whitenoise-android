@@ -76,6 +76,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.R
@@ -95,7 +96,6 @@ import dev.ipf.whitenoise.android.core.TimelineInvalidationPresentation
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.timelineInvalidationPresentation
 import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
-import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
 import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
@@ -105,6 +105,7 @@ import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
@@ -249,16 +250,17 @@ internal fun messageBubbleTimestampColor(
     }
 }
 
+/** Compact accepted references for legacy callers; see [rememberMessageAttachments] for indexed use. */
 @Composable
 internal fun rememberMessageMediaReferences(
     tags: List<MessageTagFfi>,
     messageIdHex: String,
     sourceEpoch: ULong?,
-    projectedMedia: List<MediaAttachmentReferenceFfi>?,
-): List<MediaAttachmentReferenceFfi> =
-    remember(tags, messageIdHex, sourceEpoch, projectedMedia) {
-        projectedMedia ?: MediaReferenceSupport.parseAllImetaTags(tags, sourceEpoch ?: 0uL)
-    }
+    projectedMedia: List<MediaAttachmentOutcomeFfi>?,
+): List<MediaAttachmentReferenceFfi> {
+    val attachments = rememberMessageAttachments(tags, messageIdHex, sourceEpoch, projectedMedia)
+    return attachments.references
+}
 
 internal fun messageBubbleLongPressPositionInWindow(
     rowCoordinates: LayoutCoordinates,
@@ -349,13 +351,14 @@ internal fun MessageBubble(
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
 ) {
     val record = item.record
-    val mediaReferences =
-        rememberMessageMediaReferences(
+    val messageAttachments =
+        rememberMessageAttachments(
             tags = record.tags,
             messageIdHex = record.messageIdHex,
             sourceEpoch = record.sourceEpoch,
             projectedMedia = item.projected?.media,
         )
+    val mediaReferences = messageAttachments.references
     val keptMessages = LocalKeptMessages.current
     // Null until the controller has bound an account, which is also the only
     // state in which a kept reference could not be scoped to one identity.
@@ -835,7 +838,8 @@ internal fun MessageBubble(
                     mediaReferences = mediaReferences,
                     editedText = editState?.latestText?.takeIf { record.kind == 9uL },
                     cachedAttachmentIndices =
-                        mediaReferences.indices
+                        messageAttachments.accepted
+                            .map { it.index }
                             .filterTo(mutableSetOf()) { attachmentIndex ->
                                 controller.hasCachedAttachment(record.messageIdHex, attachmentIndex)
                             },
@@ -1273,7 +1277,7 @@ internal fun MessageBubble(
     }
 
     val pendingAttachmentsForRecord = controller.pendingAttachmentsList(record.messageIdHex)
-    val bubbleMedia = rememberBubbleMedia(mediaReferences, pendingAttachmentsForRecord)
+    val bubbleMedia = rememberBubbleMedia(messageAttachments, pendingAttachmentsForRecord)
     val mediaCaption =
         MessageProjector.mediaCaption(
             message = record,
@@ -1692,7 +1696,7 @@ internal fun MessageBubble(
                                     context = context,
                                     controller = controller,
                                     messageIdHex = record.messageIdHex,
-                                    mediaReferences = mediaReferences,
+                                    attachments = messageAttachments.accepted,
                                     mine = mine,
                                     documentSaveFallback = documentSaveFallback,
                                 )

@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.projectedTimelineMessage
 import org.junit.Assert.assertEquals
@@ -139,7 +140,7 @@ class SharedMediaVisibilityTest {
         return message.copy(
             projected =
                 requireNotNull(message.projected).copy(
-                    media = listOf(reference(id, mediaType)),
+                    media = MessageAttachments.acceptedOutcomes(listOf(reference(id, mediaType))),
                     deleted = projectedDeleted,
                     retentionExpiresAt = retentionExpiresAt,
                 ),

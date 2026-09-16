@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
+import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.MessageProjector
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -829,7 +830,7 @@ internal fun forwardProjectionRecords(
                         record.plaintext == message.text && record.media.isEmpty()
                     is PreparedForwardMessage.Media ->
                         record.plaintext == message.caption.orEmpty() &&
-                            record.media.map { it.ciphertextSha256 } ==
+                            MessageAttachments.acceptedReferences(record.media).map { it.ciphertextSha256 } ==
                             references.map { it.ciphertextSha256 }
                 }
         }.associateBy(TimelineMessageRecordFfi::messageIdHex)

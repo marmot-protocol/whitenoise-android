@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionEmojiFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
+import dev.ipf.whitenoise.android.core.MessageAttachments
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -258,7 +259,7 @@ class TimelineProjectorTest {
                         deleted = true,
                         invalidationStatus = "LosingBranch",
                         mediaJson = """{"media_type":"image/jpeg"}""",
-                        media = listOf(mediaAttachment(fileName = "secret.jpg", mediaType = "image/jpeg")),
+                        media = listOf(secretImageAttachment()),
                     ),
             )
 
@@ -471,11 +472,14 @@ class TimelineProjectorTest {
         contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0)),
         kind = kind,
         mediaJson = mediaJson,
-        media = media,
+        media = MessageAttachments.acceptedOutcomes(media),
         agentTextStreamJson = null,
         deleted = deleted,
         invalidationStatus = invalidationStatus,
     )
+
+    /** The image attachment several projector cases hide behind a deleted or invalidated reply. */
+    private fun secretImageAttachment() = mediaAttachment(fileName = "secret.jpg", mediaType = "image/jpeg")
 
     private fun mediaAttachment(
         fileName: String,

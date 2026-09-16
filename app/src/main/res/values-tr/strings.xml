@@ -1577,6 +1577,9 @@
     <string name="text_attachment_preview_truncated">Bu Markdown önizlemesi güvenlik için kısaltıldı. Kalanını görmek için dosyayı başka bir uygulamada açın.</string>
     <string name="text_attachment_empty">Bu metin dosyası boş.</string>
     <string name="text_attachment_download_failed">Bu dosya indirilemedi. Tekrar deneyin veya başka bir uygulamada açın.</string>
+    <string name="media_attachment_rejected_title">Ek kullanılamıyor</string>
+    <string name="media_attachment_rejected_unsupported">Bu ek, White Noise’un bu sürümünün açamadığı bir biçim kullanıyor.</string>
+    <string name="media_attachment_rejected_malformed">Ek bilgileri bozuk olduğundan gösterilemiyor veya indirilemiyor.</string>
     <string name="text_attachment_preview_too_large">Bu dosya güvenle önizlemek için çok büyük. Başka bir uygulamada açın.</string>
     <string name="text_attachment_preview_invalid_encoding">Bu dosya desteklenen bir metin kodlaması kullanmıyor. Başka bir uygulamada açın.</string>
     <string name="text_attachment_preview_binary">Bu dosya güvenli metin içermiyor gibi görünüyor. Başka bir uygulamada açın.</string>

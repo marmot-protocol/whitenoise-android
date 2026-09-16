@@ -7684,6 +7684,14 @@
           "SEC-012",
           "SEC-013"
         ]
+      },
+      {
+        "surface": "RejectedAttachmentPlaceholder",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RejectedAttachment.kt",
+        "anchor": "fun RejectedAttachmentPlaceholder(",
+        "test_ids": [
+          "MED-017"
+        ]
       }
     ],
     "settings_controls": [

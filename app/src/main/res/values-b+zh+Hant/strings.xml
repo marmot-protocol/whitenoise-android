@@ -1555,6 +1555,9 @@
     <string name="text_attachment_preview_truncated">為確保安全，此 Markdown 預覽已截斷。請在其他應用程式中開啟檔案以查看其餘內容。</string>
     <string name="text_attachment_empty">此文字檔案為空。</string>
     <string name="text_attachment_download_failed">無法下載此檔案。請重試或在其他應用程式中開啟。</string>
+    <string name="media_attachment_rejected_title">附件無法使用</string>
+    <string name="media_attachment_rejected_unsupported">此附件使用的格式無法在此版本的 White Noise 中開啟。</string>
+    <string name="media_attachment_rejected_malformed">附件資訊格式有誤，因此無法顯示或下載。</string>
     <string name="text_attachment_preview_too_large">此檔案過大，無法安全預覽。請在其他應用程式中開啟。</string>
     <string name="text_attachment_preview_invalid_encoding">此檔案使用了不支援的文字編碼。請在其他應用程式中開啟。</string>
     <string name="text_attachment_preview_binary">此檔案似乎不包含可安全顯示的文字。請在其他應用程式中開啟。</string>

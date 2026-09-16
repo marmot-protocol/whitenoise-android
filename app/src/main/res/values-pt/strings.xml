@@ -1579,6 +1579,9 @@
     <string name="text_attachment_preview_truncated">Esta prévia em Markdown foi truncada por segurança. Abra o arquivo em outro aplicativo para ver o restante.</string>
     <string name="text_attachment_empty">Este arquivo de texto está vazio.</string>
     <string name="text_attachment_download_failed">Não foi possível baixar este arquivo. Tente novamente ou abra-o em outro aplicativo.</string>
+    <string name="media_attachment_rejected_title">Anexo indisponível</string>
+    <string name="media_attachment_rejected_unsupported">Este anexo usa um formato que esta versão do White Noise não consegue abrir.</string>
+    <string name="media_attachment_rejected_malformed">Os dados do anexo estão malformados, por isso não pode ser exibido nem baixado.</string>
     <string name="text_attachment_preview_too_large">Este arquivo é grande demais para uma prévia segura. Abra-o em outro aplicativo.</string>
     <string name="text_attachment_preview_invalid_encoding">Este arquivo não usa uma codificação de texto compatível. Abra-o em outro aplicativo.</string>
     <string name="text_attachment_preview_binary">Este arquivo não parece conter texto seguro. Abra-o em outro aplicativo.</string>

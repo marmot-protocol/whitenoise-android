@@ -1740,6 +1740,9 @@
     <string name="text_attachment_preview_truncated">This Markdown preview was truncated for safety. Open the file in another app to see the rest.</string>
     <string name="text_attachment_empty">This text file is empty.</string>
     <string name="text_attachment_download_failed">Couldn’t download this file. Try again or open it in another app.</string>
+    <string name="media_attachment_rejected_title">Attachment unavailable</string>
+    <string name="media_attachment_rejected_unsupported">This attachment uses a format this version of White Noise can’t open.</string>
+    <string name="media_attachment_rejected_malformed">The attachment details are malformed, so it can’t be shown or downloaded.</string>
     <string name="text_attachment_preview_too_large">This file is too large to preview safely. Open it in another app.</string>
     <string name="text_attachment_preview_invalid_encoding">This file doesn’t use a supported text encoding. Open it in another app.</string>
     <string name="text_attachment_preview_binary">This file doesn’t appear to contain safe text. Open it in another app.</string>

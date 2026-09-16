@@ -69,6 +69,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaPendingPlaceholder
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVideoBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVisualGridBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVoiceBubble
+import dev.ipf.whitenoise.android.ui.conversation.media.RejectedAttachmentPlaceholder
 import dev.ipf.whitenoise.android.ui.conversation.media.VoicePresentationAttachmentKey
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberVoicePresentationOwner
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
@@ -316,6 +317,11 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 reserveRetentionSpace = isFooterOwner && reserveRetentionSpace,
                 footerWarningText = fileFooterWarning.takeIf { isFooterOwner },
             )
+        }
+    }
+    if (!deleted && bubbleMedia.rejected.isNotEmpty()) {
+        bubbleMedia.rejected.forEach { entry ->
+            RejectedAttachmentPlaceholder(kind = entry.value.kind)
         }
     }
     if (!deleted && !bubbleMedia.hasConfirmedMedia && bubbleMedia.pendingAudio.isNotEmpty()) {

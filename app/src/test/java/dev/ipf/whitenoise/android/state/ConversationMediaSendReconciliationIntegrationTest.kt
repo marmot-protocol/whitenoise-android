@@ -29,6 +29,7 @@ import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
+import dev.ipf.whitenoise.android.core.MessageAttachments
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -195,7 +196,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
         replyToMessageIdHex = null,
         replyPreview = null,
         mediaJson = null,
-        media = listOf(reference),
+        media = MessageAttachments.acceptedOutcomes(listOf(reference)),
         agentTextStreamJson = null,
         groupSystem = null,
         reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),

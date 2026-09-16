@@ -37,6 +37,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -510,7 +511,7 @@ class MessageBubbleLongPressDragTest {
                 replyToMessageIdHex = null,
                 replyPreview = null,
                 mediaJson = null,
-                media = listOf(media),
+                media = MessageAttachments.acceptedOutcomes(listOf(media)),
                 agentTextStreamJson = null,
                 groupSystem = null,
                 reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),

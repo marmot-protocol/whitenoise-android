@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MediaAttachmentRejectionKindFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -195,6 +196,15 @@ class AttachmentDownloadGateTest {
             ),
         )
         assertFalse(isTransientAttachmentDownloadFailure(MarmotKitException.Runtime("download returned HTTP 404")))
+        assertFalse(
+            isTransientAttachmentDownloadFailure(
+                MarmotKitException.MediaAttachmentRejected(MediaAttachmentRejectionKindFfi.MISSING_FIELD, "no url"),
+            ),
+        )
+        assertFalse(isTransientAttachmentDownloadFailure(MarmotKitException.MediaUnfetchable("no eligible locator")))
+        assertTrue(isTransientAttachmentDownloadFailure(MarmotKitException.MediaDownloadFailed("request timed out")))
+        val integrityFailure = MarmotKitException.MediaDownloadFailed("plaintext hash mismatch")
+        assertFalse(isTransientAttachmentDownloadFailure(integrityFailure))
         assertFalse(isTransientAttachmentDownloadFailure(IllegalStateException("unexpected failure")))
     }
 

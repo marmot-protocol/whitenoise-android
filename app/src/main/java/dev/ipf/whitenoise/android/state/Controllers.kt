@@ -62,8 +62,10 @@ import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
+import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.MediaPreviewFallback
+import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageSearchConstraints
@@ -9068,7 +9070,7 @@ class ConversationController(
         // listMedia scan or parallel controller cache.
         val loadedKeys =
             timelineRecords.values.flatMap { record ->
-                record.media.mapIndexedNotNull { index, reference ->
+                MessageAttachments.accepted(record.media).mapNotNull { (index, reference) ->
                     if (reference.ciphertextSha256 in expiredCiphertextSha256) {
                         mediaCacheKey(account, record.messageIdHex, index)
                     } else {
@@ -10771,18 +10773,14 @@ class ConversationController(
     fun replyTargetMessageId(item: TimelineMessage): String? = ReplyNavigation.targetMessageId(item.record, item.projected)
 
     /**
-     * Resolve attachment references without duplicating MarmotKit's projection
-     * state. A projected list is authoritative even when empty; tag parsing is
-     * reserved for optimistic/compatibility records that do not have a
-     * projected row yet.
+     * Accepted attachments keyed by protocol index, without duplicating MarmotKit's
+     * projection state. A projected row is authoritative even when empty; positional
+     * tag parsing is reserved for optimistic/compatibility records without one.
      */
-    fun mediaReferencesFor(item: TimelineMessage): List<MediaAttachmentReferenceFfi> = item.projected?.media ?: mediaReferencesFor(item.record)
-
-    fun mediaReferencesFor(record: AppMessageRecordFfi): List<MediaAttachmentReferenceFfi> =
-        timelineRecords[record.messageIdHex]?.media
-            ?: MediaReferenceSupport.parseAllImetaTags(
-                tags = record.tags,
-                sourceEpoch = record.sourceEpoch ?: 0uL,
+    fun attachmentsFor(record: AppMessageRecordFfi): List<IndexedAttachment> =
+        timelineRecords[record.messageIdHex]?.media?.let(MessageAttachments::accepted)
+            ?: MessageAttachments.indexed(
+                MediaReferenceSupport.parseAllImetaTags(tags = record.tags, sourceEpoch = record.sourceEpoch ?: 0uL),
             )
 
     /**

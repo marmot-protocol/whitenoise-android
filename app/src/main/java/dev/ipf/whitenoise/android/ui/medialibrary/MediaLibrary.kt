@@ -67,6 +67,8 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.core.IndexedAttachment
+import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
@@ -284,8 +286,7 @@ private fun buildTiles(
     for (message in messages) {
         val record = message.record
         val mine = MessageProjector.isMine(record, myAccountId)
-        val references = message.mediaReferences()
-        references.forEachIndexed { index, reference ->
+        message.mediaAttachments().forEach { (index, reference) ->
             when {
                 MediaReferenceSupport.isImageMedia(reference) || MediaReferenceSupport.isVideoMedia(reference) -> {
                     val tile = message.toSharedMediaTile(index, reference, mine)
@@ -332,11 +333,14 @@ private fun buildTiles(
     )
 }
 
-private fun TimelineMessage.mediaReferences(): List<MediaAttachmentReferenceFfi> =
-    projected?.media
-        ?: MediaReferenceSupport.parseAllImetaTags(
-            tags = record.tags,
-            sourceEpoch = record.sourceEpoch ?: 0uL,
+/** Accepted attachments keyed by protocol index; unprojected rows fall back to positional tag parsing. */
+private fun TimelineMessage.mediaAttachments(): List<IndexedAttachment> =
+    projected?.media?.let(MessageAttachments::accepted)
+        ?: MessageAttachments.indexed(
+            MediaReferenceSupport.parseAllImetaTags(
+                tags = record.tags,
+                sourceEpoch = record.sourceEpoch ?: 0uL,
+            ),
         )
 
 private fun TimelineMessage.toSharedMediaTile(

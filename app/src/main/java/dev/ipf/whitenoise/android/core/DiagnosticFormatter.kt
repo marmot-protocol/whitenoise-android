@@ -194,6 +194,7 @@ object DiagnosticFormatter {
             marmotError is MarmotKitException.InvalidChatPin ||
                 marmotError is MarmotKitException.InvalidMessageDraft ||
                 marmotError is MarmotKitException.InvalidMediaReference ||
+                marmotError is MarmotKitException.MediaAttachmentRejected ||
                 marmotError is MarmotKitException.InvalidHex ||
                 marmotError is MarmotKitException.InvalidIdentity ||
                 marmotError is MarmotKitException.InvalidKeyPackageEvent ||
@@ -210,7 +211,8 @@ object DiagnosticFormatter {
                 marmotError is MarmotKitException.GroupSendQueueFull -> "RESOURCE_BUSY"
             marmotError is MarmotKitException.NotGroupAdmin ||
                 marmotError is MarmotKitException.AdminCannotSelfRemove ||
-                marmotError is MarmotKitException.WouldRemoveLastAdmin -> "PERMISSION_DENIED"
+                marmotError is MarmotKitException.WouldRemoveLastAdmin ||
+                marmotError is MarmotKitException.MediaUnfetchable -> "PERMISSION_DENIED"
             marmotError is MarmotKitException.Publish ||
                 marmotError is MarmotKitException.TransportClosed ||
                 marmotError is MarmotKitException.AccountCatchUp ||
@@ -219,7 +221,8 @@ object DiagnosticFormatter {
                 marmotError is MarmotKitException.ExternalSignerUnavailable -> "PLATFORM_UNAVAILABLE"
             marmotError is MarmotKitException.EncryptionFailed ||
                 marmotError is MarmotKitException.ExternalSignerMismatch -> "CRYPTO_FAILURE"
-            marmotError is MarmotKitException.Io -> "IO"
+            marmotError is MarmotKitException.Io ||
+                marmotError is MarmotKitException.MediaDownloadFailed -> "IO"
             chain.any { it is SecurityException } ||
                 names.any { "permission" in it || "security" in it } -> "PERMISSION_DENIED"
             names.any { "timeout" in it } -> "TIMEOUT"
