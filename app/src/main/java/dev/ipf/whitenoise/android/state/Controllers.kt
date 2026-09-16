@@ -6231,13 +6231,8 @@ class ConversationController(
     },
     private val textPublisher: suspend (String?, String, String, String) -> SendSummaryFfi =
         { replyTarget, account, groupIdHex, text ->
-            if (replyTarget != null) {
-                appState.marmotIo(MarmotTraceSection.TEXT_REPLY) {
-                    replyToMessage(account, groupIdHex, replyTarget, text)
-                }
-            } else {
-                appState.marmotIo(MarmotTraceSection.TEXT_SEND) { sendText(account, groupIdHex, text) }
-            }
+            val section = if (replyTarget != null) MarmotTraceSection.TEXT_REPLY else MarmotTraceSection.TEXT_SEND
+            appState.marmotIo(section) { sendComposerText(account, groupIdHex, replyTarget, text) }
         },
     private val mediaUploader: MediaUploader = { account, groupIdHex, request ->
         appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) { uploadMedia(account, groupIdHex, request) }
@@ -6249,7 +6244,7 @@ class ConversationController(
     },
     private val mediaPublisher: MediaPublisher = { account, groupIdHex, references, caption ->
         appState.marmotIo(MarmotTraceSection.MEDIA_SEND) {
-            sendMediaAttachments(account, groupIdHex, references, caption)
+            sendComposerMedia(account, groupIdHex, references, caption)
         }
     },
     private val markdownParser: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
@@ -12213,7 +12208,7 @@ class ConversationController(
         )
     }
 
-    /** Who reacted to one message; window mode lists MDK's bounded reactor preview plus the viewer's pending changes. */
+    /** Who reacted to one message; in window mode MDK's bounded reactor preview plus the viewer's pending changes. */
     fun reactionParticipantsFor(targetMessageId: String): List<ReactionParticipant> {
         val mine = conversationAccountIdHex
         val changes = optimisticReactionChanges.values.filter { it.targetMessageId == targetMessageId }

@@ -17,8 +17,10 @@ import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
+import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.MessageDraftSummaryFfi
 import dev.ipf.marmotkit.ProductRecordResultFfi
+import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
@@ -355,8 +357,11 @@ class ComposerExpansionDestructiveLifecycleTest {
             )
         }
 
-    /** Implements only the native lifecycle calls exercised by these production controller paths. */
-    @Suppress("UNCHECKED_CAST")
+    /**
+     * Implements only the native lifecycle calls exercised by these production controller paths,
+     * one scripted branch per Marmot call the send path makes.
+     */
+    @Suppress("UNCHECKED_CAST", "CyclomaticComplexMethod")
     private fun lifecycleMarmot(
         failLeave: Boolean,
         failDelete: Boolean,
@@ -375,6 +380,7 @@ class ComposerExpansionDestructiveLifecycleTest {
 
             when (method.name.substringBefore('-')) {
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
+                "selectedMessageDraft" -> SelectedMessageDraftFfi(emptyDraftRevision, null)
                 "sendText" -> {
                     calls.send.incrementAndGet()
                     sendResult()
@@ -610,4 +616,13 @@ private object LifecycleDraftPersistence : DraftPersistence {
         key: String,
         value: String?,
     ) = Unit
+}
+
+/** MDK 0.10.0 sends read the selected draft first; these cases have none, so the direct send path is taken. */
+private val emptyDraftRevision: MessageDraftRevisionFfi by lazy {
+    val unsafeClass = Class.forName("sun.misc.Unsafe")
+    val field = unsafeClass.getDeclaredField("theUnsafe").apply { isAccessible = true }
+    val unsafe = field.get(null)
+    unsafeClass.getMethod("allocateInstance", Class::class.java).invoke(unsafe, MessageDraftRevisionFfi::class.java)
+        as MessageDraftRevisionFfi
 }
