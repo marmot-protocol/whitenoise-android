@@ -82,12 +82,17 @@ internal class BlockListMirror {
         job = scope.launch { receive(accountRef, open) }
     }
 
-    /** Stops the mirror and forgets the bound account's list. */
-    fun stop() {
-        job?.cancel()
+    /**
+     * Stops the mirror and forgets the bound account's list. Returns the receive job it cancelled, if any,
+     * so a caller that must not outlive it (a test tearing down its main dispatcher) can wait for it.
+     */
+    fun stop(): Job? {
+        val stopped = job
+        stopped?.cancel()
         job = null
         accountRef = null
         install(emptyList(), revision = null, available = true)
+        return stopped
     }
 
     /** Applies one replacement; MDK's revision is monotonic per account. */
