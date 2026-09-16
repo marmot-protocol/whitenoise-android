@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.BlockListSnapshotFfi
 import dev.ipf.marmotkit.BlockListSubscriptionInterface
 import dev.ipf.marmotkit.BlockedUserFfi
+import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -15,6 +16,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -89,6 +91,47 @@ class BlockListMirrorTest {
             }
         }
     }
+
+    /** A bound mirror with a revision answers from its own rows without an authoritative read. */
+    @Test
+    fun boundMirrorAnswersWithoutReading() =
+        runBlocking {
+            val mirror = BlockListMirror()
+            mirror.bind("acct") { FakeBlockList(initial = snapshot(1uL, "aa")) }
+            awaitUntil { mirror.revision == 1uL }
+
+            var reads = 0
+            val read: suspend () -> Boolean = {
+                reads += 1
+                true
+            }
+            assertEquals(true, resolveBlockedState(mirror, "acct", "AA", read))
+            assertEquals(false, resolveBlockedState(mirror, "acct", "bb", read))
+            assertEquals(0, reads)
+            mirror.stop()
+        }
+
+    /** Without a bound revision the authoritative read decides. */
+    @Test
+    fun unboundMirrorUsesTheAuthoritativeRead() =
+        runBlocking {
+            assertEquals(true, resolveBlockedState(BlockListMirror(), "acct", "aa") { true })
+            assertEquals(false, resolveBlockedState(BlockListMirror(), "acct", "aa") { false })
+        }
+
+    /**
+     * A failed authoritative read stays unknown rather than "not blocked": the profile row keeps its
+     * disabled state instead of offering Block for someone who may already be blocked.
+     */
+    @Test
+    fun failedReadStaysUnknown() =
+        runBlocking {
+            val unavailable =
+                resolveBlockedState(BlockListMirror(), "acct", "aa") {
+                    throw MarmotKitException.BlockListUnavailable()
+                }
+            assertNull(unavailable)
+        }
 }
 
 private fun snapshot(

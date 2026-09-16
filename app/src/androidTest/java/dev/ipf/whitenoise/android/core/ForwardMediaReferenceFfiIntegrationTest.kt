@@ -132,8 +132,10 @@ class ForwardMediaReferenceFfiIntegrationTest {
                         assertNotNull("Forwarded media message must be projected locally", sentRecord)
                         requireNotNull(sentRecord)
                         assertEquals(FORWARD_CAPTION, sentRecord.plaintext)
-                        assertEquals(fixtures.map(ForwardableFixture::fileName), sentRecord.media.map { it.fileName })
-                        assertEquals(fixtures.map(ForwardableFixture::mediaType), sentRecord.media.map { it.mediaType })
+                        val projected = MessageAttachments.acceptedReferences(sentRecord.media)
+                        assertEquals(fixtures.map(ForwardableFixture::fileName), projected.map { it.fileName })
+                        assertEquals(fixtures.map(ForwardableFixture::mediaType), projected.map { it.mediaType })
+                        assertEquals(emptyList<Int>(), MessageAttachments.rejected(sentRecord.media).map { it.index })
 
                         fixtures.zip(destinationReferences).forEach { (fixture, reference) ->
                             val opened = marmot.downloadMedia(account.label, destinationGroup, reference)

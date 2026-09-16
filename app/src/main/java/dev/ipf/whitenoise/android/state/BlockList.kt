@@ -176,12 +176,27 @@ internal suspend fun WhiteNoiseAppState.setUserBlocked(
         BlockOutcome.Failed
     }
 
-/** Whether the active account blocks [userAccountIdHex], from the live mirror when bound, else from MDK. */
+/**
+ * Whether the active account blocks [userAccountIdHex], from the live mirror when bound, else from MDK.
+ * Null means nobody could answer: the mirror holds no revision yet and the authoritative read failed or the
+ * block list is unavailable. Callers must keep the block action disabled instead of reading null as "not
+ * blocked", which would offer Block for someone already blocked.
+ */
 internal suspend fun WhiteNoiseAppState.isUserBlocked(
     accountRef: String,
     userAccountIdHex: String,
-): Boolean {
-    val mirror = runtimeMirrors.blocks
+): Boolean? =
+    resolveBlockedState(runtimeMirrors.blocks, accountRef, userAccountIdHex) {
+        marmotIo { isUserBlocked(accountRef, userAccountIdHex) }
+    }
+
+/** The mirror's answer when it is bound and has a revision, otherwise [read]'s, or null when it fails. */
+internal suspend fun resolveBlockedState(
+    mirror: BlockListMirror,
+    accountRef: String,
+    userAccountIdHex: String,
+    read: suspend () -> Boolean,
+): Boolean? {
     if (mirror.accountRef == accountRef && mirror.revision != null) return mirror.isBlocked(userAccountIdHex)
-    return runCatchingCancellable { marmotIo { isUserBlocked(accountRef, userAccountIdHex) } }.getOrDefault(false)
+    return runCatchingCancellable { read() }.getOrNull()
 }

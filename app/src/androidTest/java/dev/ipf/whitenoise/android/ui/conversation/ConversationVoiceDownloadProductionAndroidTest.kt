@@ -33,6 +33,7 @@ import dev.ipf.marmotkit.GroupMemberDetailsFfi
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -1133,6 +1134,12 @@ private class InstrumentedConversationEvidence : ConversationScrollEvidenceSink 
     }
 }
 
+/** Wraps one prepared reference as MarmotKit reports it on an authoritative record. */
+private fun accepted(
+    slot: Int,
+    reference: MediaAttachmentReferenceFfi,
+): MediaAttachmentOutcomeFfi = MediaAttachmentOutcomeFfi.Accepted(slot.toUInt(), reference)
+
 /** One deterministic authoritative message with optional voice attachment metadata. */
 private fun instrumentedTimelineRecord(
     index: Int,
@@ -1161,7 +1168,7 @@ private fun instrumentedTimelineRecord(
         replyToMessageIdHex = null,
         replyPreview = null,
         mediaJson = null,
-        media = listOfNotNull(media),
+        media = listOfNotNull(media).mapIndexed { slot, reference -> accepted(slot, reference) },
         agentTextStreamJson = null,
         groupSystem = null,
         reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
