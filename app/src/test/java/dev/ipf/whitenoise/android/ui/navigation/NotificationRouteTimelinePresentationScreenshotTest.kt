@@ -52,6 +52,7 @@ import dev.ipf.whitenoise.android.state.ConversationTimelineTestDraftPersistence
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
+import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -862,7 +863,7 @@ abstract class NotificationRouteTimelinePresentationFixture {
                     routeGate.preloadCompleted.countDown()
                     preGapChatListRow()
                 }
-                "openPresentedChatList" -> {
+                "openChatListWindow" -> {
                     val accountRef = arguments?.firstOrNull() as? String
                     if (accountRef == TARGET_ACCOUNT) {
                         check(routeGate.releaseBroadBind.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
@@ -872,6 +873,8 @@ abstract class NotificationRouteTimelinePresentationFixture {
                     }
                     error("Skip broad-list startup in the focused route test")
                 }
+                "subscribeAccountAttention" -> MarmotWindowTestFakes.accountAttention()
+                "subscribeBlockedUsers" -> MarmotWindowTestFakes.blockList()
                 "toString" -> "NotificationRouteTimelineMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.firstOrNull()
