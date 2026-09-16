@@ -161,6 +161,15 @@
     <string name="profile">Perfil</string>
     <string name="profile_follow">Adicionar contato</string>
     <string name="profile_unfollow">Remover contato</string>
+    <string name="profile_block">Bloquear</string>
+    <string name="profile_unblock">Desbloquear</string>
+    <string name="blocked_users">Pessoas bloqueadas</string>
+    <string name="blocked_users_empty">Você não bloqueou ninguém.</string>
+    <string name="blocked_users_detail">Pessoas bloqueadas não podem enviar mensagens diretas para você. Os grupos em comum continuam funcionando e o histórico permanece neste dispositivo.</string>
+    <string name="block_list_unavailable">Sua lista de bloqueio não está disponível agora. Tente novamente mais tarde.</string>
+    <string name="block_change_failed">Não foi possível alterar o bloqueio. Tente novamente.</string>
+    <string name="block_publication_uncertain">O White Noise salvou seu pedido, mas ainda não conseguiu confirmá-lo. Repita a mesma ação para concluir.</string>
+    <string name="dm_send_blocked">Você bloqueou esta pessoa, então não pode enviar mensagens aqui.</string>
     <string name="profile_follow_failed">Não foi possível atualizar o seguimento. Verifique sua conexão e tente novamente.</string>
     <string name="profile_nip05_verified">Endereço Nostr verificado</string>
     <string name="profile_add_to_another_group">Adicionar a outro grupo</string>

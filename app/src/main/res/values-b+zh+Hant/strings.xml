@@ -153,6 +153,15 @@
     <string name="profile">個人檔案</string>
     <string name="profile_follow">新增聯絡人</string>
     <string name="profile_unfollow">移除聯絡人</string>
+    <string name="profile_block">封鎖</string>
+    <string name="profile_unblock">解除封鎖</string>
+    <string name="blocked_users">已封鎖的使用者</string>
+    <string name="blocked_users_empty">你尚未封鎖任何人。</string>
+    <string name="blocked_users_detail">被封鎖的使用者無法直接傳訊息給你。共同的群組仍可正常使用，歷史紀錄會保留在此裝置上。</string>
+    <string name="block_list_unavailable">封鎖清單目前無法使用，請稍後再試。</string>
+    <string name="block_change_failed">無法變更封鎖狀態，請再試一次。</string>
+    <string name="block_publication_uncertain">White Noise 已儲存你的請求，但尚未確認。再次執行相同操作即可完成。</string>
+    <string name="dm_send_blocked">你已封鎖此人，因此無法在這裡傳訊息給對方。</string>
     <string name="profile_follow_failed">無法更新追蹤狀態。請檢查網路連線後再試一次。</string>
     <string name="profile_nip05_verified">已驗證的 Nostr 位址</string>
     <string name="profile_add_to_another_group">新增到另一個群組</string>

@@ -89,14 +89,17 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.share.launchInviteShare
 import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
+import dev.ipf.whitenoise.android.state.BlockOutcome
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.isUserBlocked
 import dev.ipf.whitenoise.android.state.presentationNpubFromReference
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
+import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
@@ -477,6 +480,8 @@ internal fun ProfileSheet(
     val contentScrollState = rememberScrollState()
     var fullBannerOpen by remember(npub) { mutableStateOf(false) }
     var copied by remember(npub) { mutableStateOf(false) }
+    var blocked by remember(npub) { mutableStateOf<Boolean?>(null) }
+    var blockBusy by remember(npub) { mutableStateOf(false) }
     var feedback by remember(npub) { mutableStateOf<ToastMessage?>(null) }
     LaunchedEffect(copied) {
         if (copied) {
@@ -485,6 +490,11 @@ internal fun ProfileSheet(
         }
     }
 
+    LaunchedEffect(hex, appState.runtimeMirrors.blocks.revision) {
+        val target = hex
+        val account = appState.activeAccountRef
+        blocked = if (target != null && account != null) appState.isUserBlocked(account, target) else null
+    }
     LaunchedEffect(npub) {
         // Only pay the IO hop when the local decode couldn't normalize the
         // reference; otherwise reassigning would rebuild identical state.
@@ -752,6 +762,38 @@ internal fun ProfileSheet(
             copied = copied,
             onBack = { if (!creatingChat) owner.leave { currentDismiss() } },
             onMessage = { openOrCreateProfileChat() },
+            block =
+                hex?.takeIf { !targetIsSelf }?.let {
+                    ProfileBlockRowState(
+                        blocked = blocked == true,
+                        inProgress = blockBusy,
+                        enabled = !blockBusy && blocked != null,
+                    )
+                },
+            onBlock = {
+                val request = blockRequest(hex, appState.activeAccountRef, blocked)
+                if (request != null && owner.canAct() && !blockBusy) {
+                    val (target, account, currentlyBlocked) = request
+                    blockBusy = true
+                    appState.launchMutation {
+                        try {
+                            owner.requireCurrent()
+                            val outcome = appState.setUserBlocked(account, target, blocked = !currentlyBlocked)
+                            if (owner.canAct()) {
+                                when (outcome) {
+                                    BlockOutcome.Confirmed -> blocked = !currentlyBlocked
+                                    BlockOutcome.Uncertain -> appState.present(R.string.block_publication_uncertain)
+                                    BlockOutcome.Unavailable -> appState.present(R.string.block_list_unavailable)
+                                    BlockOutcome.Failed -> appState.present(R.string.block_change_failed)
+                                }
+                                if (outcome != BlockOutcome.Confirmed) feedback = appState.toast
+                            }
+                        } finally {
+                            blockBusy = false
+                        }
+                    }
+                }
+            },
             onFollow = {
                 if (owner.canAct() && followRow.enabled && !followBusy) {
                     val target = checkNotNull(hex)
@@ -1639,3 +1681,13 @@ private fun ProfileSheetModerationConfirmDialog(
 }
 
 private const val PROFILE_COPY_FEEDBACK_MILLIS = 2_000L
+
+/** The three facts a block toggle needs; null until the target, account and current state are all known. */
+private fun blockRequest(
+    targetHex: String?,
+    accountRef: String?,
+    blocked: Boolean?,
+): Triple<String, String, Boolean>? {
+    if (targetHex == null || accountRef == null || blocked == null) return null
+    return Triple(targetHex, accountRef, blocked)
+}

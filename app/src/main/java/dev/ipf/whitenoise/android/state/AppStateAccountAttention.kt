@@ -60,7 +60,7 @@ internal class AccountAttentionMirror {
 
 /** Badge counts keyed by account id from the newest live summary, or the legacy query before the first one. */
 internal suspend fun WhiteNoiseAppState.accountAttentionCounts(): Map<String, ULong> {
-    accountAttentionMirror.latest?.let { snapshot -> return snapshot.readyBadgeCounts() }
+    runtimeMirrors.attention.latest?.let { snapshot -> return snapshot.readyBadgeCounts() }
     return marmotIo(MarmotTraceSection.UNREAD_SUMMARY) {
         accountUnreadSummary().associate { it.accountIdHex to it.unreadCount }
     }
@@ -76,7 +76,7 @@ internal fun AccountAttentionSnapshotFfi.readyBadgeCounts(): Map<String, ULong> 
 
 /** Applies one live summary to the unread store using the signed-in account list to map ids to refs. */
 internal fun WhiteNoiseAppState.applyAccountAttention(snapshot: AccountAttentionSnapshotFfi) {
-    accountAttentionMirror.install(snapshot)
+    runtimeMirrors.attention.install(snapshot)
     val refsByAccountId = accounts.associate { it.accountIdHex to it.label }
     snapshot.accounts.forEach { entry ->
         val ref = refsByAccountId[entry.accountIdHex] ?: return@forEach

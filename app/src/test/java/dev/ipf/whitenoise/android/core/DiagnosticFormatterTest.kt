@@ -311,6 +311,9 @@ class DiagnosticFormatterTest {
                     "INVALID_INPUT",
                 MarmotKitException.MediaUnfetchable("policy") to "PERMISSION_DENIED",
                 MarmotKitException.MediaDownloadFailed("hash mismatch") to "IO",
+                MarmotKitException.UserBlocked() to "PERMISSION_DENIED",
+                MarmotKitException.BlockListUnavailable() to "PLATFORM_UNAVAILABLE",
+                MarmotKitException.BlockPublicationUncertain() to "CONNECTIVITY",
             )
 
         cases.forEach { (failure, expected) ->

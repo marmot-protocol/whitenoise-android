@@ -153,6 +153,15 @@
     <string name="profile">个人资料</string>
     <string name="profile_follow">添加联系人</string>
     <string name="profile_unfollow">移除联系人</string>
+    <string name="profile_block">屏蔽</string>
+    <string name="profile_unblock">取消屏蔽</string>
+    <string name="blocked_users">已屏蔽的用户</string>
+    <string name="blocked_users_empty">你还没有屏蔽任何人。</string>
+    <string name="blocked_users_detail">被屏蔽的用户无法直接给你发消息。共同的群组仍可正常使用，历史记录保留在此设备上。</string>
+    <string name="block_list_unavailable">屏蔽列表当前不可用，请稍后再试。</string>
+    <string name="block_change_failed">无法更改屏蔽状态，请重试。</string>
+    <string name="block_publication_uncertain">White Noise 已保存你的请求，但尚未确认。再次执行同一操作即可完成。</string>
+    <string name="dm_send_blocked">你已屏蔽此人，因此无法在这里给对方发消息。</string>
     <string name="profile_follow_failed">无法更新关注状态。请检查网络连接后重试。</string>
     <string name="profile_nip05_verified">已验证的 Nostr 地址</string>
     <string name="profile_add_to_another_group">添加到另一个群组</string>

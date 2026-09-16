@@ -217,6 +217,15 @@
     <string name="profile">Profile</string>
     <string name="profile_follow">Add Contact</string>
     <string name="profile_unfollow">Remove Contact</string>
+    <string name="profile_block">Block</string>
+    <string name="profile_unblock">Unblock</string>
+    <string name="blocked_users">Blocked users</string>
+    <string name="blocked_users_empty">You haven’t blocked anyone.</string>
+    <string name="blocked_users_detail">Blocked people can’t message you directly. Your shared groups keep working, and their history stays on this device.</string>
+    <string name="block_list_unavailable">Your block list isn’t available right now. Try again later.</string>
+    <string name="block_change_failed">Couldn’t change the block. Try again.</string>
+    <string name="block_publication_uncertain">White Noise saved your request but couldn’t confirm it yet. Try the same action again to finish it.</string>
+    <string name="dm_send_blocked">You’ve blocked this person, so you can’t message them here.</string>
     <string name="profile_follow_failed">Couldn’t update this follow. Check your connection and try again.</string>
     <string name="profile_nip05_verified">Verified Nostr address</string>
     <string name="profile_add_to_another_group">Add to another group</string>

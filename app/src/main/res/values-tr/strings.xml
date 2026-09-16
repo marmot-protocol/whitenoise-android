@@ -161,6 +161,15 @@
     <string name="profile">Profil</string>
     <string name="profile_follow">Kişi ekle</string>
     <string name="profile_unfollow">Kişiyi kaldır</string>
+    <string name="profile_block">Engelle</string>
+    <string name="profile_unblock">Engeli kaldır</string>
+    <string name="blocked_users">Engellenen kişiler</string>
+    <string name="blocked_users_empty">Kimseyi engellemediniz.</string>
+    <string name="blocked_users_detail">Engellenen kişiler size doğrudan mesaj gönderemez. Ortak gruplarınız çalışmaya devam eder ve geçmiş bu cihazda kalır.</string>
+    <string name="block_list_unavailable">Engel listeniz şu anda kullanılamıyor. Daha sonra tekrar deneyin.</string>
+    <string name="block_change_failed">Engel değiştirilemedi. Tekrar deneyin.</string>
+    <string name="block_publication_uncertain">White Noise isteğinizi kaydetti ancak henüz onaylayamadı. Tamamlamak için aynı işlemi tekrar deneyin.</string>
+    <string name="dm_send_blocked">Bu kişiyi engellediniz, bu yüzden burada mesaj gönderemezsiniz.</string>
     <string name="profile_follow_failed">Takip durumu güncellenemedi. Bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="profile_nip05_verified">Doğrulanmış Nostr adresi</string>
     <string name="profile_add_to_another_group">Başka bir gruba ekle</string>

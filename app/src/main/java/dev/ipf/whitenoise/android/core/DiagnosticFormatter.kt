@@ -212,13 +212,16 @@ object DiagnosticFormatter {
             marmotError is MarmotKitException.NotGroupAdmin ||
                 marmotError is MarmotKitException.AdminCannotSelfRemove ||
                 marmotError is MarmotKitException.WouldRemoveLastAdmin ||
-                marmotError is MarmotKitException.MediaUnfetchable -> "PERMISSION_DENIED"
+                marmotError is MarmotKitException.MediaUnfetchable ||
+                marmotError is MarmotKitException.UserBlocked -> "PERMISSION_DENIED"
             marmotError is MarmotKitException.Publish ||
                 marmotError is MarmotKitException.TransportClosed ||
                 marmotError is MarmotKitException.AccountCatchUp ||
-                marmotError is MarmotKitException.FollowListUnavailable -> "CONNECTIVITY"
+                marmotError is MarmotKitException.FollowListUnavailable ||
+                marmotError is MarmotKitException.BlockPublicationUncertain -> "CONNECTIVITY"
             marmotError is MarmotKitException.KeystoreUnavailable ||
-                marmotError is MarmotKitException.ExternalSignerUnavailable -> "PLATFORM_UNAVAILABLE"
+                marmotError is MarmotKitException.ExternalSignerUnavailable ||
+                marmotError is MarmotKitException.BlockListUnavailable -> "PLATFORM_UNAVAILABLE"
             marmotError is MarmotKitException.EncryptionFailed ||
                 marmotError is MarmotKitException.ExternalSignerMismatch -> "CRYPTO_FAILURE"
             marmotError is MarmotKitException.Io ||

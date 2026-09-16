@@ -1703,7 +1703,7 @@ class WhiteNoiseAppState private constructor(
         private set
 
     internal val accountUnreadStore = AccountUnreadStore()
-    internal val accountAttentionMirror = AccountAttentionMirror()
+    internal val runtimeMirrors = RuntimeMirrors()
 
     val accountUnreadCounts: Map<String, ULong>
         get() = accountUnreadStore.retainedCounts
@@ -4259,7 +4259,7 @@ class WhiteNoiseAppState private constructor(
         }
         runtimeStartResult.await().getOrThrow()
         runtime.marmot.emitAuditRuntimeReadinessAfterStart()
-        accountAttentionMirror.start(this, runtime.marmot)
+        runtimeMirrors.attention.start(this, runtime.marmot)
     }
 
     private suspend fun resumeCompletedBootstrap(): Boolean {

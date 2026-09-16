@@ -161,6 +161,15 @@
     <string name="profile">Profilo</string>
     <string name="profile_follow">Aggiungi contatto</string>
     <string name="profile_unfollow">Rimuovi contatto</string>
+    <string name="profile_block">Blocca</string>
+    <string name="profile_unblock">Sblocca</string>
+    <string name="blocked_users">Persone bloccate</string>
+    <string name="blocked_users_empty">Non hai bloccato nessuno.</string>
+    <string name="blocked_users_detail">Le persone bloccate non possono scriverti direttamente. I gruppi in comune continuano a funzionare e la cronologia resta su questo dispositivo.</string>
+    <string name="block_list_unavailable">La tua lista di blocco non è disponibile al momento. Riprova più tardi.</string>
+    <string name="block_change_failed">Impossibile modificare il blocco. Riprova.</string>
+    <string name="block_publication_uncertain">White Noise ha salvato la richiesta ma non è ancora riuscito a confermarla. Ripeti la stessa azione per completarla.</string>
+    <string name="dm_send_blocked">Hai bloccato questa persona, quindi non puoi scriverle qui.</string>
     <string name="profile_follow_failed">Impossibile aggiornare lo stato. Controlla la connessione e riprova.</string>
     <string name="profile_nip05_verified">Indirizzo Nostr verificato</string>
     <string name="profile_add_to_another_group">Aggiungi a un altro gruppo</string>

@@ -161,6 +161,15 @@
     <string name="profile">Profil</string>
     <string name="profile_follow">Ajouter le contact</string>
     <string name="profile_unfollow">Retirer le contact</string>
+    <string name="profile_block">Bloquer</string>
+    <string name="profile_unblock">Débloquer</string>
+    <string name="blocked_users">Personnes bloquées</string>
+    <string name="blocked_users_empty">Vous n’avez bloqué personne.</string>
+    <string name="blocked_users_detail">Les personnes bloquées ne peuvent pas vous écrire directement. Vos groupes communs continuent de fonctionner et leur historique reste sur cet appareil.</string>
+    <string name="block_list_unavailable">Votre liste de blocage n’est pas disponible pour le moment. Réessayez plus tard.</string>
+    <string name="block_change_failed">Impossible de modifier le blocage. Réessayez.</string>
+    <string name="block_publication_uncertain">White Noise a enregistré votre demande mais n’a pas encore pu la confirmer. Refaites la même action pour la terminer.</string>
+    <string name="dm_send_blocked">Vous avez bloqué cette personne, vous ne pouvez donc pas lui écrire ici.</string>
     <string name="profile_follow_failed">Impossible de mettre à jour l’abonnement. Vérifiez votre connexion et réessayez.</string>
     <string name="profile_nip05_verified">Adresse Nostr vérifiée</string>
     <string name="profile_add_to_another_group">Ajouter à un autre groupe</string>

@@ -7716,6 +7716,121 @@
         "test_ids": [
           "MED-017"
         ]
+      },
+      {
+        "surface": "BlockedUsersScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "fun BlockedUsersScreen(",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "BlockedUsersGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "fun BlockedUsersGroup(",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Profile block action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.profile_block",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Profile unblock action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.profile_unblock",
+        "test_ids": [
+          "ACC-002",
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Blocked users title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.blocked_users",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Blocked users empty state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.blocked_users_empty",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Blocked users explainer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.blocked_users_detail",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Block list unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.block_list_unavailable",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Block change failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.block_change_failed",
+        "test_ids": [
+          "SEC-014",
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Block publication uncertain",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.block_publication_uncertain",
+        "test_ids": [
+          "SEC-014",
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Profile block unavailable toast",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.block_list_unavailable",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Profile block uncertain toast",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.block_publication_uncertain",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Profile block failed toast",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.block_change_failed",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Privacy blocked users link",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.blocked_users",
+        "test_ids": [
+          "SEC-014"
+        ]
       }
     ],
     "settings_controls": [

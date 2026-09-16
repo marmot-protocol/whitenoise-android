@@ -177,6 +177,15 @@
     <string name="profile">Профиль</string>
     <string name="profile_follow">Добавить контакт</string>
     <string name="profile_unfollow">Удалить контакт</string>
+    <string name="profile_block">Заблокировать</string>
+    <string name="profile_unblock">Разблокировать</string>
+    <string name="blocked_users">Заблокированные</string>
+    <string name="blocked_users_empty">Вы никого не заблокировали.</string>
+    <string name="blocked_users_detail">Заблокированные пользователи не могут писать вам напрямую. Общие группы продолжают работать, а история остаётся на этом устройстве.</string>
+    <string name="block_list_unavailable">Список блокировок сейчас недоступен. Попробуйте позже.</string>
+    <string name="block_change_failed">Не удалось изменить блокировку. Попробуйте ещё раз.</string>
+    <string name="block_publication_uncertain">White Noise сохранил ваш запрос, но пока не смог его подтвердить. Повторите то же действие, чтобы завершить.</string>
+    <string name="dm_send_blocked">Вы заблокировали этого пользователя, поэтому не можете писать ему здесь.</string>
     <string name="profile_follow_failed">Не удалось обновить подписку. Проверьте подключение и повторите попытку.</string>
     <string name="profile_nip05_verified">Подтверждённый адрес Nostr</string>
     <string name="profile_add_to_another_group">Добавить в другую группу</string>
