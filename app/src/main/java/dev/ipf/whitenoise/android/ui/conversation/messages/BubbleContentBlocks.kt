@@ -742,7 +742,18 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                     null
                 }
             }
+        // The inline footer sits on this baseline, so the timestamp and its delivery glyph share the
+        // last line's baseline instead of hanging below the text block.
+        val lastLineBaseline =
+            lastLineLayout?.let { layout ->
+                if (layout.lineCount > 0) {
+                    layout.getLineBaseline(layout.lineCount - 1).toInt()
+                } else {
+                    null
+                }
+            }
         val footerLastLineWidth = lastLineWidth.takeIf { eventReferences.isEmpty() }
+        val footerLastLineBaseline = lastLineBaseline.takeIf { eventReferences.isEmpty() }
         if (collapsible && eventReferences.isNotEmpty() && showMessageTextBody) {
             Column(
                 modifier = bodyModifier,
@@ -772,6 +783,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 footer = { if (hasInlineFooter) inlineFooter() },
                 modifier = bodyModifier,
                 lastLineWidth = footerLastLineWidth,
+                lastLineBaseline = footerLastLineBaseline,
             ) {
                 selectableMessageBody()
             }
@@ -780,6 +792,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 footer = inlineFooter,
                 modifier = bodyModifier,
                 lastLineWidth = footerLastLineWidth,
+                lastLineBaseline = footerLastLineBaseline,
             ) {
                 selectableMessageBody()
             }

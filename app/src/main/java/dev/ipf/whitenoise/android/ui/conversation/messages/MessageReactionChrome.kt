@@ -174,7 +174,11 @@ private fun ColumnScope.reactionHostModifier(
         .layout { measurable, constraints ->
             val placeable = measurable.measure(constraints)
             val overlap = REACTION_ROW_OVERLAP.roundToPx()
-            val expandedHeight = (placeable.height - overlap).coerceAtLeast(0)
+            // Report the pills' visible protrusion, not the touch row's. The 48 dp row centres 23 dp
+            // pills, so its lower half is empty slop; reporting it pushed the next row — and, for the
+            // last message, the composer — away from the reacted bubble by more than the chips show.
+            val visibleHeight = placeable.height - REACTION_ROW_TRAILING_SLOP.roundToPx()
+            val expandedHeight = (visibleHeight - overlap).coerceAtLeast(0)
             val height = (expandedHeight * sizeFraction).roundToInt()
             layout(
                 width = placeable.width,
@@ -191,5 +195,10 @@ private const val REACTION_HOST_FADE_DURATION_MILLIS = 150
 // overlap the bubble's bottom edge by 9dp ((48 - 23) / 2 + 9).
 private val REACTION_ROW_EDGE_INSET = 12.dp
 private val REACTION_ROW_OVERLAP = 21.dp
+
+// The 48dp touch row is centred on 23dp pills, so (48 - 23) / 2 of it is empty below them.
+private val REACTION_PILL_HEIGHT = 23.dp
+private val REACTION_TOUCH_ROW_HEIGHT = 48.dp
+private val REACTION_ROW_TRAILING_SLOP = (REACTION_TOUCH_ROW_HEIGHT - REACTION_PILL_HEIGHT) / 2
 private const val REACTION_HOST_SCALE_DURATION_MILLIS = 200
 private const val REACTION_HOST_SIZE_DURATION_MILLIS = 200

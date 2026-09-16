@@ -14,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -23,7 +25,40 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.OutgoingMessageIndicator
+import dev.ipf.whitenoise.android.state.WCAG_NON_TEXT_CONTRAST
+import dev.ipf.whitenoise.android.state.contrastRatio
 import dev.ipf.whitenoise.android.state.outgoingIndicator
+
+// A delivered disc is a filled shape beside an 11 sp timestamp, so at the footer's full colour it
+// outweighs the text it annotates. Sending keeps that colour — a 1.5 dp ring is already light — and
+// a failure keeps the error colour, so only the settled success recedes to secondary metadata.
+private const val SENT_DISC_TARGET_ALPHA = 0.6f
+private const val SENT_DISC_ALPHA_STEP = 0.05f
+private const val OPAQUE_ARGB_MASK = 0xFFFFFFFFL
+
+/**
+ * Fill for the settled delivery disc. A filled 14dp disc next to 11 sp text reads louder than the
+ * timestamp it annotates, so the disc recedes toward the bubble — but only as far as the non-text
+ * contrast floor allows, and no further. How far that is depends on the fill: an account's custom
+ * bubble colour, the light-on-dark own bubble and AMOLED's white accent all afford different room,
+ * so the softening is searched per fill rather than fixed, the way the footer label colour is.
+ */
+internal fun sentDeliveryDiscColor(
+    tint: Color,
+    containerColor: Color,
+): Color {
+    var alpha = SENT_DISC_TARGET_ALPHA
+    while (alpha < 1f) {
+        val candidate = tint.copy(alpha = tint.alpha * alpha)
+        val composited = candidate.compositeOver(containerColor).opaqueArgb()
+        if (contrastRatio(composited, containerColor.opaqueArgb()) >= WCAG_NON_TEXT_CONTRAST) return candidate
+        alpha += SENT_DISC_ALPHA_STEP
+    }
+    return tint
+}
+
+/** Opaque ARGB value of a colour, for the shared contrast helper. */
+private fun Color.opaqueArgb(): Long = toArgb().toLong() and OPAQUE_ARGB_MASK
 
 /** Delivery glyph for an outgoing status in the prototype's ring, disc and warning forms. */
 @Composable
@@ -74,7 +109,7 @@ private fun BubbleDeliveryGlyph(
                     Modifier
                         .size(14.dp)
                         .clip(CircleShape)
-                        .background(tint)
+                        .background(sentDeliveryDiscColor(tint, containerColor))
                         .semantics { contentDescription = sent },
                 contentAlignment = Alignment.Center,
             ) {

@@ -55,6 +55,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
@@ -112,6 +113,21 @@ internal fun UnreadMessagesDivider(
         }
     }
 }
+
+/**
+ * Top gap that opens a sender cluster. The unread divider carries its own inset below the outline, so a
+ * first unread row that also starts a cluster must not add the cluster gap on top of it: the prototype
+ * leaves one interval there, and stacking both doubled the space below "N unread messages".
+ */
+internal fun conversationClusterTopGap(
+    sameSenderAsOlderBubble: Boolean,
+    followsUnreadDivider: Boolean,
+): Dp =
+    if (sameSenderAsOlderBubble || followsUnreadDivider) {
+        0.dp
+    } else {
+        WhiteNoiseSpacing.ConversationCluster
+    }
 
 internal fun differentDay(
     a: ULong,

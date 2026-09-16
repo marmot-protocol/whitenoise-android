@@ -117,6 +117,7 @@ internal fun FocusedTextMessagePreview(
             focusedMessagePreviewText(text, document, mentionDisplayName, isGroupMember)
         }
     var lastLineWidth by remember(excerpt) { mutableStateOf<Int?>(null) }
+    var lastLineBaseline by remember(excerpt) { mutableStateOf<Int?>(null) }
     val footer: @Composable () -> Unit =
         footerContent ?: {
             MessageInlineFooter(
@@ -133,7 +134,11 @@ internal fun FocusedTextMessagePreview(
         }
     val content: @Composable () -> Unit = {
         senderName?.let { Text(it, style = MaterialTheme.typography.labelMedium) }
-        BubbleFooterLayout(footer = footer, lastLineWidth = lastLineWidth.takeIf { warning == null }) {
+        BubbleFooterLayout(
+            footer = footer,
+            lastLineWidth = lastLineWidth.takeIf { warning == null },
+            lastLineBaseline = lastLineBaseline.takeIf { warning == null },
+        ) {
             Column {
                 Text(
                     text = excerpt,
@@ -142,12 +147,11 @@ internal fun FocusedTextMessagePreview(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.testTag("message-actions-excerpt"),
                     onTextLayout = { layout ->
+                        val lastLine = layout.lineCount - 1
                         lastLineWidth =
-                            if (layout.lineCount > 0) {
-                                ceil(layout.getLineRight(layout.lineCount - 1)).toInt()
-                            } else {
-                                null
-                            }
+                            if (layout.lineCount > 0) ceil(layout.getLineRight(lastLine)).toInt() else null
+                        lastLineBaseline =
+                            if (layout.lineCount > 0) layout.getLineBaseline(lastLine).toInt() else null
                     },
                 )
                 warning?.let {
