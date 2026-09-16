@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.parseMediaImetaTag
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertTrue
@@ -15,6 +16,8 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.util.UUID
 
+/** The packaged MDK refuses loopback and other unsafe profile-image or media authorities before any dial. */
+@PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class ProfileImageDialSafetyIntegrationTest {
     @Test

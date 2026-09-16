@@ -10,6 +10,7 @@ import dev.ipf.marmotkit.ProductAnalyticsMetadataFfi
 import dev.ipf.marmotkit.ProductAnalyticsRuntimeConfigFfi
 import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -20,6 +21,8 @@ import java.io.File
 import java.net.ServerSocket
 import java.util.UUID
 
+/** The published JNI gates host timing export behind consent that scope expansion must renew, even after restart. */
+@PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class HostTimingConsentDeviceTest {
     /** Verifies the published JNI supports export and requires renewed consent for Android scope expansion. */

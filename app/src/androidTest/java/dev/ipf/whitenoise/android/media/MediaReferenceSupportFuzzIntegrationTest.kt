@@ -6,12 +6,15 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.parseMediaImetaTag
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.Random
 
+/** The packaged MarmotKit keeps valid media tags in order, drops malformed ones and survives bounded fuzzing. */
+@PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class MediaReferenceSupportFuzzIntegrationTest {
     @Test

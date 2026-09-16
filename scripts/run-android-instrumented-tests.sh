@@ -5,14 +5,15 @@ set -euo pipefail
 
 event_name="${1:-}"
 
-# Read-aloud highlights are geometry measured from real font metrics, which
-# the Robolectric suite only simulates, so every production-row placement class
-# earns a device pass on pull requests that trigger this workflow.
-highlight_classes=dev.ipf.whitenoise.android.ui.conversation.TimelineRowTtsHighlightPaintAndroidTest,dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementAndroidTest,dev.ipf.whitenoise.android.ui.conversation.TtsRichLeafPlacementAndroidTest
+# Pull requests run only the classes annotated @PullRequestDeviceSmoke. The filter is an
+# annotation rather than a class list because AGP hands a comma-separated
+# testInstrumentationRunnerArguments.class value to `am instrument` truncated at the
+# first comma, so a list silently ran just its first class.
+smoke_annotation=dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 
 if [[ "$event_name" == "pull_request" ]]; then
   exec ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
-    -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.WarmResumeFirstUsefulFrameTest,dev.ipf.whitenoise.android.core.ProfileImageDialSafetyIntegrationTest,dev.ipf.whitenoise.android.state.HostTimingConsentDeviceTest,dev.ipf.whitenoise.android.state.StartupSelfProfilePresentationFfiIntegrationTest,dev.ipf.whitenoise.android.notifications.NotificationHapticVisualTimingDeviceTest,dev.ipf.whitenoise.android.core.ForwardMediaReferenceFfiIntegrationTest,dev.ipf.whitenoise.android.media.MediaReferenceSupportFuzzIntegrationTest,dev.ipf.whitenoise.android.share.InboundShareTaskReuseDeviceTest,"$highlight_classes" \
+    -Pandroid.testInstrumentationRunnerArguments.annotation="$smoke_annotation" \
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
     --no-daemon --stacktrace
 fi

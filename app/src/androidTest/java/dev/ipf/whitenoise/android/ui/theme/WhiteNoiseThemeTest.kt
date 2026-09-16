@@ -19,16 +19,25 @@ import org.junit.Rule
 import org.junit.Test
 
 private const val OPAQUE_ARGB_MASK = 0xFFFFFFFFL
-private val AmoledPrimary = Color(0xFFFFC400)
-private val AmoledPrimaryContainer = Color(0xFF493800)
-private val BlueFreeWhiteAccent = Color(0xFFFFFF00)
 
+// The brand palette is monochrome: dark ink on light surfaces, light ink on dark ones.
+private val LightPrimary = Color(0xFF171717)
+private val LightPrimaryContainer = Color(0xFFE5E5E5)
+private val DarkPrimary = Color(0xFFF5F5F5)
+private val DarkPrimaryContainer = Color(0xFF404040)
+
+// AMOLED is a fixed black-and-white scheme: white actions on black, no account accent.
+private val AmoledPrimary = Color.White
+private val AmoledPrimaryContainer = Color.Black
+
+/** The colour scheme WhiteNoiseTheme resolves for light, dark, AMOLED, dynamic and accented configurations. */
 class WhiteNoiseThemeTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Light and dark keep monochrome primary roles; no brand hue leaks into either scheme. */
     @Test
-    fun primaryHighlightIsCyanInLightAndDarkThemes() {
+    fun primaryRolesStayMonochromeInLightAndDarkThemes() {
         var lightPrimary: Color? = null
         var lightPrimaryContainer: Color? = null
         var darkPrimary: Color? = null
@@ -52,14 +61,14 @@ class WhiteNoiseThemeTest {
         }
 
         composeRule.runOnIdle {
-            val expected = Color(0xFF06B6D4)
-            assertEquals(expected, lightPrimary)
-            assertEquals(expected, lightPrimaryContainer)
-            assertEquals(expected, darkPrimary)
-            assertEquals(expected, darkPrimaryContainer)
+            assertEquals(LightPrimary, lightPrimary)
+            assertEquals(LightPrimaryContainer, lightPrimaryContainer)
+            assertEquals(DarkPrimary, darkPrimary)
+            assertEquals(DarkPrimaryContainer, darkPrimaryContainer)
         }
     }
 
+    /** A custom accent over dynamic colour drives every primary role and the surface tint. */
     @Test
     fun customAccentDrivesPrimaryRolesAndSurfaceTint() {
         var scheme: ColorScheme? = null
@@ -87,6 +96,7 @@ class WhiteNoiseThemeTest {
         }
     }
 
+    /** Dynamic colour without an accent keeps the platform's primary roles untouched. */
     @Test
     @SdkSuppress(minSdkVersion = Build.VERSION_CODES.S)
     fun dynamicPrimaryRolesArePreservedWithoutCustomAccent() {
@@ -117,6 +127,7 @@ class WhiteNoiseThemeTest {
         }
     }
 
+    /** Below API 31 a dynamic-colour request falls back to the monochrome brand roles. */
     @Test
     @SdkSuppress(maxSdkVersion = Build.VERSION_CODES.R)
     fun dynamicColorFallsBackToBrandPaletteBeforeApi31() {
@@ -134,13 +145,14 @@ class WhiteNoiseThemeTest {
 
         composeRule.runOnIdle {
             val actual = requireNotNull(scheme)
-            assertEquals(Color(0xFF06B6D4), actual.primary)
-            assertEquals(Color(0xFF06B6D4), actual.primaryContainer)
+            assertEquals(LightPrimary, actual.primary)
+            assertEquals(LightPrimaryContainer, actual.primaryContainer)
         }
     }
 
+    /** AMOLED ignores the saved account accent: actions stay white and tonal elevation stays off. */
     @Test
-    fun customAccentKeepsAmoledSurfaceTintTransparentAndDropsBlueChannel() {
+    fun customAccentIsIgnoredOnAmoled() {
         var scheme: ColorScheme? = null
 
         composeRule.setContent {
@@ -156,11 +168,12 @@ class WhiteNoiseThemeTest {
 
         composeRule.runOnIdle {
             val s = requireNotNull(scheme)
-            assertEquals(Color(0xFFFFC100), s.primary)
+            assertEquals(AmoledPrimary, s.primary)
             assertEquals(Color.Transparent, s.surfaceTint)
         }
     }
 
+    /** A black accent keeps inversePrimary readable in every theme; AMOLED still shows white actions. */
     @Test
     fun blackAccentKeepsInversePrimaryReadableAcrossThemes() {
         assertInversePrimaryContrast(
@@ -169,11 +182,12 @@ class WhiteNoiseThemeTest {
         )
     }
 
+    /** A white accent keeps inversePrimary readable in every theme; AMOLED still shows white actions. */
     @Test
     fun whiteAccentKeepsInversePrimaryReadableAcrossThemes() {
         assertInversePrimaryContrast(
             accent = Color.White,
-            expectedAmoledAccent = BlueFreeWhiteAccent,
+            expectedAmoledAccent = AmoledPrimary,
         )
     }
 
@@ -223,9 +237,9 @@ class WhiteNoiseThemeTest {
         }
     }
 
-    /** AMOLED replaces the cyan brand primary with a readable blue-free accent. */
+    /** AMOLED paints actions white on black instead of the monochrome dark roles. */
     @Test
-    fun amoledThemeUsesBlueFreePrimary() {
+    fun amoledThemeUsesWhiteActionsOnBlack() {
         var primary: Color? = null
         var primaryContainer: Color? = null
 
@@ -245,6 +259,7 @@ class WhiteNoiseThemeTest {
         }
     }
 
+    /** Captures the accent in every theme and checks inversePrimary stays readable on inverseSurface. */
     private fun assertInversePrimaryContrast(
         accent: Color,
         expectedAmoledAccent: Color,
@@ -277,6 +292,7 @@ private data class CapturedSchemes(
     var amoled: ColorScheme? = null,
 )
 
+/** Composes the light, dark and AMOLED themes with one accent and records their schemes. */
 @Composable
 private fun CaptureAccentSchemes(
     accent: Color,
@@ -297,4 +313,5 @@ private fun CaptureAccentSchemes(
     }
 }
 
+/** Opaque ARGB value of a colour. */
 private fun Color.toOpaqueArgb(): Long = toArgb().toLong() and OPAQUE_ARGB_MASK

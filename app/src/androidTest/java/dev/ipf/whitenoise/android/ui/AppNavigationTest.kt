@@ -1,12 +1,14 @@
 package dev.ipf.whitenoise.android.ui
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -26,7 +28,10 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isForConversation
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
+import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_HEAD_INPUT_GATE_MILLIS
+import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_ROW_PLACEMENT_MAX_MILLIS
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
+import dev.ipf.whitenoise.android.ui.common.STARTUP_LOADING_TEST_TAG
 import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_TOP_BAR_TAG
@@ -38,10 +43,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
+/** Shell navigation on a real device: avatar entry, startup and loading surfaces, and conversation routing. */
 class AppNavigationTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** The account avatar is the settings entry: monogram shown, no drawer affordance, one click opens settings. */
     @Test
     fun avatarButtonOpensSettingsWithoutDrawerNavigation() {
         var settingsClicks = 0
@@ -60,12 +67,14 @@ class AppNavigationTest {
 
         composeRule.onNodeWithContentDescription("Open navigation").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Open settings", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("AL").assertIsDisplayed()
+        // The prototype's monogram is a single glyph, so "Ada Lovelace" reads "A".
+        composeRule.onNodeWithText("A").assertIsDisplayed()
 
         composeRule.onNodeWithContentDescription("Open settings", substring = true).performClick()
         composeRule.runOnIdle { assertEquals(1, settingsClicks) }
     }
 
+    /** Without unread, the avatar description names only the settings action and the account. */
     @Test
     fun avatarWithoutUnreadDoesNotAnnounceUnread() {
         composeRule.setContent {
@@ -87,6 +96,7 @@ class AppNavigationTest {
             .assertDoesNotExist()
     }
 
+    /** With unread, the avatar description announces that this account has unread messages. */
     @Test
     fun avatarWithUnreadAnnouncesThisAccountUnread() {
         composeRule.setContent {
@@ -126,6 +136,7 @@ class AppNavigationTest {
         composeRule.runOnIdle { assertEquals(1, backClicks) }
     }
 
+    /** The bare loading screen carries no branding copy or logo. */
     @Test
     fun loadingScreenHasNoBrandingText() {
         // LoadingScreen is a bare centered spinner — no branding text. Its visual
@@ -144,19 +155,22 @@ class AppNavigationTest {
         composeRule.onNodeWithContentDescription("White Noise logo").assertDoesNotExist()
     }
 
+    /** The startup page is a spinner with one status line: no logo or branding copy. */
     @Test
-    fun startupLoadingScreenShowsBrandedProgress() {
+    fun startupLoadingScreenShowsProgressMessageWithoutBranding() {
         composeRule.setContent {
             WhiteNoiseTheme {
                 StartupLoadingScreen()
             }
         }
 
-        composeRule.onNodeWithText("White Noise").assertIsDisplayed()
-        composeRule.onNodeWithText("Starting securely…").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("White Noise logo").assertIsDisplayed()
+        composeRule.onNodeWithTag(STARTUP_LOADING_TEST_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("Starting White Noise…").assertIsDisplayed()
+        composeRule.onNodeWithText("Starting securely…").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("White Noise logo").assertDoesNotExist()
     }
 
+    /** A group's confirmation stays inside its own conversation and never shifts the visible one's header. */
     @Test
     fun groupConfirmationStaysInsideItsOriginatingConversationWithoutMovingHeader() {
         val appState = appState()
@@ -172,11 +186,7 @@ class AppNavigationTest {
         }
         composeRule.waitForIdle()
 
-        // Seeding promotes a new list head, which closes row input for the
-        // head-reorder gate window — click only once the row re-enables.
-        awaitEnabledRow(GROUP_A_NAME)
-        composeRule.onNodeWithText(GROUP_A_NAME).performClick()
-        composeRule.onNodeWithText(GROUP_A_NAME).assertIsDisplayed()
+        openConversation(GROUP_A_NAME)
 
         val deliverGroupAResult = CompletableDeferred<Unit>()
         composeRule.runOnIdle {
@@ -191,9 +201,8 @@ class AppNavigationTest {
         }
 
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
-        awaitEnabledRow(GROUP_B_NAME)
-        composeRule.onNodeWithText(GROUP_B_NAME).performClick()
-        composeRule.onNodeWithText(GROUP_B_NAME).assertIsDisplayed()
+        awaitChatList()
+        openConversation(GROUP_B_NAME)
         val headerBefore = composeRule.onNodeWithTag(CONVERSATION_TOP_BAR_TAG).fetchSemanticsNode().boundsInRoot
 
         composeRule.runOnIdle { deliverGroupAResult.complete(Unit) }
@@ -238,6 +247,7 @@ class AppNavigationTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    /** One running local account with no engine behind it, enough for the shell to compose. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -257,6 +267,7 @@ class AppNavigationTest {
             activeAccountRef = ACCOUNT_REF,
         )
 
+    /** Waits until the shell has bound a chats controller to the test account and it has finished loading. */
     private fun awaitAttachedChatsController(appState: WhiteNoiseAppState): ChatsController {
         var controller: ChatsController? = null
         composeRule.waitUntil(timeoutMillis = 5_000) {
@@ -266,20 +277,44 @@ class AppNavigationTest {
         return requireNotNull(controller)
     }
 
+    /** Reads the shell's private chats controller reflectively; null until the shell attaches one. */
     private fun attachedChatsController(appState: WhiteNoiseAppState): ChatsController? {
         val field = WhiteNoiseAppState::class.java.getDeclaredField("chatsController").apply { isAccessible = true }
         return field.get(appState) as? ChatsController
     }
 
-    private fun awaitEnabledRow(name: String) {
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule
-                .onAllNodes(hasText(name) and isEnabled())
-                .fetchSemanticsNodes()
-                .isNotEmpty()
+    /**
+     * Taps a chat row until its conversation renders. Seeding promotes a new list head, which closes
+     * row input for the head-reorder and row-placement gate windows while the row stays semantically
+     * enabled (a disabled ListItem would flash grey), so `isEnabled()` no longer tells when a tap lands.
+     * Both gates count down on the compose clock, which only moves while the test waits, so the clock is
+     * advanced past the longest window before each tap.
+     */
+    private fun openConversation(name: String) {
+        val deadline = SystemClock.uptimeMillis() + OPEN_CONVERSATION_TIMEOUT_MS
+        while (!conversationOpen()) {
+            check(SystemClock.uptimeMillis() < deadline) { "Tapping $name never opened its conversation" }
+            composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + CHAT_LIST_ROW_PLACEMENT_MAX_MILLIS)
+            composeRule.waitForIdle()
+            composeRule.onAllNodes(hasText(name)).onFirst().performClick()
+            composeRule.waitForIdle()
         }
+        composeRule.onNodeWithTag(CONVERSATION_TOP_BAR_TAG).assertIsDisplayed()
+        composeRule.onAllNodes(hasText(name)).onFirst().assertIsDisplayed()
     }
 
+    /** Waits for the conversation to leave so the next row tap targets the list, not the exiting header. */
+    private fun awaitChatList() {
+        composeRule.waitUntil(timeoutMillis = OPEN_CONVERSATION_TIMEOUT_MS) { !conversationOpen() }
+    }
+
+    /** Whether a conversation header is composed, i.e. a conversation route is on screen. */
+    private fun conversationOpen(): Boolean {
+        val headers = composeRule.onAllNodes(hasTestTag(CONVERSATION_TOP_BAR_TAG)).fetchSemanticsNodes()
+        return headers.isNotEmpty()
+    }
+
+    /** Applies one synthetic chat-list row so the list shows a group without an engine. */
     private fun seedGroup(
         controller: ChatsController,
         groupId: String,
@@ -287,6 +322,7 @@ class AppNavigationTest {
         activity: ULong,
     ) = controller.applyChatListRow(chatRow(groupId, name, activity))
 
+    /** A stable member group row with the given activity time and no messages. */
     private fun chatRow(
         groupId: String,
         name: String,
@@ -324,9 +360,12 @@ class AppNavigationTest {
         disbandRequest = null,
     )
 
+    /** Draft persistence that keeps nothing, so the test never touches real storage. */
     private object DiscardedDrafts : DraftPersistence {
+        /** No drafts are ever restored. */
         override fun read(): Map<String, String> = emptyMap()
 
+        /** Writes are dropped. */
         override fun write(
             key: String,
             value: String?,
@@ -342,5 +381,6 @@ class AppNavigationTest {
         const val GROUP_B_NAME = "Group B"
         const val NOTICE_TEXT = "Admin added"
         const val GLOBAL_NOTICE_TEXT = "Notifications enabled"
+        const val OPEN_CONVERSATION_TIMEOUT_MS = 5_000L
     }
 }
