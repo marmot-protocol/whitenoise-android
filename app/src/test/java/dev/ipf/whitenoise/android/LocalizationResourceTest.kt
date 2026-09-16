@@ -1028,8 +1028,6 @@ class LocalizationResourceTest {
                 "actions",
                 "bytes_count",
                 // Brand/protocol names kept identical across every locale.
-                "donate_method_bitcoin",
-                "donate_method_lightning",
                 "agent_connector_hermes_name",
                 "agent_connector_openclaw_name",
                 "agent_connector_opencode_name",
