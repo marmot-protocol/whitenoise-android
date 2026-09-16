@@ -22,14 +22,16 @@ private val BubbleFooterGap = 8.dp
 /**
  * Lays [content] with [footer] pinned bottom-end. The footer joins the last
  * line when it leaves room ([lastLineWidth], the real last-line right edge when
- * the caller can supply it; otherwise the widest line); else it drops to its
- * own line below. Either way it stays right of the text and never overlaps.
+ * the caller can supply it; otherwise the widest line) and sits on that line's
+ * [lastLineBaseline]; else it drops to its own line below. Either way it stays
+ * right of the text and never overlaps.
  */
 @Composable
 internal fun BubbleFooterLayout(
     footer: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     lastLineWidth: Int? = null,
+    lastLineBaseline: Int? = null,
     content: @Composable () -> Unit,
 ) {
     Layout(
@@ -46,9 +48,44 @@ internal fun BubbleFooterLayout(
             content = contentPlaceable,
             footer = footerPlaceable,
             lastLineWidth = lastLineWidth,
+            lastLineBaseline = lastLineBaseline,
             gap = BubbleFooterGap.roundToPx(),
         )
     }
+}
+
+/** Where an inline footer lands beside a bubble's last text line. */
+internal data class BubbleInlineFooterGeometry(
+    val width: Int,
+    val height: Int,
+    val x: Int,
+    val y: Int,
+)
+
+/**
+ * The prototype's inline-footer geometry. The footer sits on the last line's baseline rather than on
+ * the text block's bottom edge: the footer's box is taller than its text (it carries the 14dp delivery
+ * glyph), so bottom-aligning it dropped the timestamp and its glyph below the line they annotate.
+ * It only joins the line when it fits and when the line's baseline leaves room for the footer's own.
+ */
+@Suppress("LongParameterList") // One geometry decision; splitting it would hide the relationships.
+internal fun bubbleInlineFooterGeometry(
+    textWidth: Int,
+    textHeight: Int,
+    lastLineRight: Int,
+    lastBaseline: Int,
+    footerWidth: Int,
+    footerHeight: Int,
+    footerBaseline: Int,
+    maxWidth: Int,
+    minWidth: Int,
+    gap: Int,
+): BubbleInlineFooterGeometry {
+    val required = lastLineRight + gap + footerWidth
+    val inline = required <= maxWidth && lastBaseline >= footerBaseline
+    val width = maxOf(textWidth, footerWidth, minWidth, if (inline) required else 0).coerceAtMost(maxWidth)
+    val y = if (inline) lastBaseline - footerBaseline else textHeight + gap / 2
+    return BubbleInlineFooterGeometry(width, maxOf(textHeight, y + footerHeight), width - footerWidth, y)
 }
 
 private fun MeasureScope.layoutMeasuredBubbleFooter(
@@ -56,32 +93,31 @@ private fun MeasureScope.layoutMeasuredBubbleFooter(
     content: Placeable,
     footer: Placeable,
     lastLineWidth: Int?,
+    lastLineBaseline: Int?,
     gap: Int,
 ): MeasureResult {
     val effectiveGap = if (footer.width == 0 && footer.height == 0) 0 else gap
     val lastRight = (lastLineWidth ?: content.width).coerceIn(0, content.width)
-    val inline = lastRight + effectiveGap + footer.width <= constraints.maxWidth
-    if (inline) {
-        val width =
-            bubbleFooterInlineWidth(
-                contentWidth = content.width,
-                lastLineRight = lastRight,
-                footerWidth = footer.width,
-                minWidth = constraints.minWidth,
-                maxWidth = constraints.maxWidth,
-                gap = effectiveGap,
-            )
-        return layout(width, content.height) {
-            content.place(0, 0)
-            footer.place(width - footer.width, content.height - footer.height)
-        }
-    }
-    val width =
-        maxOf(content.width, footer.width, constraints.minWidth)
-            .coerceAtMost(constraints.maxWidth)
-    return layout(width, content.height + footer.height) {
+    val footerBaseline = footer[FirstBaseline].takeIf { it != AlignmentLine.Unspecified } ?: footer.height
+    // Without a measured baseline the footer keeps its previous bottom-aligned position, expressed as
+    // the baseline that produces it, so a caller that cannot report one is not moved by this rule.
+    val lastBaseline = lastLineBaseline ?: (content.height - footer.height + footerBaseline)
+    val geometry =
+        bubbleInlineFooterGeometry(
+            textWidth = content.width,
+            textHeight = content.height,
+            lastLineRight = lastRight,
+            lastBaseline = lastBaseline,
+            footerWidth = footer.width,
+            footerHeight = footer.height,
+            footerBaseline = footerBaseline,
+            maxWidth = constraints.maxWidth,
+            minWidth = constraints.minWidth,
+            gap = effectiveGap,
+        )
+    return layout(geometry.width, geometry.height.coerceIn(constraints.minHeight, constraints.maxHeight)) {
         content.place(0, 0)
-        footer.place(width - footer.width, content.height)
+        footer.place(geometry.x, geometry.y)
     }
 }
 
@@ -104,6 +140,7 @@ internal fun BubbleCollapsibleFooterLayout(
     footer: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     lastLineWidth: Int? = null,
+    lastLineBaseline: Int? = null,
     content: @Composable () -> Unit,
 ) {
     Layout(
@@ -147,6 +184,7 @@ internal fun BubbleCollapsibleFooterLayout(
                 content = contentPlaceable,
                 footer = footerPlaceable,
                 lastLineWidth = lastLineWidth,
+                lastLineBaseline = lastLineBaseline,
                 gap = gap,
             )
         } else {

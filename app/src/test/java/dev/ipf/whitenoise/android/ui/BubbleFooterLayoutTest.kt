@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui
 import androidx.compose.ui.layout.AlignmentLine
 import dev.ipf.whitenoise.android.ui.conversation.messages.bubbleCollapsedFooterWidth
 import dev.ipf.whitenoise.android.ui.conversation.messages.bubbleFooterInlineWidth
+import dev.ipf.whitenoise.android.ui.conversation.messages.bubbleInlineFooterGeometry
 import dev.ipf.whitenoise.android.ui.conversation.messages.collapsedFooterFitsOnOneRow
 import dev.ipf.whitenoise.android.ui.conversation.messages.collapsedFooterRowMetrics
 import org.junit.Assert.assertEquals
@@ -39,6 +40,73 @@ class BubbleFooterLayoutTest {
                 gap = 8,
             ),
         )
+    }
+
+    /** The timestamp and its glyph share the last line's baseline rather than hanging off the block. */
+    @Test
+    fun inlineFooterSitsOnTheLastLineBaseline() {
+        val geometry =
+            bubbleInlineFooterGeometry(
+                textWidth = 120,
+                textHeight = 24,
+                lastLineRight = 120,
+                lastBaseline = 19,
+                footerWidth = 58,
+                footerHeight = 16,
+                footerBaseline = 12,
+                maxWidth = 320,
+                minWidth = 0,
+                gap = 8,
+            )
+
+        assertEquals(7, geometry.y)
+        assertEquals(geometry.y + 12, 19)
+        assertEquals(186, geometry.width)
+        assertEquals(geometry.width - 58, geometry.x)
+        assertEquals(24, geometry.height)
+    }
+
+    /** A footer that would overflow the line's width drops below the text with half the gap above it. */
+    @Test
+    fun inlineFooterDropsBelowWhenTheLineHasNoRoom() {
+        val geometry =
+            bubbleInlineFooterGeometry(
+                textWidth = 300,
+                textHeight = 48,
+                lastLineRight = 300,
+                lastBaseline = 43,
+                footerWidth = 58,
+                footerHeight = 16,
+                footerBaseline = 12,
+                maxWidth = 320,
+                minWidth = 0,
+                gap = 8,
+            )
+
+        assertEquals(52, geometry.y)
+        assertEquals(300, geometry.width)
+        assertEquals(68, geometry.height)
+    }
+
+    /** A line whose baseline sits above the footer's own cannot host it without clipping the glyph. */
+    @Test
+    fun inlineFooterDropsBelowWhenTheLineBaselineIsTooHigh() {
+        val geometry =
+            bubbleInlineFooterGeometry(
+                textWidth = 40,
+                textHeight = 12,
+                lastLineRight = 40,
+                lastBaseline = 9,
+                footerWidth = 58,
+                footerHeight = 16,
+                footerBaseline = 12,
+                maxWidth = 320,
+                minWidth = 0,
+                gap = 8,
+            )
+
+        assertEquals(16, geometry.y)
+        assertEquals(32, geometry.height)
     }
 
     @Test
