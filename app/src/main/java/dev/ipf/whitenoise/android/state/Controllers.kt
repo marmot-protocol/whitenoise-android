@@ -6554,6 +6554,10 @@ class ConversationController(
     private val mediaUploadSessionEpoch = appState.mediaUploadSessionEpoch()
     private val messageById = linkedMapOf<String, AppMessageRecordFfi>()
     private val timelineRecords = linkedMapOf<String, TimelineMessageRecordFfi>()
+
+    /** Whether [messageIdHex] is an authoritative row of the current window rather than a local optimistic id. */
+    internal fun retainsTimelineRecord(messageIdHex: String): Boolean = timelineRecords.containsKey(messageIdHex)
+
     private val timelineItemsById = linkedMapOf<String, TimelineMessage>()
     private val timelineOrder = mutableListOf<String>()
     private val authoritativeTimelineOrderByMessageId = linkedMapOf<String, ULong>()
@@ -10680,13 +10684,33 @@ class ConversationController(
         return timelineRecords.containsKey(messageIdHex)
     }
 
-    /** Recenters the live window on a retained message; false when MDK no longer retains it or there is no window. */
+    /**
+     * Recenters the live window on a retained message; false when MDK no longer retains it or there is no
+     * window. Runs under the same active-call guard as pagination so a concurrent teardown cannot close the
+     * native handle while the jump is in flight.
+     */
     private suspend fun jumpWindowToMessage(messageIdHex: String): Boolean {
-        val jump = runCatchingCancellable { timelineSubscription?.jumpToMessage(messageIdHex) }
-        val page = jump.getOrNull() ?: return false
+        val page = timelineSubscription?.let { jumpIfSubscriptionActive(it, messageIdHex) }
+        if (page == null) return false
         applyTimelinePage(page, replaceWindow = true, updatePagination = true)
         return timelineRecords.containsKey(messageIdHex)
     }
+
+    /** The jump under the pagination guard; null once torn down, superseded, or when MDK dropped the target. */
+    private suspend fun jumpIfSubscriptionActive(
+        subscription: ConversationTimelineSubscriptionHandle,
+        messageIdHex: String,
+    ): TimelinePageFfi? =
+        timelineSubscriptionActiveCallMutex.withLock {
+            val stillActive =
+                synchronized(liveSubscriptionLock) {
+                    !accountTeardownRequested && timelineSubscription === subscription
+                }
+            if (!stillActive) return@withLock null
+            runCatchingCancellable {
+                withContext(Dispatchers.IO) { subscription.jumpToMessage(messageIdHex) }
+            }.getOrNull()
+        }
 
     /**
      * Page the exact chat-list first-unread boundary into the initial window.
@@ -11023,14 +11047,20 @@ class ConversationController(
         durableStreamPositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
     }
 
-    /** Applies one timeline page and invalidates suspended whole-window refreshes. */
+    /**
+     * Applies one timeline page and invalidates suspended whole-window refreshes. A window command result
+     * and its stream echo can land in either order, so the newest installed replacement is applied together
+     * with its own sidecar instead of pairing [page] with a frame from a later revision.
+     */
     internal suspend fun applyTimelinePage(
         page: TimelinePageFfi,
         replaceWindow: Boolean,
         updatePagination: Boolean,
     ): List<String> {
         timelineWindowGeneration.advance()
-        val pageMessages = page.messages
+        val installed = timelineSubscription?.latestInstalledWindow()
+        val applied = installed?.page ?: page
+        val pageMessages = applied.messages
         if (replaceWindow) trimStateForWindowReplacement()
         authoritativeTimelineOrderByMessageId.clear()
         pageMessages.forEachIndexed { index, record ->
@@ -11065,15 +11095,15 @@ class ConversationController(
         }
         applyDurableStreamPositions(durableStreamDisplayPositions(timelineRecords.values.toList()))
         if (updatePagination) {
-            hasMoreBefore = page.hasMoreBefore
-            hasMoreAfter = page.hasMoreAfter
+            hasMoreBefore = applied.hasMoreBefore
+            hasMoreAfter = applied.hasMoreAfter
         }
         pruneReadAnchorsToWindow()
         pruneConfirmedOptimisticMessages()
         pruneRetentionAtSendToWindow()
         pruneConfirmedOptimisticReactions()
         pruneMessageOverlaysToWindow()
-        installWindowFrame()
+        installWindowFrame(installed?.frame)
         recomputeReactions()
         // A non-replaceWindow page (older-history load once hasLoadedOlderPages
         // is set) skips the replaceWindow trim above, so prune messageById to the

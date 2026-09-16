@@ -28,7 +28,10 @@ internal interface ConversationTimelineSubscriptionHandle {
     fun close()
 
     /** Sidecar of the newest installed window replacement; null on seams without a window. */
-    fun latestWindowFrame(): ConversationWindowFrame? = null
+    fun latestWindowFrame(): ConversationWindowFrame? = latestInstalledWindow()?.frame
+
+    /** Page and sidecar of the newest installed replacement as one revision; null on seams without a window. */
+    fun latestInstalledWindow(): InstalledConversationWindow? = null
 
     /** Reports the row the reader sees; null when the seam has no window or nothing newer was installed. */
     suspend fun setVisibleAnchor(messageIdHex: String): TimelinePageFfi? = null

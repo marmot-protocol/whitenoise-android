@@ -42,6 +42,12 @@ internal data class ConversationWindowFrame(
     val references: Map<String, ConversationMessageReferencesFfi>,
 )
 
+/** The compatibility page and sidecar of one installed replacement, read together so they never mix revisions. */
+internal data class InstalledConversationWindow(
+    val page: TimelinePageFfi,
+    val frame: ConversationWindowFrame,
+)
+
 /** Observable owner of the newest installed frame for one conversation controller. */
 internal class ConversationWindowState {
     /** Newest installed frame, or null before the window delivered one or when the seam has no window. */
@@ -124,14 +130,13 @@ internal class ConversationWindowCursor(
 private class ConversationWindowInstaller {
     private val lock = Any()
     private var cursor: ConversationWindowCursor? = null
-    private var latestFrame: ConversationWindowFrame? = null
-    private var latestPage: TimelinePageFfi? = null
+    private var latest: InstalledConversationWindow? = null
 
-    /** Sidecar of the newest installed replacement. */
-    val frame: ConversationWindowFrame? get() = synchronized(lock) { latestFrame }
+    /** Page and sidecar of the newest installed replacement, captured under one lock. */
+    val installed: InstalledConversationWindow? get() = synchronized(lock) { latest }
 
     /** Compatibility page of the newest installed replacement. */
-    val page: TimelinePageFfi? get() = synchronized(lock) { latestPage }
+    val page: TimelinePageFfi? get() = installed?.page
 
     /** Installs [snapshot] when it is newer than everything seen so far and returns its page. */
     fun install(snapshot: ConversationWindowSnapshotFfi): TimelinePageFfi? =
@@ -142,13 +147,16 @@ private class ConversationWindowInstaller {
             } else if (!current.accept(snapshot.revision)) {
                 return null
             }
-            latestFrame = snapshot.toFrame()
-            snapshot.toTimelinePage().also { latestPage = it }
+            val page = snapshot.toTimelinePage()
+            latest = InstalledConversationWindow(page, snapshot.toFrame())
+            page
         }
 
-    // Superseded, not-ready, timed-out, outside-anchor and foreign-generation results carry no detail
-    // the app can act on: the contract is to reassess from the newest installed replacement, which the
-    // receive loop keeps delivering. Only a missing jump target is surfaced, and only when asked.
+    // Superseded, not-ready, timed-out, outside-anchor, foreign-generation and malformed-argument results
+    // carry no detail the app can act on: the contract is to reassess from the newest installed replacement,
+    // which the receive loop keeps delivering. Only a missing jump target is surfaced, and only when asked.
+    // Letting any of them escape would take the process down from a scroll-settle effect (seen on device
+    // when an optimistic row's local id reached `setVisibleAnchor`).
     @Suppress("SwallowedException", "ReturnCount")
     suspend fun command(
         rethrowMissingTarget: Boolean = false,
@@ -158,18 +166,10 @@ private class ConversationWindowInstaller {
         val result =
             try {
                 block(revision)
-            } catch (stale: MarmotKitException.ConversationWindowStale) {
-                return null
-            } catch (notReady: MarmotKitException.ConversationWindowNotReady) {
-                return null
-            } catch (timedOut: MarmotKitException.ConversationWindowTimedOut) {
-                return null
-            } catch (outside: MarmotKitException.ConversationWindowAnchorOutside) {
-                return null
-            } catch (foreign: MarmotKitException.ConversationWindowWrongGeneration) {
-                return null
             } catch (missing: MarmotKitException.ConversationWindowMessageNotRetained) {
                 if (rethrowMissingTarget) throw missing
+                return null
+            } catch (windowOutcome: MarmotKitException) {
                 return null
             }
         return install(result)
@@ -211,8 +211,8 @@ internal class FfiConversationWindowHandle(
         return page
     }
 
-    /** Sidecar of the newest installed replacement. */
-    override fun latestWindowFrame(): ConversationWindowFrame? = installer.frame
+    /** Page and sidecar of the newest installed replacement as one revision. */
+    override fun latestInstalledWindow(): InstalledConversationWindow? = installer.installed
 
     /** Reports the visible row; null when nothing newer was installed. */
     override suspend fun setVisibleAnchor(messageIdHex: String): TimelinePageFfi? =
@@ -323,16 +323,20 @@ internal fun reactionTalliesForWindow(
         }.filterValues { it.isNotEmpty() }
 }
 
-/** Installs the newest window sidecar after a page was applied and warms the previewed reactor identities. */
-internal fun ConversationController.installWindowFrame() {
-    val frame = timelineSubscription?.latestWindowFrame() ?: return
+/** Installs the sidecar that belongs to the page just applied and warms the previewed reactor identities. */
+internal fun ConversationController.installWindowFrame(frame: ConversationWindowFrame?) {
+    if (frame == null) return
     window.install(frame)
     val reactors = frame.references.values.flatMap { it.reactions.items.flatMap { item -> item.reactors } }
     if (reactors.isNotEmpty()) appState.requestProfiles(reactors.distinct())
 }
 
-/** Reports the message the reader settled on so replacements keep it in view; a no-op without a window. */
+/**
+ * Reports the message the reader settled on so replacements keep it in view; a no-op without a window.
+ * Optimistic rows carry local ids MDK never issued, so only a retained authoritative row is reported.
+ */
 suspend fun ConversationController.reportVisibleMessage(messageIdHex: String) {
+    if (!retainsTimelineRecord(messageIdHex)) return
     val page = timelineSubscription?.setVisibleAnchor(messageIdHex) ?: return
     applyTimelinePage(page, replaceWindow = true, updatePagination = true)
 }

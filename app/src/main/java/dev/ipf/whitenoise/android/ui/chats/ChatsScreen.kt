@@ -56,6 +56,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -116,6 +117,7 @@ import dev.ipf.whitenoise.android.ui.settings.ChatFoldersScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -995,13 +997,25 @@ internal fun ChatsScreen(
                 }
             }
     }
+    // The list also holds the inline load-error row, the pinned boundary and search headers, so the
+    // settled row is resolved by its item key rather than by index. Search rows are a filtered projection
+    // of the window and are never reported as its anchor.
+    val currentVisibleItems by rememberUpdatedState(visibleItems)
+    val currentVisibleChatIds by rememberUpdatedState(visibleChatIds)
+    val currentSearchActive by rememberUpdatedState(searchActive)
     LaunchedEffect(chatListState, controller, chatListWindowView) {
-        snapshotFlow { chatListState.isScrollInProgress to chatListState.firstVisibleItemIndex }
-            .filter { (scrolling, _) -> !scrolling }
-            .map { (_, firstVisibleIndex) -> firstVisibleIndex }
+        snapshotFlow {
+            val settledRowId =
+                chatListState.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
+                    (visible.key as? String)?.takeIf(currentVisibleChatIds::contains)
+                }
+            Triple(chatListState.isScrollInProgress, currentSearchActive, settledRowId)
+        }.filter { (scrolling, searching, _) -> !scrolling && !searching }
+            .map { (_, _, rowId) -> rowId }
+            .filterNotNull()
             .distinctUntilChanged()
-            .collect { firstVisibleIndex ->
-                visibleItems.getOrNull(firstVisibleIndex)?.group?.groupIdHex?.let { groupIdHex ->
+            .collect { rowId ->
+                currentVisibleItems.firstOrNull { it.id == rowId }?.group?.groupIdHex?.let { groupIdHex ->
                     controller.reportVisibleChat(groupIdHex, chatListWindowView)
                 }
             }

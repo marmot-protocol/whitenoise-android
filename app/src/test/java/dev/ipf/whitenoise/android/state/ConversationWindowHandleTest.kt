@@ -103,6 +103,34 @@ class ConversationWindowHandleTest {
             assertTrue(missing)
         }
 
+    /** A malformed anchor id, such as an optimistic row's local id, is absorbed instead of escaping to the caller. */
+    @Test
+    fun invalidAnchorIdKeepsTheWindow() =
+        runBlocking {
+            val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
+            val handle = FfiConversationWindowHandle(fake, release = fake::release)
+            handle.snapshot()
+
+            fake.failNextCommandWith = MarmotKitException.InvalidHex("Invalid character '-' at position 8")
+            assertNull(handle.setVisibleAnchor("0d2b6c1e-4f6a-4b1e-9c1d-optimistic"))
+            assertEquals(1uL, handle.latestWindowFrame()?.revision?.sequence)
+        }
+
+    /** The page and sidecar of one installed replacement are handed out together, never from mixed revisions. */
+    @Test
+    fun latestInstalledWindowPairsPageAndFrame() =
+        runBlocking {
+            val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
+            val handle = FfiConversationWindowHandle(fake, release = fake::release)
+            handle.snapshot()
+
+            val paged = handle.paginateBackwards(50u)
+            val installed = handle.latestInstalledWindow()
+            assertSame(paged, installed?.page)
+            assertEquals(2uL, installed?.frame?.revision?.sequence)
+            assertEquals(setOf("m1", "m1-older"), installed?.frame?.references?.keys)
+        }
+
     /** Cancel reaches the native window and close releases it. */
     @Test
     fun cancelAndCloseReachTheWindow() =

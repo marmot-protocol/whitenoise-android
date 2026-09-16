@@ -1812,12 +1812,15 @@ internal fun MessageBubble(
                 // `hasMedia` decides whether this row renders a media card with
                 // an optional integrated caption, or stays a text-only bubble.
                 // Deleted and persisted-failure tombstones stay text bubbles;
-                // convergence-invalidated messages retain local media.
+                // convergence-invalidated messages retain local media, and a
+                // message whose every attachment MDK rejected still renders its
+                // placeholders rather than an empty text bubble.
                 val hasMedia =
                     !deleted &&
                         !persistedFailure &&
                         (
                             anyConfirmedMedia ||
+                                bubbleMedia.rejected.isNotEmpty() ||
                                 pendingAudio.isNotEmpty() ||
                                 pendingVisualRefs.isNotEmpty() ||
                                 showPendingPlaceholder ||
