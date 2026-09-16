@@ -2224,7 +2224,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
         "anchor": "fun ComposerPill(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "CON-007"
         ]
       },
       {
@@ -2241,6 +2242,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
         "anchor": "fun ComposerResizeGestureStrip(",
         "test_ids": [
+          "CON-007",
           "CON-013",
           "CON-017"
         ]

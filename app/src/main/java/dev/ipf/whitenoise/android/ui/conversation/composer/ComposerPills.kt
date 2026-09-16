@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -63,6 +64,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -132,6 +134,7 @@ import kotlin.math.roundToInt
 
 private const val COMPOSER_TEXT_HEIGHT_ANIMATION_MILLIS = 160
 
+internal const val COMPOSER_RESIZE_HANDLE_TAG = "composer-resize-handle"
 internal const val COMPOSER_RESIZE_GESTURE_TAG = "composer-resize-gesture"
 internal const val COMPOSER_RESIZE_INDICATOR_TAG = "composer-resize-indicator"
 internal const val COMPOSER_PILL_SURFACE_TAG = "composer-pill-surface"
@@ -141,6 +144,11 @@ private val EditingEditorStartInset = 14.dp
 private val ExpandedEditorEndInset = 14.dp
 private val CompactEditorTopInset = 12.dp
 private val CompactEditorBottomInset = 12.dp
+
+// The drag strip's visible grip: Material's drag-handle proportions, drawn in the outline colour so it
+// reads as chrome rather than content.
+private val ComposerResizeHandleWidth = 32.dp
+private val ComposerResizeHandleThickness = 4.dp
 private val ExpandedEditorBottomInset = 44.dp
 
 private const val COMPOSER_ACTION_CENTER_BIAS = 0.5f
@@ -628,28 +636,37 @@ internal fun ComposerPill(
         )
     val compactTextLayout =
         compactMeasurementWidth?.let { measurementWidth ->
-            val maxTextWidthPx =
+            val editingWidthPx =
                 with(density) {
-                    val editorInsets =
-                        if (editingRequested && !multilineControlsSuppressed) {
-                            EditingEditorStartInset + ExpandedEditorEndInset
-                        } else {
-                            CompactEditorStartInset + compactMeasurementTrailingReserve
-                        }
-                    (measurementWidth - editorInsets).coerceAtLeast(1.dp).roundToPx()
+                    (measurementWidth - (EditingEditorStartInset + ExpandedEditorEndInset))
+                        .coerceAtLeast(1.dp)
+                        .roundToPx()
                 }
+            val compactWidthPx =
+                with(density) {
+                    (measurementWidth - (CompactEditorStartInset + compactMeasurementTrailingReserve))
+                        .coerceAtLeast(1.dp)
+                        .roundToPx()
+                }
+            val startsEditing = editingRequested && !multilineControlsSuppressed
             remember(
                 transformedText.text,
                 composerTextStyle,
-                maxTextWidthPx,
+                editingWidthPx,
+                compactWidthPx,
+                startsEditing,
+                multilineControlsSuppressed,
                 textMeasurer,
             ) {
-                textMeasurer
-                    .measure(
-                        text = transformedText.text,
-                        style = composerTextStyle,
-                        constraints = Constraints(maxWidth = maxTextWidthPx),
-                    )
+                composerDestinationTextLayout(
+                    measurer = textMeasurer,
+                    text = transformedText.text,
+                    style = composerTextStyle,
+                    editingWidthPx = editingWidthPx,
+                    compactWidthPx = compactWidthPx,
+                    startsEditing = startsEditing,
+                    multilineControlsSuppressed = multilineControlsSuppressed,
+                )
             }
         }
     val compactLineCount = compactTextLayout?.lineCount
@@ -681,7 +698,7 @@ internal fun ComposerPill(
                 compactLineCount?.let { lineCount ->
                     when {
                         multilineControls && lineCount <= 1 -> false
-                        !multilineControls && lineCount >= 3 -> true
+                        !multilineControls && lineCount >= COMPOSER_MULTILINE_CONTROL_LINES -> true
                         else -> multilineControls
                     }
                 } ?: multilineControls
@@ -737,7 +754,7 @@ internal fun ComposerPill(
             when {
                 multilineControlsSuppressed -> false
                 multilineControls && lineCount <= 1 -> false
-                !multilineControls && lineCount >= 3 -> true
+                !multilineControls && lineCount >= COMPOSER_MULTILINE_CONTROL_LINES -> true
                 else -> multilineControls
             }
         if (nextMultilineControls != multilineControls) {
@@ -884,6 +901,14 @@ internal fun ComposerPill(
                                             scrollValue = composerScrollState.value,
                                             maxScroll = composerScrollState.maxValue,
                                             color = editorOverflowColor,
+                                            // Painted in the inset the editor already leaves, so the
+                                            // thumb never covers a glyph and the row keeps its width.
+                                            outerGutterPx =
+                                                interpolateDp(
+                                                    0.dp,
+                                                    ExpandedEditorEndInset,
+                                                    editingProgress.value,
+                                                ).toPx(),
                                         )
                                     }.keepComposerSelectionVisibleDuringLayout(
                                         composerScrollState,
@@ -1145,6 +1170,7 @@ internal fun ComposerPill(
             // border-only pointer owner leaves reading drags and selection to
             // BasicTextField; the full surface exposes the accessible action.
             ComposerResizeGestureStrip(
+                showHandle = expandedLayout,
                 onExpansionToggle = onExpansionToggle,
                 onHeightDragStarted = { latestOnHeightDragStarted() },
                 onHeightDrag = { latestOnHeightDrag(it) },
@@ -1169,6 +1195,7 @@ private fun Modifier.boundedComposerAccessory(): Modifier =
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
 private fun ComposerResizeGestureStrip(
+    showHandle: Boolean,
     onExpansionToggle: () -> Unit,
     onHeightDragStarted: () -> Unit,
     onHeightDrag: (Float) -> Unit,
@@ -1221,7 +1248,19 @@ private fun ComposerResizeGestureStrip(
                 }.pointerInput(Unit) {
                     detectTapGestures(onTap = { latestOnExpansionToggle() })
                 },
-    )
+        contentAlignment = Alignment.Center,
+    ) {
+        // Drawn only once the composer is tall enough to resize; the one-line composer has nothing to drag.
+        if (showHandle) {
+            Box(
+                Modifier
+                    .size(width = ComposerResizeHandleWidth, height = ComposerResizeHandleThickness)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.outlineVariant)
+                    .testTag(COMPOSER_RESIZE_HANDLE_TAG),
+            )
+        }
+    }
 }
 
 /** Resolves an opaque editor overflow indicator against the current composer surface. */
