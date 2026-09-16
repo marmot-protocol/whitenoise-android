@@ -1165,9 +1165,9 @@ class WhiteNoiseAppState private constructor(
             context = appContext,
             readDraft = ::conversationDictationDraftSnapshot,
             writeDraft = ::setConversationDictationDraftIfCurrent,
-            targetAvailable = { accountRef, groupIdHex ->
-                accounts.any { it.label == accountRef && it.signedOut != true } &&
-                    (activeAccountRef != accountRef || chatsController?.containsGroup(groupIdHex) != false)
+            // Chat rows are a refreshable projection, not proof that the immutable origin was removed.
+            targetAvailable = { accountRef, _ ->
+                accounts.any { it.label == accountRef && it.signedOut != true }
             },
             targetReplyAvailable = ::conversationDictationReplyTargetAvailable,
             targetValidator = { account, group ->
@@ -4257,7 +4257,7 @@ class WhiteNoiseAppState private constructor(
         check(listenerJob != null && installedStartupListener) {
             "notification listener unavailable before Marmot startup"
         }
-        runtimeStartResult.await().getOrThrow()
+        runtimeStartResult.await().getOrThrowAtStartupStage(BootstrapStage.RUNTIME_START)
         runtime.marmot.emitAuditRuntimeReadinessAfterStart()
         runtimeMirrors.attention.start(this, runtime.marmot)
     }

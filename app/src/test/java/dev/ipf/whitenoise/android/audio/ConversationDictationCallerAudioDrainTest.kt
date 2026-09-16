@@ -19,7 +19,7 @@ class ConversationDictationCallerAudioDrainTest {
     @Test
     fun stoppedCaptureAllowsNewProviderStreamsUntilDiscarded() {
         val buffer = ConversationDictationAudioChunkBuffer(1L, chunkBytes = 4)
-        buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6), 6)
+        buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6), 6, hasSpeech = true)
         val capture = ConversationDictationCallerAudio(StoppedCaptureDevice, buffer)
         capture.finish {}
         try {
@@ -42,7 +42,7 @@ class ConversationDictationCallerAudioDrainTest {
     @Test
     fun streamsDrainFullChunkAndPartialTailWithoutRestartingRecorder() {
         val buffer = ConversationDictationAudioChunkBuffer(1L, chunkBytes = 4)
-        buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6), 6)
+        buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6), 6, hasSpeech = true)
         val bytes = mutableListOf<Byte>()
         val writer =
             ConversationDictationAudioPipeWriter { _, pcm, offset, length ->

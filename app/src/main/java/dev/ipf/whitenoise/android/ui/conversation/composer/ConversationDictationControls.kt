@@ -2,6 +2,13 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +38,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -46,15 +56,22 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import kotlin.math.PI
+import kotlin.math.sin
 
 internal const val COMPOSER_DICTATION_STRIP_TAG = "composer-dictation-strip"
 internal const val COMPOSER_DICTATION_REVIEW_DIALOG_TAG = "composer-dictation-review-dialog"
 internal const val COMPOSER_DICTATION_COMPACT_ACTIONS_TAG = "composer-dictation-compact-actions"
 internal const val APP_DICTATION_CONTROL_TAG = "app-dictation-control"
+internal const val DICTATION_LISTENING_INDICATOR_TAG = "dictation-listening-indicator"
 internal const val DICTATION_PROGRESS_TAG = "dictation-progress"
+private const val DICTATION_LISTENING_BAR_COUNT = 3
+private const val DICTATION_LISTENING_BAR_MIN_HEIGHT_DP = 6f
+private const val DICTATION_LISTENING_BAR_HEIGHT_RANGE_DP = 8f
 
-/** Three native 48dp commands; narrow hosts expose them through the same horizontal scroll owner. */
-internal val DICTATION_ACTIVE_ACTIONS_WIDTH = 144.dp
+/** A compact 24dp listening pulse followed by three native 48dp commands. */
+internal val DICTATION_ACTIVE_ACTIONS_WIDTH = 168.dp
+private val DICTATION_PROCESSING_ACTIONS_WIDTH = 144.dp
 
 /** App-root bottom control used while the immutable dictation origin is not visible. */
 @Composable
@@ -68,7 +85,7 @@ internal fun ConversationDictationPersistentControl(
         if (controller.deliveryInProgress) {
             stringResource(R.string.message_status_pending)
         } else {
-            dictationStatusLabel(state)
+            dictationStatusLabel(state, controller.captureInProgress)
         }
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -114,13 +131,13 @@ internal fun ConversationDictationCompactActions(
         if (controller.deliveryInProgress) {
             stringResource(R.string.message_status_pending)
         } else {
-            dictationStatusLabel(state)
+            dictationStatusLabel(state, controller.captureInProgress)
         }
     var reviewDialogOpen by remember(state.sessionId) { mutableStateOf(false) }
     Box(
         modifier =
             modifier
-                .width(if (state.hasActiveRecognitionActions) DICTATION_ACTIVE_ACTIONS_WIDTH else 96.dp)
+                .width(state.compactActionsWidth(controller.captureInProgress))
                 .testTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)
                 .semantics {
                     liveRegion = LiveRegionMode.Polite
@@ -154,6 +171,16 @@ private val ConversationDictationState.hasActiveRecognitionActions: Boolean
             this is ConversationDictationState.Listening ||
             this is ConversationDictationState.Processing
 
+/** Reserves either the listening pulse or processing-only action width without shifting controls. */
+private fun ConversationDictationState.compactActionsWidth(captureInProgress: Boolean) =
+    when (this) {
+        is ConversationDictationState.Starting,
+        is ConversationDictationState.Listening,
+        is ConversationDictationState.Processing,
+        -> if (captureInProgress) DICTATION_ACTIVE_ACTIONS_WIDTH else DICTATION_PROCESSING_ACTIONS_WIDTH
+        else -> 96.dp
+    }
+
 /**
  * Keeps all three explicit outcomes visible for the lifetime of app-owned recognition.
  */
@@ -161,6 +188,9 @@ private val ConversationDictationState.hasActiveRecognitionActions: Boolean
 private fun ConversationDictationActiveActions(controller: ConversationDictationController) {
     val pasteLabel = stringResource(R.string.paste)
     val sendLabel = stringResource(R.string.send)
+    if (controller.captureInProgress) {
+        ConversationDictationListeningIndicator()
+    }
     IconButton(
         onClick = controller::cancel,
         enabled = !controller.deliveryInProgress,
@@ -202,6 +232,56 @@ private fun ConversationDictationActiveActions(controller: ConversationDictation
             )
         } else {
             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = sendLabel)
+        }
+    }
+}
+
+/** Three animated bars distinguish live capture from circular action processing. */
+@Composable
+private fun ConversationDictationListeningIndicator() {
+    val transition = rememberInfiniteTransition(label = "dictation listening")
+    val phase by
+        transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec =
+                infiniteRepeatable(
+                    animation = tween(durationMillis = 900, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart,
+                ),
+            label = "dictation listening phase",
+        )
+    val barColor = MaterialTheme.colorScheme.primary
+    Canvas(
+        modifier =
+            Modifier
+                .size(24.dp)
+                .testTag(DICTATION_LISTENING_INDICATOR_TAG),
+    ) {
+        val barWidth = 3.dp.toPx()
+        val barSpacing = 2.dp.toPx()
+        val totalWidth =
+            barWidth * DICTATION_LISTENING_BAR_COUNT +
+                barSpacing * (DICTATION_LISTENING_BAR_COUNT - 1)
+        val firstBarLeft = (size.width - totalWidth) / 2f
+        repeat(DICTATION_LISTENING_BAR_COUNT) { index ->
+            val phaseOffset = index / DICTATION_LISTENING_BAR_COUNT.toFloat()
+            val level = ((sin((phase + phaseOffset) * 2f * PI) + 1f) / 2f).toFloat()
+            val barHeight =
+                (
+                    DICTATION_LISTENING_BAR_MIN_HEIGHT_DP +
+                        DICTATION_LISTENING_BAR_HEIGHT_RANGE_DP * level
+                ).dp.toPx()
+            drawRoundRect(
+                color = barColor,
+                topLeft =
+                    Offset(
+                        x = firstBarLeft + index * (barWidth + barSpacing),
+                        y = (size.height - barHeight) / 2f,
+                    ),
+                size = Size(width = barWidth, height = barHeight),
+                cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f),
+            )
         }
     }
 }
@@ -304,7 +384,10 @@ private fun ConversationDictationDismissAction(
 
 /** Maps controller phases to concise, localized live-region announcements. */
 @Composable
-private fun dictationStatusLabel(state: ConversationDictationState): String =
+private fun dictationStatusLabel(
+    state: ConversationDictationState,
+    captureInProgress: Boolean,
+): String =
     when (state) {
         is ConversationDictationState.ProviderSelectionRequired,
         is ConversationDictationState.DisclosureRequired,
@@ -315,7 +398,10 @@ private fun dictationStatusLabel(state: ConversationDictationState): String =
         is ConversationDictationState.ProviderActivityActive -> stringResource(R.string.dictation_service_open)
         is ConversationDictationState.Starting -> stringResource(R.string.dictation_starting)
         is ConversationDictationState.Listening -> stringResource(R.string.dictation_listening)
-        is ConversationDictationState.Processing -> stringResource(R.string.dictation_processing)
+        is ConversationDictationState.Processing ->
+            stringResource(
+                if (captureInProgress) R.string.dictation_listening else R.string.dictation_processing,
+            )
         is ConversationDictationState.Failed -> dictationFailureLabel(state.reason)
         is ConversationDictationState.ReviewRequired -> stringResource(R.string.dictation_review_required)
         is ConversationDictationState.DeliveryUnknown -> stringResource(R.string.delivery_not_confirmed)

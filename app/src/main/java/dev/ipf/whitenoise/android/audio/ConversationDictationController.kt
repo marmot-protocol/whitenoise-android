@@ -275,6 +275,9 @@ internal interface ConversationDictationRecognitionSession {
     /** Releases the exact caller-audio chunk only after this generation's final was accepted. */
     fun acknowledgeCallerAudio(): Boolean = false
 
+    /** Reports capture-side speech evidence for the exact caller-audio chunk, when available. */
+    fun callerAudioContainsSpeech(): Boolean? = null
+
     /** Requeues the exact caller-audio chunk when this generation failed before a usable final. */
     fun retryCallerAudio(): Boolean = false
 }
@@ -565,10 +568,21 @@ internal class ConversationDictationController internal constructor(
     val deliveryInProgress: Boolean
         get() = dispatchedSessionId != null && dispatchedSessionId == state.sessionId
 
+    /** True while an app-owned recognizer generation is starting, listening, or transcribing. */
+    private val inActiveRecognitionState: Boolean
+        get() =
+            state is ConversationDictationState.Starting ||
+                state is ConversationDictationState.Listening ||
+                state is ConversationDictationState.Processing
+
+    /** True while provider segment processing remains part of an open capture. */
+    val captureInProgress: Boolean
+        get() = !finishRequested && inActiveRecognitionState
+
     /** The completion button that owns indeterminate work for the current visible phase. */
     val processingDeliveryMode: ConversationDictationDeliveryMode?
         get() =
-            if (state is ConversationDictationState.Processing) {
+            if (finishRequested && inActiveRecognitionState) {
                 requestedDeliveryMode ?: state.target?.deliveryMode
             } else {
                 null
@@ -1623,12 +1637,15 @@ internal class ConversationDictationController internal constructor(
                     val recognized = transcript?.trim().orEmpty()
                     if (recognized.isNotBlank()) unresolvedRecognitionFailure = null
                     if (recognized.isBlank()) {
-                        val retainedCallerAudio = recognitionSession?.retryCallerAudio() == true
+                        val callerAudioContainsSpeech = recognitionSession?.callerAudioContainsSpeech()
+                        val retainedCallerAudio = retainSpeechBearingCallerAudioForRetry()
                         clearRecognitionGeneration(cancel = false)
                         when {
                             finishRequested &&
                                 (retainedCallerAudio || platform.callerAudioHasPending()) ->
                                 continueOrFinalizeCallerAudioDrain(sessionId, target)
+                            finishRequested && callerAudioContainsSpeech == false ->
+                                finalizeAccumulatedTranscript(sessionId, target)
                             finishRequested ->
                                 failOrRetainTranscript(
                                     sessionId,
@@ -1709,6 +1726,17 @@ internal class ConversationDictationController internal constructor(
                     },
                 )
             }
+        }
+    }
+
+    /** Requeues a blank speech-bearing chunk but consumes confirmed capture-side silence once. */
+    private fun retainSpeechBearingCallerAudioForRetry(): Boolean {
+        val session = recognitionSession ?: return false
+        return if (session.callerAudioContainsSpeech() == false) {
+            session.acknowledgeCallerAudio()
+            false
+        } else {
+            session.retryCallerAudio()
         }
     }
 
@@ -3329,6 +3357,9 @@ private class AndroidConversationDictationRecognitionSession(
 
     /** Acknowledges only this recognizer generation’s caller-audio chunk after its final result. */
     override fun acknowledgeCallerAudio(): Boolean = callerAudio?.acknowledge() == true
+
+    /** Returns capture-side speech evidence for this recognizer generation's exact chunk. */
+    override fun callerAudioContainsSpeech(): Boolean? = callerAudio?.containsSpeech()
 
     /** Returns this recognizer generation’s unacknowledged caller audio for a replacement request. */
     override fun retryCallerAudio(): Boolean = callerAudio?.retry() == true

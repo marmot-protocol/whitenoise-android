@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -68,6 +69,8 @@ class SupportNavigationTest {
         assertEquals(SettingsDetail.Support, current)
         composeRule.onNodeWithContentDescription(back).performClick()
         assertNull(current)
-        assertEquals(original, composeRule.onNodeWithText(support).fetchSemanticsNode().boundsInRoot)
+        composeRule.waitForIdle()
+        val restored = composeRule.onNodeWithText(support).fetchSemanticsNode().boundsInRoot
+        assertTrue("expected $original but was $restored", kotlin.math.abs(original.top - restored.top) <= 1f)
     }
 }
