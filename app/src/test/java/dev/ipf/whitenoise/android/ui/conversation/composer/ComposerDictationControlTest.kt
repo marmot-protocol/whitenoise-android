@@ -207,7 +207,7 @@ class ComposerDictationControlTest {
         assertTrue("RTL dictation action must not overlap the text field", dictation.right <= field.left)
     }
 
-    /** All four native commands remain independently reachable inside the actual narrow RTL composer. */
+    /** All three native commands remain independently reachable inside the actual narrow RTL composer. */
     @Test
     @Config(qualifiers = "w240dp-h780dp-mdpi")
     fun narrowLargeRtlDictationActionsScrollWithoutOverlappingTheLeadingTools() {
@@ -224,12 +224,8 @@ class ComposerDictationControlTest {
             assertTrue("RTL actions must stay clear of leading tools", bounds.right <= emoji.left)
             node.performClick()
         }
-        action("Pause dictation")
-        FakeDictationPlatform.listener.onResult("first")
-        action("Resume dictation")
-        FakeDictationPlatform.listener.onBeginningOfSpeech()
         action("Paste")
-        FakeDictationPlatform.listener.onResult("second")
+        FakeDictationPlatform.listener.onResult("first")
         assertTrue(controller.state is ConversationDictationState.Idle)
         composeRule.onNodeWithContentDescription("Dictate text").performClick()
         action("Send")

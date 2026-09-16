@@ -205,6 +205,7 @@ import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
+import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation as TargetValidation
 import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
 
 internal data class ProfileGroupInviteOutcome(
@@ -1169,15 +1170,25 @@ class WhiteNoiseAppState private constructor(
                     (activeAccountRef != accountRef || chatsController?.containsGroup(groupIdHex) != false)
             },
             targetReplyAvailable = ::conversationDictationReplyTargetAvailable,
-            targetValidator = { accountRef, groupIdHex ->
-                if (accounts.none { it.label == accountRef && it.signedOut != true }) {
-                    false
-                } else {
-                    runCatchingCancellable {
-                        marmotIo {
-                            groupDetails(accountRef, groupIdHex).group.selfMembership == SelfMembershipFfi.MEMBER
-                        }
-                    }.getOrDefault(false)
+            targetValidator = { account, group ->
+                val cached =
+                    synchronized(conversationControllerLock) {
+                        newestMatchingController(conversationControllers) { it.matchesConversation(account, group) }
+                    }
+                when {
+                    accounts.none { it.label == account && it.signedOut != true } ->
+                        TargetValidation.DefinitelyRemoved
+                    cached?.membersVerified == true && cached.isSelfMember -> TargetValidation.Available
+                    cached?.membersVerified == true -> TargetValidation.DefinitelyRemoved
+                    else ->
+                        runCatchingCancellable {
+                            marmotIo {
+                                val member =
+                                    groupDetails(account, group).group.selfMembership ==
+                                        SelfMembershipFfi.MEMBER
+                                if (member) TargetValidation.Available else TargetValidation.DefinitelyRemoved
+                            }
+                        }.getOrDefault(TargetValidation.Indeterminate)
                 }
             },
             targetValidationScope = mutationsScope,
@@ -2451,12 +2462,7 @@ class WhiteNoiseAppState private constructor(
         value: TextFieldValue,
     ): Boolean = composerDraftExpansionBridge.setDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
 
-    /**
-     * Sends only for the unchanged origin and a claimed dispatch, then clears its captured draft and geometry.
-     * Dictation never hides the draft through the shared presentation bridge: its controller empties the composer
-     * with its own conditional write inside [ConversationDictationSendRequest.beginDispatch] and restores that text
-     * on a failed or unknown send, which keeps a newer edit made during the send along with its retained geometry.
-     */
+    /** Dictation conditionally empties only its unchanged origin; failed or unknown sends restore that exact text. */
     internal suspend fun sendDictationTranscriptIfOriginUnchanged(request: ConversationDictationSendRequest): Boolean =
         matchingConversationControllerForReply(
             request.accountRef,
@@ -2474,7 +2480,7 @@ class WhiteNoiseAppState private constructor(
                 val replyTarget = controller.replyingTo
                 var durablyAccepted = false
                 try {
-                    durablyAccepted = sendConversationText(controller, request.payload)
+                    durablyAccepted = sendConversationText(controller, request.payload, request.onPendingShown)
                     durablyAccepted
                 } finally {
                     if (!durablyAccepted && replyTarget != null && controller.replyingTo == null) {

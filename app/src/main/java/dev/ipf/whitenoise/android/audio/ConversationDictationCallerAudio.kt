@@ -97,9 +97,9 @@ private class AndroidConversationDictationAudioCaptureDevice(
  * Owns one continuous microphone capture for a logical dictation session.
  *
  * Recognition generations attach one provider stream at a time. Capture is split into immutable
- * 30-second chunks and remains active while the provider returns a final and the next recognizer is
- * created. Queued and in-flight PCM is bounded to 90 seconds; overflow stops capture instead of
- * silently dropping a read.
+ * sentence-aware chunks bounded at 30 seconds. It remains active while the provider returns a
+ * final and the next recognizer is created. Queued and in-flight PCM is bounded to 90 seconds;
+ * overflow stops capture instead of silently dropping a read.
  */
 @Suppress("TooManyFunctions")
 internal class ConversationDictationCallerAudio internal constructor(
@@ -140,7 +140,7 @@ internal class ConversationDictationCallerAudio internal constructor(
         }
         conversationDictationDiagnostic(
             "event=caller_audio_started sample_rate=$CALLER_AUDIO_SAMPLE_RATE_HZ " +
-                "channels=$CALLER_AUDIO_CHANNEL_COUNT encoding=pcm16 chunk_seconds=30 buffer_seconds=90",
+                "channels=$CALLER_AUDIO_CHANNEL_COUNT encoding=pcm16 chunk_seconds=10-30 buffer_seconds=90",
         )
         thread(name = "dictation-caller-audio-capture", isDaemon = true, block = ::capture)
         return true
@@ -217,23 +217,15 @@ internal class ConversationDictationCallerAudio internal constructor(
         val samples = ShortArray(FRAMES_PER_READ)
         val encoded = ByteArray(FRAMES_PER_READ * BYTES_PER_FRAME)
         val progress = CallerAudioProgress()
+        var currentChunkHasSpeech = false
         try {
             while (recording.get() && progress.stopReason == null) {
                 val read = device.read(samples)
                 if (read <= 0) {
                     progress.stopReason = "read=$read"
                 } else {
-                    conversationDictationEncodePcm16(samples, read, encoded)
-                    val bytes = read * BYTES_PER_FRAME
-                    if (!buffer.append(encoded, bytes)) {
-                        progress.stopReason = "buffer_full"
-                        conversationDictationDiagnostic(
-                            "event=caller_audio_backpressure bytes=${buffer.bufferedBytes} action=stop_capture",
-                        )
-                        reportCaptureFailure(ConversationDictationCallerAudioFailure.BufferFull)
-                    } else {
-                        recordCaptureActivity(samples, read, progress)
-                    }
+                    currentChunkHasSpeech =
+                        appendCapturedAudio(samples, read, encoded, progress, currentChunkHasSpeech)
                 }
             }
         } finally {
@@ -245,15 +237,48 @@ internal class ConversationDictationCallerAudio internal constructor(
         }
     }
 
+    /** Appends one recorder read and seals a speech-bearing chunk at a natural sentence boundary. */
+    private fun appendCapturedAudio(
+        samples: ShortArray,
+        read: Int,
+        encoded: ByteArray,
+        progress: CallerAudioProgress,
+        currentChunkHasSpeech: Boolean,
+    ): Boolean {
+        conversationDictationEncodePcm16(samples, read, encoded)
+        val bytes = read * BYTES_PER_FRAME
+        if (!buffer.append(encoded, bytes)) {
+            progress.stopReason = "buffer_full"
+            conversationDictationDiagnostic(
+                "event=caller_audio_backpressure bytes=${buffer.bufferedBytes} action=stop_capture",
+            )
+            reportCaptureFailure(ConversationDictationCallerAudioFailure.BufferFull)
+            return currentChunkHasSpeech
+        }
+
+        val chunkHasSpeech = currentChunkHasSpeech || recordCaptureActivity(samples, read, progress)
+        val quietMillis = SystemClock.elapsedRealtime() - lastSpeechAt.get()
+        val sealed =
+            chunkHasSpeech &&
+                quietMillis >= SENTENCE_BOUNDARY_SILENCE_MILLIS &&
+                buffer.sealCurrentIfAtLeast(MIN_SENTENCE_CHUNK_BYTES)
+        if (sealed) {
+            conversationDictationDiagnostic("event=caller_audio_chunk_sealed reason=silence")
+        }
+        return chunkHasSpeech && !sealed
+    }
+
     /** Tracks capture-side speech before a provider receives the next sealed chunk. */
     private fun recordCaptureActivity(
         samples: ShortArray,
         read: Int,
         progress: CallerAudioProgress,
-    ) {
+    ): Boolean {
         val peak = conversationDictationPeak(samples, read)
-        if (peak >= SPEECH_PEAK) lastSpeechAt.set(SystemClock.elapsedRealtime())
+        val speech = peak >= SPEECH_PEAK
+        if (speech) lastSpeechAt.set(SystemClock.elapsedRealtime())
         progress.record(read, peak, buffer.bufferedBytes)
+        return speech
     }
 
     /** Runs a closure observer once, including registration racing with recorder release. */
@@ -335,6 +360,11 @@ internal class ConversationDictationCallerAudio internal constructor(
         }
     }
 }
+
+private const val MIN_SENTENCE_CHUNK_SECONDS = 10
+private const val MIN_SENTENCE_CHUNK_BYTES =
+    CALLER_AUDIO_SAMPLE_RATE_HZ * BYTES_PER_FRAME * MIN_SENTENCE_CHUNK_SECONDS
+private const val SENTENCE_BOUNDARY_SILENCE_MILLIS = 500L
 
 /** One provider request backed by one exact, retryable caller-audio chunk. */
 @Suppress("TooManyFunctions")

@@ -29,6 +29,7 @@ import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
@@ -52,6 +53,53 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36], qualifiers = "en")
 @Suppress("LargeClass") // Send, retry, projection, preview, and durable-draft scenarios share one controller fixture.
 class ConversationSendRetryIntegrationTest {
+    /** Hands dictation back to Idle at optimistic publication, before transport settles. */
+    @Test
+    fun dictationPendingCallbackPrecedesDurableAcceptance() =
+        runTest {
+            val appState = appState()
+            appState.setDraft(GROUP_ID, TextFieldValue("typed"))
+            val releasePublish = CompletableDeferred<Unit>()
+            var pendingShown = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        releasePublish.await()
+                        successfulSendSummary()
+                    },
+                )
+            appState.attachConversationController(controller)
+            val request =
+                ConversationDictationSendRequest(
+                    accountRef = ACCOUNT_REF,
+                    groupIdHex = GROUP_ID,
+                    expectedDraftRevision = appState.composerDraftGeneration(ACCOUNT_REF, GROUP_ID),
+                    expectedDraftText = "typed",
+                    payload = "typed spoken",
+                    onPendingShown = { pendingShown += 1 },
+                )
+
+            try {
+                val send =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        appState.sendDictationTranscriptIfOriginUnchanged(request)
+                    }
+
+                assertEquals(1, pendingShown)
+                assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+                assertFalse(send.isCompleted)
+
+                releasePublish.complete(Unit)
+                assertTrue(send.await())
+            } finally {
+                releasePublish.complete(Unit)
+                appState.detachConversationController(controller)
+            }
+        }
+
     @Test
     fun rejectedAndUnknownDictationReplySendsRestoreTheCapturedReplyTarget() =
         runTest {
