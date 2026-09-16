@@ -93,11 +93,12 @@ internal fun emptyAppState(
     profileDisplayName: suspend (String) -> String? = { profiles[it]?.displayName },
     accounts: List<AccountSummaryFfi> = listOf(testAccount(ACCOUNT_REF, ACCOUNT_HEX)),
     activeAccountRef: String = ACCOUNT_REF,
+    accountIdHex: suspend (String) -> String? = { null },
 ): WhiteNoiseAppState =
     WhiteNoiseAppState(
         context = ApplicationProvider.getApplicationContext<Context>(),
         draftStore = DraftStore(InMemoryDraftPersistence()),
-        accountIdHexResolver = { null },
+        accountIdHexResolver = accountIdHex,
         accounts = accounts,
         activeAccountRef = activeAccountRef,
         profileReader = { profiles[it] },

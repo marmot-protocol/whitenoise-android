@@ -159,7 +159,8 @@ internal fun ShareConnectScreen(
             scan@{ raw ->
                 if (!ownsScreen() || scannerSession != scanSession) return@scan
                 scannerSession = null
-                when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.ViewProfile)) {
+                val accountIdHex = appState::accountIdHexForMention
+                when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.ViewProfile, accountIdHex)) {
                     is QrScanOutcome.OpenProfileNpub ->
                         if (onScannedProfile != null) {
                             onScannedProfile(outcome)

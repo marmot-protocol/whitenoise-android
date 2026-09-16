@@ -94,6 +94,7 @@ internal fun NewMessageContent(
     creatingHex: String?,
     error: StartChatErrorUiState?,
     actions: NewMessageActions,
+    isValidNpub: (String) -> Boolean,
     retryableIdentifier: Boolean = false,
 ) {
     val query = queryState.text.toString()
@@ -112,6 +113,7 @@ internal fun NewMessageContent(
                     state = queryState,
                     placeholder = stringResource(R.string.new_message_name_or_npub),
                     onPasteRejected = actions.pasteRejected,
+                    isValidNpub = isValidNpub,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag("new_message.searchField"),
                     shape = MaterialTheme.shapes.extraLarge,
                     enabled = !busy,

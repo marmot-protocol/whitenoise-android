@@ -57,7 +57,7 @@ private class NostrEventReferenceCollector {
 
     private fun add(raw: String) {
         if (references.size >= MAX_EVENT_REFERENCES_PER_MESSAGE) return
-        NostrProfileReference.eventReference(raw)?.let { reference ->
+        NostrEventReferenceDecoder.eventReference(raw)?.let { reference ->
             references.putIfAbsent(
                 reference.stableId,
                 NostrEventReferenceOccurrence(reference, raw.trim()),

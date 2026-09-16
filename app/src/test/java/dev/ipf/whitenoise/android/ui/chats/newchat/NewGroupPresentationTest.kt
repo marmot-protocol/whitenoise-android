@@ -214,6 +214,7 @@ class NewGroupPresentationTest {
                     false,
                     incomplete,
                     NewGroupRecipientActions({}, confirm, review, {}, {}, retry, toggle, profile),
+                    isValidNpub = { true },
                 )
             }
         }

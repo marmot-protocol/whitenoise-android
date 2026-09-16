@@ -58,16 +58,19 @@ internal object RecipientPastePolicy {
 
     /** Decide one atomic paste without logging, persisting, resolving, or otherwise exporting it. */
     @Suppress("CyclomaticComplexMethod", "ReturnCount") // Identity conflicts fail closed at their detection point.
-    fun evaluate(items: List<String>): RecipientPasteDecision {
+    fun evaluate(
+        items: List<String>,
+        isValidNpub: (String) -> Boolean,
+    ): RecipientPasteDecision {
         if (items.isEmpty() || items.size > MAX_ITEMS) return rejected()
         if (items.exceedsUtf8Limit()) {
             return RecipientPasteDecision.Reject(RecipientPasteRejection.TooLarge)
         }
 
         val pastedText = items.joinToString(separator = "\n")
-        val scan = scanIdentityCandidates(pastedText)
+        val scan = scanIdentityCandidates(pastedText, isValidNpub)
         val nonBlankItems = items.map(String::trim).filter(String::isNotEmpty)
-        val exactIdentities = nonBlankItems.mapNotNull(::strictlyNormalizedWholeField)
+        val exactIdentities = nonBlankItems.mapNotNull { strictlyNormalizedWholeField(it, isValidNpub) }
         val everyNonBlankItemIsExact = exactIdentities.size == nonBlankItems.size
         val distinctExactIdentities = exactIdentities.distinct()
         val repeatedExactNip05 =
@@ -122,7 +125,10 @@ internal object RecipientPastePolicy {
         return if (containsOtherIdentity) rejected() else RecipientPasteDecision.PassThrough(pastedText)
     }
 
-    private fun strictlyNormalizedWholeField(trimmed: String): ExactIdentity? =
+    private fun strictlyNormalizedWholeField(
+        trimmed: String,
+        isValidNpub: (String) -> Boolean,
+    ): ExactIdentity? =
         when {
             trimmed.isEmpty() -> null
             hexPublicKey.matches(trimmed) -> ExactIdentity(IdentityKind.Hex, trimmed.lowercase(Locale.ROOT))
@@ -132,12 +138,15 @@ internal object RecipientPastePolicy {
                 ProfileLink
                     .parse(trimmed)
                     ?.npub
-                    ?.takeIf(NostrProfileReference::isValidNpub)
+                    ?.takeIf(isValidNpub)
                     ?.lowercase(Locale.ROOT)
                     ?.let { ExactIdentity(IdentityKind.Npub, it) }
         }
 
-    private fun scanIdentityCandidates(raw: String): IdentityScan {
+    private fun scanIdentityCandidates(
+        raw: String,
+        isValidNpub: (String) -> Boolean,
+    ): IdentityScan {
         val distinctNpubs = linkedSetOf<String>()
         var identityBearing = false
         var malformed = false
@@ -154,7 +163,7 @@ internal object RecipientPastePolicy {
                     if (
                         candidate.length == NPUB_LENGTH &&
                         hasBoundaries &&
-                        NostrProfileReference.isValidNpub(candidate)
+                        isValidNpub(candidate)
                     ) {
                         distinctNpubs += candidate.lowercase(Locale.ROOT)
                     } else {

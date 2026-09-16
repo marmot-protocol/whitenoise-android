@@ -145,7 +145,8 @@ internal fun ProfileQrSheet(
             onDismiss = { showScanner = false },
             onScan = { raw ->
                 showScanner = false
-                when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.ViewProfile)) {
+                val accountIdHex = appState::accountIdHexForMention
+                when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.ViewProfile, accountIdHex)) {
                     is QrScanOutcome.OpenProfileNpub -> {
                         onDismiss()
                         appState.presentProfile(outcome.npub)

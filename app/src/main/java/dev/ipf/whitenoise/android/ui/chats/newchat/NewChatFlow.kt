@@ -416,7 +416,7 @@ private fun NewMessageAccountScreen(
         remember(appState.chatListItems, activeHex, appState.profileRevisionForCompose) {
             deriveRecipientCandidates(appState, activeHex)
         }
-    val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query)
+    val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query, appState::accountIdHexForMention)
     val resolution = rememberRecipientResolution(query, appState, retryKey = searchRetry)
     val userSearch by key(query, searchRetry, appState.relationshipRevision) {
         rememberRecipientUserSearchState(query, appState, retryKey = searchRetry)
@@ -576,6 +576,7 @@ private fun NewMessageAccountScreen(
         )
     } else {
         NewMessageContent(
+            isValidNpub = { npub -> appState.accountIdHexForMention(npub) != null },
             queryState = queryState,
             people = people,
             search = userSearch,

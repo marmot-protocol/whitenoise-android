@@ -11,11 +11,11 @@ class RecipientPastePolicyTest {
     fun extractsOneChecksumValidNpubFromProseAndCanonicalizesIt() {
         assertEquals(
             RecipientPasteDecision.Accept(ALICE_NPUB),
-            RecipientPastePolicy.evaluate(listOf("Alice shared ($ALICE_NPUB).")),
+            evaluate(listOf("Alice shared ($ALICE_NPUB).")),
         )
         assertEquals(
             RecipientPasteDecision.Accept(ALICE_NPUB),
-            RecipientPastePolicy.evaluate(listOf("nostr:${ALICE_NPUB.uppercase()}")),
+            evaluate(listOf("nostr:${ALICE_NPUB.uppercase()}")),
         )
     }
 
@@ -25,15 +25,15 @@ class RecipientPastePolicyTest {
 
         assertEquals(
             RecipientPasteDecision.Accept(ALICE_NPUB),
-            RecipientPastePolicy.evaluate(listOf("marmot://profile/$ALICE_NPUB?from=qr")),
+            evaluate(listOf("marmot://profile/$ALICE_NPUB?from=qr")),
         )
         assertEquals(
             RecipientPasteDecision.Accept(upperHex.lowercase()),
-            RecipientPastePolicy.evaluate(listOf(upperHex)),
+            evaluate(listOf(upperHex)),
         )
         assertEquals(
             RecipientPasteDecision.Accept("alice@example.com"),
-            RecipientPastePolicy.evaluate(listOf(" alice@example.com ")),
+            evaluate(listOf(" alice@example.com ")),
         )
     }
 
@@ -49,7 +49,7 @@ class RecipientPastePolicyTest {
             assertEquals(
                 input,
                 RecipientPasteDecision.Accept(ALICE_NPUB),
-                RecipientPastePolicy.evaluate(listOf(input)),
+                evaluate(listOf(input)),
             )
         }
     }
@@ -58,7 +58,7 @@ class RecipientPastePolicyTest {
     fun leavesOrdinaryNamesForNativePasteHandling() {
         assertEquals(
             RecipientPasteDecision.PassThrough("Alice Example"),
-            RecipientPastePolicy.evaluate(listOf("Alice Example")),
+            evaluate(listOf("Alice Example")),
         )
     }
 
@@ -81,7 +81,7 @@ class RecipientPastePolicyTest {
         invalidInputs.forEach { input ->
             assertEquals(
                 RecipientPasteDecision.Reject(RecipientPasteRejection.InvalidOrAmbiguous),
-                RecipientPastePolicy.evaluate(listOf(input)),
+                evaluate(listOf(input)),
             )
         }
     }
@@ -100,7 +100,7 @@ class RecipientPastePolicyTest {
         ).forEach { input ->
             assertEquals(
                 RecipientPasteDecision.Reject(RecipientPasteRejection.InvalidOrAmbiguous),
-                RecipientPastePolicy.evaluate(listOf(input)),
+                evaluate(listOf(input)),
             )
         }
     }
@@ -109,7 +109,7 @@ class RecipientPastePolicyTest {
     fun acceptsPunctuationBoundariesAndDeduplicatesTheSameIdentity() {
         assertEquals(
             RecipientPasteDecision.Accept(ALICE_NPUB),
-            RecipientPastePolicy.evaluate(listOf("[$ALICE_NPUB]", "again: <$ALICE_NPUB>")),
+            evaluate(listOf("[$ALICE_NPUB]", "again: <$ALICE_NPUB>")),
         )
     }
 
@@ -117,7 +117,7 @@ class RecipientPastePolicyTest {
     fun rejectsMultipleDistinctIdentitiesAcrossClipboardItems() {
         assertEquals(
             RecipientPasteDecision.Reject(RecipientPasteRejection.InvalidOrAmbiguous),
-            RecipientPastePolicy.evaluate(listOf(ALICE_NPUB, BOB_NPUB)),
+            evaluate(listOf(ALICE_NPUB, BOB_NPUB)),
         )
     }
 
@@ -133,7 +133,7 @@ class RecipientPastePolicyTest {
             assertEquals(
                 items.joinToString(),
                 RecipientPasteDecision.Reject(RecipientPasteRejection.InvalidOrAmbiguous),
-                RecipientPastePolicy.evaluate(items),
+                evaluate(items),
             )
         }
     }
@@ -148,7 +148,7 @@ class RecipientPastePolicyTest {
             assertEquals(
                 item,
                 RecipientPasteDecision.Reject(RecipientPasteRejection.InvalidOrAmbiguous),
-                RecipientPastePolicy.evaluate(listOf(item)),
+                evaluate(listOf(item)),
             )
         }
     }
@@ -157,15 +157,15 @@ class RecipientPastePolicyTest {
     fun appliesTheSameIdentityPolicyToUnicodeNip05Tokens() {
         assertEquals(
             RecipientPasteDecision.Accept(UNICODE_NIP05),
-            RecipientPastePolicy.evaluate(listOf(UNICODE_NIP05)),
+            evaluate(listOf(UNICODE_NIP05)),
         )
         assertEquals(
             RecipientPasteDecision.Reject(RecipientPasteRejection.InvalidOrAmbiguous),
-            RecipientPastePolicy.evaluate(listOf("Contact $UNICODE_NIP05")),
+            evaluate(listOf("Contact $UNICODE_NIP05")),
         )
         assertEquals(
             RecipientPasteDecision.Reject(RecipientPasteRejection.InvalidOrAmbiguous),
-            RecipientPastePolicy.evaluate(listOf("$ALICE_NPUB or $UNICODE_NIP05")),
+            evaluate(listOf("$ALICE_NPUB or $UNICODE_NIP05")),
         )
     }
 
@@ -178,7 +178,7 @@ class RecipientPastePolicyTest {
             assertEquals(
                 input,
                 RecipientPasteDecision.Accept(input),
-                RecipientPastePolicy.evaluate(listOf(input)),
+                evaluate(listOf(input)),
             )
         }
     }
@@ -194,7 +194,7 @@ class RecipientPastePolicyTest {
             assertEquals(
                 input,
                 RecipientPasteDecision.Reject(RecipientPasteRejection.InvalidOrAmbiguous),
-                RecipientPastePolicy.evaluate(listOf(input)),
+                evaluate(listOf(input)),
             )
         }
     }
@@ -203,7 +203,7 @@ class RecipientPastePolicyTest {
     fun rejectsAProfileLinkContainingASecondIdentity() {
         assertEquals(
             RecipientPasteDecision.Reject(RecipientPasteRejection.InvalidOrAmbiguous),
-            RecipientPastePolicy.evaluate(listOf("marmot://profile/$ALICE_NPUB?other=$BOB_NPUB")),
+            evaluate(listOf("marmot://profile/$ALICE_NPUB?other=$BOB_NPUB")),
         )
     }
 
@@ -211,7 +211,7 @@ class RecipientPastePolicyTest {
     fun rejectsMalformedIdentityEvenBesideAValidOne() {
         assertEquals(
             RecipientPasteDecision.Reject(RecipientPasteRejection.InvalidOrAmbiguous),
-            RecipientPastePolicy.evaluate(listOf("$ALICE_NPUB and npub1broken")),
+            evaluate(listOf("$ALICE_NPUB and npub1broken")),
         )
     }
 
@@ -222,43 +222,43 @@ class RecipientPastePolicyTest {
 
         assertEquals(
             RecipientPasteDecision.PassThrough(asciiAtLimit),
-            RecipientPastePolicy.evaluate(listOf(asciiAtLimit)),
+            evaluate(listOf(asciiAtLimit)),
         )
         assertEquals(
             RecipientPasteDecision.PassThrough(multibyteAtLimit),
-            RecipientPastePolicy.evaluate(listOf(multibyteAtLimit)),
+            evaluate(listOf(multibyteAtLimit)),
         )
         assertEquals(
             RecipientPasteDecision.Reject(RecipientPasteRejection.TooLarge),
-            RecipientPastePolicy.evaluate(listOf("a".repeat(RecipientPastePolicy.MAX_UTF8_BYTES + 1))),
+            evaluate(listOf("a".repeat(RecipientPastePolicy.MAX_UTF8_BYTES + 1))),
         )
         assertEquals(
             RecipientPasteDecision.Reject(RecipientPasteRejection.TooLarge),
-            RecipientPastePolicy.evaluate(listOf("é".repeat(RecipientPastePolicy.MAX_UTF8_BYTES / 2) + "a")),
+            evaluate(listOf("é".repeat(RecipientPastePolicy.MAX_UTF8_BYTES / 2) + "a")),
         )
         assertEquals(
             RecipientPasteDecision.Reject(RecipientPasteRejection.TooLarge),
-            RecipientPastePolicy.evaluate(listOf("a".repeat(8_192), "b".repeat(8_193))),
+            evaluate(listOf("a".repeat(8_192), "b".repeat(8_193))),
         )
         assertEquals(
             RecipientPasteDecision.PassThrough("${"a".repeat(RecipientPastePolicy.MAX_UTF8_BYTES - 2)}\nb"),
-            RecipientPastePolicy.evaluate(
+            evaluate(
                 listOf("a".repeat(RecipientPastePolicy.MAX_UTF8_BYTES - 2), "b"),
             ),
         )
         assertEquals(
             RecipientPasteDecision.Reject(RecipientPasteRejection.TooLarge),
-            RecipientPastePolicy.evaluate(
+            evaluate(
                 listOf("a".repeat(RecipientPastePolicy.MAX_UTF8_BYTES - 1), "b"),
             ),
         )
         assertEquals(
             RecipientPasteDecision.Reject(RecipientPasteRejection.TooLarge),
-            RecipientPastePolicy.evaluate(listOf(ALICE_NPUB + "x".repeat(RecipientPastePolicy.MAX_UTF8_BYTES))),
+            evaluate(listOf(ALICE_NPUB + "x".repeat(RecipientPastePolicy.MAX_UTF8_BYTES))),
         )
         assertEquals(
             RecipientPasteDecision.Reject(RecipientPasteRejection.TooLarge),
-            RecipientPastePolicy.evaluate(listOf("x".repeat(RecipientPastePolicy.MAX_UTF8_BYTES), ALICE_NPUB)),
+            evaluate(listOf("x".repeat(RecipientPastePolicy.MAX_UTF8_BYTES), ALICE_NPUB)),
         )
     }
 
@@ -266,11 +266,11 @@ class RecipientPastePolicyTest {
     fun rejectsEmptyAndUnboundedItemCounts() {
         assertEquals(
             RecipientPasteDecision.Reject(RecipientPasteRejection.InvalidOrAmbiguous),
-            RecipientPastePolicy.evaluate(emptyList()),
+            evaluate(emptyList()),
         )
         assertEquals(
             RecipientPasteDecision.Reject(RecipientPasteRejection.InvalidOrAmbiguous),
-            RecipientPastePolicy.evaluate(List(RecipientPastePolicy.MAX_ITEMS + 1) { "" }),
+            evaluate(List(RecipientPastePolicy.MAX_ITEMS + 1) { "" }),
         )
     }
 
@@ -287,12 +287,18 @@ class RecipientPastePolicyTest {
     @Test
     fun rejectedPasteRequiresNoTextFieldMutation() {
         val state = TextFieldState("keep me", TextRange(2, 6))
-        val decision = RecipientPastePolicy.evaluate(listOf("npub1broken"))
+        val decision = evaluate(listOf("npub1broken"))
 
         assertEquals(RecipientPasteDecision.Reject(RecipientPasteRejection.InvalidOrAmbiguous), decision)
         assertEquals("keep me", state.text.toString())
         assertEquals(TextRange(2, 6), state.selection)
     }
+
+    /** Evaluates with a stand-in for MarmotKit's decoder: Alice's npub in all-lower or all-upper case, like Bech32. */
+    private fun evaluate(items: List<String>): RecipientPasteDecision =
+        RecipientPastePolicy.evaluate(items) { candidate ->
+            candidate == ALICE_NPUB || candidate == ALICE_NPUB.uppercase()
+        }
 
     private companion object {
         const val ALICE_NPUB = "npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6"

@@ -88,7 +88,6 @@ import dev.ipf.whitenoise.android.core.HostSafety
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.core.MessageProjector
-import dev.ipf.whitenoise.android.core.NostrProfileReference
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
@@ -189,6 +188,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -8983,7 +8983,7 @@ class WhiteNoiseAppState private constructor(
     private fun nostrEntityAccountIdHex(bech32: String): String? {
         val trimmed = bech32.trim()
         return runCatching { marmot().accountIdHex(trimmed) }.getOrNull()
-            ?: NostrProfileReference.accountIdHex(trimmed)
+            ?: accountIdHexResolver?.let { resolve -> runBlocking { resolve(trimmed) } }
     }
 
     /**

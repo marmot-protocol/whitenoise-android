@@ -92,6 +92,7 @@ class NewGroupScreenshotTest {
                         false,
                         partial,
                         NewGroupRecipientActions({}, {}, {}, {}, {}, {}, {}, {}),
+                        isValidNpub = { true },
                     )
                 }
             }

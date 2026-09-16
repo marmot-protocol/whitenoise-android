@@ -8,7 +8,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.Nip05Resolver
-import dev.ipf.whitenoise.android.core.NostrProfileReference
 import dev.ipf.whitenoise.android.core.ProfileFieldValidation
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientReference
@@ -38,12 +37,12 @@ internal fun rememberRecipientResolution(
     val accountRef = appState.activeAccountRef
     val runtimeGeneration = appState.runtimeGeneration
     var resolving by remember(trimmed, accountRef, runtimeGeneration, retryKey) {
-        mutableStateOf(trimmed.isNotEmpty() && !isPlainNameQuery(trimmed))
+        mutableStateOf(trimmed.isNotEmpty() && !isPlainNameQuery(trimmed, appState::accountIdHexForMention))
     }
     var resolvedHex by remember(trimmed, accountRef, runtimeGeneration, retryKey) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(trimmed, accountRef, runtimeGeneration, retryKey) {
-        if (trimmed.isEmpty() || isPlainNameQuery(trimmed)) {
+        if (trimmed.isEmpty() || isPlainNameQuery(trimmed, appState::accountIdHexForMention)) {
             resolving = false
             resolvedHex = null
             return@LaunchedEffect
@@ -51,7 +50,7 @@ internal fun rememberRecipientResolution(
         resolving = true
         resolvedHex = null
         val hex =
-            NostrProfileReference.accountIdHex(trimmed)
+            appState.accountIdHexForMention(trimmed)
                 ?: when (val id = ChatListIdentifierSearch.classify(trimmed)) {
                     is ChatListIdentifierSearch.Identifier.Npub -> appState.accountIdHex(id.npub)
                     is ChatListIdentifierSearch.Identifier.Nip05 -> {
@@ -96,10 +95,13 @@ internal fun rememberRecipientResolution(
  * True when [query] is plain text (name search) rather than an identifier
  * (npub / profile link / NIP-05 / bare hex) that routes to the preview card.
  */
-internal fun isPlainNameQuery(query: String): Boolean {
+internal fun isPlainNameQuery(
+    query: String,
+    accountIdHex: (String) -> String?,
+): Boolean {
     val trimmed = query.trim()
     if (trimmed.isEmpty()) return false
-    if (NostrProfileReference.accountIdHex(trimmed) != null) return false
+    if (accountIdHex(trimmed) != null) return false
     if (ChatListIdentifierSearch.classify(trimmed) != null) return false
     if (RecipientReference.normalize(trimmed) != null) return false
     return true

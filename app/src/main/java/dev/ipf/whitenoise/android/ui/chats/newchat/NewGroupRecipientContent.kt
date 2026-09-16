@@ -50,6 +50,7 @@ internal fun NewGroupRecipientContent(
     failed: Boolean,
     incomplete: Boolean,
     actions: NewGroupRecipientActions,
+    isValidNpub: (String) -> Boolean,
 ) {
     SettingsScaffold(
         title = stringResource(R.string.new_group),
@@ -70,6 +71,7 @@ internal fun NewGroupRecipientContent(
                     query,
                     actions.pasteRejected,
                     actions.scan,
+                    isValidNpub,
                     Modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag("new_group.search"),
                 )
             }

@@ -39,7 +39,7 @@ class NostrEventReferenceTest {
 
         val expectedId = id.hex()
         val expectedAuthor = author.hex()
-        assertEquals(NostrEventReference.Event(expectedId), NostrProfileReference.eventReference(note))
+        assertEquals(NostrEventReference.Event(expectedId), NostrEventReferenceDecoder.eventReference(note))
         assertEquals(
             NostrEventReference.Event(
                 expectedId,
@@ -47,7 +47,7 @@ class NostrEventReferenceTest {
                 1u,
                 relayHints = listOf("wss://ignored.example"),
             ),
-            NostrProfileReference.eventReference(nevent),
+            NostrEventReferenceDecoder.eventReference(nevent),
         )
         assertEquals(
             NostrEventReference.Address(
@@ -56,7 +56,7 @@ class NostrEventReferenceTest {
                 "article-id",
                 relayHints = listOf("wss://ignored.example"),
             ),
-            NostrProfileReference.eventReference(naddr),
+            NostrEventReferenceDecoder.eventReference(naddr),
         )
     }
 
@@ -81,17 +81,17 @@ class NostrEventReferenceTest {
                 tlv(0, id) + List(20) { index -> tlv(9, List(255) { index }) }.flatten(),
             )
 
-        assertNull(NostrProfileReference.eventReference(encode("nsec", id)))
-        assertNull(NostrProfileReference.eventReference(encode("npub", id)))
-        assertNull(NostrProfileReference.eventReference(missingId))
-        assertNull(NostrProfileReference.eventReference(duplicateId))
-        assertNull(NostrProfileReference.eventReference(duplicateAuthor))
-        assertNull(NostrProfileReference.eventReference(missingCoordinate))
-        assertNull(NostrProfileReference.eventReference(controlCoordinate))
-        assertNull(NostrProfileReference.eventReference(unsupportedKind))
-        assertNull(NostrProfileReference.eventReference(truncated))
+        assertNull(NostrEventReferenceDecoder.eventReference(encode("nsec", id)))
+        assertNull(NostrEventReferenceDecoder.eventReference(encode("npub", id)))
+        assertNull(NostrEventReferenceDecoder.eventReference(missingId))
+        assertNull(NostrEventReferenceDecoder.eventReference(duplicateId))
+        assertNull(NostrEventReferenceDecoder.eventReference(duplicateAuthor))
+        assertNull(NostrEventReferenceDecoder.eventReference(missingCoordinate))
+        assertNull(NostrEventReferenceDecoder.eventReference(controlCoordinate))
+        assertNull(NostrEventReferenceDecoder.eventReference(unsupportedKind))
+        assertNull(NostrEventReferenceDecoder.eventReference(truncated))
         assertTrue(validOversized.length > 5_000)
-        assertNull(NostrProfileReference.eventReference(validOversized))
+        assertNull(NostrEventReferenceDecoder.eventReference(validOversized))
     }
 
     @Test

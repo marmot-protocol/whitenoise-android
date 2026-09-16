@@ -192,6 +192,7 @@ class RecipientSearchFieldTest {
                         placeholder = "Search people",
                         onPasteRejected = {},
                         modifier = Modifier.testTag(FIELD_TAG),
+                        isValidNpub = { true },
                     )
                 }
             }
@@ -236,6 +237,7 @@ class RecipientSearchFieldTest {
                         placeholder = "Search people",
                         onPasteRejected = onRejected,
                         modifier = Modifier.testTag(FIELD_TAG),
+                        isValidNpub = { true },
                     )
                 }
             }

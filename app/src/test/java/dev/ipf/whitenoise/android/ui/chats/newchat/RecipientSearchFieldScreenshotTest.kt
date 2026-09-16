@@ -130,6 +130,7 @@ class RecipientSearchFieldScreenshotTest {
                                     Modifier
                                         .paddingForRecipientSearchFixture()
                                         .testTag(EMPTY_FIELD_TAG),
+                                isValidNpub = { true },
                             )
                             RecipientSearchField(
                                 state = filledState,
@@ -140,6 +141,7 @@ class RecipientSearchFieldScreenshotTest {
                                     Modifier
                                         .paddingForRecipientSearchFixture()
                                         .testTag(FILLED_FIELD_TAG),
+                                isValidNpub = { true },
                             )
                         }
                     }

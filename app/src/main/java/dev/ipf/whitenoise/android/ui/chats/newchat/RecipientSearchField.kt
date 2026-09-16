@@ -55,6 +55,7 @@ internal fun RecipientSearchField(
     state: TextFieldState,
     placeholder: String,
     onPasteRejected: () -> Unit,
+    isValidNpub: (String) -> Boolean,
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
     onScanQr: (() -> Unit)? = null,
@@ -81,6 +82,7 @@ internal fun RecipientSearchField(
                             state = state,
                             items = items,
                             platformHandlesPassThrough = true,
+                            isValidNpub = isValidNpub,
                             onRejected = latestOnPasteRejected.value,
                         )
                     return if (consumed) null else transferableContent
@@ -109,6 +111,7 @@ internal fun RecipientSearchField(
                                     state = state,
                                     items = clipboardManager?.primaryClip?.directRecipientPasteItems(),
                                     platformHandlesPassThrough = false,
+                                    isValidNpub = isValidNpub,
                                     onRejected = onPasteRejected,
                                 )
                             },
@@ -208,9 +211,10 @@ internal fun dispatchRecipientPaste(
     state: TextFieldState,
     items: List<String>?,
     platformHandlesPassThrough: Boolean,
+    isValidNpub: (String) -> Boolean,
     onRejected: () -> Unit,
 ): Boolean =
-    when (val decision = items?.let(RecipientPastePolicy::evaluate)) {
+    when (val decision = items?.let { RecipientPastePolicy.evaluate(it, isValidNpub) }) {
         is RecipientPasteDecision.Accept -> {
             state.replaceSelectionForRecipientPaste(decision.value)
             true

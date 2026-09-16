@@ -3,8 +3,6 @@ package dev.ipf.whitenoise.android.core
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 
-private const val HRP_NPUB = "npub"
-private const val HRP_NPROFILE = "nprofile"
 private const val HRP_NOTE = "note"
 private const val HRP_NEVENT = "nevent"
 private const val HRP_NADDR = "naddr"
@@ -20,39 +18,13 @@ private const val NIBBLE_MASK = 0x0f
 private val HEX_CHARS = "0123456789abcdef".toCharArray()
 
 /**
- * Shared NIP-19 Bech32/TLV decoder for profile mentions, QR validation, and
- * public event references.
+ * NIP-19 Bech32/TLV decoder for public event pointers (`note`, `nevent`, `naddr`).
  *
- * Rust's current `accountIdHex` FFI helper normalizes npub/hex but not nprofile
- * TLVs. Android needs the embedded type-0 pubkey so pasted nprofile mentions can
- * use the same profile-cache and roster-membership paths as npub mentions (#1017),
- * and so QR scans can reject checksum-invalid npub/nprofile payloads without
- * duplicating a second Bech32 implementation. Event-reference relay TLVs are
- * retained as untrusted metadata and must be validated again immediately before
- * callers dial them.
- * The temporary Kotlin extensions remain in the #1584 / MDK #959 migration
- * scope and can be removed when the generated API provides these forms.
+ * Profile references (`npub`, `nprofile`) are decoded by MarmotKit's `accountIdHex` since 0.10.0 and
+ * no longer here (#1584). Event-reference relay TLVs are retained as untrusted metadata and must be
+ * validated again immediately before callers dial them.
  */
-internal object NostrProfileReference {
-    fun accountIdHex(reference: String): String? {
-        val decoded = NostrBech32Codec.decode(reference.trim()) ?: return null
-        if (decoded.hrp != HRP_NPROFILE) return null
-        val payload =
-            NostrBech32Codec.convertBits(
-                decoded.data,
-                fromBits = 5,
-                toBits = BITS_PER_BYTE,
-                pad = false,
-            ) ?: return null
-        return NostrTlvCodec.unique(payload, TLV_SPECIAL, HASH_BYTES)?.toHexString()
-    }
-
-    fun isValidNpub(reference: String): Boolean {
-        val decoded = NostrBech32Codec.decode(reference.trim()) ?: return false
-        if (decoded.hrp != HRP_NPUB) return false
-        return pubkeyHex(decoded.data) != null
-    }
-
+internal object NostrEventReferenceDecoder {
     /** Strictly decode a public event pointer; private-key and profile forms return null. */
     fun eventReference(reference: String): NostrEventReference? =
         decodeEventPayload(reference)?.let { (hrp, payload) ->
@@ -70,17 +42,13 @@ internal object NostrProfileReference {
 }
 
 private fun decodeEventPayload(reference: String): Pair<String, List<Int>>? =
-    NostrBech32Codec.decode(reference.trim())?.let { decoded ->
-        NostrBech32Codec
-            .convertBits(decoded.data, fromBits = 5, toBits = BITS_PER_BYTE, pad = false)
-            ?.let { payload -> decoded.hrp to payload }
-    }
-
-private fun pubkeyHex(data: List<Int>): String? =
     NostrBech32Codec
-        .convertBits(data, fromBits = 5, toBits = BITS_PER_BYTE, pad = false)
-        ?.takeIf { it.size == HASH_BYTES }
-        ?.toHexString()
+        .decode(reference.trim())
+        ?.let { decoded ->
+            NostrBech32Codec
+                .convertBits(decoded.data, fromBits = 5, toBits = BITS_PER_BYTE, pad = false)
+                ?.let { payload -> decoded.hrp to payload }
+        }
 
 @Suppress("MaxLineLength")
 private fun decodeEventPointer(payload: List<Int>): NostrEventReference.Event? = NostrTlvCodec.parse(payload)?.let(::decodeEventFields)

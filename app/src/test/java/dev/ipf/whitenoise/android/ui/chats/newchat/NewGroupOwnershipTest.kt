@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.core.TestNip19
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.replaceActiveAccountForTest
 import dev.ipf.whitenoise.android.ui.share.GROUP_A
@@ -195,5 +196,6 @@ class NewGroupOwnershipTest {
         emptyAppState(
             accounts = listOf(testAccount("first", "a".repeat(64)), testAccount("second", "c".repeat(64))),
             activeAccountRef = "first",
+            accountIdHex = { reference -> TestNip19.npubToHex(reference) },
         )
 }

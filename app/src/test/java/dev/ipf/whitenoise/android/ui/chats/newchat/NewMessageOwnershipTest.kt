@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.TestNip19
 import dev.ipf.whitenoise.android.state.BoundedNpubCache
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.replaceActiveAccountForTest
@@ -204,6 +205,7 @@ class NewMessageOwnershipTest {
         emptyAppState(
             accounts = listOf(testAccount("first", "a".repeat(64)), testAccount("second", "c".repeat(64))),
             activeAccountRef = "first",
+            accountIdHex = { reference -> TestNip19.npubToHex(reference) },
         ).also { state ->
             val field = WhiteNoiseAppState::class.java.getDeclaredField("npubs")
             field.isAccessible = true

@@ -64,11 +64,11 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.Lud16Resolver
 import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.ProfileFieldValidation
-import dev.ipf.whitenoise.android.core.ProfilePseudonymGenerator
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
+import dev.ipf.whitenoise.android.state.randomProfilePseudonym
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.group.ImagePreviewPresentation
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
@@ -808,7 +808,7 @@ internal fun ProfileEditScreen(
         onEdit = ::beginEditing,
         onSave = ::saveProfile,
         onSuggestName = {
-            fields.name.setTextAndPlaceCursorAtEnd(ProfilePseudonymGenerator.random(excluding = displayName))
+            fields.name.setTextAndPlaceCursorAtEnd(appState.randomProfilePseudonym(excluding = displayName))
         },
         onOpenPicture = { if (avatarImageAvailable) fullPictureOpen = true },
         onEditPicture = { showPictureSheet = true },
