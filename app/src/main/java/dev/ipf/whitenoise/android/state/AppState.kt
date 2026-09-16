@@ -1702,7 +1702,8 @@ class WhiteNoiseAppState private constructor(
     var accounts by mutableStateOf(initialAccounts)
         private set
 
-    private val accountUnreadStore = AccountUnreadStore()
+    internal val accountUnreadStore = AccountUnreadStore()
+    internal val accountAttentionMirror = AccountAttentionMirror()
 
     val accountUnreadCounts: Map<String, ULong>
         get() = accountUnreadStore.retainedCounts
@@ -4258,6 +4259,7 @@ class WhiteNoiseAppState private constructor(
         }
         runtimeStartResult.await().getOrThrow()
         runtime.marmot.emitAuditRuntimeReadinessAfterStart()
+        accountAttentionMirror.start(this, runtime.marmot)
     }
 
     private suspend fun resumeCompletedBootstrap(): Boolean {
@@ -4772,9 +4774,7 @@ class WhiteNoiseAppState private constructor(
         val previousValues = previous.mapValues { (_, versioned) -> versioned.value }
         val rawCountsByHex =
             runCatchingCancellable {
-                marmotIo(MarmotTraceSection.UNREAD_SUMMARY) {
-                    accountUnreadSummary().associate { it.accountIdHex to it.unreadCount }
-                }
+                accountAttentionCounts()
             }.onFailure { appStateDebug { "account unread summary refresh failed" } }
                 .getOrNull()
         if (!refreshIsCurrent()) return

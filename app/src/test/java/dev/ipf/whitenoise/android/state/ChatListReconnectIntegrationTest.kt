@@ -6,17 +6,18 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.ChatListAnchorOutcomeFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
+import dev.ipf.marmotkit.ChatListPageDirectionFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.marmotkit.ChatListViewFfi
+import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.PresentationResolutionFfi
 import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.PresentationTextFfi
-import dev.ipf.marmotkit.PresentationVersionFfi
-import dev.ipf.marmotkit.PresentedChatListSnapshotFfi
-import dev.ipf.marmotkit.PresentedChatListUpdateFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
@@ -324,14 +325,16 @@ class ChatListReconnectIntegrationTest {
     /** Builds an app state whose live chat-list sources are fully controlled by this test. */
     private fun chatListTestAppState(
         diagnostics: NotificationNetworkRecoveryDiagnostics,
-        chatList: ChatListSubscriptionHandle,
+        chatList: ChatListWindowHandle,
         chats: ChatsSubscriptionHandle,
     ): WhiteNoiseAppState =
         chatListTestAppState(
             diagnostics = diagnostics,
             liveSubscriptions =
                 ChatListLiveSubscriptions(
-                    openChatList = { _, _ -> chatList },
+                    openChatListWindow = { _, view ->
+                        if (view == ChatListViewFfi.CHATS) chatList else TerminatingChatListSubscription(view)
+                    },
                     openChats = { _, _ -> chats },
                 ),
         )
@@ -403,19 +406,36 @@ private fun awaitChatListCondition(condition: () -> Boolean) {
 /** Controllable chat-list subscription used by the recovery integration test. */
 private class ScriptedChatListSubscription(
     private val initialRow: ChatListRowFfi,
-) : ChatListSubscriptionHandle {
-    private val updates = Channel<PresentedChatListUpdateFfi>(Channel.UNLIMITED)
+) : ChatListWindowHandle {
+    private val updates = Channel<ChatListWindowSnapshotFfi>(Channel.UNLIMITED)
     private var sequence = 0uL
+    private var current = windowSnapshot(listOf(initialRow), sequence)
     val nextUpdateStarted = CompletableDeferred<Unit>()
 
     /** Returns the local projection present before reconnect. */
-    override fun snapshot(): PresentedChatListUpdateFfi = presentedUpdate(listOf(initialRow), sequence)
+    override fun snapshot(): ChatListWindowSnapshotFfi = current
 
-    /** Waits for the test-controlled authoritative recovery update. */
-    override suspend fun nextUpdate(): PresentedChatListUpdateFfi? {
+    /** Waits for the test-controlled authoritative recovery replacement. */
+    override suspend fun next(): ChatListWindowSnapshotFfi? {
         nextUpdateStarted.complete(Unit)
-        return updates.receiveCatching().getOrNull()
+        return updates.receiveCatching().getOrNull()?.also { current = it }
     }
+
+    /** Commands echo the installed replacement; the recovery test never pages. */
+    override suspend fun page(
+        sequence: ULong,
+        direction: ChatListPageDirectionFfi,
+        count: UInt,
+    ): ChatListWindowSnapshotFfi = current
+
+    /** Anchor reports echo the installed replacement. */
+    override suspend fun setVisibleAnchor(
+        sequence: ULong,
+        groupIdHex: String,
+    ): ChatListWindowSnapshotFfi = current
+
+    /** Return-to-top echoes the installed replacement. */
+    override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi = current
 
     /** Delivers one authoritative update without blocking the test thread. */
     fun emit(update: ChatListSubscriptionUpdateFfi) {
@@ -426,7 +446,7 @@ private class ScriptedChatListSubscription(
                 is ChatListSubscriptionUpdateFfi.RemoveRow -> emptyList()
             }
         sequence += 1uL
-        check(updates.trySend(presentedUpdate(rows, sequence)).isSuccess)
+        check(updates.trySend(windowSnapshot(rows, sequence)).isSuccess)
     }
 
     /** Ends the scripted stream. */
@@ -461,15 +481,17 @@ private class RestartingChatListSubscriptions {
 
     val liveSubscriptions =
         ChatListLiveSubscriptions(
-            openChatList = { _, _ ->
-                TerminatingChatListSubscription().also(chatListStreams::add)
+            openChatListWindow = { _, view ->
+                TerminatingChatListSubscription(view).also { stream ->
+                    if (view == ChatListViewFfi.CHATS) chatListStreams.add(stream)
+                }
             },
             openChats = { _, _ ->
                 ScriptedChatsSubscription().also(chatStreams::add)
             },
         )
 
-    /** Reports whether the numbered chat-list stream reached its consumer loop. */
+    /** Reports whether the numbered active-chats stream reached its consumer loop. */
     fun hasStarted(index: Int): Boolean = chatListStreams.getOrNull(index)?.nextUpdateStarted?.isCompleted == true
 
     /** Ends the numbered chat-list stream to force a controller reopen. */
@@ -484,20 +506,38 @@ private class RestartingChatListSubscriptions {
     }
 }
 
-/** Subscription whose termination is explicitly controlled by its test. */
-private class TerminatingChatListSubscription : ChatListSubscriptionHandle {
+/** Window whose termination is explicitly controlled by its test. */
+private class TerminatingChatListSubscription(
+    private val view: ChatListViewFfi = ChatListViewFfi.CHATS,
+) : ChatListWindowHandle {
     private val terminated = CompletableDeferred<Unit>()
     val nextUpdateStarted = CompletableDeferred<Unit>()
 
-    /** Returns the empty initial frame for this replacement handle. */
-    override fun snapshot(): PresentedChatListUpdateFfi = presentedUpdate(emptyList(), 0uL)
+    /** Returns the empty initial replacement for this handle. */
+    override fun snapshot(): ChatListWindowSnapshotFfi = windowSnapshot(emptyList(), 0uL, view)
 
     /** Waits until the test ends this stream normally. */
-    override suspend fun nextUpdate(): PresentedChatListUpdateFfi? {
+    override suspend fun next(): ChatListWindowSnapshotFfi? {
         nextUpdateStarted.complete(Unit)
         terminated.await()
         return null
     }
+
+    /** Commands echo the empty replacement. */
+    override suspend fun page(
+        sequence: ULong,
+        direction: ChatListPageDirectionFfi,
+        count: UInt,
+    ): ChatListWindowSnapshotFfi = snapshot()
+
+    /** Anchor reports echo the empty replacement. */
+    override suspend fun setVisibleAnchor(
+        sequence: ULong,
+        groupIdHex: String,
+    ): ChatListWindowSnapshotFfi = snapshot()
+
+    /** Return-to-top echoes the empty replacement. */
+    override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi = snapshot()
 
     /** Completes the stream normally. */
     fun terminate() {
@@ -510,18 +550,19 @@ private class TerminatingChatListSubscription : ChatListSubscriptionHandle {
     }
 }
 
-/** Complete selected-presentation frame matching MarmotKit 0.9.20's subscription contract. */
-private fun presentedUpdate(
+/** Complete window replacement matching MarmotKit 0.10.0's chat-list window contract. */
+private fun windowSnapshot(
     rows: List<ChatListRowFfi>,
     sequence: ULong,
-) = PresentedChatListUpdateFfi(
+    view: ChatListViewFfi = ChatListViewFfi.CHATS,
+) = ChatListWindowSnapshotFfi(
     subscriptionGeneration = "test-generation",
     sequence = sequence,
-    snapshot =
-        PresentedChatListSnapshotFfi(
-            rows = rows.map(::presentedRow),
-            presentationVersion = PresentationVersionFfi(byteArrayOf(1), sequence),
-        ),
+    view = view,
+    rows = rows.map(::presentedRow),
+    hasMoreBefore = false,
+    hasMoreAfter = false,
+    anchor = ChatListAnchorOutcomeFfi.Top,
 )
 
 /** Pairs a chat row with deterministic selected title and avatar values. */
@@ -547,11 +588,11 @@ private class FailFirstChatListSubscriptions {
 
     val liveSubscriptions =
         ChatListLiveSubscriptions(
-            openChatList = { _, _ ->
-                if (openAttempts.incrementAndGet() == 1) {
+            openChatListWindow = { _, view ->
+                if (view == ChatListViewFfi.CHATS && openAttempts.incrementAndGet() == 1) {
                     error("scripted initial open failure")
                 }
-                stableChatList
+                if (view == ChatListViewFfi.CHATS) stableChatList else TerminatingChatListSubscription(view)
             },
             openChats = { _, _ ->
                 ScriptedChatsSubscription().also(chatStreams::add)

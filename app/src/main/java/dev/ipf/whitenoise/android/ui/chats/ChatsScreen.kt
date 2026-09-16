@@ -76,6 +76,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.GlobalAttachmentItem
@@ -92,6 +93,9 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.collectGlobalAttachments
+import dev.ipf.whitenoise.android.state.loadMoreChats
+import dev.ipf.whitenoise.android.state.reportVisibleChat
+import dev.ipf.whitenoise.android.state.returnChatListToTop
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
@@ -113,6 +117,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.util.Locale
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold as Scaffold
@@ -975,6 +980,32 @@ internal fun ChatsScreen(
                 }
             }
     }
+    // MarmotKit 0.10.0 serves the list as a bounded window (50 rows initially, 200 retained).
+    // Ask for the next page once the reader nears the end, and report the settled visible row
+    // so later replacements keep it in place instead of resetting to the top.
+    val chatListWindowView = if (showArchived) ChatListViewFfi.ARCHIVED else ChatListViewFfi.CHATS
+    LaunchedEffect(chatListState, controller, chatListWindowView) {
+        snapshotFlow {
+            val info = chatListState.layoutInfo
+            (info.visibleItemsInfo.lastOrNull()?.index ?: -1) to info.totalItemsCount
+        }.distinctUntilChanged()
+            .collect { (lastVisibleIndex, totalItems) ->
+                if (totalItems > 0 && lastVisibleIndex >= totalItems - CHAT_LIST_WINDOW_PREFETCH_ROWS) {
+                    controller.loadMoreChats(chatListWindowView)
+                }
+            }
+    }
+    LaunchedEffect(chatListState, controller, chatListWindowView) {
+        snapshotFlow { chatListState.isScrollInProgress to chatListState.firstVisibleItemIndex }
+            .filter { (scrolling, _) -> !scrolling }
+            .map { (_, firstVisibleIndex) -> firstVisibleIndex }
+            .distinctUntilChanged()
+            .collect { firstVisibleIndex ->
+                visibleItems.getOrNull(firstVisibleIndex)?.group?.groupIdHex?.let { groupIdHex ->
+                    controller.reportVisibleChat(groupIdHex, chatListWindowView)
+                }
+            }
+    }
     // Keep a new chat-list head flush at the top when live activity reorders
     // keyed items (issues #541 / #1313 / #1651). LazyColumn otherwise pins the
     // previous head by key, leaving the promoted row above or clipped by the
@@ -1724,6 +1755,7 @@ internal fun ChatsScreen(
                                             chatListState.scrollToItem(CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX)
                                         }
                                         chatListState.animateScrollToItem(0)
+                                        controller.returnChatListToTop(chatListWindowView)
                                     }
                                 },
                         contentAlignment = Alignment.Center,
@@ -1917,6 +1949,9 @@ private val FAB_SNACKBAR_INSET = 80.dp
 // deeper than SNAP rows down we hard-jump to SNAP first, then animate the final
 // stretch, so a tap from hundreds of rows deep isn't a multi-second crawl.
 private const val CHAT_LIST_JUMP_TO_TOP_SHOW_INDEX = 5
+
+/** Rows from the end of the loaded window at which the next MarmotKit page is requested. */
+private const val CHAT_LIST_WINDOW_PREFETCH_ROWS = 10
 
 private const val CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX = 2
 

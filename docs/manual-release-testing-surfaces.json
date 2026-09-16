@@ -7692,6 +7692,30 @@
         "test_ids": [
           "MED-017"
         ]
+      },
+      {
+        "surface": "Rejected attachment placeholder title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RejectedAttachment.kt",
+        "anchor": "R.string.media_attachment_rejected_title",
+        "test_ids": [
+          "MED-017"
+        ]
+      },
+      {
+        "surface": "Rejected attachment unsupported-format explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RejectedAttachment.kt",
+        "anchor": "R.string.media_attachment_rejected_unsupported",
+        "test_ids": [
+          "MED-017"
+        ]
+      },
+      {
+        "surface": "Rejected attachment malformed explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RejectedAttachment.kt",
+        "anchor": "R.string.media_attachment_rejected_malformed",
+        "test_ids": [
+          "MED-017"
+        ]
       }
     ],
     "settings_controls": [

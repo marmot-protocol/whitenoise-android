@@ -41,7 +41,6 @@ import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MessageTagFfi
-import dev.ipf.marmotkit.PresentedChatListUpdateFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
@@ -2637,7 +2636,8 @@ class ChatsController private constructor(
     var memberSnapshotsRevision by mutableLongStateOf(0L)
         private set
 
-    private var accountRef: String? = initialLocalSnapshot?.accountRef ?: initialAccountRef
+    internal var accountRef: String? = initialLocalSnapshot?.accountRef ?: initialAccountRef
+        private set
     private var pendingInitialLocalSnapshot = initialLocalSnapshot
 
     private fun chatRowKey(groupIdHex: String): String = groupIdHex.lowercase()
@@ -3150,13 +3150,13 @@ class ChatsController private constructor(
     private var isCleared = false
 
     private val liveSubscriptionLock = Any()
-    private var activeChatListSubscription: ChatListSubscriptionHandle? = null
+    internal var chatListWindows: ChatListWindowSet? = null
     private var activeChatsSubscription: ChatsSubscriptionHandle? = null
     private var bindJob: Job? = null
     private val connectionOwner =
         ChatListConnectionOwner(appState) {
             synchronized(liveSubscriptionLock) {
-                activeChatListSubscription != null &&
+                chatListWindows != null &&
                     activeChatsSubscription != null &&
                     accountRef == boundAccountRef &&
                     accountRef == appState.activeAccountRef
@@ -3180,8 +3180,8 @@ class ChatsController private constructor(
                     this.accountRef = null
                     boundAccountRef = null
                     invalidateConnectionReadiness()
-                    val current = Triple(activeChatListSubscription, activeChatsSubscription, bindJob)
-                    activeChatListSubscription = null
+                    val current = Triple(chatListWindows, activeChatsSubscription, bindJob)
+                    chatListWindows = null
                     activeChatsSubscription = null
                     current
                 }
@@ -3260,7 +3260,7 @@ class ChatsController private constructor(
                 }
             }
             while (coroutineContext.isActive && shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
-                var chatListSubscription: ChatListSubscriptionHandle? = null
+                var chatListSubscription: ChatListWindowSet? = null
                 var chatsSubscription: ChatsSubscriptionHandle? = null
                 var receivedLiveUpdate = false
                 val connectionAttempt =
@@ -3275,22 +3275,18 @@ class ChatsController private constructor(
                         connectionOwner.beginSessionAttempt(accountRef, bindEpoch)
                     }
                 try {
-                    val chatListStream = liveSubscriptions.openChatList(accountRef, true)
+                    val chatListStream = ChatListWindowSet.open(accountRef, liveSubscriptions.openChatListWindow)
                     chatListSubscription = chatListStream
                     val chatStream = liveSubscriptions.openChats(accountRef, true)
                     chatsSubscription = chatStream
                     if (!shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) break
                     synchronized(liveSubscriptionLock) {
                         if (shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
-                            activeChatListSubscription = chatListStream
+                            chatListWindows = chatListStream
                             activeChatsSubscription = chatStream
                         }
                     }
-                    val initialPresentedUpdate =
-                        withContext(Dispatchers.IO) { chatListStream.snapshot() }
-                            .requirePresentedChatListSnapshot()
-                    val presentedCursor = PresentedChatListCursor(initialPresentedUpdate)
-                    replacePresentedChatRows(initialPresentedUpdate.snapshot.rows)
+                    replacePresentedChatRows(chatListStream.rows)
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
                     groupRecordsById =
                         withContext(Dispatchers.IO) {
@@ -3324,21 +3320,15 @@ class ChatsController private constructor(
                     coroutineScope {
                         runUntilFirstLiveSubscriptionEnds(
                             first = {
-                                while (isActive) {
-                                    val update =
-                                        withContext(Dispatchers.IO) {
-                                            chatListStream.nextUpdate()
-                                        } ?: break
+                                chatListStream.receive { _, _ ->
                                     appState.recoveryDiagnostics
                                         .recordChatListSubscriptionReceived()
                                         ?.let { generation ->
                                             pendingRecoveryProjectionGeneration.publish(generation)
                                         }
-                                    if (presentedCursor.requiresReopen(update)) break
-                                    if (!presentedCursor.accept(update)) continue
                                     receivedLiveUpdate = true
                                     connectionOwner.noteLiveUpdate(connectionAttempt)
-                                    applyPresentedChatListUpdate(accountRef, update)
+                                    applyChatListWindowRows(accountRef, chatListStream.rows)
                                 }
                             },
                             second = {
@@ -3380,8 +3370,8 @@ class ChatsController private constructor(
                         )
                 } finally {
                     synchronized(liveSubscriptionLock) {
-                        if (activeChatListSubscription === chatListSubscription) {
-                            activeChatListSubscription = null
+                        if (chatListWindows === chatListSubscription) {
+                            chatListWindows = null
                         }
                         if (activeChatsSubscription === chatsSubscription) {
                             activeChatsSubscription = null
@@ -4433,16 +4423,14 @@ class ChatsController private constructor(
         }
     }
 
-    /** Applies a complete, cursor-validated presented snapshot from MDK. */
+    /** Applies the merged rows of every open chat-list window after a newer replacement was installed. */
     @VisibleForTesting
-    internal fun applyPresentedChatListUpdate(
+    internal fun applyChatListWindowRows(
         accountRef: String,
-        update: PresentedChatListUpdateFfi,
+        rows: List<PresentedChatRowFfi>,
     ) {
-        chatsDebug {
-            "presented chat list snapshot account=${accountRef.take(8)} rows=${update.snapshot.rows.size}"
-        }
-        replacePresentedChatRows(update.snapshot.rows)
+        chatsDebug { "chat list window replacement account=${accountRef.take(8)} rows=${rows.size}" }
+        replacePresentedChatRows(rows)
         scheduleRecompute()
     }
 
