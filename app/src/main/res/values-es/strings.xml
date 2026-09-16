@@ -82,6 +82,17 @@
     <string name="delete_group_dialog_title">¿Eliminar grupo?</string>
     <string name="delete_group_dialog_message">¿Quitar este grupo de este dispositivo? Si aún eres miembro, primero saldrás del grupo.</string>
     <string name="delete_group_confirm">Eliminar</string>
+    <string name="group_reset_action">Restablecer y esperar una nueva invitación</string>
+    <string name="group_reset_dialog_title">¿Restablecer este grupo en este dispositivo?</string>
+    <string name="group_reset_dialog_message">White Noise borra el historial y el estado de cifrado de este grupo solo en este dispositivo. No se envía nada al grupo. Volverás a unirte cuando un administrador envíe una nueva invitación creada después de este restablecimiento.</string>
+    <string name="group_reset_confirm">Restablecer</string>
+    <string name="toast_group_reset_done">Grupo restablecido. Reaparecerá cuando llegue una nueva invitación.</string>
+    <string name="toast_group_reset_already_waiting">Este grupo ya está esperando una nueva invitación.</string>
+    <string name="toast_couldnt_reset_group">No se pudo restablecer el grupo. Inténtalo de nuevo.</string>
+    <string name="key_package_relay_history">Historial de relés</string>
+    <string name="key_package_current">Actual</string>
+    <string name="key_package_superseded">Sustituido</string>
+    <string name="key_package_relay_event_summary">Publicado %1$s en %2$s</string>
     <string name="toast_chat_deleted_local">Chat eliminado de este dispositivo</string>
     <string name="toast_couldnt_delete_chat">No se pudo eliminar el chat</string>
     <string name="chat_list_select_all">Seleccionar todo</string>

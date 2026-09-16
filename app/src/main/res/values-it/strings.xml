@@ -82,6 +82,17 @@
     <string name="delete_group_dialog_title">Eliminare il gruppo?</string>
     <string name="delete_group_dialog_message">Rimuovere questo gruppo da questo dispositivo? Se sei ancora un membro, uscirai prima dal gruppo.</string>
     <string name="delete_group_confirm">Elimina</string>
+    <string name="group_reset_action">Reimposta e attendi un nuovo invito</string>
+    <string name="group_reset_dialog_title">Reimpostare questo gruppo su questo dispositivo?</string>
+    <string name="group_reset_dialog_message">White Noise cancella la cronologia e lo stato di cifratura di questo gruppo solo su questo dispositivo. Al gruppo non viene inviato nulla. Rientrerai solo quando un admin invierà un nuovo invito creato dopo questa reimpostazione.</string>
+    <string name="group_reset_confirm">Reimposta</string>
+    <string name="toast_group_reset_done">Gruppo reimpostato. Riapparirà quando arriverà un nuovo invito.</string>
+    <string name="toast_group_reset_already_waiting">Questo gruppo è già in attesa di un nuovo invito.</string>
+    <string name="toast_couldnt_reset_group">Impossibile reimpostare il gruppo. Riprova.</string>
+    <string name="key_package_relay_history">Cronologia relay</string>
+    <string name="key_package_current">Attuale</string>
+    <string name="key_package_superseded">Sostituito</string>
+    <string name="key_package_relay_event_summary">Pubblicato %1$s su %2$s</string>
     <string name="toast_chat_deleted_local">Chat eliminata da questo dispositivo</string>
     <string name="toast_couldnt_delete_chat">Impossibile eliminare la chat</string>
     <string name="chat_list_select_all">Seleziona tutto</string>

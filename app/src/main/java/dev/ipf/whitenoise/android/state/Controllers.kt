@@ -1094,51 +1094,6 @@ private suspend fun decodeMediaThumbnailOffMain(plaintextBytes: ByteArray) =
         )
     }
 
-/**
- * Shared local group wipe used by chat-list Delete and sole-member Leave flows.
- * The engine drops its own rows/secrets, but Android owns decrypted media caches
- * and tray notifications, so clear those before the group references disappear.
- */
-private suspend fun WhiteNoiseAppState.deleteGroupLocalWithClientCleanup(
-    account: String,
-    groupIdHex: String,
-) {
-    conversationDictation.onTargetRemoved(account, groupIdHex)
-    evictGroupMediaCaches(account, groupIdHex)
-    deleteDraftBeforeGroupRemoval(account, groupIdHex)
-    marmotIo { deleteGroupLocal(account, groupIdHex) }
-    removeComposerExpansionForGroup(account, groupIdHex)
-    dismissConversationNotifications(account, groupIdHex)
-}
-
-private suspend fun WhiteNoiseAppState.evictGroupMediaCaches(
-    account: String,
-    groupIdHex: String,
-) {
-    val media =
-        runCatchingCancellable { marmotIo { listMedia(account, groupIdHex, null) } }
-            .getOrNull()
-            ?.takeIf { it.isNotEmpty() }
-            ?: return
-    val cacheKeys =
-        media.map { rec ->
-            mediaCacheKey(account, groupIdHex, rec.messageIdHex, rec.attachmentIndex.toInt())
-        }
-    // ByteSizeLruCache is backed by a non-thread-safe LinkedHashMap. Keep the
-    // in-memory L1 removals main-confined even though the disk L2 eviction below
-    // correctly runs on IO.
-    removeMediaMemoryCacheKeys(
-        cacheKeys = cacheKeys,
-        dispatcher = Dispatchers.Main.immediate,
-        removeEntry = ::removeMediaMemoryCacheEntry,
-    )
-    val tags = media.mapNotNull { it.reference.ciphertextSha256 }.toSet()
-    withContext(Dispatchers.IO) {
-        cacheKeys.forEach { diskMediaCache.remove(it) }
-        if (tags.isNotEmpty()) diskMediaCache.removeByCiphertextTags(tags)
-    }
-}
-
 internal fun optimisticMessageIdForProjection(
     optimisticMessages: Collection<TimelineMessage>,
     projected: AppMessageRecordFfi,
@@ -9990,16 +9945,31 @@ class ConversationController(
         }
 
     suspend fun deleteGroupLocal(): Boolean =
+        runLocalGroupRemoval(R.string.toast_couldnt_delete_chat, "GROUP_LOCAL_DELETE") { account ->
+            appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
+            R.string.toast_chat_deleted_local
+        }
+
+    /** MDK 0.10.0 local reset: erase this device's state and wait for a Welcome newer than the reset. */
+    suspend fun forgetGroupLocal(): Boolean =
+        runLocalGroupRemoval(R.string.toast_couldnt_reset_group, "GROUP_LOCAL_RESET") { account ->
+            val reset = appState.forgetGroupLocalWithClientCleanup(account, group.groupIdHex)
+            if (reset) R.string.toast_group_reset_done else R.string.toast_group_reset_already_waiting
+        }
+
+    /** Shared shape of the two local removals: one mutation slot, a success toast chosen by the removal itself. */
+    private suspend fun runLocalGroupRemoval(
+        failureToast: Int,
+        operationCode: String,
+        removal: suspend (account: String) -> Int,
+    ): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatchingCancellable {
-                appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
-                presentConversationTransient(R.string.toast_chat_deleted_local)
+                presentConversationTransient(removal(account))
                 true
-            }.onFailure {
-                recordMutationFailure(R.string.toast_couldnt_delete_chat, "GROUP_LOCAL_DELETE", it)
-            }.getOrDefault(false)
+            }.onFailure { recordMutationFailure(failureToast, operationCode, it) }.getOrDefault(false)
         }
 
     suspend fun updateGroupProfile(

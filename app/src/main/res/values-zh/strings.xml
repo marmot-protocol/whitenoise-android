@@ -81,6 +81,17 @@
     <string name="delete_group_dialog_title">删除群组？</string>
     <string name="delete_group_dialog_message">从此设备移除此群组？如果你仍是成员，将先退出群组。</string>
     <string name="delete_group_confirm">删除</string>
+    <string name="group_reset_action">重置并等待新邀请</string>
+    <string name="group_reset_dialog_title">在此设备上重置此群组？</string>
+    <string name="group_reset_dialog_message">White Noise 仅会在此设备上清除该群组的历史记录和加密状态，不会向群组发送任何内容。只有当管理员在此次重置后发送新的邀请时，你才会重新加入。</string>
+    <string name="group_reset_confirm">重置</string>
+    <string name="toast_group_reset_done">群组已重置。收到新邀请后它会重新出现。</string>
+    <string name="toast_group_reset_already_waiting">此群组已在等待新的邀请。</string>
+    <string name="toast_couldnt_reset_group">无法重置群组，请重试。</string>
+    <string name="key_package_relay_history">中继历史</string>
+    <string name="key_package_current">当前</string>
+    <string name="key_package_superseded">已替换</string>
+    <string name="key_package_relay_event_summary">%1$s 发布于 %2$s</string>
     <string name="toast_chat_deleted_local">已从此设备删除聊天</string>
     <string name="toast_couldnt_delete_chat">无法删除聊天</string>
     <string name="chat_list_select_all">全选</string>

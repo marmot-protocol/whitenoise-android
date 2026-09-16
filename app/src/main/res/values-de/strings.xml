@@ -82,6 +82,17 @@
     <string name="delete_group_dialog_title">Gruppe löschen?</string>
     <string name="delete_group_dialog_message">Diese Gruppe von diesem Gerät entfernen? Wenn du noch Mitglied bist, verlässt du zuerst die Gruppe.</string>
     <string name="delete_group_confirm">Löschen</string>
+    <string name="group_reset_action">Zurücksetzen und auf neue Einladung warten</string>
+    <string name="group_reset_dialog_title">Diese Gruppe auf diesem Gerät zurücksetzen?</string>
+    <string name="group_reset_dialog_message">White Noise löscht den Verlauf und den Verschlüsselungszustand dieser Gruppe nur auf diesem Gerät. An die Gruppe wird nichts gesendet. Du trittst erst wieder bei, wenn ein Admin nach diesem Zurücksetzen eine neue Einladung sendet.</string>
+    <string name="group_reset_confirm">Zurücksetzen</string>
+    <string name="toast_group_reset_done">Gruppe zurückgesetzt. Sie erscheint wieder, wenn eine neue Einladung eintrifft.</string>
+    <string name="toast_group_reset_already_waiting">Diese Gruppe wartet bereits auf eine neue Einladung.</string>
+    <string name="toast_couldnt_reset_group">Die Gruppe konnte nicht zurückgesetzt werden. Versuche es erneut.</string>
+    <string name="key_package_relay_history">Relay-Verlauf</string>
+    <string name="key_package_current">Aktuell</string>
+    <string name="key_package_superseded">Ersetzt</string>
+    <string name="key_package_relay_event_summary">Veröffentlicht %1$s auf %2$s</string>
     <string name="toast_chat_deleted_local">Chat von diesem Gerät gelöscht</string>
     <string name="toast_couldnt_delete_chat">Chat konnte nicht gelöscht werden</string>
     <string name="chat_list_select_all">Alle auswählen</string>

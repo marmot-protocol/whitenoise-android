@@ -82,6 +82,17 @@
     <string name="delete_group_dialog_title">Grup silinsin mi?</string>
     <string name="delete_group_dialog_message">Bu grup bu cihazdan kaldırılsın mı? Hâlâ üyeyseniz önce gruptan çıkarsınız.</string>
     <string name="delete_group_confirm">Sil</string>
+    <string name="group_reset_action">Sıfırla ve yeni davet bekle</string>
+    <string name="group_reset_dialog_title">Bu grup bu cihazda sıfırlansın mı?</string>
+    <string name="group_reset_dialog_message">White Noise bu grubun geçmişini ve şifreleme durumunu yalnızca bu cihazda siler. Gruba hiçbir şey gönderilmez. Yalnızca bir yönetici bu sıfırlamadan sonra oluşturulmuş yeni bir davet gönderdiğinde yeniden katılırsınız.</string>
+    <string name="group_reset_confirm">Sıfırla</string>
+    <string name="toast_group_reset_done">Grup sıfırlandı. Yeni bir davet geldiğinde yeniden görünecek.</string>
+    <string name="toast_group_reset_already_waiting">Bu grup zaten yeni bir davet bekliyor.</string>
+    <string name="toast_couldnt_reset_group">Grup sıfırlanamadı. Tekrar deneyin.</string>
+    <string name="key_package_relay_history">Relay geçmişi</string>
+    <string name="key_package_current">Güncel</string>
+    <string name="key_package_superseded">Değiştirildi</string>
+    <string name="key_package_relay_event_summary">%1$s, %2$s üzerinde yayımlandı</string>
     <string name="toast_chat_deleted_local">Sohbet bu cihazdan silindi</string>
     <string name="toast_couldnt_delete_chat">Sohbet silinemedi</string>
     <string name="chat_list_select_all">Tümünü seç</string>

@@ -84,6 +84,17 @@
     <string name="delete_group_dialog_title">Удалить группу?</string>
     <string name="delete_group_dialog_message">Удалить эту группу с этого устройства? Если вы ещё участник, сначала вы покинете группу.</string>
     <string name="delete_group_confirm">Удалить</string>
+    <string name="group_reset_action">Сбросить и ждать новое приглашение</string>
+    <string name="group_reset_dialog_title">Сбросить эту группу на этом устройстве?</string>
+    <string name="group_reset_dialog_message">White Noise удалит историю и состояние шифрования этой группы только на этом устройстве. В группу ничего не отправляется. Вы вернётесь в неё только после нового приглашения, созданного администратором после сброса.</string>
+    <string name="group_reset_confirm">Сбросить</string>
+    <string name="toast_group_reset_done">Группа сброшена. Она появится снова, когда придёт новое приглашение.</string>
+    <string name="toast_group_reset_already_waiting">Эта группа уже ждёт новое приглашение.</string>
+    <string name="toast_couldnt_reset_group">Не удалось сбросить группу. Попробуйте ещё раз.</string>
+    <string name="key_package_relay_history">История релеев</string>
+    <string name="key_package_current">Текущий</string>
+    <string name="key_package_superseded">Заменён</string>
+    <string name="key_package_relay_event_summary">Опубликован %1$s на %2$s</string>
     <string name="toast_chat_deleted_local">Чат удалён с этого устройства</string>
     <string name="toast_couldnt_delete_chat">Не удалось удалить чат</string>
     <string name="chat_list_select_all">Выбрать все</string>
