@@ -1887,7 +1887,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
         "anchor": "fun UnreadMessagesDivider(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "CON-002"
         ]
       },
       {
@@ -3304,6 +3305,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleStatus.kt",
         "anchor": "fun OutgoingIndicatorIcon(",
         "test_ids": [
+          "CON-005",
           "MSG-001"
         ]
       },
@@ -3312,6 +3314,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleStatus.kt",
         "anchor": "fun OutgoingMessageStatusIcon(",
         "test_ids": [
+          "CON-005",
           "MSG-001"
         ]
       },
@@ -3320,6 +3323,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleStatus.kt",
         "anchor": "fun BubbleDeliveryGlyph(",
         "test_ids": [
+          "CON-005",
           "MSG-001"
         ]
       },

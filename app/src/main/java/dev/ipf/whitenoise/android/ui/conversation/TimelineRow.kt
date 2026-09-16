@@ -10,7 +10,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.GroupProjector
@@ -30,7 +29,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerO
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
-import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.util.Locale
 
 /** Renders one projected timeline item and delegates bubble gestures to the conversation owner. */
@@ -218,10 +216,15 @@ internal fun TimelineRow(
             ) {
                 onActionMenuOpenChange(false)
             }
-            // The prototype opens each sender cluster with a 12 dp gap; rows inside a run keep the list spacing.
+            // The prototype opens each sender cluster with a 12 dp gap; rows inside a run keep the list spacing,
+            // and a row the unread divider already separated keeps the divider's interval alone.
             Box(
                 Modifier.padding(
-                    top = if (sameSenderAsOlderBubble) 0.dp else WhiteNoiseSpacing.ConversationCluster,
+                    top =
+                        conversationClusterTopGap(
+                            sameSenderAsOlderBubble = sameSenderAsOlderBubble,
+                            followsUnreadDivider = showUnreadDivider,
+                        ),
                 ),
             ) {
                 key(item.record.messageIdHex) {
