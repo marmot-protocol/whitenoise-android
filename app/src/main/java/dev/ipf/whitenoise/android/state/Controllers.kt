@@ -6186,8 +6186,15 @@ class ConversationController(
     },
     private val textPublisher: suspend (String?, String, String, String) -> SendSummaryFfi =
         { replyTarget, account, groupIdHex, text ->
-            val section = if (replyTarget != null) MarmotTraceSection.TEXT_REPLY else MarmotTraceSection.TEXT_SEND
-            appState.marmotIo(section) { sendComposerText(account, groupIdHex, replyTarget, text) }
+            if (replyTarget != null) {
+                appState.marmotIo(MarmotTraceSection.TEXT_REPLY) {
+                    sendComposerText(account, groupIdHex, replyTarget, text)
+                }
+            } else {
+                appState.marmotIo(MarmotTraceSection.TEXT_SEND) {
+                    sendComposerText(account, groupIdHex, null, text)
+                }
+            }
         },
     private val mediaUploader: MediaUploader = { account, groupIdHex, request ->
         appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) { uploadMedia(account, groupIdHex, request) }
