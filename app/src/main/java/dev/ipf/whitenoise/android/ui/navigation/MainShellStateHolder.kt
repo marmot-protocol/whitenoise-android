@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
 import dev.ipf.whitenoise.android.state.SavedComposerExpansion
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.bindBlockListMirror
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollSnapshot
 
 /**
@@ -80,6 +81,8 @@ internal class MainShellProcessState(
             appState.replaceChatsController(current.controller, controller)
             current.controller.onCleared()
         }
+        // The block list is account-scoped like the chats controller, so it follows the same replacement.
+        appState.bindBlockListMirror(accountRef)
         return controller
     }
 
@@ -166,6 +169,7 @@ internal class MainShellProcessState(
         clearRetainedRoute()
         val controller = chatsEntry?.controller
         chatsEntry = null
+        appState.runtimeMirrors.blocks.stop()
         if (controller != null) {
             appState.attachChatsController(null)
             controller.onCleared()

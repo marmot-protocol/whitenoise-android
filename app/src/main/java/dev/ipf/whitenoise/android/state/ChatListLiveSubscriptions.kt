@@ -1,19 +1,43 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.ChatListPageDirectionFfi
+import dev.ipf.marmotkit.ChatListViewFfi
+import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
+import dev.ipf.marmotkit.ChatListWindowSubscription
 import dev.ipf.marmotkit.ChatsSubscription
-import dev.ipf.marmotkit.PresentedChatListSubscription
-import dev.ipf.marmotkit.PresentedChatListUpdateFfi
 
-/** Lifecycle seam for the authoritative chat-list projection stream. */
-internal interface ChatListSubscriptionHandle {
-    /** Returns the complete first frame captured when this handle opened. */
-    fun snapshot(): PresentedChatListUpdateFfi?
+/** Rows requested when a chat-list window opens; MDK defaults to the same value and caps requests at 100. */
+internal const val CHAT_LIST_WINDOW_INITIAL_ROWS: UInt = 50u
 
-    /** Waits for the next authoritative presented-list frame. */
-    suspend fun nextUpdate(): PresentedChatListUpdateFfi?
+/** Rows requested per forward page; the window retains at most 200. */
+internal const val CHAT_LIST_WINDOW_PAGE_ROWS: UInt = 50u
 
-    /** Releases this handle and unblocks any pending update read. */
+/** Lifecycle seam for one bounded live chat-list window bound to a single MDK view. */
+internal interface ChatListWindowHandle {
+    /** Returns the complete first replacement captured when this window opened; consumed once. */
+    fun snapshot(): ChatListWindowSnapshotFfi?
+
+    /** Waits for the next complete replacement, or null once the window is closed. */
+    suspend fun next(): ChatListWindowSnapshotFfi?
+
+    /** Extends the retained window from the installed [sequence] in [direction]. */
+    suspend fun page(
+        sequence: ULong,
+        direction: ChatListPageDirectionFfi,
+        count: UInt,
+    ): ChatListWindowSnapshotFfi
+
+    /** Reports the row the user actually sees so later replacements keep it in view. */
+    suspend fun setVisibleAnchor(
+        sequence: ULong,
+        groupIdHex: String,
+    ): ChatListWindowSnapshotFfi
+
+    /** Returns the window to the top of the view and resumes following new activity. */
+    suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi
+
+    /** Releases this handle and unblocks any pending receive. */
     fun close()
 }
 
@@ -29,17 +53,33 @@ internal interface ChatsSubscriptionHandle {
     fun close()
 }
 
-/** Production adapter around MarmotKit's chat-list subscription. */
-private class FfiChatListSubscriptionHandle(
-    private val subscription: PresentedChatListSubscription,
-) : ChatListSubscriptionHandle {
-    /** Delegates the initial frame without changing native cursor identity. */
-    override fun snapshot(): PresentedChatListUpdateFfi? = subscription.snapshot()
+/** Production adapter around MarmotKit's chat-list window. */
+private class FfiChatListWindowHandle(
+    private val subscription: ChatListWindowSubscription,
+) : ChatListWindowHandle {
+    /** Delegates the initial replacement without changing native cursor identity. */
+    override fun snapshot(): ChatListWindowSnapshotFfi? = subscription.snapshot()
 
-    /** Delegates the next-frame wait to MarmotKit. */
-    override suspend fun nextUpdate(): PresentedChatListUpdateFfi? = subscription.next()
+    /** Delegates the next-replacement wait to MarmotKit. */
+    override suspend fun next(): ChatListWindowSnapshotFfi? = subscription.next()
 
-    /** Closes the underlying MarmotKit subscription. */
+    /** Delegates a page command; MarmotKit validates the sequence and row count. */
+    override suspend fun page(
+        sequence: ULong,
+        direction: ChatListPageDirectionFfi,
+        count: UInt,
+    ): ChatListWindowSnapshotFfi = subscription.page(sequence, direction, count)
+
+    /** Delegates the visible-anchor report. */
+    override suspend fun setVisibleAnchor(
+        sequence: ULong,
+        groupIdHex: String,
+    ): ChatListWindowSnapshotFfi = subscription.setVisibleAnchor(sequence, groupIdHex)
+
+    /** Delegates the return-to-top command. */
+    override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi = subscription.returnToTop(sequence)
+
+    /** Closes the underlying MarmotKit window; these handles expose no separate cancel. */
     override fun close() = subscription.close()
 }
 
@@ -59,16 +99,16 @@ private class FfiChatsSubscriptionHandle(
 
 /** Opens the paired streams consumed by [ChatsController]. */
 internal class ChatListLiveSubscriptions(
-    val openChatList: suspend (account: String, includeArchived: Boolean) -> ChatListSubscriptionHandle,
+    val openChatListWindow: suspend (account: String, view: ChatListViewFfi) -> ChatListWindowHandle,
     val openChats: suspend (account: String, includeArchived: Boolean) -> ChatsSubscriptionHandle,
 ) {
     companion object {
         /** Binds the seam to the production MarmotKit runtime. */
         fun bind(appState: WhiteNoiseAppState): ChatListLiveSubscriptions =
             ChatListLiveSubscriptions(
-                openChatList = { account, includeArchived ->
+                openChatListWindow = { account, view ->
                     appState.marmotIo {
-                        FfiChatListSubscriptionHandle(openPresentedChatList(account, includeArchived))
+                        FfiChatListWindowHandle(openChatListWindow(account, view, CHAT_LIST_WINDOW_INITIAL_ROWS))
                     }
                 },
                 openChats = { account, includeArchived ->

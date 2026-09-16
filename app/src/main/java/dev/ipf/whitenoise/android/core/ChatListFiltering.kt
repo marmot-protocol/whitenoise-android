@@ -33,7 +33,6 @@ import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.ProfileFieldValidation
 import dev.ipf.whitenoise.android.core.ProfileLink
-import dev.ipf.whitenoise.android.core.ProfilePseudonymGenerator
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.QrCodeEncoder
 import dev.ipf.whitenoise.android.core.ReactionTally

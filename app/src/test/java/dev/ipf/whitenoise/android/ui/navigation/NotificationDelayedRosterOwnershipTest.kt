@@ -58,6 +58,7 @@ import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.TtsAutoReadPreferences
@@ -530,7 +531,9 @@ abstract class NotificationDelayedRosterFixture {
                 "groupRoster" -> gatedRoster(gate, arguments)
                 "groupRecoveryStatus" -> recoveryStatus(arguments)
                 "chatListRow" -> gatedProjection(gate, arguments)
-                "openPresentedChatList" -> gatedBroadBind(gate, arguments)
+                "openChatListWindow" -> gatedBroadBind(gate, arguments)
+                "subscribeAccountAttention" -> MarmotWindowTestFakes.accountAttention()
+                "subscribeBlockedUsers" -> MarmotWindowTestFakes.blockList()
                 "toString" -> "NotificationDelayedRosterMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.firstOrNull()

@@ -69,6 +69,7 @@ class StalenessGuardCoverageTest {
         val appState = productionSource("AppState.kt")
         val controllers = productionSource("Controllers.kt")
         val nativePushFallback = productionSource("NativePushFallbackRuntime.kt")
+        val directChatResolution = productionSource("DirectChatResolution.kt")
         val guardedPaths =
             mapOf(
                 "AppState.kt:refreshAccountUnreadCounts" to
@@ -121,7 +122,7 @@ class StalenessGuardCoverageTest {
                     listOf("bindEpoch", "memberCacheEpoch", "memberCacheLifetime.isCurrent"),
                 "Controllers.kt:applyFetchedMemberSnapshot" to
                     listOf("isActiveBindEpoch(epoch)", "memberCacheLifetime.isCurrent"),
-                "Controllers.kt:resolveDirectChatGroup" to
+                "DirectChatResolution.kt:resolveDirectChatGroup" to
                     listOf("accountStillBound", "isActiveBindEpoch(epoch)"),
                 "Controllers.kt:refreshCurrentTimeline" to
                     listOf("timelineWindowGeneration.advance", "timelineWindowGeneration.isCurrent"),
@@ -158,6 +159,7 @@ class StalenessGuardCoverageTest {
                 when (fileName) {
                     "AppState.kt" -> appState
                     "NativePushFallbackRuntime.kt" -> nativePushFallback
+                    "DirectChatResolution.kt" -> directChatResolution
                     else -> controllers
                 }
             val body = source.functionSection(functionName)
@@ -243,7 +245,8 @@ class StalenessGuardCoverageTest {
         val guardedNames = guardedPaths.keys
         val candidates =
             asyncPublicationCandidates("AppState.kt", appState) +
-                asyncPublicationCandidates("Controllers.kt", controllers)
+                asyncPublicationCandidates("Controllers.kt", controllers) +
+                asyncPublicationCandidates("DirectChatResolution.kt", directChatResolution)
         val unclassified = candidates - guardedNames - exemptions.keys
         assertTrue(
             "suspend-then-publish paths need a StalenessGuard or a commented exemption: $unclassified",
@@ -395,6 +398,7 @@ class StalenessGuardCoverageTest {
             "TtsPaceTracker.kt",
             "MessageDraftRepository.kt",
             "MessageForwarding.kt",
+            "DirectChatResolution.kt",
         ).associateWith(::productionSource)
 
     /** Locates one production source from either the module or repository working directory. */

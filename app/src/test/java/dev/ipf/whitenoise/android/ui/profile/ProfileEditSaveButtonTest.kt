@@ -17,8 +17,10 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -347,11 +349,14 @@ internal fun profilePortTestState(
     context: Context,
     label: String,
     account: String,
+    marmot: MarmotInterface? = null,
 ): WhiteNoiseAppState =
     WhiteNoiseAppState(
         context = context,
         draftStore = DraftStore.forContext(context),
         accountIdHexResolver = { null },
+        initialMarmotRuntime =
+            marmot?.let { engine -> AppMarmotRuntime(context.cacheDir.resolve("profile-port-$label").path, engine) },
         accounts =
             listOf(
                 AccountSummaryFfi(

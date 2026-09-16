@@ -2,16 +2,18 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.Context
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.ConversationController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** Saves every accepted attachment under its protocol index; one failure does not stop the rest. */
 internal suspend fun saveMessageMediaAttachments(
     context: Context,
     controller: ConversationController,
     messageIdHex: String,
-    mediaReferences: List<MediaAttachmentReferenceFfi>,
+    attachments: List<IndexedAttachment>,
     mine: Boolean,
     documentSaveFallback: DocumentSaveFallback? = null,
 ): MessageAttachmentSaveSummary {
@@ -25,7 +27,7 @@ internal suspend fun saveMessageMediaAttachments(
             mine = mine,
             documentSaveFallback = documentSaveFallback,
         )
-    mediaReferences.forEachIndexed { attachmentIndex, reference ->
+    attachments.forEach { (attachmentIndex, reference) ->
         val result =
             runCatching<Boolean> {
                 saveMessageMediaAttachment(saveContext, attachmentIndex, reference)
@@ -41,7 +43,7 @@ internal suspend fun saveMessageMediaAttachments(
     }
     return MessageAttachmentSaveSummary(
         savedCount = savedCount,
-        totalCount = mediaReferences.size,
+        totalCount = attachments.size,
         firstFailure = firstFailure,
     )
 }

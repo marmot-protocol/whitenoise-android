@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -94,7 +95,7 @@ internal fun rememberTextAttachmentNativeActions(
                     (expiry == null || expiry > now) &&
                     (recordEpoch == null || recordEpoch == reference.sourceEpoch) &&
                     controller.isMessageMine(item.record) == mine &&
-                    controller.mediaReferencesFor(item).getOrNull(attachmentIndex) == reference
+                    controller.attachmentsFor(item).firstOrNull { it.index == attachmentIndex }?.value == reference
             }
             owned =
                 TextAttachmentNativeActions(::sourceIsCurrent) {

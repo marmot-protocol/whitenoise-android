@@ -281,15 +281,18 @@ internal class AttachmentDownloadGate(
 /**
  * Conservative classifier for the current MDK media error surface.
  *
- * MDK does not yet expose a typed Blossom/network error, so only failures that
- * clearly describe a pre-result connectivity problem are retried. Integrity,
- * policy, decryption, missing-reference, and ordinary unknown failures fail
- * immediately instead of repeating a potentially minute-long request.
+ * MDK types malformed references and policy refusals but folds transport,
+ * integrity and decryption failures into one `MediaDownloadFailed`, so only
+ * failures that clearly describe a pre-result connectivity problem are retried.
+ * Rejected or unfetchable references, integrity, decryption and ordinary unknown
+ * failures fail immediately instead of repeating a potentially minute-long request.
  */
 internal fun isTransientAttachmentDownloadFailure(throwable: Throwable): Boolean {
     val explicitlyTerminal =
         throwable is CancellationException ||
-            throwable is MarmotKitException.InvalidMediaReference
+            throwable is MarmotKitException.InvalidMediaReference ||
+            throwable is MarmotKitException.MediaAttachmentRejected ||
+            throwable is MarmotKitException.MediaUnfetchable
     val typedTransient = throwable is MarmotKitException.StorageBusy || throwable is IOException
     val text =
         generateSequence(throwable) { it.cause }

@@ -1,12 +1,12 @@
 package dev.ipf.whitenoise.android.ui.qr
 
-import dev.ipf.whitenoise.android.core.NostrProfileReference
 import dev.ipf.whitenoise.android.core.ProfileLink
 
 /**
  * Pure scan-result parsing for [QrScannerSheet] callers. Each [QrScanUseCase]
  * maps a raw QR payload to the navigation or error outcome that surface should
- * take. Npub/nprofile payloads are checksum-validated at this boundary.
+ * take. Npub/nprofile payloads are validated by MarmotKit's decoder, injected as [AccountIdHexResolver],
+ * so the parser itself stays pure.
  */
 enum class QrScanUseCase {
     /** Profile QR sheet and New Message scan-to-chat. */
@@ -33,6 +33,9 @@ sealed interface QrScanOutcome {
     data object Invalid : QrScanOutcome
 }
 
+/** Decodes an npub or nprofile reference to its hex account id, or null when it is not a valid one. */
+typealias AccountIdHexResolver = (String) -> String?
+
 object QrScanResult {
     private const val NOSTR_URI_PREFIX = "nostr:"
     private val HEX_PUBKEY = Regex("^[0-9a-fA-F]{64}$")
@@ -40,23 +43,30 @@ object QrScanResult {
     fun resolve(
         raw: String,
         useCase: QrScanUseCase,
+        accountIdHex: AccountIdHexResolver,
     ): QrScanOutcome =
         when (useCase) {
-            QrScanUseCase.ViewProfile -> resolveViewProfile(raw)
-            QrScanUseCase.PickRecipient -> resolvePickRecipient(raw)
+            QrScanUseCase.ViewProfile -> resolveViewProfile(raw, accountIdHex)
+            QrScanUseCase.PickRecipient -> resolvePickRecipient(raw, accountIdHex)
         }
 
-    private fun resolveViewProfile(raw: String): QrScanOutcome {
-        validatedNpub(raw)?.let { return QrScanOutcome.OpenProfileNpub(it) }
-        validatedNprofile(raw)?.let { (nprofile, hex) ->
+    private fun resolveViewProfile(
+        raw: String,
+        accountIdHex: AccountIdHexResolver,
+    ): QrScanOutcome {
+        validatedNpub(raw, accountIdHex)?.let { return QrScanOutcome.OpenProfileNpub(it) }
+        validatedNprofile(raw, accountIdHex)?.let { (nprofile, hex) ->
             return QrScanOutcome.OpenProfileNprofile(nprofile, hex)
         }
         return QrScanOutcome.Invalid
     }
 
-    private fun resolvePickRecipient(raw: String): QrScanOutcome {
-        validatedNpub(raw)?.let { return QrScanOutcome.FillRecipientQuery(it) }
-        validatedNprofile(raw)?.let { (_, hex) ->
+    private fun resolvePickRecipient(
+        raw: String,
+        accountIdHex: AccountIdHexResolver,
+    ): QrScanOutcome {
+        validatedNpub(raw, accountIdHex)?.let { return QrScanOutcome.FillRecipientQuery(it) }
+        validatedNprofile(raw, accountIdHex)?.let { (_, hex) ->
             return QrScanOutcome.FillRecipientQuery(hex)
         }
         val trimmed = raw.trim()
@@ -64,14 +74,20 @@ object QrScanResult {
         return QrScanOutcome.Invalid
     }
 
-    private fun validatedNpub(raw: String): String? {
+    private fun validatedNpub(
+        raw: String,
+        accountIdHex: AccountIdHexResolver,
+    ): String? {
         val candidate = ProfileLink.parse(raw)?.npub ?: bech32Candidate(raw, "npub1") ?: return null
-        return candidate.takeIf { NostrProfileReference.isValidNpub(candidate) }?.lowercase()
+        return candidate.takeIf { accountIdHex(candidate) != null }?.lowercase()
     }
 
-    private fun validatedNprofile(raw: String): Pair<String, String>? {
+    private fun validatedNprofile(
+        raw: String,
+        accountIdHex: AccountIdHexResolver,
+    ): Pair<String, String>? {
         val candidate = bech32Candidate(raw, "nprofile1") ?: return null
-        val hex = NostrProfileReference.accountIdHex(candidate) ?: return null
+        val hex = accountIdHex(candidate) ?: return null
         return candidate.lowercase() to hex
     }
 

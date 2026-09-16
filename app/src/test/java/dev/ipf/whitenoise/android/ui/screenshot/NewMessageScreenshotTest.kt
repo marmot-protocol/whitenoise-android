@@ -109,6 +109,7 @@ class NewMessageScreenshotTest {
                         null,
                         error,
                         NewMessageActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}),
+                        isValidNpub = { true },
                     )
                 }
             }

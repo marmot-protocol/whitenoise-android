@@ -5,11 +5,13 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MediaAttachmentRejectionKindFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.parseMediaImetaTag
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -97,9 +99,16 @@ class ProfileImageDialSafetyIntegrationTest {
                 error
             }
 
+        // MarmotKit 0.10.0 reports a per-attachment rejection instead of the old reference error. The
+        // safety property is unchanged: a peer-supplied loopback locator never becomes a fetchable
+        // attachment, and the malformed-field kind is what the app renders as a rejected slot.
         assertTrue(
             "Expected packaged MDK to reject a peer-supplied loopback media locator; got $failure",
-            failure is MarmotKitException.InvalidMediaReference,
+            failure is MarmotKitException.MediaAttachmentRejected,
+        )
+        assertEquals(
+            MediaAttachmentRejectionKindFfi.MALFORMED_FIELD,
+            (failure as MarmotKitException.MediaAttachmentRejected).kind,
         )
     }
 

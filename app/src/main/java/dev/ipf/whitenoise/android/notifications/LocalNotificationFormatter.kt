@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 
@@ -426,10 +427,15 @@ object LocalNotificationFormatter {
         shortNpub: (String) -> String,
     ): String = clean(override) ?: displayName(user, shortNpub)
 
+    // MDK fills `displayName` from whatever identity it holds, which can be the raw account key when the
+    // sender has published no profile. A key is not a name: it is rejected here so the abbreviated identity
+    // below is what a reader sees (device report on #2616).
     private fun displayName(
         user: NotificationUserFfi,
         shortNpub: (String) -> String,
-    ): String = clean(user.displayName) ?: shortNpub(user.accountIdHex)
+    ): String =
+        clean(user.displayName)?.takeUnless(IdentityFormatter::isNostrIdentityFallback)
+            ?: shortNpub(user.accountIdHex)
 
     private fun clean(value: String?): String? {
         if (value == null) return null

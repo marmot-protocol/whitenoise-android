@@ -48,6 +48,7 @@ internal fun NewGroupRecipientSearchField(
     state: TextFieldState,
     onPasteRejected: () -> Unit,
     onScan: () -> Unit,
+    isValidNpub: (String) -> Boolean,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -65,6 +66,7 @@ internal fun NewGroupRecipientSearchField(
                             state,
                             content.clipEntry.clipData.directRecipientPasteItems(),
                             true,
+                            isValidNpub,
                             latestRejected.value,
                         )
                     return if (consumed) null else content
@@ -121,6 +123,7 @@ internal fun NewGroupRecipientSearchField(
                                         state,
                                         clipboard?.primaryClip?.directRecipientPasteItems(),
                                         false,
+                                        isValidNpub,
                                         onPasteRejected,
                                     )
                                 }) {

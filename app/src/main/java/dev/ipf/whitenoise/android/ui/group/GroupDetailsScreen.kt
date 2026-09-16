@@ -1782,6 +1782,19 @@ internal fun GroupDetailsScreen(
                         )
                     },
                 )
+                GroupDetailsResetControl(
+                    isDm = isDm,
+                    readOnlyInvite = readOnlyInvite,
+                    enabled = !mutationsBlocked,
+                    inProgress = activeMutation?.action == GroupMutationAction.Reset,
+                    onResetConfirmed = {
+                        runGroupMutation(
+                            action = GroupMutationAction.Reset,
+                            mutation = { controller.forgetGroupLocal() },
+                            onSuccess = onLeft,
+                        )
+                    },
+                )
             }
         }
     }
@@ -2214,6 +2227,7 @@ private enum class GroupMutationAction {
     DisappearingMessages,
     Archive,
     Delete,
+    Reset,
     Leave,
     EnableDisbanding,
     Disband,

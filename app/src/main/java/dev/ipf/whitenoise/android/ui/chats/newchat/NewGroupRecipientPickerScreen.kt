@@ -80,7 +80,7 @@ private fun NewGroupRecipientAccountScreen(
         remember(appState.chatListItems, activeHex, appState.profileRevisionForCompose) {
             deriveRecipientCandidates(appState, activeHex)
         }
-    val identifier = query.isNotBlank() && !isPlainNameQuery(query)
+    val identifier = query.isNotBlank() && !isPlainNameQuery(query, appState::accountIdHexForMention)
     val resolvedHex = resolution.resolvedHex?.takeUnless { it.equals(activeHex, true) }
     val matches =
         if (identifier) {
@@ -176,6 +176,7 @@ private fun NewGroupRecipientAccountScreen(
                         }
                     },
                 ),
+            isValidNpub = { npub -> appState.accountIdHexForMention(npub) != null },
         )
     }
     scannerSession?.takeIf { owner.isCurrent() }?.let { token ->
@@ -184,7 +185,8 @@ private fun NewGroupRecipientAccountScreen(
             { raw ->
                 if (owner.isCurrent() && scannerSession == token) {
                     scannerSession = null
-                    when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.PickRecipient)) {
+                    val accountIdHex = appState::accountIdHexForMention
+                    when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.PickRecipient, accountIdHex)) {
                         is QrScanOutcome.FillRecipientQuery -> queryState.replaceRecipientText(outcome.reference)
                         else -> appState.present(R.string.error_qr_not_valid_npub_or_public_key, copyable = true)
                     }

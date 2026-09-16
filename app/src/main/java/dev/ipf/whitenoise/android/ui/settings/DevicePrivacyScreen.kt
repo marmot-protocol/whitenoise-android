@@ -30,6 +30,7 @@ internal fun DevicePrivacyScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     onOpenDiagnostics: () -> Unit = {},
+    onOpenBlockedUsers: () -> Unit = {},
     credentialAvailableOverride: Boolean? = null,
 ) {
     val context = LocalContext.current
@@ -104,6 +105,21 @@ internal fun DevicePrivacyScreen(
                                 value = delayLabels.getValue(appState.appLockDelay),
                             )
                         }
+                    }
+                }
+            }
+            item { SettingsSection(stringResource(R.string.blocked_users)) }
+            item {
+                SettingsGroup(modifier = Modifier.testTag("privacy.blocked_users.group")) {
+                    row("blocked_users") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.blocked_users),
+                            onClick = onOpenBlockedUsers,
+                            value =
+                                appState.runtimeMirrors.blocks.users.size
+                                    .toString(),
+                        )
                     }
                 }
             }

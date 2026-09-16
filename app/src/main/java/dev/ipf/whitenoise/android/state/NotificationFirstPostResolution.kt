@@ -45,9 +45,7 @@ internal suspend fun resolveNotificationMentionDisplayName(
 internal fun notificationSenderNameOverride(
     contactNickname: String?,
     localProfileName: String?,
-): String? =
-    ProfileSanitizer.displayName(contactNickname)
-        ?: ProfileSanitizer.displayName(localProfileName)
+): String? = humanNotificationLabel(contactNickname) ?: humanNotificationLabel(localProfileName)
 
 /** Accepts a sanitized payload hint only when it is not an identity fallback. */
 internal fun notificationDisplayNameHint(raw: String?): String? {
@@ -182,7 +180,7 @@ internal class NotificationIdentityResolver(
         val nickname = source.contactNickname(accountRef, accountIdHex)
         val localName = if (nickname == null) bestEffortDisplayName(accountIdHex) else null
         return nickname
-            ?: localName?.let(ProfileSanitizer::displayName)
+            ?: humanNotificationLabel(localName)
             ?: source.displayNameHint(accountIdHex)
             ?: source.cachedShortNpub(accountIdHex)
     }

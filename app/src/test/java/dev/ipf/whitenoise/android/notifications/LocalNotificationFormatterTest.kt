@@ -595,6 +595,69 @@ class LocalNotificationFormatterTest {
         assertEquals("Invite from Carol", content?.body)
     }
 
+    /** A nickname or profile name supplied by the caller wins over everything in the payload. */
+    @Test
+    fun resolvedSenderNameWinsOverThePayloadLabel() {
+        val content =
+            content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    groupName = "Launch",
+                    sender = user(displayName = "alice"),
+                ),
+                senderNameOverride = "Alice at work",
+            )
+
+        assertEquals("Alice at work in Launch", content?.title)
+    }
+
+    /** A published profile name in the payload is used when the caller resolved no nickname. */
+    @Test
+    fun payloadProfileNameIsUsedWithoutAResolvedName() {
+        val content =
+            content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    groupName = "Launch",
+                    sender = user(displayName = "Alice"),
+                ),
+            )
+
+        assertEquals("Alice in Launch", content?.title)
+    }
+
+    /** A raw account key is an identity, not a name: the abbreviated identity is shown instead. */
+    @Test
+    fun rawHexSenderKeyIsNeverDisplayed() {
+        val content =
+            content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    groupName = "Launch",
+                    sender = user(displayName = SAMPLE_ACCOUNT_ID_HEX),
+                ),
+            )
+
+        assertEquals("$SAMPLE_SHORT_NPUB in Launch", content?.title)
+        assertFalse(content?.title.orEmpty().contains(SAMPLE_ACCOUNT_ID_HEX))
+        assertEquals(SAMPLE_SHORT_NPUB, content?.senderName)
+    }
+
+    /** A full npub in the payload is refused for the same reason as a raw key. */
+    @Test
+    fun fullNpubSenderLabelIsNeverDisplayed() {
+        val content =
+            content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    groupName = "Launch",
+                    sender = user(displayName = "npub1qy352euf40x77qfrg4ncn27daufwuj22r4ttmxhstefp92xqnjgs8pjhstefp92"),
+                ),
+            )
+
+        assertEquals("$SAMPLE_SHORT_NPUB in Launch", content?.title)
+    }
+
     private fun content(
         update: NotificationUpdateFfi,
         senderNameOverride: String? = null,

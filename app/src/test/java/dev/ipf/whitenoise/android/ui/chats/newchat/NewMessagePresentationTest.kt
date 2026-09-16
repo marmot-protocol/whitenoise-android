@@ -163,6 +163,7 @@ class NewMessagePresentationTest {
                     null,
                     null,
                     NewMessageActions({}, {}, {}, {}, { calls += "retrySearch" }, {}, {}, {}, {}, {}),
+                    isValidNpub = { true },
                 )
             }
         }
@@ -204,6 +205,7 @@ class NewMessagePresentationTest {
                         { calls += "profile" },
                         {},
                     ),
+                    isValidNpub = { true },
                 )
             }
         }

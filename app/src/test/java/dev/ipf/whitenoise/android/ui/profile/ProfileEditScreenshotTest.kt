@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -16,6 +17,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.awaitCancellation
@@ -25,6 +27,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.lang.reflect.Proxy
 
 /** Focused profile reference frames use cached synthetic images and stub every network/publication boundary. */
 @RunWith(RobolectricTestRunner::class)
@@ -47,6 +50,9 @@ class ProfileEditScreenshotTest {
 
     /** Edit and Suggest name use light action text against the dark form surfaces. */
     @Test fun profileEditingDark() = capture("profile_editing_dark", editing = true, dark = true)
+
+    /** Suggest name fills the name field from MDK's pseudonym generator while editing (#1584). */
+    @Test fun profileEditingSuggestedName() = capture("profile_editing_suggested_light", editing = true, suggest = true)
 
     /** Long RTL text and twice-sized type use a scrollable form beneath the pinned Save. */
     @Test
@@ -84,10 +90,12 @@ class ProfileEditScreenshotTest {
         fields: Boolean = false,
         invalid: Boolean = false,
         images: Boolean = false,
+        suggest: Boolean = false,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val account = "0101010101010101010101010101010101010101010101010101010101010101"
-        val appState = profilePortTestState(context, "alice", account)
+        val engine = if (suggest) pseudonymEngine() else null
+        val appState = profilePortTestState(context, "alice", account, marmot = engine)
         val avatar = "https://profile-screenshot.invalid/avatar.png"
         val banner = "https://profile-screenshot.invalid/banner.png"
         if (images) {
@@ -135,6 +143,10 @@ class ProfileEditScreenshotTest {
             }
         }
         if (editing) composeRule.onNodeWithTag("profile.edit").performClick()
+        if (suggest) {
+            composeRule.onNodeWithTag("profile.suggest_name").performClick()
+            composeRule.onNodeWithText("Quiet Otter").assertExists()
+        }
         if (invalid) {
             composeRule
                 .onNodeWithTag("profile.address_field")
@@ -146,3 +158,18 @@ class ProfileEditScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$file.png")
     }
 }
+
+/** An engine that only answers the pseudonym draw, so the suggested name is deterministic in the frame. */
+private fun pseudonymEngine(): MarmotInterface =
+    Proxy.newProxyInstance(
+        MarmotInterface::class.java.classLoader,
+        arrayOf(MarmotInterface::class.java),
+    ) { proxy, method, args ->
+        when (method.name) {
+            "randomProfilePseudonym" -> "Quiet Otter"
+            "toString" -> "PseudonymEngineFixture"
+            "hashCode" -> System.identityHashCode(proxy)
+            "equals" -> proxy === args?.firstOrNull()
+            else -> throw UnsupportedOperationException("Unused native test call: ${method.name}")
+        }
+    } as MarmotInterface

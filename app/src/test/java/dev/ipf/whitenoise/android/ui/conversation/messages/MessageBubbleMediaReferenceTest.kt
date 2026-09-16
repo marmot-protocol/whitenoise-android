@@ -2,10 +2,12 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createComposeRule
+import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MessageTagFfi
-import org.junit.Assert.assertSame
+import dev.ipf.whitenoise.android.core.MessageAttachments
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -23,7 +25,8 @@ class MessageBubbleMediaReferenceTest {
     fun projectedReferenceChangeRefreshesTheRememberedMedia() {
         val first = listOf(reference("first.jpg"))
         val second = listOf(reference("second.jpg"))
-        val projectedMedia = mutableStateOf<List<MediaAttachmentReferenceFfi>?>(first)
+        val initial = MessageAttachments.acceptedOutcomes(first)
+        val projectedMedia = mutableStateOf<List<MediaAttachmentOutcomeFfi>?>(initial)
         var rendered: List<MediaAttachmentReferenceFfi>? = null
 
         composeRule.setContent {
@@ -36,9 +39,9 @@ class MessageBubbleMediaReferenceTest {
                 )
         }
 
-        composeRule.runOnIdle { assertSame(first, rendered) }
-        composeRule.runOnIdle { projectedMedia.value = second }
-        composeRule.runOnIdle { assertSame(second, rendered) }
+        composeRule.runOnIdle { assertEquals(first, rendered) }
+        composeRule.runOnIdle { projectedMedia.value = MessageAttachments.acceptedOutcomes(second) }
+        composeRule.runOnIdle { assertEquals(second, rendered) }
     }
 
     @Test

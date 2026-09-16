@@ -41,7 +41,6 @@ import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MessageTagFfi
-import dev.ipf.marmotkit.PresentedChatListUpdateFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
@@ -62,8 +61,10 @@ import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
+import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.MediaPreviewFallback
+import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageSearchConstraints
@@ -95,9 +96,6 @@ import dev.ipf.whitenoise.android.media.mutationKey
 import dev.ipf.whitenoise.android.media.shouldCommitPrimaryGroupImageMutation
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.newchat.directChatPreferenceOrder
-import dev.ipf.whitenoise.android.ui.chats.newchat.existingDirectChatFromProvenance
-import dev.ipf.whitenoise.android.ui.chats.newchat.rankedDirectChatCandidates
-import dev.ipf.whitenoise.android.ui.chats.newchat.resolveExistingDirectChatCandidates
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -1092,51 +1090,6 @@ private suspend fun decodeMediaThumbnailOffMain(plaintextBytes: ByteArray) =
             MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
         )
     }
-
-/**
- * Shared local group wipe used by chat-list Delete and sole-member Leave flows.
- * The engine drops its own rows/secrets, but Android owns decrypted media caches
- * and tray notifications, so clear those before the group references disappear.
- */
-private suspend fun WhiteNoiseAppState.deleteGroupLocalWithClientCleanup(
-    account: String,
-    groupIdHex: String,
-) {
-    conversationDictation.onTargetRemoved(account, groupIdHex)
-    evictGroupMediaCaches(account, groupIdHex)
-    deleteDraftBeforeGroupRemoval(account, groupIdHex)
-    marmotIo { deleteGroupLocal(account, groupIdHex) }
-    removeComposerExpansionForGroup(account, groupIdHex)
-    dismissConversationNotifications(account, groupIdHex)
-}
-
-private suspend fun WhiteNoiseAppState.evictGroupMediaCaches(
-    account: String,
-    groupIdHex: String,
-) {
-    val media =
-        runCatchingCancellable { marmotIo { listMedia(account, groupIdHex, null) } }
-            .getOrNull()
-            ?.takeIf { it.isNotEmpty() }
-            ?: return
-    val cacheKeys =
-        media.map { rec ->
-            mediaCacheKey(account, groupIdHex, rec.messageIdHex, rec.attachmentIndex.toInt())
-        }
-    // ByteSizeLruCache is backed by a non-thread-safe LinkedHashMap. Keep the
-    // in-memory L1 removals main-confined even though the disk L2 eviction below
-    // correctly runs on IO.
-    removeMediaMemoryCacheKeys(
-        cacheKeys = cacheKeys,
-        dispatcher = Dispatchers.Main.immediate,
-        removeEntry = ::removeMediaMemoryCacheEntry,
-    )
-    val tags = media.mapNotNull { it.reference.ciphertextSha256 }.toSet()
-    withContext(Dispatchers.IO) {
-        cacheKeys.forEach { diskMediaCache.remove(it) }
-        if (tags.isNotEmpty()) diskMediaCache.removeByCiphertextTags(tags)
-    }
-}
 
 internal fun optimisticMessageIdForProjection(
     optimisticMessages: Collection<TimelineMessage>,
@@ -2468,7 +2421,7 @@ internal class OptimisticArchiveIntent(
 
 /** Owns the active account's chat-list projection and live subscription lifecycle. */
 class ChatsController private constructor(
-    private val appState: WhiteNoiseAppState,
+    internal val appState: WhiteNoiseAppState,
     private val memberSnapshotLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi>,
     private val memberSnapshotRetryDelay: (Int) -> Long,
     private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi,
@@ -2635,7 +2588,8 @@ class ChatsController private constructor(
     var memberSnapshotsRevision by mutableLongStateOf(0L)
         private set
 
-    private var accountRef: String? = initialLocalSnapshot?.accountRef ?: initialAccountRef
+    internal var accountRef: String? = initialLocalSnapshot?.accountRef ?: initialAccountRef
+        private set
     private var pendingInitialLocalSnapshot = initialLocalSnapshot
 
     private fun chatRowKey(groupIdHex: String): String = groupIdHex.lowercase()
@@ -3033,7 +2987,7 @@ class ChatsController private constructor(
 
     private val chatRowsByGroup = LinkedHashMap<String, ChatListRowFfi>()
     private var selectedPresentationsByGroup = emptyMap<String, ConversationPresentationFfi>()
-    private val chatRows: Collection<ChatListRowFfi>
+    internal val chatRows: Collection<ChatListRowFfi>
         get() = chatRowsByGroup.values
     private var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
 
@@ -3133,7 +3087,7 @@ class ChatsController private constructor(
     private val bindLifetime = StalenessGuard()
 
     /** Current account-binding token passed through projection helpers. */
-    private val bindEpoch: Long
+    internal val bindEpoch: Long
         get() = bindLifetime.capture()
 
     // Monotonically increments whenever a live group update invalidates member
@@ -3148,13 +3102,13 @@ class ChatsController private constructor(
     private var isCleared = false
 
     private val liveSubscriptionLock = Any()
-    private var activeChatListSubscription: ChatListSubscriptionHandle? = null
+    internal var chatListWindows: ChatListWindowSet? = null
     private var activeChatsSubscription: ChatsSubscriptionHandle? = null
     private var bindJob: Job? = null
     private val connectionOwner =
         ChatListConnectionOwner(appState) {
             synchronized(liveSubscriptionLock) {
-                activeChatListSubscription != null &&
+                chatListWindows != null &&
                     activeChatsSubscription != null &&
                     accountRef == boundAccountRef &&
                     accountRef == appState.activeAccountRef
@@ -3178,8 +3132,8 @@ class ChatsController private constructor(
                     this.accountRef = null
                     boundAccountRef = null
                     invalidateConnectionReadiness()
-                    val current = Triple(activeChatListSubscription, activeChatsSubscription, bindJob)
-                    activeChatListSubscription = null
+                    val current = Triple(chatListWindows, activeChatsSubscription, bindJob)
+                    chatListWindows = null
                     activeChatsSubscription = null
                     current
                 }
@@ -3258,7 +3212,7 @@ class ChatsController private constructor(
                 }
             }
             while (coroutineContext.isActive && shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
-                var chatListSubscription: ChatListSubscriptionHandle? = null
+                var chatListSubscription: ChatListWindowSet? = null
                 var chatsSubscription: ChatsSubscriptionHandle? = null
                 var receivedLiveUpdate = false
                 val connectionAttempt =
@@ -3273,22 +3227,18 @@ class ChatsController private constructor(
                         connectionOwner.beginSessionAttempt(accountRef, bindEpoch)
                     }
                 try {
-                    val chatListStream = liveSubscriptions.openChatList(accountRef, true)
+                    val chatListStream = ChatListWindowSet.open(accountRef, liveSubscriptions.openChatListWindow)
                     chatListSubscription = chatListStream
                     val chatStream = liveSubscriptions.openChats(accountRef, true)
                     chatsSubscription = chatStream
                     if (!shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) break
                     synchronized(liveSubscriptionLock) {
                         if (shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
-                            activeChatListSubscription = chatListStream
+                            chatListWindows = chatListStream
                             activeChatsSubscription = chatStream
                         }
                     }
-                    val initialPresentedUpdate =
-                        withContext(Dispatchers.IO) { chatListStream.snapshot() }
-                            .requirePresentedChatListSnapshot()
-                    val presentedCursor = PresentedChatListCursor(initialPresentedUpdate)
-                    replacePresentedChatRows(initialPresentedUpdate.snapshot.rows)
+                    replacePresentedChatRows(chatListStream.rows)
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
                     groupRecordsById =
                         withContext(Dispatchers.IO) {
@@ -3322,21 +3272,15 @@ class ChatsController private constructor(
                     coroutineScope {
                         runUntilFirstLiveSubscriptionEnds(
                             first = {
-                                while (isActive) {
-                                    val update =
-                                        withContext(Dispatchers.IO) {
-                                            chatListStream.nextUpdate()
-                                        } ?: break
+                                chatListStream.receive { _, _ ->
                                     appState.recoveryDiagnostics
                                         .recordChatListSubscriptionReceived()
                                         ?.let { generation ->
                                             pendingRecoveryProjectionGeneration.publish(generation)
                                         }
-                                    if (presentedCursor.requiresReopen(update)) break
-                                    if (!presentedCursor.accept(update)) continue
                                     receivedLiveUpdate = true
                                     connectionOwner.noteLiveUpdate(connectionAttempt)
-                                    applyPresentedChatListUpdate(accountRef, update)
+                                    applyChatListWindowRows(accountRef, chatListStream.rows)
                                 }
                             },
                             second = {
@@ -3378,8 +3322,8 @@ class ChatsController private constructor(
                         )
                 } finally {
                     synchronized(liveSubscriptionLock) {
-                        if (activeChatListSubscription === chatListSubscription) {
-                            activeChatListSubscription = null
+                        if (chatListWindows === chatListSubscription) {
+                            chatListWindows = null
                         }
                         if (activeChatsSubscription === chatsSubscription) {
                             activeChatsSubscription = null
@@ -4159,12 +4103,12 @@ class ChatsController private constructor(
             )
         }
 
-    private fun boundAccountIdHex(): String? {
+    internal fun boundAccountIdHex(): String? {
         val ref = accountRef ?: return null
         return appState.accounts.firstOrNull { it.label == ref }?.accountIdHex
     }
 
-    private fun projectChatRow(
+    internal fun projectChatRow(
         authoritativeRow: ChatListRowFfi,
         activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
     ): ChatListItem {
@@ -4301,71 +4245,11 @@ class ChatsController private constructor(
         val account = accountRef ?: return unavailable
         return resolveDirectChatGroup(
             account = account,
-            bindAccount = account,
             epoch = bindEpoch,
             activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
             groupIdHex = provenanceGroupIdHex,
             targetReference = targetReference,
-        )
-    }
-
-    /**
-     * Authoritatively search every current direct-chat row except stale picker
-     * provenance. This covers identifier/QR taps and cold member-cache misses,
-     * while refusing creation if any candidate could not be read locally.
-     */
-    internal suspend fun resolveExistingDirectChat(
-        targetReference: String,
-        excludingGroupIdHex: String? = null,
-    ): NewMessageDirectChatResolution {
-        val unavailable = NewMessageDirectChatResolution(item = null, createRequired = false)
-        val account = accountRef ?: return unavailable
-        val bindAccount = account
-        val epoch = bindEpoch
-        val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
-        val candidateGroupIds =
-            rankedDirectChatCandidates(
-                candidates =
-                    chatRows
-                        .asSequence()
-                        .filterNot { it.pendingConfirmation }
-                        .map(::projectChatRow)
-                        .asIterable(),
-                excludingGroupIdHex = excludingGroupIdHex,
-            ).map(ChatListItem::id)
-        return resolveExistingDirectChatCandidates(candidateGroupIds) { groupIdHex ->
-            resolveDirectChatGroup(
-                account = account,
-                bindAccount = bindAccount,
-                epoch = epoch,
-                activeAccountIdHex = activeAccountIdHex,
-                groupIdHex = groupIdHex,
-                targetReference = targetReference,
-            )
-        }
-    }
-
-    private suspend fun resolveDirectChatGroup(
-        account: String,
-        bindAccount: String,
-        epoch: Long,
-        activeAccountIdHex: String?,
-        groupIdHex: String?,
-        targetReference: String,
-    ): NewMessageDirectChatResolution {
-        val normalizedTarget = targetReference.trim()
-        return existingDirectChatFromProvenance(
-            provenanceGroupIdHex = groupIdHex,
-            targetReference = targetReference,
-            activeAccountIdHex = activeAccountIdHex,
-            equivalentTarget = { other -> appState.npub(other).equals(normalizedTarget, ignoreCase = true) },
             chatItemForGroup = ::chatItemForGroup,
-            authoritativeGroupDetails = { currentGroupIdHex ->
-                runCatchingCancellable {
-                    appState.marmotIo { groupDetails(account, currentGroupIdHex) }
-                }.getOrNull()?.let(::applyAuthoritativeGroupDetails)
-            },
-            accountStillBound = { accountRef == bindAccount && isActiveBindEpoch(epoch) },
         )
     }
 
@@ -4431,16 +4315,14 @@ class ChatsController private constructor(
         }
     }
 
-    /** Applies a complete, cursor-validated presented snapshot from MDK. */
+    /** Applies the merged rows of every open chat-list window after a newer replacement was installed. */
     @VisibleForTesting
-    internal fun applyPresentedChatListUpdate(
+    internal fun applyChatListWindowRows(
         accountRef: String,
-        update: PresentedChatListUpdateFfi,
+        rows: List<PresentedChatRowFfi>,
     ) {
-        chatsDebug {
-            "presented chat list snapshot account=${accountRef.take(8)} rows=${update.snapshot.rows.size}"
-        }
-        replacePresentedChatRows(update.snapshot.rows)
+        chatsDebug { "chat list window replacement account=${accountRef.take(8)} rows=${rows.size}" }
+        replacePresentedChatRows(rows)
         scheduleRecompute()
     }
 
@@ -5457,7 +5339,10 @@ class ChatsController private constructor(
     }
 
     /** Checks that suspended work still belongs to the live account binding. */
-    private fun isActiveBindEpoch(epoch: Long): Boolean = !isCleared && bindLifetime.isCurrent(epoch) && accountRef != null
+    internal fun isActiveBindEpoch(epoch: Long): Boolean {
+        val bound = accountRef != null
+        return !isCleared && bindLifetime.isCurrent(epoch) && bound
+    }
 
     private fun recompute(scheduleBackgroundEnrichment: Boolean = true) {
         if (isCleared) return
@@ -6243,10 +6128,12 @@ class ConversationController(
         { replyTarget, account, groupIdHex, text ->
             if (replyTarget != null) {
                 appState.marmotIo(MarmotTraceSection.TEXT_REPLY) {
-                    replyToMessage(account, groupIdHex, replyTarget, text)
+                    sendComposerText(account, groupIdHex, replyTarget, text)
                 }
             } else {
-                appState.marmotIo(MarmotTraceSection.TEXT_SEND) { sendText(account, groupIdHex, text) }
+                appState.marmotIo(MarmotTraceSection.TEXT_SEND) {
+                    sendComposerText(account, groupIdHex, null, text)
+                }
             }
         },
     private val mediaUploader: MediaUploader = { account, groupIdHex, request ->
@@ -6259,7 +6146,7 @@ class ConversationController(
     },
     private val mediaPublisher: MediaPublisher = { account, groupIdHex, references, caption ->
         appState.marmotIo(MarmotTraceSection.MEDIA_SEND) {
-            sendMediaAttachments(account, groupIdHex, references, caption)
+            sendComposerMedia(account, groupIdHex, references, caption)
         }
     },
     private val markdownParser: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
@@ -6607,6 +6494,10 @@ class ConversationController(
     private val mediaUploadSessionEpoch = appState.mediaUploadSessionEpoch()
     private val messageById = linkedMapOf<String, AppMessageRecordFfi>()
     private val timelineRecords = linkedMapOf<String, TimelineMessageRecordFfi>()
+
+    /** Whether [messageIdHex] is an authoritative row of the current window rather than a local optimistic id. */
+    internal fun retainsTimelineRecord(messageIdHex: String): Boolean = timelineRecords.containsKey(messageIdHex)
+
     private val timelineItemsById = linkedMapOf<String, TimelineMessage>()
     private val timelineOrder = mutableListOf<String>()
     private val authoritativeTimelineOrderByMessageId = linkedMapOf<String, ULong>()
@@ -6734,7 +6625,11 @@ class ConversationController(
     // the returned page directly instead of merging against a hand-rolled
     // cursor.
     @Volatile
-    private var timelineSubscription: ConversationTimelineSubscriptionHandle? = null
+    internal var timelineSubscription: ConversationTimelineSubscriptionHandle? = null
+        private set
+
+    /** Newest installed conversation-window sidecar: header, capabilities, draft and reaction references. */
+    internal val window = ConversationWindowState()
     private val liveSubscriptionLock = Any()
     private val timelineSubscriptionActiveCallMutex = Mutex()
     private var groupStateSubscription: ConversationGroupStateSubscriptionHandle? = null
@@ -6916,7 +6811,13 @@ class ConversationController(
     val canSendMessages: Boolean
         // The engine gates all ordinary outbound work while a disband
         // converges and forever after it lands; mirror that on the composer.
-        get() = membersVerified && isSelfMember && !group.unrecoverable && !group.disbanding && !group.disbanded
+        get() =
+            membersVerified &&
+                isSelfMember &&
+                !group.unrecoverable &&
+                !group.disbanding &&
+                !group.disbanded &&
+                window.allowsSend
 
     val canLeaveGroup: Boolean
         get() = GroupProjector.canLeaveGroup(group, conversationAccountIdHex, memberCount)
@@ -7592,6 +7493,7 @@ class ConversationController(
                     }
                 }
                 withContext(Dispatchers.IO) {
+                    runCatching { timelineStream.cancel() }
                     runCatching { timelineStream.close() }
                 }
             }
@@ -7684,12 +7586,15 @@ class ConversationController(
         val timelineWindows = Channel<RecoveryStampedTimelineWindow>(capacity = Channel.BUFFERED)
         val pump =
             async {
+                // The seam absorbs MDK's window errors, so reaching this catch means an unexpected failure.
+                // It still must not cancel the conversation scope: ending the pump lets the subscription
+                // loop reconnect, where a crash would take the whole app down (#2616 device reports).
                 try {
                     while (isActive) {
                         val page =
-                            withContext(Dispatchers.IO) {
-                                timelineStream.nextWindow()
-                            } ?: break
+                            runCatchingCancellable {
+                                withContext(Dispatchers.IO) { timelineStream.nextWindow() }
+                            }.getOrNull() ?: break
                         timelineWindows.send(
                             RecoveryStampedTimelineWindow(
                                 page = page,
@@ -9068,7 +8973,7 @@ class ConversationController(
         // listMedia scan or parallel controller cache.
         val loadedKeys =
             timelineRecords.values.flatMap { record ->
-                record.media.mapIndexedNotNull { index, reference ->
+                MessageAttachments.accepted(record.media).mapNotNull { (index, reference) ->
                     if (reference.ciphertextSha256 in expiredCiphertextSha256) {
                         mediaCacheKey(account, record.messageIdHex, index)
                     } else {
@@ -9994,16 +9899,31 @@ class ConversationController(
         }
 
     suspend fun deleteGroupLocal(): Boolean =
+        runLocalGroupRemoval(R.string.toast_couldnt_delete_chat, "GROUP_LOCAL_DELETE") { account ->
+            appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
+            R.string.toast_chat_deleted_local
+        }
+
+    /** MDK 0.10.0 local reset: erase this device's state and wait for a Welcome newer than the reset. */
+    suspend fun forgetGroupLocal(): Boolean =
+        runLocalGroupRemoval(R.string.toast_couldnt_reset_group, "GROUP_LOCAL_RESET") { account ->
+            val reset = appState.forgetGroupLocalWithClientCleanup(account, group.groupIdHex)
+            if (reset) R.string.toast_group_reset_done else R.string.toast_group_reset_already_waiting
+        }
+
+    /** Shared shape of the two local removals: one mutation slot, a success toast chosen by the removal itself. */
+    private suspend fun runLocalGroupRemoval(
+        failureToast: Int,
+        operationCode: String,
+        removal: suspend (account: String) -> Int,
+    ): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatchingCancellable {
-                appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
-                presentConversationTransient(R.string.toast_chat_deleted_local)
+                presentConversationTransient(removal(account))
                 true
-            }.onFailure {
-                recordMutationFailure(R.string.toast_couldnt_delete_chat, "GROUP_LOCAL_DELETE", it)
-            }.getOrDefault(false)
+            }.onFailure { recordMutationFailure(failureToast, operationCode, it) }.getOrDefault(false)
         }
 
     suspend fun updateGroupProfile(
@@ -10691,6 +10611,7 @@ class ConversationController(
         messageIdHex: String,
         maxOlderPages: Int = ReplyNavigation.MaxOlderPages,
     ): Boolean {
+        if (jumpWindowToMessage(messageIdHex)) return true
         var loadedPageCount = 0
         while (
             ReplyNavigation.shouldLoadOlder(
@@ -10705,6 +10626,34 @@ class ConversationController(
         }
         return timelineRecords.containsKey(messageIdHex)
     }
+
+    /**
+     * Recenters the live window on a retained message; false when MDK no longer retains it or there is no
+     * window. Runs under the same active-call guard as pagination so a concurrent teardown cannot close the
+     * native handle while the jump is in flight.
+     */
+    private suspend fun jumpWindowToMessage(messageIdHex: String): Boolean {
+        val page = timelineSubscription?.let { jumpIfSubscriptionActive(it, messageIdHex) }
+        if (page == null) return false
+        applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+        return timelineRecords.containsKey(messageIdHex)
+    }
+
+    /** The jump under the pagination guard; null once torn down, superseded, or when MDK dropped the target. */
+    private suspend fun jumpIfSubscriptionActive(
+        subscription: ConversationTimelineSubscriptionHandle,
+        messageIdHex: String,
+    ): TimelinePageFfi? =
+        timelineSubscriptionActiveCallMutex.withLock {
+            val stillActive =
+                synchronized(liveSubscriptionLock) {
+                    !accountTeardownRequested && timelineSubscription === subscription
+                }
+            if (!stillActive) return@withLock null
+            runCatchingCancellable {
+                withContext(Dispatchers.IO) { subscription.jumpToMessage(messageIdHex) }
+            }.getOrNull()
+        }
 
     /**
      * Page the exact chat-list first-unread boundary into the initial window.
@@ -10771,18 +10720,14 @@ class ConversationController(
     fun replyTargetMessageId(item: TimelineMessage): String? = ReplyNavigation.targetMessageId(item.record, item.projected)
 
     /**
-     * Resolve attachment references without duplicating MarmotKit's projection
-     * state. A projected list is authoritative even when empty; tag parsing is
-     * reserved for optimistic/compatibility records that do not have a
-     * projected row yet.
+     * Accepted attachments keyed by protocol index, without duplicating MarmotKit's
+     * projection state. A projected row is authoritative even when empty; positional
+     * tag parsing is reserved for optimistic/compatibility records without one.
      */
-    fun mediaReferencesFor(item: TimelineMessage): List<MediaAttachmentReferenceFfi> = item.projected?.media ?: mediaReferencesFor(item.record)
-
-    fun mediaReferencesFor(record: AppMessageRecordFfi): List<MediaAttachmentReferenceFfi> =
-        timelineRecords[record.messageIdHex]?.media
-            ?: MediaReferenceSupport.parseAllImetaTags(
-                tags = record.tags,
-                sourceEpoch = record.sourceEpoch ?: 0uL,
+    fun attachmentsFor(record: AppMessageRecordFfi): List<IndexedAttachment> =
+        timelineRecords[record.messageIdHex]?.media?.let(MessageAttachments::accepted)
+            ?: MessageAttachments.indexed(
+                MediaReferenceSupport.parseAllImetaTags(tags = record.tags, sourceEpoch = record.sourceEpoch ?: 0uL),
             )
 
     /**
@@ -11045,14 +10990,20 @@ class ConversationController(
         durableStreamPositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
     }
 
-    /** Applies one timeline page and invalidates suspended whole-window refreshes. */
-    private suspend fun applyTimelinePage(
+    /**
+     * Applies one timeline page and invalidates suspended whole-window refreshes. A window command result
+     * and its stream echo can land in either order, so the newest installed replacement is applied together
+     * with its own sidecar instead of pairing [page] with a frame from a later revision.
+     */
+    internal suspend fun applyTimelinePage(
         page: TimelinePageFfi,
         replaceWindow: Boolean,
         updatePagination: Boolean,
     ): List<String> {
         timelineWindowGeneration.advance()
-        val pageMessages = page.messages
+        val installed = timelineSubscription?.latestInstalledWindow()
+        val applied = installed?.page ?: page
+        val pageMessages = applied.messages
         if (replaceWindow) trimStateForWindowReplacement()
         authoritativeTimelineOrderByMessageId.clear()
         pageMessages.forEachIndexed { index, record ->
@@ -11087,14 +11038,15 @@ class ConversationController(
         }
         applyDurableStreamPositions(durableStreamDisplayPositions(timelineRecords.values.toList()))
         if (updatePagination) {
-            hasMoreBefore = page.hasMoreBefore
-            hasMoreAfter = page.hasMoreAfter
+            hasMoreBefore = applied.hasMoreBefore
+            hasMoreAfter = applied.hasMoreAfter
         }
         pruneReadAnchorsToWindow()
         pruneConfirmedOptimisticMessages()
         pruneRetentionAtSendToWindow()
         pruneConfirmedOptimisticReactions()
         pruneMessageOverlaysToWindow()
+        installWindowFrame(installed?.frame)
         recomputeReactions()
         // A non-replaceWindow page (older-history load once hasLoadedOlderPages
         // is set) skips the replaceWindow trim above, so prune messageById to the
@@ -12174,25 +12126,7 @@ class ConversationController(
             }
         }
         val computed =
-            sendersByTarget
-                .mapValues { (_, byEmoji) ->
-                    byEmoji
-                        .mapNotNull { (emoji, senders) ->
-                            if (senders.isEmpty()) {
-                                null
-                            } else {
-                                ReactionTally(
-                                    emoji = emoji,
-                                    count = senders.size,
-                                    mine = mine != null && senders.contains(mine),
-                                )
-                            }
-                        }.sortedWith(
-                            compareByDescending<ReactionTally> { it.count }
-                                .thenByDescending { it.mine }
-                                .thenBy { it.emoji },
-                        )
-                }.filterValues { it.isNotEmpty() }
+            reactionTalliesForWindow(sendersByTarget, window.frame?.references, optimisticReactionChanges.values, mine)
         reactionsState.keys.retainAll(computed.keys)
         reactionsState.putAll(computed)
     }
@@ -12209,7 +12143,10 @@ class ConversationController(
         }
     }
 
+    /** Chips for one message: window references when retained, otherwise confirmed senders plus optimistic changes. */
     private fun reactionTalliesFor(targetMessageId: String): List<ReactionTally> {
+        val changes = optimisticReactionChanges.values.filter { it.targetMessageId == targetMessageId }
+        window.references(targetMessageId)?.let { return windowReactionTallies(it.reactions, changes) }
         val confirmed = linkedMapOf<String, MutableSet<String>>()
         timelineRecords[targetMessageId]?.reactions?.byEmoji.orEmpty().forEach { summary ->
             confirmed.getOrPut(summary.emoji) { linkedSetOf() }.addAll(summary.senders)
@@ -12221,8 +12158,11 @@ class ConversationController(
         )
     }
 
+    /** Who reacted to one message; in window mode MDK's bounded reactor preview plus the viewer's pending changes. */
     fun reactionParticipantsFor(targetMessageId: String): List<ReactionParticipant> {
         val mine = conversationAccountIdHex
+        val changes = optimisticReactionChanges.values.filter { it.targetMessageId == targetMessageId }
+        window.references(targetMessageId)?.let { return windowReactionParticipants(it.reactions, mine, changes) }
         val participants =
             timelineRecords[targetMessageId]
                 ?.reactions

@@ -3,13 +3,20 @@ package dev.ipf.whitenoise.android.state
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Looper
+import dev.ipf.marmotkit.AccountAttentionSnapshotFfi
+import dev.ipf.marmotkit.AccountAttentionSubscription
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
+import dev.ipf.marmotkit.ChatListAnchorOutcomeFfi
+import dev.ipf.marmotkit.ChatListPageDirectionFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ChatListViewFfi
+import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
+import dev.ipf.marmotkit.ChatListWindowSubscription
 import dev.ipf.marmotkit.ChatNotificationSettingsFfi
 import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.ConversationPresentationFfi
@@ -31,8 +38,6 @@ import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.PresentationVersionFfi
 import dev.ipf.marmotkit.PresentedChatListSnapshotFfi
-import dev.ipf.marmotkit.PresentedChatListSubscription
-import dev.ipf.marmotkit.PresentedChatListUpdateFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.PushRegistrationShareOutcomeFfi
@@ -355,10 +360,12 @@ internal class NotificationBootstrapTestFixture(
                     "npub1coldidentityfallback"
                 }
                 "listAccounts" -> accounts
-                "openPresentedChatList" -> {
-                    localSnapshotSubscriptionCalls.incrementAndGet()
-                    emptyChatListSubscription()
+                "openChatListWindow" -> {
+                    val view = arguments?.get(1) as ChatListViewFfi
+                    if (view == ChatListViewFfi.CHATS) localSnapshotSubscriptionCalls.incrementAndGet()
+                    emptyChatListWindow(view)
                 }
+                "subscribeAccountAttention" -> emptyAccountAttentionSubscription()
                 "subscribeChats" -> {
                     localSnapshotGroupSubscriptionCalls.incrementAndGet()
                     emptyChatsSubscription()
@@ -447,12 +454,19 @@ internal class NotificationBootstrapTestFixture(
             notificationFirstPostTimingObserver = notificationFirstPostTimingObserver,
         )
 
-    /** Creates the inert presented-list handle used by bootstrap tests. */
-    private fun emptyChatListSubscription(): PresentedChatListSubscription =
-        allocateWithoutConstructor(EmptyChatListSubscription::class.java).apply {
+    /** Creates the inert chat-list window used by bootstrap tests; only the active view carries rows. */
+    private fun emptyChatListWindow(view: ChatListViewFfi): ChatListWindowSubscription =
+        allocateWithoutConstructor(EmptyChatListWindow::class.java).apply {
             onSnapshot = localSnapshotReadCalls::incrementAndGet
-            rows = chatListRows
+            this.view = view
+            rows = if (view == ChatListViewFfi.CHATS) chatListRows else emptyList()
         }
+
+    /** Creates an inert attention summary that reports nothing and ends immediately. */
+    private fun emptyAccountAttentionSubscription(): AccountAttentionSubscription {
+        val subscription = allocateWithoutConstructor(EmptyAccountAttentionSubscription::class.java)
+        return subscription
+    }
 
     /** Supplies an inert local group snapshot without a native pointer. */
     private fun emptyChatsSubscription(): ChatsSubscription =
@@ -502,22 +516,53 @@ internal class NotificationBootstrapTestFixture(
         return unsafeClass.getMethod("allocateInstance", Class::class.java).invoke(unsafe, type) as T
     }
 
-    private class EmptyChatListSubscription : PresentedChatListSubscription(NoPointer) {
+    private class EmptyChatListWindow : ChatListWindowSubscription(NoPointer) {
         lateinit var onSnapshot: () -> Unit
+        lateinit var view: ChatListViewFfi
         lateinit var rows: List<ChatListRowFfi>
 
-        /** Returns the fixture's complete initial selected-presentation frame. */
-        override fun snapshot(): PresentedChatListUpdateFfi {
+        /** Returns the fixture's complete initial window replacement. */
+        override fun snapshot(): ChatListWindowSnapshotFfi {
             onSnapshot()
-            return PresentedChatListUpdateFfi(
+            return ChatListWindowSnapshotFfi(
                 subscriptionGeneration = "notification-bootstrap",
                 sequence = 0u,
-                snapshot = presentedChatListSnapshot(rows),
+                view = view,
+                rows = presentedChatListSnapshot(rows).rows,
+                hasMoreBefore = false,
+                hasMoreAfter = false,
+                anchor = ChatListAnchorOutcomeFfi.Top,
             )
         }
 
         /** Ends immediately because bootstrap cases do not require live list updates. */
-        override suspend fun next(): PresentedChatListUpdateFfi? = null
+        override suspend fun next(): ChatListWindowSnapshotFfi? = null
+
+        /** Commands echo the initial replacement. */
+        override suspend fun page(
+            sequence: ULong,
+            direction: ChatListPageDirectionFfi,
+            count: UInt,
+        ): ChatListWindowSnapshotFfi = snapshot()
+
+        /** Anchor reports echo the initial replacement. */
+        override suspend fun setVisibleAnchor(
+            sequence: ULong,
+            groupIdHex: String,
+        ): ChatListWindowSnapshotFfi = snapshot()
+
+        /** Return-to-top echoes the initial replacement. */
+        override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi = snapshot()
+
+        override fun close() = Unit
+    }
+
+    private class EmptyAccountAttentionSubscription : AccountAttentionSubscription(NoPointer) {
+        /** No account has a summary in bootstrap fixtures. */
+        override fun snapshot(): AccountAttentionSnapshotFfi? = null
+
+        /** Ends immediately so the mirror does not hold the fixture open. */
+        override suspend fun next(): AccountAttentionSnapshotFfi? = null
 
         override fun close() = Unit
     }

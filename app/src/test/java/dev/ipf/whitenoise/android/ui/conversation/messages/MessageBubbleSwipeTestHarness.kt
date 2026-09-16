@@ -25,6 +25,7 @@ import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionEmojiFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUserReactionFfi
+import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -162,7 +163,7 @@ internal fun swipeTestProjectedRecord(
         replyToMessageIdHex = null,
         replyPreview = null,
         mediaJson = null,
-        media = if (media) listOf(reference) else emptyList(),
+        media = MessageAttachments.acceptedOutcomes(if (media) listOf(reference) else emptyList()),
         agentTextStreamJson = null,
         groupSystem = null,
         reactions = swipeTestReactions(reacted),

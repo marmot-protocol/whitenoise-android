@@ -117,7 +117,7 @@ internal fun ContactPickerScreen(
         remember(appState.chatListItems, activeHex, appState.profileRevisionForCompose) {
             deriveRecipientCandidates(appState, activeHex)
         }
-    val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query)
+    val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query, appState::accountIdHexForMention)
     val userSearch by rememberRecipientUserSearchState(query, appState)
     val discovered = userSearch.candidates
     val followedIds = userSearch.followedAccountIds
@@ -211,6 +211,7 @@ internal fun ContactPickerScreen(
                 .consumeWindowInsets(padding),
         ) {
             RecipientSearchField(
+                isValidNpub = { npub -> appState.accountIdHexForMention(npub) != null },
                 state = queryState,
                 placeholder = stringResource(R.string.search_people_hint),
                 onPasteRejected = { appState.present(R.string.error_invalid_identity_reference) },
@@ -350,7 +351,8 @@ internal fun ContactPickerScreen(
             onDismiss = { showScanner = false },
             onScan = { raw ->
                 showScanner = false
-                when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.PickRecipient)) {
+                val accountIdHex = appState::accountIdHexForMention
+                when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.PickRecipient, accountIdHex)) {
                     is QrScanOutcome.FillRecipientQuery ->
                         queryState.replaceRecipientText(outcome.reference)
                     QrScanOutcome.Invalid ->

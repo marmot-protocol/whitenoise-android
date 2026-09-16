@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
+import dev.ipf.whitenoise.android.core.MessageAttachments
 
 /** Complete display projection for an available or unavailable reply target. */
 data class TimelineReplyDisplay(
@@ -28,6 +30,12 @@ fun replyMediaKindFromMime(mime: String?): ReplyMediaKind {
         mime.startsWith("video/", ignoreCase = true) -> ReplyMediaKind.Video
         else -> ReplyMediaKind.Document
     }
+}
+
+/** Reply-preview media fallback from MarmotKit outcomes; rejected slots contribute nothing. */
+fun acceptedReplyMediaFallback(media: List<MediaAttachmentOutcomeFfi>): MediaPreviewFallback? {
+    val accepted = MessageAttachments.acceptedReferences(media)
+    return typedReplyMediaFallback(accepted)
 }
 
 /** Preserves the first typed attachment's safe reply-preview inputs. */
@@ -184,7 +192,7 @@ object TimelineProjector {
                     )
                 }
         }
-        val mediaFallback = if (preview.deleted) null else typedReplyMediaFallback(preview.media)
+        val mediaFallback = if (preview.deleted) null else acceptedReplyMediaFallback(preview.media)
         return TimelineReplyDisplay(
             sender = preview.sender,
             body = preview.displayBody(copy, mediaFallback),
@@ -198,7 +206,7 @@ object TimelineProjector {
     /** Builds the preview shown when the target record itself is still available. */
     fun replyTargetPreview(
         record: TimelineMessageRecordFfi,
-        mediaFallback: MediaPreviewFallback? = typedReplyMediaFallback(record.media),
+        mediaFallback: MediaPreviewFallback? = acceptedReplyMediaFallback(record.media),
         copy: MessageTextCopy = MessageTextCopy.Default,
     ): TimelineReplyDisplay {
         val visibleMediaFallback = if (record.deleted) null else mediaFallback

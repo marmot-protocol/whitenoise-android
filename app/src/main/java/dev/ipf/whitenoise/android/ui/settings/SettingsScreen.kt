@@ -324,6 +324,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.KeyPackages -> SettingsDetail.Developer
         SettingsDetail.SupportRelays -> SettingsDetail.Support
         SettingsDetail.DiagnosticsImprovements -> SettingsDetail.DevicePrivacy
+        SettingsDetail.BlockedUsers -> SettingsDetail.DevicePrivacy
         else -> null
     }
 
@@ -430,7 +431,10 @@ private fun SettingsDetailRoute(
                 appState,
                 onBack = { onDetailChange(null) },
                 onOpenDiagnostics = { onDetailChange(SettingsDetail.DiagnosticsImprovements) },
+                onOpenBlockedUsers = { onDetailChange(SettingsDetail.BlockedUsers) },
             )
+        SettingsDetail.BlockedUsers ->
+            BlockedUsersScreen(appState, onBack = { onDetailChange(SettingsDetail.DevicePrivacy) })
         SettingsDetail.DiagnosticsImprovements ->
             DiagnosticsImprovementsScreen(appState, onBack = { onDetailChange(SettingsDetail.DevicePrivacy) })
         SettingsDetail.AiAgents -> AiAgentsScreen(appState, onBack = { onDetailChange(null) })

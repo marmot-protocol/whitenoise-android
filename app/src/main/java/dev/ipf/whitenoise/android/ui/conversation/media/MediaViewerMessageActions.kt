@@ -18,6 +18,8 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingForwardRequest
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.attachmentsFor
+import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.rememberForwardEligibilityNowSeconds
 import java.util.UUID
@@ -142,7 +144,10 @@ internal fun rememberMediaViewerForwardActions(
             item,
             references,
             available,
-            references.indices.filterTo(mutableSetOf()) { hasCachedAttachment(page.messageIdHex, it) },
+            controller
+                .attachmentsFor(item)
+                .map { it.index }
+                .filterTo(mutableSetOf()) { hasCachedAttachment(page.messageIdHex, it) },
             atSeconds,
             controller.editsByTarget[page.messageIdHex]?.latestText,
         )

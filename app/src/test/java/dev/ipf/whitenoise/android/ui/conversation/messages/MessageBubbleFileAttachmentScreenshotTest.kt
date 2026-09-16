@@ -62,6 +62,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
+import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -817,9 +818,9 @@ open class MessageBubbleFileAttachmentFixtures {
                 replyPreview = replyPreview().takeIf { hasReply },
                 mediaJson = null,
                 media =
-                    attachments.map { (name, attachmentMediaType) ->
-                        fileReference(name, attachmentMediaType)
-                    },
+                    MessageAttachments.acceptedOutcomes(
+                        attachments.map { (name, attachmentMediaType) -> fileReference(name, attachmentMediaType) },
+                    ),
                 agentTextStreamJson = null,
                 groupSystem = null,
                 reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),

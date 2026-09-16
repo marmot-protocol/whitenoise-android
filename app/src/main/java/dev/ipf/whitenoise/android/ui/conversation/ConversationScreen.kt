@@ -120,14 +120,18 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
+import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
+import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
+import dev.ipf.whitenoise.android.state.reportVisibleMessage
+import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
@@ -1003,7 +1007,9 @@ internal fun ConversationScreen(
                                 mediaReferences = mediaReferences,
                                 editedText = editedText,
                                 cachedAttachmentIndices =
-                                    mediaReferences.indices
+                                    controller
+                                        .attachmentsFor(item)
+                                        .map { it.index }
                                         .filterTo(mutableSetOf()) { attachmentIndex ->
                                             controller.hasCachedAttachment(messageId, attachmentIndex)
                                         },
@@ -1793,9 +1799,8 @@ internal fun ConversationScreen(
                         nextIdx++
                     }
                     val nextMsg = controller.timeline.getOrNull(nextIdx)
-                    val refs = nextMsg?.let(controller::mediaReferencesFor)
                     val audioEntry =
-                        refs?.withIndex()?.firstOrNull { (_, r) ->
+                        nextMsg?.let(controller::attachmentsFor)?.firstOrNull { (_, r) ->
                             r.mediaType.startsWith("audio/", ignoreCase = true)
                         }
                     if (nextMsg != null && audioEntry != null) {
@@ -3002,6 +3007,7 @@ internal fun ConversationScreen(
             .collect { messageId ->
                 if (messageId.isNotBlank()) {
                     controller.markReadUpTo(messageId)
+                    controller.reportVisibleMessage(messageId)
                 }
             }
     }
@@ -3320,12 +3326,11 @@ internal fun ConversationScreen(
                                     aggregateMessageAttachmentSaveSummaries(
                                         selections.map { selection ->
                                             val record = selection.record
-                                            val mediaReferences = controller.mediaReferencesFor(record)
                                             saveMessageMediaAttachments(
                                                 context = context,
                                                 controller = controller,
                                                 messageIdHex = record.messageIdHex,
-                                                mediaReferences = mediaReferences,
+                                                attachments = controller.attachmentsFor(record),
                                                 mine = controller.isMessageMine(record),
                                                 documentSaveFallback = documentSaveFallback,
                                             )
@@ -3950,6 +3955,7 @@ internal fun ConversationScreen(
                                                         }
                                                         ConversationJumpToNewestOutcome.Tail -> {
                                                             unreadJumpState = unreadJumpState.suppressCurrentStack()
+                                                            controller.returnToLatestWindow()
                                                         }
                                                         ConversationJumpToNewestOutcome.Cancelled -> Unit
                                                     }

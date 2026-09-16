@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import dev.ipf.whitenoise.android.core.MessageAttachments
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -16,7 +17,7 @@ class TimelineRecordRenderEqualityTest {
     @Test
     fun typedMediaChangeInvalidatesRenderedRecord() {
         val withoutMedia = record()
-        val withMedia = record().copy(media = listOf(reference()))
+        val withMedia = record().copy(media = MessageAttachments.acceptedOutcomes(listOf(reference())))
 
         assertFalse(timelineRecordsRenderEqual(withoutMedia, withMedia))
     }

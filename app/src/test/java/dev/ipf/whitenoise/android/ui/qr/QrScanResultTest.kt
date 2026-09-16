@@ -12,11 +12,29 @@ class QrScanResultTest {
     private val invalidNprofileChecksum = checksumInvalid(sampleNprofile)
     private val sampleNprofileHex = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
 
+    private fun viewProfile(raw: String): QrScanOutcome {
+        val outcome = QrScanResult.resolve(raw, QrScanUseCase.ViewProfile, ::scriptedAccountIdHex)
+        return outcome
+    }
+
+    private fun pickRecipient(raw: String): QrScanOutcome {
+        val outcome = QrScanResult.resolve(raw, QrScanUseCase.PickRecipient, ::scriptedAccountIdHex)
+        return outcome
+    }
+
+    /** Stands in for MarmotKit's decoder: only the two checksum-valid fixtures resolve, case-insensitively. */
+    private fun scriptedAccountIdHex(reference: String): String? =
+        when (reference.lowercase()) {
+            validNpub -> sampleNprofileHex
+            sampleNprofile -> sampleNprofileHex
+            else -> null
+        }
+
     @Test
     fun viewProfile_acceptsBareNpub() {
         assertEquals(
             QrScanOutcome.OpenProfileNpub(validNpub),
-            QrScanResult.resolve(validNpub, QrScanUseCase.ViewProfile),
+            viewProfile(validNpub),
         )
     }
 
@@ -24,11 +42,11 @@ class QrScanResultTest {
     fun viewProfile_acceptsNostrPrefixedNpub() {
         assertEquals(
             QrScanOutcome.OpenProfileNpub(validNpub),
-            QrScanResult.resolve("nostr:$validNpub", QrScanUseCase.ViewProfile),
+            viewProfile("nostr:$validNpub"),
         )
         assertEquals(
             QrScanOutcome.OpenProfileNpub(validNpub),
-            QrScanResult.resolve("NOSTR:$validNpub", QrScanUseCase.ViewProfile),
+            viewProfile("NOSTR:$validNpub"),
         )
     }
 
@@ -36,7 +54,7 @@ class QrScanResultTest {
     fun viewProfile_acceptsProfileLinks() {
         assertEquals(
             QrScanOutcome.OpenProfileNpub(validNpub),
-            QrScanResult.resolve("marmot://profile/$validNpub?from=qr", QrScanUseCase.ViewProfile),
+            viewProfile("marmot://profile/$validNpub?from=qr"),
         )
     }
 
@@ -44,7 +62,7 @@ class QrScanResultTest {
     fun viewProfile_acceptsBareNprofile() {
         assertEquals(
             QrScanOutcome.OpenProfileNprofile(sampleNprofile, sampleNprofileHex),
-            QrScanResult.resolve(sampleNprofile, QrScanUseCase.ViewProfile),
+            viewProfile(sampleNprofile),
         )
     }
 
@@ -52,7 +70,7 @@ class QrScanResultTest {
     fun viewProfile_acceptsNostrPrefixedNprofile() {
         assertEquals(
             QrScanOutcome.OpenProfileNprofile(sampleNprofile, sampleNprofileHex),
-            QrScanResult.resolve("nostr:$sampleNprofile", QrScanUseCase.ViewProfile),
+            viewProfile("nostr:$sampleNprofile"),
         )
     }
 
@@ -60,34 +78,34 @@ class QrScanResultTest {
     fun viewProfile_acceptsUppercaseBech32Payloads() {
         assertEquals(
             QrScanOutcome.OpenProfileNpub(validNpub),
-            QrScanResult.resolve(validNpub.uppercase(), QrScanUseCase.ViewProfile),
+            viewProfile(validNpub.uppercase()),
         )
         assertEquals(
             QrScanOutcome.OpenProfileNprofile(sampleNprofile, sampleNprofileHex),
-            QrScanResult.resolve("NOSTR:${sampleNprofile.uppercase()}", QrScanUseCase.ViewProfile),
+            viewProfile("NOSTR:${sampleNprofile.uppercase()}"),
         )
     }
 
     @Test
     fun viewProfile_rejectsMalformedInput() {
-        assertEquals(QrScanOutcome.Invalid, QrScanResult.resolve("", QrScanUseCase.ViewProfile))
-        assertEquals(QrScanOutcome.Invalid, QrScanResult.resolve("npub1abc", QrScanUseCase.ViewProfile))
-        assertEquals(QrScanOutcome.Invalid, QrScanResult.resolve("https://example.com", QrScanUseCase.ViewProfile))
-        assertEquals(QrScanOutcome.Invalid, QrScanResult.resolve(validNsec, QrScanUseCase.ViewProfile))
+        assertEquals(QrScanOutcome.Invalid, viewProfile(""))
+        assertEquals(QrScanOutcome.Invalid, viewProfile("npub1abc"))
+        assertEquals(QrScanOutcome.Invalid, viewProfile("https://example.com"))
+        assertEquals(QrScanOutcome.Invalid, viewProfile(validNsec))
     }
 
     @Test
     fun viewProfile_rejectsChecksumInvalidNpubAndNprofile() {
-        assertEquals(QrScanOutcome.Invalid, QrScanResult.resolve(shapeOnlyNpub, QrScanUseCase.ViewProfile))
-        assertEquals(QrScanOutcome.Invalid, QrScanResult.resolve(invalidNpubChecksum, QrScanUseCase.ViewProfile))
+        assertEquals(QrScanOutcome.Invalid, viewProfile(shapeOnlyNpub))
+        assertEquals(QrScanOutcome.Invalid, viewProfile(invalidNpubChecksum))
         assertEquals(
             QrScanOutcome.Invalid,
-            QrScanResult.resolve("marmot://profile/$invalidNpubChecksum?from=qr", QrScanUseCase.ViewProfile),
+            viewProfile("marmot://profile/$invalidNpubChecksum?from=qr"),
         )
-        assertEquals(QrScanOutcome.Invalid, QrScanResult.resolve(invalidNprofileChecksum, QrScanUseCase.ViewProfile))
+        assertEquals(QrScanOutcome.Invalid, viewProfile(invalidNprofileChecksum))
         assertEquals(
             QrScanOutcome.Invalid,
-            QrScanResult.resolve("nostr:$invalidNprofileChecksum", QrScanUseCase.ViewProfile),
+            viewProfile("nostr:$invalidNprofileChecksum"),
         )
     }
 
@@ -96,15 +114,15 @@ class QrScanResultTest {
         val hex = "a".repeat(64)
         assertEquals(
             QrScanOutcome.FillRecipientQuery(validNpub),
-            QrScanResult.resolve(validNpub, QrScanUseCase.PickRecipient),
+            pickRecipient(validNpub),
         )
         assertEquals(
             QrScanOutcome.FillRecipientQuery(validNpub),
-            QrScanResult.resolve("nostr:$validNpub", QrScanUseCase.PickRecipient),
+            pickRecipient("nostr:$validNpub"),
         )
         assertEquals(
             QrScanOutcome.FillRecipientQuery(hex),
-            QrScanResult.resolve(hex.uppercase(), QrScanUseCase.PickRecipient),
+            pickRecipient(hex.uppercase()),
         )
     }
 
@@ -112,20 +130,20 @@ class QrScanResultTest {
     fun pickRecipient_acceptsNprofileAsHexPubkey() {
         assertEquals(
             QrScanOutcome.FillRecipientQuery(sampleNprofileHex),
-            QrScanResult.resolve(sampleNprofile, QrScanUseCase.PickRecipient),
+            pickRecipient(sampleNprofile),
         )
         assertEquals(
             QrScanOutcome.FillRecipientQuery(sampleNprofileHex),
-            QrScanResult.resolve("nostr:$sampleNprofile", QrScanUseCase.PickRecipient),
+            pickRecipient("nostr:$sampleNprofile"),
         )
     }
 
     @Test
     fun pickRecipient_rejectsMalformedInput() {
-        assertEquals(QrScanOutcome.Invalid, QrScanResult.resolve("not-a-key", QrScanUseCase.PickRecipient))
-        assertEquals(QrScanOutcome.Invalid, QrScanResult.resolve(validNsec, QrScanUseCase.PickRecipient))
-        assertEquals(QrScanOutcome.Invalid, QrScanResult.resolve(shapeOnlyNpub, QrScanUseCase.PickRecipient))
-        assertEquals(QrScanOutcome.Invalid, QrScanResult.resolve(invalidNpubChecksum, QrScanUseCase.PickRecipient))
+        assertEquals(QrScanOutcome.Invalid, pickRecipient("not-a-key"))
+        assertEquals(QrScanOutcome.Invalid, pickRecipient(validNsec))
+        assertEquals(QrScanOutcome.Invalid, pickRecipient(shapeOnlyNpub))
+        assertEquals(QrScanOutcome.Invalid, pickRecipient(invalidNpubChecksum))
     }
 
     private fun npub(bytes: List<Int>): String = bech32Encode("npub", convertBits(bytes, fromBits = 8, toBits = 5, pad = true))

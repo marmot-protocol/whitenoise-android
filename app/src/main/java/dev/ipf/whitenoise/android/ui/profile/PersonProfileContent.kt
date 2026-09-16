@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -59,6 +61,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
  * [fromGroup] marks a profile opened from inside a group: the relationship rows then carry the Profile Actions
  * heading that separates them from the group-scoped moderation block supplied through [adminActions].
  */
+
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
 @Composable
 internal fun PersonProfileContent(
@@ -81,6 +84,8 @@ internal fun PersonProfileContent(
     onAvatar: () -> Unit,
     onBanner: () -> Unit,
     onCopyLightning: () -> Unit,
+    block: ProfileBlockRowState? = null,
+    onBlock: () -> Unit = {},
     sharedAvatars: @Composable () -> Unit = {},
     error: @Composable () -> Unit = {},
     adminActions: @Composable () -> Unit = {},
@@ -204,6 +209,25 @@ internal fun PersonProfileContent(
                                 },
                                 modifier = Modifier.testTag(PROFILE_FOLLOW_ACTION_TAG),
                             )
+                        }
+                        if (block != null) {
+                            row("block") { row ->
+                                SettingsAction(
+                                    row,
+                                    stringResource(blockActionLabel(block)),
+                                    onBlock,
+                                    enabled = block.enabled,
+                                    destructive = !block.blocked,
+                                    leading = {
+                                        if (block.inProgress) {
+                                            CircularProgressIndicator(Modifier.size(24.dp))
+                                        } else {
+                                            Icon(Icons.Outlined.Block, contentDescription = null)
+                                        }
+                                    },
+                                    modifier = Modifier.testTag(PROFILE_BLOCK_ACTION_TAG),
+                                )
+                            }
                         }
                     }
                     adminActions()
@@ -401,4 +425,10 @@ internal fun PersonProfileBottomAction(
             Text(label)
         }
     }
+}
+
+/** Unblock reads as the inverse of the confirmed state, never of a request still in flight. */
+private fun blockActionLabel(block: ProfileBlockRowState): Int {
+    val label = if (block.blocked) R.string.profile_unblock else R.string.profile_block
+    return label
 }

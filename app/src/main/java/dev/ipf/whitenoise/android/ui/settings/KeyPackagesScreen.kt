@@ -27,9 +27,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountKeyPackageFfi
+import dev.ipf.marmotkit.AccountKeyPackageRelayEventFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.keyPackageRelayHistory
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -94,6 +96,8 @@ internal fun KeyPackagesScreen(
     loadKeyPackages: suspend (refreshFromNetwork: Boolean) -> List<AccountKeyPackageFfi> = appState::fetchKeyPackages,
     deleteKeyPackage: suspend (accountRef: String, eventIdHex: String, sourceRelays: List<String>) -> Boolean =
         appState::deleteKeyPackage,
+    loadRelayEvents: suspend (refreshFromNetwork: Boolean) -> List<AccountKeyPackageRelayEventFfi> =
+        appState::keyPackageRelayHistory,
 ) {
     val accountRef = appState.activeAccountRef
     key(accountRef) {
@@ -103,6 +107,7 @@ internal fun KeyPackagesScreen(
             onBack = onBack,
             loadKeyPackages = loadKeyPackages,
             deleteKeyPackage = deleteKeyPackage,
+            loadRelayEvents = loadRelayEvents,
         )
     }
 }
@@ -117,9 +122,11 @@ private fun KeyPackagesScreenForAccount(
     onBack: () -> Unit,
     loadKeyPackages: suspend (refreshFromNetwork: Boolean) -> List<AccountKeyPackageFfi>,
     deleteKeyPackage: suspend (accountRef: String, eventIdHex: String, sourceRelays: List<String>) -> Boolean,
+    loadRelayEvents: suspend (refreshFromNetwork: Boolean) -> List<AccountKeyPackageRelayEventFfi>,
 ) {
     val scope = rememberCoroutineScope()
     var packages by remember { mutableStateOf<List<AccountKeyPackageFfi>>(emptyList()) }
+    var relayEvents by remember { mutableStateOf<List<AccountKeyPackageRelayEventFfi>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var working by remember { mutableStateOf(false) }
     var loaded by remember { mutableStateOf(false) }
@@ -129,6 +136,7 @@ private fun KeyPackagesScreenForAccount(
         loading = true
         try {
             packages = loadKeyPackages(refreshFromNetwork)
+            relayEvents = loadRelayEvents(refreshFromNetwork)
             loaded = true
         } finally {
             loading = false
@@ -149,6 +157,7 @@ private fun KeyPackagesScreenForAccount(
                 packageCount = packages.relayBacked().size,
             ),
         packages = packages,
+        relayEvents = relayEvents,
         onBack = onBack,
         onRefresh = { scope.launch { reload(refreshFromNetwork = true) } },
         onRepublish = {
@@ -227,6 +236,7 @@ internal fun KeyPackagesContent(
     onRepublish: () -> Unit,
     onPublishNew: () -> Unit,
     onDelete: (AccountKeyPackageFfi) -> Unit,
+    relayEvents: List<AccountKeyPackageRelayEventFfi> = emptyList(),
 ) {
     val published = packages.relayBacked()
     val retained = packages.filter { it.local && !it.relay }
@@ -276,6 +286,7 @@ internal fun KeyPackagesContent(
             itemsIndexed(published, key = { index, kp -> "published-${kp.eventIdHex}:$index" }) { _, kp ->
                 PublishedKeyPackage(kp, state.packageActionsEnabled, onDelete = { onDelete(kp) })
             }
+            item { KeyPackageRelayHistory(relayEvents) }
             item { SettingsSection(stringResource(R.string.developer_retained)) }
             val packagesResolved =
                 KeyPackagesSection.Empty in state.sections ||

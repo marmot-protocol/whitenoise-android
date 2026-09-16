@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchNavBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAttachmentSheetState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar

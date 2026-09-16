@@ -33,6 +33,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
 import dev.ipf.whitenoise.android.state.AutomaticBacklogStoppedException
@@ -755,7 +756,8 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
                     plaintext = if (index in voiceIndices) "incoming voice note $index" else "message-$index",
                 ).let { record ->
                     references[messageId]?.let { reference ->
-                        record.copy(media = listOf(reference), sourceEpoch = reference.sourceEpoch)
+                        val media = MessageAttachments.acceptedOutcomes(listOf(reference))
+                        record.copy(media = media, sourceEpoch = reference.sourceEpoch)
                     } ?: record
                 }
             }

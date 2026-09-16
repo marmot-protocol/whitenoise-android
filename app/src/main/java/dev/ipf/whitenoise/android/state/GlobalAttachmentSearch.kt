@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.GlobalAttachmentItem
+import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.MessageSearchConstraints
 import dev.ipf.whitenoise.android.core.globalAttachmentMatchesSelection
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
@@ -129,11 +130,11 @@ private fun libraryItems(
 ): List<GlobalAttachmentItem> {
     val eligible =
         !record.deleted &&
-            record.media.isNotEmpty() &&
+            MessageAttachments.hasAccepted(record.media) &&
             matchesNeedle(record, needle) &&
             (constraints == null || constraints.matches(searchableTimelineRecord(record)))
     if (!eligible) return emptyList()
-    return record.media.mapIndexedNotNull { index, reference ->
+    return MessageAttachments.accepted(record.media).mapNotNull { (index, reference) ->
         if (!globalAttachmentMatchesSelection(reference.mediaType, kinds)) {
             null
         } else {
@@ -157,7 +158,7 @@ private fun matchesNeedle(
 ): Boolean =
     needle.isEmpty() ||
         record.plaintext.lowercase(Locale.ROOT).contains(needle) ||
-        record.media.any { it.fileName.lowercase(Locale.ROOT).contains(needle) }
+        MessageAttachments.acceptedReferences(record.media).any { it.fileName.lowercase(Locale.ROOT).contains(needle) }
 
 /** Runs one page read, letting cancellation through and swallowing a single chat's failure. */
 private inline fun <T> runCatchingPage(block: () -> T): T? =

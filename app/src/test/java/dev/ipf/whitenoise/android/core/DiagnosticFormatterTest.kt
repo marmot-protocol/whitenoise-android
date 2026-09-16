@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MediaAttachmentRejectionKindFfi
 import dev.ipf.marmotkit.ReceivedMessageFfi
 import dev.ipf.marmotkit.RuntimeMessageReceivedFfi
 import dev.ipf.marmotkit.RuntimeProjectionUpdateFfi
@@ -306,6 +307,13 @@ class DiagnosticFormatterTest {
                 MarmotKitException.KeystoreUnavailable("locked") to "PLATFORM_UNAVAILABLE",
                 MarmotKitException.Io("disk") to "IO",
                 MarmotKitException.EncryptionFailed("cipher") to "CRYPTO_FAILURE",
+                MarmotKitException.MediaAttachmentRejected(MediaAttachmentRejectionKindFfi.MALFORMED_FIELD, "x") to
+                    "INVALID_INPUT",
+                MarmotKitException.MediaUnfetchable("policy") to "PERMISSION_DENIED",
+                MarmotKitException.MediaDownloadFailed("hash mismatch") to "IO",
+                MarmotKitException.UserBlocked() to "PERMISSION_DENIED",
+                MarmotKitException.BlockListUnavailable() to "PLATFORM_UNAVAILABLE",
+                MarmotKitException.BlockPublicationUncertain() to "CONNECTIVITY",
             )
 
         cases.forEach { (failure, expected) ->

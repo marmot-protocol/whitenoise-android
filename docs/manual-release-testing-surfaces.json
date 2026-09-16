@@ -7684,6 +7684,307 @@
           "SEC-012",
           "SEC-013"
         ]
+      },
+      {
+        "surface": "RejectedAttachmentPlaceholder",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RejectedAttachment.kt",
+        "anchor": "fun RejectedAttachmentPlaceholder(",
+        "test_ids": [
+          "MED-017"
+        ]
+      },
+      {
+        "surface": "Rejected attachment placeholder title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RejectedAttachment.kt",
+        "anchor": "R.string.media_attachment_rejected_title",
+        "test_ids": [
+          "MED-017"
+        ]
+      },
+      {
+        "surface": "Rejected attachment unsupported-format explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RejectedAttachment.kt",
+        "anchor": "R.string.media_attachment_rejected_unsupported",
+        "test_ids": [
+          "MED-017"
+        ]
+      },
+      {
+        "surface": "Rejected attachment malformed explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RejectedAttachment.kt",
+        "anchor": "R.string.media_attachment_rejected_malformed",
+        "test_ids": [
+          "MED-017"
+        ]
+      },
+      {
+        "surface": "BlockedUsersScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "fun BlockedUsersScreen(",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "BlockedUsersGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "fun BlockedUsersGroup(",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Profile block action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.profile_block",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Profile unblock action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.profile_unblock",
+        "test_ids": [
+          "ACC-002",
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Blocked users unblock action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.profile_unblock",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Blocked users title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.blocked_users",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Blocked users empty state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.blocked_users_empty",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Blocked users explainer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.blocked_users_detail",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Block list unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.block_list_unavailable",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Block change failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.block_change_failed",
+        "test_ids": [
+          "SEC-014",
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Block publication uncertain",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.block_publication_uncertain",
+        "test_ids": [
+          "SEC-014",
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Profile block unavailable toast",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.block_list_unavailable",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Profile block uncertain toast",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.block_publication_uncertain",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Profile block failed toast",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.block_change_failed",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Privacy blocked users link",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.blocked_users",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "GroupDetailsResetControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "fun GroupDetailsResetControl(",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "KeyPackageRelayHistory",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
+        "anchor": "fun KeyPackageRelayHistory(",
+        "test_ids": [
+          "ACC-016"
+        ]
+      },
+      {
+        "surface": "KeyPackageRelayEventRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
+        "anchor": "fun KeyPackageRelayEventRow(",
+        "test_ids": [
+          "ACC-016"
+        ]
+      },
+      {
+        "surface": "group reset action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.group_reset_action",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "group reset dialog title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.group_reset_dialog_title",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "group reset dialog message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.group_reset_dialog_message",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "group reset confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.group_reset_confirm",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "toast group reset done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_group_reset_done",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "toast group reset already waiting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_group_reset_already_waiting",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "toast couldnt reset group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_reset_group",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "key package relay history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
+        "anchor": "R.string.key_package_relay_history",
+        "test_ids": [
+          "ACC-016"
+        ]
+      },
+      {
+        "surface": "key package relay event unpublished",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
+        "anchor": "R.string.developer_not_published",
+        "test_ids": [
+          "ACC-016"
+        ]
+      },
+      {
+        "surface": "key package current",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
+        "anchor": "R.string.key_package_current",
+        "test_ids": [
+          "ACC-016"
+        ]
+      },
+      {
+        "surface": "key package superseded",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
+        "anchor": "R.string.key_package_superseded",
+        "test_ids": [
+          "ACC-016"
+        ]
+      },
+      {
+        "surface": "key package relay event summary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
+        "anchor": "R.string.key_package_relay_event_summary",
+        "test_ids": [
+          "ACC-016"
+        ]
+      },
+      {
+        "surface": "toast chat deleted local",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_chat_deleted_local",
+        "test_ids": [
+          "CHL-010",
+          "GRP-010"
+        ]
+      },
+      {
+        "surface": "toast couldnt delete chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_delete_chat",
+        "test_ids": [
+          "CHL-010",
+          "GRP-010"
+        ]
+      },
+      {
+        "surface": "Key package relay history load failure toast",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateKeyPackages.kt",
+        "anchor": "R.string.toast_couldnt_load_key_packages",
+        "test_ids": [
+          "ACC-016"
+        ]
       }
     ],
     "settings_controls": [

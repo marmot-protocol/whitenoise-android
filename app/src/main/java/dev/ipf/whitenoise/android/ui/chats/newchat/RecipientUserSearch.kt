@@ -182,7 +182,7 @@ internal fun rememberRecipientUserSearchState(
                 retryKey = retryKey,
             ),
     ) {
-        if (trimmed.isEmpty() || !isPlainNameQuery(trimmed)) {
+        if (trimmed.isEmpty() || !isPlainNameQuery(trimmed, appState::accountIdHexForMention)) {
             value = RecipientUserSearchState()
             return@produceState
         }

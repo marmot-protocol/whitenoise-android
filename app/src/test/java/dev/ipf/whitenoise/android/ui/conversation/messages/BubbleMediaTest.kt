@@ -2,6 +2,9 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaAttachmentRejectionFfi
+import dev.ipf.marmotkit.MediaAttachmentRejectionKindFfi
+import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -29,6 +32,34 @@ class BubbleMediaTest {
         assertEquals(listOf(0), media.videos.map { it.index })
         assertEquals(listOf(3), media.files.map { it.index })
         assertEquals(listOf(0, 1, 4), media.visuals.map { it.index })
+        assertTrue(media.hasConfirmedMedia)
+    }
+
+    /** A rejected slot stays out of every media bucket but keeps its siblings' protocol indexes intact. */
+    @Test
+    fun rejectedSlotsRenderAsPlaceholdersWithoutRenumberingSiblings() {
+        val rejection = MediaAttachmentRejectionFfi(MediaAttachmentRejectionKindFfi.UNSUPPORTED_FORMAT, "unknown")
+        val media =
+            bubbleMedia(
+                attachments =
+                    MessageAttachmentSet(
+                        accepted =
+                            MessageAttachments.indexed(listOf(reference("first.jpg", "image/jpeg"))) +
+                                listOf(IndexedValue(2, reference("notes.pdf", "application/pdf"))),
+                        rejected = listOf(IndexedValue(1, rejection)),
+                    ),
+                pendingAttachments = emptyList(),
+            )
+
+        assertEquals(listOf(0), media.images.map { it.index })
+        assertEquals(listOf(2), media.files.map { it.index })
+        assertEquals(listOf(1), media.rejected.map { it.index })
+        assertEquals(
+            MediaAttachmentRejectionKindFfi.UNSUPPORTED_FORMAT,
+            media.rejected
+                .single()
+                .value.kind,
+        )
         assertTrue(media.hasConfirmedMedia)
     }
 

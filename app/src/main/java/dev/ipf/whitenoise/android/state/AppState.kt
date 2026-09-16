@@ -88,7 +88,6 @@ import dev.ipf.whitenoise.android.core.HostSafety
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.core.MessageProjector
-import dev.ipf.whitenoise.android.core.NostrProfileReference
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
@@ -189,6 +188,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -1702,7 +1702,8 @@ class WhiteNoiseAppState private constructor(
     var accounts by mutableStateOf(initialAccounts)
         private set
 
-    private val accountUnreadStore = AccountUnreadStore()
+    internal val accountUnreadStore = AccountUnreadStore()
+    internal val runtimeMirrors = RuntimeMirrors()
 
     val accountUnreadCounts: Map<String, ULong>
         get() = accountUnreadStore.retainedCounts
@@ -4258,6 +4259,7 @@ class WhiteNoiseAppState private constructor(
         }
         runtimeStartResult.await().getOrThrow()
         runtime.marmot.emitAuditRuntimeReadinessAfterStart()
+        runtimeMirrors.attention.start(this, runtime.marmot)
     }
 
     private suspend fun resumeCompletedBootstrap(): Boolean {
@@ -4772,9 +4774,7 @@ class WhiteNoiseAppState private constructor(
         val previousValues = previous.mapValues { (_, versioned) -> versioned.value }
         val rawCountsByHex =
             runCatchingCancellable {
-                marmotIo(MarmotTraceSection.UNREAD_SUMMARY) {
-                    accountUnreadSummary().associate { it.accountIdHex to it.unreadCount }
-                }
+                accountAttentionCounts()
             }.onFailure { appStateDebug { "account unread summary refresh failed" } }
                 .getOrNull()
         if (!refreshIsCurrent()) return
@@ -8983,7 +8983,7 @@ class WhiteNoiseAppState private constructor(
     private fun nostrEntityAccountIdHex(bech32: String): String? {
         val trimmed = bech32.trim()
         return runCatching { marmot().accountIdHex(trimmed) }.getOrNull()
-            ?: NostrProfileReference.accountIdHex(trimmed)
+            ?: accountIdHexResolver?.let { resolve -> runBlocking { resolve(trimmed) } }
     }
 
     /**

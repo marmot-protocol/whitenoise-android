@@ -37,6 +37,7 @@ import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineDispatcher
@@ -64,6 +65,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /** Full Compose-route coverage for inactive-account notification navigation. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
+@Suppress("LargeClass") // The 0.10.0 fixtures add two engine cases; the scenarios themselves are unchanged.
 class NotificationAccountIsolationNavigationTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -551,7 +553,7 @@ class NotificationAccountIsolationNavigationTest {
                     }
                     chatListRow(requireNotNull(groupIdHex))
                 }
-                "openPresentedChatList" -> {
+                "openChatListWindow" -> {
                     val accountRef = arguments?.firstOrNull() as? String
                     if (accountRef == SOURCE_ACCOUNT) {
                         check(gate.releaseSourceBroadList.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
@@ -566,6 +568,8 @@ class NotificationAccountIsolationNavigationTest {
                     }
                     error("Skip broad-list startup in the focused route test")
                 }
+                "subscribeAccountAttention" -> MarmotWindowTestFakes.accountAttention()
+                "subscribeBlockedUsers" -> MarmotWindowTestFakes.blockList()
                 "toString" -> "NotificationAccountIsolationMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.firstOrNull()
