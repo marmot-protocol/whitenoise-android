@@ -7751,6 +7751,14 @@
         ]
       },
       {
+        "surface": "Blocked users unblock action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.profile_unblock",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
         "surface": "Blocked users title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
         "anchor": "R.string.blocked_users",
@@ -7916,6 +7924,14 @@
         "surface": "key package relay history",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
         "anchor": "R.string.key_package_relay_history",
+        "test_ids": [
+          "ACC-016"
+        ]
+      },
+      {
+        "surface": "key package relay event unpublished",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
+        "anchor": "R.string.developer_not_published",
         "test_ids": [
           "ACC-016"
         ]
