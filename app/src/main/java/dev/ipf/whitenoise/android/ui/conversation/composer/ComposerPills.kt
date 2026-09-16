@@ -7,7 +7,6 @@ import android.window.OnBackInvokedDispatcher
 import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
@@ -131,8 +130,6 @@ import kotlinx.coroutines.flow.first
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
-
-private const val COMPOSER_TEXT_HEIGHT_ANIMATION_MILLIS = 160
 
 internal const val COMPOSER_RESIZE_HANDLE_TAG = "composer-resize-handle"
 internal const val COMPOSER_RESIZE_GESTURE_TAG = "composer-resize-gesture"
@@ -675,10 +672,15 @@ internal fun ComposerPill(
     val compactLineCount = compactDraftMeasurement?.crossoverLineCount
     // The prototype animates the measured text row independently of discrete full-screen resizing.
     // Read frames in measurement so the field and its selection owner are never replaced.
+    //
+    // The height shares the editing row's clock deliberately. On its own shorter one it settled first,
+    // and for the ~60ms the insets kept animating it asserted a height the narrower editor could not
+    // honour yet — a draft that wraps to three compact lines but two editing ones sat in a two-line box
+    // with a third still in it. Finishing together, the height only claims to be final once the width is.
     val animatedTextHeight =
         animateIntAsState(
             targetValue = compactTextLayout?.size?.height ?: 0,
-            animationSpec = tween(COMPOSER_TEXT_HEIGHT_ANIMATION_MILLIS, easing = LinearEasing),
+            animationSpec = tween(COMPOSER_EXPANSION_ANIMATION_MILLIS, easing = FastOutSlowInEasing),
             label = "composer text height",
         )
     val automaticTextHeight =

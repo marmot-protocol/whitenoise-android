@@ -524,6 +524,38 @@ class ComposerBarScreenshotTest {
         composeRule.waitForIdle()
     }
 
+    /**
+     * Captures the composer partway through a bulk replacement, past the height animation's former
+     * 160ms clock but before the 220ms editing row lands.
+     *
+     * On separate clocks the height was already final at this point while the editor was still
+     * widening, so it asserted a height the narrower row could not honour — a draft wrapping to three
+     * compact lines but two editing ones sat in a two-line box. Sharing one clock, the height is still
+     * growing here. It is a separate capture so the settled sequence keeps its own frame timing; adding
+     * an advance to that test moved only the caret's blink phase.
+     */
+    @Test
+    fun composerBulkPasteMidTransitionFrame() {
+        renderBulkPasteComposer()
+        val field = composeRule.onNode(hasSetTextAction())
+        val root = composeRule.onNodeWithTag(BULK_PASTE_TAG)
+        // Short enough that the row is still growing toward its target here. The long draft used by the
+        // settled sequence reaches the automatic ceiling well before this point, where every clock looks
+        // alike, so it could not tell the two apart.
+        val replacement = (1..3).joinToString("\n") { line -> "Bulk paste line $line." }
+
+        field.performClick()
+        composeRule.mainClock.autoAdvance = false
+        try {
+            field.performTextReplacement(replacement)
+            composeRule.mainClock.advanceTimeBy(BULK_PASTE_MID_TRANSITION_MILLIS)
+            composeRule.runOnIdle { }
+            root.captureRoboImage("src/test/snapshots/composer_bulk_paste_mid_transition.png")
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
     /** Renders a short focused composer at the bottom of a fixed phone viewport. */
     private fun renderBulkPasteComposer() {
         composeRule.setContent {
@@ -613,6 +645,8 @@ class ComposerBarScreenshotTest {
         )
 
     private companion object {
+        /** Sampled past the height animation's former 160ms clock, before the 220ms editing row lands. */
+        const val BULK_PASTE_MID_TRANSITION_MILLIS = 182L
         const val TAG = "composer-bar"
         const val LONG_TAG = "long-composer-bar"
         const val BULK_PASTE_TAG = "bulk-paste-composer"
