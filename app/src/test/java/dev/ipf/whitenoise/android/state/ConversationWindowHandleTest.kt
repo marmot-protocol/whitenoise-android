@@ -131,6 +131,57 @@ class ConversationWindowHandleTest {
             assertEquals(setOf("m1", "m1-older"), installed?.frame?.references?.keys)
         }
 
+    /** A not-ready stream is retryable: the loop keeps receiving and delivers the next real replacement. */
+    @Test
+    fun notReadyStreamKeepsReceiving() =
+        runBlocking {
+            val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
+            val handle = FfiConversationWindowHandle(fake, release = fake::release)
+            handle.snapshot()
+            fake.failNextReceiveWith = MarmotKitException.ConversationWindowNotReady()
+            fake.emit(snapshot(sequence = 2uL, messageIds = listOf("m1", "m2")))
+
+            val next = handle.nextWindow()
+            assertEquals(listOf("m1", "m2"), next?.messages?.map { it.messageIdHex })
+            assertEquals(1, fake.receiveFailures)
+        }
+
+    /** A terminal stream error ends the stream instead of throwing, so the controller reopens the window. */
+    @Test
+    fun terminalStreamErrorEndsTheStream() =
+        runBlocking {
+            val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
+            val handle = FfiConversationWindowHandle(fake, release = fake::release)
+            handle.snapshot()
+            fake.failNextReceiveWith = MarmotKitException.ConversationWindowQuery("closed")
+
+            assertNull(handle.nextWindow())
+        }
+
+    /** An initial snapshot the runtime cannot answer yields no page rather than an error. */
+    @Test
+    fun unavailableSnapshotYieldsNoPage() {
+        val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
+        fake.failNextSnapshotWith = MarmotKitException.ConversationWindowNotReady()
+        val handle = FfiConversationWindowHandle(fake, release = fake::release)
+
+        assertNull(handle.snapshot())
+        assertNull(handle.latestWindowFrame())
+    }
+
+    /** Teardown never fails the caller, even when the runtime already released the window. */
+    @Test
+    fun teardownAbsorbsRuntimeFailures() =
+        runBlocking {
+            val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = emptyList()))
+            val release: () -> Unit = { throw MarmotKitException.ConversationWindowQuery("gone") }
+            val handle = FfiConversationWindowHandle(fake, release = release)
+            fake.failCancelWith = MarmotKitException.ConversationWindowQuery("gone")
+
+            handle.cancel()
+            handle.close()
+        }
+
     /** Cancel reaches the native window and close releases it. */
     @Test
     fun cancelAndCloseReachTheWindow() =
@@ -151,12 +202,29 @@ private class FakeConversationWindow(
     private val updates = Channel<ConversationWindowSnapshotFfi>(Channel.UNLIMITED)
     val pageCalls = mutableListOf<Pair<ULong, ConversationPageDirectionFfi>>()
     var failNextCommandWith: Throwable? = null
+    var failNextReceiveWith: Throwable? = null
+    var failNextSnapshotWith: Throwable? = null
+    var failCancelWith: Throwable? = null
+    var receiveFailures = 0
     var cancelled = false
     var released = false
 
-    override fun snapshot(): ConversationWindowSnapshotFfi = current
+    override fun snapshot(): ConversationWindowSnapshotFfi {
+        failNextSnapshotWith?.let { failure ->
+            failNextSnapshotWith = null
+            throw failure
+        }
+        return current
+    }
 
-    override suspend fun next(): ConversationWindowSnapshotFfi? = updates.receiveCatching().getOrNull()
+    override suspend fun next(): ConversationWindowSnapshotFfi? {
+        failNextReceiveWith?.let { failure ->
+            failNextReceiveWith = null
+            receiveFailures += 1
+            throw failure
+        }
+        return updates.receiveCatching().getOrNull()
+    }
 
     override suspend fun page(
         revision: ConversationWindowRevisionFfi,
@@ -196,6 +264,10 @@ private class FakeConversationWindow(
 
     override suspend fun cancel() {
         cancelled = true
+        failCancelWith?.let { failure ->
+            failCancelWith = null
+            throw failure
+        }
     }
 
     fun release() {

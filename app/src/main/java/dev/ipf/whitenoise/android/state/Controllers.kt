@@ -7586,12 +7586,15 @@ class ConversationController(
         val timelineWindows = Channel<RecoveryStampedTimelineWindow>(capacity = Channel.BUFFERED)
         val pump =
             async {
+                // The seam absorbs MDK's window errors, so reaching this catch means an unexpected failure.
+                // It still must not cancel the conversation scope: ending the pump lets the subscription
+                // loop reconnect, where a crash would take the whole app down (#2616 device reports).
                 try {
                     while (isActive) {
                         val page =
-                            withContext(Dispatchers.IO) {
-                                timelineStream.nextWindow()
-                            } ?: break
+                            runCatchingCancellable {
+                                withContext(Dispatchers.IO) { timelineStream.nextWindow() }
+                            }.getOrNull() ?: break
                         timelineWindows.send(
                             RecoveryStampedTimelineWindow(
                                 page = page,

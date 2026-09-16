@@ -19,12 +19,16 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.ReactionTally
+import kotlinx.coroutines.delay
 
 /** Rows requested per conversation page and at opening; MDK accepts 1–200 and retains at most 200. */
 internal const val CONVERSATION_WINDOW_MAX_ROWS: UInt = 200u
 
 /** `timeoutMs = 0` selects MDK's 30-second deadline for opening and every window command. */
 internal const val CONVERSATION_WINDOW_DEFAULT_DEADLINE: UInt = 0u
+
+/** Pause before receiving again while MDK reports the window not ready, so a repair cannot spin the loop. */
+internal const val CONVERSATION_WINDOW_NOT_READY_RETRY_MS = 250L
 
 /**
  * Everything one installed conversation window replacement carries beyond its compatibility
@@ -188,13 +192,25 @@ internal class FfiConversationWindowHandle(
 ) : ConversationTimelineSubscriptionHandle {
     private val installer = ConversationWindowInstaller()
 
-    /** Consumes the initial replacement once. */
-    override fun snapshot(): TimelinePageFfi? = window.snapshot()?.let(installer::install)
+    /**
+     * Consumes the initial replacement once. A window that cannot answer yet yields no page rather than an
+     * error: the receive loop below delivers the first replacement once MDK is ready.
+     */
+    @Suppress("SwallowedException", "TooGenericExceptionCaught")
+    override fun snapshot(): TimelinePageFfi? =
+        try {
+            window.snapshot()?.let(installer::install)
+        } catch (unavailable: MarmotKitException) {
+            null
+        }
 
-    /** Waits for the next replacement that is newer than everything installed so far. */
+    /**
+     * Waits for the next replacement that is newer than everything installed so far. Null ends the stream,
+     * which the controller answers by reopening; no window error reaches the caller as a throw.
+     */
     override suspend fun nextWindow(): TimelinePageFfi? {
         while (true) {
-            val snapshot = window.next() ?: return null
+            val snapshot = window.nextReplacementOrNull() ?: return null
             installer.install(snapshot)?.let { return it }
         }
     }
@@ -233,10 +249,24 @@ internal class FfiConversationWindowHandle(
         }
 
     /** Wakes pending operations and releases the runtime window; call before [close]. */
-    override suspend fun cancel() = window.cancel()
+    @Suppress("SwallowedException", "TooGenericExceptionCaught")
+    override suspend fun cancel() {
+        try {
+            window.cancel()
+        } catch (teardown: MarmotKitException) {
+            // The window is being torn down; a runtime that already released it needs nothing more.
+        }
+    }
 
-    /** Releases the native handle. */
-    override fun close() = release()
+    /** Releases the native handle; a handle the runtime already dropped needs no further action. */
+    @Suppress("SwallowedException", "TooGenericExceptionCaught")
+    override fun close() {
+        try {
+            release()
+        } catch (teardown: MarmotKitException) {
+            // Same contract as cancel: releasing twice, or after shutdown, is not an app-visible failure.
+        }
+    }
 
     private suspend fun page(
         direction: ConversationPageDirectionFfi,
@@ -248,6 +278,28 @@ internal class FfiConversationWindowHandle(
                 window.page(revision, direction, rows, CONVERSATION_WINDOW_DEFAULT_DEADLINE)
             }
         return result ?: installer.page ?: TimelinePageFfi(emptyList(), false, false)
+    }
+}
+
+/**
+ * One replacement from MDK's stream, or null when the stream ended and the window must be reopened.
+ *
+ * `ConversationWindowNotReady` is retryable by contract: MDK repairs dirty read state and retries accepted
+ * work in the background, so the loop waits briefly and keeps receiving instead of failing the screen. Every
+ * other window error is terminal for this handle, and the controller's reconnect loop opens a new one. No
+ * window error escapes: one reaching the receive pump would cancel its scope and take the process down,
+ * which is exactly how a not-ready window crashed the app on device.
+ */
+@Suppress("SwallowedException", "TooGenericExceptionCaught")
+private suspend fun ConversationWindowSubscriptionInterface.nextReplacementOrNull(): ConversationWindowSnapshotFfi? {
+    while (true) {
+        try {
+            return next()
+        } catch (notReady: MarmotKitException.ConversationWindowNotReady) {
+            delay(CONVERSATION_WINDOW_NOT_READY_RETRY_MS)
+        } catch (terminal: MarmotKitException) {
+            return null
+        }
     }
 }
 
