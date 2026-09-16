@@ -97,7 +97,9 @@ class BlockListMirrorTest {
     fun boundMirrorAnswersWithoutReading() =
         runBlocking {
             val mirror = BlockListMirror()
-            mirror.bind("acct") { FakeBlockList(initial = snapshot(1uL, "aa")) }
+            // The stream ends right after its snapshot, so this test leaves no receive coroutine parked on
+            // the test dispatcher for whichever class the runner schedules next.
+            mirror.bind("acct") { FakeBlockList(initial = snapshot(1uL, "aa"), endAfterSnapshot = true) }
             awaitUntil { mirror.revision == 1uL }
 
             var reads = 0
@@ -142,12 +144,16 @@ private fun snapshot(
 /** Scripted block-list stream. */
 private class FakeBlockList(
     private val initial: BlockListSnapshotFfi,
+    private val endAfterSnapshot: Boolean = false,
 ) : BlockListSubscriptionInterface {
     private val updates = Channel<BlockListSnapshotFfi>(Channel.UNLIMITED)
 
     override fun snapshot(): BlockListSnapshotFfi = initial
 
-    override suspend fun next(): BlockListSnapshotFfi? = updates.receiveCatching().getOrNull()
+    override suspend fun next(): BlockListSnapshotFfi? {
+        if (endAfterSnapshot) return null
+        return updates.receiveCatching().getOrNull()
+    }
 
     fun emit(snapshot: BlockListSnapshotFfi) {
         check(updates.trySend(snapshot).isSuccess)
