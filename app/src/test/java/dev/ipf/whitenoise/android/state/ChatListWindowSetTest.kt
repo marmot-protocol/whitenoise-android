@@ -80,6 +80,10 @@ class ChatListWindowSetTest {
             val windows = ChatListWindowSet.open("acct") { _, view -> handles.getValue(view) }
             var replacements = 0
             val receiver = launch { windows.receive { _, _ -> replacements += 1 } }
+            // Every view must be waiting inside next() before the foreign generation is queued: otherwise a
+            // sibling can be cancelled before it ever starts receiving, and the assertion below would pass or
+            // fail on coroutine start order rather than on the contract.
+            handles.values.forEach { handle -> awaitUntil { handle.awaitingNext } }
             handles.getValue(ChatListViewFfi.LEFT).emit(sequence = 5uL, rows = emptyList(), generation = "other")
             receiver.join()
             assertEquals(0, replacements)
@@ -130,14 +134,24 @@ private class FakeWindow(
     var closed = false
     var cancelledNext = false
 
+    /** True once this view's receive loop is parked inside [next]; lets a test wait for all views to arrive. */
+    @Volatile
+    var awaitingNext = false
+        private set
+
     override fun snapshot(): ChatListWindowSnapshotFfi = current
 
     override suspend fun next(): ChatListWindowSnapshotFfi? =
         try {
+            // Inside the try before suspending: a cancellation that lands while this coroutine is running
+            // still surfaces at the receive below, so the catch records it either way.
+            awaitingNext = true
             updates.receiveCatching().getOrNull()
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             cancelledNext = true
             throw cancel
+        } finally {
+            awaitingNext = false
         }
 
     override suspend fun page(
