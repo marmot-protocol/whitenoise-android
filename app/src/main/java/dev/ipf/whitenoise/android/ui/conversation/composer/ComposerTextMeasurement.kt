@@ -61,6 +61,9 @@ internal fun composerDestinationTextLayout(
         return measurer.measure(text = text, style = style, constraints = constraints)
     }
     if (startsEditing) {
+        // The editor's insets are driven by the same editing state, so a draft that starts editing is
+        // already drawn at this width — its own count is the rendered one, and a compact count here
+        // would describe a row the reader is not looking at.
         val editing = measure(editingWidthPx)
         return ComposerDraftMeasurement(editing, editing.lineCount)
     }

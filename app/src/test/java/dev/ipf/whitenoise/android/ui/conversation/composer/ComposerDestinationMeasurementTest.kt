@@ -52,6 +52,42 @@ class ComposerDestinationMeasurementTest {
         )
     }
 
+    /**
+     * Any non-empty draft requests the editing row, whatever its focus or dismiss state. That is what
+     * keeps the measured width and the drawn width the same: the compact branch of the destination
+     * measurement is only reached while the editor really is compact, so the crossover count it reports
+     * and the row the reader sees can never describe different widths.
+     */
+    @Test
+    fun everyNonEmptyDraftRequestsTheEditingRow() {
+        for (focused in listOf(false, true)) {
+            for (dismissing in listOf(false, true)) {
+                assertTrue(
+                    "a non-empty draft must request the editing row (focused=$focused, dismissing=$dismissing)",
+                    editingRequested(hasText = true, focused = focused, dismissInProgress = dismissing),
+                )
+            }
+        }
+    }
+
+    /** An empty automatic draft that is neither focused nor forced stays on the compact row. */
+    @Test
+    fun anEmptyUnfocusedDraftKeepsTheCompactRow() {
+        assertFalse(editingRequested(hasText = false))
+    }
+
+    private fun editingRequested(
+        hasText: Boolean,
+        focused: Boolean = false,
+        dismissInProgress: Boolean = false,
+    ) = composerEditingRequested(
+        focused = focused,
+        hasText = hasText,
+        forceEditingLayout = false,
+        mode = ComposerExpansionMode.Automatic,
+        dismissInProgress = dismissInProgress,
+    )
+
     private fun measuresAtEditingWidth(
         compactLineCount: Int,
         startsEditing: Boolean = false,
