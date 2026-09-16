@@ -96,9 +96,6 @@ import dev.ipf.whitenoise.android.media.mutationKey
 import dev.ipf.whitenoise.android.media.shouldCommitPrimaryGroupImageMutation
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.newchat.directChatPreferenceOrder
-import dev.ipf.whitenoise.android.ui.chats.newchat.existingDirectChatFromProvenance
-import dev.ipf.whitenoise.android.ui.chats.newchat.rankedDirectChatCandidates
-import dev.ipf.whitenoise.android.ui.chats.newchat.resolveExistingDirectChatCandidates
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -2424,7 +2421,7 @@ internal class OptimisticArchiveIntent(
 
 /** Owns the active account's chat-list projection and live subscription lifecycle. */
 class ChatsController private constructor(
-    private val appState: WhiteNoiseAppState,
+    internal val appState: WhiteNoiseAppState,
     private val memberSnapshotLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi>,
     private val memberSnapshotRetryDelay: (Int) -> Long,
     private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi,
@@ -2990,7 +2987,7 @@ class ChatsController private constructor(
 
     private val chatRowsByGroup = LinkedHashMap<String, ChatListRowFfi>()
     private var selectedPresentationsByGroup = emptyMap<String, ConversationPresentationFfi>()
-    private val chatRows: Collection<ChatListRowFfi>
+    internal val chatRows: Collection<ChatListRowFfi>
         get() = chatRowsByGroup.values
     private var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
 
@@ -3090,7 +3087,7 @@ class ChatsController private constructor(
     private val bindLifetime = StalenessGuard()
 
     /** Current account-binding token passed through projection helpers. */
-    private val bindEpoch: Long
+    internal val bindEpoch: Long
         get() = bindLifetime.capture()
 
     // Monotonically increments whenever a live group update invalidates member
@@ -4106,12 +4103,12 @@ class ChatsController private constructor(
             )
         }
 
-    private fun boundAccountIdHex(): String? {
+    internal fun boundAccountIdHex(): String? {
         val ref = accountRef ?: return null
         return appState.accounts.firstOrNull { it.label == ref }?.accountIdHex
     }
 
-    private fun projectChatRow(
+    internal fun projectChatRow(
         authoritativeRow: ChatListRowFfi,
         activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
     ): ChatListItem {
@@ -4248,71 +4245,11 @@ class ChatsController private constructor(
         val account = accountRef ?: return unavailable
         return resolveDirectChatGroup(
             account = account,
-            bindAccount = account,
             epoch = bindEpoch,
             activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
             groupIdHex = provenanceGroupIdHex,
             targetReference = targetReference,
-        )
-    }
-
-    /**
-     * Authoritatively search every current direct-chat row except stale picker
-     * provenance. This covers identifier/QR taps and cold member-cache misses,
-     * while refusing creation if any candidate could not be read locally.
-     */
-    internal suspend fun resolveExistingDirectChat(
-        targetReference: String,
-        excludingGroupIdHex: String? = null,
-    ): NewMessageDirectChatResolution {
-        val unavailable = NewMessageDirectChatResolution(item = null, createRequired = false)
-        val account = accountRef ?: return unavailable
-        val bindAccount = account
-        val epoch = bindEpoch
-        val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
-        val candidateGroupIds =
-            rankedDirectChatCandidates(
-                candidates =
-                    chatRows
-                        .asSequence()
-                        .filterNot { it.pendingConfirmation }
-                        .map(::projectChatRow)
-                        .asIterable(),
-                excludingGroupIdHex = excludingGroupIdHex,
-            ).map(ChatListItem::id)
-        return resolveExistingDirectChatCandidates(candidateGroupIds) { groupIdHex ->
-            resolveDirectChatGroup(
-                account = account,
-                bindAccount = bindAccount,
-                epoch = epoch,
-                activeAccountIdHex = activeAccountIdHex,
-                groupIdHex = groupIdHex,
-                targetReference = targetReference,
-            )
-        }
-    }
-
-    private suspend fun resolveDirectChatGroup(
-        account: String,
-        bindAccount: String,
-        epoch: Long,
-        activeAccountIdHex: String?,
-        groupIdHex: String?,
-        targetReference: String,
-    ): NewMessageDirectChatResolution {
-        val normalizedTarget = targetReference.trim()
-        return existingDirectChatFromProvenance(
-            provenanceGroupIdHex = groupIdHex,
-            targetReference = targetReference,
-            activeAccountIdHex = activeAccountIdHex,
-            equivalentTarget = { other -> appState.npub(other).equals(normalizedTarget, ignoreCase = true) },
             chatItemForGroup = ::chatItemForGroup,
-            authoritativeGroupDetails = { currentGroupIdHex ->
-                runCatchingCancellable {
-                    appState.marmotIo { groupDetails(account, currentGroupIdHex) }
-                }.getOrNull()?.let(::applyAuthoritativeGroupDetails)
-            },
-            accountStillBound = { accountRef == bindAccount && isActiveBindEpoch(epoch) },
         )
     }
 
@@ -5402,7 +5339,10 @@ class ChatsController private constructor(
     }
 
     /** Checks that suspended work still belongs to the live account binding. */
-    private fun isActiveBindEpoch(epoch: Long): Boolean = !isCleared && bindLifetime.isCurrent(epoch) && accountRef != null
+    internal fun isActiveBindEpoch(epoch: Long): Boolean {
+        val bound = accountRef != null
+        return !isCleared && bindLifetime.isCurrent(epoch) && bound
+    }
 
     private fun recompute(scheduleBackgroundEnrichment: Boolean = true) {
         if (isCleared) return

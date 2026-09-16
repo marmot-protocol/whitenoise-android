@@ -6,11 +6,14 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -135,8 +138,33 @@ class DetailsSurfacePolishScreenshotTest {
             fontScale = 2f,
         )
 
+    /** The danger zone's reset row and its confirmation are the admin's path to MDK 0.10.0's local group reset. */
+    @Test
+    fun groupAdminResetConfirmationLight() {
+        renderGroupDetails(group = group(admin = true), members = groupMembers(), darkTheme = false)
+        val reset = app.getString(R.string.group_reset_action)
+        composeRule.onNodeWithText(reset).performScrollTo()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_details_reset_row_light.png")
+        composeRule.onNodeWithText(reset).performClick()
+        composeRule.onNodeWithText(app.getString(R.string.group_reset_dialog_title)).assertIsDisplayed()
+        composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_details_reset_dialog_light.png")
+    }
+
+    /** Renders the details screen and records the full viewport once every asynchronous row settled. */
     private fun captureGroupDetails(
         snapshot: String,
+        group: AppGroupRecordFfi,
+        members: List<AppGroupMemberRecordFfi>,
+        darkTheme: Boolean,
+        amoled: Boolean = false,
+    ) {
+        renderGroupDetails(group, members, darkTheme, amoled)
+        assertUnavailableCallsAreAbsent()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshot")
+    }
+
+    /** Composes the details screen for [group] and waits for the shared-content counts to load. */
+    private fun renderGroupDetails(
         group: AppGroupRecordFfi,
         members: List<AppGroupMemberRecordFfi>,
         darkTheme: Boolean,
@@ -163,8 +191,6 @@ class DetailsSurfacePolishScreenshotTest {
         }
         composeRule.waitForIdle()
         awaitSharedContentCounts()
-        assertUnavailableCallsAreAbsent()
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshot")
     }
 
     /**

@@ -10,13 +10,23 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.ChatListWindowSubscription
+import dev.ipf.marmotkit.ConversationAnchorKindFfi
+import dev.ipf.marmotkit.ConversationAnchorOutcomeFfi
+import dev.ipf.marmotkit.ConversationCapabilitiesFfi
+import dev.ipf.marmotkit.ConversationHeaderFfi
+import dev.ipf.marmotkit.ConversationOpenReadStateFfi
+import dev.ipf.marmotkit.ConversationParticipationFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
+import dev.ipf.marmotkit.ConversationWindowRevisionFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
+import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.PresentationResolutionFfi
 import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
+import dev.ipf.marmotkit.SelectedMessageDraftFfi
 
 /**
  * Native-handle stubs for the MarmotKit 0.10.0 subscriptions that runtime fixtures must answer: the
@@ -60,6 +70,57 @@ internal object MarmotWindowTestFakes {
 
     /** A block list with nobody blocked that ends immediately. */
     fun blockList(): BlockListSubscription = nativeStub(EmptyBlockList::class.java)
+
+    /** A conversation window sidecar whose prepared header carries [title]; everything else is empty and stable. */
+    fun conversationFrame(title: String): ConversationWindowFrame =
+        ConversationWindowFrame(
+            revision = ConversationWindowRevisionFfi("test", 1uL),
+            header =
+                ConversationHeaderFfi(
+                    selected =
+                        ConversationPresentationFfi(
+                            title = PresentationTextFfi.Literal(title),
+                            avatar = SelectedAvatarFfi.Placeholder("group", PresentationSourceFfi.GROUP_FALLBACK),
+                            titleSource = PresentationSourceFfi.GROUP_FALLBACK,
+                            avatarSource = PresentationSourceFfi.GROUP_FALLBACK,
+                            peerId = null,
+                            resolution = PresentationResolutionFfi.FALLBACK,
+                        ),
+                    memberCount = 2uL,
+                    archived = false,
+                    epoch = 1uL,
+                    lifecycle = GroupLifecycleStateFfi.STABLE,
+                    disbanding = false,
+                    unrecoverable = false,
+                    capabilities =
+                        ConversationCapabilitiesFfi(
+                            participation = ConversationParticipationFfi.ACTIVE,
+                            isSelfAdmin = false,
+                            isLastAdmin = false,
+                            canSend = true,
+                            canInvite = false,
+                            canEditGroup = false,
+                            canLeave = true,
+                            requiresSelfDemoteBeforeLeave = false,
+                            canEnableDisbanding = false,
+                            canDisband = false,
+                        ),
+                ),
+            identities = emptyMap(),
+            readState =
+                ConversationOpenReadStateFfi(
+                    initialized = true,
+                    lastReadMessageIdHex = null,
+                    lastReadTimelineAt = null,
+                    manuallyMarkedUnread = false,
+                    unreadCount = 0uL,
+                    unreadMentionCount = 0uL,
+                    firstUnreadMessageIdHex = null,
+                ),
+            draft = SelectedMessageDraftFfi(nativeStub(MessageDraftRevisionFfi::class.java), null),
+            anchor = ConversationAnchorOutcomeFfi(ConversationAnchorKindFfi.LATEST, 0u),
+            references = emptyMap(),
+        )
 
     /** The chat-list rows an account's fixture serves: only the active view carries them. */
     fun rowsForView(

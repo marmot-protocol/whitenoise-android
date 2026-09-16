@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -96,6 +97,21 @@ class ConversationTopBarSemanticsTest {
         composeRule
             .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
             .captureRoboImage("src/test/snapshots/conversation_header_compact_timer_light.png")
+    }
+
+    /** MDK's prepared title replaces the app's own projection once the window installs its first sidecar. */
+    @Test
+    fun preparedWindowTitleReplacesFallback() {
+        val appState = appState()
+        val controller = ConversationController(appState = appState, initialGroup = group())
+        controller.window.install(MarmotWindowTestFakes.conversationFrame("Prepared by MDK"))
+        render(appState, controller)
+
+        composeRule.onNodeWithText("Prepared by MDK").assertExists()
+        composeRule.onNodeWithText("Benchmark group").assertDoesNotExist()
+        composeRule
+            .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_header_prepared_title_light.png")
     }
 
     /** Hydration cannot replace the opening route title until the existing route owner releases its freeze. */
