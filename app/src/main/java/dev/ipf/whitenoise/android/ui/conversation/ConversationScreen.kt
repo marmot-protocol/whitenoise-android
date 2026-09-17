@@ -486,23 +486,20 @@ private fun rememberConversationReadAnchor(
     entrySessionIdentity: Any,
     renderedTimeline: List<TimelineMessage>,
     listState: LazyListState,
-    hasOlderHeader: Boolean,
-    hasInlineTopError: Boolean,
+    leadingStructuralRowCount: Int,
     initialTimelineAnchored: Boolean,
 ): MutableState<String?> {
     val readAnchor = remember(entrySessionIdentity) { mutableStateOf(controller.lastReadMessageId) }
     val renderedSize = renderedTimeline.size
     val currentHighestVisibleTimelineIndex by
-        remember(listState, renderedSize, hasOlderHeader, hasInlineTopError) {
+        remember(listState, renderedSize, leadingStructuralRowCount) {
             derivedStateOf {
                 val visible = listState.layoutInfo.visibleItemsInfo
                 if (visible.isEmpty()) return@derivedStateOf -1
-                val olderHeader = if (hasOlderHeader) 1 else 0
-                val inlineTopError = if (hasInlineTopError) 1 else 0
-                // LazyColumn layout: [top spacer][maybe top error]
-                // [maybe older-loading][timeline items].
+                // LazyColumn layout: [top spacer][maybe group recovery]
+                // [maybe top error][maybe older-loading][timeline items].
                 // Tail clearance is content padding, not a zero-sized list item.
-                val firstTimelineListIndex = 1 + inlineTopError + olderHeader
+                val firstTimelineListIndex = 1 + leadingStructuralRowCount
                 (visible.last().index - firstTimelineListIndex)
                     .coerceAtMost(renderedSize - 1)
             }
@@ -944,6 +941,7 @@ internal fun ConversationScreen(
         loadFailurePlacement == LoadFailurePlacement.Inline &&
             controller.errorEdge == ConversationLoadFailureEdge.TOP
     val inlineTopErrorCount = if (hasInlineTopError) 1 else 0
+    val groupRecoveryCount = if (controller.conversationGroupRecoveryRowVisible()) 1 else 0
     val leadingStructuralRowCount = controller.conversationLeadingStructuralRowCount(renderedTimeline.size)
     val conversationMedia =
         rememberSharedMediaTiles(
@@ -1103,6 +1101,7 @@ internal fun ConversationScreen(
                 liveRenderedTimeline.isNotEmpty() &&
                     controller.error != null &&
                     controller.errorEdge == ConversationLoadFailureEdge.TOP,
+            hasGroupRecovery = controller.conversationGroupRecoveryRowVisible(),
         )
     }
 
@@ -1273,6 +1272,7 @@ internal fun ConversationScreen(
             renderedTimelineSize = renderedSize,
             hasOlderHeader = hasOlderHeader,
             hasInlineTopError = hasInlineTopError,
+            hasGroupRecovery = controller.conversationGroupRecoveryRowVisible(),
         )
 
     /** Resolves a saved logical anchor after current header and error rows. */
@@ -1322,6 +1322,7 @@ internal fun ConversationScreen(
                             liveRenderedSize > 0 &&
                                 controller.error != null &&
                                 controller.errorEdge == ConversationLoadFailureEdge.TOP,
+                        hasGroupRecovery = controller.conversationGroupRecoveryRowVisible(),
                     ),
                 )
             },
@@ -1333,8 +1334,7 @@ internal fun ConversationScreen(
             entrySessionIdentity = entryUnreadSessionIdentity,
             renderedTimeline = renderedTimeline,
             listState = listState,
-            hasOlderHeader = hasOlderHeader,
-            hasInlineTopError = hasInlineTopError,
+            leadingStructuralRowCount = leadingStructuralRowCount,
             initialTimelineAnchored = initialTimelineAnchored,
         )
     DisposableEffect(controller) {
@@ -1348,8 +1348,7 @@ internal fun ConversationScreen(
             val firstTimelineIndex =
                 listState.firstVisibleItemIndex -
                     1 -
-                    (if (hasInlineTopError) 1 else 0) -
-                    (if (hasOlderHeader) 1 else 0)
+                    controller.conversationLeadingStructuralRowCount(rendered.size)
             val anchor = rendered.getOrNull(firstTimelineIndex)
             onSaveScrollSnapshot(
                 conversationScrollSnapshotOnLeave(
@@ -2104,6 +2103,7 @@ internal fun ConversationScreen(
                 rowKeys = renderedTimelineAnchorKeys,
                 olderHeaderCount = olderHeaderCount,
                 inlineTopErrorCount = inlineTopErrorCount,
+                groupRecoveryCount = groupRecoveryCount,
             ),
         onTailAlignmentCommitted = {
             seededTailAlignmentRecoveryVisible = false
@@ -2653,6 +2653,7 @@ internal fun ConversationScreen(
                         renderedMessageIds = rendered.map { it.record.messageIdHex },
                         olderHeaderCount = liveOlderHeaderCount,
                         inlineTopErrorCount = liveInlineTopErrorCount,
+                        groupRecoveryCount = if (controller.conversationGroupRecoveryRowVisible()) 1 else 0,
                     ).coerceAtMost(liveTailTimelineIndex)
                 }
             }.filterNotNull()
@@ -2697,7 +2698,7 @@ internal fun ConversationScreen(
             }
         val restoredItem =
             restoredRendered.getOrNull(
-                targetIndex - 1 - restoredOlderHeaderCount - restoredInlineTopErrorCount,
+                targetIndex - 1 - controller.conversationLeadingStructuralRowCount(restoredRendered.size),
             )
         scrollCoordinator.settleReadingAt(
             ConversationScrollAnchor(
@@ -2713,6 +2714,7 @@ internal fun ConversationScreen(
                     rowKeys = restoredRendered.map { it.id to it.record.messageIdHex },
                     olderHeaderCount = restoredOlderHeaderCount,
                     inlineTopErrorCount = restoredInlineTopErrorCount,
+                    groupRecoveryCount = if (controller.conversationGroupRecoveryRowVisible()) 1 else 0,
                 ),
             viewportHeight = timelineViewport.readingLayoutInfo().viewportSize.height,
         )
@@ -2835,6 +2837,7 @@ internal fun ConversationScreen(
                     rowKeys = anchoredTimeline.map { it.id to it.record.messageIdHex },
                     olderHeaderCount = anchoredOlderHeaderCount,
                     inlineTopErrorCount = anchoredInlineTopErrorCount,
+                    groupRecoveryCount = if (controller.conversationGroupRecoveryRowVisible()) 1 else 0,
                 ),
             viewportHeight = timelineViewport.readingLayoutInfo().viewportSize.height,
         )
@@ -2878,6 +2881,7 @@ internal fun ConversationScreen(
                     rowKeys = renderedTimelineAnchorKeys,
                     olderHeaderCount = olderHeaderCount,
                     inlineTopErrorCount = inlineTopErrorCount,
+                    groupRecoveryCount = groupRecoveryCount,
                 ),
             )
         if (initialTimelineAnchored && structureChanged) {
@@ -3694,10 +3698,7 @@ internal fun ConversationScreen(
                                     conversationTimelineContentPadding(snackbarContentInset.value, overlayPadding),
                             ) {
                                 item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
-                                if (
-                                    controller.groupRecoveryReadFailed ||
-                                    controller.groupRecoveryStatus?.hasVisibleRecoveryState() == true
-                                ) {
+                                if (controller.conversationGroupRecoveryRowVisible()) {
                                     item(key = "group-recovery") {
                                         ConversationGroupRecoveryCard(controller, appState)
                                     }

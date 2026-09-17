@@ -103,6 +103,7 @@ internal fun conversationScrollRestoreListIndex(
     renderedMessageIds: List<String> = emptyList(),
     olderHeaderCount: Int,
     inlineTopErrorCount: Int = 0,
+    groupRecoveryCount: Int = 0,
 ): Int {
     val anchorIndex =
         snapshot.anchorMessageIdHex
@@ -114,7 +115,7 @@ internal fun conversationScrollRestoreListIndex(
                 ?.takeIf { it >= 0 }
             ?: -1
     return if (anchorIndex >= 0) {
-        1 + olderHeaderCount + inlineTopErrorCount + anchorIndex
+        1 + olderHeaderCount + inlineTopErrorCount + groupRecoveryCount + anchorIndex
     } else {
         snapshot.firstVisibleItemIndex
     }
@@ -158,10 +159,15 @@ internal fun isNearBottom(
     hasOlderHeader: Boolean,
     hasInlineTopError: Boolean = false,
     timelineViewport: ConversationTimelineViewport? = null,
+    hasGroupRecovery: Boolean = false,
 ): Boolean {
     if (!listState.canScrollForward) return true
     val leadingStructuralRowCount =
-        conversationTimelineLeadingStructuralRowCount(hasOlderHeader, hasInlineTopError)
+        conversationTimelineLeadingStructuralRowCount(
+            hasOlderHeader = hasOlderHeader,
+            hasInlineTopError = hasInlineTopError,
+            hasGroupRecovery = hasGroupRecovery,
+        )
     val tailTimelineIndex =
         conversationTimelineTailListIndex(
             timelineSize = timelineSize,
@@ -213,8 +219,16 @@ internal fun rememberConversationNearBottom(
     hasOlderHeader: Boolean,
     hasInlineTopError: Boolean = false,
     timelineViewport: ConversationTimelineViewport? = null,
+    hasGroupRecovery: Boolean = false,
 ): Boolean {
-    val nearBottom by remember(listState, renderedTimelineSize, hasOlderHeader, hasInlineTopError, timelineViewport) {
+    val nearBottom by remember(
+        listState,
+        renderedTimelineSize,
+        hasOlderHeader,
+        hasInlineTopError,
+        timelineViewport,
+        hasGroupRecovery,
+    ) {
         derivedStateOf {
             isNearBottom(
                 listState,
@@ -222,6 +236,7 @@ internal fun rememberConversationNearBottom(
                 hasOlderHeader,
                 hasInlineTopError,
                 timelineViewport,
+                hasGroupRecovery,
             )
         }
     }

@@ -88,11 +88,15 @@ internal fun conversationScrollAnchor(
     hasOlderHeader: Boolean,
     hasInlineTopError: Boolean = false,
     timelineViewport: ConversationTimelineViewport? = null,
+    hasGroupRecovery: Boolean = false,
 ): ConversationScrollAnchor {
     val firstTimelineListIndex =
         1 +
-            (if (hasInlineTopError) 1 else 0) +
-            (if (hasOlderHeader) 1 else 0)
+            conversationTimelineLeadingStructuralRowCount(
+                hasOlderHeader = hasOlderHeader,
+                hasInlineTopError = hasInlineTopError,
+                hasGroupRecovery = hasGroupRecovery,
+            )
     val visibleTimelineRow =
         (timelineViewport?.readingLayoutInfo() ?: listState.layoutInfo).visibleItemsInfo.firstOrNull { visible ->
             val timelineIndex = visible.index - firstTimelineListIndex
@@ -143,6 +147,7 @@ internal data class ConversationTimelineStructure(
     val rowKeys: List<Pair<String, String>>,
     val olderHeaderCount: Int,
     val inlineTopErrorCount: Int = 0,
+    val groupRecoveryCount: Int = 0,
 )
 
 internal data class ConversationInitialAnchorLayout(
