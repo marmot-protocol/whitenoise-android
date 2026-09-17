@@ -142,6 +142,7 @@ internal fun DrawScope.drawComposerEditorOverflowAffordance(
     scrollValue: Int,
     maxScroll: Int,
     color: Color,
+    outerGutterPx: Float = 0f,
 ) {
     if (maxScroll <= 0) return
     val viewport = size.height
@@ -152,17 +153,40 @@ internal fun DrawScope.drawComposerEditorOverflowAffordance(
     val thumbWidth = COMPOSER_SCROLLBAR_THUMB_WIDTH.toPx()
     val inset = COMPOSER_SCROLLBAR_EDGE_INSET.toPx()
     val x =
-        if (layoutDirection == LayoutDirection.Rtl) {
-            inset
-        } else {
-            size.width - thumbWidth - inset
-        }
+        composerOverflowThumbXPx(
+            editorWidthPx = size.width,
+            thumbWidthPx = thumbWidth,
+            edgeInsetPx = inset,
+            outerGutterPx = outerGutterPx,
+            rightToLeft = layoutDirection == LayoutDirection.Rtl,
+        )
     drawRoundRect(
         color = color,
         topLeft = Offset(x, progress * travel),
         size = Size(thumbWidth, thumbHeight),
         cornerRadius = CornerRadius(thumbWidth / 2f),
     )
+}
+
+/**
+ * Where the editor's overflow thumb is painted. The editor fills its row, so with an [outerGutterPx]
+ * the thumb goes in the inset beside it and a draft's last glyphs, caret and selection handles keep the
+ * whole row width; without one it falls back to the trailing edge inside the editor.
+ */
+internal fun composerOverflowThumbXPx(
+    editorWidthPx: Float,
+    thumbWidthPx: Float,
+    edgeInsetPx: Float,
+    outerGutterPx: Float,
+    rightToLeft: Boolean,
+): Float {
+    val centred = ((outerGutterPx - thumbWidthPx) / 2f).coerceAtLeast(0f)
+    return when {
+        outerGutterPx <= 0f && rightToLeft -> edgeInsetPx
+        outerGutterPx <= 0f -> editorWidthPx - thumbWidthPx - edgeInsetPx
+        rightToLeft -> centred - outerGutterPx
+        else -> editorWidthPx + centred
+    }
 }
 
 private val COMPOSER_SCROLLBAR_THUMB_WIDTH = 3.dp

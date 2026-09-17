@@ -21,6 +21,12 @@ internal data class ConversationViewportEvidence(
     val viewportEndOffsetPx: Int,
     val viewportHeightPx: Int,
     val canScrollForward: Boolean,
+    /**
+     * Whether the list can still travel toward index zero. The transcript is a reversed list, so that
+     * end holds the newest message: this is false exactly when the tail is physically reached, while
+     * [canScrollForward] stays true for as long as there is older history to walk back through.
+     */
+    val canScrollBackward: Boolean,
     val visibleItems: List<ConversationVisibleItemEvidence>,
 )
 
