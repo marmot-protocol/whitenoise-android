@@ -101,8 +101,7 @@ internal fun conversationScrollRestoreListIndex(
     snapshot: ConversationScrollSnapshot,
     renderedItemIds: List<String>,
     renderedMessageIds: List<String> = emptyList(),
-    olderHeaderCount: Int,
-    inlineTopErrorCount: Int = 0,
+    trailingRowCount: Int = 0,
 ): Int {
     val anchorIndex =
         snapshot.anchorMessageIdHex
@@ -114,7 +113,11 @@ internal fun conversationScrollRestoreListIndex(
                 ?.takeIf { it >= 0 }
             ?: -1
     return if (anchorIndex >= 0) {
-        1 + olderHeaderCount + inlineTopErrorCount + anchorIndex
+        conversationTimelineListIndex(
+            timelineIndex = anchorIndex,
+            timelineSize = renderedItemIds.size,
+            trailingRowCount = trailingRowCount,
+        )
     } else {
         snapshot.firstVisibleItemIndex
     }
@@ -155,41 +158,45 @@ internal suspend fun loadConversationTimelineToNewest(
 internal fun isNearBottom(
     listState: LazyListState,
     timelineSize: Int,
-    hasOlderHeader: Boolean,
-    hasInlineTopError: Boolean = false,
+    trailingRowCount: Int = 0,
     timelineViewport: ConversationTimelineViewport? = null,
 ): Boolean {
-    if (!listState.canScrollForward) return true
-    val leadingStructuralRowCount =
-        conversationTimelineLeadingStructuralRowCount(hasOlderHeader, hasInlineTopError)
+    // The transcript is reversed, so history lies toward higher indices and the
+    // newest edge is exhausted when the list can no longer scroll backward.
+    if (!listState.canScrollBackward) return true
     val tailTimelineIndex =
         conversationTimelineTailListIndex(
             timelineSize = timelineSize,
-            leadingStructuralRowCount = leadingStructuralRowCount,
+            trailingRowCount = trailingRowCount,
         )
             ?: return true
-    // Check the LAST visible item, not the first — keeps "near bottom"
-    // truthful when the viewport shrinks (e.g. keyboard open) and fewer
-    // items fit, which pushes firstVisibleItemIndex earlier even though
-    // the bottom is still on-screen.
+    // Check the FIRST visible item, not the last — the reversed list lays its
+    // lowest index against the composer, and that stays truthful when the
+    // viewport shrinks under the keyboard and fewer rows fit.
     val layoutInfo = (timelineViewport?.readingLayoutInfo() ?: listState.layoutInfo)
-    val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull() ?: return false
-    if (lastVisible.index > tailTimelineIndex) return true
-    if (lastVisible.index < tailTimelineIndex) return false
+    val newestVisible = layoutInfo.visibleItemsInfo.firstOrNull() ?: return false
+    if (newestVisible.index < tailTimelineIndex) return true
+    if (newestVisible.index > tailTimelineIndex) return false
 
     // A normal tail row counts as near-bottom as soon as any part is visible,
     // preserving the existing one-row threshold. For an oversized row, keep
     // only a small no-flicker zone near the real tail; a full viewport delays
     // the FAB until too much of an expanded message has already scrolled away.
     val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
-    if (lastVisible.size <= viewportHeight) return true
-    val tailDistanceFromViewport =
-        lastVisible.offset + lastVisible.size - layoutInfo.viewportEndOffset
+    if (newestVisible.size <= viewportHeight) return true
+    // Reversed offsets grow upward, so the newest row hides below the clear
+    // bottom edge exactly as far as its offset falls under the viewport start.
+    val tailDistanceFromViewport = layoutInfo.viewportStartOffset - newestVisible.offset
     val oversizedTailThreshold = viewportHeight / 4
     return tailDistanceFromViewport <= oversizedTailThreshold
 }
 
-/** True when the target row has settled at the usable transcript top. */
+/**
+ * True when the target row has settled at the usable transcript top.
+ *
+ * Reversed offsets grow upward, so a row's top edge is its offset plus its
+ * height and the transcript's top is the viewport's end offset.
+ */
 internal fun isConversationItemTopAligned(
     listState: LazyListState,
     targetIndex: Int,
@@ -198,7 +205,7 @@ internal fun isConversationItemTopAligned(
 ): Boolean {
     val layoutInfo = (timelineViewport?.readingLayoutInfo() ?: listState.layoutInfo)
     val target = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex } ?: return false
-    return abs(target.offset - layoutInfo.viewportStartOffset) <= tolerancePx.coerceAtLeast(0)
+    return abs((target.offset + target.size) - layoutInfo.viewportEndOffset) <= tolerancePx.coerceAtLeast(0)
 }
 
 /**
@@ -210,17 +217,15 @@ internal fun isConversationItemTopAligned(
 internal fun rememberConversationNearBottom(
     listState: LazyListState,
     renderedTimelineSize: Int,
-    hasOlderHeader: Boolean,
-    hasInlineTopError: Boolean = false,
+    trailingRowCount: Int = 0,
     timelineViewport: ConversationTimelineViewport? = null,
 ): Boolean {
-    val nearBottom by remember(listState, renderedTimelineSize, hasOlderHeader, hasInlineTopError, timelineViewport) {
+    val nearBottom by remember(listState, renderedTimelineSize, trailingRowCount, timelineViewport) {
         derivedStateOf {
             isNearBottom(
                 listState,
                 renderedTimelineSize,
-                hasOlderHeader,
-                hasInlineTopError,
+                trailingRowCount,
                 timelineViewport,
             )
         }

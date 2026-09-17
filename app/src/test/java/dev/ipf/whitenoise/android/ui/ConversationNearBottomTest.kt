@@ -37,6 +37,7 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollWriter
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTimelineStructure
 import dev.ipf.whitenoise.android.ui.conversation.LazyListConversationScrollWriter
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollAnchor
+import dev.ipf.whitenoise.android.ui.conversation.conversationTimelineListIndex
 import dev.ipf.whitenoise.android.ui.conversation.conversationTimelineTailListIndex
 import dev.ipf.whitenoise.android.ui.conversation.isNearBottom
 import dev.ipf.whitenoise.android.ui.conversation.jumpToNewest
@@ -66,10 +67,9 @@ class ConversationNearBottomTest {
         modifier: Modifier = Modifier.height(400.dp),
         tailRowHeight: Dp = 50.dp,
     ) {
-        LazyColumn(modifier = modifier, state = listState) {
-            item { Spacer(Modifier.height(1.dp)) }
-            item { Spacer(Modifier.height(1.dp)) }
-            items((0 until timelineSize).toList()) { index ->
+        // Reversed emission: newest message first, structural spacers last.
+        LazyColumn(modifier = modifier, state = listState, reverseLayout = true) {
+            items((0 until timelineSize).toList().asReversed()) { index ->
                 Box(
                     Modifier
                         .fillMaxWidth()
@@ -83,6 +83,8 @@ class ConversationNearBottomTest {
                         ),
                 )
             }
+            item { Spacer(Modifier.height(1.dp)) }
+            item { Spacer(Modifier.height(1.dp)) }
         }
     }
 
@@ -92,7 +94,7 @@ class ConversationNearBottomTest {
         timelineSize: Int,
         coordinatorHolder: Array<ConversationScrollCoordinator?>,
     ) {
-        val tailTimelineIndex = requireNotNull(conversationTimelineTailListIndex(timelineSize, 1))
+        val tailTimelineIndex = requireNotNull(conversationTimelineTailListIndex(timelineSize, 0))
         val coordinator =
             remember(listState) {
                 ConversationScrollCoordinator(
@@ -106,7 +108,7 @@ class ConversationNearBottomTest {
             rememberConversationNearBottom(
                 listState = listState,
                 renderedTimelineSize = timelineSize,
-                hasOlderHeader = true,
+                trailingRowCount = 0,
             )
 
         Box {
@@ -141,7 +143,7 @@ class ConversationNearBottomTest {
                 rememberConversationNearBottom(
                     listState = listState,
                     renderedTimelineSize = timelineSize.value,
-                    hasOlderHeader = true,
+                    trailingRowCount = 0,
                 )
             TimelineHarness(
                 listState = listState,
@@ -167,9 +169,8 @@ class ConversationNearBottomTest {
     fun shortTailRemainsNearBottomWhileItIsStillVisible() {
         val listState = LazyListState()
         val timelineSize = 3
-        val firstTimelineIndex = 2
         val tailListIndex =
-            requireNotNull(conversationTimelineTailListIndex(timelineSize, leadingStructuralRowCount = 1))
+            requireNotNull(conversationTimelineTailListIndex(timelineSize, trailingRowCount = 0))
 
         composeRule.setContent {
             TimelineHarness(
@@ -182,23 +183,25 @@ class ConversationNearBottomTest {
 
         val rowSize =
             listState.layoutInfo.visibleItemsInfo
-                .single { it.index == firstTimelineIndex }
+                .single { it.index == tailListIndex }
                 .size
-        scrollTo(listState, firstTimelineIndex, rowSize * 2 / 5)
+        // Reversed: slide the newest row under the composer by more than the
+        // oversized-row no-flicker zone, so only its short height keeps it
+        // near-bottom.
+        scrollTo(listState, tailListIndex, rowSize * 3 / 5)
 
         val layoutInfo = listState.layoutInfo
         val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
-        val lastVisible = layoutInfo.visibleItemsInfo.last()
-        val tailDistanceFromViewport =
-            lastVisible.offset + lastVisible.size - layoutInfo.viewportEndOffset
+        val newestVisible = layoutInfo.visibleItemsInfo.first()
+        val tailDistanceFromViewport = layoutInfo.viewportStartOffset - newestVisible.offset
 
-        assertEquals(tailListIndex, lastVisible.index)
-        assertTrue(lastVisible.size < viewportHeight)
+        assertEquals(tailListIndex, newestVisible.index)
+        assertTrue(newestVisible.size < viewportHeight)
         assertTrue(tailDistanceFromViewport > viewportHeight / 4)
-        assertTrue(tailDistanceFromViewport <= lastVisible.size)
+        assertTrue(tailDistanceFromViewport <= newestVisible.size)
         assertTrue(
             "A normal tail row remains near-bottom while any part is visible",
-            isNearBottom(listState, timelineSize, hasOlderHeader = true),
+            isNearBottom(listState, timelineSize, trailingRowCount = 0),
         )
     }
 
@@ -208,7 +211,7 @@ class ConversationNearBottomTest {
         val jumpToNewestLabel = context.getString(R.string.jump_to_newest)
         val listState = LazyListState()
         val timelineSize = 1
-        val tailTimelineIndex = requireNotNull(conversationTimelineTailListIndex(timelineSize, 1))
+        val tailTimelineIndex = requireNotNull(conversationTimelineTailListIndex(timelineSize, 0))
         val coordinatorHolder = arrayOf<ConversationScrollCoordinator?>(null)
 
         composeRule.setContent {
@@ -232,26 +235,25 @@ class ConversationNearBottomTest {
 
         val viewportHeight =
             listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
-        val tailSize =
-            listState.layoutInfo.visibleItemsInfo
-                .single { it.index == tailTimelineIndex }
-                .size
-        val nearTailOffset = tailSize - viewportHeight - viewportHeight / 8
+        // Reversed: the offset scrolled past the origin is the distance the
+        // newest row has slipped under the composer, whatever its height.
+        val beforePadding = listState.layoutInfo.beforeContentPadding
+        val nearTailOffset = viewportHeight / 8 + beforePadding
         scrollTo(listState, tailTimelineIndex, nearTailOffset)
-        val nearTail = listState.layoutInfo.visibleItemsInfo.last()
+        val nearTail = listState.layoutInfo.visibleItemsInfo.first()
         val nearTailDistanceFromViewport =
-            nearTail.offset + nearTail.size - listState.layoutInfo.viewportEndOffset
+            listState.layoutInfo.viewportStartOffset - nearTail.offset
 
         assertEquals(tailTimelineIndex, nearTail.index)
         assertTrue(nearTailDistanceFromViewport in 1 until viewportHeight / 4)
         composeRule.onNodeWithTag(TAIL_ROW_TAG).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertDoesNotExist()
 
-        val farTailOffset = tailSize - viewportHeight - viewportHeight / 2
+        val farTailOffset = viewportHeight / 2 + beforePadding
         scrollTo(listState, tailTimelineIndex, farTailOffset)
-        val lastVisible = listState.layoutInfo.visibleItemsInfo.last()
+        val lastVisible = listState.layoutInfo.visibleItemsInfo.first()
         val tailDistanceFromViewport =
-            lastVisible.offset + lastVisible.size - listState.layoutInfo.viewportEndOffset
+            listState.layoutInfo.viewportStartOffset - lastVisible.offset
         assertEquals(tailTimelineIndex, lastVisible.index)
         assertTrue(tailDistanceFromViewport > viewportHeight / 4)
         composeRule.onNodeWithTag(TAIL_ROW_TAG).assertIsDisplayed()
@@ -265,7 +267,7 @@ class ConversationNearBottomTest {
         composeRule.runOnIdle {
             assertFalse(
                 "Jump to newest must reach the physical end of the list",
-                listState.canScrollForward,
+                listState.canScrollBackward,
             )
             assertTrue(coordinatorHolder[0]!!.isFollowingTail)
         }
@@ -278,7 +280,7 @@ class ConversationNearBottomTest {
         val listState = LazyListState()
         val timelineSize = 50
         val tailTimelineIndex =
-            requireNotNull(conversationTimelineTailListIndex(timelineSize, leadingStructuralRowCount = 1))
+            requireNotNull(conversationTimelineTailListIndex(timelineSize, trailingRowCount = 0))
         val coordinatorHolder = arrayOf<ConversationScrollCoordinator?>(null)
 
         composeRule.setContent {
@@ -295,7 +297,7 @@ class ConversationNearBottomTest {
                 rememberConversationNearBottom(
                     listState = listState,
                     renderedTimelineSize = timelineSize,
-                    hasOlderHeader = true,
+                    trailingRowCount = 0,
                 )
 
             Box {
@@ -318,6 +320,10 @@ class ConversationNearBottomTest {
             }
         }
 
+        composeRule.waitForIdle()
+        // A reversed transcript opens against the composer, so scroll into
+        // history before the jump affordance has anything to return from.
+        scrollTo(listState, 30)
         composeRule.waitForIdle()
         composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertIsDisplayed()
         composeRule.onNodeWithText("3").assertIsDisplayed()
@@ -353,7 +359,7 @@ class ConversationNearBottomTest {
         val listState = LazyListState()
         val timelineSize = 5
         val tailListIndex =
-            requireNotNull(conversationTimelineTailListIndex(timelineSize, leadingStructuralRowCount = 1))
+            requireNotNull(conversationTimelineTailListIndex(timelineSize, trailingRowCount = 0))
         val itemIds = (0 until timelineSize).map { "item-$it" }
         val messageIds = (0 until timelineSize).map { "message-$it" }
         val viewportHeight = mutableStateOf(TALL_TAIL_VIEWPORT)
@@ -369,7 +375,7 @@ class ConversationNearBottomTest {
         composeRule.waitForIdle()
         scrollTo(listState, tailListIndex, PAUSED_OFFSET_IN_TALL_TAIL)
 
-        val nearBottom = isNearBottom(listState, timelineSize, hasOlderHeader = true)
+        val nearBottom = isNearBottom(listState, timelineSize, trailingRowCount = 0)
         assertTrue(
             "Unread pixels must remain below the viewport for this to be a history read",
             listState.canScrollForward,
@@ -384,7 +390,7 @@ class ConversationNearBottomTest {
                 listState = listState,
                 renderedItemIds = itemIds,
                 renderedMessageIds = messageIds,
-                hasOlderHeader = true,
+                trailingRowCount = 0,
             )
         val coordinator =
             ConversationScrollCoordinator(writer = LazyListConversationScrollWriter(listState))
@@ -462,7 +468,7 @@ class ConversationNearBottomTest {
                     resumedGeometry = geometry,
                     resumedTimelineStructure = structure,
                     resolveAnchorIndex = { indexBefore },
-                    resolveTailIndex = { listState.layoutInfo.totalItemsCount - 1 },
+                    resolveTailIndex = { REVERSED_TAIL_INDEX },
                 )
             }
         }
@@ -518,7 +524,7 @@ class ConversationNearBottomTest {
                         resumedTimelineStructure = structure,
                         resumedScrollAnchor = anchor,
                         resolveAnchorIndex = { indexBefore },
-                        resolveTailIndex = { listState.layoutInfo.totalItemsCount - 1 },
+                        resolveTailIndex = { REVERSED_TAIL_INDEX },
                     )
                 }
             }
@@ -541,7 +547,7 @@ class ConversationNearBottomTest {
             )
         }
         composeRule.waitForIdle()
-        val tail = listState.layoutInfo.totalItemsCount - 1
+        val tail = REVERSED_TAIL_INDEX
         scrollTo(listState, tail)
         val coordinator = ConversationScrollCoordinator(LazyListConversationScrollWriter(listState))
         val pausedGeometry = ConversationForegroundGeometry(listState.layoutInfo.viewportSize.height, 0, 96)
@@ -573,7 +579,7 @@ class ConversationNearBottomTest {
         }
         composeRule.waitForIdle()
 
-        assertTrue(isNearBottom(listState, timelineSize = 50, hasOlderHeader = true))
+        assertTrue(isNearBottom(listState, timelineSize = 50, trailingRowCount = 0))
         assertTrue(coordinator.isFollowingTail)
     }
 
@@ -605,7 +611,7 @@ class ConversationNearBottomTest {
             runBlocking {
                 followed =
                     coordinator.followTailIfAllowed(
-                        resolveTailIndex = { listState.layoutInfo.totalItemsCount - 1 },
+                        resolveTailIndex = { REVERSED_TAIL_INDEX },
                         reason = ConversationScrollReason.NewMessage,
                         awaitFrame = {},
                     )
@@ -619,7 +625,7 @@ class ConversationNearBottomTest {
     }
 
     @Test
-    fun headerFirstViewportAnchorsTheFirstVisibleTimelineRow() {
+    fun reversedViewportAnchorsTheNewestVisibleTimelineRow() {
         val listState = LazyListState()
         val itemIds = (0 until 50).map { "item-$it" }
         val messageIds = (0 until 50).map { "message-$it" }
@@ -632,21 +638,23 @@ class ConversationNearBottomTest {
         }
         composeRule.waitForIdle()
         scrollTo(listState, 1)
-        val firstTimelineRow = listState.layoutInfo.visibleItemsInfo.first { it.index >= 2 }
+        // Reversed: the lowest visible index is the newest row on screen.
+        val newestVisibleRow = listState.layoutInfo.visibleItemsInfo.first()
 
         val anchor =
             conversationScrollAnchor(
                 listState = listState,
                 renderedItemIds = itemIds,
                 renderedMessageIds = messageIds,
-                hasOlderHeader = true,
+                trailingRowCount = 0,
             )
 
         assertEquals(1, listState.firstVisibleItemIndex)
-        assertEquals(firstTimelineRow.index, anchor.listIndex)
-        assertEquals(-firstTimelineRow.offset, anchor.pixelOffset)
-        assertEquals("item-0", anchor.itemId)
-        assertEquals("message-0", anchor.messageId)
+        assertEquals(newestVisibleRow.index, anchor.listIndex)
+        assertEquals(-newestVisibleRow.offset, anchor.pixelOffset)
+        // Row 1 of a reversed 50-message transcript is the second newest.
+        assertEquals("item-48", anchor.itemId)
+        assertEquals("message-48", anchor.messageId)
     }
 
     /** Mirrors the resume observer: resolve the bookmarked message back to a live list index. */
@@ -677,12 +685,15 @@ class ConversationNearBottomTest {
                             listState = listState,
                             renderedItemIds = itemIds,
                             renderedMessageIds = messageIds,
-                            hasOlderHeader = true,
+                            trailingRowCount = 0,
                         ),
                     resolveAnchorIndex = { anchor ->
-                        messageIds.indexOf(anchor.messageId).takeIf { it >= 0 }?.plus(2)
+                        messageIds
+                            .indexOf(anchor.messageId)
+                            .takeIf { it >= 0 }
+                            ?.let { conversationTimelineListIndex(it, messageIds.size, 0) }
                     },
-                    resolveTailIndex = { listState.layoutInfo.totalItemsCount - 1 },
+                    resolveTailIndex = { REVERSED_TAIL_INDEX },
                 )
             }
         }
@@ -729,3 +740,6 @@ class ConversationNearBottomTest {
 private const val TAIL_ROW_TAG = "conversation-tail-row"
 private val TALL_TAIL_VIEWPORT = 100.dp
 private const val PAUSED_OFFSET_IN_TALL_TAIL = 200
+
+/** The reversed transcript lays its newest row at the origin. */
+private const val REVERSED_TAIL_INDEX = 0

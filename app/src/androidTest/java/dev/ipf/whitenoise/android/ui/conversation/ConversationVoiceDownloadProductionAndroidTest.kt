@@ -689,7 +689,14 @@ private fun instrumentedHistorySnapshot(
     val timelineIndex = fixture.records.indexOfFirst { it.messageIdHex == messageId }
     check(timelineIndex >= 0)
     return ConversationScrollSnapshot(
-        firstVisibleItemIndex = timelineIndex + 1,
+        // Reversed transcript: a chronological position maps to its row measured
+        // from the newest message rather than from the top of the list.
+        firstVisibleItemIndex =
+            conversationTimelineListIndex(
+                timelineIndex = timelineIndex,
+                timelineSize = fixture.records.size,
+                trailingRowCount = 0,
+            ),
         firstVisibleItemScrollOffset = DEVICE_HISTORY_OFFSET_PX,
         anchorItemId = "msg:$messageId",
         anchorMessageIdHex = messageId,

@@ -149,25 +149,7 @@ internal fun ConversationForegroundRestoreEffects(
             },
         )
     val currentTimelineStructureProvider by
-        rememberUpdatedState(
-            newValue = {
-                val liveTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-                ConversationTimelineStructure(
-                    rowKeys = liveTimeline.map { it.id to it.record.messageIdHex },
-                    olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0,
-                    inlineTopErrorCount =
-                        if (
-                            liveTimeline.isNotEmpty() &&
-                            controller.error != null &&
-                            controller.errorEdge == ConversationLoadFailureEdge.TOP
-                        ) {
-                            1
-                        } else {
-                            0
-                        },
-                )
-            },
-        )
+        rememberUpdatedState(newValue = { controller.conversationTimelineStructure() })
     val currentForegroundSettleStateProvider by
         rememberUpdatedState(
             newValue = {
@@ -262,5 +244,30 @@ internal fun ConversationForegroundRestoreEffects(
             scrollCoordinator.cancelForegroundRestore()
             foregroundRestoreToken = null
         },
+    )
+}
+
+/**
+ * Snapshots the controller's current transcript row structure.
+ *
+ * Structural rows shift every timeline index, so the restore gate compares
+ * this snapshot across a pause to decide whether a correction is owed.
+ */
+internal fun ConversationController.conversationTimelineStructure(): ConversationTimelineStructure {
+    val liveTimeline = timeline.filterNot { MessageProjector.isEdit(it.record) }
+    return ConversationTimelineStructure(
+        rowKeys = liveTimeline.map { it.id to it.record.messageIdHex },
+        olderHeaderCount = if (hasMoreBefore || isLoadingOlder) 1 else 0,
+        inlineTopErrorCount =
+            if (
+                liveTimeline.isNotEmpty() &&
+                error != null &&
+                errorEdge == ConversationLoadFailureEdge.TOP
+            ) {
+                1
+            } else {
+                0
+            },
+        groupRecoveryCount = if (conversationGroupRecoveryRowVisible()) 1 else 0,
     )
 }

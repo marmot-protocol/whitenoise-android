@@ -80,7 +80,7 @@ class LoadFailurePlacementTest {
         val failureResolutionStart = "private fun discardInitialTimelineSeedForFailure"
         val failureResolutionEnd = "private fun publishAuthoritativeEmptyInitialTimeline"
         val seededReconciliationStart = "val seededTailAlignmentReady ="
-        val seededReconciliationEnd = "ConversationTailInsetReanchorEffect("
+        val seededReconciliationEnd = "// The reversed transcript keeps its newest row"
         val transcriptVisibilityStart = "val transcriptVisibilityCommitted by"
         val transcriptVisibilityEnd = "// First-frame completion waits"
         assertUniqueOrderedWindow(controllers, failureResolutionStart, failureResolutionEnd)

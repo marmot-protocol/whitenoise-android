@@ -17,7 +17,6 @@ import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,21 +35,21 @@ internal class LazyListConversationScrollWriterEvidenceTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** A visible snap-to-tail reports its measured physical-end request exactly once. */
+    /** A visible snap-to-tail reports one request for the list's origin. */
     @Test
-    fun visibleSnapTailReportsTheMeasuredOffset() = assertTailWrites(animated = false, visible = true)
+    fun visibleSnapTailReportsOneOriginWrite() = assertTailWrites(animated = false, visible = true)
 
-    /** An unmeasured snap-to-tail reports both materialization and measured correction writes. */
+    /** An unmeasured snap-to-tail needs no measuring pass before its request. */
     @Test
-    fun unmeasuredSnapTailReportsInitialAndCorrectionWrites() = assertTailWrites(animated = false, visible = false)
+    fun unmeasuredSnapTailReportsOneOriginWrite() = assertTailWrites(animated = false, visible = false)
 
-    /** A visible animated tail command reports its measured physical-end request exactly once. */
+    /** A visible animated tail command reports one request for the list's origin. */
     @Test
-    fun visibleAnimatedTailReportsTheMeasuredOffset() = assertTailWrites(animated = true, visible = true)
+    fun visibleAnimatedTailReportsOneOriginWrite() = assertTailWrites(animated = true, visible = true)
 
-    /** An unmeasured animated tail reports both materialization and measured correction writes. */
+    /** An unmeasured animated tail needs no measuring pass before its request. */
     @Test
-    fun unmeasuredAnimatedTailReportsInitialAndCorrectionWrites() = assertTailWrites(animated = true, visible = false)
+    fun unmeasuredAnimatedTailReportsOneOriginWrite() = assertTailWrites(animated = true, visible = false)
 
     /** Checks the selected command's complete ordered writes after proving its initial measurement state. */
     private fun assertTailWrites(
@@ -59,17 +58,14 @@ internal class LazyListConversationScrollWriterEvidenceTest {
     ) {
         val fixture = mountList()
         val index = if (visible) VISIBLE_TARGET_INDEX else UNMEASURED_TARGET_INDEX
-        val expectedOffsets =
-            if (visible) {
-                listOf(fixture.visibleSize(index))
-            } else {
-                fixture.assertNotVisible(index)
-                listOf(0, ROW_HEIGHT_PX)
-            }
+        if (!visible) fixture.assertNotVisible(index)
         fixture.runWriterCommand {
             if (animated) writer.animateScrollToTail(index) else writer.scrollToTail(index)
         }
-        assertEquals(expectedOffsets.map { scrollEvidence(animated, index, it) }, fixture.evidence.writes)
+        // The reversed transcript reaches a row's newest edge at offset zero
+        // however tall the row is, so an oversized or not-yet-measured row no
+        // longer needs a measuring pass followed by a correction write.
+        assertEquals(listOf(scrollEvidence(animated, index, 0)), fixture.evidence.writes)
     }
 
     /** Mounts an oversized-row list so visible and not-yet-measured branches are deterministic. */
@@ -115,13 +111,6 @@ internal class LazyListConversationScrollWriterEvidenceTest {
         private val scope: CoroutineScope,
         val evidence: RecordingEvidence,
     ) {
-        /** Returns the real measured size of an item that must already be visible. */
-        fun visibleSize(index: Int): Int =
-            composeRule
-                .runOnIdle {
-                    requireNotNull(listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }).size
-                }.also { size -> assertTrue(size > 0) }
-
         /** Proves [index] starts outside the composed viewport before materialization. */
         fun assertNotVisible(index: Int) {
             composeRule.runOnIdle {
@@ -169,7 +158,6 @@ internal class LazyListConversationScrollWriterEvidenceTest {
         const val UNMEASURED_TARGET_INDEX = 12
         const val VIEWPORT_HEIGHT_DP = 96
         const val ROW_HEIGHT_DP = 128
-        const val ROW_HEIGHT_PX = ROW_HEIGHT_DP
         const val COMMAND_TIMEOUT_MILLIS = 10_000L
     }
 }

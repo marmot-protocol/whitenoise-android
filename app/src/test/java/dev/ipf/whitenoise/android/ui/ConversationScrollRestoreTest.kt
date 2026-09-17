@@ -123,13 +123,14 @@ class ConversationScrollRestoreTest {
                 anchorMessageIdHex = "reader",
             )
 
+        // Reversed rows: the anchor is 12 messages from the oldest end of a
+        // 50-row window, so it lands 37 rows above the newest message.
         assertEquals(
-            1 + 1 + 12,
+            37,
             conversationScrollRestoreListIndex(
                 snapshot = snapshot,
                 renderedItemIds = renderedItemIds,
                 renderedMessageIds = renderedMessageIds,
-                olderHeaderCount = 1,
             ),
         )
     }
@@ -145,12 +146,11 @@ class ConversationScrollRestoreTest {
             )
 
         assertEquals(
-            1,
+            0,
             conversationScrollRestoreListIndex(
                 snapshot = snapshot,
                 renderedItemIds = listOf("stream:reader"),
                 renderedMessageIds = listOf("reader"),
-                olderHeaderCount = 0,
             ),
         )
     }
@@ -170,7 +170,6 @@ class ConversationScrollRestoreTest {
             conversationScrollRestoreListIndex(
                 snapshot = snapshot,
                 renderedItemIds = (0 until 50).map { "msg:$it" },
-                olderHeaderCount = 1,
             ),
         )
     }

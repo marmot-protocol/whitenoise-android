@@ -19,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -46,21 +45,19 @@ class ConversationTailSpacingTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** Resolves the real final message index after every supported leading structural-row combination. */
+    /** Resolves the newest message row, which trails only the bottom-edge failure row. */
     @Test
     fun tailIndexTargetsTheRealFinalRowAcrossHeaderVariants() {
-        assertNull(conversationTimelineTailListIndex(timelineSize = 0, leadingStructuralRowCount = 0))
-        assertEquals(1, conversationTimelineTailListIndex(timelineSize = 1, leadingStructuralRowCount = 0))
-        assertEquals(5, conversationTimelineTailListIndex(timelineSize = 4, leadingStructuralRowCount = 1))
+        assertNull(conversationTimelineTailListIndex(timelineSize = 0, trailingRowCount = 0))
+        assertEquals(0, conversationTimelineTailListIndex(timelineSize = 1, trailingRowCount = 0))
+        assertEquals(0, conversationTimelineTailListIndex(timelineSize = 4, trailingRowCount = 0))
+        // Rows above the timeline live at the reversed list's far end, so they
+        // can no longer displace the newest row.
         assertEquals(
-            6,
+            1,
             conversationTimelineTailListIndex(
                 timelineSize = 4,
-                leadingStructuralRowCount =
-                    conversationTimelineLeadingStructuralRowCount(
-                        hasOlderHeader = true,
-                        hasInlineTopError = true,
-                    ),
+                trailingRowCount = conversationTimelineTrailingRowCount(hasBottomError = true),
             ),
         )
     }
@@ -72,7 +69,7 @@ class ConversationTailSpacingTest {
             requireNotNull(
                 conversationTimelineTailListIndex(
                     timelineSize = 1,
-                    leadingStructuralRowCount = 2,
+                    trailingRowCount = 0,
                 ),
             )
         val listState = LazyListState(firstVisibleItemIndex = tailIndex)
@@ -92,9 +89,13 @@ class ConversationTailSpacingTest {
         composeRule.waitForIdle()
 
         assertEquals("no synthetic tail item may be reintroduced", 4, listState.layoutInfo.totalItemsCount)
-        assertFalse("the seeded final row must reach its physical end", listState.canScrollForward)
-        assertTrue(listState.firstVisibleItemScrollOffset > 0)
-        assertEquals(1, writer.snapCount)
+        // Reversed: the newest edge is exhausted when the list cannot scroll
+        // backward, and reaching it needs no offset into an oversized row.
+        assertFalse("the seeded final row must reach its physical end", listState.canScrollBackward)
+        assertEquals(0, listState.firstVisibleItemScrollOffset)
+        // The reversed transcript seeds directly at its origin, so the newest
+        // row is already aligned and no correcting write is owed.
+        assertEquals(0, writer.snapCount)
         assertFalse("the available tail writer must not exhaust", tailAlignmentExhausted)
         assertTrue("the seeded tail alignment callback must commit", tailAlignmentCommitted)
         assertTrue(
@@ -104,7 +105,7 @@ class ConversationTailSpacingTest {
                 anchorTailImmediately = true,
                 seededTailAlignmentCommitted = tailAlignmentCommitted,
                 viewportMeasured = listState.layoutInfo.viewportSize.height > 0,
-                canScrollForward = listState.canScrollForward,
+                canScrollTowardNewest = listState.canScrollBackward,
             ),
         )
     }
@@ -139,24 +140,26 @@ class ConversationTailSpacingTest {
         LazyColumn(
             state = listState,
             modifier = Modifier.size(width = 320.dp, height = 100.dp),
+            reverseLayout = true,
             verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
             contentPadding = conversationTimelineContentPadding(0.dp),
         ) {
-            item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
-            item(key = "top-error") { Spacer(Modifier.fillMaxWidth().height(44.dp)) }
-            item(key = "older-header") { Spacer(Modifier.fillMaxWidth().height(40.dp)) }
+            // Reversed emission: the newest row is laid out against the composer.
             item(key = "tail") { Spacer(Modifier.fillMaxWidth().height(400.dp)) }
+            item(key = "older-header") { Spacer(Modifier.fillMaxWidth().height(40.dp)) }
+            item(key = "top-error") { Spacer(Modifier.fillMaxWidth().height(44.dp)) }
+            item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
         }
     }
 
-    /** Includes the top error and older-page header when judging distance from an oversized tail. */
+    /** Keeps the oversized newest row near-bottom only inside its small no-flicker zone. */
     @Test
-    fun oversizedTailNearBottomCountsTopErrorAndOlderHeaderRows() {
+    fun oversizedTailNearBottomUsesTheNoFlickerZone() {
         val tailIndex =
             requireNotNull(
                 conversationTimelineTailListIndex(
                     timelineSize = 1,
-                    leadingStructuralRowCount = 2,
+                    trailingRowCount = 0,
                 ),
             )
         val listState = LazyListState()
@@ -164,34 +167,25 @@ class ConversationTailSpacingTest {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.size(width = 320.dp, height = 100.dp),
+                reverseLayout = true,
             ) {
-                item { Spacer(Modifier.height(4.dp)) }
-                item { Spacer(Modifier.height(44.dp)) }
-                item { Spacer(Modifier.height(40.dp)) }
+                // Reversed emission: the oversized newest row sits at the origin
+                // and the structural rows stack above it.
                 item { Spacer(Modifier.fillMaxWidth().height(400.dp).testTag(TAIL_ROW_TAG)) }
+                item { Spacer(Modifier.height(40.dp)) }
+                item { Spacer(Modifier.height(44.dp)) }
+                item { Spacer(Modifier.height(4.dp)) }
             }
         }
         composeRule.waitForIdle()
 
-        scrollTo(listState, tailIndex, 280)
-        assertTrue(
-            isNearBottom(
-                listState = listState,
-                timelineSize = 1,
-                hasOlderHeader = true,
-                hasInlineTopError = true,
-            ),
-        )
+        // Resting against the composer, the newest row is trivially near bottom.
+        scrollTo(listState, tailIndex, 0)
+        assertTrue(isNearBottom(listState = listState, timelineSize = 1))
 
-        scrollTo(listState, tailIndex, 250)
-        assertFalse(
-            isNearBottom(
-                listState = listState,
-                timelineSize = 1,
-                hasOlderHeader = true,
-                hasInlineTopError = true,
-            ),
-        )
+        // Scrolled a long way up inside the same oversized row, it is not.
+        scrollTo(listState, tailIndex, 280)
+        assertFalse(isNearBottom(listState = listState, timelineSize = 1))
     }
 
     /** Ignores bottom-geometry changes when there is no real message row to anchor. */
@@ -207,7 +201,7 @@ class ConversationTailSpacingTest {
         composeRule.waitForIdle()
 
         assertEquals(0, fixture.writer.snapCount)
-        assertFalse(fixture.listState.canScrollForward)
+        assertFalse(fixture.listState.canScrollBackward)
         composeRule.onNodeWithTag(TAIL_ROW_TAG).assertDoesNotExist()
     }
 
@@ -218,7 +212,7 @@ class ConversationTailSpacingTest {
         showFixture(fixture)
 
         assertTailGap(CONVERSATION_TIMELINE_TAIL_GAP)
-        assertFalse(fixture.listState.canScrollForward)
+        assertFalse(fixture.listState.canScrollBackward)
         assertEquals(0, fixture.writer.snapCount)
     }
 
@@ -234,8 +228,10 @@ class ConversationTailSpacingTest {
         composeRule.waitForIdle()
 
         assertTailGap(CONVERSATION_TIMELINE_TAIL_GAP)
-        assertFalse(fixture.listState.canScrollForward)
-        assertTrue(fixture.writer.snapCount > 0)
+        assertFalse(fixture.listState.canScrollBackward)
+        // Bottom-anchored layout absorbs the keyboard, so the follower stays
+        // pinned without any scroll being issued.
+        assertEquals(0, fixture.writer.snapCount)
     }
 
     /** Applies temporary snackbar clearance and restores the one-gap resting state. */
@@ -252,173 +248,47 @@ class ConversationTailSpacingTest {
         composeRule.runOnUiThread { fixture.snackbarContentInset.value = 0.dp }
         composeRule.waitForIdle()
         assertTailGap(CONVERSATION_TIMELINE_TAIL_GAP)
-        assertFalse(fixture.listState.canScrollForward)
-        assertTrue(fixture.writer.snapCount >= 2)
+        assertFalse(fixture.listState.canScrollBackward)
+        assertEquals(0, fixture.writer.snapCount)
     }
 
-    /** Retains a pending snackbar transition until foreground-restore ownership is released. */
+    /** Keeps a history reader's exact row and offset across an inset change, with no write. */
     @Test
-    fun snackbarInsetDuringForegroundRestoreReanchorsAfterRestoreOwnershipEnds() {
+    fun insetTransitionDoesNotMoveAHistoryReader() {
+        val fixture = TailSpacingFixture(timelineSize = 24)
+        showFixture(fixture)
+        scrollTo(fixture.listState, index = 5, offset = 7)
+        val indexBefore = fixture.listState.firstVisibleItemIndex
+        val offsetBefore = fixture.listState.firstVisibleItemScrollOffset
+        val writesBefore = fixture.writer.snapCount
+
+        composeRule.runOnUiThread { fixture.bottomChromeHeight.value = 180.dp }
+        composeRule.waitForIdle()
+
+        assertEquals(indexBefore, fixture.listState.firstVisibleItemIndex)
+        assertEquals(offsetBefore, fixture.listState.firstVisibleItemScrollOffset)
+        assertEquals("a reader owes no compensating write", writesBefore, fixture.writer.snapCount)
+    }
+
+    /** Keeps a tail follower pinned across a coordinated keyboard and snackbar change, with no write. */
+    @Test
+    fun coordinatedInsetChangeKeepsTheTailPinnedWithoutAWrite() {
         val fixture = TailSpacingFixture(timelineSize = 24)
         showFixture(fixture)
         scrollToTail(fixture)
+        val writesBefore = fixture.writer.snapCount
 
         composeRule.runOnUiThread {
-            fixture.foregroundRestoreInProgress.value = true
+            fixture.bottomChromeHeight.value = 180.dp
             fixture.snackbarContentInset.value = 64.dp
         }
         composeRule.waitForIdle()
 
-        assertEquals(0, fixture.writer.snapCount)
-        assertTrue(fixture.listState.canScrollForward)
-
-        composeRule.runOnUiThread { fixture.foregroundRestoreInProgress.value = false }
-        composeRule.waitForIdle()
-
+        // Bottom-anchored layout absorbs both insets, so the resting interval
+        // below the newest row is unchanged and no scroll was issued.
         assertTailGap(CONVERSATION_TIMELINE_TAIL_GAP + 64.dp)
-        assertFalse(fixture.listState.canScrollForward)
-        assertEquals(1, fixture.writer.snapCount)
-    }
-
-    /** Defers a frozen route transition and applies its bottom correction exactly once on release. */
-    @Test
-    fun insetTransitionDuringRouteFreezeReanchorsExactlyOnceAfterRelease() {
-        val fixture = TailSpacingFixture(timelineSize = 24)
-        showFixture(fixture)
-        scrollToTail(fixture)
-
-        composeRule.runOnUiThread {
-            fixture.routePresentationFrozen.value = true
-            fixture.bottomChromeHeight.value = 180.dp
-        }
-        composeRule.waitForIdle()
-
-        assertEquals(0, fixture.writer.snapCount)
-        assertTrue(fixture.listState.canScrollForward)
-
-        composeRule.runOnUiThread { fixture.routePresentationFrozen.value = false }
-        composeRule.waitForIdle()
-        composeRule.waitUntil(timeoutMillis = 5_000) { fixture.writer.snapCount == 1 }
-        composeRule.waitForIdle()
-
-        assertTailGap(CONVERSATION_TIMELINE_TAIL_GAP)
-        assertFalse(fixture.listState.canScrollForward)
-        assertEquals(1, fixture.writer.snapCount)
-    }
-
-    /** Waits for a transient programmatic tail command before applying the latest IME correction. */
-    @Test
-    fun imeTransitionWaitsForTransientTailCommandThenReanchors() {
-        val fixture = TailSpacingFixture(timelineSize = 24)
-        showFixture(fixture)
-        scrollToTail(fixture)
-        val commandGate = CompletableDeferred<Unit>()
-
-        holdTransientCommand(fixture, commandGate)
-        composeRule.runOnUiThread { fixture.bottomChromeHeight.value = 180.dp }
-        composeRule.waitForIdle()
-
-        assertEquals("the active command still owns the writer", 0, fixture.writer.snapCount)
-        assertTrue(fixture.listState.canScrollForward)
-
-        composeRule.runOnUiThread { commandGate.complete(Unit) }
-        composeRule.waitUntil(timeoutMillis = 5_000) { fixture.writer.snapCount == 1 }
-
-        assertTailGap(CONVERSATION_TIMELINE_TAIL_GAP)
-        assertFalse(fixture.listState.canScrollForward)
-        assertTrue(fixture.coordinator.isFollowingTail)
-    }
-
-    /** Cancels the frame-suspended inset writer once and exits when a drag claims durable history. */
-    @Test
-    fun gestureDuringInsetFrameEndsTheTailRetryWithoutAnotherWrite() {
-        val fixture = TailSpacingFixture(timelineSize = 24)
-        showFixture(fixture)
-        scrollToTail(fixture)
-
-        composeRule.mainClock.autoAdvance = false
-        try {
-            composeRule.runOnUiThread { fixture.bottomChromeHeight.value = 180.dp }
-            repeat(3) {
-                if (fixture.coordinator.mode is ConversationScrollMode.ProgrammaticJump) return@repeat
-                composeRule.mainClock.advanceTimeByFrame()
-                composeRule.waitForIdle()
-            }
-            assertTrue(fixture.coordinator.mode is ConversationScrollMode.ProgrammaticJump)
-            assertEquals("the inset writer must still be awaiting its layout frame", 0, fixture.writer.snapCount)
-
-            composeRule.runOnUiThread {
-                fixture.coordinator.onUserGestureStarted(
-                    ConversationScrollAnchor(
-                        listIndex = 10,
-                        pixelOffset = 7,
-                        itemId = "message-9",
-                        messageId = "message-9",
-                    ),
-                )
-            }
-            composeRule.mainClock.advanceTimeByFrame()
-            composeRule.waitForIdle()
-        } finally {
-            composeRule.mainClock.autoAdvance = true
-        }
-
-        assertEquals(0, fixture.writer.snapCount)
-        assertEquals(ConversationScrollMode.ReadingHistory("message-9", 7), fixture.coordinator.mode)
-        assertFalse(fixture.coordinator.isFollowingTail)
-    }
-
-    /** Preserves a history reader's pixel anchor when a transient command settles back to history. */
-    @Test
-    fun insetTransitionDuringTransientHistoryCommandPreservesReaderAnchor() {
-        val fixture =
-            TailSpacingFixture(
-                timelineSize = 30,
-                initialMode = ConversationScrollMode.ReadingHistory("message-5", 7),
-            )
-        showFixture(fixture)
-        scrollTo(fixture.listState, index = 5, offset = 7)
-        val indexBefore = fixture.listState.firstVisibleItemIndex
-        val offsetBefore = fixture.listState.firstVisibleItemScrollOffset
-        val commandGate = CompletableDeferred<Unit>()
-
-        holdTransientCommand(fixture, commandGate)
-        composeRule.runOnUiThread { fixture.bottomChromeHeight.value = 180.dp }
-        composeRule.waitForIdle()
-        composeRule.runOnUiThread { commandGate.complete(Unit) }
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            fixture.coordinator.mode is ConversationScrollMode.ReadingHistory
-        }
-
-        assertEquals(indexBefore, fixture.listState.firstVisibleItemIndex)
-        assertEquals(offsetBefore, fixture.listState.firstVisibleItemScrollOffset)
-        assertEquals(0, fixture.writer.snapCount)
-        assertFalse(fixture.coordinator.isFollowingTail)
-    }
-
-    /** Leaves a stable history anchor untouched across one coordinated IME and snackbar transition. */
-    @Test
-    fun coordinatedImeAndSnackbarChangeDoesNotMoveAHistoryReader() {
-        val fixture =
-            TailSpacingFixture(
-                timelineSize = 30,
-                initialMode = ConversationScrollMode.ReadingHistory("message-5", 7),
-            )
-        showFixture(fixture)
-        scrollTo(fixture.listState, index = 5, offset = 7)
-        val indexBefore = fixture.listState.firstVisibleItemIndex
-        val offsetBefore = fixture.listState.firstVisibleItemScrollOffset
-
-        composeRule.runOnUiThread {
-            fixture.bottomChromeHeight.value = 180.dp
-            fixture.snackbarContentInset.value = 64.dp
-        }
-        composeRule.waitForIdle()
-
-        assertEquals(indexBefore, fixture.listState.firstVisibleItemIndex)
-        assertEquals(offsetBefore, fixture.listState.firstVisibleItemScrollOffset)
-        assertEquals(0, fixture.writer.snapCount)
-        assertTrue(fixture.listState.canScrollForward)
+        assertFalse(fixture.listState.canScrollBackward)
+        assertEquals("a pinned tail owes no compensating write", writesBefore, fixture.writer.snapCount)
     }
 
     /** Mounts the production-shaped tail-spacing fixture and waits for its initial layout. */
@@ -466,30 +336,11 @@ class ConversationTailSpacingTest {
                     )
                 },
             ) { scaffoldPadding ->
-                val density = LocalDensity.current
-                ConversationTailInsetReanchorEffect(
-                    scrollCoordinator = coordinator,
-                    bottomChromeHeightPx = measuredBottomChromeHeightPx.value,
-                    snackbarContentInsetPx =
-                        with(density) { fixture.snackbarContentInset.value.roundToPx() },
-                    bottomInputRevision = 0L,
-                    hasTimeline = fixture.timelineSize > 0,
-                    initialTimelineAnchored = true,
-                    routePresentationFrozen = fixture.routePresentationFrozen.value,
-                    foregroundRestoreInProgress = fixture.foregroundRestoreInProgress.value,
-                    currentTailIndex = {
-                        requireNotNull(
-                            conversationTimelineTailListIndex(
-                                timelineSize = fixture.timelineSize,
-                                leadingStructuralRowCount = 0,
-                            ),
-                        )
-                    },
-                )
                 Box(Modifier.fillMaxSize().padding(scaffoldPadding)) {
                     LazyColumn(
                         state = fixture.listState,
                         modifier = Modifier.fillMaxSize().testTag(TRANSCRIPT_TAG),
+                        reverseLayout = true,
                         verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
                         contentPadding =
                             conversationTimelineContentPadding(fixture.snackbarContentInset.value),
@@ -501,10 +352,12 @@ class ConversationTailSpacingTest {
         }
     }
 
-    /** Adds the permanent top spacer and message rows used by the tail-spacing harness. */
+    /**
+     * Adds message rows then the permanent top spacer, in reversed emission
+     * order, so the newest row is laid out against the composer.
+     */
     private fun LazyListScope.tailSpacingItems(timelineSize: Int) {
-        item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
-        items((0 until timelineSize).toList()) { index ->
+        items((0 until timelineSize).toList().asReversed()) { index ->
             Spacer(
                 Modifier
                     .fillMaxWidth()
@@ -518,6 +371,7 @@ class ConversationTailSpacingTest {
                     ),
             )
         }
+        item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
     }
 
     /** Requires the measured gap between the transcript viewport and final message to equal [expected]. */
@@ -546,7 +400,7 @@ class ConversationTailSpacingTest {
             requireNotNull(
                 conversationTimelineTailListIndex(
                     timelineSize = fixture.timelineSize,
-                    leadingStructuralRowCount = 0,
+                    trailingRowCount = 0,
                 ),
             ),
         )

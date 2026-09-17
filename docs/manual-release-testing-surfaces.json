@@ -1928,17 +1928,6 @@
         ]
       },
       {
-        "surface": "ConversationTailInsetReanchorEffect",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTailInsetReanchorEffect.kt",
-        "anchor": "fun ConversationTailInsetReanchorEffect(",
-        "test_ids": [
-          "CON-001",
-          "CON-002",
-          "CON-003",
-          "CON-014"
-        ]
-      },
-      {
         "surface": "ConversationTopBar",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
         "anchor": "fun ConversationTopBar(",

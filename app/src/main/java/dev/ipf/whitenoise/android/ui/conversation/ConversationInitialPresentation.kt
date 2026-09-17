@@ -46,7 +46,7 @@ internal fun conversationFirstFrameSeedPresentation(
         anchorTailImmediately = anchorTailImmediately,
         // Start on the real keyed tail row. Compose then keeps that message key
         // stable while the local page reconciles, without a zero-sized sentinel.
-        initialListIndex = if (anchorTailImmediately) seededConversationTailListIndex(rendered.size) else 0,
+        initialListIndex = if (anchorTailImmediately) SEEDED_CONVERSATION_TAIL_LIST_INDEX else 0,
         latestTimelineId = rendered.lastOrNull()?.id.takeIf { anchorTailImmediately },
         awaitingAuthoritativeTimeline = anchorTailImmediately && !controller.hasPublishedAuthoritativeTimeline,
     )
@@ -76,8 +76,14 @@ internal fun shouldAnchorConversationTailOnFirstFrame(
         !hasFocusedDestination &&
         notificationOpenRequestId == 0L
 
-/** Index of the real final row for a tail-seeded transcript with one top spacer. */
-internal fun seededConversationTailListIndex(renderedTimelineSize: Int): Int = renderedTimelineSize.coerceAtLeast(0)
+/**
+ * Row of the newest message in a tail-seeded transcript.
+ *
+ * The transcript is a reversed lazy column, so its newest row is the layout
+ * origin at index 0 whatever the timeline's length. A freshly seeded first
+ * frame carries no bottom-edge failure row, so nothing precedes it.
+ */
+internal const val SEEDED_CONVERSATION_TAIL_LIST_INDEX = 0
 
 /**
  * Reveals the transcript only after its logical anchor and any required physical tail correction agree.
@@ -88,13 +94,13 @@ internal fun conversationTranscriptVisibilityCommitted(
     anchorTailImmediately: Boolean,
     seededTailAlignmentCommitted: Boolean,
     viewportMeasured: Boolean,
-    canScrollForward: Boolean,
+    canScrollTowardNewest: Boolean,
 ): Boolean =
     initialTimelineAnchored &&
         (
             !anchorTailImmediately ||
                 seededTailAlignmentCommitted ||
-                (viewportMeasured && !canScrollForward)
+                (viewportMeasured && !canScrollTowardNewest)
         )
 
 /**
@@ -136,7 +142,7 @@ internal fun SeededConversationAnchorBaselineEffect(
             currentExhaustionCallback.value()
             awaitSeededTailAlignmentSafeFallback(
                 isFollowingTail = { scrollCoordinator.isFollowingTail },
-                canScrollForward = { listState.canScrollForward },
+                canScrollTowardNewest = { listState.canScrollBackward },
                 awaitSafeState = { safeToReveal ->
                     snapshotFlow { scrollCoordinator.mode to safeToReveal() }.first { it.second }
                 },
@@ -169,7 +175,7 @@ private suspend fun awaitSeededTailAlignment(
             )
         },
         isFollowingTail = { scrollCoordinator.isFollowingTail },
-        canScrollForward = { listState.canScrollForward },
+        canScrollTowardNewest = { listState.canScrollBackward },
         awaitFrame = { withFrameNanos { } },
     )
 
@@ -182,11 +188,11 @@ private suspend fun awaitSeededTailAlignment(
 internal suspend fun awaitSeededTailAlignmentUntilCommit(
     followTail: suspend () -> Boolean,
     isFollowingTail: () -> Boolean,
-    canScrollForward: () -> Boolean,
+    canScrollTowardNewest: () -> Boolean,
     awaitFrame: suspend () -> Unit,
     maxAttempts: Int = SEEDED_TAIL_ALIGNMENT_MAX_ATTEMPTS,
 ): Boolean {
-    if (seededTailAlignmentMayCommit(false, isFollowingTail(), canScrollForward())) return true
+    if (seededTailAlignmentMayCommit(false, isFollowingTail(), canScrollTowardNewest())) return true
     val positioned =
         reconcileSeededTailAnchor(
             followTail = followTail,
@@ -194,7 +200,7 @@ internal suspend fun awaitSeededTailAlignmentUntilCommit(
             awaitFrame = awaitFrame,
             maxAttempts = maxAttempts,
         )
-    return seededTailAlignmentMayCommit(positioned, isFollowingTail(), canScrollForward())
+    return seededTailAlignmentMayCommit(positioned, isFollowingTail(), canScrollTowardNewest())
 }
 
 /**
@@ -203,14 +209,14 @@ internal suspend fun awaitSeededTailAlignmentUntilCommit(
  */
 internal suspend fun awaitSeededTailAlignmentSafeFallback(
     isFollowingTail: () -> Boolean,
-    canScrollForward: () -> Boolean,
+    canScrollTowardNewest: () -> Boolean,
     awaitSafeState: suspend (safeToReveal: () -> Boolean) -> Unit,
 ) {
     awaitSafeState {
         seededTailAlignmentMayCommit(
             positioned = false,
             isFollowingTail = isFollowingTail(),
-            canScrollForward = canScrollForward(),
+            canScrollTowardNewest = canScrollTowardNewest(),
         )
     }
 }
@@ -222,8 +228,13 @@ internal suspend fun awaitSeededTailAlignmentSafeFallback(
 internal fun seededTailAlignmentMayCommit(
     positioned: Boolean,
     isFollowingTail: Boolean,
-    canScrollForward: Boolean,
-): Boolean = positioned || !isFollowingTail || !canScrollForward
+    canScrollTowardNewest: Boolean,
+): Boolean = positioned || !isFollowingTail || !canScrollTowardNewest
+
+// In the reversed transcript `LazyListState.canScrollBackward` is true exactly
+// while rows still sit between the viewport and the newest message, so its
+// negation is the "already at the newest edge" signal the forward layout read
+// from `canScrollForward`.
 
 /**
  * Positions the tail before the seeded transcript is revealed. A refused

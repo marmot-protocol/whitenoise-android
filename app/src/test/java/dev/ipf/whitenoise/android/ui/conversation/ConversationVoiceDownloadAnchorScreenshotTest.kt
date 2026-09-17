@@ -173,7 +173,10 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
     fun screenshotsShowFullyVisibleDownloadingAndPlayableRows() {
         val fixture = conversationFixture(voiceIndices = setOf(HISTORY_VOICE_INDEX), idOffset = 600)
         val voiceId = fixture.voiceMessageIds.single()
-        val precedingId = fixture.records[HISTORY_VOICE_INDEX - 1].messageIdHex
+        // The reversed transcript reaches an anchor by its newest edge, so the rows
+        // left on screen are older than it. Anchor on the row after the voice
+        // message for that message to stay visible.
+        val precedingId = fixture.records[HISTORY_VOICE_INDEX + 1].messageIdHex
         val control = VoiceControl(messageId = voiceId, materializationAttemptCount = 1)
         val runtime = ControlledVoicePresentationRuntime(mapOf(voiceId to control))
         val evidence = RecordingConversationScrollEvidenceSink()
@@ -424,7 +427,10 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
     fun screenshotShowsFullyVisibleLongDurationLargeFontRtlRow() {
         val fixture = conversationFixture(voiceIndices = setOf(HISTORY_VOICE_INDEX), idOffset = 700)
         val voiceId = fixture.voiceMessageIds.single()
-        val precedingId = fixture.records[HISTORY_VOICE_INDEX - 1].messageIdHex
+        // The reversed transcript reaches an anchor by its newest edge, so the rows
+        // left on screen are older than it. Anchor on the row after the voice
+        // message for that message to stay visible.
+        val precedingId = fixture.records[HISTORY_VOICE_INDEX + 1].messageIdHex
         val control =
             VoiceControl(
                 messageId = voiceId,
@@ -494,7 +500,11 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
         val evidence = RecordingConversationScrollEvidenceSink()
         try {
             awaitConversationCondition { fixture.controller.timeline.size == fixture.records.size }
-            val host = showConversation(fixture, runtime, evidence, historyAnchorMessageId = firstVoiceId)
+            // The reversed transcript anchors on the newest row on screen and leaves
+            // older rows visible, so anchoring on the newer voice row keeps both
+            // reachable while that row owns the anchor.
+            val anchorId = fixture.voiceMessageIds.last()
+            val host = showConversation(fixture, runtime, evidence, historyAnchorMessageId = anchorId)
             val afterExplicitJump = focusWhileVoiceDownloadsAreHeld(fixture, controls, host, evidence)
             val concurrentStart = evidence.checkpoint()
 
@@ -506,8 +516,8 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             awaitMountedConversationCondition("incoming history window") {
                 fixture.controller.timeline.size == fixture.records.size + 1
             }
-            val afterIncoming = evidence.awaitReadingHistory()
-            assertIncomingReanchorFrames(
+            val afterIncoming = evidence.latestViewport()
+            assertIncomingLeavesTheReaderUntouched(
                 expected = afterExplicitJump,
                 actual = afterIncoming,
                 evidence = evidence,
@@ -570,7 +580,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             awaitAttachmentOpenIntent(fixture.controller, voiceId)
             controls.getValue(voiceId).awaitMaterializationAttempt(0)
         }
-        val downloading = evidence.awaitAnchor(fixture.voiceMessageIds.first())
+        val downloading = evidence.awaitAnchor(fixture.voiceMessageIds.last())
         val explicitTargetId = fixture.records[HISTORY_VOICE_INDEX - 2].messageIdHex
         evidence.clearWrites()
         host.focus(explicitTargetId, evidence)
@@ -588,17 +598,33 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
     }
 
     /**
-     * Requires every concurrent incoming frame to retain the same logical and
-     * pixel anchor while permitting only the production structural reanchor owner.
+     * An incoming message inserts at the reversed transcript's origin, so every
+     * lazy index shifts by one while the reader's rows stay exactly where they
+     * were. The stable identities and the measured pixel geometry are therefore
+     * the contract here rather than the raw index, and they must hold on every
+     * frame emitted after the row lands, not only the last one: a transient jump
+     * that is corrected before the final frame would otherwise go unnoticed. The
+     * one re-anchor that follows must land on the renumbered row at the unchanged
+     * offset.
+     *
+     * What the reader sees is each keyed row at its pixel position, so that is
+     * what every frame is held to. The anchor's logical id is held only once the
+     * coordinator has re-anchored: the first frame after the insert is captured
+     * while the id list has already renumbered but the layout has not yet been
+     * remeasured, so mapping its stale index through the new list names the
+     * neighbouring message even though no row has moved. The row keys on that
+     * same frame are what prove nothing moved.
      */
-    private fun assertIncomingReanchorFrames(
+    private fun assertIncomingLeavesTheReaderUntouched(
         expected: ConversationViewportEvidence,
         actual: ConversationViewportEvidence,
         evidence: RecordingConversationScrollEvidenceSink,
         checkpoint: Int,
     ) {
-        assertSameViewport("incoming structural reanchor", expected, actual)
-        evidence.viewportsSince(checkpoint).forEachIndexed { index, frame ->
+        val frames = evidence.viewportsSince(checkpoint)
+        assertTrue("incoming emitted no viewport frames to inspect", frames.isNotEmpty())
+        frames.forEachIndexed { index, frame ->
+            val phase = "incoming frame $index"
             val permittedOwner =
                 when (val mode = frame.mode) {
                     expected.mode -> true
@@ -607,9 +633,22 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
                             mode.pixelOffset == expected.anchor.pixelOffset
                     else -> false
                 }
-            assertTrue("incoming frame $index used an unexpected scroll owner: ${frame.mode}", permittedOwner)
-            assertSameViewport("incoming concurrent frame $index", expected.copy(mode = frame.mode), frame)
+            assertTrue("$phase used an unexpected scroll owner: ${frame.mode}", permittedOwner)
+            assertReaderGeometryUnchanged(phase, expected, frame)
+            val reanchored = frame.anchor.listIndex == expected.anchor.listIndex + 1
+            if (reanchored) assertLogicalIdentityUnchanged(phase, expected, frame)
         }
+        assertEquals("incoming changed scroll owner", expected.mode, actual.mode)
+        assertReaderGeometryUnchanged("incoming settled frame", expected, actual)
+        assertLogicalIdentityUnchanged("incoming settled frame", expected, actual)
+        assertEquals(
+            "one inserted row must shift the reader's lazy index by exactly one",
+            expected.anchor.listIndex + 1,
+            actual.anchor.listIndex,
+        )
+        // The reader keeps its pixel position, but the row inserted at the origin
+        // renumbers it, so the coordinator still owes exactly one re-anchor to the
+        // shifted index at the same offset.
         assertEquals(
             "the incoming row owns one structural history reanchor",
             listOf(
@@ -621,6 +660,38 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             ),
             evidence.writes,
         )
+    }
+
+    /**
+     * Compares everything the reader can see that must survive a row being inserted
+     * at the origin: the pixel offset, the viewport bounds and where each keyed row
+     * sits. The raw lazy index is deliberately not compared, because the insertion
+     * renumbers it; the logical ids are compared separately once re-anchored.
+     */
+    private fun assertReaderGeometryUnchanged(
+        phase: String,
+        expected: ConversationViewportEvidence,
+        frame: ConversationViewportEvidence,
+    ) {
+        assertEquals("$phase changed account owner", expected.accountRef, frame.accountRef)
+        assertEquals("$phase changed pixel offset", expected.anchor.pixelOffset, frame.anchor.pixelOffset)
+        assertEquals("$phase changed viewport start", expected.viewportStartOffsetPx, frame.viewportStartOffsetPx)
+        assertEquals("$phase changed viewport end", expected.viewportEndOffsetPx, frame.viewportEndOffsetPx)
+        assertEquals(
+            "$phase moved or resized the reader's rows",
+            expected.visibleItems.map { it.key to (it.offsetPx to it.sizePx) },
+            frame.visibleItems.map { it.key to (it.offsetPx to it.sizePx) },
+        )
+    }
+
+    /** Requires the anchor to name the same message and item it did before the insert. */
+    private fun assertLogicalIdentityUnchanged(
+        phase: String,
+        expected: ConversationViewportEvidence,
+        frame: ConversationViewportEvidence,
+    ) {
+        assertEquals("$phase changed logical message", expected.anchor.messageId, frame.anchor.messageId)
+        assertEquals("$phase changed logical item", expected.anchor.itemId, frame.anchor.itemId)
     }
 }
 
@@ -727,7 +798,14 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
         val timelineIndex = fixture.records.indexOfFirst { it.messageIdHex == messageId }
         require(timelineIndex >= 0)
         return ConversationScrollSnapshot(
-            firstVisibleItemIndex = timelineIndex + 1,
+            // Reversed transcript: a chronological position maps to its row measured
+            // from the newest message rather than from the top of the list.
+            firstVisibleItemIndex =
+                conversationTimelineListIndex(
+                    timelineIndex = timelineIndex,
+                    timelineSize = fixture.records.size,
+                    trailingRowCount = 0,
+                ),
             firstVisibleItemScrollOffset = HISTORY_OFFSET_PX,
             anchorItemId = "msg:$messageId",
             anchorMessageIdHex = messageId,

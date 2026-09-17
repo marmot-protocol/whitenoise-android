@@ -8,6 +8,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
@@ -99,9 +100,16 @@ private fun MeasureScope.layoutMeasuredBubbleFooter(
     val effectiveGap = if (footer.width == 0 && footer.height == 0) 0 else gap
     val lastRight = (lastLineWidth ?: content.width).coerceIn(0, content.width)
     val footerBaseline = footer[FirstBaseline].takeIf { it != AlignmentLine.Unspecified } ?: footer.height
+    // A reported text baseline is local to the text block that measured it, so a body built from
+    // several blocks placed the footer against the wrong one. The body's own last baseline is
+    // already expressed in the coordinates the footer is placed in, so prefer it and keep the
+    // reported line only for content that publishes no baseline of its own.
     // Without a measured baseline the footer keeps its previous bottom-aligned position, expressed as
     // the baseline that produces it, so a caller that cannot report one is not moved by this rule.
-    val lastBaseline = lastLineBaseline ?: (content.height - footer.height + footerBaseline)
+    val lastBaseline =
+        content[LastBaseline].takeIf { it != AlignmentLine.Unspecified }
+            ?: lastLineBaseline
+            ?: (content.height - footer.height + footerBaseline)
     val geometry =
         bubbleInlineFooterGeometry(
             textWidth = content.width,
