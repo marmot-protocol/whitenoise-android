@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -82,7 +81,7 @@ internal fun OutgoingIndicatorIcon(
 }
 
 /**
- * The prototype's in-bubble delivery glyphs: a 14dp progress ring while sending, a filled 14dp disc carrying a
+ * The prototype's in-bubble delivery glyphs: a 14dp pending clock while sending, a filled 14dp disc carrying a
  * 10dp check in the bubble's own colour once sent, and the warning glyph on failure.
  */
 @Suppress("FunctionNaming")
@@ -95,11 +94,13 @@ private fun BubbleDeliveryGlyph(
     when (indicator) {
         OutgoingMessageIndicator.Sending -> {
             val sending = stringResource(R.string.sending)
-            // A status glyph, not a progress control: it must not read as the composer's progress indicator.
-            CircularProgressIndicator(
+            // A static pending clock, not a spinner: a turning ring read as progress and
+            // collided with the disappearing-message countdown ring beside it.
+            Icon(
+                painter = painterResource(R.drawable.ic_pending),
+                contentDescription = null,
                 modifier = Modifier.size(14.dp).clearAndSetSemantics { contentDescription = sending },
-                color = tint,
-                strokeWidth = 1.5.dp,
+                tint = tint,
             )
         }
         OutgoingMessageIndicator.Sent -> {

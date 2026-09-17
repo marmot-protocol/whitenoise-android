@@ -78,7 +78,7 @@ class ConversationTimelineUnderlayTest {
     private val mountedRows = mutableMapOf<Int, Any>()
     private val clickedRows = mutableListOf<Int>()
     private val sentenceLayouts = ConversationTtsSentenceLayoutRegistry()
-    private val speechTarget = ConversationTtsFollowTarget(7L, "5", 0, 1, "review-sentence", 42uL)
+    private val speechTarget = ConversationTtsFollowTarget(7L, "19", 0, 1, "review-sentence", 42uL)
 
     /** The same row paints into the margin while covered controls are absent and partial-row input remains usable. */
     @Test
@@ -86,19 +86,27 @@ class ConversationTimelineUnderlayTest {
         foreground = 120
         render()
         rule.waitForIdle()
+        // The reversed list rests with its newest row clear of the composer, so slide
+        // that row under the overlay before asserting what the overlay covers.
+        rule.runOnIdle { scope.launch { list.scrollToItem(0, COVERED_ROW_OVERLAP_PX) } }
+        rule.waitForIdle()
         rule.runOnIdle {
             assertEquals(480, list.layoutInfo.viewportSize.height)
             assertEquals(360, viewport.readingLayoutInfo().viewportSize.height)
-            assertEquals(8, viewport.readingLayoutInfo().afterContentPadding)
-            assertTrue(list.layoutInfo.visibleItemsInfo.any { it.key == 5 })
-            assertFalse(viewport.readingLayoutInfo().visibleItemsInfo.any { it.key == 5 })
-            assertTrue(viewport.readingLayoutInfo().visibleItemsInfo.any { it.key == 4 })
+            assertEquals(8, viewport.readingLayoutInfo().beforeContentPadding)
+            // Reversed rows: the newest key sits at the origin against the composer,
+            // so it is the occluded one and its predecessor is the first readable row.
+            assertTrue(list.layoutInfo.visibleItemsInfo.any { it.key == 19 })
+            assertFalse(viewport.readingLayoutInfo().visibleItemsInfo.any { it.key == 19 })
+            assertTrue(viewport.readingLayoutInfo().visibleItemsInfo.any { it.key == 18 })
         }
-        rule.onNodeWithTag("row-5").assertDoesNotExist()
+        rule.onNodeWithTag("row-$COVERED_ROW_VALUE").assertDoesNotExist()
         rule.onNodeWithTag("frame").performTouchInput { click(Offset(14f, 440f)) }
         assertTrue(clickedRows.isEmpty())
-        rule.onNodeWithTag("row-4").performTouchInput { click(Offset(8f, 12f)) }
-        assertEquals(listOf(4), clickedRows)
+        // A row fully inside the clear band still accepts input. Reversed emission puts
+        // value 17 two rows above the covered origin.
+        rule.onNodeWithTag("row-$CLEAR_ROW_VALUE").performTouchInput { click(Offset(8f, 12f)) }
+        assertEquals(listOf(CLEAR_ROW_VALUE), clickedRows)
         val pixels = rule.onNodeWithTag("frame").captureToImage().toPixelMap()
         assertEquals("the existing row must paint through the composer margin", Color.Cyan, pixels[14, 440])
         rule.onNodeWithTag("frame").captureRoboImage("src/test/snapshots/conversation_timeline_underlay.png")
@@ -144,7 +152,7 @@ class ConversationTimelineUnderlayTest {
     @Test
     fun oversizedTailUsesTheClearEdgeAcrossExpansionAndIme() {
         render(followTail = true, oversizedLastRow = true)
-        rule.runOnIdle { scope.launch { writer.scrollToTail(19) } }
+        rule.runOnIdle { scope.launch { writer.scrollToTail(0) } }
         rule.waitForIdle()
         assertTailAtClearEdge()
         rule.runOnIdle {
@@ -174,7 +182,7 @@ class ConversationTimelineUnderlayTest {
         rule.waitForIdle()
         rule.runOnIdle {
             assertEquals(416, viewport.readingHeightPx())
-            assertEquals(40, viewport.readingLayoutInfo().afterContentPadding)
+            assertEquals(40, viewport.readingLayoutInfo().beforeContentPadding)
             assertTrue(observedReadingHeights.all { it == 416 })
             observedReadingHeights.clear()
             foreground = 96
@@ -182,9 +190,9 @@ class ConversationTimelineUnderlayTest {
         }
         rule.waitForIdle()
         rule.runOnIdle {
-            assertEquals(104, list.layoutInfo.afterContentPadding)
+            assertEquals(104, list.layoutInfo.beforeContentPadding)
             assertEquals(384, viewport.readingHeightPx())
-            assertEquals(8, viewport.readingLayoutInfo().afterContentPadding)
+            assertEquals(8, viewport.readingLayoutInfo().beforeContentPadding)
             assertTrue(observedReadingHeights.all { it == 416 || it == 384 })
         }
     }
@@ -195,6 +203,10 @@ class ConversationTimelineUnderlayTest {
         foreground = 120
         render()
         rule.waitForIdle()
+        // The reversed list rests with its newest row clear of the composer, so slide
+        // that row under the overlay before asserting what the overlay covers.
+        rule.runOnIdle { scope.launch { list.scrollToItem(0, COVERED_ROW_OVERLAP_PX) } }
+        rule.waitForIdle()
         var followed = false
         rule.runOnIdle {
             assertTrue(checkNotNull(sentenceLayouts.completeSentenceBounds(speechTarget)).top >= 360f)
@@ -203,8 +215,8 @@ class ConversationTimelineUnderlayTest {
                     followTtsTargetInViewport(
                         target = speechTarget,
                         direction = TtsFollowDirection.Forward,
-                        itemKey = 5,
-                        targetIndex = 5,
+                        itemKey = COVERED_ROW_VALUE,
+                        targetIndex = 0,
                         estimatedItemHeightPx = 80,
                         listState = list,
                         timelineViewport = viewport,
@@ -212,14 +224,14 @@ class ConversationTimelineUnderlayTest {
                         sentenceLayouts = sentenceLayouts,
                         claimPreposition = { true },
                         claimCorrectiveScroll = { true },
-                        resolveTargetIndex = { 5 },
+                        resolveTargetIndex = { 0 },
                         isCurrentTarget = { true },
                         currentScrollAnchor = {
                             ConversationScrollAnchor(
                                 list.firstVisibleItemIndex,
                                 list.firstVisibleItemScrollOffset,
-                                "5",
-                                "5",
+                                "19",
+                                "19",
                             )
                         },
                     )
@@ -240,8 +252,8 @@ class ConversationTimelineUnderlayTest {
         rule.runOnIdle {
             val clear = viewport.readingLayoutInfo()
             val tail = clear.visibleItemsInfo.single { it.key == 19 }
-            assertTrue(abs(tail.offset + tail.size - (clear.viewportEndOffset - clear.afterContentPadding)) <= 1)
-            assertFalse(list.canScrollForward)
+            assertTrue(abs(tail.offset - (clear.viewportStartOffset + clear.beforeContentPadding)) <= 1)
+            assertFalse(list.canScrollBackward)
         }
     }
 
@@ -310,15 +322,16 @@ class ConversationTimelineUnderlayTest {
                                         .padding(horizontal = 12.dp)
                                         .measureConversationTimelinePadding(viewport, 8.dp + notice.dp, overlap)
                                         .onGloballyPositioned(viewport::onPaintViewportMeasured),
+                                reverseLayout = true,
                                 contentPadding = conversationTimelineContentPadding(notice.dp, overlap),
                             ) {
-                                items((0..19).toList(), key = { it }) { index ->
+                                items((0..19).toList().asReversed(), key = { it }) { index ->
                                     val rowInstance = remember(index) { Any() }
                                     mountedRows[index] = rowInstance
-                                    if (index == 5) {
+                                    if (index == COVERED_ROW_VALUE) {
                                         DisposableEffect(rowInstance) {
-                                            sentenceLayouts.mountRow("5", rowInstance)
-                                            onDispose { sentenceLayouts.unmountRow("5", rowInstance) }
+                                            sentenceLayouts.mountRow("19", rowInstance)
+                                            onDispose { sentenceLayouts.unmountRow("19", rowInstance) }
                                         }
                                     }
                                     Box(Modifier.timelineReadingExposure(viewport)) {
@@ -331,7 +344,7 @@ class ConversationTimelineUnderlayTest {
                                                 .background(Color.Cyan)
                                                 .clickable { clickedRows += index }
                                                 .onGloballyPositioned { coordinates ->
-                                                    if (index == 5) {
+                                                    if (index == COVERED_ROW_VALUE) {
                                                         val position = coordinates.positionInWindow()
                                                         val coverage =
                                                             setOf(TtsSentenceProjectionSegment("plain", 0, 8))
@@ -363,3 +376,19 @@ class ConversationTimelineUnderlayTest {
         }
     }
 }
+
+/**
+ * Reversed emission lays the newest value at the origin against the composer, so
+ * that value is the covered row this harness exercises.
+ */
+private const val COVERED_ROW_VALUE = 19
+
+/**
+ * Pixels the newest row is slid under the composer so the overlay covers it whole.
+ * Partial rows stay readable by design, so this clears the row's full 80px height
+ * plus the resting gap beneath it.
+ */
+private const val COVERED_ROW_OVERLAP_PX = 100
+
+/** A row sitting well inside the clear band once the origin is slid under the composer. */
+private const val CLEAR_ROW_VALUE = 17

@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.conversation
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -92,8 +91,9 @@ class ConversationSeededTailRecoveryScreenshotTest {
 
         composeRule.onNodeWithTag(CONVERSATION_SEEDED_TAIL_RECOVERY_TEST_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(TRANSCRIPT_ROW_TEST_TAG).assertIsDisplayed()
-        assertFalse(fixture.listState.canScrollForward)
-        assertTrue(fixture.listState.firstVisibleItemScrollOffset > 0)
+        // Reversed: the aligned tail is the origin, reached with no residual offset.
+        assertFalse(fixture.listState.canScrollBackward)
+        assertEquals(0, fixture.listState.firstVisibleItemScrollOffset)
         assertEquals(1, fixture.writer.tailWriteCount)
     }
 
@@ -116,7 +116,8 @@ class ConversationSeededTailRecoveryScreenshotTest {
 
         composeRule.onNodeWithTag(CONVERSATION_SEEDED_TAIL_RECOVERY_TEST_TAG).assertDoesNotExist()
         assertTrue(fixture.coordinator.mode is ConversationScrollMode.ReadingHistory)
-        assertTrue(fixture.listState.canScrollForward)
+        // The reader stays off the newest edge, so rows still sit between it and the origin.
+        assertTrue(fixture.listState.canScrollBackward)
         assertEquals(0, fixture.writer.tailWriteCount)
     }
 
@@ -236,9 +237,10 @@ class ConversationSeededTailRecoveryScreenshotTest {
                     }.semantics {
                         if (!visible) hideFromAccessibility()
                     },
+            reverseLayout = true,
         ) {
-            item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
-            items(timelineRows, key = { "oversized-row-$it" }) { row ->
+            items(timelineRows, key = { "oversized-row-${timelineRows - 1 - it}" }) { reversedRow ->
+                val row = timelineRows - 1 - reversedRow
                 Box(
                     Modifier
                         .fillMaxWidth()
@@ -291,7 +293,7 @@ class ConversationSeededTailRecoveryScreenshotTest {
             retryGeneration = fixture.retryGeneration,
             listState = fixture.listState,
             scrollCoordinator = fixture.coordinator,
-            currentTailIndex = { timelineRows },
+            currentTailIndex = { 0 },
             postInitialReanchorGate = fixture.postInitialReanchorGate,
             timelineStructure =
                 ConversationTimelineStructure(
@@ -325,7 +327,11 @@ class ConversationSeededTailRecoveryScreenshotTest {
         val timelineRows = mutableStateOf(1)
         val recoveryVisible = mutableStateOf(false)
         val committed = mutableStateOf(false)
-        val listState = LazyListState()
+
+        // The reversed transcript's origin is already its tail, so the fixture starts
+        // scrolled into the oversized row: only then is an alignment write genuinely
+        // owed and only then can a refused writer leave the recovery surface visible.
+        val listState = LazyListState(firstVisibleItemIndex = 0, firstVisibleItemScrollOffset = 600)
         val writer = CountingTailWriter(listState)
         val coordinator = ConversationScrollCoordinator(writer)
         val postInitialReanchorGate = ConversationPostInitialReanchorGate()
