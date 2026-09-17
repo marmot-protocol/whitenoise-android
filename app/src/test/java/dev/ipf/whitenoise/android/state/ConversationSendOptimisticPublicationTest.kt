@@ -19,6 +19,7 @@ import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
+import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollWriter
 import dev.ipf.whitenoise.android.ui.conversation.revealSentAtLiveTail
 import kotlinx.coroutines.CompletableDeferred
@@ -119,7 +120,9 @@ class ConversationSendOptimisticPublicationTest {
                         onDurablyAccepted = {
                             revealJob =
                                 launch(start = CoroutineStart.UNDISPATCHED) {
-                                    revealResult.complete(scrollCoordinator.revealSentAtLiveTail(controller))
+                                    revealResult.complete(
+                                        scrollCoordinator.revealSentAtLiveTail(controller, awaitFrame = {}),
+                                    )
                                 }
                         },
                     )
@@ -138,9 +141,13 @@ class ConversationSendOptimisticPublicationTest {
                 // newest row. A reveal can no longer target a stale index that
                 // predates the row published after the previous composition.
                 assertEquals(
-                    "the reveal must animate to the transcript's newest row",
+                    "a reader following the tail must be pinned to the newest row, not carried there",
                     listOf(0),
-                    writer.animatedIndexes,
+                    writer.snappedIndexes,
+                )
+                assertTrue(
+                    "pinning the tail must not glide across the lines the composer released",
+                    writer.animatedIndexes.isEmpty(),
                 )
                 send.await()
             } finally {
@@ -155,6 +162,38 @@ class ConversationSendOptimisticPublicationTest {
                 } finally {
                     controller.onCleared()
                 }
+            }
+        }
+
+    /** Carries a reader who sent from history to the new row instead of snapping them there. */
+    @Test
+    fun durableCallbackAnimatesAHistoryReaderToTheLiveTail() =
+        runBlocking {
+            val writer = RecordingSendRevealWriter()
+            val scrollCoordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("older-row", 0),
+                )
+            val controller = controller(textPublisher = { _, _, _, _ -> sentSummary() })
+
+            try {
+                controller.send("sent from history")
+                assertTrue(
+                    scrollCoordinator.revealSentAtLiveTail(
+                        controller,
+                        awaitFrame = { error("a history reader is carried to the row without waiting for a frame") },
+                    ),
+                )
+                assertEquals(
+                    "a history reader must be carried to the transcript's newest row",
+                    listOf(0),
+                    writer.animatedIndexes,
+                )
+                assertTrue("a history reader must not be snapped", writer.snappedIndexes.isEmpty())
+                assertEquals(ConversationScrollMode.FollowingTail, scrollCoordinator.mode)
+            } finally {
+                controller.onCleared()
             }
         }
 
@@ -771,15 +810,16 @@ private fun group(selfMembership: SelfMembershipFfi = SelfMembershipFfi.MEMBER) 
 /** Records the logical list row selected by the production Send reveal command. */
 private class RecordingSendRevealWriter : ConversationScrollWriter {
     val animatedIndexes = mutableListOf<Int>()
+    val snappedIndexes = mutableListOf<Int>()
 
     override val firstVisibleItemIndex: Int = 0
 
-    /** Records non-animated pre-positioning when a target is far from the current viewport. */
+    /** Records a snap, whether it pins the tail or pre-positions near a far target. */
     override suspend fun scrollToItem(
         index: Int,
         scrollOffset: Int,
     ) {
-        animatedIndexes += index
+        snappedIndexes += index
     }
 
     /** Records the final animated target selected from the controller's live timeline. */
