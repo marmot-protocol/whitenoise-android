@@ -21397,7 +21397,7 @@
       },
       {
         "surface": "string:report_dismiss_failed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationReports.kt",
         "anchor": "R.string.report_dismiss_failed",
         "test_ids": [
           "MSG-016"
@@ -21405,7 +21405,7 @@
       },
       {
         "surface": "string:report_message_failed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationReports.kt",
         "anchor": "R.string.report_message_failed",
         "test_ids": [
           "MSG-016"
