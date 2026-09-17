@@ -235,8 +235,16 @@ internal fun GroupSystemRow(
                 val actorHex = GroupSystemEvents.actorHex(event, record.sender)
                 GroupSystemEvents.summary(
                     event = event,
-                    actorName = actorHex?.let { appState.displayName(it) },
-                    subjectName = event.subject?.let { appState.displayName(it) },
+                    actorName =
+                        GroupSystemEvents.preferredName(
+                            actorHex?.let { appState.displayName(it) },
+                            event.actorDisplayName,
+                        ),
+                    subjectName =
+                        GroupSystemEvents.preferredName(
+                            event.subject?.let { appState.displayName(it) },
+                            event.subjectDisplayName,
+                        ),
                     actorIsSelf = GroupSystemEvents.isSelf(selfHex, actorHex),
                     subjectIsSelf = GroupSystemEvents.isSelf(selfHex, event.subject),
                     retentionLabel = retentionLabel,

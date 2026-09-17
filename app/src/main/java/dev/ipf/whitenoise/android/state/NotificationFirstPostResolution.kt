@@ -244,8 +244,9 @@ internal class NotificationGroupSystemTextResolver(
                             } else {
                                 GroupSystemEvents.summary(
                                     event = event,
-                                    actorName = actorName,
-                                    subjectName = subjectName,
+                                    actorName = GroupSystemEvents.preferredName(actorName, event.actorDisplayName),
+                                    subjectName =
+                                        GroupSystemEvents.preferredName(subjectName, event.subjectDisplayName),
                                     actorIsSelf = GroupSystemEvents.isSelf(update.accountIdHex, actorHex),
                                     subjectIsSelf = GroupSystemEvents.isSelf(update.accountIdHex, subjectHex),
                                     copy = notificationGroupSystemCopy(context),

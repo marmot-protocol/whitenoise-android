@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
+import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 
 data class GroupRenameDiffNames(
@@ -144,19 +145,45 @@ object GroupSystemEvents {
      */
     fun parse(plaintext: String): GroupSystemEvent? = GroupSystemEventJson.parse(plaintext)
 
-    private fun fromFfi(ffi: GroupSystemEventFfi): GroupSystemEvent =
-        GroupSystemEvent(
+    /**
+     * MarmotKit 0.10.1 states provenance rather than leaving the host to infer it. A member-authored row
+     * that merely schema-parsed is no longer treated as an authenticated state change, which is the
+     * distinction #985 and #1318 are about; its actor and subject are dropped with it so a summary can
+     * never name whoever the payload claims acted. Prepared display names ride along as a fallback for a
+     * reader with no local name for that account.
+     */
+    private fun fromFfi(ffi: GroupSystemEventFfi): GroupSystemEvent {
+        val authenticated = ffi.provenance == GroupSystemEventProvenanceFfi.AUTHENTICATED_GROUP_STATE
+        return GroupSystemEvent(
             systemType = ffi.systemType,
             text = ffi.text,
-            actor = ffi.actorAccountIdHex,
-            subject = ffi.subjectAccountIdHex,
+            actor = ffi.actorAccountIdHex.takeIf { authenticated },
+            subject = ffi.subjectAccountIdHex.takeIf { authenticated },
             name = ffi.name,
             oldName = ffi.oldName?.takeIf { it.isNotBlank() },
             oldNameKnown = ffi.oldName != null,
             oldRetentionSeconds = ffi.oldRetentionSeconds,
             newRetentionSeconds = ffi.newRetentionSeconds,
-            fromAuthenticatedStateProjection = true,
+            fromAuthenticatedStateProjection = authenticated,
+            actorDisplayName = ProfileSanitizer.displayName(ffi.actorDisplayName)?.takeIf { authenticated },
+            subjectDisplayName = ProfileSanitizer.displayName(ffi.subjectDisplayName)?.takeIf { authenticated },
         )
+    }
+
+    /**
+     * The name a system row should show for one participant. A local name wins, because the reader's own
+     * nickname or a cached profile is what they recognise. When the local lookup only produced an identity
+     * (an npub or a raw key, which is what [WhiteNoiseAppState.displayName] falls back to), MarmotKit's
+     * prepared label from the authenticated projection reads better, so it is preferred instead.
+     */
+    fun preferredName(
+        localName: String?,
+        preparedName: String?,
+    ): String? {
+        val local = localName?.trim()?.takeIf { it.isNotEmpty() }
+        if (local != null && !IdentityFormatter.isNostrIdentityFallback(local)) return local
+        return preparedName?.trim()?.takeIf { it.isNotEmpty() } ?: local
+    }
 
     /**
      * Resolve a timeline kind-1210 row without treating successful schema
