@@ -424,6 +424,10 @@ internal fun ComposerPill(
     // Back has asked the keyboard to hide: the editing row collapses now, in the
     // same frame, instead of waiting for focus to clear once the IME inset lands.
     dismissInProgress: Boolean = false,
+    // An accepted send has just emptied the field: the pill takes its one-line
+    // geometry in the same frame, so the bubble it produced lands where it will
+    // stay instead of riding the shrinking pill down.
+    collapsedBySend: Boolean = false,
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -684,7 +688,12 @@ internal fun ComposerPill(
     val animatedTextHeight =
         animateIntAsState(
             targetValue = compactTextLayout?.size?.height ?: 0,
-            animationSpec = tween(COMPOSER_EXPANSION_ANIMATION_MILLIS, easing = FastOutSlowInEasing),
+            animationSpec =
+                composerGeometrySpec(
+                    collapsedBySend = collapsedBySend,
+                    durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
+                    easing = FastOutSlowInEasing,
+                ),
             label = "composer text height",
         )
     val automaticTextHeight =
@@ -728,7 +737,12 @@ internal fun ComposerPill(
     val editingProgress =
         animateFloatAsState(
             targetValue = if (editingLayout) 1f else 0f,
-            animationSpec = tween(COMPOSER_EXPANSION_ANIMATION_MILLIS, easing = FastOutSlowInEasing),
+            animationSpec =
+                composerGeometrySpec(
+                    collapsedBySend = collapsedBySend,
+                    durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
+                    easing = FastOutSlowInEasing,
+                ),
             label = "composer editing row",
         )
     // The compact one-line row centres its inline actions; as the editing row
@@ -742,7 +756,8 @@ internal fun ComposerPill(
         animateFloatAsState(
             targetValue = if (expandedLayout) 1f else 0f,
             animationSpec =
-                tween(
+                composerGeometrySpec(
+                    collapsedBySend = collapsedBySend,
                     durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
                     easing = FastOutSlowInEasing,
                 ),

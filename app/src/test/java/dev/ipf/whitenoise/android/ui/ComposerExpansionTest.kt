@@ -1,11 +1,15 @@
 package dev.ipf.whitenoise.android.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.SnapSpec
+import androidx.compose.animation.core.TweenSpec
 import androidx.compose.ui.unit.Density
 import dev.ipf.whitenoise.android.state.RetainedComposerExpansion
 import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_EXPANSION_ANIMATION_MILLIS
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerExpansionMode
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerExpansionState
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerGeometrySpec
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerHeightAnimationDurationMillis
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerHeightPx
 import dev.ipf.whitenoise.android.ui.conversation.composer.dragComposerHeight
@@ -15,6 +19,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.toComposerExpansionSt
 import dev.ipf.whitenoise.android.ui.conversation.composer.toRetainedPreference
 import dev.ipf.whitenoise.android.ui.conversation.composer.toggleComposerFullScreen
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ComposerExpansionTest {
@@ -64,6 +69,17 @@ class ComposerExpansionTest {
                 discreteTransitionActive = false,
             ),
         )
+    }
+
+    /** The pill's geometry snaps only for the collapse an accepted send causes; every other change tweens. */
+    @Test
+    fun onlyTheCollapseAfterAnAcceptedSendSnapsThePillGeometry() {
+        val tweened = composerGeometrySpec<Int>(collapsedBySend = false, durationMillis = 160, easing = LinearEasing)
+        val snapped = composerGeometrySpec<Int>(collapsedBySend = true, durationMillis = 160, easing = LinearEasing)
+
+        assertTrue(tweened is TweenSpec<Int>)
+        assertEquals(160, (tweened as TweenSpec<Int>).durationMillis)
+        assertTrue(snapped is SnapSpec<Int>)
     }
 
     @Test
