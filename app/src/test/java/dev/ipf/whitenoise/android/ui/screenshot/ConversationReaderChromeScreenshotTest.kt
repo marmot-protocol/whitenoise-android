@@ -11,9 +11,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -60,10 +62,13 @@ class ConversationReaderChromeScreenshotTest {
         TimeZone.setDefault(originalZone)
     }
 
-    /** Latest accepted revision appears first and the original remains reachable and selectable. */
-    @Test fun historyLight() = captureHistory("conversation_edit_history_light", dark = false)
+    /**
+     * MarmotKit's own history stands in for the window's edits: its revisions render newest first with no
+     * Original row, because the bubble already shows the edited body.
+     */
+    @Test fun historyLight() = captureHistory("conversation_edit_history_light", dark = false, authoritative = true)
 
-    /** Large RTL history keeps full revision text and a reachable native Back affordance. */
+    /** Large RTL fallback history keeps full revision text, the Original row and a reachable native Back. */
     @Test fun historyDarkLargeRtl() = captureHistory("conversation_edit_history_dark_large_rtl", dark = true)
 
     /** The compact field and disabled date affordance use the prototype light header. */
@@ -87,41 +92,59 @@ class ConversationReaderChromeScreenshotTest {
         )
     }
 
-    /** Uses accepted native versions with exact timestamps, never a prototype history controller. */
+    /**
+     * Uses accepted native versions with exact timestamps, never a prototype history controller. With
+     * [authoritative] the dialog loads MarmotKit's complete history, which differs from the window's edits
+     * and carries no original body.
+     */
     private fun captureHistory(
         name: String,
         dark: Boolean,
+        authoritative: Boolean = false,
     ) {
         var dismissed = 0
         val first = "First accepted revision"
         val latest = "Latest accepted revision. The complete historical text stays selectable and available."
+        val engineHistory =
+            listOf(
+                EditVersion("engine-first", "Engine revision the loaded window never saw", 1_800_000_030uL),
+                EditVersion("first", first, 1_800_000_060uL),
+                EditVersion("latest", latest, 1_800_000_120uL),
+            )
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (dark) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, fontScale = if (dark) 2f else 1f) {
                     EditHistoryDialog(
-                        original = "Original message",
+                        original = "Original message".takeUnless { authoritative },
                         originalTimestamp = 1_800_000_000uL,
                         editState =
                             EditState(
                                 latest,
-                                2,
+                                if (authoritative) 3 else 2,
                                 listOf(
                                     EditVersion("first", first, 1_800_000_060uL),
                                     EditVersion("latest", latest, 1_800_000_120uL),
                                 ),
                             ),
                         onDismissRequest = { dismissed++ },
+                        loadAuthoritativeHistory = if (authoritative) ({ engineHistory }) else null,
                     )
                 }
             }
         }
+        composeRule.waitForIdle()
         val newest = composeRule.onNodeWithTag("message.history.version.2").fetchSemanticsNode().boundsInRoot
         val older = composeRule.onNodeWithTag("message.history.version.1").fetchSemanticsNode().boundsInRoot
         assertTrue(newest.top < older.top)
         composeRule.onNodeWithTag("message.history").captureRoboImage("src/test/snapshots/$name.png")
-        composeRule.onNodeWithTag("message.history.body.0").performScrollTo().assertIsDisplayed()
+        if (authoritative) {
+            composeRule.onNodeWithTag("message.history.version.3").assertIsDisplayed()
+            composeRule.onAllNodesWithTag("message.history.version.0").assertCountEquals(0)
+        } else {
+            composeRule.onNodeWithTag("message.history.body.0").performScrollTo().assertIsDisplayed()
+        }
         composeRule.onNodeWithContentDescription("Back").performClick()
         assertEquals(1, dismissed)
     }

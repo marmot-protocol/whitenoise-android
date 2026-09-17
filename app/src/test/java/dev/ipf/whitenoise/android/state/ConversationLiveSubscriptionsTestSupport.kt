@@ -165,6 +165,8 @@ internal fun timelineRecord(
         media = emptyList(),
         agentTextStreamJson = null,
         groupSystem = null,
+        hasReports = false,
+        edit = null,
         reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
         deleted = false,
         deletedByMessageIdHex = null,
@@ -291,6 +293,7 @@ internal fun notifiedMessagePreview(): ChatListMessagePreviewFfi =
         deleted = false,
         attachmentKind = null,
         attachmentCount = 0u,
+        groupSystem = null,
         deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
     )
 

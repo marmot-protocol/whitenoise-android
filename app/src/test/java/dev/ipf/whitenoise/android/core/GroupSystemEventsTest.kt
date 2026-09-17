@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
+import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -19,6 +20,9 @@ class GroupSystemEventsTest {
             """"data":{"actor":"$actorHex"}}"""
     private val avatarChangedStructured =
         GroupSystemEventFfi(
+            provenance = GroupSystemEventProvenanceFfi.AUTHENTICATED_GROUP_STATE,
+            actorDisplayName = null,
+            subjectDisplayName = null,
             systemType = "group_avatar_changed",
             text = "Group avatar changed",
             actorAccountIdHex = actorHex,
@@ -82,6 +86,9 @@ class GroupSystemEventsTest {
         // fields to authenticated state attribution.
         val structured =
             GroupSystemEventFfi(
+                provenance = GroupSystemEventProvenanceFfi.AUTHENTICATED_GROUP_STATE,
+                actorDisplayName = null,
+                subjectDisplayName = null,
                 systemType = "member_added",
                 text = "",
                 actorAccountIdHex = actorHex,
@@ -184,6 +191,9 @@ class GroupSystemEventsTest {
     fun structuredDisappearingTimerChangeStillRenders() {
         val structured =
             GroupSystemEventFfi(
+                provenance = GroupSystemEventProvenanceFfi.AUTHENTICATED_GROUP_STATE,
+                actorDisplayName = null,
+                subjectDisplayName = null,
                 systemType = "disappearing_timer_changed",
                 text = "Disappearing messages are off",
                 actorAccountIdHex = actorHex,
@@ -507,6 +517,9 @@ class GroupSystemEventsTest {
 
         val structured =
             GroupSystemEventFfi(
+                provenance = GroupSystemEventProvenanceFfi.AUTHENTICATED_GROUP_STATE,
+                actorDisplayName = null,
+                subjectDisplayName = null,
                 systemType = "group_renamed",
                 text = "Group renamed",
                 actorAccountIdHex = "alice",
@@ -530,6 +543,9 @@ class GroupSystemEventsTest {
         // from the JSON payload so the diff shows on that path.
         val structured =
             GroupSystemEventFfi(
+                provenance = GroupSystemEventProvenanceFfi.AUTHENTICATED_GROUP_STATE,
+                actorDisplayName = null,
+                subjectDisplayName = null,
                 systemType = "group_renamed",
                 text = "Group renamed",
                 actorAccountIdHex = "alice",
@@ -681,6 +697,8 @@ class GroupSystemEventsTest {
         media = emptyList(),
         agentTextStreamJson = null,
         groupSystem = groupSystem,
+        hasReports = false,
+        edit = null,
         reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
         deleted = false,
         deletedByMessageIdHex = null,

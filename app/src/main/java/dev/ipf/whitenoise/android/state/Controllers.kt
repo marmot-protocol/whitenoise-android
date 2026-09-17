@@ -18,6 +18,7 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
@@ -57,6 +58,7 @@ import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
 import dev.ipf.whitenoise.android.core.ConversationTranscriptTimelineReader
+import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
@@ -80,6 +82,7 @@ import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
+import dev.ipf.whitenoise.android.core.withAuthoritativeEdits
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
@@ -1124,7 +1127,11 @@ internal fun optimisticMessageIdForProjection(
             }
         if (pendingMediaCount > 1) return null
     }
+    // MarmotKit 0.10.1 commits a pending row for a send before the call returns its id, so two identical
+    // texts in flight can both be candidates. `optimisticMessages` is a snapshot map with no insertion
+    // order; pairing oldest-first by the monotonic timeline order keeps the match deterministic.
     return optimisticMessages
+        .sortedBy { it.timelineOrder }
         .firstOrNull { optimistic ->
             if (!isSendableOptimisticStatus(optimistic.status, allowDelayedProjection)) return@firstOrNull false
             if (optimistic.record.direction != projected.direction) return@firstOrNull false
@@ -2986,6 +2993,8 @@ class ChatsController private constructor(
     }
 
     private val chatRowsByGroup = LinkedHashMap<String, ChatListRowFfi>()
+    private var selectedAvatarAssetsByGroup: Map<String, AvatarAssetFfi> = emptyMap()
+
     private var selectedPresentationsByGroup = emptyMap<String, ConversationPresentationFfi>()
     internal val chatRows: Collection<ChatListRowFfi>
         get() = chatRowsByGroup.values
@@ -3191,6 +3200,7 @@ class ChatsController private constructor(
         try {
             val catchUpGate = ChatListCatchUpGate()
             var retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
+            var lastFailureNotReady = false
             var localFramePresented = preserveLoadedContent && seededLocalSnapshot == null && keepLoadedContent
             var pendingReadinessCatchUp: Deferred<AccountCatchUpResult>? = null
             var initialSubscriptionProjection = true
@@ -3213,6 +3223,7 @@ class ChatsController private constructor(
             }
             while (coroutineContext.isActive && shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
                 var chatListSubscription: ChatListWindowSet? = null
+                lastFailureNotReady = false
                 var chatsSubscription: ChatsSubscriptionHandle? = null
                 var receivedLiveUpdate = false
                 val connectionAttempt =
@@ -3227,7 +3238,12 @@ class ChatsController private constructor(
                         connectionOwner.beginSessionAttempt(accountRef, bindEpoch)
                     }
                 try {
-                    val chatListStream = ChatListWindowSet.open(accountRef, liveSubscriptions.openChatListWindow)
+                    val chatListStream =
+                        ChatListWindowSet.open(
+                            accountRef,
+                            openFallback = liveSubscriptions.openPresentedChatList,
+                            openWindow = liveSubscriptions.openChatListWindow,
+                        )
                     chatListSubscription = chatListStream
                     val chatStream = liveSubscriptions.openChats(accountRef, true)
                     chatsSubscription = chatStream
@@ -3307,16 +3323,17 @@ class ChatsController private constructor(
                     }
                     isLoading = false
                     val hasLoadedContent = chatRows.isNotEmpty()
+                    lastFailureNotReady = DiagnosticFormatter.isNotReady(throwable)
                     error =
                         privacySafeErrorPresentation(
                             operationCode = if (hasLoadedContent) "CHAT_LIST_REFRESH" else "CHAT_LIST_LOAD",
                             throwable = throwable,
                             message =
                                 AppText.Resource(
-                                    if (hasLoadedContent) {
-                                        R.string.error_loaded_content_may_be_out_of_date
-                                    } else {
-                                        R.string.error_try_again
+                                    when {
+                                        lastFailureNotReady -> R.string.error_not_ready
+                                        hasLoadedContent -> R.string.error_loaded_content_may_be_out_of_date
+                                        else -> R.string.error_try_again
                                     },
                                 ),
                         )
@@ -3346,6 +3363,9 @@ class ChatsController private constructor(
                         currentRetryDelayMs = retryDelayMs,
                         receivedUpdate = receivedLiveUpdate,
                     )
+                // MDK documents its not-ready states as clearing on their own once startup hydration
+                // finishes, so poll them briskly instead of letting the connectivity backoff stretch.
+                if (lastFailureNotReady) retryDelayMs = minOf(retryDelayMs, NOT_READY_RETRY_DELAY_MS)
                 chatsDebug { "chat subscriptions ended; retrying in ${retryDelayMs}ms account=${accountRef.take(8)}" }
                 val userRequestedRetry = withTimeoutOrNull(retryDelayMs) { retryLoadSignal.receive() } != null
                 retryDelayMs =
@@ -3918,6 +3938,7 @@ class ChatsController private constructor(
                 preview =
                     entry.preview.copy(
                         messageIdHex = confirmedMessageIdHex,
+                        groupSystem = null,
                         deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED,
                     ),
                 confirmedMessageIdHex = confirmedMessageIdHex,
@@ -4092,6 +4113,7 @@ class ChatsController private constructor(
             chatListItemFromProjection(
                 row = row,
                 selectedPresentation = selectedPresentationsByGroup[chatRowKey(row.groupIdHex)],
+                selectedAvatarAsset = selectedAvatarAssetsByGroup[chatRowKey(row.groupIdHex)],
                 group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
                 activeAccountIdHex = activeAccountIdHex,
                 members = memberCacheByGroup[row.groupIdHex],
@@ -4116,6 +4138,7 @@ class ChatsController private constructor(
         return chatListItemFromProjection(
             row = row,
             selectedPresentation = selectedPresentationsByGroup[chatRowKey(row.groupIdHex)],
+            selectedAvatarAsset = selectedAvatarAssetsByGroup[chatRowKey(row.groupIdHex)],
             group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
             activeAccountIdHex = activeAccountIdHex,
             members = memberCacheByGroup[row.groupIdHex],
@@ -4330,6 +4353,13 @@ class ChatsController private constructor(
     private fun replacePresentedChatRows(rows: List<PresentedChatRowFfi>) {
         selectedPresentationsByGroup =
             rows.associate { presented -> chatRowKey(presented.row.groupIdHex) to presented.presentation }
+        // MarmotKit 0.10.1 stores avatars durably and names each row's asset here; the row prefers those
+        // bytes over fetching its URL, so a cached avatar survives being offline.
+        selectedAvatarAssetsByGroup =
+            rows
+                .mapNotNull { presented ->
+                    presented.avatarAsset?.let { chatRowKey(presented.row.groupIdHex) to it }
+                }.toMap()
         rows.forEach { requestChatRowProfiles(it.row) }
         replaceChatRows(rows.map(PresentedChatRowFfi::row))
     }
@@ -5824,7 +5854,7 @@ private inline fun chatsDebug(
     if (BuildConfig.DEBUG) {
         Log.e("DMChats", message(), error)
     } else {
-        Log.e("DMChats", "operation_failed")
+        Log.e("DMChats", releaseFailureMarker("CHATS", error, message()))
     }
 }
 
@@ -6079,6 +6109,25 @@ internal fun conversationStartsLoading(
 ): Boolean = startOnConstruction && (accountRefOverride ?: activeAccountRef) != null
 
 internal fun isTerminalOpenFailure(throwable: Throwable): Boolean = throwable is ConversationInitialLoadException
+
+/** Retry cadence while MarmotKit reports a documented not-ready state; well under the connectivity backoff. */
+internal const val NOT_READY_RETRY_DELAY_MS = 2_000L
+
+/**
+ * The sentence shown for a failed conversation load. A bounded-read timeout keeps its restart guidance;
+ * MarmotKit's not-ready and window-timeout states get copy that says the app is still working and will
+ * retry, instead of the generic "something went wrong".
+ */
+internal fun conversationLoadFailureMessage(
+    throwable: Throwable,
+    initialOpenTimedOut: Boolean,
+): Int =
+    when {
+        initialOpenTimedOut -> R.string.error_restart_app_before_retry
+        DiagnosticFormatter.isNotReady(throwable) -> R.string.error_not_ready
+        DiagnosticFormatter.errorCode(throwable) == "TIMEOUT" -> R.string.error_window_timed_out
+        else -> R.string.error_try_again
+    }
 
 internal fun shouldOfferConversationLoadRetry(throwable: Throwable): Boolean = !isTerminalOpenFailure(throwable)
 
@@ -6442,7 +6491,7 @@ class ConversationController(
         lastMutationError = null
     }
 
-    private fun recordMutationFailure(
+    internal fun recordMutationFailure(
         @StringRes title: Int,
         operationCode: String,
         throwable: Throwable,
@@ -7266,18 +7315,13 @@ class ConversationController(
             val initialOpenTimedOut = isTerminalOpenFailure(throwable)
             discardInitialTimelineSeedForFailure(preserveOptimisticMessages = true)
             isLoading = false
+            val operationCode = if (timelineRecords.isEmpty()) "CONVERSATION_LOAD" else "CONVERSATION_REFRESH"
+            if (!BuildConfig.DEBUG) Log.e("DMConversation", releaseFailureMarker(operationCode, throwable))
             subscriptionError =
                 privacySafeErrorPresentation(
-                    operationCode = if (timelineRecords.isEmpty()) "CONVERSATION_LOAD" else "CONVERSATION_REFRESH",
+                    operationCode = operationCode,
                     throwable = throwable,
-                    message =
-                        if (initialOpenTimedOut) {
-                            AppText.Resource(R.string.error_restart_app_before_retry)
-                        } else if (timelineRecords.isEmpty()) {
-                            AppText.Resource(R.string.error_try_again)
-                        } else {
-                            AppText.Resource(R.string.error_loaded_content_may_be_out_of_date)
-                        },
+                    message = AppText.Resource(conversationLoadFailureMessage(throwable, initialOpenTimedOut)),
                     retryable = shouldOfferConversationLoadRetry(throwable),
                 )
             if (initialOpenTimedOut) {
@@ -7840,6 +7884,7 @@ class ConversationController(
                             deleted = false,
                             attachmentKind = null,
                             attachmentCount = 0u,
+                            groupSystem = null,
                             deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
                         ),
                     )
@@ -8907,6 +8952,7 @@ class ConversationController(
             deleted = false,
             attachmentKind = null,
             attachmentCount = 0u,
+            groupSystem = null,
             deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
         )
 
@@ -12034,7 +12080,8 @@ class ConversationController(
                     isTimelineMessageVisible(message.record.messageIdHex, hiddenIds)
                 }
             }
-        val aggregated = aggregateEdits(visible.map { it.record })
+        val localEdits = aggregateEdits(visible.map { it.record })
+        val aggregated = withAuthoritativeEdits(localEdits, authoritativeEditsOf(timelineRecords.values))
         // Drop any optimistic edit the real kind-1009 has now caught up to:
         // once `aggregateEdits` reports the same latest text, the overlay is
         // redundant and would otherwise mask a later remote edit. Failed/Pending

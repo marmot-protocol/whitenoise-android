@@ -1409,6 +1409,7 @@ private fun preview(
         deleted = false,
         attachmentKind = null,
         attachmentCount = 0u,
+        groupSystem = null,
         deliveryState = deliveryState,
     )
 

@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.RuntimeProjectionUpdateFfi
 import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -295,6 +296,25 @@ class DiagnosticFormatterTest {
         assertTrue(report.contains("operation=VERY_LONG_OPERATION_"))
     }
 
+    /** The report names MarmotKit's error variant, so a field report tells engine failures apart without data. */
+    @Test
+    fun reportNamesTheMarmotVariantWithoutItsMessage() {
+        val report =
+            DiagnosticFormatter.errorReport(
+                operationCode = "CHAT_LIST_LOAD",
+                throwable =
+                    IllegalStateException("wrapped", MarmotKitException.ChatWindowQuery("group=abc detail")),
+                context = DiagnosticFormatter.ErrorReportContext("dev", "test", "now"),
+            )
+
+        assertTrue(report.contains("error=WINDOW_QUERY"))
+        assertTrue(report.contains("marmot=ChatWindowQuery"))
+        assertFalse(report.contains("group=abc"))
+        assertNull(DiagnosticFormatter.marmotVariant(IllegalStateException("plain")))
+        assertTrue(DiagnosticFormatter.isNotReady(MarmotKitException.ChatPresentationNotReady()))
+        assertFalse(DiagnosticFormatter.isNotReady(MarmotKitException.ChatWindowQuery("x")))
+    }
+
     @Test
     fun typedMarmotFailuresUseStableCategories() {
         val cases =
@@ -314,6 +334,14 @@ class DiagnosticFormatterTest {
                 MarmotKitException.UserBlocked() to "PERMISSION_DENIED",
                 MarmotKitException.BlockListUnavailable() to "PLATFORM_UNAVAILABLE",
                 MarmotKitException.BlockPublicationUncertain() to "CONNECTIVITY",
+                MarmotKitException.ConversationWindowNotReady() to "NOT_READY",
+                MarmotKitException.ChatPresentationNotReady() to "NOT_READY",
+                MarmotKitException.DirectConversationIndexNotReady() to "NOT_READY",
+                MarmotKitException.ConversationWindowTimedOut() to "TIMEOUT",
+                MarmotKitException.ConversationWindowClosed() to "WINDOW_CLOSED",
+                MarmotKitException.ChatWindowStale() to "STALE_WINDOW",
+                MarmotKitException.ConversationWindowQuery("closed") to "WINDOW_QUERY",
+                MarmotKitException.ChatWindowQuery("no such view") to "WINDOW_QUERY",
             )
 
         cases.forEach { (failure, expected) ->

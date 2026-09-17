@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
+import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
@@ -272,6 +273,9 @@ class NotificationFirstPostIntegrationTest {
             val raw = "{\"v\":1,\"system_type\":\"group_avatar_changed\"}"
             val system =
                 GroupSystemEventFfi(
+                    provenance = GroupSystemEventProvenanceFfi.AUTHENTICATED_GROUP_STATE,
+                    actorDisplayName = null,
+                    subjectDisplayName = null,
                     systemType = "group_avatar_changed",
                     text = "Group avatar changed",
                     actorAccountIdHex = MENTION_ACCOUNT_ID_HEX,
@@ -710,6 +714,8 @@ class NotificationFirstPostIntegrationTest {
             media = emptyList(),
             agentTextStreamJson = null,
             groupSystem = groupSystem,
+            hasReports = false,
+            edit = null,
             reactions = TimelineReactionSummaryFfi(emptyList(), emptyList()),
             deleted = false,
             deletedByMessageIdHex = null,

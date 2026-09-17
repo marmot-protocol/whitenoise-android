@@ -129,6 +129,7 @@ class ConversationInitialTimelineTest {
         deleted = deleted,
         attachmentKind = attachmentKind,
         attachmentCount = attachmentCount,
+        groupSystem = null,
         deliveryState = deliveryState,
     )
 

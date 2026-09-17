@@ -103,6 +103,8 @@ class TimelineMarkdownHydrationTest {
             media = emptyList(),
             agentTextStreamJson = null,
             groupSystem = null,
+            hasReports = false,
+            edit = null,
             reactions = TimelineReactionSummaryFfi(emptyList(), emptyList()),
             deleted = false,
             deletedByMessageIdHex = null,

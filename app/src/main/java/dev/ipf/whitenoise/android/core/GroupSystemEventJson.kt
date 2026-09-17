@@ -21,6 +21,13 @@ data class GroupSystemEvent(
     val oldRetentionSeconds: ULong? = null,
     val newRetentionSeconds: ULong? = null,
     val fromAuthenticatedStateProjection: Boolean,
+    /**
+     * Labels MarmotKit prepared for this row's actor and subject (0.10.1). They are a fallback for a
+     * reader that has no local name: an account-scoped nickname still wins, because the app owns its own
+     * naming. Absent on rows parsed from JSON, where no identity is authenticated.
+     */
+    val actorDisplayName: String? = null,
+    val subjectDisplayName: String? = null,
 )
 
 /** Pure, bounded JSON parser shared by the Android projection and `:fuzz`. */

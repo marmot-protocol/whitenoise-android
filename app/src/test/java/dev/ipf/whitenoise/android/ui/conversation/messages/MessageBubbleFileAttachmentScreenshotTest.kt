@@ -765,6 +765,7 @@ open class MessageBubbleFileAttachmentFixtures {
         )
 
     /** Builds a deterministic confirmed-message fixture with a canonical protocol id. */
+    @Suppress("LongMethod") // One fixture spells out every field of the authoritative record.
     protected fun fileTimelineMessage(
         index: Int,
         fileName: String,
@@ -823,6 +824,8 @@ open class MessageBubbleFileAttachmentFixtures {
                     ),
                 agentTextStreamJson = null,
                 groupSystem = null,
+                hasReports = false,
+                edit = null,
                 reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
                 deleted = false,
                 deletedByMessageIdHex = null,

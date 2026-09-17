@@ -158,6 +158,7 @@ object DiagnosticFormatter {
             appendLine("White Noise error report")
             appendLine("operation=${stableCode(operationCode)}")
             appendLine("error=${errorCode(throwable)}")
+            marmotVariant(throwable)?.let { appendLine("marmot=$it") }
             (technicalDetail ?: metadata?.diagnosticTechnicalDetail ?: contentionDetail(throwable))
                 ?.trim()
                 ?.takeIf(String::isNotEmpty)
@@ -166,6 +167,19 @@ object DiagnosticFormatter {
             appendLine("android=${redactError(context.androidVersion)}")
             append("utc=${redactError(context.occurredAtUtc)}")
         }.take(MAX_REPORT_LEN)
+
+    /**
+     * The MarmotKit error variant in [throwable]'s cause chain, as a bare type name such as
+     * `ChatWindowQuery`. It carries no user data and is what distinguishes one engine failure from another
+     * once the message text has been dropped for privacy.
+     */
+    fun marmotVariant(throwable: Throwable): String? {
+        val error = causeChain(throwable).filterIsInstance<MarmotKitException>().firstOrNull()
+        return error?.javaClass?.simpleName
+    }
+
+    /** Whether MarmotKit reported a state it documents as retryable after a moment, such as a post-upgrade backfill. */
+    fun isNotReady(throwable: Throwable): Boolean = errorCode(throwable) == "NOT_READY"
 
     /** Keeps the native busy boundary diagnosable after log rotation without copying exception text. */
     private fun contentionDetail(throwable: Throwable): String? {
@@ -187,6 +201,7 @@ object DiagnosticFormatter {
         val names = chain.map { it.javaClass.simpleName.lowercase(Locale.ROOT) }
         val marmotError = chain.filterIsInstance<MarmotKitException>().firstOrNull()
         val diagnosticError = chain.filterIsInstance<DiagnosticErrorMetadata>().firstOrNull()
+        val windowCode = marmotError?.let(::windowErrorCode)
         return when {
             chain.any { it is java.util.concurrent.CancellationException } -> "CANCELLED"
             diagnosticError != null -> stableCode(diagnosticError.diagnosticErrorCode)
@@ -209,6 +224,7 @@ object DiagnosticFormatter {
                 marmotError is MarmotKitException.AccountSessionBusy ||
                 marmotError is MarmotKitException.StorageBusy ||
                 marmotError is MarmotKitException.GroupSendQueueFull -> "RESOURCE_BUSY"
+            windowCode != null -> windowCode
             marmotError is MarmotKitException.NotGroupAdmin ||
                 marmotError is MarmotKitException.AdminCannotSelfRemove ||
                 marmotError is MarmotKitException.WouldRemoveLastAdmin ||
@@ -238,6 +254,38 @@ object DiagnosticFormatter {
             else -> "UNEXPECTED"
         }
     }
+
+    /**
+     * Categories for MarmotKit 0.10.0's live-window and readiness errors. Not-ready states are documented
+     * as clearing on their own; a timed-out open is a timeout; closed, stale and query errors stay distinct
+     * so a report says whether the window needs reopening, reassessing, or was asked something invalid.
+     */
+    private fun windowErrorCode(error: MarmotKitException): String? =
+        when (error) {
+            is MarmotKitException.ConversationWindowNotReady,
+            is MarmotKitException.ChatPresentationNotReady,
+            is MarmotKitException.DirectConversationIndexNotReady,
+            -> "NOT_READY"
+            is MarmotKitException.ConversationWindowTimedOut -> "TIMEOUT"
+            is MarmotKitException.ConversationWindowClosed,
+            is MarmotKitException.ChatWindowClosed,
+            -> "WINDOW_CLOSED"
+            is MarmotKitException.ConversationWindowStale,
+            is MarmotKitException.ConversationWindowWrongGeneration,
+            is MarmotKitException.ConversationWindowAnchorOutside,
+            is MarmotKitException.ChatWindowStale,
+            is MarmotKitException.ChatWindowAnchorOutside,
+            -> "STALE_WINDOW"
+            is MarmotKitException.ConversationWindowQuery,
+            is MarmotKitException.ConversationWindowInvalidLimit,
+            is MarmotKitException.ConversationWindowInvalidTarget,
+            is MarmotKitException.ConversationWindowMessageNotRetained,
+            is MarmotKitException.ConversationWindowPresentation,
+            is MarmotKitException.ChatWindowQuery,
+            is MarmotKitException.ChatWindowInvalidLimit,
+            -> "WINDOW_QUERY"
+            else -> null
+        }
 
     private fun causeChain(throwable: Throwable): List<Throwable> =
         generateSequence(throwable) { current -> current.cause?.takeUnless { it === current } }

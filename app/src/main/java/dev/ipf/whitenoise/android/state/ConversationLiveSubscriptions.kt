@@ -1,10 +1,14 @@
 package dev.ipf.whitenoise.android.state
 
+import android.util.Log
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ConversationOpenModeFfi
 import dev.ipf.marmotkit.GroupStateSubscription
+import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.TimelineMessagesSubscription
 import dev.ipf.marmotkit.TimelinePageFfi
+import kotlinx.coroutines.CancellationException
 
 /**
  * Lifecycle-shaped seam for conversation live subscriptions. Production binds
@@ -99,18 +103,7 @@ internal class ConversationLiveSubscriptions(
         fun bind(appState: WhiteNoiseAppState): ConversationLiveSubscriptions =
             ConversationLiveSubscriptions(
                 openTimeline = { account, groupIdHex, limit ->
-                    appState.marmotIo {
-                        val window =
-                            openConversationWindow(
-                                accountRef = account,
-                                groupIdHex = groupIdHex,
-                                mode = ConversationOpenModeFfi.AUTOMATIC,
-                                messageIdHex = null,
-                                initialRows = limit.coerceIn(1u, CONVERSATION_WINDOW_MAX_ROWS),
-                                timeoutMs = CONVERSATION_WINDOW_DEFAULT_DEADLINE,
-                            )
-                        FfiConversationWindowHandle(window, release = window::close)
-                    }
+                    appState.marmotIo { openTimelineWithFallback(account, groupIdHex, limit) }
                 },
                 openGroupState = { account, groupIdHex ->
                     appState.marmotIo {
@@ -126,3 +119,36 @@ internal class ConversationLiveSubscriptions(
 /** Returns a test override when installed, otherwise the production MDK binding. */
 internal fun WhiteNoiseAppState.conversationLiveSubscriptions(): ConversationLiveSubscriptions =
     liveSubscriptionOverrides.conversation ?: ConversationLiveSubscriptions.bind(this)
+
+/**
+ * Opens MarmotKit's conversation window, and when the engine refuses it falls back to the plain timeline
+ * subscription the app used before 0.10.0. The screen then loses only the window-only extras (prepared
+ * title, capabilities, anchors) and keeps its messages, instead of showing an error for every chat. The
+ * refusal is logged as a release-safe marker so field reports name the engine error.
+ *
+ * Opening keeps MDK's own deadline. MarmotKit 0.10.1 returns the stored conversation before live recovery
+ * (mdk#1873), so a healthy open no longer waits on hydration and a shorter app-side deadline would only
+ * abandon opens that are about to succeed.
+ */
+internal suspend fun MarmotInterface.openTimelineWithFallback(
+    account: String,
+    groupIdHex: String,
+    limit: UInt,
+): ConversationTimelineSubscriptionHandle =
+    try {
+        val window =
+            openConversationWindow(
+                accountRef = account,
+                groupIdHex = groupIdHex,
+                mode = ConversationOpenModeFfi.AUTOMATIC,
+                messageIdHex = null,
+                initialRows = limit.coerceIn(1u, CONVERSATION_WINDOW_MAX_ROWS),
+                timeoutMs = CONVERSATION_WINDOW_DEFAULT_DEADLINE,
+            )
+        FfiConversationWindowHandle(window, release = window::close)
+    } catch (cancel: CancellationException) {
+        throw cancel
+    } catch (refused: MarmotKitException) {
+        Log.e("DMConversation", releaseFailureMarker("CONVERSATION_WINDOW_OPEN", refused) + " fallback=timeline")
+        FfiConversationTimelineSubscriptionHandle(subscribeTimelineMessages(account, groupIdHex, limit))
+    }

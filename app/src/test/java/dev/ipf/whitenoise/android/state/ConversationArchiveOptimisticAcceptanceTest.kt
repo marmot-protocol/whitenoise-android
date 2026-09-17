@@ -383,6 +383,7 @@ class ConversationArchiveOptimisticAcceptanceTest {
                     deleted = false,
                     attachmentKind = null,
                     attachmentCount = 0u,
+                    groupSystem = null,
                     deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
                 ),
             unreadCount = 0uL,

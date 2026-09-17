@@ -17,6 +17,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
+import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -162,6 +163,9 @@ class GroupSystemRetentionScreenshotTest {
 
     private fun retentionChangeEvent() =
         GroupSystemEventFfi(
+            provenance = GroupSystemEventProvenanceFfi.AUTHENTICATED_GROUP_STATE,
+            actorDisplayName = null,
+            subjectDisplayName = null,
             systemType = "disappearing_timer_changed",
             text = "Messages now disappear after 5 minutes",
             actorAccountIdHex = ACCOUNT_ID,

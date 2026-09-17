@@ -606,6 +606,7 @@ class ChatListFoldUnreadRegressionTest {
                     deleted = deleted,
                     attachmentKind = null,
                     attachmentCount = 0u,
+                    groupSystem = null,
                     deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
                 )
             } else {

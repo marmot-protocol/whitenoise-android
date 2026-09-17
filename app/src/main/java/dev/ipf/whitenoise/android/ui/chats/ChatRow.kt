@@ -326,6 +326,7 @@ internal fun ChatRow(
                     // conversation header does.
                     fallbackPictureUrl = avatarAccount?.let { item.selectedAvatarUrl ?: appState.avatarUrl(it) },
                     firstFrameAvatar = item.firstFrameAvatar,
+                    durableAvatar = item.selectedAvatarAsset,
                 )
                 if (pinned) {
                     Surface(

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.os.Looper
 import dev.ipf.marmotkit.GroupSystemEventFfi
+import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
@@ -293,6 +294,9 @@ class ConversationAuthoritativeTimelineOrderingTest {
             sourceEpoch = SOURCE_EPOCH,
             groupSystem =
                 GroupSystemEventFfi(
+                    provenance = GroupSystemEventProvenanceFfi.AUTHENTICATED_GROUP_STATE,
+                    actorDisplayName = null,
+                    subjectDisplayName = null,
                     systemType = "member_added",
                     text = "member added",
                     actorAccountIdHex = ConversationTimelineTestIds.ACCOUNT_ID,

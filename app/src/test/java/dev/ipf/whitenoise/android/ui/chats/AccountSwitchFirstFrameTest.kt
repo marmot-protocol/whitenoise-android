@@ -129,7 +129,7 @@ class AccountSwitchFirstFrameTest {
                 memberSnapshotLoader = { _, _ -> emptyList() },
                 initialLocalSnapshot =
                     snapshot(rawRow).copy(
-                        presentedRows = listOf(PresentedChatRowFfi(rawRow, presentation)),
+                        presentedRows = listOf(PresentedChatRowFfi(rawRow, presentation, avatarAsset = null)),
                     ),
             )
         appState.attachChatsController(controller)

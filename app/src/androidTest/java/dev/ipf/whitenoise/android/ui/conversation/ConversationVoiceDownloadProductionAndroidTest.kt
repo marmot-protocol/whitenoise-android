@@ -1171,6 +1171,8 @@ private fun instrumentedTimelineRecord(
         media = listOfNotNull(media).mapIndexed { slot, reference -> accepted(slot, reference) },
         agentTextStreamJson = null,
         groupSystem = null,
+        hasReports = false,
+        edit = null,
         reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
         deleted = false,
         deletedByMessageIdHex = null,
