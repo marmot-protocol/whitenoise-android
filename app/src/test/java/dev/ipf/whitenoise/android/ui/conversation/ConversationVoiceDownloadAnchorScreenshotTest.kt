@@ -173,7 +173,10 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
     fun screenshotsShowFullyVisibleDownloadingAndPlayableRows() {
         val fixture = conversationFixture(voiceIndices = setOf(HISTORY_VOICE_INDEX), idOffset = 600)
         val voiceId = fixture.voiceMessageIds.single()
-        val precedingId = fixture.records[HISTORY_VOICE_INDEX - 1].messageIdHex
+        // The reversed transcript reaches an anchor by its newest edge, so the rows
+        // left on screen are older than it. Anchor on the row after the voice
+        // message for that message to stay visible.
+        val precedingId = fixture.records[HISTORY_VOICE_INDEX + 1].messageIdHex
         val control = VoiceControl(messageId = voiceId, materializationAttemptCount = 1)
         val runtime = ControlledVoicePresentationRuntime(mapOf(voiceId to control))
         val evidence = RecordingConversationScrollEvidenceSink()
@@ -424,7 +427,10 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
     fun screenshotShowsFullyVisibleLongDurationLargeFontRtlRow() {
         val fixture = conversationFixture(voiceIndices = setOf(HISTORY_VOICE_INDEX), idOffset = 700)
         val voiceId = fixture.voiceMessageIds.single()
-        val precedingId = fixture.records[HISTORY_VOICE_INDEX - 1].messageIdHex
+        // The reversed transcript reaches an anchor by its newest edge, so the rows
+        // left on screen are older than it. Anchor on the row after the voice
+        // message for that message to stay visible.
+        val precedingId = fixture.records[HISTORY_VOICE_INDEX + 1].messageIdHex
         val control =
             VoiceControl(
                 messageId = voiceId,
@@ -494,7 +500,10 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
         val evidence = RecordingConversationScrollEvidenceSink()
         try {
             awaitConversationCondition { fixture.controller.timeline.size == fixture.records.size }
-            val host = showConversation(fixture, runtime, evidence, historyAnchorMessageId = firstVoiceId)
+            // Both voice rows must be reachable, and the reversed transcript leaves
+            // rows older than its anchor on screen, so anchor past the newer of them.
+            val anchorId = fixture.records[HISTORY_VOICE_INDEX + 2].messageIdHex
+            val host = showConversation(fixture, runtime, evidence, historyAnchorMessageId = anchorId)
             val afterExplicitJump = focusWhileVoiceDownloadsAreHeld(fixture, controls, host, evidence)
             val concurrentStart = evidence.checkpoint()
 

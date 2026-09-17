@@ -630,6 +630,12 @@ internal class ConversationScrollCoordinator(
             writer.scrollToTail(index.coerceAtLeast(0))
         }
 
+        /** Corrects a reached row so its reading start meets the top of the viewport. */
+        suspend fun alignReadingStart(index: Int) {
+            ensureCurrent()
+            writer.alignReadingStart(index.coerceAtLeast(0))
+        }
+
         /**
          * Keeps distance-independent navigation responsive: snap near a far target, then animate only
          * the final few rows. Message-backed callers can re-resolve after each snap because paging may
@@ -774,6 +780,9 @@ internal suspend fun ConversationScrollCoordinator.jumpToUnreadOrNewest(
                 animateScrollToItem(initialTargetIndex, 0) {
                     resolveUnreadIndex()
                 }
+            // The reversed transcript reaches a row by its newest edge, so an
+            // unread message taller than the viewport would open at its end.
+            if (targetResolved) alignReadingStart(resolveUnreadIndex() ?: initialTargetIndex)
         }
     if (!completed) return ConversationJumpToNewestOutcome.Cancelled
     if (!targetResolved || resolveUnreadIndex() == null) return jumpToTail()
@@ -943,6 +952,12 @@ internal interface ConversationScrollWriter {
     suspend fun animateScrollToTail(index: Int) {
         animateScrollToItem(index)
     }
+
+    /**
+     * Corrects an already-reached [index] so its reading start, not its newest
+     * edge, meets the top of the viewport. A no-op unless the row overhangs.
+     */
+    suspend fun alignReadingStart(index: Int) = Unit
 }
 
 /** The only implementation that writes the Compose list state. */
@@ -996,6 +1011,29 @@ internal class LazyListConversationScrollWriter(
     /** Animates to the physical newest edge of [index]; see [scrollToTail]. */
     override suspend fun animateScrollToTail(index: Int) {
         animateScrollToItem(index, 0)
+    }
+
+    /**
+     * The reversed transcript anchors rows by their newest edge, so a zero offset
+     * lands a row's end against the composer. A row taller than the viewport must
+     * therefore be scrolled through by its overhang for its reading start to reach
+     * the top. The caller has already reached the row, so its height is measured.
+     */
+    override suspend fun alignReadingStart(index: Int) {
+        val offset = readingStartOffset(index)
+        if (offset > 0) animateScrollToItem(index, offset)
+    }
+
+    /**
+     * The overhang a row has beyond the viewport's far edge, which is what separates
+     * its two edges. A scroll offset places the row's own edge at minus that offset,
+     * so the row's reading start meets [LazyListLayoutInfo.viewportEndOffset] exactly
+     * when the offset is its height less that edge.
+     */
+    private fun readingStartOffset(index: Int): Int {
+        val layoutInfo = listState.layoutInfo
+        val size = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.size ?: return 0
+        return (size - layoutInfo.viewportEndOffset).coerceAtLeast(0)
     }
 }
 

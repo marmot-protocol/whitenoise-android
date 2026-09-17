@@ -76,7 +76,10 @@ class ConversationUnreadJumpScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
                 Surface(modifier = Modifier.fillMaxWidth().height(420.dp).testTag(ROOT_TAG)) {
-                    val listState = rememberLazyListState(initialFirstVisibleItemIndex = 8)
+                    // Start on the oversized unread row itself: reversed rows are reached
+                    // by their newest edge, so it is visible but not yet reading-start
+                    // aligned, which is what the first tap has to correct.
+                    val listState = rememberLazyListState(initialFirstVisibleItemIndex = 6)
                     val scope = rememberCoroutineScope()
                     var pendingUnreadId: String? by remember { mutableStateOf(UNREAD_ID) }
                     coordinator =
