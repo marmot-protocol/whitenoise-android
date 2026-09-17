@@ -25035,6 +25035,14 @@
         "test_ids": [
           "MED-006"
         ]
+      },
+      {
+        "surface": "Composer resize settle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerExpansion.kt",
+        "anchor": "internal fun settleComposerHeight(",
+        "test_ids": [
+          "CON-017"
+        ]
       }
     ],
     "notification_content_contracts": [

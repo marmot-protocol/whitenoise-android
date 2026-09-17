@@ -621,6 +621,9 @@ internal fun ComposerPill(
     val compactTrailingReserve =
         4.dp + dictationControlWidth + expandedTrailingActionInset +
             (if (trailingAction != null) 40.dp else 0.dp)
+    // What the compact trailing reserve leaves over once the control row has taken its share: the 4dp
+    // gap before the controls when nothing sits between them, and nothing at all when it does.
+    val compactFreeTrailingGutter = if (expandedTrailingActionInset > 0.dp) 0.dp else 4.dp
     val compactMeasurementTrailingReserve =
         4.dp +
             dictationControlWidth +
@@ -954,9 +957,13 @@ internal fun ComposerPill(
                                             color = editorOverflowColor,
                                             // Painted in the inset the editor already leaves, so the
                                             // thumb never covers a glyph and the row keeps its width.
+                                            // The compact row reserves its trailing space for the
+                                            // dictation and send controls, so only the gap before them
+                                            // is free; without one the helper falls back inside the
+                                            // editor rather than painting over a control.
                                             outerGutterPx =
                                                 interpolateDp(
-                                                    0.dp,
+                                                    compactFreeTrailingGutter,
                                                     ExpandedEditorEndInset,
                                                     editingProgress.value,
                                                 ).toPx(),

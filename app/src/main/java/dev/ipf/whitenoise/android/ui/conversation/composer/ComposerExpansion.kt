@@ -152,32 +152,6 @@ internal fun settleComposerHeight(
     }
 }
 
-/**
- * Settles a new gesture at a prototype endpoint while allowing legacy retained
- * manual heights to restore until the user explicitly resizes that draft.
- * A half-second velocity projection wins at 48dp; otherwise the midpoint wins.
- */
-internal fun settleComposerEndpoint(
-    state: ComposerExpansionState,
-    automaticHeightPx: Float,
-    maximumHeightPx: Float,
-    projectedTravelPx: Float,
-    velocityThresholdPx: Float,
-): ComposerExpansionState {
-    val maximum = normalizedMaximumHeight(maximumHeightPx)
-    val automatic = normalizedMinimumHeight(automaticHeightPx, maximum)
-    val height = composerHeightPx(state, automatic, automatic, maximum)
-    val progress = if (maximum > automatic) (height - automatic) / (maximum - automatic) else 0f
-    val expand =
-        when {
-            maximum <= automatic -> false
-            projectedTravelPx <= -velocityThresholdPx -> true
-            projectedTravelPx >= velocityThresholdPx -> false
-            else -> progress >= 0.5f
-        }
-    return if (expand) ComposerExpansionState(ComposerExpansionMode.FullScreen) else ComposerExpansionState()
-}
-
 /** The accessible tap path always toggles between the current height and full screen. */
 internal fun toggleComposerFullScreen(state: ComposerExpansionState): ComposerExpansionState =
     if (state.mode == ComposerExpansionMode.FullScreen) {
