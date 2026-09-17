@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.BlockedUserFfi
 import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -35,6 +36,23 @@ class BlockListMirrorTest {
         Dispatchers.resetMain()
     }
 
+    /**
+     * Waits for a stopped receive job to finish while the test main dispatcher is still installed. The
+     * loop's IO steps resume onto Main; a resume that lands after `resetMain()` is an uncaught exception
+     * on a worker thread, which fails the next `runTest` anywhere in the JVM.
+     */
+    private fun Job?.drain() {
+        val job = this ?: return
+        runBlocking {
+            withTimeout(5_000) {
+                while (!job.isCompleted) {
+                    mainDispatcher.scheduler.advanceUntilIdle()
+                    delay(5)
+                }
+            }
+        }
+    }
+
     /** The initial snapshot answers membership checks case-insensitively and newer replacements replace the list. */
     @Test
     fun installsSnapshotThenReplacements() =
@@ -52,7 +70,7 @@ class BlockListMirrorTest {
             awaitUntil { mirror.revision == 2uL }
             assertFalse(mirror.isBlocked("aa"))
             assertTrue(mirror.isBlocked("cc"))
-            mirror.stop()
+            mirror.stop().drain()
         }
 
     /** An older revision never replaces a newer one. */
@@ -72,7 +90,7 @@ class BlockListMirrorTest {
             val mirror = BlockListMirror()
             mirror.bind("acct") { first }
             awaitUntil { mirror.revision == 1uL }
-            mirror.stop()
+            mirror.stop().drain()
             assertEquals(null, mirror.accountRef)
             assertTrue(mirror.users.isEmpty())
 
@@ -80,7 +98,7 @@ class BlockListMirrorTest {
             mirror.bind("acct") { second }
             awaitUntil { mirror.revision == 7uL }
             assertTrue(mirror.isBlocked("dd"))
-            mirror.stop()
+            mirror.stop().drain()
         }
 
     private suspend fun awaitUntil(condition: () -> Boolean) {
@@ -110,7 +128,7 @@ class BlockListMirrorTest {
             assertEquals(true, resolveBlockedState(mirror, "acct", "AA", read))
             assertEquals(false, resolveBlockedState(mirror, "acct", "bb", read))
             assertEquals(0, reads)
-            mirror.stop()
+            mirror.stop().drain()
         }
 
     /** Without a bound revision the authoritative read decides. */
